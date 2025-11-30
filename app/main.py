@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson
+from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, cms
 
 # Configure logging
 logging.basicConfig(
@@ -49,10 +49,524 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title="External Data Ingestion Service",
-    description="Multi-source data ingestion service for public data providers",
+    title="Nexdata External Data Ingestion API",
+    description="""
+# 🚀 Welcome to Nexdata External Data Ingestion API
+
+## 🎯 What Is This?
+
+**Nexdata** is a unified REST API that provides programmatic access to **10+ major U.S. public data sources**. Instead of learning different APIs for each data provider, writing custom scraping code, or manually downloading datasets, you can use one consistent interface to ingest, store, and query data from multiple sources—all automatically stored in PostgreSQL with proper schemas.
+
+**Perfect for:**
+- 📊 Data scientists building analytical datasets
+- 💼 Financial analysts tracking economic indicators
+- 🏗️ Researchers combining multiple data sources
+- 🏢 Developers building data-driven applications
+- 📈 Analysts creating dashboards and reports
+
+---
+
+## 📚 Available Data Sources (10+ Sources, 50+ Endpoints)
+
+### 📊 U.S. Census Bureau
+**What:** Demographics, housing, and economic characteristics for every geography in the U.S.
+
+**Available Data:**
+- **ACS 5-Year Survey** (2009-2023): Most detailed demographic data
+- **Population**: Age, sex, race, ethnicity (B01001, B01002, B01003)
+- **Income**: Household income, poverty status, earnings (B19013, B19001, B19301)
+- **Housing**: Occupancy, values, costs, units (B25001, B25003, B25077)
+- **Employment**: Labor force, occupation, commute (B23025, C24010)
+- **Education**: School enrollment, attainment (B14001, B15003)
+
+**Geographic Levels:** Nation, State, County, Census Tract, Block Group, ZIP Code, Metropolitan Area
+
+**Typical Use Cases:**
+- Market research by geography
+- Site selection analysis
+- Demographic profiling
+- Community needs assessment
+
+---
+
+### 💰 Federal Reserve Economic Data (FRED)
+**What:** 800,000+ economic time series from the Federal Reserve Bank of St. Louis
+
+**Available Data:**
+- **National Accounts**: GDP, GNP, personal income, disposable income
+- **Employment**: Unemployment rates, job openings, initial claims, labor force participation
+- **Prices**: CPI, PPI, PCE, inflation rates
+- **Money & Banking**: Interest rates, monetary aggregates, credit conditions
+- **Production**: Industrial production, capacity utilization, manufacturing
+- **International**: Exchange rates, trade balance, foreign transactions
+
+**Frequencies:** Daily, weekly, monthly, quarterly, annual
+
+**Typical Use Cases:**
+- Economic modeling and forecasting
+- Interest rate analysis
+- Inflation tracking
+- Macroeconomic research
+- Investment strategy backtesting
+
+---
+
+### ⚡ Energy Information Administration (EIA)
+**What:** Comprehensive energy statistics for the United States
+
+**Available Data:**
+- **Petroleum**: Crude oil prices (WTI, Brent), gasoline prices, refinery operations
+- **Natural Gas**: Production, consumption, storage, prices by region
+- **Electricity**: Generation by fuel type, retail sales, wholesale prices
+- **Coal**: Production, consumption, exports, stocks
+- **Renewables**: Solar, wind, hydro generation and capacity
+- **Forecasts**: Short-term energy outlook (STEO) projections
+
+**Typical Use Cases:**
+- Energy market analysis
+- Commodity trading strategies
+- Environmental impact studies
+- Energy consumption forecasting
+- Policy analysis
+
+---
+
+### 🏛️ Securities and Exchange Commission (SEC)
+**What:** Corporate financial filings and investment adviser information
+
+**Available Data:**
+- **Company Financials**: Structured data from 10-K and 10-Q filings
+- **Company Facts**: Assets, revenue, earnings, shares outstanding
+- **Form ADV**: Investment adviser registrations and disclosures
+- **Family Offices**: Private wealth management firms and contact information
+- **Real-time Access**: Latest filings from EDGAR database
+
+**Coverage:** 10,000+ public companies, 15,000+ registered investment advisers
+
+**Typical Use Cases:**
+- Financial statement analysis
+- Investment research
+- Due diligence
+- Family office identification
+- Regulatory compliance monitoring
+
+---
+
+### 🌦️ NOAA Weather & Climate
+**What:** Weather observations and historical climate data from NOAA
+
+**Available Data:**
+- **Weather Observations**: Temperature, precipitation, wind, humidity
+- **Climate Normals**: Historical averages and extremes
+- **Severe Weather**: Storms, warnings, alerts
+- **Station Data**: 10,000+ weather stations nationwide
+- **Historical Archive**: Data going back 100+ years
+
+**Typical Use Cases:**
+- Climate change analysis
+- Agriculture planning
+- Risk assessment
+- Travel and logistics optimization
+- Historical trend analysis
+
+---
+
+### 🏠 Real Estate & Housing Data
+**What:** Property values, rental prices, and housing market indicators
+
+**Available Data:**
+- **FHFA House Price Index**: Official U.S. house price trends
+- **HUD Building Permits**: New construction permits nationwide
+- **Redfin Market Data**: Home sales, inventory, prices by market
+- **OpenStreetMap Buildings**: Building footprints and attributes
+- **Time Series**: Historical trends and forecasts
+
+**Geographic Coverage:** National, state, metro, county, ZIP code
+
+**Typical Use Cases:**
+- Real estate investment analysis
+- Market trend analysis
+- Housing affordability studies
+- Property valuation modeling
+- Development planning
+
+---
+
+### 🗺️ Geographic Boundaries (GeoJSON)
+**What:** Geographic boundary files for mapping and spatial analysis
+
+**Available Data:**
+- **State Boundaries**: All 50 states + DC, territories
+- **County Boundaries**: 3,000+ counties
+- **Census Tract Boundaries**: 80,000+ tracts
+- **ZIP Code Boundaries**: 40,000+ ZIP codes
+- **Metro Area Boundaries**: Combined Statistical Areas
+
+**Format:** GeoJSON (easily usable in mapping libraries)
+
+**Typical Use Cases:**
+- Interactive mapping applications
+- Spatial data visualization
+- Geographic analysis
+- Location-based services
+
+---
+
+## 🎯 How to Use This API (3 Simple Steps)
+
+### Step 1️⃣: Start an Ingestion Job
+
+Use **POST /api/v1/jobs** to ingest data from any source. The API is source-agnostic—just specify the source and configuration.
+
+**Example: Ingest Census Population Data**
+```json
+POST /api/v1/jobs
+{
+  "source": "census",
+  "config": {
+    "survey": "acs5",
+    "year": 2023,
+    "table_id": "B01001",
+    "geo_level": "state"
+  }
+}
+```
+
+**Example: Ingest Economic Time Series**
+```json
+POST /api/v1/jobs
+{
+  "source": "fred",
+  "config": {
+    "series_id": "UNRATE",
+    "start_date": "2020-01-01",
+    "end_date": "2024-12-31"
+  }
+}
+```
+
+**Example: Ingest Energy Prices**
+```json
+POST /api/v1/jobs
+{
+  "source": "eia",
+  "config": {
+    "series_id": "PET.RWTC.W",
+    "frequency": "weekly"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "job_id": "123e4567-e89b-12d3-a456-426614174000",
+  "status": "pending",
+  "source": "census",
+  "created_at": "2024-01-15T10:30:00Z"
+}
+```
+
+---
+
+### Step 2️⃣: Monitor Job Progress
+
+Track your ingestion job with **GET /api/v1/jobs/{job_id}**
+
+**Job Lifecycle:**
+```
+pending → running → success (or failed)
+```
+
+**Example Response:**
+```json
+{
+  "job_id": "123e4567-e89b-12d3-a456-426614174000",
+  "status": "success",
+  "source": "census",
+  "rows_affected": 52,
+  "started_at": "2024-01-15T10:30:05Z",
+  "completed_at": "2024-01-15T10:30:45Z",
+  "error_message": null,
+  "config": {...}
+}
+```
+
+**Status Indicators:**
+- ✅ **success**: Data ingested successfully
+- ⚠️ **failed**: Error occurred (see error_message)
+- 🔄 **running**: Ingestion in progress
+- ⏳ **pending**: Job queued, not started yet
+
+---
+
+### Step 3️⃣: Query Your Data
+
+Once ingested, data is stored in PostgreSQL with strongly-typed schemas:
+
+**Option A: Direct SQL Access**
+```sql
+-- Connect to PostgreSQL
+psql -h localhost -U nexdata -d nexdata
+
+-- Query ingested census data
+SELECT * FROM acs5_2023_b01001 WHERE state = '34' LIMIT 10;
+
+-- Query FRED time series
+SELECT * FROM fred_series WHERE series_id = 'UNRATE' ORDER BY date DESC;
+
+-- Query SEC company facts
+SELECT * FROM sec_company_facts WHERE cik = '0000320193';
+```
+
+**Option B: Source-Specific API Endpoints**
+
+Many sources provide query endpoints:
+- **Census**: Browse metadata, search variables
+- **FRED**: Search series, browse categories
+- **SEC**: Query Form ADV firms, get company details
+- **GeoJSON**: Get boundaries, search locations
+
+---
+
+## 🔑 Authentication & API Keys
+
+### Which Sources Need API Keys?
+
+| Source | API Key Required? | How to Get | Time to Get |
+|--------|-------------------|------------|-------------|
+| **Census** | Recommended (higher limits) | [Get Key](https://api.census.gov/data/key_signup.html) | 1 min |
+| **FRED** | ✅ Required | [Get Key](https://fred.stlouisfed.org/docs/api/api_key.html) | 2 min |
+| **EIA** | ✅ Required | [Get Key](https://www.eia.gov/opendata/register.php) | 2 min |
+| **NOAA** | Optional (per-request) | [Get Token](https://www.ncdc.noaa.gov/cdo-web/token) | 2 min |
+| **SEC** | ❌ Not required | N/A | - |
+
+### How to Configure API Keys
+
+Set environment variables in your `.env` file:
+```bash
+CENSUS_SURVEY_API_KEY=your_census_key_here
+FRED_API_KEY=your_fred_key_here
+EIA_API_KEY=your_eia_key_here
+
+# Optional: Configure rate limits
+MAX_CONCURRENCY=5
+MAX_REQUESTS_PER_SECOND=10
+```
+
+**All API keys are free** and take 1-2 minutes to obtain. You only need keys for sources you plan to use.
+
+---
+
+## 💡 Common Use Cases & Examples
+
+### Use Case 1: Economic Dashboard
+**Goal:** Track unemployment, GDP, and inflation
+
+1. Ingest FRED series: UNRATE, GDP, CPIAUCSL
+2. Query time series data
+3. Build dashboard with real-time updates
+
+### Use Case 2: Market Research
+**Goal:** Analyze demographics for site selection
+
+1. Ingest Census ACS data for target counties
+2. Pull income, population, education tables
+3. Join with geographic boundaries for mapping
+
+### Use Case 3: Investment Research
+**Goal:** Analyze SEC filings for portfolio companies
+
+1. Ingest company financials via SEC endpoints
+2. Track quarterly earnings and balance sheets
+3. Monitor Form ADV filings for institutional investors
+
+### Use Case 4: Energy Trading
+**Goal:** Track crude oil and natural gas prices
+
+1. Ingest EIA petroleum and natural gas series
+2. Get daily/weekly price updates
+3. Combine with FRED economic indicators
+
+### Use Case 5: Housing Market Analysis
+**Goal:** Track home prices and construction
+
+1. Ingest FHFA House Price Index
+2. Pull HUD building permits
+3. Combine with Census demographic data
+
+---
+
+## 🛠️ Technical Architecture
+
+### Tech Stack
+- **FastAPI**: Modern, fast Python web framework with automatic API documentation
+- **PostgreSQL**: Robust relational database for structured data storage
+- **SQLAlchemy**: Python ORM for database operations
+- **httpx**: Async HTTP client with connection pooling and retry logic
+- **Docker**: Containerized PostgreSQL for easy setup
+- **Pydantic**: Data validation and serialization
+
+### Design Principles
+
+✅ **Plugin Architecture**: Each data source is self-contained and independently maintained
+
+✅ **Job Tracking**: Every ingestion is tracked with status, timing, and row counts
+
+✅ **Type Safety**: Strongly-typed database columns (no JSON blobs for data)
+
+✅ **Rate Limiting**: Built-in respect for API rate limits with configurable concurrency
+
+✅ **Error Handling**: Exponential backoff with jitter, graceful failure handling
+
+✅ **Idempotency**: Safe to re-run ingestions without duplicating data
+
+✅ **SQL Safety**: All queries use parameterization (no SQL injection risk)
+
+### Data Storage
+
+**Core Tables:**
+- `ingestion_jobs`: Tracks all ingestion runs (status, errors, timing)
+- `dataset_registry`: Metadata about available datasets
+
+**Source-Specific Tables:**
+- `acs5_2023_b01001`: Census ACS 5-year table B01001, year 2023
+- `fred_series`: FRED economic time series observations
+- `eia_petroleum_prices`: EIA petroleum price data
+- `sec_company_facts`: SEC company financial facts
+- And more...
+
+---
+
+## 📖 Documentation & Resources
+
+### Interactive Documentation
+- **This Page (Swagger UI)**: Interactive API testing and exploration
+- **ReDoc**: [/redoc](/redoc) - Clean, readable documentation
+- **OpenAPI Schema**: [/openapi.json](/openapi.json) - Machine-readable spec
+
+### Getting Started
+- **GitHub Repository**: [View on GitHub](https://github.com/yourusername/nexdata)
+- **README**: Quick start guide and setup instructions
+- **Health Check**: [/health](/health) - Check service status
+
+### Import to Tools
+- **Postman**: Import `/openapi.json` for full collection
+- **Insomnia**: Import OpenAPI spec for all endpoints
+- **Code Generation**: Use spec to generate client libraries (Python, TypeScript, Java, etc.)
+
+---
+
+## 🚦 Rate Limits & Best Practices
+
+### Default Rate Limits
+- **Max Concurrency**: 5 simultaneous requests
+- **Requests Per Second**: 10 across all concurrent requests
+- **Configurable**: Adjust via environment variables
+
+### Best Practices
+
+✅ **Start Small**: Test with small datasets before large ingestions
+
+✅ **Monitor Jobs**: Always check job status before assuming success
+
+✅ **Respect Limits**: Don't exceed provider rate limits
+
+✅ **Handle Errors**: Jobs can fail—check error messages and retry
+
+✅ **Use Batch Endpoints**: For multiple tables/series, use batch ingestion endpoints
+
+✅ **Cache Results**: Store ingested data locally, don't re-ingest unnecessarily
+
+---
+
+## 🎉 Ready to Get Started?
+
+### Try Your First Request
+
+1. **Check Health**: GET `/health` - Verify service is running
+2. **List Jobs**: GET `/api/v1/jobs` - See existing ingestion jobs
+3. **Start Ingestion**: POST `/api/v1/jobs` - Ingest your first dataset
+4. **Monitor Progress**: GET `/api/v1/jobs/{job_id}` - Track job status
+5. **Query Data**: Connect to PostgreSQL or use query endpoints
+
+### Explore Data Sources
+
+Browse the endpoint sections below to see what's available:
+- 📊 **census** - Demographics and housing
+- 💰 **fred** - Economic indicators
+- ⚡ **eia** - Energy data
+- 🏛️ **sec** - Company financials
+- 🌦️ **noaa** - Weather data
+- 🏠 **realestate** - Housing market data
+
+**👇 Scroll down to explore all endpoints organized by data source!**
+
+---
+
+**Questions or Issues?** Check the [GitHub repository](https://github.com/yourusername/nexdata) or open an issue.
+
+**Built with ❤️ for the data community**
+    """,
     version="0.1.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    contact={
+        "name": "Nexdata External Data Ingestion",
+        "url": "https://github.com/yourusername/nexdata"
+    },
+    license_info={
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT"
+    },
+    openapi_tags=[
+        {
+            "name": "Root",
+            "description": "Service information and health checks"
+        },
+        {
+            "name": "jobs",
+            "description": "⚙️ **Ingestion Job Management** - Start, monitor, and track data ingestion jobs"
+        },
+        {
+            "name": "census",
+            "description": "📊 **U.S. Census Bureau** - Demographics, housing, and economic data"
+        },
+        {
+            "name": "fred",
+            "description": "💰 **Federal Reserve Economic Data** - 800K+ economic time series"
+        },
+        {
+            "name": "eia",
+            "description": "⚡ **Energy Information Administration** - Energy production, prices, and consumption"
+        },
+        {
+            "name": "sec",
+            "description": "🏛️ **Securities and Exchange Commission** - Company financials and Form ADV data"
+        },
+        {
+            "name": "noaa",
+            "description": "🌦️ **NOAA Weather & Climate** - Weather observations and historical climate data"
+        },
+        {
+            "name": "realestate",
+            "description": "🏠 **Real Estate Data** - Zillow home values and rental market data"
+        },
+        {
+            "name": "geojson",
+            "description": "🗺️ **Geographic Boundaries** - GeoJSON boundaries for mapping"
+        },
+        {
+            "name": "family_offices",
+            "description": "💼 **Family Offices** - Investment adviser and family office tracking"
+        },
+        {
+            "name": "cms",
+            "description": "🏥 **CMS / HHS Healthcare Data** - Medicare utilization, hospital costs, and drug pricing"
+        }
+    ]
 )
 
 # CORS middleware (configure as needed)
@@ -74,16 +588,33 @@ app.include_router(fred.router, prefix="/api/v1")
 app.include_router(eia.router, prefix="/api/v1")
 app.include_router(sec.router, prefix="/api/v1")
 app.include_router(realestate.router, prefix="/api/v1")
+app.include_router(family_offices.router, prefix="/api/v1")
+app.include_router(cms.router, prefix="/api/v1")
 
 
-@app.get("/")
+@app.get("/", tags=["Root"])
 def root():
-    """Root endpoint with service info."""
+    """
+    Service information and quick links.
+    
+    Use this endpoint to verify the service is running and get links to documentation.
+    """
     return {
         "service": "External Data Ingestion Service",
         "version": "0.1.0",
-        "sources": ["census", "fred", "eia", "sec", "realestate"],  # Update as sources are added
-        "docs": "/docs"
+        "status": "running",
+        "sources": ["census", "fred", "eia", "sec", "realestate", "noaa", "cms"],
+        "documentation": {
+            "swagger_ui": "/docs",
+            "redoc": "/redoc",
+            "openapi_schema": "/openapi.json"
+        },
+        "featured_endpoints": {
+            "form_adv_query": "/api/v1/sec/form-adv/firms",
+            "form_adv_ingest": "/api/v1/sec/form-adv/ingest/family-offices",
+            "job_status": "/api/v1/jobs/{job_id}",
+            "health_check": "/health"
+        }
     }
 
 

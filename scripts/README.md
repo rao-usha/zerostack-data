@@ -169,6 +169,26 @@ Scripts for triggering ingestion jobs:
 - `api_ingest_200.py` - API-based ingestion for 200 companies
 - `sec_companies_200.py` - SEC companies list processing
 
+## 🏛️ Family Office / Form ADV Scripts
+
+**Location:** `/scripts/family_office/`
+
+Specialized scripts for SEC Form ADV ingestion (family offices and investment advisers).
+
+**Key Scripts:**
+- `ingest_family_offices.ps1` - PowerShell batch ingestion
+- `ingest_family_offices.sh` - Bash batch ingestion
+- `ingest_all_family_offices.py` - Python comprehensive ingestion
+- `monitor_ingestion.ps1` - Monitor ingestion progress
+
+**Quick Start:**
+```powershell
+cd scripts/family_office
+powershell -ExecutionPolicy Bypass -File .\ingest_family_offices.ps1
+```
+
+**Documentation:** See `/scripts/family_office/README.md` for complete details
+
 ## 🧪 Sample Data & Testing
 
 - `load_lp_sample_data.py` - Load LP strategies sample data

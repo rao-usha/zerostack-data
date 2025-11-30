@@ -16,7 +16,14 @@ from app.sources.sec import ingest, metadata, ingest_xbrl, formadv_ingest
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/sec", tags=["SEC EDGAR"])
+router = APIRouter(
+    prefix="/sec", 
+    tags=["SEC EDGAR"],
+    responses={
+        404: {"description": "Not found"},
+        500: {"description": "Internal server error"}
+    }
+)
 
 
 # =============================================================================
@@ -510,8 +517,9 @@ async def _run_company_ingestion(
     
     This function is called by FastAPI's background tasks system.
     """
-    from app.core.database import SessionLocal
+    from app.core.database import get_session_factory
     
+    SessionLocal = get_session_factory()
     db = SessionLocal()
     
     try:
@@ -538,8 +546,9 @@ async def _run_financial_data_ingestion(
     
     This function is called by FastAPI's background tasks system.
     """
-    from app.core.database import SessionLocal
+    from app.core.database import get_session_factory
     
+    SessionLocal = get_session_factory()
     db = SessionLocal()
     
     try:
@@ -559,14 +568,14 @@ async def _run_financial_data_ingestion(
 # =============================================================================
 
 
-@router.post("/form-adv/ingest/family-offices", response_model=IngestResponse)
+@router.post("/form-adv/ingest/family-offices", response_model=IngestResponse, tags=["Form ADV - Ingestion"])
 async def ingest_form_adv_family_offices(
     request: IngestFormADVRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """
-    Ingest SEC Form ADV data for family offices.
+    🏛️ Ingest SEC Form ADV data for family offices.
     
     This endpoint:
     1. Searches IAPD (Investment Adviser Public Disclosure) for each firm
@@ -651,14 +660,14 @@ async def ingest_form_adv_family_offices(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/form-adv/ingest/crd", response_model=IngestResponse)
+@router.post("/form-adv/ingest/crd", response_model=IngestResponse, tags=["Form ADV - Ingestion"])
 async def ingest_form_adv_by_crd(
     request: IngestFormADVByCRDRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """
-    Ingest SEC Form ADV data for a specific firm by CRD number.
+    🏛️ Ingest SEC Form ADV data for a specific firm by CRD number.
     
     Use this endpoint when you already know the CRD number for a firm.
     CRD numbers can be found via the IAPD website or previous searches.
@@ -723,8 +732,9 @@ async def _run_formadv_ingestion(
     """
     Background task for running Form ADV ingestion for family offices.
     """
-    from app.core.database import SessionLocal
+    from app.core.database import get_session_factory
     
+    SessionLocal = get_session_factory()
     db = SessionLocal()
     
     try:
@@ -748,8 +758,9 @@ async def _run_formadv_crd_ingestion(
     """
     Background task for running Form ADV ingestion by CRD number.
     """
-    from app.core.database import SessionLocal
+    from app.core.database import get_session_factory
     
+    SessionLocal = get_session_factory()
     db = SessionLocal()
     
     try:
@@ -762,4 +773,329 @@ async def _run_formadv_crd_ingestion(
         logger.error(f"Background Form ADV CRD ingestion failed for job {job_id}: {e}", exc_info=True)
     finally:
         db.close()
+
+
+# =============================================================================
+# Form ADV Query Endpoints
+# =============================================================================
+
+
+@router.get("/form-adv/firms", tags=["Form ADV - Query"])
+async def query_form_adv_firms(
+    limit: int = 100,
+    offset: int = 0,
+    family_office_only: bool = False,
+    state: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    📊 Query Form ADV firms from the database.
+    
+    Returns business contact information for registered investment advisers.
+    
+    **Parameters:**
+    - `limit`: Maximum number of results (default: 100, max: 1000)
+    - `offset`: Pagination offset (default: 0)
+    - `family_office_only`: Filter to only family offices (default: false)
+    - `state`: Filter by state (e.g., "NY", "CA")
+    
+    **Example:**
+    ```
+    GET /api/v1/sec/form-adv/firms?limit=50&family_office_only=true&state=NY
+    ```
+    """
+    try:
+        from sqlalchemy import text
+        
+        # Validate limit
+        limit = min(limit, 1000)
+        
+        # Build query
+        query = """
+            SELECT 
+                crd_number,
+                sec_number,
+                firm_name,
+                legal_name,
+                business_address_street1,
+                business_address_city,
+                business_address_state,
+                business_address_zip,
+                business_phone,
+                business_email,
+                website,
+                assets_under_management,
+                is_family_office,
+                registration_status,
+                registration_date,
+                ingested_at
+            FROM sec_form_adv
+            WHERE 1=1
+        """
+        
+        params = {}
+        
+        if family_office_only:
+            query += " AND is_family_office = :family_office"
+            params["family_office"] = True
+        
+        if state:
+            query += " AND business_address_state = :state"
+            params["state"] = state.upper()
+        
+        query += """
+            ORDER BY assets_under_management DESC NULLS LAST
+            LIMIT :limit OFFSET :offset
+        """
+        params["limit"] = limit
+        params["offset"] = offset
+        
+        result = db.execute(text(query), params)
+        rows = result.fetchall()
+        
+        # Convert to dict
+        firms = []
+        for row in rows:
+            firms.append({
+                "crd_number": row[0],
+                "sec_number": row[1],
+                "firm_name": row[2],
+                "legal_name": row[3],
+                "business_address": {
+                    "street": row[4],
+                    "city": row[5],
+                    "state": row[6],
+                    "zip": row[7]
+                },
+                "contact": {
+                    "phone": row[8],
+                    "email": row[9],
+                    "website": row[10]
+                },
+                "assets_under_management": float(row[11]) if row[11] else None,
+                "is_family_office": row[12],
+                "registration_status": row[13],
+                "registration_date": row[14].isoformat() if row[14] else None,
+                "ingested_at": row[15].isoformat() if row[15] else None
+            })
+        
+        return {
+            "count": len(firms),
+            "limit": limit,
+            "offset": offset,
+            "firms": firms
+        }
+    
+    except Exception as e:
+        logger.error(f"Error querying Form ADV firms: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/form-adv/firms/{crd_number}", tags=["Form ADV - Query"])
+async def get_form_adv_firm(
+    crd_number: str,
+    db: Session = Depends(get_db)
+):
+    """
+    📋 Get detailed information for a specific firm by CRD number.
+    
+    Includes personnel information if available.
+    
+    **Example:**
+    ```
+    GET /api/v1/sec/form-adv/firms/158626
+    ```
+    """
+    try:
+        from sqlalchemy import text
+        
+        # Query firm
+        firm_query = text("""
+            SELECT 
+                crd_number,
+                sec_number,
+                firm_name,
+                legal_name,
+                doing_business_as,
+                business_address_street1,
+                business_address_street2,
+                business_address_city,
+                business_address_state,
+                business_address_zip,
+                business_address_country,
+                business_phone,
+                business_fax,
+                business_email,
+                website,
+                mailing_address_street1,
+                mailing_address_city,
+                mailing_address_state,
+                mailing_address_zip,
+                registration_status,
+                registration_date,
+                state_registrations,
+                assets_under_management,
+                aum_date,
+                total_client_count,
+                is_family_office,
+                form_adv_url,
+                filing_date,
+                last_amended_date,
+                ingested_at
+            FROM sec_form_adv
+            WHERE crd_number = :crd_number
+        """)
+        
+        result = db.execute(firm_query, {"crd_number": crd_number})
+        row = result.fetchone()
+        
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Firm with CRD {crd_number} not found")
+        
+        # Query personnel
+        personnel_query = text("""
+            SELECT 
+                full_name,
+                title,
+                position_type,
+                email,
+                phone
+            FROM sec_form_adv_personnel
+            WHERE crd_number = :crd_number
+            ORDER BY full_name
+        """)
+        
+        personnel_result = db.execute(personnel_query, {"crd_number": crd_number})
+        personnel_rows = personnel_result.fetchall()
+        
+        personnel = []
+        for p_row in personnel_rows:
+            personnel.append({
+                "name": p_row[0],
+                "title": p_row[1],
+                "position_type": p_row[2],
+                "email": p_row[3],
+                "phone": p_row[4]
+            })
+        
+        # Build response
+        firm = {
+            "crd_number": row[0],
+            "sec_number": row[1],
+            "firm_name": row[2],
+            "legal_name": row[3],
+            "doing_business_as": row[4],
+            "business_address": {
+                "street1": row[5],
+                "street2": row[6],
+                "city": row[7],
+                "state": row[8],
+                "zip": row[9],
+                "country": row[10]
+            },
+            "contact": {
+                "phone": row[11],
+                "fax": row[12],
+                "email": row[13],
+                "website": row[14]
+            },
+            "mailing_address": {
+                "street": row[15],
+                "city": row[16],
+                "state": row[17],
+                "zip": row[18]
+            },
+            "registration": {
+                "status": row[19],
+                "date": row[20].isoformat() if row[20] else None,
+                "states": row[21] if row[21] else []
+            },
+            "assets_under_management": {
+                "amount": float(row[22]) if row[22] else None,
+                "date": row[23].isoformat() if row[23] else None
+            },
+            "client_count": row[24],
+            "is_family_office": row[25],
+            "form_adv": {
+                "url": row[26],
+                "filing_date": row[27].isoformat() if row[27] else None,
+                "last_amended": row[28].isoformat() if row[28] else None
+            },
+            "personnel": personnel,
+            "metadata": {
+                "ingested_at": row[29].isoformat() if row[29] else None
+            }
+        }
+        
+        return firm
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching Form ADV firm {crd_number}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/form-adv/stats", tags=["Form ADV - Query"])
+async def get_form_adv_stats(db: Session = Depends(get_db)):
+    """
+    📈 Get statistics about ingested Form ADV data.
+    
+    Returns counts by various dimensions.
+    
+    **Example:**
+    ```
+    GET /api/v1/sec/form-adv/stats
+    ```
+    """
+    try:
+        from sqlalchemy import text
+        
+        stats_query = text("""
+            SELECT 
+                COUNT(*) as total_firms,
+                COUNT(CASE WHEN is_family_office = true THEN 1 END) as family_offices,
+                COUNT(DISTINCT business_address_state) as states_represented,
+                SUM(assets_under_management) as total_aum,
+                AVG(assets_under_management) as avg_aum,
+                MAX(assets_under_management) as max_aum,
+                COUNT(business_email) as firms_with_email,
+                COUNT(business_phone) as firms_with_phone,
+                COUNT(website) as firms_with_website
+            FROM sec_form_adv
+        """)
+        
+        result = db.execute(stats_query)
+        row = result.fetchone()
+        
+        personnel_query = text("""
+            SELECT COUNT(*) FROM sec_form_adv_personnel
+        """)
+        personnel_result = db.execute(personnel_query)
+        personnel_count = personnel_result.scalar()
+        
+        return {
+            "firms": {
+                "total": row[0],
+                "family_offices": row[1],
+                "states_represented": row[2]
+            },
+            "assets_under_management": {
+                "total": float(row[3]) if row[3] else 0,
+                "average": float(row[4]) if row[4] else 0,
+                "maximum": float(row[5]) if row[5] else 0
+            },
+            "contact_info_availability": {
+                "email": row[6],
+                "phone": row[7],
+                "website": row[8]
+            },
+            "personnel": {
+                "total_records": personnel_count
+            }
+        }
+    
+    except Exception as e:
+        logger.error(f"Error fetching Form ADV stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 

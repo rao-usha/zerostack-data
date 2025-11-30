@@ -86,15 +86,15 @@ def generate_create_table_sql() -> str:
             
             -- Processing metadata
             ingested_at TIMESTAMP DEFAULT NOW(),
-            last_updated_at TIMESTAMP DEFAULT NOW(),
-            
-            -- Indexes for efficient queries
-            INDEX idx_formadv_crd (crd_number),
-            INDEX idx_formadv_sec_number (sec_number),
-            INDEX idx_formadv_firm_name (firm_name),
-            INDEX idx_formadv_state (business_address_state),
-            INDEX idx_formadv_family_office (is_family_office)
+            last_updated_at TIMESTAMP DEFAULT NOW()
         );
+        
+        -- Create indexes for efficient queries
+        CREATE INDEX IF NOT EXISTS idx_formadv_crd ON sec_form_adv(crd_number);
+        CREATE INDEX IF NOT EXISTS idx_formadv_sec_number ON sec_form_adv(sec_number);
+        CREATE INDEX IF NOT EXISTS idx_formadv_firm_name ON sec_form_adv(firm_name);
+        CREATE INDEX IF NOT EXISTS idx_formadv_state ON sec_form_adv(business_address_state);
+        CREATE INDEX IF NOT EXISTS idx_formadv_family_office ON sec_form_adv(is_family_office);
     """
 
 
@@ -135,13 +135,13 @@ def generate_personnel_table_sql() -> str:
             ingested_at TIMESTAMP DEFAULT NOW(),
             
             -- Foreign key constraint
-            FOREIGN KEY (crd_number) REFERENCES sec_form_adv(crd_number),
-            
-            -- Indexes
-            INDEX idx_formadv_personnel_crd (crd_number),
-            INDEX idx_formadv_personnel_individual_crd (individual_crd_number),
-            INDEX idx_formadv_personnel_name (last_name, first_name)
+            FOREIGN KEY (crd_number) REFERENCES sec_form_adv(crd_number) ON DELETE CASCADE
         );
+        
+        -- Create indexes
+        CREATE INDEX IF NOT EXISTS idx_formadv_personnel_crd ON sec_form_adv_personnel(crd_number);
+        CREATE INDEX IF NOT EXISTS idx_formadv_personnel_individual_crd ON sec_form_adv_personnel(individual_crd_number);
+        CREATE INDEX IF NOT EXISTS idx_formadv_personnel_name ON sec_form_adv_personnel(last_name, first_name);
     """
 
 
