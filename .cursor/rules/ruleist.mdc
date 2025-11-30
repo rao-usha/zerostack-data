@@ -1,0 +1,271 @@
+---
+alwaysApply: true
+---
+
+# External Data Ingestion Service - AI Agent Rules
+
+You are working on an External Data Ingestion Service that ingests data from multiple public data providers into PostgreSQL via a FastAPI HTTP API.
+
+## PROJECT CONTEXT
+
+This is a **multi-source ingestion service** designed to ingest from many public data providers:
+- **Current source:** "census" (ACS 5-year)
+- **Future sources:** "bls", "bea", "fred", "sec", etc. (ONLY when user explicitly requests)
+
+**Tech Stack:** FastAPI + PostgreSQL + Docker + SQLAlchemy + httpx
+
+## CRITICAL: SCOPE & SOURCE CONTROL
+
+### Explicitly Declared Sources Only
+- **ONLY** ingest from sources that are explicitly declared and configured in the codebase
+- Current approved source: **"census"** (ACS 5-year)
+- **NEVER** add new data sources without explicit user request
+- If a source is not listed or explicitly requested, treat it as **OUT OF SCOPE**
+
+### Official APIs Only
+- Only call official, documented APIs or well-defined bulk-download endpoints
+- **NEVER** scrape arbitrary websites
+- **NEVER** access content behind paywalls or requiring login
+- **NEVER** use proprietary or paid APIs unless user explicitly configures them
+
+### Service-First Architecture
+- All ingestion **MUST** go through the service's HTTP API and ingestion functions
+- No random one-off scripts unless user explicitly requests them
+
+## DATA SAFETY & COMPLIANCE
+
+### Licensing Requirements
+Only use data that is:
+- Public domain
+- Openly licensed for reuse
+- Explicitly confirmed as licensed for our use
+
+### PII Protection (CRITICAL)
+**NEVER:**
+- Collect, store, or infer PII beyond what the source explicitly provides
+- Attempt to de-anonymize any dataset
+- Join datasets in ways that increase re-identification risk at individual level
+
+### When in Doubt
+- Treat questionable datasets as **RESTRICTED**
+- **DO NOT** ingest them
+- Leave a clear comment or TODO instead
+
+## NETWORK & RATE LIMITS
+
+### Rate Limit Compliance
+- **ALWAYS** obey documented rate limits for each source
+- Use environment variables: `MAX_CONCURRENCY`, `MAX_REQUESTS_PER_SECOND`
+- Default to **conservative values**
+
+### Bounded Concurrency (MANDATORY)
+- **NEVER** design code with unbounded parallel requests
+- **ALWAYS** use bounded concurrency: semaphores, worker pools, limited async tasks
+- Use `asyncio.Semaphore` or similar mechanisms
+
+### Error Handling
+When sources return errors or rate-limit responses:
+- Respect `Retry-After` headers when available
+- Implement exponential backoff with jitter
+- Fail jobs gracefully with clear errors in `ingestion_jobs` table
+
+## DATABASE & SCHEMA RULES
+
+### Write Control
+- All writes **MUST** go through well-defined ingestion functions
+- **NO** arbitrary ad-hoc DDL/DML outside migrations or ingestion steps
+
+### Schema Changes
+Schema changes **MUST** be:
+- Explicit and deterministic
+- Idempotent (safe to run multiple times)
+- Implemented via separated "create/migrate_table" logic or migration scripts
+
+### Source-Specific Tables
+For tables like `acs5_2023_b01001`:
+- Derive columns from official metadata
+- Use **typed columns** (INT, NUMERIC, TEXT, etc.)
+- **NEVER** use raw JSON blobs as the final data form
+- Avoid silent schema drift
+- **NEVER** drop or rename columns without explicit change request
+
+### Destructive Operations
+- **NEVER** automatically drop tables, truncate tables, or delete large amounts of data
+- Destructive operations require **explicit user intent** and clear documentation
+
+### SQL Safety
+- **ALWAYS** parameterize queries
+- **NEVER** build SQL by string concatenation with untrusted input
+
+## JOB CONTROL & OBSERVABILITY
+
+### Job Tracking (MANDATORY)
+- Every ingestion run **MUST** have a corresponding `ingestion_jobs` record
+- **NEVER** run ingestion "fire and forget"
+
+### Job States
+Use **ONLY** these states:
+- `pending`
+- `running`
+- `success`
+- `failed`
+
+### Job Completion
+On job completion:
+- Record row counts where practical
+- Record error messages in structured way when jobs fail
+
+### Deterministic Behavior
+- Given same source, config, and code version, jobs should behave identically
+- Behavior must be deterministic and inspectable
+
+## EXTENSIBILITY & PLUGIN PATTERN
+
+### Source Module Structure
+Each data source **MUST**:
+- Live in its own module: `/sources/{source_name}/`
+- Example: `/sources/census/`, `/sources/bls/`, `/sources/bea/`
+
+### Source Adapter Isolation
+All source-specific logic stays in its adapter:
+- API URLs
+- Authentication
+- Schema mapping
+- Ingestion routines
+
+### Core Service Neutrality
+The core service (`main.py` + `core/*`) **MUST NOT**:
+- Contain hard-coded assumptions about a single source
+- It routes based on "source" name and calls appropriate adapter
+
+### Adding New Sources
+To add a new source:
+1. Create module under `app/sources/{source_name}/`
+2. Implement adapter with clear config contract
+3. Use `dataset_registry` and `ingestion_jobs` consistently
+4. Register adapter in core service
+
+## AGENT BEHAVIOR & DEPENDENCIES
+
+### Prohibited Actions
+**DO NOT:**
+- Install extra system packages or change OS-level config unless explicitly asked
+- Introduce new external services or dependencies without clear reason
+- Add new data sources without explicit user request
+
+### Design Preferences
+**PREFER:**
+- Simple, explicit designs over clever architectures
+- Stable, well-known libraries: FastAPI, SQLAlchemy, httpx/requests, psycopg2
+
+### Communication
+Clearly separate:
+- "Implement this now" vs "Future improvement / TODO"
+- Current requirements vs optional enhancements
+
+### Conflict Resolution
+If requirements conflict, prioritize:
+1. **Safety and data compliance**
+2. **Deterministic, debuggable behavior**
+3. **Performance and convenience**
+
+## CODE STRUCTURE REQUIREMENTS
+
+### Directory Structure
+```
+app/
+├── main.py              # FastAPI app, source-agnostic
+├── core/                # Core logic, no source-specific code
+│   ├── config.py
+│   ├── database.py
+│   ├── models.py
+│   ├── schemas.py
+│   └── ingestion.py
+├── sources/             # Source adapters
+│   ├── census/          # Census adapter
+│   │   ├── adapter.py
+│   │   ├── api.py
+│   │   └── schemas.py
+│   └── [future sources]
+└── api/                 # API routes
+    └── v1/
+        └── jobs.py
+```
+
+### Database Tables
+**Core tables (required):**
+- `ingestion_jobs` - Tracks all ingestion runs
+- `dataset_registry` - Metadata about datasets
+
+**Source-specific tables:**
+- Named like: `{dataset}_{year}_{table}` (e.g., `acs5_2023_b01001`)
+
+## TESTING & VALIDATION
+
+### Before Committing Code
+Ensure:
+- Configuration validation works
+- Rate limits are respected and configurable
+- Error handling with exponential backoff implemented
+- Tables created with proper typed schema
+- Data insertion uses parameterized queries
+- Dataset registered in `dataset_registry`
+- Job tracking updates status correctly
+- All rules in this file are followed
+
+## COMMON PITFALLS TO AVOID
+
+1. ❌ Unbounded concurrency → ✅ Use semaphores/rate limiters
+2. ❌ Missing error handling → ✅ Implement retry with backoff
+3. ❌ SQL string concatenation → ✅ Use parameterized queries
+4. ❌ Missing job tracking → ✅ Always update job status
+5. ❌ JSON storage for data → ✅ Use typed columns
+6. ❌ Adding sources proactively → ✅ Wait for explicit user request
+7. ❌ Hardcoding source logic in core → ✅ Use plugin pattern
+8. ❌ Scraping websites → ✅ Use official APIs only
+
+## WHEN USER ASKS TO "SET THINGS UP"
+
+1. First, ensure all rules above are understood
+2. Create `RULES.md` documenting these rules
+3. Implement multi-source architecture (source-agnostic core)
+4. Implement "census" adapter as first concrete source
+5. Use FastAPI + Postgres + Docker as specified
+6. Follow all rules throughout implementation
+
+## PRIORITY MATRIX
+
+When making decisions, use this priority order:
+
+**P0 - Critical (Never Violate):**
+- Data safety and licensing compliance
+- PII protection
+- SQL injection prevention
+- Bounded concurrency
+- Job tracking for all ingestion runs
+
+**P1 - High Priority:**
+- Rate limit compliance
+- Deterministic behavior
+- Plugin pattern adherence
+- Typed database schemas
+
+**P2 - Important:**
+- Error handling with retries
+- Idempotent operations
+- Clear documentation
+- Performance optimization
+
+## RESPONSE STYLE
+
+When responding to user requests:
+- Confirm understanding of applicable rules
+- Explain which rules guide your approach
+- Flag any potential rule violations
+- Suggest alternatives if request conflicts with rules
+- Be explicit about what you're implementing vs suggesting for later
+
+## REMEMBER
+
+This service is designed for **extensibility**. Every architectural decision should support adding new sources cleanly without refactoring core logic. The user controls which sources are added and when.
+

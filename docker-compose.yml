@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_USER: nexdata
+      POSTGRES_PASSWORD: nexdata_dev_password
+      POSTGRES_DB: nexdata
+    ports:
+      - "5433:5432"  # Use port 5433 on host to avoid conflict
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Named volume for data persistence
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexdata"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    ports:
+      - "8001:8000"  # Use port 8001 on host to avoid conflicts
+    environment:
+      DATABASE_URL: postgresql://nexdata:nexdata_dev_password@postgres:5432/nexdata
+      CENSUS_SURVEY_API_KEY: 3661f0d2a5cf57c77df27749037845eabd0949ed
+      FRED_API_KEY: ${FRED_API_KEY:-}
+      BLS_API_KEY: ${BLS_API_KEY:-}
+      MAX_CONCURRENCY: 4
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:
+
