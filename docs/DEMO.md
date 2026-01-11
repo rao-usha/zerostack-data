@@ -77,27 +77,27 @@ Ingests only the first dataset from each source.
 ## 🔍 Viewing the Results
 
 ### 1. API Documentation
-Visit: http://localhost:8000/docs
+Visit: http://localhost:8001/docs
 
 Interactive Swagger UI with all endpoints.
 
 ### 2. Health Check
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 ```
 
 Shows service and database status.
 
 ### 3. List All Jobs
 ```bash
-curl http://localhost:8000/api/v1/jobs
+curl http://localhost:8001/api/v1/jobs
 ```
 
-Or visit: http://localhost:8000/api/v1/jobs
+Or visit: http://localhost:8001/api/v1/jobs
 
 ### 4. Get Specific Job
 ```bash
-curl http://localhost:8000/api/v1/jobs/{job_id}
+curl http://localhost:8001/api/v1/jobs/{job_id}
 ```
 
 Shows status, rows ingested, errors, etc.
@@ -106,7 +106,7 @@ Shows status, rows ingested, errors, etc.
 
 Example - Get FRED GDP data:
 ```bash
-curl http://localhost:8000/api/v1/fred/series/GDP/observations
+curl http://localhost:8001/api/v1/fred/series/GDP/observations
 ```
 
 Example - Get Census population:
@@ -143,7 +143,7 @@ python scripts/quick_demo.py
 "In 30 seconds, we just ingested GDP, unemployment, and census data. The system handled API calls, rate limiting, and database insertion automatically."
 
 ### Show API Docs (2 minutes)
-1. Open http://localhost:8000/docs
+1. Open http://localhost:8001/docs
 2. Expand `/api/v1/jobs` endpoint
 3. Show example request
 4. Execute a live request
@@ -189,7 +189,7 @@ SELECT * FROM fred_gdp ORDER BY date DESC LIMIT 10;
 
 ```bash
 # Via API
-curl -X POST http://localhost:8000/api/v1/fred/ingest \
+curl -X POST http://localhost:8001/api/v1/fred/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "series_ids": ["MORTGAGE30US"],
@@ -200,19 +200,19 @@ curl -X POST http://localhost:8000/api/v1/fred/ingest \
 2. **Check the job:**
 ```bash
 # Get job ID from response, then check status
-curl http://localhost:8000/api/v1/jobs/123
+curl http://localhost:8001/api/v1/jobs/123
 ```
 
 3. **Query the data:**
 ```bash
-curl http://localhost:8000/api/v1/fred/series/MORTGAGE30US/observations
+curl http://localhost:8001/api/v1/fred/series/MORTGAGE30US/observations
 ```
 
 ### Show Error Handling (3 minutes)
 
 1. **Invalid request:**
 ```bash
-curl -X POST http://localhost:8000/api/v1/jobs \
+curl -X POST http://localhost:8001/api/v1/jobs \
   -H "Content-Type: application/json" \
   -d '{
     "source": "invalid_source",
@@ -224,7 +224,7 @@ Shows validation error.
 
 2. **Check failed jobs:**
 ```bash
-curl http://localhost:8000/api/v1/jobs?status=failed
+curl http://localhost:8001/api/v1/jobs?status=failed
 ```
 
 ## 📈 Performance Metrics
@@ -233,13 +233,13 @@ After running full demo, show:
 
 ```bash
 # Count total jobs
-curl http://localhost:8000/api/v1/jobs | jq 'length'
+curl http://localhost:8001/api/v1/jobs | jq 'length'
 
 # Count successful jobs
-curl http://localhost:8000/api/v1/jobs | jq '[.[] | select(.status=="success")] | length'
+curl http://localhost:8001/api/v1/jobs | jq '[.[] | select(.status=="success")] | length'
 
 # Total rows ingested
-curl http://localhost:8000/api/v1/jobs | jq '[.[] | .rows_ingested // 0] | add'
+curl http://localhost:8001/api/v1/jobs | jq '[.[] | .rows_ingested // 0] | add'
 ```
 
 ## 🎓 Teaching Points
@@ -287,13 +287,13 @@ python scripts/start_service.py
 cat .env
 
 # Check specific job error
-curl http://localhost:8000/api/v1/jobs/{job_id}
+curl http://localhost:8001/api/v1/jobs/{job_id}
 ```
 
 ### No Data After Ingestion
 ```bash
 # Check job actually succeeded
-curl http://localhost:8000/api/v1/jobs/{job_id}
+curl http://localhost:8001/api/v1/jobs/{job_id}
 
 # Check table exists
 docker-compose exec db psql -U nexdata_user -d nexdata -c "\dt"

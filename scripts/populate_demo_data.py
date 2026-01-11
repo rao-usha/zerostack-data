@@ -30,7 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Configuration
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = "http://localhost:8001"
 POLL_INTERVAL = 3  # seconds between status checks
 MAX_WAIT_TIME = 300  # maximum seconds to wait for a job
 

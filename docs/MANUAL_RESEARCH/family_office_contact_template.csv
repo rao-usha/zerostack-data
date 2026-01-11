@@ -1,0 +1,4 @@
+office_id,full_name,title,role,email,phone,confidence_level,notes
+1,John Smith,Chief Investment Officer,CIO,john.smith@example.com,(555) 123-4567,high,Manages $10B portfolio
+1,Jane Doe,Managing Director,Managing Director,jane.doe@example.com,(555) 123-4568,high,Oversees operations
+2,Bob Johnson,Principal,Principal,bjohnson@familyoffice.com,(555) 234-5678,medium,Family member and decision maker

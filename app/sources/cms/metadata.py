@@ -9,12 +9,17 @@ from typing import Dict, Any, List
 logger = logging.getLogger(__name__)
 
 # CMS Dataset definitions
+# NOTE: CMS has transitioned from Socrata to DKAN API format
+# Dataset IDs need to be obtained from data.cms.gov for current data
+# See: https://downloads.cms.gov/files/Socrata-DKAN-API-Endpoints-Mapping.pdf
+
 DATASETS = {
     "medicare_utilization": {
         "table_name": "cms_medicare_utilization",
         "display_name": "Medicare Provider Utilization and Payment Data",
         "description": "Medicare Part B claims data for physicians and other healthcare practitioners",
-        "socrata_dataset_id": "fs4p-t5eq",  # 2022 data
+        "socrata_dataset_id": None,  # DEPRECATED: CMS moved to DKAN format
+        "dkan_dataset_id": None,  # TODO: Get current ID from data.cms.gov
         "source_url": "https://data.cms.gov/provider-summary-by-type-of-service/medicare-physician-other-practitioners/medicare-physician-other-practitioners-by-provider-and-service",
         "columns": {
             "rndrng_npi": {"type": "TEXT", "description": "National Provider Identifier"},
@@ -82,7 +87,8 @@ DATASETS = {
         "table_name": "cms_drug_pricing",
         "display_name": "Medicare Part D Drug Spending",
         "description": "Medicare Part D prescription drug costs and utilization by brand name and generic drugs",
-        "socrata_dataset_id": "yvpj-pmj2",  # Medicare Part D Spending by Drug
+        "socrata_dataset_id": None,  # DEPRECATED: CMS moved to DKAN format
+        "dkan_dataset_id": None,  # TODO: Get current ID from data.cms.gov
         "source_url": "https://data.cms.gov/medicare-drug-spending",
         "columns": {
             "brnd_name": {"type": "TEXT", "description": "Brand Name"},

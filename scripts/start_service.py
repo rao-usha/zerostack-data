@@ -27,8 +27,8 @@ APP_STARTUP_TIMEOUT = 30  # seconds
 APP_HEALTH_CHECK_INTERVAL = 2  # seconds
 APP_RESTART_DELAY = 5  # seconds
 MAX_RESTART_ATTEMPTS = 3
-HEALTH_CHECK_URL = "http://localhost:8000/health"
-API_DOCS_URL = "http://localhost:8000/docs"
+HEALTH_CHECK_URL = "http://localhost:8001/health"
+API_DOCS_URL = "http://localhost:8001/docs"
 
 # Setup logging
 logging.basicConfig(
@@ -346,7 +346,7 @@ def main():
         logger.info("=" * 60)
         logger.info("✓ SERVICE RUNNING")
         logger.info("=" * 60)
-        logger.info(f"API Server: http://localhost:8000")
+        logger.info(f"API Server: http://localhost:8001")
         logger.info(f"API Docs: {API_DOCS_URL}")
         logger.info("Press Ctrl+C to stop")
         logger.info("=" * 60)

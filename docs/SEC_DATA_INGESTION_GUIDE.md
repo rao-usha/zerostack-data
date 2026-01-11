@@ -64,7 +64,7 @@ Normalized cash flow data:
 Ingests **both** filings metadata AND financial data:
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
   -H "Content-Type: application/json" \
   -d '{
     "cik": "0000320193",
@@ -83,7 +83,7 @@ curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
 If you just want structured financial data:
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/financial-data" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/financial-data" \
   -H "Content-Type: application/json" \
   -d '{
     "cik": "0000320193"
@@ -95,7 +95,7 @@ curl -X POST "http://localhost:8000/api/v1/sec/ingest/financial-data" \
 If you just want filing metadata:
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/company" \
   -H "Content-Type: application/json" \
   -d '{
     "cik": "0000320193",
@@ -113,32 +113,32 @@ curl -X POST "http://localhost:8000/api/v1/sec/ingest/company" \
 
 ```bash
 # Apple (AAPL)
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
   -H "Content-Type: application/json" \
   -d '{"cik": "0000320193", "filing_types": ["10-K", "10-Q"]}'
 
 # Microsoft (MSFT)
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
   -H "Content-Type: application/json" \
   -d '{"cik": "0000789019", "filing_types": ["10-K", "10-Q"]}'
 
 # Google (GOOGL)
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
   -H "Content-Type: application/json" \
   -d '{"cik": "0001652044", "filing_types": ["10-K", "10-Q"]}'
 
 # Amazon (AMZN)
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
   -H "Content-Type: application/json" \
   -d '{"cik": "0001018724", "filing_types": ["10-K", "10-Q"]}'
 
 # Tesla (TSLA)
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
   -H "Content-Type: application/json" \
   -d '{"cik": "0001318605", "filing_types": ["10-K", "10-Q"]}'
 
 # NVIDIA (NVDA)
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
   -H "Content-Type: application/json" \
   -d '{"cik": "0001045810", "filing_types": ["10-K", "10-Q"]}'
 ```
@@ -147,22 +147,22 @@ curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
 
 ```bash
 # JPMorgan Chase (JPM)
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
   -H "Content-Type: application/json" \
   -d '{"cik": "0000019617", "filing_types": ["10-K", "10-Q"]}'
 
 # Bank of America (BAC)
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
   -H "Content-Type: application/json" \
   -d '{"cik": "0000070858", "filing_types": ["10-K", "10-Q"]}'
 
 # Goldman Sachs (GS)
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
   -H "Content-Type: application/json" \
   -d '{"cik": "0000886982", "filing_types": ["10-K", "10-Q"]}'
 
 # Wells Fargo (WFC)
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
   -H "Content-Type: application/json" \
   -d '{"cik": "0000072971", "filing_types": ["10-K", "10-Q"]}'
 ```
@@ -328,10 +328,10 @@ CREATE TABLE sec_income_statement (
 
 ```bash
 # Check job status
-curl "http://localhost:8000/api/v1/jobs/{job_id}"
+curl "http://localhost:8001/api/v1/jobs/{job_id}"
 
 # Check all SEC jobs
-curl "http://localhost:8000/api/v1/jobs?source=sec"
+curl "http://localhost:8001/api/v1/jobs?source=sec"
 ```
 
 Or query the database directly:
@@ -365,7 +365,7 @@ If you want to ingest multiple companies programmatically:
 for cik in "0000320193" "0000789019" "0001652044" "0001018724" "0001318605" "0001045810"
 do
     echo "Ingesting CIK: $cik"
-    curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+    curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
       -H "Content-Type: application/json" \
       -d "{\"cik\": \"$cik\", \"filing_types\": [\"10-K\", \"10-Q\"]}"
     echo ""
@@ -396,7 +396,7 @@ Create a cron job or scheduled task:
 # Where update_sec_filings.sh contains:
 #!/bin/bash
 for cik in $(cat /path/to/tracked_companies.txt); do
-    curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+    curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
       -H "Content-Type: application/json" \
       -d "{\"cik\": \"$cik\"}"
 done

@@ -4,7 +4,7 @@
 
 Once your service is running, access the **interactive Swagger UI** at:
 
-# **👉 http://localhost:8000/docs**
+# **👉 http://localhost:8001/docs**
 
 ---
 
@@ -23,9 +23,9 @@ Once your service is running, access the **interactive Swagger UI** at:
 
 | Format | URL | Best For |
 |--------|-----|----------|
-| **Swagger UI** (Interactive) | http://localhost:8000/docs | Testing APIs, exploring features |
-| **ReDoc** (Clean reading) | http://localhost:8000/redoc | Reading docs, printing |
-| **OpenAPI JSON** (Schema) | http://localhost:8000/openapi.json | Postman, client generation |
+| **Swagger UI** (Interactive) | http://localhost:8001/docs | Testing APIs, exploring features |
+| **ReDoc** (Clean reading) | http://localhost:8001/redoc | Reading docs, printing |
+| **OpenAPI JSON** (Schema) | http://localhost:8001/openapi.json | Postman, client generation |
 
 ---
 
@@ -40,7 +40,7 @@ python scripts/start_service.py
 ### 2. Open Your Browser
 
 ```
-http://localhost:8000/docs
+http://localhost:8001/docs
 ```
 
 ### 3. Start Testing!
@@ -71,7 +71,7 @@ You'll see these organized sections:
 ### Import to Postman
 1. Open Postman
 2. Import → Link
-3. Paste: `http://localhost:8000/openapi.json`
+3. Paste: `http://localhost:8001/openapi.json`
 
 ### Copy Curl Commands
 Execute any request in Swagger, then copy the generated curl command
@@ -79,7 +79,7 @@ Execute any request in Swagger, then copy the generated curl command
 ### Generate Client Code
 ```bash
 # Download the schema
-curl http://localhost:8000/openapi.json > api-spec.json
+curl http://localhost:8001/openapi.json > api-spec.json
 
 # Use OpenAPI Generator to create client libraries
 # Python, TypeScript, Java, Go, etc.
@@ -101,7 +101,7 @@ curl http://localhost:8000/openapi.json > api-spec.json
 
 ```bash
 # Check if service is running
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
 # Should return: {"status": "healthy", "database": "connected"}
 ```
@@ -110,8 +110,8 @@ curl http://localhost:8000/health
 
 ```bash
 # Check what's using port 8000
-netstat -ano | findstr :8000  # Windows
-lsof -i :8000                 # Mac/Linux
+netstat -ano | findstr :8001  # Windows
+lsof -i :8001                 # Mac/Linux
 ```
 
 ### Service Not Running?
@@ -133,7 +133,7 @@ python scripts/start_service.py
 
 Your complete API documentation is at:
 
-# **http://localhost:8000/docs**
+# **http://localhost:8001/docs**
 
 Happy coding! 🚀
 

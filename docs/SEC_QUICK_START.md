@@ -24,7 +24,7 @@ The SEC EDGAR adapter provides access to corporate filings including:
 ### 1. Ingest Apple's Filings (Last 5 Years)
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/company" \
   -H "Content-Type: application/json" \
   -d '{
     "cik": "0000320193"
@@ -38,7 +38,7 @@ curl -X POST "http://localhost:8000/api/v1/sec/ingest/company" \
 ### 2. Ingest Specific Filing Types and Date Range
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/company" \
   -H "Content-Type: application/json" \
   -d '{
     "cik": "0000320193",
@@ -51,7 +51,7 @@ curl -X POST "http://localhost:8000/api/v1/sec/ingest/company" \
 ### 3. Ingest Multiple Companies at Once
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/multiple" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/multiple" \
   -H "Content-Type: application/json" \
   -d '{
     "ciks": ["0000320193", "0000789019", "0001652044"],
@@ -69,7 +69,7 @@ curl -X POST "http://localhost:8000/api/v1/sec/ingest/multiple" \
 ### 4. Check Job Status
 
 ```bash
-curl "http://localhost:8000/api/v1/jobs/{job_id}"
+curl "http://localhost:8001/api/v1/jobs/{job_id}"
 ```
 
 Replace `{job_id}` with the ID returned from the ingestion request.
@@ -79,7 +79,7 @@ Replace `{job_id}` with the ID returned from the ingestion request.
 ### Method 1: Use Common Companies Endpoint
 
 ```bash
-curl "http://localhost:8000/api/v1/sec/common-companies"
+curl "http://localhost:8001/api/v1/sec/common-companies"
 ```
 
 Returns CIK numbers for major companies grouped by sector.
@@ -105,7 +105,7 @@ See `SEC_COMPANIES_TRACKING.md` for more CIK numbers.
 Get the full list of supported filing types:
 
 ```bash
-curl "http://localhost:8000/api/v1/sec/supported-filing-types"
+curl "http://localhost:8001/api/v1/sec/supported-filing-types"
 ```
 
 **Currently supported:**
@@ -276,7 +276,7 @@ from datetime import date
 
 # Ingest Apple's filings
 response = requests.post(
-    "http://localhost:8000/api/v1/sec/ingest/company",
+    "http://localhost:8001/api/v1/sec/ingest/company",
     json={
         "cik": "0000320193",
         "filing_types": ["10-K", "10-Q"],
@@ -290,7 +290,7 @@ print(f"Job ID: {job_id}")
 
 # Check job status
 status_response = requests.get(
-    f"http://localhost:8000/api/v1/jobs/{job_id}"
+    f"http://localhost:8001/api/v1/jobs/{job_id}"
 )
 print(status_response.json())
 ```
@@ -312,7 +312,7 @@ for company in companies:
     print(f"Ingesting {company['name']}...")
     
     response = requests.post(
-        "http://localhost:8000/api/v1/sec/ingest/company",
+        "http://localhost:8001/api/v1/sec/ingest/company",
         json={"cik": company["cik"]}
     )
     
@@ -385,7 +385,7 @@ for company in companies:
 
 ## Support
 
-- **API Documentation:** http://localhost:8000/docs
+- **API Documentation:** http://localhost:8001/docs
 - **Source Code:** `/app/sources/sec/`
 - **Job Tracking:** `/app/core/models.py` (IngestionJob model)
 
@@ -395,7 +395,7 @@ for company in companies:
 
 ```bash
 # Ingest major tech companies
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/multiple" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/multiple" \
   -H "Content-Type: application/json" \
   -d '{
     "ciks": [
@@ -410,7 +410,7 @@ curl -X POST "http://localhost:8000/api/v1/sec/ingest/multiple" \
 
 ```bash
 # Ingest major banks
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/multiple" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/multiple" \
   -H "Content-Type: application/json" \
   -d '{
     "ciks": [
@@ -425,7 +425,7 @@ curl -X POST "http://localhost:8000/api/v1/sec/ingest/multiple" \
 
 ```bash
 # Ingest latest quarter for tracked companies
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/multiple" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/multiple" \
   -H "Content-Type: application/json" \
   -d '{
     "ciks": ["YOUR", "COMPANY", "CIKS"],
@@ -440,7 +440,7 @@ curl -X POST "http://localhost:8000/api/v1/sec/ingest/multiple" \
 **Ready to start?** Try ingesting your first company:
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/company" \
   -H "Content-Type: application/json" \
   -d '{"cik": "0000320193"}'
 ```

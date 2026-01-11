@@ -59,8 +59,8 @@ CREATE DATABASE nexdata;
 # Start API server
 uvicorn app.main:app --reload
 
-# API available at: http://localhost:8000
-# Interactive docs: http://localhost:8000/docs
+# API available at: http://localhost:8001
+# Interactive docs: http://localhost:8001/docs
 ```
 
 ## Using the API
@@ -68,7 +68,7 @@ uvicorn app.main:app --reload
 ### Create an Ingestion Job
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/jobs \
+curl -X POST http://localhost:8001/api/v1/jobs \
   -H "Content-Type: application/json" \
   -d '{
     "source": "census",
@@ -104,7 +104,7 @@ Response:
 ### Check Job Status
 
 ```bash
-curl http://localhost:8000/api/v1/jobs/1
+curl http://localhost:8001/api/v1/jobs/1
 ```
 
 Response (completed):
@@ -126,13 +126,13 @@ Response (completed):
 
 ```bash
 # All jobs
-curl http://localhost:8000/api/v1/jobs
+curl http://localhost:8001/api/v1/jobs
 
 # Filter by source
-curl http://localhost:8000/api/v1/jobs?source=census
+curl http://localhost:8001/api/v1/jobs?source=census
 
 # Filter by status
-curl http://localhost:8000/api/v1/jobs?status=success
+curl http://localhost:8001/api/v1/jobs?status=success
 ```
 
 ## Census Source Configuration
@@ -332,7 +332,7 @@ MAX_REQUESTS_PER_SECOND=2.0  # Lower rate
 If a table doesn't exist after ingestion, check job status:
 
 ```bash
-curl http://localhost:8000/api/v1/jobs/{job_id}
+curl http://localhost:8001/api/v1/jobs/{job_id}
 ```
 
 Look for `error_message` field if status is "failed".

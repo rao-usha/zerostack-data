@@ -16,7 +16,7 @@ import json
 from typing import List, Dict, Any
 
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:8001"
 
 
 def ingest_family_offices(family_office_names: List[str]) -> Dict[str, Any]:

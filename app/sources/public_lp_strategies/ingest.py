@@ -25,6 +25,7 @@ from app.core.models import (
     LpAssetClassProjection,
     LpManagerOrVehicleExposure,
     LpStrategyThematicTag,
+    LpKeyContact,
     DatasetRegistry,
 )
 from app.sources.public_lp_strategies.types import (
@@ -35,6 +36,8 @@ from app.sources.public_lp_strategies.types import (
     AssetClassAllocationInput,
     AssetClassProjectionInput,
     ThematicTagInput,
+    LpKeyContactInput,
+    ContactExtractionResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -537,3 +540,178 @@ def ingest_lp_strategy_document(
     }
 
 
+# =============================================================================
+# LP KEY CONTACT INGESTION
+# =============================================================================
+
+
+def register_lp_contact(db: Session, contact_input: LpKeyContactInput) -> LpKeyContact:
+    """
+    Register or update an LP key contact.
+    
+    Deduplicates by (lp_id, full_name, email).
+    If contact exists, updates fields if new data has higher confidence.
+    
+    Args:
+        db: Database session
+        contact_input: Contact input data
+        
+    Returns:
+        LpKeyContact instance
+    """
+    from app.sources.public_lp_strategies.contact_validation import is_likely_duplicate
+    
+    # Check for existing contact
+    existing = db.query(LpKeyContact).filter(
+        LpKeyContact.lp_id == contact_input.lp_id,
+        LpKeyContact.full_name == contact_input.full_name
+    ).first()
+    
+    if existing:
+        # Update if new confidence is higher or if fields are missing
+        should_update = False
+        
+        confidence_order = {'high': 3, 'medium': 2, 'low': 1}
+        new_conf = confidence_order.get(contact_input.confidence_level, 1)
+        existing_conf = confidence_order.get(existing.confidence_level, 1)
+        
+        if new_conf >= existing_conf:
+            # Update fields that are newly provided
+            if contact_input.email and not existing.email:
+                existing.email = contact_input.email
+                should_update = True
+            if contact_input.phone and not existing.phone:
+                existing.phone = contact_input.phone
+                should_update = True
+            if contact_input.title and not existing.title:
+                existing.title = contact_input.title
+                should_update = True
+            if contact_input.role_category and not existing.role_category:
+                existing.role_category = contact_input.role_category
+                should_update = True
+            if contact_input.linkedin_url and not existing.linkedin_url:
+                existing.linkedin_url = contact_input.linkedin_url
+                should_update = True
+            
+            # Always update source if new confidence is higher
+            if new_conf > existing_conf:
+                existing.source_type = contact_input.source_type
+                existing.source_url = contact_input.source_url
+                existing.confidence_level = contact_input.confidence_level
+                should_update = True
+        
+        if should_update:
+            existing.updated_at = datetime.utcnow()
+            db.commit()
+            db.refresh(existing)
+            logger.info(f"Updated LP contact: {existing.full_name} (ID: {existing.id})")
+        else:
+            logger.info(f"LP contact already exists (no update): {existing.full_name} (ID: {existing.id})")
+        
+        return existing
+    
+    # Create new contact
+    contact = LpKeyContact(
+        lp_id=contact_input.lp_id,
+        full_name=contact_input.full_name,
+        title=contact_input.title,
+        role_category=contact_input.role_category,
+        email=contact_input.email,
+        phone=contact_input.phone,
+        linkedin_url=contact_input.linkedin_url,
+        source_document_id=contact_input.source_document_id,
+        source_type=contact_input.source_type,
+        source_url=contact_input.source_url,
+        confidence_level=contact_input.confidence_level,
+        is_verified=contact_input.is_verified,
+        collected_date=datetime.utcnow()
+    )
+    
+    db.add(contact)
+    db.commit()
+    db.refresh(contact)
+    
+    logger.info(f"Registered new LP contact: {contact.full_name} (ID: {contact.id}) at {contact.lp_id}")
+    
+    return contact
+
+
+def batch_register_lp_contacts(
+    db: Session,
+    contacts_input: List[LpKeyContactInput]
+) -> ContactExtractionResult:
+    """
+    Batch register multiple LP contacts.
+    
+    Args:
+        db: Database session
+        contacts_input: List of contact inputs
+        
+    Returns:
+        ContactExtractionResult with counts and errors
+    """
+    result = ContactExtractionResult(
+        contacts_found=len(contacts_input),
+        contacts_inserted=0,
+        contacts_skipped=0,
+        errors=[]
+    )
+    
+    for contact_input in contacts_input:
+        try:
+            contact = register_lp_contact(db, contact_input)
+            result.contacts_inserted += 1
+        except Exception as e:
+            logger.error(f"Error registering contact {contact_input.full_name}: {e}")
+            result.errors.append(f"{contact_input.full_name}: {str(e)}")
+            result.contacts_skipped += 1
+    
+    logger.info(
+        f"Batch contact registration complete: "
+        f"found={result.contacts_found}, inserted={result.contacts_inserted}, "
+        f"skipped={result.contacts_skipped}"
+    )
+    
+    return result
+
+
+def get_lp_contacts(db: Session, lp_id: int) -> List[LpKeyContact]:
+    """
+    Get all contacts for a specific LP.
+    
+    Args:
+        db: Database session
+        lp_id: LP fund ID
+        
+    Returns:
+        List of LpKeyContact instances
+    """
+    contacts = db.query(LpKeyContact).filter(
+        LpKeyContact.lp_id == lp_id
+    ).order_by(
+        LpKeyContact.role_category,
+        LpKeyContact.full_name
+    ).all()
+    
+    return contacts
+
+
+def get_contacts_by_role(db: Session, role_category: str) -> List[LpKeyContact]:
+    """
+    Get all contacts with a specific role across all LPs.
+    
+    Args:
+        db: Database session
+        role_category: Role to filter by (e.g., 'CIO', 'CFO')
+        
+    Returns:
+        List of LpKeyContact instances
+    """
+    contacts = db.query(LpKeyContact).filter(
+        LpKeyContact.role_category == role_category
+    ).order_by(
+        LpKeyContact.lp_id,
+        LpKeyContact.full_name
+    ).all()
+    
+    return contacts

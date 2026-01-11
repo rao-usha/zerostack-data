@@ -10,7 +10,7 @@ FastAPI automatically generates beautiful, interactive API documentation using S
 
 ### 🌐 Interactive Swagger UI (Recommended)
 
-**URL:** **http://localhost:8000/docs**
+**URL:** **http://localhost:8001/docs**
 
 **Features:**
 - ✅ **Try APIs instantly** - Execute requests directly in your browser
@@ -23,7 +23,7 @@ FastAPI automatically generates beautiful, interactive API documentation using S
 
 ### 📄 Alternative ReDoc UI
 
-**URL:** **http://localhost:8000/redoc**
+**URL:** **http://localhost:8001/redoc**
 
 **Features:**
 - ✅ Clean, read-only documentation
@@ -34,7 +34,7 @@ FastAPI automatically generates beautiful, interactive API documentation using S
 
 ### 💾 OpenAPI Schema (JSON)
 
-**URL:** **http://localhost:8000/openapi.json**
+**URL:** **http://localhost:8001/openapi.json**
 
 **Use for:**
 - ✅ Generating client libraries (Python, TypeScript, Java, etc.)
@@ -54,12 +54,12 @@ python scripts/start_service.py
 
 # Or manually
 docker-compose up -d db
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 ```
 
 ### Step 2: Open Swagger UI
 
-Open your browser to: **http://localhost:8000/docs**
+Open your browser to: **http://localhost:8001/docs**
 
 You'll see a beautiful interface with all your API endpoints!
 
@@ -196,7 +196,7 @@ Pre-filled examples you can use directly
 
 ```bash
 # Download the spec file
-curl http://localhost:8000/openapi.json > api-spec.json
+curl http://localhost:8001/openapi.json > api-spec.json
 
 # Or click "Download" in Swagger UI (top right)
 ```
@@ -206,7 +206,7 @@ curl http://localhost:8000/openapi.json > api-spec.json
 1. Open Postman
 2. Click **"Import"**
 3. Select **"Link"**
-4. Paste: `http://localhost:8000/openapi.json`
+4. Paste: `http://localhost:8001/openapi.json`
 5. Click **"Import"**
 
 Now you have all endpoints in Postman!
@@ -221,13 +221,13 @@ Use the OpenAPI spec to auto-generate client code:
 pip install openapi-python-client
 
 # Generate client
-openapi-python-client generate --url http://localhost:8000/openapi.json
+openapi-python-client generate --url http://localhost:8001/openapi.json
 
 # Use the client
 from nexdata_client import Client
 from nexdata_client.models import JobCreate
 
-client = Client(base_url="http://localhost:8000")
+client = Client(base_url="http://localhost:8001")
 ```
 
 #### TypeScript/JavaScript Client
@@ -237,7 +237,7 @@ npm install -g @openapitools/openapi-generator-cli
 
 # Generate TypeScript client
 openapi-generator-cli generate \
-  -i http://localhost:8000/openapi.json \
+  -i http://localhost:8001/openapi.json \
   -g typescript-axios \
   -o ./typescript-client
 
@@ -260,7 +260,7 @@ If authentication is added:
 
 **Local sharing:**
 ```
-http://localhost:8000/docs
+http://localhost:8001/docs
 ```
 
 **Remote sharing (if deployed):**
@@ -411,14 +411,14 @@ def create_job(job: JobCreate):
 **Solutions:**
 ```bash
 # Check if service is running
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
 # Restart the service
 python scripts/start_service.py
 
 # Check for port conflicts
-netstat -ano | findstr :8000  # Windows
-lsof -i :8000  # Mac/Linux
+netstat -ano | findstr :8001  # Windows
+lsof -i :8001  # Mac/Linux
 ```
 
 ### "Failed to fetch" Error
@@ -430,7 +430,7 @@ lsof -i :8000  # Mac/Linux
 2. Verify API is actually running
 3. Test endpoint directly:
    ```bash
-   curl http://localhost:8000/
+   curl http://localhost:8001/
    ```
 
 ### Endpoints Not Showing
@@ -468,7 +468,7 @@ lsof -i :8000  # Mac/Linux
 
 2. **Access from other devices:**
    ```
-   http://YOUR_LOCAL_IP:8000/docs
+   http://YOUR_LOCAL_IP:8001/docs
    ```
 
 3. **Update CORS if needed** in `app/main.py`:
@@ -490,11 +490,11 @@ lsof -i :8000  # Mac/Linux
 
 | Resource | URL | Purpose |
 |----------|-----|---------|
-| **Swagger UI** | http://localhost:8000/docs | Interactive API docs |
-| **ReDoc** | http://localhost:8000/redoc | Alternative docs |
-| **OpenAPI Schema** | http://localhost:8000/openapi.json | Machine-readable spec |
-| **Root** | http://localhost:8000/ | Service info |
-| **Health Check** | http://localhost:8000/health | Status check |
+| **Swagger UI** | http://localhost:8001/docs | Interactive API docs |
+| **ReDoc** | http://localhost:8001/redoc | Alternative docs |
+| **OpenAPI Schema** | http://localhost:8001/openapi.json | Machine-readable spec |
+| **Root** | http://localhost:8001/ | Service info |
+| **Health Check** | http://localhost:8001/health | Status check |
 
 ### Common Tasks
 
@@ -537,7 +537,7 @@ Search YouTube for:
 - ✅ **Schema definitions** for all models
 
 **Next steps:**
-1. 🌐 Open **http://localhost:8000/docs**
+1. 🌐 Open **http://localhost:8001/docs**
 2. 🔍 Explore your data sources
 3. 🚀 Test your first API call
 4. 📤 Share with your team!

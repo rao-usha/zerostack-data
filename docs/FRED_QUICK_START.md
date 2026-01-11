@@ -220,7 +220,7 @@ CREATE INDEX idx_fred_{category}_series_id ON fred_{category} (series_id);
 ### Example 1: Ingest Interest Rates (Last 5 Years)
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/fred/ingest \
+curl -X POST http://localhost:8001/api/v1/fred/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "category": "interest_rates",
@@ -232,7 +232,7 @@ curl -X POST http://localhost:8000/api/v1/fred/ingest \
 ### Example 2: Ingest Specific Series Only
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/fred/ingest \
+curl -X POST http://localhost:8001/api/v1/fred/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "category": "interest_rates",
@@ -245,7 +245,7 @@ curl -X POST http://localhost:8000/api/v1/fred/ingest \
 ### Example 3: Ingest All Economic Data (Batch)
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/fred/ingest/batch \
+curl -X POST http://localhost:8001/api/v1/fred/ingest/batch \
   -H "Content-Type: application/json" \
   -d '{
     "categories": [
@@ -292,7 +292,7 @@ import httpx
 
 # Start ingestion
 response = httpx.post(
-    "http://localhost:8000/api/v1/fred/ingest",
+    "http://localhost:8001/api/v1/fred/ingest",
     json={
         "category": "interest_rates",
         "observation_start": "2020-01-01",
@@ -305,7 +305,7 @@ job_id = response.json()["job_id"]
 import time
 while True:
     status_response = httpx.get(
-        f"http://localhost:8000/api/v1/jobs/{job_id}"
+        f"http://localhost:8001/api/v1/jobs/{job_id}"
     )
     status = status_response.json()["status"]
     

@@ -24,6 +24,15 @@ services:
       CENSUS_SURVEY_API_KEY: 3661f0d2a5cf57c77df27749037845eabd0949ed
       FRED_API_KEY: ${FRED_API_KEY:-}
       BLS_API_KEY: ${BLS_API_KEY:-}
+      KAGGLE_USERNAME: ${KAGGLE_USERNAME:-}
+      KAGGLE_KEY: ${KAGGLE_KEY:-}
+      KAGGLE_DATA_DIR: /app/data/kaggle
+      DATA_GOV_API: ${DATA_GOV_API:-}
+      BEA_API_KEY: ${BEA_API_KEY:-}
+      BTS_APP_TOKEN: ${BTS_APP_TOKEN:-}
+      USDA_API_KEY: ${USDA_API_KEY:-}
+      DATA_COMMONS_API_KEY: ${DATA_COMMONS_API_KEY:-}
+      YELP_API_KEY: ${YELP_API_KEY:-}
       MAX_CONCURRENCY: 4
       LOG_LEVEL: INFO
     depends_on:
@@ -31,6 +40,8 @@ services:
         condition: service_healthy
     volumes:
       - ./app:/app/app
+      - ./data/kaggle:/app/data/kaggle
+      - ./.kaggle:/home/appuser/.kaggle:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:

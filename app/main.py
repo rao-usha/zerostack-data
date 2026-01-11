@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, cms
+from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets
 
 # Configure logging
 logging.basicConfig(
@@ -563,8 +563,88 @@ Browse the endpoint sections below to see what's available:
             "description": "💼 **Family Offices** - Investment adviser and family office tracking"
         },
         {
+            "name": "family_office_contacts",
+            "description": "👥 **Family Office Contacts** - Contact research and enrichment for family offices"
+        },
+        {
             "name": "cms",
             "description": "🏥 **CMS / HHS Healthcare Data** - Medicare utilization, hospital costs, and drug pricing"
+        },
+        {
+            "name": "kaggle",
+            "description": "🏆 **Kaggle Datasets** - Competition datasets (M5 Forecasting, etc.)"
+        },
+        {
+            "name": "international_econ",
+            "description": "🌍 **International Economic Data** - World Bank, IMF, OECD, BIS global economic indicators"
+        },
+        {
+            "name": "fbi_crime",
+            "description": "🚔 **FBI Crime Data** - UCR crime statistics, NIBRS incident data, hate crimes, and LEOKA"
+        },
+        {
+            "name": "bts",
+            "description": "🚚 **Bureau of Transportation Statistics** - Border crossings, freight flows (FAF5), and vehicle miles traveled"
+        },
+        {
+            "name": "bea",
+            "description": "📈 **Bureau of Economic Analysis** - GDP, Personal Income, PCE, Regional economic data, and International transactions"
+        },
+        {
+            "name": "fema",
+            "description": "🌊 **OpenFEMA** - Disaster declarations, Public Assistance grants, and Hazard Mitigation projects"
+        },
+        {
+            "name": "data_commons",
+            "description": "📊 **Google Data Commons** - Unified public data from 200+ sources (demographics, economy, health, crime, etc.)"
+        },
+        {
+            "name": "yelp",
+            "description": "🏪 **Yelp Fusion** - Business listings, reviews, and local business activity (500 calls/day free tier)"
+        },
+        {
+            "name": "us_trade",
+            "description": "🚢 **US International Trade** - Census Bureau trade data: imports/exports by HS code, port, state, and trading partner"
+        },
+        {
+            "name": "CFTC COT",
+            "description": "📈 **CFTC Commitments of Traders** - Weekly futures positioning data: commercial vs non-commercial, managed money, swap dealers"
+        },
+        {
+            "name": "USDA Agriculture",
+            "description": "🌾 **USDA NASS QuickStats** - Agricultural statistics: crop production, yields, prices, livestock inventory"
+        },
+        {
+            "name": "BLS Labor Statistics",
+            "description": "📊 **Bureau of Labor Statistics** - Employment, unemployment, CPI, PPI, JOLTS job openings and labor turnover"
+        },
+        {
+            "name": "FCC Broadband & Telecom",
+            "description": "📡 **FCC National Broadband Map** - Broadband coverage, ISP availability, technology deployment, digital divide metrics"
+        },
+        {
+            "name": "Treasury FiscalData",
+            "description": "💵 **U.S. Treasury FiscalData** - Federal debt, interest rates, revenue/spending, Treasury auction results"
+        },
+        {
+            "name": "FDIC BankFind",
+            "description": "🏦 **FDIC BankFind Suite** - Bank financials, demographics, failed banks, and branch-level deposits for 4,000+ U.S. banks"
+        },
+        {
+            "name": "irs-soi",
+            "description": "💰 **IRS Statistics of Income (SOI)** - Income/wealth distribution by geography: ZIP code income, county income, migration flows, business income"
+        },
+        {
+            "name": "Agentic Portfolio Research",
+            "description": "🤖 **Agentic Portfolio Discovery** - AI-powered portfolio research for LPs and Family Offices using SEC 13F, website scraping, and more"
+        },
+        {
+            "name": "Foot Traffic",
+            "description": "🚶 **Foot Traffic Intelligence** - Location discovery, foot traffic data collection, and competitive benchmarking for retail/hospitality investments"
+        },
+        {
+            "name": "Prediction Markets",
+            "description": "🎲 **Prediction Market Intelligence** - Monitor Kalshi, Polymarket for market consensus on economic, political, sports, and world events"
         }
     ]
 )
@@ -589,7 +669,26 @@ app.include_router(eia.router, prefix="/api/v1")
 app.include_router(sec.router, prefix="/api/v1")
 app.include_router(realestate.router, prefix="/api/v1")
 app.include_router(family_offices.router, prefix="/api/v1")
+app.include_router(family_office_contacts.router, prefix="/api/v1", tags=["family_office_contacts"])
 app.include_router(cms.router, prefix="/api/v1")
+app.include_router(kaggle.router, prefix="/api/v1")
+app.include_router(international_econ.router, prefix="/api/v1")
+app.include_router(fbi_crime.router, prefix="/api/v1")
+app.include_router(bts.router, prefix="/api/v1")
+app.include_router(bea.router, prefix="/api/v1")
+app.include_router(fema.router, prefix="/api/v1")
+app.include_router(data_commons.router, prefix="/api/v1")
+app.include_router(yelp.router, prefix="/api/v1")
+app.include_router(us_trade.router, prefix="/api/v1")
+app.include_router(cftc_cot.router, prefix="/api/v1")
+app.include_router(usda.router, prefix="/api/v1")
+app.include_router(bls.router, prefix="/api/v1")
+app.include_router(fcc_broadband.router, prefix="/api/v1")
+app.include_router(treasury.router, prefix="/api/v1")
+app.include_router(fdic.router, prefix="/api/v1")
+app.include_router(irs_soi.router, prefix="/api/v1")
+app.include_router(foot_traffic.router, prefix="/api/v1")
+app.include_router(prediction_markets.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])
@@ -603,7 +702,7 @@ def root():
         "service": "External Data Ingestion Service",
         "version": "0.1.0",
         "status": "running",
-        "sources": ["census", "fred", "eia", "sec", "realestate", "noaa", "cms"],
+        "sources": ["census", "fred", "eia", "sec", "realestate", "noaa", "cms", "kaggle", "international_econ", "fbi_crime", "bts", "bea", "fema", "data_commons", "yelp", "us_trade", "cftc_cot", "usda", "bls", "fcc_broadband", "treasury", "fdic", "irs_soi", "agentic_portfolio", "foot_traffic", "prediction_markets"],
         "documentation": {
             "swagger_ui": "/docs",
             "redoc": "/redoc",

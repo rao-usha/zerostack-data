@@ -62,7 +62,7 @@ venv\Scripts\activate     # Windows
 uvicorn app.main:app --reload
 ```
 
-Access the API documentation at: http://localhost:8000/docs
+Access the API documentation at: http://localhost:8001/docs
 
 ## Available Datasets
 
@@ -77,7 +77,7 @@ Access the API documentation at: http://localhost:8000/docs
 ### Get List of Available Datasets
 
 ```bash
-curl http://localhost:8000/api/v1/noaa/datasets
+curl http://localhost:8001/api/v1/noaa/datasets
 ```
 
 ## Quick Start Examples
@@ -85,7 +85,7 @@ curl http://localhost:8000/api/v1/noaa/datasets
 ### Example 1: Ingest Daily Weather for California (January 2024)
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/noaa/ingest \
+curl -X POST http://localhost:8001/api/v1/noaa/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "token": "YOUR_NOAA_TOKEN",
@@ -115,7 +115,7 @@ curl -X POST http://localhost:8000/api/v1/noaa/ingest \
 ### Example 2: Ingest Data for Specific Weather Station
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/noaa/ingest \
+curl -X POST http://localhost:8001/api/v1/noaa/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "token": "YOUR_NOAA_TOKEN",
@@ -131,7 +131,7 @@ curl -X POST http://localhost:8000/api/v1/noaa/ingest \
 ### Example 3: Ingest Climate Normals
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/noaa/ingest \
+curl -X POST http://localhost:8001/api/v1/noaa/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "token": "YOUR_NOAA_TOKEN",
@@ -147,7 +147,7 @@ curl -X POST http://localhost:8000/api/v1/noaa/ingest \
 For large date ranges, use chunking to avoid API limits:
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/noaa/ingest \
+curl -X POST http://localhost:8001/api/v1/noaa/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "token": "YOUR_NOAA_TOKEN",
@@ -208,7 +208,7 @@ Get available locations (states, cities, ZIP codes).
 **Example:**
 ```bash
 # Get all US states
-curl "http://localhost:8000/api/v1/noaa/locations?token=YOUR_TOKEN&dataset_id=GHCND&location_category_id=ST&limit=100"
+curl "http://localhost:8001/api/v1/noaa/locations?token=YOUR_TOKEN&dataset_id=GHCND&location_category_id=ST&limit=100"
 ```
 
 **GET** `/api/v1/noaa/stations`
@@ -224,7 +224,7 @@ Get available weather stations.
 **Example:**
 ```bash
 # Get California weather stations
-curl "http://localhost:8000/api/v1/noaa/stations?token=YOUR_TOKEN&dataset_id=GHCND&location_id=FIPS:06&limit=100"
+curl "http://localhost:8001/api/v1/noaa/stations?token=YOUR_TOKEN&dataset_id=GHCND&location_id=FIPS:06&limit=100"
 ```
 
 **GET** `/api/v1/noaa/data-types`
@@ -239,7 +239,7 @@ Get available data types for a dataset.
 **Example:**
 ```bash
 # Get GHCND data types
-curl "http://localhost:8000/api/v1/noaa/data-types?token=YOUR_TOKEN&dataset_id=GHCND"
+curl "http://localhost:8001/api/v1/noaa/data-types?token=YOUR_TOKEN&dataset_id=GHCND"
 ```
 
 ### Job Status
@@ -312,7 +312,7 @@ Check status of an ingestion job.
 
 ```bash
 # Find stations in California
-curl "http://localhost:8000/api/v1/noaa/stations?token=YOUR_TOKEN&location_id=FIPS:06&limit=100"
+curl "http://localhost:8001/api/v1/noaa/stations?token=YOUR_TOKEN&location_id=FIPS:06&limit=100"
 ```
 
 ## Best Practices
@@ -497,7 +497,7 @@ import requests
 from datetime import date
 
 # Configuration
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:8001/api/v1"
 NOAA_TOKEN = "YOUR_NOAA_TOKEN"
 
 # Ingest daily weather data

@@ -25,7 +25,7 @@ docker-compose exec postgres psql -U nexdata -d nexdata -c \
 ## API Endpoint
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/sec/form-adv/ingest/family-offices \
+curl -X POST http://localhost:8001/api/v1/sec/form-adv/ingest/family-offices \
   -H "Content-Type: application/json" \
   -d '{
     "family_office_names": [

@@ -52,7 +52,7 @@ python scripts/populate_demo_data.py --api-url http://localhost:9000
 **Options:**
 - `--sources` - Comma-separated list: census,fred,eia,sec,realestate
 - `--quick` - Reduced datasets for faster completion
-- `--api-url` - Custom API base URL (default: http://localhost:8000)
+- `--api-url` - Custom API base URL (default: http://localhost:8001)
 
 **What it ingests:**
 - **Census:** Population by state, median income by county

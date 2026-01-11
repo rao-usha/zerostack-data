@@ -289,3 +289,122 @@ class LpStrategySnapshotResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# =============================================================================
+# LP KEY CONTACT MODELS
+# =============================================================================
+
+
+class LpKeyContactInput(BaseModel):
+    """
+    Input model for registering a key contact at an LP fund.
+    
+    Only public information from official sources:
+    - SEC filings (Form ADV)
+    - Official LP websites (contact pages, team pages)
+    - Annual reports and disclosure documents
+    - Manual research with verification
+    """
+    
+    lp_id: int = Field(..., description="Foreign key to lp_fund.id")
+    full_name: str = Field(..., min_length=2, max_length=255, description="Full name of contact")
+    title: Optional[str] = Field(None, description="Job title (e.g., 'Chief Investment Officer')")
+    role_category: Optional[str] = Field(None, description="Standardized role: CIO, CFO, CEO, Investment Director, etc.")
+    
+    # Contact information (only if publicly disclosed)
+    email: Optional[str] = Field(None, description="Professional email (only if publicly listed)")
+    phone: Optional[str] = Field(None, description="Phone number (only if publicly listed)")
+    linkedin_url: Optional[str] = Field(None, description="LinkedIn URL for manual reference (no scraping)")
+    
+    # Data provenance
+    source_document_id: Optional[int] = Field(None, description="FK to lp_document.id if from document")
+    source_type: Optional[str] = Field(None, description="Source: sec_adv, website, disclosure_doc, annual_report, manual")
+    source_url: Optional[str] = Field(None, description="URL where information was found")
+    confidence_level: Optional[str] = Field("medium", description="Quality indicator: high, medium, low")
+    is_verified: int = Field(0, ge=0, le=1, description="1 if manually verified, 0 otherwise")
+    
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: Optional[str]) -> Optional[str]:
+        """Validate email format if provided."""
+        if v is None:
+            return v
+        import re
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, v):
+            raise ValueError(f"Invalid email format: {v}")
+        
+        # Reject generic emails unless they're institutional
+        generic_prefixes = ['info', 'contact', 'admin', 'webmaster', 'sales', 'support']
+        email_prefix = v.split('@')[0].lower()
+        if email_prefix in generic_prefixes:
+            # Allow if it's a specific institutional address
+            if not any(term in v.lower() for term in ['investment', 'investor', 'relations']):
+                raise ValueError(f"Generic email not allowed: {v}")
+        
+        return v
+    
+    @field_validator("role_category")
+    @classmethod
+    def validate_role_category(cls, v: Optional[str]) -> Optional[str]:
+        """Validate role category."""
+        if v is None:
+            return v
+        valid_roles = ['CIO', 'CFO', 'CEO', 'Investment Director', 'Board Member', 
+                      'Managing Director', 'IR Contact', 'Other']
+        if v not in valid_roles:
+            raise ValueError(f"Invalid role_category. Must be one of: {valid_roles}")
+        return v
+    
+    @field_validator("source_type")
+    @classmethod
+    def validate_source_type(cls, v: Optional[str]) -> Optional[str]:
+        """Validate source type."""
+        if v is None:
+            return v
+        valid_sources = ['sec_adv', 'website', 'disclosure_doc', 'annual_report', 'manual']
+        if v not in valid_sources:
+            raise ValueError(f"Invalid source_type. Must be one of: {valid_sources}")
+        return v
+    
+    @field_validator("confidence_level")
+    @classmethod
+    def validate_confidence_level(cls, v: Optional[str]) -> Optional[str]:
+        """Validate confidence level."""
+        if v is None:
+            return v
+        valid_levels = ['high', 'medium', 'low']
+        if v not in valid_levels:
+            raise ValueError(f"Invalid confidence_level. Must be one of: {valid_levels}")
+        return v
+
+
+class LpKeyContactOutput(BaseModel):
+    """Output model for LP key contact."""
+    
+    id: int
+    lp_id: int
+    full_name: str
+    title: Optional[str]
+    role_category: Optional[str]
+    email: Optional[str]
+    phone: Optional[str]
+    linkedin_url: Optional[str]
+    source_document_id: Optional[int]
+    source_type: Optional[str]
+    source_url: Optional[str]
+    confidence_level: Optional[str]
+    is_verified: int
+    collected_date: datetime
+    created_at: datetime
+    
+    model_config = {"from_attributes": True}
+
+
+class ContactExtractionResult(BaseModel):
+    """Result of contact extraction from a source."""
+    
+    contacts_found: int
+    contacts_inserted: int
+    contacts_skipped: int  # Duplicates or validation failures
+    errors: List[str] = []
+    extraction_timestamp: datetime = Field(default_factory=datetime.utcnow)

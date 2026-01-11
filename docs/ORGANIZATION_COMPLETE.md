@@ -223,8 +223,8 @@ uvicorn app.main:app --reload
    ```
 
 2. **Explore the API:**
-   - Visit http://localhost:8000/docs
-   - Check health: http://localhost:8000/health
+   - Visit http://localhost:8001/docs
+   - Check health: http://localhost:8001/health
 
 3. **Run your first ingestion:**
    - Follow examples in `QUICKSTART.md`

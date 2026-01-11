@@ -17,8 +17,8 @@ param(
 
 # Configuration
 $ErrorActionPreference = "Continue"
-$HealthCheckUrl = "http://localhost:8000/health"
-$ApiDocsUrl = "http://localhost:8000/docs"
+$HealthCheckUrl = "http://localhost:8001/health"
+$ApiDocsUrl = "http://localhost:8001/docs"
 $LogFile = "service_startup.log"
 
 # Global state
@@ -356,7 +356,7 @@ function Main {
         Write-Log "=" * 60 "SUCCESS"
         Write-Log "✓ SERVICE RUNNING" "SUCCESS"
         Write-Log "=" * 60 "SUCCESS"
-        Write-Log "API Server: http://localhost:8000" "SUCCESS"
+        Write-Log "API Server: http://localhost:8001" "SUCCESS"
         Write-Log "API Docs: $ApiDocsUrl" "SUCCESS"
         Write-Log "Press Ctrl+C to stop" "SUCCESS"
         Write-Log "=" * 60 "SUCCESS"

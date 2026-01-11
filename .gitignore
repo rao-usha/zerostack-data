@@ -63,6 +63,11 @@ data/*
 !data/.gitkeep
 sec_data_output/
 
+# Database backups
+backup/
+*.sql
+*.sql.gz
+
 # Docker
 docker-compose.override.yml
 

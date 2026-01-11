@@ -18,8 +18,8 @@ APP_STARTUP_TIMEOUT=30
 RESTART_DELAY=5
 STOP_DB_ON_EXIT=false
 
-HEALTH_CHECK_URL="http://localhost:8000/health"
-API_DOCS_URL="http://localhost:8000/docs"
+HEALTH_CHECK_URL="http://localhost:8001/health"
+API_DOCS_URL="http://localhost:8001/docs"
 LOG_FILE="service_startup.log"
 
 # Global state
@@ -380,7 +380,7 @@ main() {
         log SUCCESS "============================================================"
         log SUCCESS "✓ SERVICE RUNNING"
         log SUCCESS "============================================================"
-        log SUCCESS "API Server: http://localhost:8000"
+        log SUCCESS "API Server: http://localhost:8001"
         log SUCCESS "API Docs: $API_DOCS_URL"
         log SUCCESS "Press Ctrl+C to stop"
         log SUCCESS "============================================================"

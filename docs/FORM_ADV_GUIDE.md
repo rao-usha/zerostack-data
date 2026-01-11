@@ -134,7 +134,7 @@ Key columns:
 import requests
 import time
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:8001"
 
 # 1. Trigger ingestion
 response = requests.post(
@@ -163,7 +163,7 @@ while True:
 
 ```bash
 # Trigger ingestion
-curl -X POST http://localhost:8000/api/v1/sec/form-adv/ingest/family-offices \
+curl -X POST http://localhost:8001/api/v1/sec/form-adv/ingest/family-offices \
   -H "Content-Type: application/json" \
   -d '{
     "family_office_names": ["Soros Fund Management", "Pritzker Group"],
@@ -172,7 +172,7 @@ curl -X POST http://localhost:8000/api/v1/sec/form-adv/ingest/family-offices \
   }'
 
 # Check job status
-curl http://localhost:8000/api/v1/jobs/123
+curl http://localhost:8001/api/v1/jobs/123
 ```
 
 ### SQL Queries
@@ -237,7 +237,7 @@ The test script will:
 docker-compose up -d
 
 # 2. Trigger ingestion
-curl -X POST http://localhost:8000/api/v1/sec/form-adv/ingest/family-offices \
+curl -X POST http://localhost:8001/api/v1/sec/form-adv/ingest/family-offices \
   -H "Content-Type: application/json" \
   -d '{
     "family_office_names": ["Pritzker Group"]

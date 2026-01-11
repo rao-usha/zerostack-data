@@ -18,7 +18,7 @@ import time
 import os
 
 # Configuration
-BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000/api/v1")
+BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8001/api/v1")
 NOAA_TOKEN = os.getenv("NOAA_TOKEN", "YOUR_NOAA_TOKEN_HERE")
 
 # Check if token is configured
@@ -234,7 +234,7 @@ def main():
         print("✅ Successfully demonstrated NOAA data ingestion!")
         print()
         print("Next steps:")
-        print("1. Check the FastAPI docs: http://localhost:8000/docs")
+        print("1. Check the FastAPI docs: http://localhost:8001/docs")
         print("2. Read NOAA_QUICK_START.md for detailed documentation")
         print("3. Query the data using the SQL examples above")
         print("4. Try other datasets: normal_daily, gsom, etc.")

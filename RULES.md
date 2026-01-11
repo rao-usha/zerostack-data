@@ -1,28 +1,70 @@
-# External Data Ingestion Service - Development Rules
+# Nexdata - Development Rules
 
-This document outlines the architectural principles and rules for developing this service.
+This document outlines the architectural principles and rules for developing the Nexdata External Data Ingestion Service.
+
+## Service Configuration
+
+**CRITICAL: Always verify ports from `docker-compose.yml` before connecting.**
+
+| Service | Internal Port | Public/Host Port | Container Name |
+|---------|---------------|------------------|----------------|
+| API | 8000 | **8001** | `nexdata-api-1` |
+| PostgreSQL | 5432 | **5433** | `nexdata-postgres-1` |
+
+- **Documentation/curl commands:** Use public ports (8001, 5433)
+- **Code inside containers:** Use internal ports (8000, 5432)
+
+---
 
 ## Core Principles
 
 ### 1. Multi-Source Architecture
 
-This is a **multi-source ingestion service**. The architecture must support multiple data providers:
+This is a **multi-source ingestion service** supporting 25+ data providers:
 
-- **Current source:** `census` (ACS 5-year)
-- **Future sources:** `bls`, `bea`, `fred`, `sec`, etc. (added only when explicitly requested)
+**Approved Sources:**
+- Government/Economic: BEA, BLS, BTS, Census, EIA, FDIC, FEMA, FRED, IRS SOI, NOAA, Treasury, US Trade, USDA
+- Financial/Regulatory: CFTC COT, CMS, SEC (EDGAR, Form ADV, 13F, XBRL)
+- Other: Data Commons, FBI Crime, FCC Broadband, Kaggle, Real Estate, Yelp
+- Research: Public LP Strategies, Family Office tracking, Portfolio research
 
-**Key Rule:** The core service (`main.py`, `core/*`) must remain **source-agnostic**. All source-specific logic lives in `sources/{source_name}/`.
+**Key Rule:** The core service (`main.py`, `core/*`) must remain **source-agnostic**. All source-specific logic lives in `app/sources/{source_name}/`.
+
+**Adding NEW sources:** Requires explicit user request and follows the source module checklist.
 
 ### 2. Safety & Compliance
 
 #### Data Licensing
-- Only ingest data that is:
-  - Public domain
-  - Openly licensed for reuse
-  - Explicitly confirmed as licensed for our use
-- **Never** scrape arbitrary websites
-- **Never** access content behind paywalls or requiring login
-- Only use official, documented APIs
+Only ingest data that is:
+- Public domain
+- Openly licensed for reuse
+- Explicitly confirmed as licensed for our use
+
+#### Data Collection Methods
+
+**Permitted (Analyst-Equivalent Research):**
+- ✅ Official, documented APIs (preferred)
+- ✅ Structured data extraction from public websites (with safeguards)
+- ✅ Parsing public contact pages, directories, "About Us" pages
+- ✅ Extracting publicly disclosed information from official sources
+- ✅ Downloading bulk data files (CSV, Excel, PDF parsing)
+- ✅ SEC/regulatory filings
+- ✅ News articles and press releases (public, professional context)
+
+**Prohibited:**
+- ❌ Accessing content behind paywalls or requiring login
+- ❌ Aggressive/abusive scraping (ignoring robots.txt, rate limits)
+- ❌ Collecting personal information not publicly disclosed
+- ❌ Circumventing access controls or authentication
+- ❌ Scraping social media profiles (violates ToS)
+- ❌ Personal emails (gmail, yahoo) for business contacts
+
+**Required Safeguards:**
+- Respect robots.txt
+- Conservative rate limiting (1-2 req/sec per domain)
+- Proper User-Agent identification
+- Exponential backoff on errors
+- Respect "do not contact" or removal requests
 
 #### PII Protection (CRITICAL)
 **NEVER:**
@@ -30,18 +72,13 @@ This is a **multi-source ingestion service**. The architecture must support mult
 - Attempt to de-anonymize any dataset
 - Join datasets in ways that increase re-identification risk
 
-#### When in Doubt
-- Treat questionable datasets as **RESTRICTED**
-- **DO NOT** ingest them
-- Leave a clear comment or TODO instead
-
 ### 3. Network & Rate Limits
 
 #### Bounded Concurrency (MANDATORY)
 - **NEVER** design code with unbounded parallel requests
 - **ALWAYS** use bounded concurrency: semaphores, worker pools, limited async tasks
 - Use `asyncio.Semaphore` or similar mechanisms
-- Configure via `MAX_CONCURRENCY` environment variable
+- Configure via `MAX_CONCURRENCY` environment variable (default: 4)
 
 #### Rate Limit Compliance
 - **ALWAYS** obey documented rate limits for each source
@@ -58,9 +95,7 @@ This is a **multi-source ingestion service**. The architecture must support mult
 #### Schema Management
 - Use **typed columns** (INT, NUMERIC, TEXT, etc.)
 - **NEVER** use raw JSON blobs as the final data form
-- Schema changes must be:
-  - Explicit and deterministic
-  - Idempotent (safe to run multiple times)
+- Schema changes must be explicit, deterministic, and idempotent
 
 #### Destructive Operations
 - **NEVER** automatically drop tables, truncate tables, or delete large amounts of data
@@ -88,77 +123,102 @@ Use **ONLY** these states:
 - Record error messages in structured way when jobs fail
 - Track start and completion timestamps
 
-### 6. Extensibility & Plugin Pattern
+### 6. Agentic Research Rules
 
-#### Source Module Structure
-Each data source **MUST**:
-- Live in its own module: `app/sources/{source_name}/`
-- Implement a clear adapter interface
-- Handle its own API URLs, authentication, schema mapping
+#### LLM Usage
+- Approved providers: OpenAI, Anthropic
+- Log all LLM API costs per job
+- Soft limits: warn at $1/job
 
-#### Directory Structure
-```
-app/
-├── main.py              # FastAPI app, source-agnostic
-├── core/                # Core logic, no source-specific code
-│   ├── config.py
-│   ├── database.py
-│   ├── models.py
-│   ├── schemas.py
-│   └── ingestion.py
-├── sources/             # Source adapters
-│   ├── census/          # Census adapter
-│   │   ├── adapter.py
-│   │   ├── api.py
-│   │   └── schemas.py
-│   └── [future sources]
-└── api/                 # API routes
-    └── v1/
-        └── jobs.py
+#### Confidence Scoring
+- `high`: Multiple sources agree
+- `medium`: Single reliable source (SEC, official website)
+- `low`: Needs human review (news, LLM extraction)
+
+#### Human Review
+- LLM-extracted contacts require human verification before marking as verified
+- Statistical data can be auto-accepted with source attribution
+
+### 7. API Design Standards
+
+#### Standard Response Format
+```python
+{
+    "data": [...],
+    "meta": {"count": N, "source": "...", "job_id": "..."},
+    "errors": []
+}
 ```
 
-### 7. Testing Requirements
+#### Error Handling
+- Standard HTTP codes: 400, 404, 429, 500
+- Structured error messages with error_code and message
 
-#### Unit Tests
+### 8. Data Quality Standards
+
+#### Validation (Source-Dependent)
+- **Contacts:** Strict - reject invalid emails, validate phone formats, reject personal emails
+- **Statistical data:** Flexible - accept with warnings/flags
+
+#### Duplicate Detection
+- Check existing records before inserting
+- Use composite keys for deduplication
+
+---
+
+## Source Module Structure
+
+### Directory Layout
+```
+app/sources/{source_name}/
+├── __init__.py      # Exports
+├── client.py        # HTTP/API client logic
+├── ingest.py        # Ingestion orchestration
+├── metadata.py      # Dataset schemas, field definitions
+```
+
+### Adding a New Source - Checklist
+1. [ ] Create module under `app/sources/{source_name}/`
+2. [ ] Implement `client.py` with HTTP logic and rate limiting
+3. [ ] Implement `metadata.py` with dataset schemas
+4. [ ] Implement `ingest.py` with orchestration and job tracking
+5. [ ] Create API routes in `app/api/v1/{source_name}.py`
+6. [ ] Register router in `app/main.py`
+7. [ ] Add unit tests (mocked, no API calls)
+8. [ ] Add integration tests (real API, `RUN_INTEGRATION_TESTS=true`)
+9. [ ] Create `docs/{SOURCE}_QUICK_START.md`
+
+---
+
+## Testing Requirements
+
+### Unit Tests
 - Must run WITHOUT API keys or network access
-- Must pass in clean environment
 - Use fixtures and mocks for external dependencies
 - Mark with `@pytest.mark.unit`
 
-#### Integration Tests
+### Integration Tests
 - Only run when `RUN_INTEGRATION_TESTS=true`
 - Require valid API keys
-- Make real API calls to verify functionality
 - Mark with `@pytest.mark.integration`
 
-### 8. Configuration Management
+---
 
-#### Startup vs. Operation
-- **App startup** should NOT require data source API keys
-- **Ingestion operations** MUST validate API keys before proceeding
-- Fail early with clear error messages
+## Configuration
 
-#### Environment Variables
-Required:
+### Environment Variables
+**Required:**
 - `DATABASE_URL` - PostgreSQL connection URL
 
-Optional (with defaults):
-- `CENSUS_SURVEY_API_KEY` - Required only for Census operations
+**Optional (with defaults):**
 - `MAX_CONCURRENCY` - Default: 4
 - `MAX_REQUESTS_PER_SECOND` - Default: 5.0
 - `LOG_LEVEL` - Default: INFO
 - `RUN_INTEGRATION_TESTS` - Default: false
 
-## Common Pitfalls to Avoid
+**Source-specific API keys:** Required only when using that source.
 
-1. ❌ Unbounded concurrency → ✅ Use semaphores/rate limiters
-2. ❌ Missing error handling → ✅ Implement retry with backoff
-3. ❌ SQL string concatenation → ✅ Use parameterized queries
-4. ❌ Missing job tracking → ✅ Always update job status
-5. ❌ JSON storage for data → ✅ Use typed columns
-6. ❌ Adding sources proactively → ✅ Wait for explicit user request
-7. ❌ Hardcoding source logic in core → ✅ Use plugin pattern
-8. ❌ Scraping websites → ✅ Use official APIs only
+---
 
 ## Priority Matrix
 
@@ -168,6 +228,7 @@ Optional (with defaults):
 - SQL injection prevention
 - Bounded concurrency
 - Job tracking for all ingestion runs
+- Service configuration verification (check ports!)
 
 **P1 - High Priority:**
 - Rate limit compliance
@@ -181,21 +242,25 @@ Optional (with defaults):
 - Clear documentation
 - Performance optimization
 
-## Adding New Data Sources
+---
 
-To add a new source:
+## Common Pitfalls to Avoid
 
-1. Create module under `app/sources/{source_name}/`
-2. Implement client with HTTP logic
-3. Implement metadata parsing
-4. Implement ingestion orchestration
-5. Register in API routes
-6. Add tests (unit + integration)
-7. Document in README
+1. ❌ Unbounded concurrency → ✅ Use semaphores/rate limiters
+2. ❌ Missing error handling → ✅ Implement retry with backoff
+3. ❌ SQL string concatenation → ✅ Use parameterized queries
+4. ❌ Missing job tracking → ✅ Always update job status
+5. ❌ JSON storage for data → ✅ Use typed columns
+6. ❌ Hardcoding source logic in core → ✅ Use plugin pattern
+7. ❌ Assuming port 8000 → ✅ Check docker-compose.yml (API is 8001)
+8. ❌ Personal emails for contacts → ✅ Require business emails
 
-**Remember:** Only add sources when explicitly requested by the user.
+---
 
+## Quick Reference
 
-
-
-
+- **API Swagger UI:** http://localhost:8001/docs
+- **API ReDoc:** http://localhost:8001/redoc
+- **Database:** `postgresql://nexdata:nexdata_dev_password@localhost:5433/nexdata`
+- **Start services:** `docker-compose up -d`
+- **View logs:** `docker-compose logs -f api`

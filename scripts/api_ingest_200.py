@@ -11,7 +11,7 @@ from datetime import datetime
 from sec_companies_200 import get_all_companies, COMPANIES_200
 
 # API Configuration
-API_BASE_URL = "http://localhost:8000/api/v1"
+API_BASE_URL = "http://localhost:8001/api/v1"
 BATCH_SIZE = 10  # Companies per batch
 DELAY_BETWEEN_COMPANIES = 1  # Seconds
 DELAY_BETWEEN_BATCHES = 5  # Seconds

@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(dir)",
+      "Bash(explorer \"C:\\\\Users\\\\awron\\\\projects\\\\claude-telegram-bridge\")",
+      "Bash(start \"\" \"C:\\\\Users\\\\awron\\\\projects\\\\claude-telegram-bridge\")",
+      "Bash(timeout:*)",
+      "Bash(dir:*)",
+      "Bash(tasklist:*)",
+      "Bash(docker exec:*)",
+      "Bash(curl:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nrefactor: Consolidate API clients with BaseAPIClient pattern\n\nMajor refactoring to eliminate duplicate code across 16+ API clients:\n\nCore Infrastructure:\n- Add app/core/http_client.py - BaseAPIClient with retry, rate limiting, backoff\n- Add app/core/api_errors.py - Standardized error classification system\n- Add app/core/api_registry.py - Centralized config for 24 API sources\n- Add app/core/batch_operations.py - Reusable batch INSERT with upsert\n- Add app/core/ingest_base.py - BaseSourceIngestor for ingestion orchestration\n- Update app/core/config.py - Add unified get_api_key\\(\\) method\n\nRefactored Clients \\(all now extend BaseAPIClient\\):\n- FRED, EIA, BLS, NOAA, BEA, FEMA, Treasury, FDIC\n- SEC, Census, BTS, FBI Crime, CFTC COT, Data Commons\n- Yelp, US Trade, FCC Broadband\n\nBenefits:\n- ~50-60% code reduction per client\n- Consistent error handling and retry logic\n- Centralized rate limiting configuration\n- Easier addition of new data sources\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(docker cp:*)",
+      "Bash(.\\\\venv\\\\Scripts\\\\python.exe -m pytest:*)",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/test_fred_integration.py -v)",
+      "Bash(./venv/Scripts/python.exe -m pytest -v)",
+      "Bash(git commit:*)",
+      "Bash(ls:*)",
+      "Bash(xargs:*)"
+    ]
+  }
+}

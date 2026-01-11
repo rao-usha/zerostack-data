@@ -204,7 +204,7 @@ CREATE TABLE noaa_ghcnd_daily (
 ### Basic Ingestion
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/noaa/ingest \
+curl -X POST http://localhost:8001/api/v1/noaa/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "token": "YOUR_NOAA_TOKEN",
@@ -219,7 +219,7 @@ curl -X POST http://localhost:8000/api/v1/noaa/ingest \
 ### Chunked Ingestion (Large Date Ranges)
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/noaa/ingest \
+curl -X POST http://localhost:8001/api/v1/noaa/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "token": "YOUR_NOAA_TOKEN",
@@ -236,13 +236,13 @@ curl -X POST http://localhost:8000/api/v1/noaa/ingest \
 
 ```bash
 # List datasets
-curl http://localhost:8000/api/v1/noaa/datasets
+curl http://localhost:8001/api/v1/noaa/datasets
 
 # Find weather stations in California
-curl "http://localhost:8000/api/v1/noaa/stations?token=YOUR_TOKEN&location_id=FIPS:06"
+curl "http://localhost:8001/api/v1/noaa/stations?token=YOUR_TOKEN&location_id=FIPS:06"
 
 # Get available data types
-curl "http://localhost:8000/api/v1/noaa/data-types?token=YOUR_TOKEN&dataset_id=GHCND"
+curl "http://localhost:8001/api/v1/noaa/data-types?token=YOUR_TOKEN&dataset_id=GHCND"
 ```
 
 ### Python Client
@@ -251,7 +251,7 @@ curl "http://localhost:8000/api/v1/noaa/data-types?token=YOUR_TOKEN&dataset_id=G
 import requests
 
 response = requests.post(
-    "http://localhost:8000/api/v1/noaa/ingest",
+    "http://localhost:8001/api/v1/noaa/ingest",
     json={
         "token": "YOUR_NOAA_TOKEN",
         "dataset_key": "ghcnd_daily",
@@ -324,12 +324,12 @@ print(f"Ingested {result['rows_inserted']} rows into {result['table_name']}")
 
 3. **List Datasets:**
    ```bash
-   curl http://localhost:8000/api/v1/noaa/datasets
+   curl http://localhost:8001/api/v1/noaa/datasets
    ```
 
 4. **Ingest Test Data:**
    ```bash
-   curl -X POST http://localhost:8000/api/v1/noaa/ingest \
+   curl -X POST http://localhost:8001/api/v1/noaa/ingest \
      -H "Content-Type: application/json" \
      -d '{
        "token": "YOUR_TOKEN",
@@ -344,7 +344,7 @@ print(f"Ingested {result['rows_inserted']} rows into {result['table_name']}")
 
 5. **Check Job Status:**
    ```bash
-   curl http://localhost:8000/api/v1/jobs/{job_id}
+   curl http://localhost:8001/api/v1/jobs/{job_id}
    ```
 
 6. **Query Data:**
@@ -464,7 +464,7 @@ All implementation uses existing project dependencies:
 ### Documentation
 - **Quick Start Guide:** `NOAA_QUICK_START.md`
 - **This Summary:** `NOAA_IMPLEMENTATION_SUMMARY.md`
-- **API Docs:** http://localhost:8000/docs (when service running)
+- **API Docs:** http://localhost:8001/docs (when service running)
 - **Official NOAA Docs:** https://www.ncdc.noaa.gov/cdo-web/webservices/v2
 
 ### Troubleshooting

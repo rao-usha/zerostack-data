@@ -5,7 +5,7 @@
 Your Nexdata API comes with **automatic, interactive documentation**!
 
 ### Swagger UI (Interactive)
-**👉 http://localhost:8000/docs**
+**👉 http://localhost:8001/docs**
 
 - ✅ Try APIs instantly in your browser
 - ✅ See live request/response examples
@@ -14,14 +14,14 @@ Your Nexdata API comes with **automatic, interactive documentation**!
 - ✅ Download OpenAPI spec
 
 ### ReDoc (Read-only)
-**👉 http://localhost:8000/redoc**
+**👉 http://localhost:8001/redoc**
 
 - ✅ Clean documentation view
 - ✅ Better for reading/printing
 - ✅ Search functionality
 
 ### OpenAPI Schema (JSON)
-**👉 http://localhost:8000/openapi.json**
+**👉 http://localhost:8001/openapi.json**
 
 - ✅ Import into Postman/Insomnia
 - ✅ Generate client libraries
@@ -38,7 +38,7 @@ Your Nexdata API comes with **automatic, interactive documentation**!
 
 2. **Open your browser to:**
    ```
-   http://localhost:8000/docs
+   http://localhost:8001/docs
    ```
 
 3. **Try your first API call!**
@@ -72,7 +72,7 @@ Every endpoint includes:
 ## 💡 Common Tasks
 
 ### Test an Endpoint
-1. Go to http://localhost:8000/docs
+1. Go to http://localhost:8001/docs
 2. Find your endpoint
 3. Click "Try it out"
 4. Edit parameters
@@ -81,7 +81,7 @@ Every endpoint includes:
 ### Import to Postman
 1. Open Postman
 2. Click "Import"
-3. Paste: `http://localhost:8000/openapi.json`
+3. Paste: `http://localhost:8001/openapi.json`
 4. Done!
 
 ### Copy Curl Command
@@ -94,12 +94,12 @@ Every endpoint includes:
 ```bash
 # Python
 pip install openapi-python-client
-openapi-python-client generate --url http://localhost:8000/openapi.json
+openapi-python-client generate --url http://localhost:8001/openapi.json
 
 # TypeScript
 npm install -g @openapitools/openapi-generator-cli
 openapi-generator-cli generate \
-  -i http://localhost:8000/openapi.json \
+  -i http://localhost:8001/openapi.json \
   -g typescript-axios \
   -o ./client
 ```
@@ -114,7 +114,7 @@ For detailed documentation, see: **[docs/SWAGGER_UI_GUIDE.md](docs/SWAGGER_UI_GU
 
 ## ✨ That's It!
 
-Your API is fully documented at: **http://localhost:8000/docs**
+Your API is fully documented at: **http://localhost:8001/docs**
 
 Happy coding! 🚀
 

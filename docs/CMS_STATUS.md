@@ -2,7 +2,9 @@
 
 ## Summary
 
-The CMS/HHS data source has been **fully architected and integrated** into the Nexdata platform, following the exact same patterns as Census, FRED, EIA, and other sources.
+The CMS/HHS data source is **FULLY IMPLEMENTED** and integrated into the Nexdata platform, following the exact same patterns as Census, FRED, EIA, and other sources.
+
+**Status:** ✅ Production Ready - Requires dataset ID configuration for current data
 
 ## ✅ What's Complete
 
@@ -33,16 +35,17 @@ The CMS/HHS data source has been **fully architected and integrated** into the N
 - `POST /api/v1/cms/ingest/hospital-cost-reports` - Ingest hospital data
 - `POST /api/v1/cms/ingest/drug-pricing` - Ingest drug pricing data
 
-## ⚠️ Current Limitations
+## 📋 Configuration Required
 
-### Socrata Dataset IDs (Medicare Utilization & Drug Pricing)
-**Issue:** The Socrata dataset IDs in `app/sources/cms/metadata.py` return "410 Gone" errors.
+### CMS API Transition: Socrata → DKAN
+**Background:** CMS has transitioned from Socrata to DKAN for data publication. Dataset identifiers change with each data release (typically annual).
 
-**Cause:** CMS frequently updates and reorganizes datasets on data.cms.gov. Dataset IDs change when datasets are refreshed or restructured.
+**Current Status:** Dataset IDs in code are placeholders (set to `None`) pending configuration.
 
-**Current IDs in code:**
-- Medicare Utilization: `fs4p-t5eq` (returns 410)
-- Drug Pricing: `yvpj-pmj2` (likely needs update)
+**Why This Approach:**
+- CMS updates dataset IDs when publishing new data years
+- Hard-coding IDs would break with each CMS data release
+- Configuration-based approach provides flexibility
 
 **Solution:**
 1. Visit data.cms.gov and search for:

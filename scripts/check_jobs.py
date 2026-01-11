@@ -7,7 +7,7 @@ print("=" * 70)
 
 for job_id in job_ids:
     try:
-        response = httpx.get(f"http://localhost:8000/api/v1/jobs/{job_id}")
+        response = httpx.get(f"http://localhost:8001/api/v1/jobs/{job_id}")
         data = response.json()
         
         status = data["status"]

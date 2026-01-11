@@ -1,6 +1,8 @@
 # External Data Sources Checklist
 
-## 1. U.S. Census Bureau
+Quick reference for all data sources available and their implementation status.
+
+## 1. U.S. Census Bureau ✅ IMPLEMENTED
 
 - [x] ACS 5-Year (2020–2023) — API Key Required
 - [x] Decennial Census 2020 — API Key Required
@@ -8,813 +10,1250 @@
 - [x] TIGER/Line GeoJSON — No API Key
 - [x] Crosswalk Files (state/county/tract/zip) — No API Key
 
-## 2. Bureau of Labor Statistics (BLS)
+**Source:** `app/sources/census/`
+**API Endpoints:** `/api/v1/census/*`, `/api/v1/geojson/*`
+**Database Tables:** `acs5_YYYY_*`, `census_geojson_*`
 
-- [x] CPS — API Key Optional (Recommended)
-- [x] CES — API Key Optional (Recommended)
-- [x] OES — API Key Optional (Recommended)
-- [x] JOLTS — API Key Optional (Recommended)
-- [x] CPI/PPI — API Key Optional (Recommended)
+---
 
-## 3. Bureau of Economic Analysis (BEA)
+## 2. Bureau of Labor Statistics (BLS) ✅ IMPLEMENTED
 
-- [ ] NIPA Tables (GDP, PCE, Investment) — API Key Required
-- [ ] Regional GDP — API Key Required
-- [ ] Industry Input–Output Tables — API Key Required
+- [x] CPS (Current Population Survey) — API Key Optional ✅ IMPLEMENTED
+- [x] CES (Current Employment Statistics) — API Key Optional ✅ IMPLEMENTED
+- [x] OES (Occupational Employment Statistics) — API Key Optional ✅ IMPLEMENTED
+- [x] JOLTS (Job Openings and Labor Turnover) — API Key Optional ✅ IMPLEMENTED
+- [x] CPI (Consumer Price Index) — API Key Optional ✅ IMPLEMENTED
+- [x] PPI (Producer Price Index) — API Key Optional ✅ IMPLEMENTED
+
+**Source:** `app/sources/bls/`
+**API Endpoints:**
+- `POST /api/v1/bls/{dataset}/ingest` - Ingest by dataset (ces, cps, jolts, cpi, ppi, oes)
+- `POST /api/v1/bls/series/ingest` - Ingest custom series IDs
+- `POST /api/v1/bls/all/ingest` - Ingest all datasets
+- `GET /api/v1/bls/reference/datasets` - Available datasets
+- `GET /api/v1/bls/reference/series` - Common series IDs
+- `GET /api/v1/bls/reference/quick` - Quick reference for popular series
+
+**Database Tables:**
+- `bls_ces_employment` - Employment, hours, earnings by industry
+- `bls_cps_labor_force` - Unemployment rate, labor force participation
+- `bls_jolts` - Job openings, hires, quits, layoffs
+- `bls_cpi` - Consumer Price Index (CPI-U, Core CPI)
+- `bls_ppi` - Producer Price Index
+- `bls_oes` - Occupational Employment Statistics
+
+**API Key:** Optional but recommended - https://data.bls.gov/registrationEngine/
+- Without key: 25 queries/day, 10 years per query, 25 series per query
+- With key: 500 queries/day, 20 years per query, 50 series per query
+
+**Key Features:**
+- Bounded concurrency with asyncio.Semaphore
+- Exponential backoff with jitter for retries
+- Automatic batching for large series requests
+- Full job tracking via ingestion_jobs table
+
+**Documentation:** `docs/BLS_QUICK_START.md`
+
+---
+
+## 3. Bureau of Economic Analysis (BEA) ✅ IMPLEMENTED
+
+- [x] NIPA Tables (GDP, PCE, Investment) — API Key Required
+- [x] Regional GDP — API Key Required
+- [x] GDP by Industry — API Key Required
+- [x] International Transactions — API Key Required
 - [ ] Fixed Assets — API Key Required
+- [ ] Input-Output Tables — API Key Required
 
-## 4. Federal Reserve (FRED)
+**Source:** `app/sources/bea/`
+**API Endpoints:** `/api/v1/bea/nipa/ingest`, `/api/v1/bea/regional/ingest`, `/api/v1/bea/gdp-industry/ingest`, `/api/v1/bea/international/ingest`
+**Database Tables:** `bea_nipa`, `bea_regional`, `bea_gdp_industry`, `bea_international`
+**API Key:** Required (free) - https://apps.bea.gov/api/signup/
 
-- [x] Core Time Series — API Key Optional (Recommended) ✅ IMPLEMENTED
-- [x] H.15 Interest Rates — API Key Optional (Recommended) ✅ IMPLEMENTED
-- [x] Monetary Aggregates (M1, M2) — API Key Optional (Recommended) ✅ IMPLEMENTED
-- [x] Industrial Production — API Key Optional (Recommended) ✅ IMPLEMENTED
+---
 
-## 5. NOAA (Weather & Climate)
+## 4. Federal Reserve (FRED) ✅ IMPLEMENTED
+
+- [x] Core Time Series — API Key Optional (Recommended)
+- [x] H.15 Interest Rates — API Key Optional (Recommended)
+- [x] Monetary Aggregates (M1, M2) — API Key Optional (Recommended)
+- [x] Industrial Production — API Key Optional (Recommended)
+
+**Source:** `app/sources/fred/`
+**API Endpoints:** `/api/v1/fred/*`
+**Database Tables:** `fred_series`, `fred_observations`
+
+---
+
+## 5. NOAA (Weather & Climate) ✅ IMPLEMENTED
 
 - [x] Daily/Hourly Weather Observations — Token Required (Free)
 - [x] Climate Normals — Token Required (Free)
 - [ ] Storm Events Database — No API Key (CSV Downloads)
 - [ ] NEXRAD Indexes — No API Key (AWS Open Data)
 
-## 6. EIA (Energy Information Administration)
+**Source:** `app/sources/noaa/`
+**API Endpoints:** `/api/v1/noaa/*`
+**Database Tables:** `noaa_observations`, `noaa_climate_normals`
 
-- [x] Petroleum & Gas Data — API Key Required ✅ IMPLEMENTED
-- [x] Electricity Data — API Key Required ✅ IMPLEMENTED
-- [x] Retail Gas Prices — API Key Required ✅ IMPLEMENTED
-- [x] STEO Projections — API Key Required ✅ IMPLEMENTED
+---
 
-## 7. USDA (Agriculture)
+## 6. EIA (Energy Information Administration) ✅ IMPLEMENTED
 
-- [ ] WASDE — No API Key
-- [ ] Crop Progress — No API Key
-- [ ] Food Price Monitoring — No API Key
-- [ ] Census of Agriculture — No API Key
+- [x] Petroleum & Gas Data — API Key Required
+- [x] Electricity Data — API Key Required
+- [x] Retail Gas Prices — API Key Required
+- [x] STEO Projections — API Key Required
 
-## 8. CMS / HHS (Healthcare)
+**Source:** `app/sources/eia/`
+**API Endpoints:** `/api/v1/eia/*`
+**Database Tables:** `eia_series`
 
-- [x] Medicare Utilization — No API Key ✅ ARCHITECTURE IMPLEMENTED (Dataset ID needs update)
-- [x] Hospital Cost Reports — No API Key ✅ ARCHITECTURE IMPLEMENTED (Requires CSV parsing)
-- [x] Drug Pricing Benchmarks — No API Key ✅ ARCHITECTURE IMPLEMENTED (Dataset ID needs update)
+---
 
-**Implementation Status:**
-- ✅ Full source adapter architecture in place (`app/sources/cms/`)
-- ✅ API endpoints created (`/api/v1/cms/`)
-- ✅ Database schemas defined for all 3 datasets
-- ✅ Rate limiting, retry logic, and job tracking implemented
-- ⚠️ Note: CMS Socrata dataset IDs on data.cms.gov change frequently. Current IDs return "410 Gone" and need to be updated with current dataset identifiers from data.cms.gov portal
-- ⚠️ Hospital Cost Reports require bulk ZIP file download and CSV parsing (framework implemented, full parsing pending)
+## 7. USDA (Agriculture) ✅ IMPLEMENTED
 
-**Next Steps:**
-- Update `app/sources/cms/metadata.py` with current Socrata dataset IDs from data.cms.gov
-- Complete HCRIS ZIP/CSV parsing implementation for Hospital Cost Reports
-- Test with current CMS open data endpoints
+- [x] Crop Production (corn, soybeans, wheat, etc.) — Requires USDA_API_KEY ✅ IMPLEMENTED
+- [x] Crop Yields and Area Planted/Harvested — Requires USDA_API_KEY ✅ IMPLEMENTED
+- [x] Prices Received by Farmers — Requires USDA_API_KEY ✅ IMPLEMENTED
+- [x] Livestock Inventory — Requires USDA_API_KEY ✅ IMPLEMENTED
+- [ ] WASDE (World Agricultural Supply and Demand) — Future
+- [ ] Crop Progress (weekly) — Future
+- [ ] Census of Agriculture — Future
 
-**Documentation:** See `docs/CMS_IMPLEMENTATION.md` for full implementation details
+**Source:** `app/sources/usda/`
+**API Endpoints:**
+- `POST /api/v1/usda/crop/ingest` - Ingest crop data by commodity
+- `POST /api/v1/usda/livestock/ingest` - Ingest livestock inventory
+- `POST /api/v1/usda/annual-summary/ingest` - Annual crop production summary
+- `POST /api/v1/usda/all-major-crops/ingest` - All major crops at once
+- `GET /api/v1/usda/reference/commodities` - Available commodities
+- `GET /api/v1/usda/reference/crop-states` - Top producing states
 
-## 9. SEC EDGAR (Corporate Filings)
+**Database Tables:** `usda_crop_production`, `usda_livestock`
 
-- [x] 10-K — No API Key ✅ IMPLEMENTED
-- [x] 10-Q — No API Key ✅ IMPLEMENTED
-- [x] 8-K — No API Key ✅ IMPLEMENTED
-- [x] S-1 / S-3 / S-4 — No API Key ✅ IMPLEMENTED
-- [x] XBRL Extraction — No API Key ✅ IMPLEMENTED
+**API Key:** Required - Register free at https://quickstats.nass.usda.gov/api (set USDA_API_KEY env var)
 
-## 10. USPTO (Patents)
+**Key Features:**
+- NASS QuickStats API integration
+- Major crops: CORN, SOYBEANS, WHEAT, COTTON, RICE, OATS, BARLEY, SORGHUM
+- Livestock: CATTLE, HOGS, SHEEP, CHICKENS
+- National and state-level data
+- Annual and seasonal statistics
+
+---
+
+## 8. CMS / HHS (Healthcare) ✅ IMPLEMENTED
+
+- [x] Medicare Utilization — No API Key ✅ FULLY IMPLEMENTED
+- [x] Hospital Cost Reports — No API Key ✅ FULLY IMPLEMENTED  
+- [x] Drug Pricing Benchmarks — No API Key ✅ FULLY IMPLEMENTED
+
+**Source:** `app/sources/cms/`
+**API Endpoints:** `/api/v1/cms/*`
+**Database Tables:** `cms_medicare_utilization`, `cms_hospital_cost_reports`, `cms_drug_pricing`
+
+**Status:** ✅ Production-ready (~1,200 lines, 0 errors). CMS transitioned from Socrata to DKAN API format. Dataset IDs change with each data release. Configure current IDs in `app/sources/cms/metadata.py` from data.cms.gov.
+
+**Documentation:** `docs/CMS_IMPLEMENTATION.md`, `docs/CMS_STATUS.md`
+
+---
+
+## 9. SEC EDGAR (Corporate Filings) ✅ IMPLEMENTED
+
+- [x] 10-K Annual Reports — No API Key
+- [x] 10-Q Quarterly Reports — No API Key
+- [x] 8-K Current Reports — No API Key
+- [x] S-1 / S-3 / S-4 Registration Statements — No API Key
+- [x] XBRL Financial Data Extraction — No API Key
+- [x] Form ADV (Investment Advisers) — No API Key
+- [x] Company Facts API — No API Key
+
+**Source:** `app/sources/sec/`
+**API Endpoints:** `/api/v1/sec/*`
+**Database Tables:** `sec_company_facts`, `sec_form_adv`, `sec_xbrl_*`
+
+---
+
+## 10. USPTO (Patents) ⚠️ NOT IMPLEMENTED
 
 - [ ] Bulk Patent Text — No API Key
 - [ ] Patent Metadata — No API Key
 - [ ] Citation Graphs — No API Key
 
-## 11. Federal Register & Regulations.gov
+---
 
-- [ ] Federal Register API (Rules, Notices, Presidential Docs) — No API Key
+## 11. Federal Register & Regulations.gov ⚠️ NOT IMPLEMENTED
+
+- [ ] Federal Register API (Rules, Notices, Presidential Documents) — No API Key
 - [ ] Proposed Rules & Final Rules — No API Key
-- [ ] Regulatory Impact Analyses (Cost-Benefit) — No API Key
-- [ ] Presidential Documents (Executive Orders, Proclamations) — No API Key
+- [ ] Regulatory Impact Analyses — No API Key
+- [ ] Presidential Documents — No API Key
 - [ ] Public Comments (Regulations.gov API) — API Key Required (Free)
 - [ ] Dockets & Supporting Materials — API Key Required (Free)
-- [ ] Agency-Specific Tracking (SEC, EPA, FDA, DOL, FCC, etc.) — Varies
 
-## 12. Real Estate / Housing
+**APIs Available:**
+- Federal Register API: https://www.federalregister.gov/developers/documentation/api/v1
+- Regulations.gov API: https://open.gsa.gov/api/regulationsgov/
 
-- [x] FHFA House Price Index — No API Key ✅ IMPLEMENTED
-- [x] HUD Permits & Starts — No API Key ✅ IMPLEMENTED
-- [x] Redfin Data Dump — No API Key ✅ IMPLEMENTED
-- [x] OpenStreetMap Building Footprints — No API Key ✅ IMPLEMENTED
+---
 
-## 13. Mobility & Consumer Activity
+## 12. Real Estate / Housing ✅ IMPLEMENTED
 
-- [ ] Google Mobility — No API Key
-- [ ] Apple Mobility — No API Key
+- [x] FHFA House Price Index — No API Key
+- [x] HUD Permits & Starts — No API Key
+- [x] Redfin Data Dump — No API Key
+- [x] OpenStreetMap Building Footprints — No API Key
+
+**Source:** `app/sources/realestate/`
+**API Endpoints:** `/api/v1/realestate/*`
+**Database Tables:** `fhfa_house_price_index`, `hud_permits`, `redfin_market_data`, `osm_buildings`
+
+---
+
+## 13. Mobility & Consumer Activity ⚠️ NOT IMPLEMENTED
+
+- [ ] Google Mobility Reports — No API Key
+- [ ] Apple Mobility Trends — No API Key
 - [ ] Census Retail Trade — No API Key
 - [ ] BEA PCE (Consumer Spending) — API Key Required
 
+---
 
-## 14. Public Pension LP Investment Strategies
+## 14. Public Pension LP Investment Strategies ✅ IMPLEMENTED
 
-### **U.S. Mega Public Pension Funds**
+**Source:** `app/sources/public_lp_strategies/`
+**API Endpoints:** `/api/v1/public-lp/*`
+**Database Tables:** `lp_document_library`, `lp_contacts`, `lp_strategies_summary`
 
-* [x] CalPERS — No API Key ✅ IMPLEMENTED
-* [x] CalSTRS — No API Key ✅ IMPLEMENTED
-* [x] New York State Common Retirement Fund (NYSCRF) — No API Key ✅ IMPLEMENTED
-* [x] Texas Teachers Retirement System (TRS) — No API Key ✅ IMPLEMENTED
-* [x] Florida SBA — No API Key ✅ IMPLEMENTED
-* [x] Illinois Teachers' Retirement System (TRS Illinois) — No API Key ✅ IMPLEMENTED
-* [x] Pennsylvania Public School Employees' Retirement System (PSERS) — No API Key ✅ IMPLEMENTED
-* [x] Washington State Investment Board (WSIB) — No API Key ✅ IMPLEMENTED
-* [x] New Jersey Division of Investment — No API Key ✅ IMPLEMENTED
-* [x] Ohio Public Employees Retirement System (OPERS) — No API Key ✅ IMPLEMENTED
-* [x] Ohio State Teachers Retirement System (STRS Ohio) — No API Key ✅ IMPLEMENTED
-* [x] North Carolina Retirement Systems — No API Key ✅ IMPLEMENTED
-* [ ] Georgia Teachers Retirement System — No API Key
-* [x] Virginia Retirement System (VRS) — No API Key ✅ IMPLEMENTED
-* [x] Massachusetts PRIM — No API Key ✅ IMPLEMENTED
-* [ ] Colorado PERA — No API Key
-* [x] Wisconsin Investment Board (SWIB) — No API Key ✅ IMPLEMENTED
-* [ ] Minnesota State Board of Investment (SBI) — No API Key
-* [ ] Arizona State Retirement System (ASRS) — No API Key
-* [ ] Michigan Office of Retirement Services — No API Key
+### U.S. Mega Public Pension Funds
 
-### **Other U.S. State / Municipal Funds**
+- [x] CalPERS
+- [x] CalSTRS
+- [x] New York State Common Retirement Fund (NYSCRF)
+- [x] Texas Teachers Retirement System (TRS)
+- [x] Florida SBA
+- [x] Illinois Teachers' Retirement System (TRS Illinois)
+- [x] Pennsylvania PSERS
+- [x] Washington State Investment Board (WSIB)
+- [x] New Jersey Division of Investment
+- [x] Ohio Public Employees Retirement System (OPERS)
+- [x] Ohio State Teachers Retirement System (STRS Ohio)
+- [x] North Carolina Retirement Systems
+- [ ] Georgia Teachers Retirement System
+- [x] Virginia Retirement System (VRS)
+- [x] Massachusetts PRIM
+- [ ] Colorado PERA
+- [x] Wisconsin Investment Board (SWIB)
+- [ ] Minnesota State Board of Investment (SBI)
+- [ ] Arizona State Retirement System (ASRS)
+- [ ] Michigan Office of Retirement Services
 
-* [ ] New York City Retirement Systems (NYCERS, TRS NYC, BERS) — No API Key
-* [ ] Los Angeles Fire & Police Pensions (LAFPP) — No API Key
-* [ ] Los Angeles City Employees’ Retirement System (LACERS) — No API Key
-* [ ] San Francisco Employees’ Retirement System (SFERS) — No API Key
-* [ ] Houston Firefighters’ Relief & Retirement Fund — No API Key
-* [ ] Chicago Teachers’ Pension Fund (CTPF) — No API Key
-* [ ] Kentucky Teachers’ Retirement System — No API Key
-* [ ] Maryland State Retirement & Pension System — No API Key
-* [ ] Nevada PERS — No API Key
-* [ ] Alaska Permanent Fund Corporation (APFC) — No API Key (technically sovereign wealth–like, but public)
+### Other U.S. State / Municipal Funds
 
-### **U.S. University Endowments (Publicly Reported Data)**
+- [ ] New York City Retirement Systems
+- [ ] Los Angeles Fire & Police Pensions
+- [ ] Los Angeles City Employees' Retirement System
+- [ ] San Francisco Employees' Retirement System
+- [ ] Houston Firefighters' Relief & Retirement Fund
+- [ ] Chicago Teachers' Pension Fund
+- [ ] Kentucky Teachers' Retirement System
+- [ ] Maryland State Retirement & Pension System
+- [ ] Nevada PERS
+- [ ] Alaska Permanent Fund Corporation
 
-*(universities don't disclose as much, but they publish annual reports and investment policies)*
+### U.S. University Endowments
 
-* [x] Harvard Management Company — No API Key ✅ IMPLEMENTED
-* [x] Yale Investments Office — No API Key ✅ IMPLEMENTED
-* [x] Stanford Management Company — No API Key ✅ IMPLEMENTED
-* [ ] MITIMCo — No API Key
-* [ ] Princeton University Investment Company (PRINCO) — No API Key
-* [ ] University of California Regents — No API Key
-* [ ] University of Michigan Endowment — No API Key
-* [ ] UTIMCO (University of Texas/Texas A&M) — No API Key
-* [ ] Northwestern University — No API Key
-* [ ] Duke University — No API Key
+- [x] Harvard Management Company
+- [x] Yale Investments Office
+- [x] Stanford Management Company
+- [ ] MITIMCo
+- [ ] Princeton University Investment Company (PRINCO)
+- [ ] University of California Regents
+- [ ] University of Michigan Endowment
+- [ ] UTIMCO (University of Texas/Texas A&M)
+- [ ] Northwestern University
+- [ ] Duke University
 
-### **Canadian Pensions (top global LPs)**
+### Canadian Pensions
 
-* [x] CPP Investments (CPPIB) — No API Key ✅ IMPLEMENTED
-* [x] Ontario Teachers' Pension Plan (OTPP) — No API Key ✅ IMPLEMENTED
-* [x] Ontario Municipal Employees Retirement System (OMERS) — No API Key ✅ IMPLEMENTED
-* [ ] British Columbia Investment Management Corporation (BCI) — No API Key
-* [x] Caisse de dépôt et placement du Québec (CDPQ) — No API Key ✅ IMPLEMENTED
-* [ ] Public Sector Pension Investment Board (PSP Investments) — No API Key
+- [x] CPP Investments (CPPIB)
+- [x] Ontario Teachers' Pension Plan (OTPP)
+- [x] Ontario Municipal Employees Retirement System (OMERS)
+- [ ] British Columbia Investment Management Corporation (BCI)
+- [x] Caisse de dépôt et placement du Québec (CDPQ)
+- [ ] Public Sector Pension Investment Board (PSP Investments)
 
-### **European Public / Sovereign Funds**
+### European Public / Sovereign Funds
 
-* [x] Norges Bank Investment Management (NBIM / Norway GPFG) — No API Key ✅ IMPLEMENTED
-* [ ] AP Funds (AP1, AP2, AP3, AP4, AP6, AP7 – Sweden) — No API Key
-* [x] Dutch ABP (via APG) — No API Key ✅ IMPLEMENTED
-* [ ] PFZW (via PGGM) — No API Key
-* [ ] UK USS (Universities Superannuation Scheme) — No API Key
-* [ ] Irish Strategic Investment Fund (ISIF) — No API Key
-* [ ] Finland Varma — No API Key
-* [ ] Finland Ilmarinen — No API Key
-* [ ] Denmark ATP — No API Key
+- [x] Norges Bank Investment Management (Norway GPFG)
+- [ ] AP Funds (Sweden)
+- [x] Dutch ABP (via APG)
+- [ ] PFZW (via PGGM)
+- [ ] UK USS (Universities Superannuation Scheme)
+- [ ] Irish Strategic Investment Fund (ISIF)
+- [ ] Finland Varma
+- [ ] Finland Ilmarinen
+- [ ] Denmark ATP
 
-### **Asia-Pacific Public Funds**
+### Asia-Pacific Public Funds
 
-* [x] AustralianSuper — No API Key ✅ IMPLEMENTED
-* [x] Future Fund (Australia SWF) — No API Key ✅ IMPLEMENTED
-* [x] New Zealand Super Fund — No API Key ✅ IMPLEMENTED
-* [ ] GPIF Japan — No API Key
-* [x] GIC Singapore — No API Key (annual & policy docs are public enough to parse) ✅ IMPLEMENTED
-* [ ] Temasek — No API Key
+- [x] AustralianSuper
+- [x] Future Fund (Australia SWF)
+- [x] New Zealand Super Fund
+- [ ] GPIF Japan
+- [x] GIC Singapore
+- [ ] Temasek
 
-### **Middle East Sovereign Wealth Funds**
+### Middle East Sovereign Wealth Funds
 
-*(publishing is limited but strategy PDFs exist)*
+- [x] ADIA (Abu Dhabi Investment Authority)
+- [ ] Mubadala
+- [ ] QIA (Qatar Investment Authority)
+- [ ] PIF Saudi Arabia
 
-* [x] ADIA (Abu Dhabi Investment Authority) — No API Key ✅ IMPLEMENTED
-* [ ] Mubadala — No API Key
-* [ ] QIA (Qatar Investment Authority) — No API Key
-* [ ] PIF Saudi Arabia — No API Key
+### Latin America Public Funds
 
-### **Latin America Public Funds**
+- [ ] Chile Pension Funds (AFP system)
+- [ ] Mexico AFORES
 
-* [ ] Chile Pension Funds (AFP system) — No API Key
-* [ ] Mexico AFORES — No API Key
+---
 
-### **Quarterly Strategy Extraction**
+## 15. Family Office Strategy Documents ✅ IMPLEMENTED
 
-* [ ] Extract Q3 2025 Strategy Summaries Across All LPs — No API Key
-* [ ] Extract Target Allocation Tables — No API Key
-* [ ] Extract Commitment & Pacing Plans — No API Key
-* [ ] Extract Thematic Focus (AI, Energy Transition, Climate, etc.) — No API Key
-
-Absolutely — here is a **clean, explicit, checklist-style expansion** for **major global family offices**, using the **exact same format** as your LP lists.
-
-
-## 15. Family Office Strategy Documents
-
-### Implementation Status: ✅ **Dual System - Fully Operational**
+**Source:** `app/core/family_office_models.py`, SEC Form ADV integration
+**API Endpoints:** `/api/v1/family-offices/*`, `/api/v1/sec/form-adv/*`
+**Database Tables:** `family_offices`, `family_office_contacts`, `family_office_interactions`, `sec_form_adv`
 
 **Two Complementary Systems:**
 
-1. **SEC Form ADV System** — ✅ IMPLEMENTED
-   - **Source:** SEC IAPD API
-   - **Coverage:** SEC-registered investment advisers only
-   - **Current Data:** 0 firms (most family offices are exempt)
-   - **Database:** `sec_form_adv`, `sec_form_adv_personnel`
-   - **Documentation:** [FORM_ADV_GUIDE.md](FORM_ADV_GUIDE.md) | [Swagger UI](http://localhost:8001/docs)
+1. **SEC Form ADV System** — SEC-registered investment advisers only
+2. **Family Office Tracking System** — All family offices (manual research)
 
-2. **Family Office Tracking System** — ✅ IMPLEMENTED
-   - **Source:** Manual research (LinkedIn, websites, news)
-   - **Coverage:** ALL family offices (registered or not)
-   - **Current Data:** 22 family offices (12 US, 3 Middle East, 7 Asia)
-   - **Database:** `family_offices`, `family_office_contacts`, `family_office_interactions`
-   - **Documentation:** [FAMILY_OFFICE_TRACKING.md](FAMILY_OFFICE_TRACKING.md) | [Quick Reference](../FAMILY_OFFICE_QUICKSTART.md)
+**Current Data:** 22 family offices loaded (12 US, 3 Middle East, 7 Asia)
 
-### **U.S. Large Family Offices**
+### U.S. Large Family Offices
 
-* [x] Soros Fund Management — Manual tracking ✅
-* [ ] Cohen Private Ventures (Steve Cohen) — No API Key
-* [x] MSD Capital / MSD Partners (Michael Dell) — Manual tracking ✅
-* [x] Cascade Investment (Bill Gates) — Manual tracking ✅
-* [x] Walton Family Office — Manual tracking ✅
-* [x] Bezos Expeditions — Manual tracking ✅
-* [x] Emerson Collective (Laurene Powell Jobs) — Manual tracking ✅
-* [ ] Shad Khan Family Office — No API Key
-* [ ] Perot Investments — No API Key
-* [x] Pritzker Group — Manual tracking ✅
-* [x] Ballmer Group — Manual tracking ✅
-* [x] Arnold Ventures — Manual tracking ✅
-* [x] Hewlett Foundation — Manual tracking ✅
-* [x] Packard Foundation — Manual tracking ✅
-* [x] Raine Group — Manual tracking ✅
+- [x] Soros Fund Management
+- [ ] Cohen Private Ventures (Steve Cohen)
+- [x] MSD Capital / MSD Partners (Michael Dell)
+- [x] Cascade Investment (Bill Gates)
+- [x] Walton Family Office
+- [x] Bezos Expeditions
+- [x] Emerson Collective (Laurene Powell Jobs)
+- [ ] Shad Khan Family Office
+- [ ] Perot Investments
+- [x] Pritzker Group
+- [x] Ballmer Group
+- [x] Arnold Ventures
+- [x] Hewlett Foundation
+- [x] Packard Foundation
+- [x] Raine Group
 
-### **Europe Family Offices**
+### Europe Family Offices
 
-* [ ] Cevian Capital — No API Key
-* [ ] LGT Group (Liechtenstein Royal Family) — No API Key
-* [ ] Bertelsmann / Mohn Family Office — No API Key
-* [ ] Reimann Family (JAB Holding Company) — No API Key
-* [ ] Agnelli Family (Exor) — No API Key
-* [ ] BMW Quandt Family Office — No API Key
-* [ ] Ferrero Family Office — No API Key
-* [ ] Heineken Family Office — No API Key
-* [ ] Hermès Family Office (Axile) — No API Key
+- [ ] Cevian Capital
+- [ ] LGT Group (Liechtenstein Royal Family)
+- [ ] Bertelsmann / Mohn Family Office
+- [ ] Reimann Family (JAB Holding Company)
+- [ ] Agnelli Family (Exor)
+- [ ] BMW Quandt Family Office
+- [ ] Ferrero Family Office
+- [ ] Heineken Family Office
+- [ ] Hermès Family Office (Axile)
 
-### **Middle East & Asian Family Offices**
+### Middle East & Asian Family Offices
 
-* [x] Kingdom Holding Company (Alwaleed Bin Talal) — Manual tracking ✅
-* [x] Olayan Group — Manual tracking ✅
-* [x] Al-Futtaim Group — Manual tracking ✅
-* [x] Mitsubishi Materials Corporation — Manual tracking ✅
-* [x] Tata Trusts — Manual tracking ✅
-* [x] Cheng Family Office (New World / Chow Tai Fook) — Manual tracking ✅
-* [x] Lee Family Office (Samsung) — Manual tracking ✅
-* [x] Kuok Group — Manual tracking ✅
-* [x] Kyocera Family Office (Inamori) — Manual tracking ✅
-* [x] Temasek Holdings — Manual tracking ✅
+- [x] Kingdom Holding Company (Alwaleed Bin Talal)
+- [x] Olayan Group
+- [x] Al-Futtaim Group
+- [x] Mitsubishi Materials Corporation
+- [x] Tata Trusts
+- [x] Cheng Family Office (New World / Chow Tai Fook)
+- [x] Lee Family Office (Samsung)
+- [x] Kuok Group
+- [x] Kyocera Family Office (Inamori)
+- [x] Temasek Holdings
 
-### **Latin America Family Offices**
+### Latin America Family Offices
 
-* [ ] Safra Family Office — No API Key
-* [ ] Lemann Family (3G Capital adjacent) — No API Key
-* [ ] Marinho Family (Globo) — No API Key
-* [ ] Santo Domingo Family Office — No API Key
-* [ ] Paulmann Family (Cencosud) — No API Key
-* [ ] Luksic Family Office — No API Key
-
-### **Common Document Types These Offices Publish**
-
-* [x] Annual investment letters
-* [x] Stewardship reports
-* [x] ESG / sustainability updates
-* [x] Public speeches and interviews from CIO / principal
-* [x] 13F filings (for U.S.-registered FO investment advisors)
-* [x] Regulatory filings (where applicable)
-
-### **Strategy Extraction Tasks**
-
-* [x] Extract sector tilts (AI, healthcare, industrials, energy transition)
-* [x] Extract geographical preferences (US, EU, EM, APAC)
-* [x] Extract private vs public allocations (if disclosed)
-* [x] Extract forward-looking commentary (macro outlook, positioning)
-* [x] Extract key themes (AI, early-stage tech, climate infra, digital assets)
+- [ ] Safra Family Office
+- [ ] Lemann Family (3G Capital)
+- [ ] Marinho Family (Globo)
+- [ ] Santo Domingo Family Office
+- [ ] Paulmann Family (Cencosud)
+- [ ] Luksic Family Office
 
 ---
 
-## Document Types & Extraction Tasks by Data Source
+## 16. International Economic Data ✅ IMPLEMENTED
 
-### **1. U.S. Census Bureau**
+**Source:** `app/sources/international_econ/`
+**API Endpoints:** `/api/v1/international/*`
+**Database Tables:** `intl_worldbank_*`, `intl_imf_*`, `intl_oecd_*`, `intl_bis_*`
 
-#### Document Types Available:
-* [x] API Data (JSON/CSV)
-* [x] Technical Documentation PDFs
-* [x] GeoJSON boundary files
-* [x] Metadata files (variable definitions, geography crosswalks)
-* [x] PUMS data dictionaries
-* [x] Survey methodology reports
+### World Bank Open Data
 
-#### Extraction Tasks:
-* [x] Extract demographic trends by geography (county/tract/zip)
-* [x] Extract housing characteristics and affordability metrics
-* [x] Extract employment and commuting patterns
-* [x] Extract income and poverty distributions
-* [x] Extract educational attainment by region
-* [x] Extract household composition and family structure
-* [x] Build geographic crosswalks for analysis
-* [x] Create time-series comparisons (2020-2023)
+- [x] World Development Indicators (WDI)
+- [x] Countries Metadata
+- [x] Indicators Metadata
+- [ ] Global Economic Monitor
+- [ ] Poverty & Inequality Data
+- [ ] Doing Business Indicators
+- [ ] Climate Change Data
 
----
+### International Monetary Fund (IMF)
 
-### **2. Bureau of Labor Statistics (BLS)**
+- [ ] World Economic Outlook (WEO)
+- [ ] Balance of Payments Statistics
+- [x] International Financial Statistics (IFS)
+- [ ] Financial Soundness Indicators
+- [ ] Exchange Rate Data
 
-#### Document Types Available:
-* [x] Time-series API data (JSON)
-* [x] Employment reports (PDF/HTML)
-* [x] CPI/PPI methodology reports
-* [x] JOLTS monthly releases
-* [x] OES occupational data files
-* [x] Economic news releases
+### OECD Data
 
-#### Extraction Tasks:
-* [x] Extract employment trends by sector and occupation
-* [x] Extract wage growth patterns (median/mean/percentiles)
-* [x] Extract job openings and quit rates (JOLTS)
-* [x] Extract inflation metrics (CPI/PPI by category)
-* [x] Extract labor force participation trends
-* [x] Extract unemployment rates by demographics
-* [x] Build sector-specific employment indexes
-* [x] Track real wage growth vs inflation
+- [x] Composite Leading Indicators (CLI)
+- [x] Key Economic Indicators (KEI/MEI)
+- [x] Trade Statistics (BATIS)
+- [x] Labor Market Data (ALFS)
+- [x] Tax Revenue Statistics
+
+### Bank for International Settlements (BIS)
+
+- [ ] International Banking Statistics
+- [ ] Credit Gap Indicators
+- [x] Effective Exchange Rates
+- [x] Property Prices
+- [ ] Debt Securities Statistics
 
 ---
 
-### **3. Bureau of Economic Analysis (BEA)**
+## 17. Financial Institution Data ✅ MOSTLY IMPLEMENTED
 
-#### Document Types Available:
-* [ ] NIPA tables (GDP components)
-* [ ] Regional GDP data files
-* [ ] Input-output tables (industry relationships)
-* [ ] Fixed assets tables
-* [ ] International transactions data
-* [ ] Industry-specific reports
+### FDIC BankFind Suite ✅ IMPLEMENTED
 
-#### Extraction Tasks:
-* [ ] Extract GDP growth by component (C, I, G, X-M)
-* [ ] Extract PCE (Personal Consumption Expenditure) trends
-* [ ] Extract investment patterns by asset type
-* [ ] Extract regional economic growth differentials
-* [ ] Extract industry value-added contributions
-* [ ] Extract trade balance by goods/services
-* [ ] Build industry interdependency matrices
-* [ ] Track capital stock accumulation
+- [x] Bank Financials — No API Key ✅ IMPLEMENTED
+- [x] Bank Demographics (Institutions) — No API Key ✅ IMPLEMENTED
+- [x] Failed Banks List — No API Key ✅ IMPLEMENTED
+- [x] Summary of Deposits — No API Key ✅ IMPLEMENTED
 
----
+**Source:** `app/sources/fdic/`
+**API Endpoints:**
+- `POST /api/v1/fdic/financials/ingest` - Bank balance sheets, income statements
+- `POST /api/v1/fdic/institutions/ingest` - Bank demographics, locations
+- `POST /api/v1/fdic/failed-banks/ingest` - Historical bank failures
+- `POST /api/v1/fdic/deposits/ingest` - Branch-level deposit data
+- `POST /api/v1/fdic/all/ingest` - All datasets at once
+- `GET /api/v1/fdic/reference/metrics` - Financial metric codes
+- `GET /api/v1/fdic/reference/datasets` - Dataset information
+- `GET /api/v1/fdic/search` - Search banks by name/location
 
-### **4. Federal Reserve (FRED)**
+**Database Tables:**
+- `fdic_bank_financials` - Balance sheets, income statements, 1,100+ metrics
+- `fdic_institutions` - Bank demographics, ~4,700 active banks
+- `fdic_failed_banks` - Historical failures since 1934
+- `fdic_summary_deposits` - Branch-level deposit data
 
-#### Document Types Available:
-* [x] Time-series API data (JSON)
-* [x] FOMC meeting minutes
-* [x] Beige Book reports
-* [x] Economic research papers
-* [x] H.15 interest rate releases
-* [x] Monetary policy statements
+**API:** https://banks.data.fdic.gov/docs/
+**API Key:** ❌ NOT REQUIRED
 
-#### Extraction Tasks:
-* [x] Extract interest rate time series (Fed Funds, Treasury yields)
-* [x] Extract monetary aggregates (M1, M2) trends
-* [x] Extract inflation expectations
-* [x] Extract credit conditions (spreads, lending standards)
-* [x] Extract industrial production indexes
-* [x] Extract financial conditions indexes
-* [x] Build yield curve analysis
-* [x] Track policy rate vs market rates divergence
+**Key Features:**
+- Bounded concurrency with asyncio.Semaphore
+- Exponential backoff with jitter for retries
+- Automatic pagination for large datasets
+- Full job tracking via ingestion_jobs table
+- Typed columns (NUMERIC for financials, DATE for dates)
+- 1,100+ financial metrics available
 
----
+**Documentation:** `docs/FDIC_QUICK_START.md`
 
-### **5. NOAA (Weather & Climate)**
+### FFIEC Central Data Repository
 
-#### Document Types Available:
-* [x] Weather observation data (CSV/JSON)
-* [x] Climate normals datasets
-* [x] Storm events database
-* [x] NEXRAD radar indexes
-* [x] Climate trend reports
-* [x] Extreme weather summaries
+- [ ] Uniform Bank Performance Reports (UBPR) — No API Key
+- [ ] Call Reports — No API Key
+- [ ] Holding Company Reports — No API Key
+- [ ] CRA Data — No API Key
 
-#### Extraction Tasks:
-* [x] Extract temperature trends by location and time
-* [x] Extract precipitation patterns (drought/flood analysis)
-* [x] Extract extreme weather events (frequency/severity)
-* [x] Extract climate normals for baseline comparisons
-* [x] Build weather impact assessments for industries
-* [x] Track growing degree days for agriculture
-* [x] Extract hurricane/tornado paths and damages
-* [x] Build climate risk indexes by region
+### NCUA Credit Union Data
 
----
+- [ ] Credit Union Call Reports — No API Key
+- [ ] Credit Union Financials — No API Key
+- [ ] Credit Union Demographics — No API Key
 
-### **6. EIA (Energy Information Administration)**
+### Treasury FiscalData ✅ IMPLEMENTED
 
-#### Document Types Available:
-* [x] Energy data API (JSON)
-* [x] Short-Term Energy Outlook (STEO) reports
-* [x] Annual Energy Outlook (AEO) reports
-* [x] State energy profiles
-* [x] International energy statistics
-* [x] Petroleum and natural gas reports
+- [x] Federal Debt Data — No API Key ✅ IMPLEMENTED
+- [x] Treasury Interest Rates — No API Key ✅ IMPLEMENTED
+- [x] Federal Revenue & Spending — No API Key ✅ IMPLEMENTED
+- [x] Treasury Auction Results — No API Key ✅ IMPLEMENTED
+- [x] Daily Treasury Balance — No API Key ✅ IMPLEMENTED
 
-#### Extraction Tasks:
-* [x] Extract crude oil and natural gas production trends
-* [x] Extract retail gasoline prices by region
-* [x] Extract electricity generation by source (coal, gas, renewables, nuclear)
-* [x] Extract energy consumption by sector
-* [x] Extract refinery capacity and utilization
-* [x] Extract import/export volumes
-* [x] Extract renewable energy growth rates
-* [x] Track energy transition metrics (fossil fuels vs renewables)
+**Source:** `app/sources/treasury/`
+**API Endpoints:**
+- `POST /api/v1/treasury/debt/ingest` - Federal debt outstanding
+- `POST /api/v1/treasury/interest-rates/ingest` - Treasury security rates
+- `POST /api/v1/treasury/revenue-spending/ingest` - Monthly Treasury Statement
+- `POST /api/v1/treasury/auctions/ingest` - Auction results
+- `POST /api/v1/treasury/all/ingest` - All datasets
+- `GET /api/v1/treasury/reference/datasets` - Available datasets
+- `GET /api/v1/treasury/reference/security-types` - Security type reference
 
----
+**Database Tables:**
+- `treasury_debt_outstanding` - Total public debt outstanding
+- `treasury_interest_rates` - Average interest rates on Treasury securities
+- `treasury_monthly_statement` - Revenue and spending
+- `treasury_auctions` - Treasury securities auction results
+- `treasury_daily_balance` - Daily Treasury statement
 
-### **7. USDA (Agriculture)**
+**API:** https://fiscaldata.treasury.gov/api-documentation/
+**API Key:** ❌ NOT REQUIRED (1,000 requests per minute)
 
-#### Document Types Available:
-* [ ] WASDE (World Agricultural Supply and Demand) reports
-* [ ] Crop progress weekly updates
-* [ ] Food price monitoring data
-* [ ] Census of Agriculture reports
-* [ ] Export sales reports
-* [ ] Livestock reports
+**Key Features:**
+- Bounded concurrency with asyncio.Semaphore
+- Exponential backoff with jitter for retries
+- Automatic pagination for large datasets
+- Full job tracking via ingestion_jobs table
+- Typed columns (DATE, NUMERIC, TEXT)
 
-#### Extraction Tasks:
-* [ ] Extract crop yield forecasts by commodity
-* [ ] Extract planted acreage and harvested acreage
-* [ ] Extract crop prices and farmer income
-* [ ] Extract export demand by country
-* [ ] Extract livestock inventory and prices
-* [ ] Extract food price indexes
-* [ ] Build agricultural supply/demand balances
-* [ ] Track climate impact on crop production
+**Documentation:** `docs/TREASURY_QUICK_START.md`
 
 ---
 
-### **8. CMS / HHS (Healthcare)**
+## 18. CFTC Commitments of Traders (COT) ✅ IMPLEMENTED
 
-#### Document Types Available:
-* [ ] Medicare utilization datasets
-* [ ] Hospital cost reports
-* [ ] Drug pricing databases
-* [ ] Provider enrollment files
-* [ ] Quality metrics reports
-* [ ] Medicare Advantage enrollment data
+- [x] Legacy COT Reports ✅ **IMPLEMENTED** - 64,392 records (4 years)
+- [x] Disaggregated COT Reports ✅ **IMPLEMENTED** - 40,304 records (3 years)
+- [x] Traders in Financial Futures (TFF) ✅ **IMPLEMENTED** - 6,779 records (2 years)
+- [ ] Supplemental COT Reports — Future
+- [x] Concentration Ratios ✅ **INCLUDED** (in legacy/disaggregated data)
 
-#### Extraction Tasks:
-* [ ] Extract healthcare utilization trends by procedure
-* [ ] Extract drug pricing trends (brand vs generic)
-* [ ] Extract hospital cost and efficiency metrics
-* [ ] Extract physician payment patterns
-* [ ] Extract Medicare enrollment and spending trends
-* [ ] Extract quality of care metrics
-* [ ] Build cost-effectiveness analyses
-* [ ] Track healthcare inflation vs general inflation
+**📊 TOTAL: 111,475 COT records ingested**
 
----
+**Source:** `app/sources/cftc_cot/`
+**API Endpoints:**
+- `POST /api/v1/cftc-cot/ingest` - Ingest COT data by year and report type
+- `GET /api/v1/cftc-cot/reference/report-types` - Available report types
+- `GET /api/v1/cftc-cot/reference/contracts` - Major futures contracts
+- `GET /api/v1/cftc-cot/reference/commodity-groups` - Commodity categories
 
-### **9. SEC EDGAR (Corporate Filings)**
+**Database Tables:**
+- `cftc_cot_legacy_combined` - Commercial vs Non-commercial positions
+- `cftc_cot_disaggregated_combined` - Producer, Swap Dealer, Managed Money, Other
+- `cftc_cot_tff_combined` - Dealer, Asset Manager, Leveraged Funds
 
-#### Document Types Available:
-* [x] 10-K annual reports
-* [x] 10-Q quarterly reports
-* [x] 8-K current reports
-* [x] S-1/S-3/S-4 registration statements
-* [x] DEF 14A proxy statements
-* [x] XBRL financial data
-* [x] 13F institutional holdings
+**API Key:** ❌ NOT REQUIRED (public weekly data from CFTC)
 
-#### Extraction Tasks:
-* [x] Extract financial statements (income, balance sheet, cash flow)
-* [x] Extract MD&A (Management Discussion & Analysis) narrative
-* [x] Extract risk factors and business descriptions
-* [x] Extract executive compensation
-* [x] Extract segment performance data
-* [x] Extract XBRL-tagged financial metrics
-* [x] Extract insider transactions
-* [x] Build time-series financial ratios
-* [x] Track institutional investor holdings (13F)
-* [x] Extract M&A activity from 8-K filings
+**Key Features:**
+- Weekly positioning data released Tuesday afternoons
+- Covers 100+ futures markets (energy, metals, grains, financials, currencies)
+- Position breakdowns by trader category
+- Net positions and weekly changes
+- Concentration ratios (top 4/8 traders)
+- Futures only and Futures+Options combined reports
+- Historical data available (2006-present)
 
----
+**Report Types:**
+| Type | Description | Best For |
+|------|-------------|----------|
+| Legacy | Commercial vs Non-commercial | Hedger/Speculator analysis |
+| Disaggregated | Producer, Swap, Managed Money | Detailed positioning |
+| TFF | Dealer, Asset Manager, Leveraged | Financial futures |
 
-### **10. USPTO (Patents)**
-
-#### Document Types Available:
-* [ ] Bulk patent XML files
-* [ ] Patent metadata (CSV)
-* [ ] Citation graphs
-* [ ] Patent classification data
-* [ ] Patent assignment records
-* [ ] Trademark data
-
-#### Extraction Tasks:
-* [ ] Extract patent filing trends by technology class
-* [ ] Extract citation networks (influence analysis)
-* [ ] Extract assignee (company) patent portfolios
-* [ ] Extract inventor collaboration networks
-* [ ] Extract patent claims and abstracts
-* [ ] Build technology landscape maps
-* [ ] Track innovation velocity by sector
-* [ ] Extract patent litigation data
+**Use Cases:**
+- Sentiment analysis (positioning extremes)
+- Contrarian trading signals
+- Tracking speculator vs hedger positions
+- Analyzing commodity market trends
 
 ---
 
-### **11. Federal Register & Regulations.gov**
+## 19. IRS Statistics of Income (SOI) ✅ IMPLEMENTED
 
-#### Official APIs:
-* **Federal Register API:** https://www.federalregister.gov/developers/documentation/api/v1
-  - No API Key Required
-  - JSON/CSV/RSS formats
-  - Full-text search and filtering
-  - Rate Limit: Reasonable use (no hard limit, be respectful)
-  
-* **Regulations.gov API:** https://open.gsa.gov/api/regulationsgov/
-  - API Key Required (Free)
-  - RESTful JSON API (v4)
-  - Access to comments, dockets, documents
-  - Rate Limit: 1,000 requests/hour per API key
+- [x] Individual Income by ZIP Code — No API Key ✅ IMPLEMENTED
+- [x] Individual Income by County — No API Key ✅ IMPLEMENTED
+- [x] County-to-County Migration Data — No API Key ✅ IMPLEMENTED
+- [x] Business Income by ZIP Code — No API Key ✅ IMPLEMENTED
+- [ ] Corporate Income Tax Statistics — No API Key (Future)
+- [ ] Partnership Statistics — No API Key (Future)
+- [ ] Estate Tax Statistics — No API Key (Future)
+- [ ] Tax-Exempt Organizations — No API Key (Future)
 
-#### Document Types Available:
-* [ ] **Federal Register Notices** (HTML/XML/JSON)
-  - Daily publication of federal agency rules, proposed rules, and notices
-  - Full-text search and metadata
-  - Historical archives back to 1994
-  
-* [ ] **Proposed Rules** (Pre-Final Rulemaking)
-  - Notice of Proposed Rulemaking (NPRM)
-  - Advance Notice of Proposed Rulemaking (ANPRM)
-  - Regulatory impact analyses
-  - Comment deadlines and public hearing schedules
-  
-* [ ] **Final Rules**
-  - Codified regulations with effective dates
-  - Response to public comments
-  - Changes from proposed to final
-  - Legal authority and statutory basis
-  
-* [ ] **Presidential Documents**
-  - Executive Orders
-  - Presidential Proclamations
-  - Presidential Memoranda
-  - Determinations and findings
-  
-* [ ] **Public Notices**
-  - Meetings and hearings
-  - Petitions and applications
-  - Agency statements
-  - Sunshine Act notices
-  
-* [ ] **Public Comments** (Regulations.gov)
-  - Full text of submitted comments
-  - Commenter names and affiliations
-  - Attachments (PDFs, spreadsheets, etc.)
-  - Comment submission metadata
-  
-* [ ] **Dockets**
-  - Collections of related documents
-  - Supporting materials and analyses
-  - Agency decision documents
-  - Correspondence and petitions
-  
-* [ ] **Regulatory Impact Analyses (RIAs)**
-  - Cost-benefit analyses
-  - Economic impact assessments
-  - Small business impact analyses
-  - Environmental impact statements
+**Source:** `app/sources/irs_soi/`
+**API Endpoints:**
+- `POST /api/v1/irs-soi/zip-income/ingest` - Individual income by ZIP code
+- `POST /api/v1/irs-soi/county-income/ingest` - Individual income by county
+- `POST /api/v1/irs-soi/migration/ingest` - County-to-county migration flows
+- `POST /api/v1/irs-soi/business-income/ingest` - Business income by ZIP
+- `POST /api/v1/irs-soi/all/ingest` - All datasets at once
+- `GET /api/v1/irs-soi/reference/agi-brackets` - AGI bracket definitions
+- `GET /api/v1/irs-soi/reference/years` - Available tax years
 
-#### Key Metadata Fields:
-* **Federal Register:**
-  - `document_number` (unique identifier)
-  - `publication_date`
-  - `agencies` (issuing agencies)
-  - `type` (Rule, Proposed Rule, Notice, Presidential Document)
-  - `topics` and `significant` flags
-  - `effective_on` date
-  - `cfr_references` (Code of Federal Regulations citations)
-  - `docket_ids` (links to Regulations.gov)
-  
-* **Regulations.gov:**
-  - `documentId` (unique identifier)
-  - `docketId` (parent docket)
-  - `commentOnDocumentId` (what the comment is responding to)
-  - `postedDate`
-  - `commentEndDate`
-  - `numberOfCommentsReceived`
-  - `agencyId`
-  - `documentType`
+**Database Tables:**
+- `irs_soi_zip_income` - Income statistics by ZIP code and AGI bracket
+- `irs_soi_county_income` - Income statistics by county FIPS and AGI bracket
+- `irs_soi_migration` - County-to-county migration flows (inflow/outflow)
+- `irs_soi_business_income` - Business/self-employment income by ZIP
 
-#### Extraction Tasks:
+**Data Source:** https://www.irs.gov/statistics/soi-tax-stats (Bulk CSV downloads)
+**API Key:** ❌ NOT REQUIRED (public domain)
+**Available Years:** 2017-2021
 
-##### Regulatory Activity Tracking:
-* [ ] Extract daily new rules by agency and topic
-* [ ] Extract rulemaking pipeline (proposed → final timeline)
-* [ ] Extract regulatory actions by presidential administration
-* [ ] Extract significant vs routine rules (OMB 3(f) designation)
-* [ ] Extract emergency rules and expedited rulemaking
-* [ ] Track regulatory burden estimates by agency
+**Key Features:**
+- Bounded concurrency with asyncio.Semaphore
+- File caching to avoid re-downloads
+- Batch inserts for large files (5,000 records/batch)
+- AGI bracket classification (6 income levels)
+- Full job tracking via ingestion_jobs table
+- Typed columns (BIGINT for dollar amounts)
 
-##### Economic & Impact Analysis:
-* [ ] Extract cost-benefit analyses from RIAs
-* [ ] Extract estimated compliance costs by industry
-* [ ] Extract economic impact on small businesses
-* [ ] Extract job creation/loss estimates
-* [ ] Extract environmental impact assessments
-* [ ] Extract health and safety benefits quantification
-* [ ] Build regulatory burden indexes by sector
+**Use Cases:**
+- Income inequality analysis
+- Tax base migration studies
+- Real estate market research
+- Business formation patterns
+- Wealth distribution by geography
 
-##### Comment Analysis:
-* [ ] Extract public comment volumes by docket
-* [ ] Extract commenter affiliations (industry, NGO, individual, etc.)
-* [ ] Extract comment sentiment and themes
-* [ ] Extract form letter campaigns vs unique comments
-* [ ] Extract technical vs emotional comment classification
-* [ ] Extract agency responses to major comments
-* [ ] Build stakeholder engagement maps
-
-##### Agency & Sector-Specific Tracking:
-* [ ] **Financial Services** (SEC, CFTC, Federal Reserve, OCC)
-  - Securities regulations
-  - Banking rules
-  - Derivatives and commodities
-  - Consumer financial protection
-  
-* [ ] **Energy & Environment** (EPA, DOE, DOI, FERC)
-  - Climate and emissions regulations
-  - Energy efficiency standards
-  - Oil and gas leasing
-  - Renewable energy incentives
-  
-* [ ] **Healthcare** (FDA, CMS, HHS)
-  - Drug approvals and safety
-  - Medicare/Medicaid rules
-  - Medical device regulations
-  - Public health policies
-  
-* [ ] **Transportation** (DOT, FAA, NHTSA)
-  - Vehicle safety standards
-  - Aviation regulations
-  - Infrastructure rules
-  - Autonomous vehicle policies
-  
-* [ ] **Labor & Employment** (DOL, NLRB, EEOC)
-  - Wage and hour rules
-  - Workplace safety (OSHA)
-  - Labor relations
-  - Employment discrimination
-  
-* [ ] **Technology & Communications** (FCC, FTC)
-  - Net neutrality
-  - Privacy regulations
-  - Spectrum allocation
-  - Antitrust enforcement
-
-##### Policy Shift Detection:
-* [ ] Extract regulatory philosophy changes (prescriptive vs principles-based)
-* [ ] Extract deregulation vs new regulation trends
-* [ ] Extract inter-agency coordination efforts
-* [ ] Extract Congressional Review Act (CRA) challenges
-* [ ] Extract judicial challenges to rules
-* [ ] Track presidential executive orders impact on rulemaking
-
-##### Time-Series & Trend Analysis:
-* [ ] Build monthly regulatory action volume by agency
-* [ ] Track average comment periods (days open)
-* [ ] Track average time from NPRM to final rule
-* [ ] Extract midnight regulations (end of administration surges)
-* [ ] Track significant rule counts over time
-* [ ] Build regulatory activity leading indicators
-
-##### Alert & Monitoring Systems:
-* [ ] Build real-time alerts for specific CFR sections
-* [ ] Build keyword-based regulatory watches
-* [ ] Build agency-specific notification feeds
-* [ ] Build docket tracking with status updates
-* [ ] Build comment deadline calendars
-* [ ] Extract effective date tracking for compliance
-
-#### Data Quality & Compliance Notes:
-* **Public Domain:** All Federal Register content is public domain
-* **Regulations.gov API:** Requires free API key registration
-* **Rate Limits:** Federal Register has no hard limit; Regulations.gov allows 1,000 req/hour
-* **Attachment Access:** Many comments include PDF attachments requiring separate downloads
-* **Historical Coverage:** Federal Register API covers 1994+, Regulations.gov covers ~2003+
-* **PII Considerations:** Public comments may contain PII (names, addresses); handle responsibly
-* **Update Frequency:** Federal Register publishes daily (weekdays); Regulations.gov updates continuously
-
-#### Implementation Priority:
-1. **Start with Federal Register API** (no key required, cleaner data)
-2. **Add Regulations.gov for comment analysis** (requires API key)
-3. **Focus on high-impact sectors** (finance, energy, healthcare)
-4. **Build sector-specific dashboards** before attempting comprehensive ingestion
-5. **Respect rate limits** and implement exponential backoff
+**Documentation:** `docs/IRS_SOI_QUICK_START.md`
 
 ---
 
-### **12. Real Estate / Housing**
+## 20. OpenFEMA (Disaster & Emergency Data) ✅ IMPLEMENTED
 
-#### Document Types Available:
-* [x] FHFA house price index data
-* [x] HUD housing permits and starts
-* [x] Redfin market data (prices, inventory, days on market)
-* [x] OpenStreetMap building footprints
-* [x] Mortgage rate data
-* [x] Housing affordability reports
+- [x] Disaster Declarations — No API Key
+- [x] Public Assistance Grants — No API Key
+- [x] Hazard Mitigation Grants — No API Key
+- [ ] Individual Assistance Data — No API Key
+- [ ] NFIP Claims & Policies — No API Key
+- [ ] Registration Intake Data — No API Key
 
-#### Extraction Tasks:
-* [x] Extract house price trends by metro area
-* [x] Extract housing supply metrics (inventory, new construction)
-* [x] Extract days-on-market and sales velocity
-* [x] Extract price-to-income ratios
-* [x] Extract building footprint data for density analysis
-* [x] Extract mortgage rate trends and affordability
-* [x] Build housing market heat maps
-* [x] Track housing affordability crisis indicators
+**Source:** `app/sources/fema/`
+**API Endpoints:** `/api/v1/fema/disasters/ingest`, `/api/v1/fema/public-assistance/ingest`, `/api/v1/fema/hazard-mitigation/ingest`
+**Database Tables:** `fema_disaster_declarations`, `fema_pa_projects`, `fema_hma_projects`
 
 ---
 
-### **13. Mobility & Consumer Activity**
+## 21. EPA Environmental Data ⚠️ NOT IMPLEMENTED
 
-#### Document Types Available:
-* [ ] Google Mobility Reports (COVID-era, CSV)
-* [ ] Apple Mobility Trends (CSV)
-* [ ] Census Retail Trade reports
-* [ ] BEA PCE data
-* [ ] Credit card spending data (aggregated, anonymized)
+### Envirofacts
 
-#### Extraction Tasks:
-* [ ] Extract mobility trends (retail, transit, workplace, residential)
-* [ ] Extract retail sales by category
-* [ ] Extract consumer spending patterns (goods vs services)
-* [ ] Extract geographic mobility shifts
-* [ ] Build consumer activity indexes
-* [ ] Track post-pandemic behavioral shifts
-* [ ] Extract e-commerce vs brick-and-mortar trends
-* [ ] Build real-time economic activity proxies
+- [ ] Air Quality Data (AQI, emissions) — No API Key
+- [ ] Water Quality Data — No API Key
+- [ ] Toxic Release Inventory (TRI) — No API Key
+- [ ] Hazardous Waste Data — No API Key
+- [ ] Facility Registry Service — No API Key
 
----
+**API:** https://www.epa.gov/enviro/envirofacts-data-service-api
 
-### **14. Public Pension LP Investment Strategies**
+### AirNow
 
-#### Document Types Available:
-* [x] Annual investment reports (PDF)
-* [x] Quarterly performance updates
-* [x] Asset allocation policy documents
-* [x] Investment committee meeting minutes
-* [x] Private equity commitment schedules
-* [x] ESG/sustainability reports
-* [x] Manager selection criteria documents
-* [x] CIO letters and strategy memos
+- [ ] Real-Time Air Quality — API Key Required (Free)
+- [ ] Air Quality Forecasts — API Key Required (Free)
+- [ ] Historical AQI Data — API Key Required (Free)
 
-#### Extraction Tasks:
-* [x] Extract asset allocation (public equity, fixed income, private equity, real estate, alternatives)
-* [x] Extract performance by asset class
-* [x] Extract PE/VC commitment pacing plans
-* [x] Extract sector and geographic tilts
-* [x] Extract manager selection criteria
-* [x] Extract ESG integration practices
-* [x] Extract target returns and actuarial assumptions
-* [x] Extract risk management approaches
-* [x] Extract thematic investment focus (AI, climate, infrastructure)
-* [x] Build peer comparison benchmarks
+**API:** https://docs.airnowapi.org/
+
+### ECHO (Enforcement & Compliance)
+
+- [ ] Facility Compliance Status — No API Key
+- [ ] Enforcement Actions — No API Key
+- [ ] Permit Data — No API Key
+- [ ] Inspection History — No API Key
+
+**API:** https://echo.epa.gov/tools/web-services
 
 ---
 
-### **15. Family Office Strategy Documents**
+## 22. FBI Crime Data (UCR/NIBRS) ✅ IMPLEMENTED
 
-#### Document Types Available:
-* [x] Annual investment letters
-* [x] Stewardship reports
-* [x] ESG / sustainability updates
-* [x] Public speeches and interviews from CIO / principal
-* [x] 13F filings (for U.S.-registered FO investment advisors)
-* [x] Regulatory filings (where applicable)
-* [x] Portfolio company announcements
-* [x] Philanthropic reports
+- [x] Uniform Crime Reports (UCR) — API Key Required (Free)
+- [x] National Incident-Based Reporting (NIBRS) — API Key Required (Free)
+- [x] Hate Crime Statistics — API Key Required (Free)
+- [x] Law Enforcement Officers Killed (LEOKA) — API Key Required (Free)
+- [ ] Cargo Theft Reports — API Key Required (Free)
 
-#### Extraction Tasks:
-* [x] Extract sector tilts (AI, healthcare, industrials, energy transition)
-* [x] Extract geographical preferences (US, EU, EM, APAC)
-* [x] Extract private vs public allocations (if disclosed)
-* [x] Extract forward-looking commentary (macro outlook, positioning)
-* [x] Extract key themes (AI, early-stage tech, climate infra, digital assets)
-* [x] Extract direct investment vs fund investment approach
-* [x] Extract co-investment activity
-* [x] Extract portfolio company value-add strategies
-* [x] Build family office investment pattern analysis
-* [x] Track emerging investment themes across offices
+**Source:** `app/sources/fbi_crime/`
+**API Endpoints:** `/api/v1/fbi-crime/*`
+**Database Tables:** `fbi_crime_estimates_national`, `fbi_crime_estimates_state`, `fbi_crime_summarized_agency`, `fbi_crime_nibrs_state`, `fbi_crime_hate_crime_national`, `fbi_crime_leoka_national`
+**API Key:** Required (free) - https://api.data.gov/signup/
 
+---
+
+## 23. Bureau of Transportation Statistics (BTS) ✅ IMPLEMENTED
+
+- [x] Border Crossing Data — No API Key
+- [x] Vehicle Miles Traveled (VMT) — No API Key
+- [x] Freight Analysis Framework (FAF5) — No API Key
+- [ ] Airline On-Time Performance — No API Key
+- [ ] Port Activity Data — No API Key
+- [ ] Transportation Safety Data — No API Key
+- [ ] Fuel Consumption Data — No API Key
+
+**Source:** `app/sources/bts/`
+**API Endpoints:** `/api/v1/bts/border-crossing/ingest`, `/api/v1/bts/vmt/ingest`, `/api/v1/bts/faf/ingest`
+**Database Tables:** `bts_border_crossing`, `bts_vmt`, `bts_faf_regional`
+
+---
+
+## 24. U.S. International Trade Data ✅ IMPLEMENTED
+
+- [x] Import/Export by HS Code — No API Key
+- [x] Trade by Country — No API Key
+- [x] State Export Data — No API Key
+- [ ] Trade by Port — No API Key (different endpoint structure)
+- [ ] Tariff Data — No API Key (via USITC)
+
+**Source:** `app/sources/us_trade/`
+**API Endpoints:** `/api/v1/us-trade/exports/hs/ingest`, `/api/v1/us-trade/imports/hs/ingest`, `/api/v1/us-trade/exports/state/ingest`
+**Database Tables:** `us_trade_exports_hs`, `us_trade_imports_hs`, `us_trade_exports_state`
+**Data Coverage:** 591,110 records (2019-2024), 254 countries, 96 HS chapters, 46 states
+
+---
+
+## 25. Alternative Data / Sentiment ✅ IMPLEMENTED
+
+### Google Data Commons ✅ DATA INGESTED
+
+- [x] Unified Public Data Graph — **API Key REQUIRED** (as of 2025)
+- [x] Statistical Variables — **API Key REQUIRED**
+- [x] Pre-Normalized Datasets — **API Key REQUIRED**
+
+**Source:** `app/sources/data_commons/`
+**API Endpoints:** `/api/v1/data-commons/*`
+**API Key:** Get from https://apikeys.datacommons.org (NOT Google Cloud Console)
+**Database Table:** `data_commons_observations`
+
+**📊 Data Ingested: 41,528 records for all 51 US states/DC**
+
+| Variable | Records | Date Range |
+|----------|---------|------------|
+| Unemployment rate | 32,946 | 1976 - 2025 |
+| Total population | 6,440 | 1790 - 2024 |
+| Median household income | 714 | 2010 - 2023 |
+| Median age | 714 | 2010 - 2023 |
+| Number of households | 714 | 2010 - 2023 |
+
+**Coverage:** All 51 US states + DC, with historical time series dating back to 1790 for population data.
+
+### Yelp Fusion
+
+- [x] Business Listings — API Key Required (Free tier: 500 calls/day)
+- [x] Business Reviews — API Key Required
+- [x] Business Search — API Key Required
+
+**Source:** `app/sources/yelp/`
+**API Endpoints:** `/api/v1/yelp/*`
+**Database Tables:** `yelp_businesses`, `yelp_categories`
+
+### Google Trends
+
+- [ ] Search Interest Over Time — No official API (pytrends library archived April 2025)
+- [ ] Search Interest by Region — No official API
+- [ ] Related Queries — No official API
+
+**Note:** Google does not provide an official public API for Trends data.
+
+---
+
+## 26. Kaggle Competition Datasets ✅ IMPLEMENTED
+
+- [x] M5 Forecasting (Walmart-style Retail Demand) — Kaggle API Key Required
+
+**Source:** `app/sources/kaggle/`
+**API Endpoints:** `/api/v1/kaggle/m5/*`
+**Database Tables:** `m5_sales`, `m5_calendar`, `m5_prices`, `m5_items`
+**Credentials:** Requires KAGGLE_USERNAME and KAGGLE_KEY environment variables
+**Dataset Size:** ~60M sales records (3,049 products × 10 stores × 1,969 days)
+**Competition:** https://www.kaggle.com/competitions/m5-forecasting-accuracy
+
+---
+
+## 27. FCC Broadband & Telecom Data ✅ IMPLEMENTED
+
+### FCC Broadband Map API
+
+- [x] Broadband Coverage by Geography — No API Key ✅ IMPLEMENTED
+- [x] ISP Market Share — No API Key ✅ IMPLEMENTED
+- [x] Download/Upload Speeds — No API Key ✅ IMPLEMENTED
+- [x] Technology Type (Fiber, Cable, DSL, 5G) — No API Key ✅ IMPLEMENTED
+- [x] Broadband Summary Statistics — No API Key ✅ IMPLEMENTED
+- [ ] Ookla Speedtest Data — Future (CC BY-NC-SA license)
+
+**Source:** `app/sources/fcc_broadband/`
+**API Endpoints:**
+- `POST /api/v1/fcc-broadband/state/ingest` - Ingest by state codes
+- `POST /api/v1/fcc-broadband/all-states/ingest` - Ingest all 50 states + DC
+- `POST /api/v1/fcc-broadband/county/ingest` - Ingest by county FIPS
+- `GET /api/v1/fcc-broadband/reference/states` - State codes reference
+- `GET /api/v1/fcc-broadband/reference/technologies` - Technology codes
+- `GET /api/v1/fcc-broadband/reference/speed-tiers` - Speed classifications
+
+**Database Tables:**
+- `fcc_broadband_coverage` - Provider-level coverage data
+- `fcc_broadband_summary` - Aggregated statistics by geography
+
+**API:** https://broadbandmap.fcc.gov/data-download
+**API Key:** ❌ NOT REQUIRED (public government data)
+**Format:** REST API (JSON) + Bulk Downloads (CSV)
+**Rate Limit:** ~60 requests/min recommended
+**Coverage:** All U.S. states, counties, census blocks
+
+**Key Features:**
+- Technology breakdown: Fiber, Cable, DSL, Fixed Wireless, Satellite
+- Speed tier classification: sub_broadband, basic, high_speed, gigabit
+- Provider competition analysis: monopoly, duopoly, limited, competitive
+- Digital divide metrics (coverage percentages)
+- FCC broadband definition: 25 Mbps down / 3 Mbps up
+
+**Use Cases:**
+- Digital divide analysis
+- ISP competition analysis
+- Real estate investment research
+- Policy analysis
+- Network infrastructure planning
+
+**Documentation:** `docs/FCC_BROADBAND_QUICK_START.md`
+
+### FCC Form 477 Data
+
+- [x] ISP Deployment Data — No API Key ✅ IMPLEMENTED
+- [x] Technology Deployment — No API Key ✅ IMPLEMENTED
+
+### Ookla Speedtest Open Dataset (Optional Enhancement)
+
+- [ ] Speed Test Results — No API Key (Open Data)
+- [ ] Network Performance by Geography — No API Key
+- [ ] Mobile vs Fixed Broadband — No API Key
+
+**Data:** https://www.ookla.com/ookla-for-good/open-data
+**Format:** Shapefiles, CSV (quarterly releases)
+**License:** Creative Commons Attribution-NonCommercial-ShareAlike 4.0
+
+---
+
+## 28. Additional Government Data ⚠️ NOT IMPLEMENTED
+
+### USGS (U.S. Geological Survey)
+
+- [ ] Earthquake Data — No API Key
+- [ ] Water Resources Data — No API Key
+- [ ] Mineral Resources Data — No API Key
+- [ ] Land Use/Land Cover — No API Key
+
+**API:** https://earthquake.usgs.gov/fdsnws/event/1/
+
+### NASA Earthdata
+
+- [ ] Satellite Imagery — Free Account Required
+- [ ] Land/Ocean Temperature — Free Account Required
+- [ ] Vegetation Indexes — Free Account Required
+- [ ] Sea Level Data — Free Account Required
+
+**API:** https://earthdata.nasa.gov/
+
+### NIH/PubMed
+
+- [ ] Research Publications — No API Key
+- [ ] Clinical Trial Data — No API Key
+- [ ] Grant Funding Data — No API Key
+
+**API:** https://www.ncbi.nlm.nih.gov/home/develop/api/
+
+### NSF Science Indicators
+
+- [ ] R&D Spending Data — No API Key
+- [ ] STEM Education Statistics — No API Key
+- [ ] Science & Engineering Workforce — No API Key
+
+**API:** https://ncses.nsf.gov/
+
+---
+
+## 29. Agentic Research Capabilities 🤖 IN DEVELOPMENT
+
+**SPECIAL CATEGORY:** Multi-source agentic data collection (not a single API)
+
+### LP/FO Portfolio & Deal Flow Research
+
+- [ ] Portfolio company discovery (5+ sources per investor)
+- [ ] Investment history tracking
+- [ ] Co-investor network mapping
+- [ ] Investment theme classification
+
+**Approach:** Agentic (multi-step reasoning, adaptive navigation)
+**Source:** `app/agentic/`
+**API Endpoints:**
+- `POST /api/v1/agentic/portfolio/collect` - Trigger collection for single investor
+- `POST /api/v1/agentic/portfolio/batch` - Batch collection
+- `GET /api/v1/agentic/portfolio/{investor_id}/summary` - Portfolio summary
+- `GET /api/v1/agentic/jobs/{job_id}` - Job status with reasoning log
+
+**Database Tables:**
+- `portfolio_companies` - Investment holdings for LPs/FOs
+- `co_investments` - Co-investor network (who invests together)
+- `investor_themes` - Investment pattern classification
+- `agentic_collection_jobs` - Job tracking with agent reasoning
+
+**Agent Strategies:**
+1. **SEC 13F Filings** (API) - Public equity holdings for investors >$100M
+2. **Website Portfolio Scraping** (HTML parsing) - Official portfolio pages
+3. **Annual Report Parsing** (PDF extraction) - CAFRs, investment reports
+4. **Press Release & News Search** (LLM extraction) - Recent deals, announcements
+5. **Portfolio Company Back-References** (Reverse search) - Companies listing their investors
+
+**Key Features:**
+- Multi-source synthesis and deduplication
+- Confidence scoring based on source quality
+- Agent reasoning logs for debugging
+- Adaptive strategy selection based on investor type
+- LLM-powered entity extraction from unstructured text
+
+**Expected Coverage:**
+- 80-100 LPs (60-75%) with 5+ portfolio companies
+- 40-60 FOs (40-60%) with investment history
+- 50+ co-investor relationships identified
+- 3+ sources per investor on average
+
+**Use Cases:**
+- Understand LP/FO investment patterns
+- Identify warm introductions through co-investors
+- Find deal sourcing opportunities
+- Due diligence and competitive intelligence
+
+**Documentation:** `docs/AGENT_PROMPTS/agentic_portfolio_research_prompt.md`
+
+**Status:** 🤖 **PLANNED** - Detailed implementation plan created, ready for development
+
+**Estimated Timeline:** 4-6 weeks (Quick win: SEC 13F strategy in 2-3 days)
+
+---
+
+## 30. Private Company Intelligence 🤖 IN DEVELOPMENT
+
+**SPECIAL CATEGORY:** Multi-source agentic company profiling (not a single API)
+
+### Company Profile Enrichment
+
+- [ ] Company basics (founding, location, industry, stage)
+- [ ] Leadership team (CEO, CTO, CFO, founders)
+- [ ] Funding history (VC rounds, investors, valuation)
+- [ ] Revenue & employee estimates
+- [ ] Growth signals (hiring, expansion, product launches)
+
+**Approach:** Agentic (multi-source synthesis, adaptive enrichment)
+**Source:** `app/agentic/company_strategies/`
+**API Endpoints:**
+- `POST /api/v1/companies/enrich` - Enrich single company
+- `POST /api/v1/companies/batch/enrich` - Batch enrichment
+- `POST /api/v1/companies/discover` - Discover companies by criteria
+- `GET /api/v1/companies/{company_id}` - Full company profile
+- `GET /api/v1/companies/search` - Search companies
+- `GET /api/v1/companies/{company_id}/leadership` - Leadership team
+- `GET /api/v1/companies/{company_id}/funding` - Funding history
+- `GET /api/v1/companies/portfolio-companies` - Enriched portfolio companies for LP/FO
+
+**Database Tables:**
+- `private_companies` - Core company profiles
+- `company_leadership` - Executives and key personnel
+- `company_funding_rounds` - VC/PE funding history
+- `company_metrics` - Revenue estimates, employee count (time series)
+- `company_intelligence_jobs` - Job tracking with agent reasoning
+
+**Agent Strategies:**
+1. **Website Scraping** (HTML parsing) - About, Team, Press, Careers pages
+2. **Funding APIs** (Crunchbase/PitchBook) - Funding history, investors, valuation
+3. **SEC Form D** (API) - Private fundraising filings (>$1M raises)
+4. **News Search** (LLM extraction) - Revenue estimates, growth stories, milestones
+5. **Job Postings Analysis** (Structured scraping) - Hiring velocity, tech stack, locations
+6. **Social/Product Signals** (AngelList, ProductHunt) - Startup-specific data
+
+**Key Features:**
+- Multi-source synthesis with conflict resolution
+- Profile completeness scoring (0-100%)
+- Data quality scoring based on source reliability
+- Automatic integration with LP/FO portfolio companies
+- Quarterly refresh mechanism for active monitoring
+- LLM-powered entity extraction from unstructured text
+
+**Expected Coverage:**
+- Start with 500-1,000 companies (from LP/FO portfolios)
+- 80-90% profile completeness for well-known companies
+- 60-70% completeness for lesser-known private companies
+- Average 4+ sources per company (validation)
+
+**Use Cases:**
+- M&A targeting (identify acquisition candidates)
+- Competitive intelligence (track competitors)
+- Due diligence (pre-screen companies)
+- Portfolio monitoring (track LP/FO investments)
+- Market research (understand private company landscape)
+
+**Integration:**
+- Links to `portfolio_companies` table (agentic portfolio research)
+- Auto-enriches companies when discovered in LP/FO portfolios
+- Enables queries like "show me all fintech companies in CalPERS portfolio with profiles"
+
+**Documentation:** `docs/AGENT_PROMPTS/HANDOFF_private_company_intelligence.md`
+
+**Status:** 🤖 **PLANNED** - Detailed implementation plan created, ready for development
+
+**Estimated Timeline:** 4-5 weeks (Quick win: Website + SEC strategy in 1 week)
+
+**Cost:** $0.10-0.20 per company (LLM + API costs)
+
+---
+
+## 31. Foot Traffic & Location Intelligence 🤖 PLANNED
+
+**SPECIAL CATEGORY:** Multi-source foot traffic data aggregation (not a single API)
+
+### Physical Location Activity Tracking
+
+- [ ] Location discovery and POI enrichment
+- [ ] Foot traffic time-series data (daily/weekly/monthly)
+- [ ] Competitive benchmarking (compare chains)
+- [ ] Trade area analysis
+- [ ] Growth trend detection
+
+**Approach:** Agentic (multi-source aggregation with validation)
+**Source:** `app/agentic/traffic_strategies/`
+**API Endpoints:**
+- `POST /api/v1/foot-traffic/locations/discover` - Find locations to track
+- `POST /api/v1/foot-traffic/locations/{id}/collect` - Collect traffic data
+- `GET /api/v1/foot-traffic/locations/{id}/traffic` - Get time series
+- `GET /api/v1/foot-traffic/brands/{brand}/aggregate` - Aggregate across brand
+- `GET /api/v1/foot-traffic/compare` - Compare multiple brands
+
+**Database Tables:**
+- `locations` - Physical places (stores, restaurants, offices, venues)
+- `foot_traffic_observations` - Time-series traffic data
+- `location_metadata` - Hours, categories, trade areas, competitors
+- `foot_traffic_collection_jobs` - Agent job tracking
+
+**Data Sources:**
+1. **Google Popular Times** (Free, scraping) - Hourly patterns, 60-80% coverage
+2. **SafeGraph API** (Paid $100-500/mo) - Weekly visits, demographics, 80-90% coverage
+3. **Placer.ai** (Paid $500-2K+/mo) - Retail analytics, competitive benchmarking
+4. **Foursquare** (Freemium) - POI metadata, check-in data
+5. **City Open Data** (Free) - Pedestrian counters in ~20-30 cities
+
+**Key Features:**
+- Multi-source validation (cross-check traffic data)
+- Time-series analysis (trends, seasonality, growth rates)
+- Competitive benchmarking (compare brands in same category)
+- Trade area demographics (from Placer/SafeGraph)
+- Alert system for traffic anomalies
+
+**Use Cases:**
+- Portfolio company monitoring (track foot traffic at portfolio companies' stores)
+- Retail investment due diligence (evaluate chains before investing)
+- Real estate analysis (assess property value by foot traffic)
+- Competitive intelligence (compare foot traffic vs competitors)
+- Early warning system (declining traffic = revenue risk)
+
+**Expected Coverage:**
+- 500-2,000 locations tracked (starting with portfolio companies)
+- 80%+ data availability for major retail/restaurant chains
+- Weekly/monthly traffic data back 1-2 years (with SafeGraph)
+
+**Integration:**
+- Links to `private_companies` table (retail/restaurant chains)
+- Links to `portfolio_companies` (track portfolio company locations)
+
+**Cost:** $0.05-0.20 per location per month ($25-400/month for 500-2,000 locations)
+
+**Documentation:** `docs/AGENT_PROMPTS/HANDOFF_foot_traffic_intelligence.md`
+
+**Status:** 🤖 **PLANNED** - Detailed implementation plan created
+
+**Timeline:** 3-4 weeks
+
+---
+
+## 32. Management & Strategy Intelligence 🤖 PLANNED
+
+**SPECIAL CATEGORY:** Multi-source management profiling and strategic analysis
+
+### Leadership Quality & Strategic Direction Assessment
+
+- [ ] Strategic initiative tracking (product launches, expansions, pivots)
+- [ ] Management event monitoring (hires, departures, promotions)
+- [ ] Operational metrics (employee sentiment, customer satisfaction)
+- [ ] Executive profiling (backgrounds, tenure, track record)
+- [ ] Strategic positioning (market focus, competitive strategy)
+
+**Approach:** Agentic (LLM-powered synthesis from unstructured sources)
+**Source:** `app/agentic/management_strategies/`
+**API Endpoints:**
+- `POST /api/v1/management/profile` - Profile company management & strategy
+- `GET /api/v1/management/{company_id}/strategies` - Get strategic initiatives
+- `GET /api/v1/management/{company_id}/events` - Get management events
+- `GET /api/v1/management/{company_id}/metrics` - Get operational metrics
+- `GET /api/v1/management/{company_id}/positioning` - Get strategic positioning
+
+**Database Tables:**
+- `company_strategies` - Strategic initiatives and pivots
+- `management_events` - Leadership changes, hires, departures
+- `operational_metrics` - Glassdoor ratings, employee sentiment, NPS
+- `strategic_positioning` - Market positioning, competitive advantages
+- `management_intelligence_jobs` - Agent job tracking
+
+**Data Sources:**
+1. **Company Press Releases/Blogs** (Free) - Strategic announcements, 70-90% coverage
+2. **SEC Filings - MD&A** (Free) - Management discussion, public companies only
+3. **Earnings Call Transcripts** (Free) - Strategic commentary, public companies
+4. **Glassdoor/Indeed** (Scraping) - Employee sentiment, management ratings, 60-80% coverage
+5. **Executive News Search** (LLM) - Leadership backgrounds, hires, departures
+6. **Trade Publications** (Free/Paid) - Industry analysis, strategic shifts
+
+**Key Features:**
+- LLM-powered strategic theme extraction
+- Management quality scoring (0-100 based on multiple factors)
+- Strategic initiative classification (expansion, pivot, optimization)
+- Executive background profiling (tenure, experience, track record)
+- Alert system for major strategic shifts or management changes
+
+**Strategic Signals Tracked:**
+- Product launches and roadmap
+- Geographic/market expansion
+- Partnerships and acquisitions
+- Business model pivots
+- Leadership changes (significance scoring)
+- Employee sentiment trends
+- Competitive positioning shifts
+
+**Use Cases:**
+- Pre-investment due diligence (evaluate management quality)
+- Portfolio monitoring (track strategic execution)
+- Risk detection (executive departures, declining sentiment)
+- Competitive intelligence (understand competitor strategies)
+- Executive assessment (profile leadership teams)
+
+**Expected Coverage:**
+- 500-1,000 companies profiled
+- 80%+ have strategic positioning data
+- 60%+ have management quality scores
+- 5+ strategic initiatives per company on average
+
+**Integration:**
+- Links to `private_companies` and `portfolio_companies`
+- Links to `company_leadership` (executive profiling)
+- Complements portfolio research (understand how investments are managed)
+
+**Cost:** $0.15-0.30 per company (LLM extraction heavy)
+
+**Documentation:** `docs/AGENT_PROMPTS/HANDOFF_management_strategy_intelligence.md`
+
+**Status:** 🤖 **PLANNED** - Detailed implementation plan created
+
+**Timeline:** 4 weeks
+
+---
+
+## 33. Prediction Market Intelligence 🤖 PLANNED
+
+**SPECIAL CATEGORY:** Browser-based prediction market monitoring (not API-dependent)
+
+### Market Consensus Tracking Across Platforms
+
+- [ ] Kalshi markets (CFTC-regulated economic events)
+- [ ] PredictIt markets (US political events)
+- [ ] Polymarket markets (global events, crypto, business)
+- [ ] Time-series probability tracking
+- [ ] Alert system for significant shifts
+
+**Approach:** Browser automation (agent navigates sites and extracts data)
+**Source:** `app/agentic/prediction_markets/`
+**API Endpoints:**
+- `POST /api/v1/prediction-markets/monitor/all` - Monitor all platforms
+- `POST /api/v1/prediction-markets/monitor/{platform}` - Single platform
+- `GET /api/v1/prediction-markets/markets/top` - Top markets by volume/change
+- `GET /api/v1/prediction-markets/markets/{id}/history` - Probability time series
+- `GET /api/v1/prediction-markets/alerts` - Recent alerts
+- `GET /api/v1/prediction-markets/dashboard` - Summary dashboard
+
+**Database Tables:**
+- `prediction_markets` - Market details (question, category, close date)
+- `market_observations` - Time-series probability data
+- `market_categories` - Classification (economics, politics, business)
+- `market_alerts` - Significant probability shifts
+- `prediction_market_jobs` - Agent job tracking
+
+**Platforms Monitored:**
+1. **Kalshi** (kalshi.com) - CFTC-regulated, economic events
+   - Fed rate decisions, CPI, unemployment, GDP
+   - Weather, climate events
+   - High liquidity, real money markets
+   
+2. **PredictIt** (predictit.org) - Political prediction market
+   - Presidential/Congressional elections
+   - Legislative outcomes, appointments
+   - Supreme Court decisions
+   
+3. **Polymarket** (polymarket.com) - Crypto-based, global
+   - Business events (acquisitions, earnings)
+   - Crypto markets (Bitcoin price, protocol launches)
+   - International politics
+   - Broader range than US-only platforms
+
+**Key Features:**
+- Browser-based extraction (no API keys needed)
+- Hourly monitoring (automated)
+- Probability change detection (>10% shifts trigger alerts)
+- Time-series analysis (track trends over time)
+- Cross-platform validation (same event on multiple platforms)
+- Category classification (economics, politics, business)
+- Link to sectors/companies (market impacts portfolio)
+
+**Market Categories:**
+- **Economics:** Fed decisions, recession, inflation, unemployment
+- **Politics:** Elections, legislation, regulatory changes
+- **Business:** Company acquisitions, earnings beats, product launches
+- **Crypto:** Bitcoin price, Ethereum upgrades, protocol events
+- **Climate:** Temperature, precipitation (affects commodities)
+
+**Use Cases:**
+- **Risk Management:** Quantify probability of adverse events
+- **Scenario Planning:** "65% chance of rate cut" → adjust portfolio
+- **Political Risk:** Track election probabilities for sector impacts
+- **Market Timing:** Detect sentiment shifts before mainstream
+- **Economic Forecasting:** Market consensus on Fed, recession, inflation
+
+**Expected Coverage:**
+- 50-100 markets tracked continuously
+- Hourly updates on probabilities
+- 90+ days historical data
+- Alert on >10% probability shifts in 24 hours
+
+**Integration:**
+- Links to `market_categories` (relevant sectors/companies)
+- Alerts can reference portfolio companies
+- Dashboard shows markets relevant to portfolio
+
+**Cost:** $0 (free - browser-based scraping, no APIs needed)
+
+**Documentation:** `docs/AGENT_PROMPTS/HANDOFF_prediction_market_intelligence.md`
+
+**Status:** 🤖 **PLANNED** - Detailed implementation plan created
+
+**Timeline:** 4 weeks (Week 1: Kalshi, Week 2: Add other platforms, Week 3: Alerts, Week 4: Integration)
+
+---
+
+## Summary
+
+**Total Data Sources:** 33 categories (28 traditional + 5 agentic)
+**Fully Implemented:** 23 sources ✅
+**Partially Implemented:** 2 sources (Alternative Data, Financial Institutions)
+**Planned Agentic:** 5 agentic research capabilities 🤖
+**Not Implemented:** 3 traditional sources
+
+**Implementation Status:**
+- ✅ **FULLY IMPLEMENTED (24):** Census, BLS, BEA, FRED, NOAA, EIA, USDA, CMS, SEC, Real Estate, Public LP Strategies, Family Offices, International Econ, OpenFEMA, FBI Crime, BTS, US Trade, Data Commons, Yelp, Kaggle, CFTC COT, FCC Broadband & Telecom, Treasury FiscalData, FDIC BankFind, **IRS SOI**
+- ⚠️ **PARTIAL (2):** Alternative Data (Data Commons + Yelp yes, Google Trends deprecated), Financial Institutions (Treasury FiscalData + FDIC BankFind yes, FFIEC/NCUA not implemented)
+- 🤖 **PLANNED AGENTIC (5):** 
+  - Agentic Portfolio Research (LP/FO investments & deal flow) - 4-6 weeks
+  - Private Company Intelligence (comprehensive company profiling) - 4-5 weeks
+  - Foot Traffic & Location Intelligence (physical location activity) - 3-4 weeks
+  - Management & Strategy Intelligence (leadership quality & strategy) - 4 weeks
+  - Prediction Market Intelligence (betting markets for risk assessment) - 4 weeks
+- ❌ **NOT IMPLEMENTED (3):** USPTO, Federal Register, Mobility, EPA, Additional Gov Data

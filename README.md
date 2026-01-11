@@ -18,6 +18,15 @@ Access data from major U.S. public data providers through a single API:
 | **🏛️ SEC** | Company financials, Form ADV investment adviser filings | ✅ Ready |
 | **🌦️ NOAA** | Weather observations, historical climate data | ✅ Ready |
 | **🏠 Real Estate** | Zillow home values, rental market indices | ✅ Ready |
+| **📈 BEA** | GDP, Personal Income, PCE, Regional economic accounts | ✅ Ready |
+| **🚚 BTS** | Border crossings, freight flows, vehicle miles traveled | ✅ Ready |
+| **🌊 FEMA** | Disaster declarations, Public Assistance grants | ✅ Ready |
+| **🚔 FBI Crime** | UCR crime statistics, hate crimes, LEOKA | ✅ Ready |
+| **🌍 International** | World Bank, IMF, OECD global economic indicators | ✅ Ready |
+| **🏆 Kaggle** | Competition datasets (M5 Forecasting, etc.) | ✅ Ready |
+| **🏥 CMS** | Medicare utilization, hospital costs, drug pricing | ✅ Ready |
+| **📊 Data Commons** | Unified data from 200+ sources (demographics, economy, crime) | ✅ Ready |
+| **🏪 Yelp** | Business listings, ratings, reviews (500 calls/day free) | ✅ Ready |
 
 ---
 
@@ -56,7 +65,7 @@ cp .env.example .env  # Or create manually (see below)
 python scripts/start_service.py
 ```
 
-**✅ That's it!** The API is now running at **http://localhost:8000**
+**✅ That's it!** The API is now running at **http://localhost:8001**
 
 ---
 
@@ -64,7 +73,7 @@ python scripts/start_service.py
 
 Once the service is running, visit:
 
-### **🌐 http://localhost:8000/docs**
+### **🌐 http://localhost:8001/docs**
 
 This opens the **interactive Swagger UI** where you can:
 - ✅ Browse all available endpoints
@@ -73,8 +82,8 @@ This opens the **interactive Swagger UI** where you can:
 - ✅ View detailed documentation for each data source
 
 **Alternative documentation formats:**
-- **ReDoc UI**: http://localhost:8000/redoc
-- **OpenAPI JSON**: http://localhost:8000/openapi.json
+- **ReDoc UI**: http://localhost:8001/redoc
+- **OpenAPI JSON**: http://localhost:8001/openapi.json
 
 ---
 
@@ -90,7 +99,16 @@ Some data sources work better with API keys. They're free and take 2 minutes:
 | FRED | Required | [Get Key](https://fred.stlouisfed.org/docs/api/api_key.html) | 2 minutes |
 | EIA | Required | [Get Key](https://www.eia.gov/opendata/register.php) | 2 minutes |
 | NOAA | Optional | [Get Token](https://www.ncdc.noaa.gov/cdo-web/token) | 2 minutes |
+| BEA | Required | [Get Key](https://apps.bea.gov/api/signup/) | 2 minutes |
+| Data Commons | Optional | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) | 5 minutes |
+| Yelp | Required | [Get Key](https://www.yelp.com/developers/v3/manage_app) | 2 minutes |
+| Kaggle | Required | [Account API](https://www.kaggle.com/account) | 2 minutes |
+| FBI Crime | Required | [Get Key](https://api.data.gov/signup/) | 2 minutes |
 | SEC | Not Needed | N/A | - |
+| BTS | Not Needed | N/A | - |
+| FEMA | Not Needed | N/A | - |
+| CMS | Not Needed | N/A | - |
+| International | Not Needed | N/A | - |
 
 ### Step 2: Configure Environment Variables
 
@@ -104,6 +122,16 @@ DATABASE_URL=postgresql://nexdata:nexdata@localhost:5432/nexdata
 CENSUS_SURVEY_API_KEY=your_census_key_here
 FRED_API_KEY=your_fred_key_here
 EIA_API_KEY=your_eia_key_here
+BEA_API_KEY=your_bea_key_here
+
+# Alternative Data Sources
+DATA_COMMONS_API_KEY=your_google_api_key_here  # Optional but recommended
+YELP_API_KEY=your_yelp_key_here  # Required for Yelp (500 calls/day free)
+
+# Other Sources
+KAGGLE_USERNAME=your_kaggle_username
+KAGGLE_KEY=your_kaggle_key
+DATA_GOV_API=your_data_gov_key_here  # For FBI Crime
 
 # Optional: Rate limiting (adjust as needed)
 MAX_CONCURRENCY=5
@@ -118,7 +146,7 @@ MAX_REQUESTS_PER_SECOND=10
 
 ```bash
 # Start an ingestion job
-curl -X POST http://localhost:8000/api/v1/jobs \
+curl -X POST http://localhost:8001/api/v1/jobs \
   -H "Content-Type: application/json" \
   -d '{
     "source": "census",
@@ -133,7 +161,7 @@ curl -X POST http://localhost:8000/api/v1/jobs \
 # Response: {"job_id": "123e4567-e89b-12d3-a456-426614174000"}
 
 # Check status
-curl http://localhost:8000/api/v1/jobs/123e4567-e89b-12d3-a456-426614174000
+curl http://localhost:8001/api/v1/jobs/123e4567-e89b-12d3-a456-426614174000
 
 # When status is "success", data is in PostgreSQL table: acs5_2023_b01001
 ```
@@ -142,7 +170,7 @@ curl http://localhost:8000/api/v1/jobs/123e4567-e89b-12d3-a456-426614174000
 
 ```bash
 # Ingest unemployment rate data
-curl -X POST http://localhost:8000/api/v1/jobs \
+curl -X POST http://localhost:8001/api/v1/jobs \
   -H "Content-Type: application/json" \
   -d '{
     "source": "fred",
@@ -158,7 +186,7 @@ curl -X POST http://localhost:8000/api/v1/jobs \
 
 ```bash
 # Ingest crude oil prices
-curl -X POST http://localhost:8000/api/v1/jobs \
+curl -X POST http://localhost:8001/api/v1/jobs \
   -H "Content-Type: application/json" \
   -d '{
     "source": "eia",
@@ -175,7 +203,7 @@ curl -X POST http://localhost:8000/api/v1/jobs \
 import requests
 
 # Start ingestion
-response = requests.post('http://localhost:8000/api/v1/jobs', json={
+response = requests.post('http://localhost:8001/api/v1/jobs', json={
     'source': 'census',
     'config': {
         'survey': 'acs5',
@@ -188,7 +216,7 @@ job_id = response.json()['job_id']
 print(f"Job started: {job_id}")
 
 # Check status
-status = requests.get(f'http://localhost:8000/api/v1/jobs/{job_id}')
+status = requests.get(f'http://localhost:8001/api/v1/jobs/{job_id}')
 print(status.json())
 ```
 
@@ -298,7 +326,7 @@ docker-compose up -d db
 netstat -ano | findstr :8000
 
 # Check port usage (Mac/Linux)
-lsof -i :8000
+lsof -i :8001
 ```
 
 ### "Database connection refused"
@@ -415,7 +443,16 @@ datacollector/
 │   │   ├── eia/
 │   │   ├── sec/
 │   │   ├── noaa/
-│   │   └── realestate/
+│   │   ├── realestate/
+│   │   ├── bea/
+│   │   ├── bts/
+│   │   ├── fema/
+│   │   ├── fbi_crime/
+│   │   ├── cms/
+│   │   ├── kaggle/
+│   │   ├── international_econ/
+│   │   ├── data_commons/
+│   │   └── yelp/
 │   └── api/v1/              # API endpoints
 ├── scripts/                 # Utility scripts
 ├── tests/                   # Test suite
@@ -467,7 +504,7 @@ ALLOWED_HOSTS=your-domain.com,api.your-domain.com
 ### Health Check
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
 # Returns: {"status": "healthy", "database": "connected"}
 ```
@@ -512,7 +549,7 @@ A: No, only for sources you want to use. Census and SEC work without keys (with 
 A: Yes! Includes rate limiting, error handling, and job tracking suitable for production.
 
 **Q: How do I view the API documentation?**  
-A: Visit **http://localhost:8000/docs** (Swagger UI) after starting the service.
+A: Visit **http://localhost:8001/docs** (Swagger UI) after starting the service.
 
 **Q: Where is my data stored?**  
 A: PostgreSQL database. Connect with: `docker exec -it nexdata-db psql -U nexdata -d nexdata`
@@ -536,9 +573,18 @@ MIT License - See LICENSE file for details
 Data provided by:
 - U.S. Census Bureau
 - Federal Reserve Bank of St. Louis (FRED)
-- U.S. Energy Information Administration
-- U.S. Securities and Exchange Commission
-- National Oceanic and Atmospheric Administration
+- U.S. Energy Information Administration (EIA)
+- U.S. Securities and Exchange Commission (SEC)
+- Bureau of Economic Analysis (BEA)
+- Bureau of Transportation Statistics (BTS)
+- FEMA (OpenFEMA)
+- FBI Crime Data Explorer
+- Centers for Medicare & Medicaid Services (CMS)
+- National Oceanic and Atmospheric Administration (NOAA)
+- Google Data Commons
+- Yelp Fusion API
+- World Bank, IMF, OECD
+- Kaggle
 - Zillow Research
 
 ---
@@ -547,7 +593,7 @@ Data provided by:
 
 - **GitHub Issues**: Report bugs or request features
 - **Documentation**: Check `/docs` directory for guides
-- **API Docs**: http://localhost:8000/docs (when running)
+- **API Docs**: http://localhost:8001/docs (when running)
 
 ---
 

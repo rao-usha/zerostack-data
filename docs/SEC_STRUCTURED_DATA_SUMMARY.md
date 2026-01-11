@@ -161,7 +161,7 @@ docker-compose up -d
 
 **Full ingestion (filings + financial data):**
 ```bash
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
   -H "Content-Type: application/json" \
   -d '{
     "cik": "0000320193",

@@ -95,8 +95,8 @@ uvicorn app.main:app --reload
 ### 6. Verify It's Running
 
 Open your browser:
-- **API Documentation:** http://localhost:8000/docs
-- **Health Check:** http://localhost:8000/health
+- **API Documentation:** http://localhost:8001/docs
+- **Health Check:** http://localhost:8001/health
 
 You should see:
 ```json
@@ -137,7 +137,7 @@ python scripts/populate_demo_data.py --sources census,fred
 
 **Option A: Using the API Docs**
 
-1. Go to http://localhost:8000/docs
+1. Go to http://localhost:8001/docs
 2. Expand `POST /api/v1/jobs`
 3. Click "Try it out"
 4. Use this example:
@@ -160,7 +160,7 @@ python scripts/populate_demo_data.py --sources census,fred
 **Option B: Using curl**
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/jobs" \
+curl -X POST "http://localhost:8001/api/v1/jobs" \
   -H "Content-Type: application/json" \
   -d '{
     "source": "census",
@@ -177,10 +177,10 @@ curl -X POST "http://localhost:8000/api/v1/jobs" \
 
 ```bash
 # Replace {job_id} with the actual job ID
-curl http://localhost:8000/api/v1/jobs/{job_id}
+curl http://localhost:8001/api/v1/jobs/{job_id}
 ```
 
-Or visit: http://localhost:8000/api/v1/jobs/{job_id} in your browser
+Or visit: http://localhost:8001/api/v1/jobs/{job_id} in your browser
 
 ## Common Issues
 
@@ -256,7 +256,7 @@ docker-compose down
 ## Getting Help
 
 - **Documentation:** See `docs/` directory
-- **API Docs:** http://localhost:8000/docs (when running)
+- **API Docs:** http://localhost:8001/docs (when running)
 - **Rules & Guidelines:** See `RULES.md`
 - **Project Structure:** See main `README.md`
 

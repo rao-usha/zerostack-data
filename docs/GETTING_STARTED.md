@@ -66,10 +66,10 @@ Comprehensive demo with data from all sources.
 
 Once the service is running:
 
-- **API Documentation:** http://localhost:8000/docs
-- **Health Check:** http://localhost:8000/health
-- **List All Jobs:** http://localhost:8000/api/v1/jobs
-- **Root Endpoint:** http://localhost:8000/
+- **API Documentation:** http://localhost:8001/docs
+- **Health Check:** http://localhost:8001/health
+- **List All Jobs:** http://localhost:8001/api/v1/jobs
+- **Root Endpoint:** http://localhost:8001/
 
 ---
 
@@ -101,7 +101,7 @@ Once the service is running:
 1. Start service: `python scripts/start_service.py`
 2. Make changes to code
 3. Test: API auto-reloads on save
-4. Check: http://localhost:8000/docs
+4. Check: http://localhost:8001/docs
 
 ### Running Tests
 ```bash
@@ -144,7 +144,7 @@ Every data ingestion creates a tracked job:
 ### Ingest Data from a Specific Source
 
 **Via API (interactive):**
-1. Go to http://localhost:8000/docs
+1. Go to http://localhost:8001/docs
 2. Find your source endpoint (e.g., `/api/v1/fred/ingest`)
 3. Click "Try it out"
 4. Fill in parameters
@@ -152,7 +152,7 @@ Every data ingestion creates a tracked job:
 
 **Via curl:**
 ```bash
-curl -X POST http://localhost:8000/api/v1/fred/ingest \
+curl -X POST http://localhost:8001/api/v1/fred/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "series_ids": ["GDP"],
@@ -163,21 +163,21 @@ curl -X POST http://localhost:8000/api/v1/fred/ingest \
 ### Check Job Status
 ```bash
 # Get job ID from ingestion response, then:
-curl http://localhost:8000/api/v1/jobs/{job_id}
+curl http://localhost:8001/api/v1/jobs/{job_id}
 ```
 
 ### List All Jobs
 ```bash
-curl http://localhost:8000/api/v1/jobs
+curl http://localhost:8001/api/v1/jobs
 
 # Or visit in browser:
-http://localhost:8000/api/v1/jobs
+http://localhost:8001/api/v1/jobs
 ```
 
 ### Query Ingested Data
 ```bash
 # Via API (if endpoint exists)
-curl http://localhost:8000/api/v1/fred/series/GDP/observations
+curl http://localhost:8001/api/v1/fred/series/GDP/observations
 
 # Via database (direct)
 docker-compose exec db psql -U nexdata_user -d nexdata
@@ -216,7 +216,7 @@ lsof -ti:8000 | xargs kill -9
 cat .env
 
 # Check specific job error
-curl http://localhost:8000/api/v1/jobs/{job_id}
+curl http://localhost:8001/api/v1/jobs/{job_id}
 
 # Check logs
 tail -f service_startup.log
@@ -256,7 +256,7 @@ See `docs/EXTERNAL_DATA_SOURCES.md` for complete list.
 
 ## 🎯 Next Steps
 
-1. **Explore the API:** http://localhost:8000/docs
+1. **Explore the API:** http://localhost:8001/docs
 2. **Try the demo:** `python scripts/populate_demo_data.py`
 3. **Read source guides:** `docs/*_QUICK_START.md`
 4. **Add your own data:** Follow patterns in `app/sources/`
@@ -280,10 +280,10 @@ python scripts/populate_demo_data.py
 pytest tests/
 
 # Check health
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
 # View API docs
-# Visit: http://localhost:8000/docs
+# Visit: http://localhost:8001/docs
 
 # Stop everything
 # Press Ctrl+C (in service terminal)

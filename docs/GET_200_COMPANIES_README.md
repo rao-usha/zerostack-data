@@ -57,7 +57,7 @@ python ingest_200_companies.py
 
 ```bash
 # Ingest a specific company
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
   -H "Content-Type: application/json" \
   -d '{
     "cik": "0000320193",
@@ -232,7 +232,7 @@ Or use the API to refresh specific companies:
 # Refresh just the tech giants weekly
 for cik in "0000320193" "0000789019" "0001652044" "0001018724"
 do
-    curl -X POST "http://localhost:8000/api/v1/sec/ingest/full-company" \
+    curl -X POST "http://localhost:8001/api/v1/sec/ingest/full-company" \
       -H "Content-Type: application/json" \
       -d "{\"cik\": \"$cik\"}"
 done
@@ -243,7 +243,7 @@ done
 ### Service Not Running
 ```bash
 # Check if service is running
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
 # Start with Docker
 docker-compose up -d

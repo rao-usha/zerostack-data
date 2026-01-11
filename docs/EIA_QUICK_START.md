@@ -57,7 +57,7 @@ The EIA API provides access to:
 ### Example 1: Ingest Petroleum Consumption Data
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/eia/petroleum/ingest" \
+curl -X POST "http://localhost:8001/api/v1/eia/petroleum/ingest" \
   -H "Content-Type: application/json" \
   -d '{
     "subcategory": "consumption",
@@ -80,7 +80,7 @@ Response:
 ### Example 2: Ingest Electricity Retail Sales
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/eia/electricity/ingest" \
+curl -X POST "http://localhost:8001/api/v1/eia/electricity/ingest" \
   -H "Content-Type: application/json" \
   -d '{
     "subcategory": "retail_sales",
@@ -97,7 +97,7 @@ curl -X POST "http://localhost:8000/api/v1/eia/electricity/ingest" \
 ### Example 3: Ingest Retail Gas Prices
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/eia/retail-gas-prices/ingest" \
+curl -X POST "http://localhost:8001/api/v1/eia/retail-gas-prices/ingest" \
   -H "Content-Type: application/json" \
   -d '{
     "frequency": "weekly",
@@ -109,7 +109,7 @@ curl -X POST "http://localhost:8000/api/v1/eia/retail-gas-prices/ingest" \
 ### Example 4: Ingest Natural Gas Consumption
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/eia/natural-gas/ingest" \
+curl -X POST "http://localhost:8001/api/v1/eia/natural-gas/ingest" \
   -H "Content-Type: application/json" \
   -d '{
     "subcategory": "consumption",
@@ -122,7 +122,7 @@ curl -X POST "http://localhost:8000/api/v1/eia/natural-gas/ingest" \
 ### Example 5: Ingest STEO Projections
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/eia/steo/ingest" \
+curl -X POST "http://localhost:8001/api/v1/eia/steo/ingest" \
   -H "Content-Type: application/json" \
   -d '{
     "frequency": "monthly",
@@ -136,7 +136,7 @@ curl -X POST "http://localhost:8000/api/v1/eia/steo/ingest" \
 After submitting an ingestion job, check its status:
 
 ```bash
-curl "http://localhost:8000/api/v1/jobs/123"
+curl "http://localhost:8001/api/v1/jobs/123"
 ```
 
 Response:
@@ -303,7 +303,7 @@ Some date ranges or facet combinations may not have data. Check:
 
 ## Interactive Documentation
 
-Visit http://localhost:8000/docs for:
+Visit http://localhost:8001/docs for:
 - Interactive API documentation
 - Try the endpoints directly in your browser
 - See all available parameters and schemas

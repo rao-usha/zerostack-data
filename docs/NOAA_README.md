@@ -54,7 +54,7 @@ This will:
 - ✅ Show job status
 
 ### Step 4: Access API Documentation
-Visit: http://localhost:8000/docs  
+Visit: http://localhost:8001/docs  
 Navigate to the "noaa" section to explore all endpoints.
 
 ## 📊 Available Datasets
@@ -71,7 +71,7 @@ Navigate to the "noaa" section to explore all endpoints.
 
 ### Ingest Daily Weather for California (January 2024)
 ```bash
-curl -X POST http://localhost:8000/api/v1/noaa/ingest \
+curl -X POST http://localhost:8001/api/v1/noaa/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "token": "YOUR_TOKEN",
@@ -113,7 +113,7 @@ Start here:
 3. **example_noaa_usage.py** - Working example code
 4. **NOAA_IMPLEMENTATION_SUMMARY.md** - Technical details
 
-Or visit: http://localhost:8000/docs for interactive API documentation.
+Or visit: http://localhost:8001/docs for interactive API documentation.
 
 ## 🌟 Key Features
 
@@ -142,10 +142,10 @@ Or visit: http://localhost:8000/docs for interactive API documentation.
 ### Explore
 ```bash
 # List available datasets
-curl http://localhost:8000/api/v1/noaa/datasets
+curl http://localhost:8001/api/v1/noaa/datasets
 
 # Find California weather stations
-curl "http://localhost:8000/api/v1/noaa/stations?token=YOUR_TOKEN&location_id=FIPS:06"
+curl "http://localhost:8001/api/v1/noaa/stations?token=YOUR_TOKEN&location_id=FIPS:06"
 ```
 
 ### Ingest
@@ -154,7 +154,7 @@ curl "http://localhost:8000/api/v1/noaa/stations?token=YOUR_TOKEN&location_id=FI
 python example_noaa_usage.py
 
 # Or use the API directly
-curl -X POST http://localhost:8000/api/v1/noaa/ingest ...
+curl -X POST http://localhost:8001/api/v1/noaa/ingest ...
 ```
 
 ### Query
@@ -181,7 +181,7 @@ ORDER BY date DESC;
 **Questions?** Check the documentation:
 - `NOAA_QUICK_START.md` - Detailed guide
 - `NOAA_DEPLOYMENT_CHECKLIST.md` - Testing and troubleshooting
-- http://localhost:8000/docs - Interactive API docs
+- http://localhost:8001/docs - Interactive API docs
 - https://www.ncdc.noaa.gov/cdo-web/webservices/v2 - Official NOAA docs
 
 ## 🎯 Status

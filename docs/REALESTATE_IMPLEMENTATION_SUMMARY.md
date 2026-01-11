@@ -412,12 +412,12 @@ async def test_fhfa_ingestion(db_session):
 
 ```bash
 # Test FHFA ingestion
-curl -X POST http://localhost:8000/api/v1/realestate/fhfa/ingest \
+curl -X POST http://localhost:8001/api/v1/realestate/fhfa/ingest \
   -H "Content-Type: application/json" \
   -d '{"geography_type": "National"}'
 
 # Check job status
-curl http://localhost:8000/api/v1/realestate/fhfa/status/1
+curl http://localhost:8001/api/v1/realestate/fhfa/status/1
 
 # Query data
 psql -d nexdata -c "SELECT * FROM realestate_fhfa_hpi LIMIT 10;"
@@ -458,10 +458,10 @@ psql -d nexdata -c "SELECT * FROM realestate_fhfa_hpi LIMIT 10;"
 
 ```bash
 # Check service health
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
 # Check real estate info
-curl http://localhost:8000/api/v1/realestate/info
+curl http://localhost:8001/api/v1/realestate/info
 
 # Check recent jobs
 psql -d nexdata -c "
@@ -577,7 +577,7 @@ The real estate module is **production-ready** with:
 ## Quick Links
 
 - **Quick Start Guide:** [REALESTATE_QUICK_START.md](./REALESTATE_QUICK_START.md)
-- **API Documentation:** http://localhost:8000/docs
+- **API Documentation:** http://localhost:8001/docs
 - **Project Rules:** [RULES.md](./RULES.md)
 - **Main README:** [README.md](./README.md)
 

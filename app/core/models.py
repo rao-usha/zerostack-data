@@ -460,10 +460,16 @@ class LpKeyContact(Base):
     Key contacts at LP funds - public-facing individuals that GPs would contact.
     
     IMPORTANT: Only public information from official LP websites, annual reports,
-    investment committee minutes, and LinkedIn. No private/restricted data.
+    investment committee minutes, SEC filings. No private/restricted data.
     
-    Typical roles: CIO, Head of Private Equity, Managing Director - Alternatives,
-    Senior Investment Officer, etc.
+    Data Collection Rules:
+    - ✅ Official LP websites, SEC filings, annual reports
+    - ✅ Publicly disclosed executive names and professional contact info
+    - ❌ NO LinkedIn scraping (violates ToS)
+    - ❌ NO authentication bypass or paywalls
+    - ❌ NO personal emails (only professional/institutional)
+    
+    Typical roles: CIO, CFO, CEO, Investment Directors, Board Members
     """
     __tablename__ = "lp_key_contact"
     
@@ -471,45 +477,749 @@ class LpKeyContact(Base):
     lp_id = Column(Integer, nullable=False, index=True)  # FK to lp_fund.id
     
     # Personal information (public only)
-    full_name = Column(String(255), nullable=False)
-    title = Column(String(255), nullable=False)  # e.g., "Chief Investment Officer"
-    department = Column(String(255), nullable=True)  # e.g., "Private Equity", "Alternatives"
+    full_name = Column(Text, nullable=False)
+    title = Column(Text, nullable=True)  # e.g., "Chief Investment Officer"
+    
+    # Role categorization (standardized)
+    role_category = Column(String(100), nullable=True, index=True)
+    # role_category values: 'CIO', 'CFO', 'CEO', 'Investment Director', 
+    #                       'Board Member', 'Managing Director', 'IR Contact', 'Other'
     
     # Contact information (public only - from official sources)
-    email = Column(String(255), nullable=True)  # Only if publicly listed
-    phone = Column(String(50), nullable=True)  # Only if publicly listed
-    office_location = Column(String(255), nullable=True)  # e.g., "Sacramento, CA"
+    email = Column(Text, nullable=True)  # Only if publicly listed
+    phone = Column(Text, nullable=True)  # Only if publicly listed
     
-    # Professional profile
-    linkedin_url = Column(Text, nullable=True)
-    bio_summary = Column(Text, nullable=True)  # Brief background if available
-    years_at_fund = Column(Integer, nullable=True)
+    # Professional profile (optional)
+    linkedin_url = Column(Text, nullable=True)  # For manual research, no scraping
     
-    # Categorization
-    contact_type = Column(String(100), nullable=False, index=True)
-    # contact_type values: 'cio', 'head_of_pe', 'head_of_alternatives', 'senior_investment_officer',
-    #                      'managing_director', 'investment_committee_member', 'ir_contact', 'operations'
+    # Data provenance and quality
+    source_document_id = Column(Integer, nullable=True, index=True)  # FK to lp_document.id if from document
+    source_type = Column(String(100), nullable=True, index=True)
+    # source_type values: 'sec_adv', 'website', 'disclosure_doc', 'annual_report', 'manual'
     
-    seniority_level = Column(String(50), nullable=True)  # 'c_suite', 'senior', 'mid', 'junior'
-    is_decision_maker = Column(Integer, default=0)  # 0 or 1 (boolean) - for investment decisions
-    
-    # Data quality
-    last_verified = Column(DateTime, nullable=True)
     source_url = Column(Text, nullable=True)  # Where this information was found
-    confidence_score = Column(String(50), nullable=True)  # 0.0-1.0 (data quality indicator)
+    
+    confidence_level = Column(String(50), nullable=True)  # 'high', 'medium', 'low'
+    is_verified = Column(Integer, default=0)  # 0 or 1 (boolean) - manually verified
+    
+    # Timestamps
+    collected_date = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        Index('idx_lp_contact_role_category', 'role_category'),
+        Index('idx_lp_contact_source_type', 'source_type'),
+        UniqueConstraint('lp_id', 'full_name', 'email', name='uq_lp_contact_person_email'),
+    )
+    
+    def __repr__(self) -> str:
+        return (
+            f"<LpKeyContact(id={self.id}, lp_id={self.lp_id}, "
+            f"name='{self.full_name}', role='{self.role_category}')>"
+        )
+
+
+# =============================================================================
+# AGENTIC PORTFOLIO RESEARCH MODELS
+# =============================================================================
+
+
+class PortfolioCompany(Base):
+    """
+    Investment holdings discovered by the agentic portfolio research system.
+    
+    Tracks portfolio companies, investments, and deal flow for LPs and FOs.
+    Data is collected from multiple sources (SEC 13F, websites, annual reports,
+    press releases) and synthesized/deduplicated.
+    """
+    __tablename__ = "portfolio_companies"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    investor_id = Column(Integer, nullable=False, index=True)
+    investor_type = Column(String(50), nullable=False, index=True)  # 'lp' or 'family_office'
+    
+    # Company Details
+    company_name = Column(Text, nullable=False, index=True)
+    company_website = Column(Text, nullable=True)
+    company_industry = Column(String(255), nullable=True, index=True)
+    company_stage = Column(String(100), nullable=True)  # seed, series_a, growth, public, etc.
+    company_location = Column(String(255), nullable=True)
+    company_ticker = Column(String(20), nullable=True, index=True)  # For public equities
+    company_cusip = Column(String(20), nullable=True)  # CUSIP identifier
+    
+    # Investment Details
+    investment_type = Column(String(100), nullable=True, index=True)  # equity, PE, VC, real_estate, etc.
+    investment_date = Column(DateTime, nullable=True)
+    investment_amount_usd = Column(String(50), nullable=True)  # Stored as string for NUMERIC compatibility
+    shares_held = Column(String(50), nullable=True)  # Number of shares (for 13F)
+    market_value_usd = Column(String(50), nullable=True)  # Market value (for 13F)
+    ownership_percentage = Column(String(50), nullable=True)
+    current_holding = Column(Integer, default=1)  # Boolean: 1 = current, 0 = exited
+    exit_date = Column(DateTime, nullable=True)
+    exit_type = Column(String(100), nullable=True)  # IPO, acquisition, secondary, etc.
+    
+    # Data Provenance
+    source_type = Column(String(100), nullable=False, index=True)
+    # source_type values: 'sec_13f', 'website', 'annual_report', 'news', 
+    #                     'press_release', 'portfolio_company_website'
+    source_url = Column(Text, nullable=True)
+    source_urls = Column(JSON, nullable=True)  # Multiple sources for merged records
+    confidence_level = Column(String(50), nullable=False, default='medium')  # 'high', 'medium', 'low'
+    collected_date = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_verified_date = Column(DateTime, nullable=True)
+    
+    # Agent Metadata
+    collection_method = Column(String(100), default='agentic_search')
+    agent_reasoning = Column(Text, nullable=True)
+    collection_job_id = Column(Integer, nullable=True, index=True)  # FK to agentic_collection_jobs
     
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
     
     __table_args__ = (
-        Index('idx_lp_contact_lp_type', 'lp_id', 'contact_type'),
-        UniqueConstraint('lp_id', 'full_name', 'title', name='uq_lp_contact'),
+        Index('idx_portfolio_investor', 'investor_id', 'investor_type'),
+        Index('idx_portfolio_company_name', 'company_name'),
+        Index('idx_portfolio_current', 'current_holding'),
+        Index('idx_portfolio_source', 'source_type'),
+        UniqueConstraint('investor_id', 'investor_type', 'company_name', 'investment_date', 
+                        name='uq_portfolio_company'),
     )
     
     def __repr__(self) -> str:
         return (
-            f"<LpKeyContact(id={self.id}, lp_id={self.lp_id}, "
-            f"name='{self.full_name}', title='{self.title}')>"
+            f"<PortfolioCompany(id={self.id}, investor_id={self.investor_id}, "
+            f"company='{self.company_name}', source='{self.source_type}')>"
+        )
+
+
+class CoInvestment(Base):
+    """
+    Tracks co-investor relationships discovered during portfolio research.
+    
+    When we find that two investors participated in the same deal,
+    we record the relationship here for network analysis.
+    """
+    __tablename__ = "co_investments"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    primary_investor_id = Column(Integer, nullable=False, index=True)
+    primary_investor_type = Column(String(50), nullable=False)  # 'lp' or 'family_office'
+    co_investor_name = Column(Text, nullable=False, index=True)
+    co_investor_type = Column(String(100), nullable=True)  # PE firm, VC, family office, etc.
+    
+    # Deal details
+    deal_name = Column(Text, nullable=True)  # Company name or deal identifier
+    deal_date = Column(DateTime, nullable=True)
+    deal_size_usd = Column(String(50), nullable=True)
+    
+    # Relationship strength
+    co_investment_count = Column(Integer, default=1)  # Number of times they've co-invested
+    
+    # Data provenance
+    source_type = Column(String(100), nullable=True)
+    source_url = Column(Text, nullable=True)
+    collected_date = Column(DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    
+    __table_args__ = (
+        Index('idx_coinvest_primary', 'primary_investor_id', 'primary_investor_type'),
+        Index('idx_coinvest_co_investor', 'co_investor_name'),
+        UniqueConstraint('primary_investor_id', 'primary_investor_type', 'co_investor_name', 'deal_name',
+                        name='uq_co_investment'),
+    )
+    
+    def __repr__(self) -> str:
+        return (
+            f"<CoInvestment(id={self.id}, primary={self.primary_investor_id}, "
+            f"co_investor='{self.co_investor_name}', deal='{self.deal_name}')>"
+        )
+
+
+class InvestorTheme(Base):
+    """
+    Investment themes and patterns identified from portfolio analysis.
+    
+    Classifies investors by their investment preferences based on
+    observed portfolio patterns (sectors, geography, stage, asset class).
+    """
+    __tablename__ = "investor_themes"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    investor_id = Column(Integer, nullable=False, index=True)
+    investor_type = Column(String(50), nullable=False)  # 'lp' or 'family_office'
+    
+    # Theme classification
+    theme_category = Column(String(100), nullable=False, index=True)
+    # theme_category values: 'sector', 'geography', 'stage', 'asset_class'
+    theme_value = Column(String(255), nullable=False, index=True)
+    # e.g., for sector: 'climate_tech', 'healthcare', 'fintech'
+    # e.g., for geography: 'us', 'europe', 'asia', 'emerging_markets'
+    # e.g., for stage: 'seed', 'growth', 'buyout', 'public_equity'
+    
+    # Quantification
+    investment_count = Column(Integer, nullable=True)  # Number of investments in this theme
+    percentage_of_portfolio = Column(String(50), nullable=True)  # % of portfolio
+    
+    # Confidence
+    confidence_level = Column(String(50), nullable=True)  # 'high', 'medium', 'low'
+    evidence_sources = Column(JSON, nullable=True)  # List of source types supporting this
+    
+    # Timestamps
+    collected_date = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    
+    __table_args__ = (
+        Index('idx_theme_investor', 'investor_id', 'investor_type'),
+        Index('idx_theme_category_value', 'theme_category', 'theme_value'),
+        UniqueConstraint('investor_id', 'investor_type', 'theme_category', 'theme_value',
+                        name='uq_investor_theme'),
+    )
+    
+    def __repr__(self) -> str:
+        return (
+            f"<InvestorTheme(id={self.id}, investor_id={self.investor_id}, "
+            f"category='{self.theme_category}', value='{self.theme_value}')>"
+        )
+
+
+class AgenticCollectionJob(Base):
+    """
+    Tracks agentic portfolio collection jobs with full reasoning trail.
+    
+    Unlike regular ingestion_jobs, this tracks:
+    - Which strategies were attempted
+    - Agent's reasoning for strategy selection
+    - Results per strategy
+    - Resource usage (API calls, tokens, cost)
+    """
+    __tablename__ = "agentic_collection_jobs"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_type = Column(String(100), nullable=False, index=True)
+    # job_type values: 'portfolio_discovery', 'deal_flow_update', 'co_investor_mapping', 'theme_analysis'
+    
+    # Target investor
+    target_investor_id = Column(Integer, nullable=True, index=True)
+    target_investor_type = Column(String(50), nullable=True)  # 'lp' or 'family_office'
+    target_investor_name = Column(Text, nullable=True)
+    
+    # Job status
+    status = Column(String(50), nullable=False, default='pending', index=True)
+    # status values: 'pending', 'running', 'success', 'partial_success', 'failed'
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    
+    # Results summary
+    sources_checked = Column(Integer, nullable=True, default=0)
+    sources_successful = Column(Integer, nullable=True, default=0)
+    companies_found = Column(Integer, nullable=True, default=0)
+    new_companies = Column(Integer, nullable=True, default=0)
+    updated_companies = Column(Integer, nullable=True, default=0)
+    
+    # Agent decision trail
+    strategies_used = Column(JSON, nullable=True)  # List of strategy names
+    reasoning_log = Column(JSON, nullable=True)  # Detailed reasoning for each decision
+    
+    # Errors and warnings
+    errors = Column(JSON, nullable=True)  # Structured error information
+    warnings = Column(JSON, nullable=True)  # List of warning messages
+    
+    # Resource tracking
+    requests_made = Column(Integer, nullable=True, default=0)
+    tokens_used = Column(Integer, nullable=True, default=0)
+    cost_usd = Column(String(50), nullable=True)  # Estimated cost
+    
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    
+    __table_args__ = (
+        Index('idx_agentic_job_status', 'status'),
+        Index('idx_agentic_job_target', 'target_investor_id', 'target_investor_type'),
+    )
+    
+    def __repr__(self) -> str:
+        return (
+            f"<AgenticCollectionJob(id={self.id}, type='{self.job_type}', "
+            f"target='{self.target_investor_name}', status='{self.status}')>"
+        )
+
+
+# =============================================================================
+# FOOT TRAFFIC & LOCATION INTELLIGENCE MODELS
+# =============================================================================
+
+
+class Location(Base):
+    """
+    Physical locations (stores, restaurants, offices, venues) for foot traffic tracking.
+    
+    Represents Points of Interest (POIs) that can be linked to portfolio companies
+    or tracked independently for competitive analysis.
+    """
+    __tablename__ = "locations"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    # Identifiers
+    location_name = Column(Text, nullable=False, index=True)
+    brand_name = Column(String(255), nullable=True, index=True)  # e.g., "Starbucks" for "Starbucks #1234"
+    chain_id = Column(Integer, nullable=True, index=True)  # FK to private_companies.id
+    
+    # Location Details
+    street_address = Column(Text, nullable=True)
+    city = Column(String(255), nullable=True, index=True)
+    state = Column(String(50), nullable=True, index=True)
+    postal_code = Column(String(20), nullable=True, index=True)
+    country = Column(String(100), nullable=True, default='United States')
+    latitude = Column(String(50), nullable=True)  # Stored as string for precision
+    longitude = Column(String(50), nullable=True)
+    
+    # POI Metadata
+    category = Column(String(100), nullable=True, index=True)  # restaurant, retail, office, venue
+    subcategory = Column(String(100), nullable=True)  # coffee_shop, fast_food, clothing_store
+    
+    hours_of_operation = Column(JSON, nullable=True)  # {"Monday": {"open": "0800", "close": "2000"}, ...}
+    phone = Column(String(50), nullable=True)
+    website = Column(Text, nullable=True)
+    
+    # External IDs (for API mapping)
+    google_place_id = Column(String(255), nullable=True, unique=True)
+    safegraph_placekey = Column(String(255), nullable=True, unique=True)
+    foursquare_fsq_id = Column(String(255), nullable=True)
+    placer_venue_id = Column(String(255), nullable=True)
+    
+    # Status
+    is_active = Column(Integer, nullable=False, default=1)  # 1 = active, 0 = closed
+    opened_date = Column(DateTime, nullable=True)
+    closed_date = Column(DateTime, nullable=True)
+    
+    # Linkage to portfolio tracking
+    portfolio_company_id = Column(Integer, nullable=True, index=True)  # FK to portfolio_companies.id
+    
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_updated = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        Index('idx_locations_brand', 'brand_name'),
+        Index('idx_locations_city_state', 'city', 'state'),
+        Index('idx_locations_category', 'category'),
+        Index('idx_locations_chain', 'chain_id'),
+        Index('idx_locations_coords', 'latitude', 'longitude'),
+    )
+    
+    def __repr__(self) -> str:
+        return (
+            f"<Location(id={self.id}, name='{self.location_name}', "
+            f"brand='{self.brand_name}', city='{self.city}')>"
+        )
+
+
+class FootTrafficObservation(Base):
+    """
+    Time-series foot traffic data for locations.
+    
+    Captures visitor counts, patterns, and engagement metrics from multiple sources.
+    Supports daily, weekly, and monthly aggregation levels.
+    """
+    __tablename__ = "foot_traffic_observations"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    location_id = Column(Integer, nullable=False, index=True)  # FK to locations.id
+    
+    # Time Period
+    observation_date = Column(DateTime, nullable=False, index=True)
+    observation_period = Column(String(20), nullable=False, index=True)  # daily, weekly, monthly, hourly
+    
+    # Traffic Metrics
+    visit_count = Column(Integer, nullable=True)  # Absolute visitor count (if available)
+    visitor_count = Column(Integer, nullable=True)  # Unique visitors (if available)
+    visit_count_relative = Column(Integer, nullable=True)  # 0-100 scale (Google Popular Times)
+    
+    # Dwell & Engagement
+    median_dwell_minutes = Column(String(50), nullable=True)  # NUMERIC stored as string
+    avg_dwell_minutes = Column(String(50), nullable=True)
+    
+    # Hourly Breakdown (for daily observations)
+    hourly_traffic = Column(JSON, nullable=True)  # {"00": 10, "01": 5, "02": 3, ..., "23": 15}
+    
+    # Day of Week Patterns (for weekly observations)
+    daily_traffic = Column(JSON, nullable=True)  # {"Mon": 850, "Tue": 920, ..., "Sun": 650}
+    
+    # Visitor Demographics (if available from SafeGraph/Placer)
+    visitor_demographics = Column(JSON, nullable=True)
+    # {"age_ranges": {"18-24": 0.15, ...}, "median_income": 75000, "home_distance_mi": {...}}
+    
+    # Data Provenance
+    source_type = Column(String(50), nullable=False, index=True)  # google, safegraph, placer, city_data, foursquare
+    source_confidence = Column(String(20), nullable=True)  # high, medium, low
+    
+    collected_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    
+    __table_args__ = (
+        UniqueConstraint('location_id', 'observation_date', 'observation_period', 'source_type',
+                        name='uq_traffic_observation'),
+        Index('idx_traffic_location', 'location_id'),
+        Index('idx_traffic_date', 'observation_date'),
+        Index('idx_traffic_source', 'source_type'),
+    )
+    
+    def __repr__(self) -> str:
+        return (
+            f"<FootTrafficObservation(id={self.id}, location_id={self.location_id}, "
+            f"date={self.observation_date}, visits={self.visit_count})>"
+        )
+
+
+class LocationMetadata(Base):
+    """
+    Extended metadata for locations including trade area analysis and competitive data.
+    
+    Stores enrichment data from Placer.ai, SafeGraph, and other sources.
+    """
+    __tablename__ = "location_metadata"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    location_id = Column(Integer, nullable=False, index=True)  # FK to locations.id
+    
+    # Business Info
+    square_footage = Column(Integer, nullable=True)
+    employee_count_estimate = Column(Integer, nullable=True)
+    parking_spots = Column(Integer, nullable=True)
+    
+    # Trade Area (from Placer.ai)
+    trade_area_5min_population = Column(Integer, nullable=True)
+    trade_area_5min_median_income = Column(String(50), nullable=True)
+    trade_area_10min_population = Column(Integer, nullable=True)
+    trade_area_10min_median_income = Column(String(50), nullable=True)
+    
+    # Competitive Set
+    nearby_competitors = Column(JSON, nullable=True)
+    # [{"name": "Panera #123", "distance_mi": 0.5, "category": "fast_casual"}, ...]
+    
+    # Ratings & Reviews
+    google_rating = Column(String(10), nullable=True)  # e.g., "4.5"
+    google_review_count = Column(Integer, nullable=True)
+    yelp_rating = Column(String(10), nullable=True)
+    yelp_review_count = Column(Integer, nullable=True)
+    
+    last_updated = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (
+        Index('idx_metadata_location', 'location_id'),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<LocationMetadata(id={self.id}, location_id={self.location_id})>"
+
+
+class FootTrafficCollectionJob(Base):
+    """
+    Tracks foot traffic collection jobs with full agent reasoning trail.
+    
+    Supports multiple job types:
+    - discover_locations: Find locations for a brand
+    - collect_traffic: Gather foot traffic data for locations
+    - enrich_metadata: Add trade area and competitive data
+    """
+    __tablename__ = "foot_traffic_collection_jobs"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_type = Column(String(50), nullable=False, index=True)
+    # job_type values: 'discover_locations', 'collect_traffic', 'enrich_metadata', 'analyze_trends'
+    
+    # Target specification
+    target_brand = Column(String(255), nullable=True, index=True)
+    target_location_id = Column(Integer, nullable=True, index=True)
+    geographic_scope = Column(Text, nullable=True)  # city, state, national, specific_address
+    
+    # Job status
+    status = Column(String(50), nullable=False, default='pending', index=True)
+    # status values: 'pending', 'running', 'success', 'partial_success', 'failed'
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    
+    # Results
+    locations_found = Column(Integer, nullable=True, default=0)
+    locations_enriched = Column(Integer, nullable=True, default=0)
+    observations_collected = Column(Integer, nullable=True, default=0)
+    sources_checked = Column(JSON, nullable=True)  # List of source names checked
+    
+    # Agent Reasoning
+    reasoning_log = Column(JSON, nullable=True)  # Detailed reasoning for each decision
+    
+    # Errors and Warnings
+    errors = Column(JSON, nullable=True)
+    warnings = Column(JSON, nullable=True)
+    
+    # Resource tracking
+    requests_made = Column(Integer, nullable=True, default=0)
+    cost_usd = Column(String(50), nullable=True)  # Estimated API cost
+    
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    
+    __table_args__ = (
+        Index('idx_ft_job_status', 'status'),
+        Index('idx_ft_job_brand', 'target_brand'),
+    )
+    
+    def __repr__(self) -> str:
+        return (
+            f"<FootTrafficCollectionJob(id={self.id}, type='{self.job_type}', "
+            f"brand='{self.target_brand}', status='{self.status}')>"
+        )
+
+
+# =============================================================================
+# PREDICTION MARKET INTELLIGENCE MODELS
+# =============================================================================
+
+
+class PredictionMarket(Base):
+    """
+    Prediction market metadata from Kalshi, Polymarket, PredictIt.
+    
+    Tracks market details, categories, and resolution status.
+    Markets are uniquely identified by (source, market_id).
+    """
+    __tablename__ = "prediction_markets"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    # Source & Identifiers
+    source = Column(String(50), nullable=False, index=True)  # kalshi, polymarket, predictit
+    market_id = Column(String(255), nullable=False, index=True)  # platform-specific ID
+    market_url = Column(Text, nullable=True)  # direct link to market
+    
+    # Market Details
+    question = Column(Text, nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(String(100), nullable=True, index=True)  # economics, politics, sports, crypto, business
+    subcategory = Column(String(100), nullable=True, index=True)  # fed_rates, presidential_election, nfl, etc.
+    
+    # Market Type
+    outcome_type = Column(String(50), nullable=True)  # binary, multiple_choice, scalar
+    possible_outcomes = Column(JSON, nullable=True)  # for multiple choice markets
+    
+    # Timing
+    created_date = Column(DateTime, nullable=True)
+    close_date = Column(DateTime, nullable=True, index=True)  # when market resolves
+    resolved_date = Column(DateTime, nullable=True)
+    
+    # Resolution
+    resolved_outcome = Column(String(255), nullable=True)  # actual outcome when market closes
+    
+    # Status
+    is_active = Column(Integer, nullable=False, default=1, index=True)  # 1 = active, 0 = resolved/closed
+    is_featured = Column(Integer, nullable=False, default=0)  # high-profile market
+    
+    # Latest Values (for quick queries without joining observations)
+    last_yes_probability = Column(String(20), nullable=True)  # 0.00 to 1.00
+    last_volume_usd = Column(String(50), nullable=True)
+    last_updated = Column(DateTime, nullable=True)
+    
+    # Metadata
+    first_observed = Column(DateTime, nullable=False, default=datetime.utcnow)
+    
+    __table_args__ = (
+        UniqueConstraint('source', 'market_id', name='uq_prediction_market'),
+        Index('idx_pm_source', 'source'),
+        Index('idx_pm_category', 'category'),
+        Index('idx_pm_close_date', 'close_date'),
+        Index('idx_pm_active', 'is_active'),
+    )
+    
+    def __repr__(self) -> str:
+        return (
+            f"<PredictionMarket(id={self.id}, source='{self.source}', "
+            f"question='{self.question[:50]}...', prob={self.last_yes_probability})>"
+        )
+
+
+class MarketObservation(Base):
+    """
+    Time-series probability and volume data for prediction markets.
+    
+    Captures snapshots of market state at regular intervals for trend analysis.
+    """
+    __tablename__ = "market_observations"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    market_id = Column(Integer, nullable=False, index=True)  # FK to prediction_markets.id
+    
+    # Observation Time
+    observation_timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    
+    # Probabilities (0.00 to 1.00)
+    yes_probability = Column(String(20), nullable=False)  # stored as string for precision
+    no_probability = Column(String(20), nullable=True)  # can be derived (1 - yes) for binary
+    
+    # For Multiple Choice Markets
+    outcome_probabilities = Column(JSON, nullable=True)  # {"outcome_1": "0.45", "outcome_2": "0.35", ...}
+    
+    # Market Activity
+    volume_usd = Column(String(50), nullable=True)  # total volume
+    volume_24h_usd = Column(String(50), nullable=True)  # 24h volume
+    liquidity_usd = Column(String(50), nullable=True)  # open interest / liquidity
+    trade_count = Column(Integer, nullable=True)  # number of trades (if available)
+    
+    # Price Movement (calculated)
+    probability_change_1h = Column(String(20), nullable=True)  # change from 1 hour ago
+    probability_change_24h = Column(String(20), nullable=True)  # change from 24 hours ago
+    probability_change_7d = Column(String(20), nullable=True)  # change from 7 days ago
+    
+    # Data Quality
+    data_source = Column(String(50), nullable=False, default='api')  # api, browser, manual
+    confidence_score = Column(String(10), nullable=True)  # 0-1, how confident in data quality
+    
+    __table_args__ = (
+        Index('idx_mo_market', 'market_id'),
+        Index('idx_mo_timestamp', 'observation_timestamp'),
+        Index('idx_mo_market_time', 'market_id', 'observation_timestamp'),
+    )
+    
+    def __repr__(self) -> str:
+        return (
+            f"<MarketObservation(id={self.id}, market_id={self.market_id}, "
+            f"prob={self.yes_probability}, time={self.observation_timestamp})>"
+        )
+
+
+class MarketCategory(Base):
+    """
+    Classification system for prediction markets.
+    
+    Links market categories to relevant sectors and companies,
+    and defines alert thresholds for monitoring.
+    """
+    __tablename__ = "market_categories"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    category_name = Column(String(100), nullable=False, unique=True, index=True)
+    parent_category = Column(String(100), nullable=True)  # for hierarchical categories
+    display_name = Column(String(255), nullable=True)  # human-readable name
+    
+    # Relevance
+    relevant_sectors = Column(JSON, nullable=True)  # which sectors this affects
+    relevant_companies = Column(JSON, nullable=True)  # array of company IDs
+    impact_level = Column(String(20), nullable=True)  # high, medium, low
+    
+    # Monitoring
+    monitoring_priority = Column(Integer, nullable=True)  # 1-5 (5 = highest)
+    alert_threshold = Column(String(10), nullable=True)  # probability change threshold (e.g., "0.10")
+    
+    description = Column(Text, nullable=True)
+    
+    def __repr__(self) -> str:
+        return f"<MarketCategory(name='{self.category_name}', priority={self.monitoring_priority})>"
+
+
+class MarketAlert(Base):
+    """
+    Alerts for significant probability shifts in prediction markets.
+    
+    Generated when probability changes exceed configured thresholds.
+    """
+    __tablename__ = "market_alerts"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    market_id = Column(Integer, nullable=False, index=True)  # FK to prediction_markets.id
+    
+    # Alert Details
+    alert_type = Column(String(50), nullable=False, index=True)
+    # alert_type values: 'probability_spike', 'probability_drop', 'volume_surge', 'new_market', 'market_resolved'
+    alert_severity = Column(String(20), nullable=False, index=True)  # critical, high, medium, low
+    
+    # Trigger Conditions
+    triggered_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    probability_before = Column(String(20), nullable=True)
+    probability_after = Column(String(20), nullable=True)
+    probability_change = Column(String(20), nullable=True)
+    time_period = Column(String(20), nullable=True)  # 1h, 24h, 7d
+    
+    # Context
+    alert_message = Column(Text, nullable=True)
+    affected_sectors = Column(JSON, nullable=True)
+    affected_companies = Column(JSON, nullable=True)
+    
+    # Status
+    is_acknowledged = Column(Integer, nullable=False, default=0)  # 0 or 1
+    acknowledged_at = Column(DateTime, nullable=True)
+    acknowledged_by = Column(String(100), nullable=True)
+    
+    __table_args__ = (
+        Index('idx_alert_market', 'market_id'),
+        Index('idx_alert_triggered', 'triggered_at'),
+        Index('idx_alert_severity', 'alert_severity'),
+        Index('idx_alert_acknowledged', 'is_acknowledged'),
+    )
+    
+    def __repr__(self) -> str:
+        return (
+            f"<MarketAlert(id={self.id}, market_id={self.market_id}, "
+            f"type='{self.alert_type}', severity='{self.alert_severity}')>"
+        )
+
+
+class PredictionMarketJob(Base):
+    """
+    Tracks prediction market monitoring jobs.
+    
+    Each job monitors one or more platforms and captures:
+    - Markets checked and updated
+    - New markets discovered
+    - Alerts generated
+    """
+    __tablename__ = "prediction_market_jobs"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_type = Column(String(50), nullable=False, index=True)
+    # job_type values: 'monitor_all', 'monitor_kalshi', 'monitor_polymarket', 
+    #                  'monitor_predictit', 'analyze_trends', 'generate_alerts'
+    
+    # Target specification
+    target_platforms = Column(JSON, nullable=True)  # ['kalshi', 'polymarket', 'predictit']
+    target_categories = Column(JSON, nullable=True)  # ['economics', 'politics', 'sports']
+    
+    # Job status
+    status = Column(String(50), nullable=False, default='pending', index=True)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    
+    # Results
+    markets_checked = Column(Integer, nullable=True, default=0)
+    markets_updated = Column(Integer, nullable=True, default=0)
+    new_markets_found = Column(Integer, nullable=True, default=0)
+    observations_stored = Column(Integer, nullable=True, default=0)
+    alerts_generated = Column(Integer, nullable=True, default=0)
+    
+    # Agent Reasoning
+    reasoning_log = Column(JSON, nullable=True)
+    
+    # Errors
+    errors = Column(JSON, nullable=True)
+    warnings = Column(JSON, nullable=True)
+    
+    # Resource tracking
+    requests_made = Column(Integer, nullable=True, default=0)
+    
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    
+    __table_args__ = (
+        Index('idx_pm_job_status', 'status'),
+        Index('idx_pm_job_type', 'job_type'),
+    )
+    
+    def __repr__(self) -> str:
+        return (
+            f"<PredictionMarketJob(id={self.id}, type='{self.job_type}', "
+            f"status='{self.status}', markets_updated={self.markets_updated})>"
         )
 

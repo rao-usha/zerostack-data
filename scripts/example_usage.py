@@ -9,7 +9,7 @@ import time
 from typing import Dict, Any
 
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:8001"
 
 
 async def create_job(config: Dict[str, Any]) -> Dict[str, Any]:

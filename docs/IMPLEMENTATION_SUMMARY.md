@@ -253,7 +253,7 @@ RUN_INTEGRATION_TESTS=true pytest tests/integration/
 
 4. **Create ingestion job:**
    ```bash
-   curl -X POST http://localhost:8000/api/v1/jobs \
+   curl -X POST http://localhost:8001/api/v1/jobs \
      -H "Content-Type: application/json" \
      -d '{
        "source": "census",
@@ -268,7 +268,7 @@ RUN_INTEGRATION_TESTS=true pytest tests/integration/
 
 5. **Check job status:**
    ```bash
-   curl http://localhost:8000/api/v1/jobs/1
+   curl http://localhost:8001/api/v1/jobs/1
    ```
 
 6. **Query ingested data:**
@@ -317,7 +317,7 @@ RUN_INTEGRATION_TESTS=true pytest tests/integration/
 1. Ensure you have a PostgreSQL database running
 2. Set `DATABASE_URL` and `CENSUS_SURVEY_API_KEY` in `.env`
 3. Start the service: `uvicorn app.main:app --reload`
-4. Access interactive docs: http://localhost:8000/docs
+4. Access interactive docs: http://localhost:8001/docs
 5. Create ingestion jobs via API
 
 ### To Add More Sources (Future):

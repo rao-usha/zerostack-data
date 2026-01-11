@@ -61,7 +61,7 @@ All NOAA weather and climate data ingestion features have been successfully impl
 
 ### 3. Service (Already Running)
 - FastAPI service: `uvicorn app.main:app --reload`
-- API docs: http://localhost:8000/docs
+- API docs: http://localhost:8001/docs
 
 ## How to Test
 
@@ -87,10 +87,10 @@ This script will:
 
 ```bash
 # List datasets
-curl http://localhost:8000/api/v1/noaa/datasets
+curl http://localhost:8001/api/v1/noaa/datasets
 
 # Ingest sample data
-curl -X POST http://localhost:8000/api/v1/noaa/ingest \
+curl -X POST http://localhost:8001/api/v1/noaa/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "token": "YOUR_TOKEN",
@@ -105,7 +105,7 @@ curl -X POST http://localhost:8000/api/v1/noaa/ingest \
 
 ### Option 3: API Documentation
 
-Visit: http://localhost:8000/docs
+Visit: http://localhost:8001/docs
 
 Navigate to "noaa" section and try the interactive API.
 
@@ -143,7 +143,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 ### 4. Verify Integration
 ```bash
 # Check service includes NOAA
-curl http://localhost:8000/
+curl http://localhost:8001/
 
 # Should show: "sources": ["census", "bls", "fred", "noaa", "public_lp_strategies"]
 ```
@@ -151,7 +151,7 @@ curl http://localhost:8000/
 ### 5. Test Ingestion
 ```bash
 # Run small test ingestion
-curl -X POST http://localhost:8000/api/v1/noaa/ingest \
+curl -X POST http://localhost:8001/api/v1/noaa/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "token": "YOUR_TOKEN",
@@ -180,7 +180,7 @@ SELECT * FROM ingestion_jobs WHERE source = 'noaa' ORDER BY started_at DESC LIMI
 ### Job Status
 ```bash
 # Get job status
-curl http://localhost:8000/api/v1/jobs/{job_id}
+curl http://localhost:8001/api/v1/jobs/{job_id}
 ```
 
 ### Database Queries
@@ -326,7 +326,7 @@ LIMIT 10;
 - **Quick Start:** `NOAA_QUICK_START.md`
 - **Implementation:** `NOAA_IMPLEMENTATION_SUMMARY.md`
 - **Example Script:** `example_noaa_usage.py`
-- **API Docs:** http://localhost:8000/docs
+- **API Docs:** http://localhost:8001/docs
 
 ### Official NOAA
 - **CDO API:** https://www.ncdc.noaa.gov/cdo-web/webservices/v2

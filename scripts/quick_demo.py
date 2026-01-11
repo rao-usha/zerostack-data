@@ -17,7 +17,7 @@ import requests
 from pathlib import Path
 
 # Configuration
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = "http://localhost:8001"
 
 def main():
     """Run quick demo data ingestion."""

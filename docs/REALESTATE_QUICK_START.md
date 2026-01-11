@@ -110,7 +110,7 @@ The real estate module provides ingestion capabilities for multiple housing and 
 
 3. **Check Service Health:**
    ```bash
-   curl http://localhost:8000/health
+   curl http://localhost:8001/health
    ```
 
 ## Quick Start Examples
@@ -120,7 +120,7 @@ The real estate module provides ingestion capabilities for multiple housing and 
 **Goal:** Get quarterly national house price indices for the last 5 years.
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/realestate/fhfa/ingest" \
+curl -X POST "http://localhost:8001/api/v1/realestate/fhfa/ingest" \
   -H "Content-Type: application/json" \
   -d '{
     "geography_type": "National",
@@ -141,7 +141,7 @@ curl -X POST "http://localhost:8000/api/v1/realestate/fhfa/ingest" \
 
 **Check Status:**
 ```bash
-curl http://localhost:8000/api/v1/realestate/fhfa/status/123
+curl http://localhost:8001/api/v1/realestate/fhfa/status/123
 ```
 
 **Query Data:**
@@ -164,7 +164,7 @@ LIMIT 20;
 **Goal:** Get building permits and housing starts for California.
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/realestate/hud/ingest" \
+curl -X POST "http://localhost:8001/api/v1/realestate/hud/ingest" \
   -H "Content-Type: application/json" \
   -d '{
     "geography_type": "State",
@@ -194,7 +194,7 @@ ORDER BY date DESC;
 **Goal:** Get housing market metrics for all metro areas.
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/realestate/redfin/ingest" \
+curl -X POST "http://localhost:8001/api/v1/realestate/redfin/ingest" \
   -H "Content-Type: application/json" \
   -d '{
     "region_type": "metro",
@@ -225,7 +225,7 @@ LIMIT 20;
 **Goal:** Get residential building footprints in San Francisco.
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/realestate/osm/ingest" \
+curl -X POST "http://localhost:8001/api/v1/realestate/osm/ingest" \
   -H "Content-Type: application/json" \
   -d '{
     "bounding_box": [37.7, -122.5, 37.8, -122.4],
@@ -570,7 +570,7 @@ bbox = [37.0, -123.0, 38.0, -122.0]  # ~100km x 100km
 **Solution:**
 ```bash
 # Try without filters first
-curl -X POST "http://localhost:8000/api/v1/realestate/fhfa/ingest" \
+curl -X POST "http://localhost:8001/api/v1/realestate/fhfa/ingest" \
   -H "Content-Type: application/json" \
   -d '{}'
 ```
@@ -625,7 +625,7 @@ docker-compose logs -f app
 
 **Check job details:**
 ```bash
-curl http://localhost:8000/api/v1/realestate/{source}/status/{job_id}
+curl http://localhost:8001/api/v1/realestate/{source}/status/{job_id}
 ```
 
 **Common causes:**

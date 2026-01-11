@@ -318,7 +318,7 @@ Rate limiting is hardcoded to comply with SEC limits:
 ### Example 1: Basic Ingestion
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/company" \
   -H "Content-Type: application/json" \
   -d '{"cik": "0000320193"}'
 ```
@@ -326,7 +326,7 @@ curl -X POST "http://localhost:8000/api/v1/sec/ingest/company" \
 ### Example 2: Custom Date Range
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/company" \
   -H "Content-Type: application/json" \
   -d '{
     "cik": "0000320193",
@@ -339,7 +339,7 @@ curl -X POST "http://localhost:8000/api/v1/sec/ingest/company" \
 ### Example 3: Batch Ingestion
 
 ```bash
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/multiple" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/multiple" \
   -H "Content-Type: application/json" \
   -d '{
     "ciks": ["0000320193", "0000789019", "0001652044"],
@@ -571,12 +571,12 @@ Potential future additions (only if user explicitly requests):
 docker-compose up -d
 
 # Test ingestion
-curl -X POST "http://localhost:8000/api/v1/sec/ingest/company" \
+curl -X POST "http://localhost:8001/api/v1/sec/ingest/company" \
   -H "Content-Type: application/json" \
   -d '{"cik": "0000320193"}'
 
 # Check job status
-curl "http://localhost:8000/api/v1/jobs/{job_id}"
+curl "http://localhost:8001/api/v1/jobs/{job_id}"
 
 # Query results
 psql -c "SELECT * FROM sec_10k LIMIT 5;"
