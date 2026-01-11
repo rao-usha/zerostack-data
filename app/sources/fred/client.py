@@ -15,89 +15,99 @@ Rate limits:
 - With API key (free): 120 requests per minute per IP
 - API key available at: https://fred.stlouisfed.org/docs/api/api_key.html
 """
-import asyncio
 import logging
-import random
 from typing import Dict, List, Optional, Any
-import httpx
-from datetime import datetime
+
+from app.core.http_client import BaseAPIClient
+from app.core.api_errors import FatalError, RetryableError
+from app.core.api_registry import get_api_config
 
 logger = logging.getLogger(__name__)
 
 
-class FREDClient:
+class FREDClient(BaseAPIClient):
     """
     HTTP client for FRED API with bounded concurrency and rate limiting.
-    
-    Responsibilities:
-    - Make HTTP requests to FRED API
-    - Implement retry logic with exponential backoff
-    - Respect rate limits via semaphore
-    - Handle API errors gracefully
+
+    Inherits retry logic, backoff, and error handling from BaseAPIClient.
     """
-    
-    # FRED API endpoints
+
+    SOURCE_NAME = "fred"
     BASE_URL = "https://api.stlouisfed.org/fred"
-    
-    # Rate limit defaults (conservative)
-    # FRED allows 120 requests per minute with API key
-    # We default to 2 concurrent requests to be conservative
-    DEFAULT_MAX_CONCURRENCY = 2
-    DEFAULT_MAX_REQUESTS_PER_MINUTE = 60  # Conservative default
-    
+
     def __init__(
         self,
         api_key: Optional[str] = None,
-        max_concurrency: int = DEFAULT_MAX_CONCURRENCY,
+        max_concurrency: int = 2,
         max_retries: int = 3,
         backoff_factor: float = 2.0
     ):
         """
         Initialize FRED API client.
-        
+
         Args:
             api_key: Optional FRED API key (recommended for production)
             max_concurrency: Maximum concurrent requests
             max_retries: Maximum retry attempts for failed requests
             backoff_factor: Exponential backoff multiplier
         """
-        self.api_key = api_key
-        self.max_concurrency = max_concurrency
-        self.max_retries = max_retries
-        self.backoff_factor = backoff_factor
-        
-        # Semaphore for bounded concurrency - MANDATORY per RULES
-        self.semaphore = asyncio.Semaphore(max_concurrency)
-        
-        # HTTP client (will be created in async context)
-        self._client: Optional[httpx.AsyncClient] = None
-        
+        # Get config from registry
+        config = get_api_config("fred")
+
+        super().__init__(
+            api_key=api_key,
+            max_concurrency=max_concurrency,
+            max_retries=max_retries,
+            backoff_factor=backoff_factor,
+            timeout=config.timeout_seconds,
+            connect_timeout=config.connect_timeout_seconds,
+            rate_limit_interval=config.get_rate_limit_interval()
+        )
+
         if not api_key:
             logger.warning(
                 "FRED API key not provided. Access may be limited. "
-                "Get a free key at: https://fred.stlouisfed.org/docs/api/api_key.html"
+                f"Get a free key at: {config.signup_url}"
             )
-        
-        logger.info(
-            f"Initialized FREDClient: "
-            f"api_key_present={api_key is not None}, "
-            f"max_concurrency={max_concurrency}"
-        )
-    
-    async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create the HTTP client."""
-        if self._client is None:
-            self._client = httpx.AsyncClient(
-                timeout=httpx.Timeout(30.0, connect=10.0)
+
+    def _add_auth_to_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Add API key to request parameters."""
+        if self.api_key:
+            params["api_key"] = self.api_key
+        params["file_type"] = "json"
+        return params
+
+    def _check_api_error(
+        self,
+        data: Dict[str, Any],
+        resource_id: str
+    ) -> Optional[Exception]:
+        """Check for FRED-specific API errors."""
+        if "error_code" in data:
+            error_code = data.get("error_code")
+            error_message = data.get("error_message", "Unknown error")
+
+            logger.warning(f"FRED API error: {error_code} - {error_message}")
+
+            # Non-retryable errors
+            if error_code in [400, 404]:
+                return FatalError(
+                    message=f"FRED API error {error_code}: {error_message}",
+                    source=self.SOURCE_NAME,
+                    status_code=error_code,
+                    response_data=data
+                )
+
+            # Retryable errors
+            return RetryableError(
+                message=f"FRED API error {error_code}: {error_message}",
+                source=self.SOURCE_NAME,
+                status_code=error_code,
+                response_data=data
             )
-        return self._client
-    
-    async def close(self):
-        """Close the HTTP client."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
-    
+
+        return None
+
     async def get_series_observations(
         self,
         series_id: str,
@@ -109,7 +119,7 @@ class FREDClient:
     ) -> Dict[str, Any]:
         """
         Fetch observations (data points) for a FRED series.
-        
+
         Args:
             series_id: FRED series ID (e.g., "GDP", "UNRATE", "DFF")
             observation_start: Start date in YYYY-MM-DD format (optional)
@@ -117,57 +127,45 @@ class FREDClient:
             units: Units transformation (lin, chg, ch1, pch, pc1, pca, cch, cca, log)
             frequency: Frequency aggregation (d, w, bw, m, q, sa, a, wef, weth, wew, wetu, wem, wesu, wesa, bwew, bwem)
             aggregation_method: Aggregation method (avg, sum, eop)
-            
+
         Returns:
             Dict containing API response with observations
-            
+
         Raises:
-            Exception: On API errors after retries
+            APIError: On API errors after retries
         """
-        params = {
+        params: Dict[str, Any] = {
             "series_id": series_id,
-            "file_type": "json"
+            "units": units,
+            "aggregation_method": aggregation_method
         }
-        
-        if self.api_key:
-            params["api_key"] = self.api_key
-        
+
         if observation_start:
             params["observation_start"] = observation_start
         if observation_end:
             params["observation_end"] = observation_end
         if frequency:
             params["frequency"] = frequency
-        
-        params["units"] = units
-        params["aggregation_method"] = aggregation_method
-        
-        url = f"{self.BASE_URL}/series/observations"
-        
-        return await self._request_with_retry(url, params, series_id)
-    
+
+        return await self.get(
+            "series/observations",
+            params=params,
+            resource_id=f"series:{series_id}"
+        )
+
     async def get_series_info(self, series_id: str) -> Dict[str, Any]:
         """
         Fetch metadata for a FRED series.
-        
+
         Args:
             series_id: FRED series ID
-            
+
         Returns:
             Dict containing series metadata
         """
-        params = {
-            "series_id": series_id,
-            "file_type": "json"
-        }
-        
-        if self.api_key:
-            params["api_key"] = self.api_key
-        
-        url = f"{self.BASE_URL}/series"
-        
-        return await self._request_with_retry(url, params, series_id)
-    
+        params = {"series_id": series_id}
+        return await self.get("series", params=params, resource_id=f"info:{series_id}")
+
     async def get_multiple_series(
         self,
         series_ids: List[str],
@@ -176,168 +174,28 @@ class FREDClient:
     ) -> Dict[str, List[Dict[str, Any]]]:
         """
         Fetch multiple series concurrently (with bounded concurrency).
-        
+
         Args:
             series_ids: List of FRED series IDs
             observation_start: Start date in YYYY-MM-DD format (optional)
             observation_end: End date in YYYY-MM-DD format (optional)
-            
+
         Returns:
             Dict mapping series_id to list of observations
         """
-        tasks = []
-        for series_id in series_ids:
-            task = self.get_series_observations(
+        async def fetch_one(series_id: str) -> List[Dict[str, Any]]:
+            response = await self.get_series_observations(
                 series_id=series_id,
                 observation_start=observation_start,
                 observation_end=observation_end
             )
-            tasks.append((series_id, task))
-        
-        results = {}
-        for series_id, task in tasks:
-            try:
-                response = await task
-                observations = response.get("observations", [])
-                results[series_id] = observations
-            except Exception as e:
-                logger.error(f"Failed to fetch series {series_id}: {e}")
-                results[series_id] = []
-        
-        return results
-    
-    async def _request_with_retry(
-        self,
-        url: str,
-        params: Dict[str, Any],
-        series_id: str
-    ) -> Dict[str, Any]:
-        """
-        Make HTTP GET request with exponential backoff retry.
-        
-        Args:
-            url: API endpoint URL
-            params: Query parameters
-            series_id: Series ID being requested (for logging)
-            
-        Returns:
-            Parsed JSON response
-            
-        Raises:
-            Exception: After all retries exhausted
-        """
-        async with self.semaphore:  # Bounded concurrency
-            client = await self._get_client()
-            
-            for attempt in range(self.max_retries):
-                try:
-                    logger.debug(
-                        f"Fetching FRED series {series_id} "
-                        f"(attempt {attempt+1}/{self.max_retries})"
-                    )
-                    
-                    response = await client.get(url, params=params)
-                    
-                    # Check for HTTP errors
-                    response.raise_for_status()
-                    
-                    # Parse JSON response
-                    data = response.json()
-                    
-                    # Check for FRED API errors
-                    if "error_code" in data:
-                        error_code = data.get("error_code")
-                        error_message = data.get("error_message", "Unknown error")
-                        
-                        logger.warning(
-                            f"FRED API returned error: {error_code} - {error_message}"
-                        )
-                        
-                        # Some errors are not retryable
-                        if error_code in [400, 404]:  # Bad request or not found
-                            raise Exception(
-                                f"FRED API error {error_code}: {error_message}"
-                            )
-                        
-                        # Retry on other errors
-                        if attempt < self.max_retries - 1:
-                            await self._backoff(attempt)
-                            continue
-                        else:
-                            raise Exception(
-                                f"FRED API error {error_code}: {error_message}"
-                            )
-                    
-                    # Success!
-                    logger.debug(f"Successfully fetched series {series_id}")
-                    return data
-                
-                except httpx.HTTPStatusError as e:
-                    logger.warning(
-                        f"HTTP error fetching FRED data (attempt {attempt+1}): {e}"
-                    )
-                    
-                    # Check for rate limiting (429)
-                    if e.response.status_code == 429:
-                        retry_after = e.response.headers.get("Retry-After")
-                        if retry_after:
-                            wait_time = int(retry_after)
-                            logger.warning(f"Rate limited. Waiting {wait_time}s")
-                            await asyncio.sleep(wait_time)
-                            continue
-                    
-                    # Retry on 5xx errors, not on 4xx
-                    if e.response.status_code >= 500 and attempt < self.max_retries - 1:
-                        await self._backoff(attempt)
-                    else:
-                        raise Exception(
-                            f"FRED API HTTP error: {e.response.status_code} - "
-                            f"{e.response.text}"
-                        )
-                
-                except httpx.RequestError as e:
-                    logger.warning(
-                        f"Request error fetching FRED data (attempt {attempt+1}): {e}"
-                    )
-                    if attempt < self.max_retries - 1:
-                        await self._backoff(attempt)
-                    else:
-                        raise Exception(f"FRED API request failed: {str(e)}")
-                
-                except Exception as e:
-                    logger.error(
-                        f"Unexpected error fetching FRED data (attempt {attempt+1}): {e}"
-                    )
-                    if attempt < self.max_retries - 1:
-                        await self._backoff(attempt)
-                    else:
-                        raise
-            
-            # Should never reach here, but just in case
-            raise Exception(f"Failed to fetch FRED data after {self.max_retries} attempts")
-    
-    async def _backoff(self, attempt: int):
-        """
-        Exponential backoff with jitter.
-        
-        Args:
-            attempt: Current attempt number (0-indexed)
-        """
-        # Calculate backoff: base * factor^attempt + random jitter
-        base_delay = 1.0
-        max_delay = 60.0
-        
-        delay = min(
-            base_delay * (self.backoff_factor ** attempt),
-            max_delay
+            return response.get("observations", [])
+
+        return await self.fetch_multiple(
+            items=series_ids,
+            fetch_func=fetch_one,
+            item_id_func=lambda x: x
         )
-        
-        # Add jitter (±25%)
-        jitter = delay * 0.25 * (2 * random.random() - 1)
-        delay_with_jitter = max(0.1, delay + jitter)
-        
-        logger.debug(f"Backing off for {delay_with_jitter:.2f}s")
-        await asyncio.sleep(delay_with_jitter)
 
 
 # Common FRED series IDs organized by category
@@ -373,4 +231,3 @@ COMMON_SERIES = {
         "retail_sales": "RSXFS",  # Retail Sales
     }
 }
-
