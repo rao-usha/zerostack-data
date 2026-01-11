@@ -208,16 +208,22 @@ class TestFREDTableCreation:
 class TestFREDIntegration:
     """
     Integration tests for FRED ingestion.
-    
+
     These tests require:
-    - Database connection
+    - Database connection (DATABASE_URL env var)
     - FRED API key (optional, will use throttled mode without key)
-    
+
     Run with: pytest tests/test_fred_integration.py -v -m integration
     """
-    
+
     async def test_full_ingestion_pipeline(self, db_session: Session):
         """Test complete FRED ingestion pipeline."""
+        import os
+
+        # Skip if DATABASE_URL not configured (required by Settings)
+        if not os.environ.get("DATABASE_URL"):
+            pytest.skip("DATABASE_URL not configured - skipping integration test")
+
         # Skip if no database
         if not db_session:
             pytest.skip("Database not available")

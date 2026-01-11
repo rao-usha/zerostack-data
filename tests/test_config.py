@@ -25,8 +25,9 @@ def test_config_requires_database_url(clean_env, monkeypatch):
 def test_config_census_key_optional_for_startup(clean_env, monkeypatch):
     """Census API key is optional for app startup."""
     monkeypatch.setenv("DATABASE_URL", "postgresql://test")
-    
-    settings = Settings()
+
+    # Disable .env file loading for this test
+    settings = Settings(_env_file=None)
     assert settings.database_url == "postgresql://test"
     assert settings.census_survey_api_key is None
 
@@ -35,13 +36,14 @@ def test_config_census_key_optional_for_startup(clean_env, monkeypatch):
 def test_config_census_key_required_for_ingestion(clean_env, monkeypatch):
     """Census API key is required when calling require_census_api_key()."""
     monkeypatch.setenv("DATABASE_URL", "postgresql://test")
-    
-    settings = Settings()
-    
+
+    # Disable .env file loading for this test
+    settings = Settings(_env_file=None)
+
     # Should raise clear error when trying to ingest without key
     with pytest.raises(MissingCensusAPIKeyError) as exc_info:
         settings.require_census_api_key()
-    
+
     assert "CENSUS_SURVEY_API_KEY is required" in str(exc_info.value)
     assert "https://api.census.gov" in str(exc_info.value)
 

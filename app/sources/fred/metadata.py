@@ -128,14 +128,16 @@ def parse_observations(
             continue
         
         # Parse value (may be "." for missing data)
-        value = None
-        if value_str and value_str != ".":
-            try:
-                value = float(value_str)
-            except ValueError:
-                logger.warning(f"Invalid value '{value_str}' for {series_id} on {date_str}")
-                continue
-        
+        # Skip rows with missing data
+        if not value_str or value_str == ".":
+            continue
+
+        try:
+            value = float(value_str)
+        except ValueError:
+            logger.warning(f"Invalid value '{value_str}' for {series_id} on {date_str}")
+            continue
+
         row = {
             "series_id": series_id,
             "date": date_str,

@@ -64,6 +64,14 @@ def test_db():
         Base.metadata.drop_all(bind=engine)
 
 
+@pytest.fixture(scope="function")
+def db_session(test_db):
+    """
+    Alias for test_db fixture for backward compatibility.
+    """
+    yield test_db
+
+
 @pytest.fixture
 def sample_census_metadata():
     """
