@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules
+from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks
 
 # Configure logging
 logging.basicConfig(
@@ -679,6 +679,10 @@ Browse the endpoint sections below to see what's available:
         {
             "name": "schedules",
             "description": "📅 **Scheduled Ingestion** - Automated data refresh with cron-based scheduling for all data sources"
+        },
+        {
+            "name": "webhooks",
+            "description": "🔔 **Webhook Notifications** - Configure webhooks to receive notifications for job events and monitoring alerts"
         }
     ]
 )
@@ -724,6 +728,7 @@ app.include_router(irs_soi.router, prefix="/api/v1")
 app.include_router(foot_traffic.router, prefix="/api/v1")
 app.include_router(prediction_markets.router, prefix="/api/v1")
 app.include_router(schedules.router, prefix="/api/v1")
+app.include_router(webhooks.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])

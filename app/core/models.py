@@ -1288,3 +1288,101 @@ class PredictionMarketJob(Base):
             f"status='{self.status}', markets_updated={self.markets_updated})>"
         )
 
+
+# =============================================================================
+# WEBHOOK NOTIFICATION MODELS
+# =============================================================================
+
+
+class WebhookEventType(str, enum.Enum):
+    """Types of events that can trigger webhooks."""
+    JOB_FAILED = "job_failed"
+    JOB_SUCCESS = "job_success"
+    ALERT_HIGH_FAILURE_RATE = "alert_high_failure_rate"
+    ALERT_STUCK_JOB = "alert_stuck_job"
+    ALERT_DATA_STALENESS = "alert_data_staleness"
+    SCHEDULE_TRIGGERED = "schedule_triggered"
+    CLEANUP_COMPLETED = "cleanup_completed"
+
+
+class Webhook(Base):
+    """
+    Webhook configuration for notifications.
+
+    Webhooks can be configured to send HTTP POST requests to external
+    services (Slack, Discord, custom endpoints) when events occur.
+    """
+    __tablename__ = "webhooks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False, unique=True)
+    url = Column(String(2048), nullable=False)  # Webhook endpoint URL
+
+    # Event configuration
+    event_types = Column(JSON, nullable=False)  # List of WebhookEventType values
+    source_filter = Column(String(50), nullable=True)  # Optional: only trigger for specific source
+
+    # Authentication (optional)
+    secret = Column(String(255), nullable=True)  # For HMAC signature verification
+    headers = Column(JSON, nullable=True)  # Custom headers to include
+
+    # State
+    is_active = Column(Integer, nullable=False, default=1)  # 1=active, 0=disabled
+
+    # Statistics
+    total_sent = Column(Integer, nullable=False, default=0)
+    total_failed = Column(Integer, nullable=False, default=0)
+    last_sent_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return (
+            f"<Webhook(id={self.id}, name='{self.name}', "
+            f"active={self.is_active}, sent={self.total_sent})>"
+        )
+
+
+class WebhookDelivery(Base):
+    """
+    Log of webhook delivery attempts.
+
+    Tracks each webhook notification sent, including success/failure status.
+    """
+    __tablename__ = "webhook_deliveries"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    webhook_id = Column(Integer, nullable=False, index=True)
+
+    # Event details
+    event_type = Column(String(50), nullable=False, index=True)
+    event_data = Column(JSON, nullable=False)  # The payload sent
+
+    # Delivery status
+    status = Column(String(20), nullable=False, index=True)  # success, failed, pending
+    response_code = Column(Integer, nullable=True)
+    response_body = Column(Text, nullable=True)
+    error_message = Column(Text, nullable=True)
+
+    # Timing
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    delivered_at = Column(DateTime, nullable=True)
+
+    # Retry tracking
+    attempt_number = Column(Integer, nullable=False, default=1)
+
+    __table_args__ = (
+        Index('idx_webhook_delivery_webhook', 'webhook_id'),
+        Index('idx_webhook_delivery_status', 'status'),
+        Index('idx_webhook_delivery_created', 'created_at'),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<WebhookDelivery(id={self.id}, webhook_id={self.webhook_id}, "
+            f"event='{self.event_type}', status='{self.status}')>"
+        )
+

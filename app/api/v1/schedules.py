@@ -351,12 +351,12 @@ def create_default_schedules(db: Session = Depends(get_db)):
 # =============================================================================
 
 @router.post("/cleanup/stuck-jobs")
-def cleanup_stuck_jobs(timeout_hours: int = 2):
+async def cleanup_stuck_jobs(timeout_hours: int = 2):
     """
     Manually trigger cleanup of stuck jobs.
 
     Jobs that have been in RUNNING status for longer than the timeout
-    will be marked as FAILED.
+    will be marked as FAILED. Sends webhook notifications if configured.
 
     Args:
         timeout_hours: Hours after which a running job is considered stuck (default 2)
@@ -364,7 +364,7 @@ def cleanup_stuck_jobs(timeout_hours: int = 2):
     Returns:
         Cleanup results including list of cleaned up jobs
     """
-    result = scheduler_service.cleanup_stuck_jobs(timeout_hours=timeout_hours)
+    result = await scheduler_service.cleanup_stuck_jobs(timeout_hours=timeout_hours)
     return result
 
 

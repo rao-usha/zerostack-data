@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 
 from app.core.models import IngestionJob, JobStatus
+from app.core import webhook_service
 
 logger = logging.getLogger(__name__)
 
@@ -303,3 +304,97 @@ def get_monitoring_dashboard(db: Session) -> Dict[str, Any]:
         "alerts": monitor.check_alerts(),
         "dashboard_generated_at": datetime.utcnow().isoformat()
     }
+
+
+async def check_and_notify_alerts(
+    db: Session,
+    failure_threshold: int = 3,
+    time_window_hours: int = 1
+) -> Dict[str, Any]:
+    """
+    Check for alerts and send webhook notifications.
+
+    Args:
+        db: Database session
+        failure_threshold: Number of failures to trigger alert
+        time_window_hours: Time window for failure count
+
+    Returns:
+        Dictionary with alerts found and notifications sent
+    """
+    monitor = JobMonitor(db)
+    alerts = monitor.check_alerts(
+        failure_threshold=failure_threshold,
+        time_window_hours=time_window_hours
+    )
+
+    if not alerts:
+        return {
+            "alerts_found": 0,
+            "notifications_sent": 0,
+            "alerts": []
+        }
+
+    notifications_sent = 0
+    for alert in alerts:
+        try:
+            result = await webhook_service.notify_alert(
+                alert_type=alert["alert_type"],
+                source=alert["source"],
+                message=alert["message"],
+                details=alert
+            )
+            if result.get("successful", 0) > 0:
+                notifications_sent += 1
+        except Exception as e:
+            logger.error(f"Failed to send alert notification: {e}")
+
+    return {
+        "alerts_found": len(alerts),
+        "notifications_sent": notifications_sent,
+        "alerts": alerts
+    }
+
+
+async def notify_job_completion(
+    job_id: int,
+    source: str,
+    status: JobStatus,
+    rows_inserted: int = 0,
+    error_message: Optional[str] = None,
+    config: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Send webhook notification for job completion.
+
+    Args:
+        job_id: The job ID
+        source: The data source
+        status: The job status
+        rows_inserted: Number of rows inserted (for successful jobs)
+        error_message: Error message (for failed jobs)
+        config: Job configuration
+
+    Returns:
+        Webhook trigger result
+    """
+    try:
+        if status == JobStatus.SUCCESS:
+            return await webhook_service.notify_job_success(
+                job_id=job_id,
+                source=source,
+                rows_inserted=rows_inserted,
+                config=config
+            )
+        elif status == JobStatus.FAILED:
+            return await webhook_service.notify_job_failed(
+                job_id=job_id,
+                source=source,
+                error_message=error_message or "Unknown error",
+                config=config
+            )
+        else:
+            return {"webhooks_triggered": 0}
+    except Exception as e:
+        logger.error(f"Failed to send job completion notification: {e}")
+        return {"webhooks_triggered": 0, "error": str(e)}

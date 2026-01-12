@@ -530,7 +530,7 @@ def create_default_schedules(db: Session) -> List[IngestionSchedule]:
 STUCK_JOB_TIMEOUT_HOURS = 2
 
 
-def cleanup_stuck_jobs(timeout_hours: int = STUCK_JOB_TIMEOUT_HOURS) -> Dict[str, Any]:
+async def cleanup_stuck_jobs(timeout_hours: int = STUCK_JOB_TIMEOUT_HOURS) -> Dict[str, Any]:
     """
     Find and mark stuck jobs as failed.
 
@@ -543,7 +543,7 @@ def cleanup_stuck_jobs(timeout_hours: int = STUCK_JOB_TIMEOUT_HOURS) -> Dict[str
     Returns:
         Dictionary with cleanup results
     """
-    from sqlalchemy import text
+    from app.core import webhook_service
 
     SessionLocal = get_session_factory()
     db = SessionLocal()
@@ -589,6 +589,16 @@ def cleanup_stuck_jobs(timeout_hours: int = STUCK_JOB_TIMEOUT_HOURS) -> Dict[str
         db.commit()
 
         logger.info(f"Cleaned up {len(cleaned_jobs)} stuck jobs")
+
+        # Send webhook notification for cleanup
+        try:
+            await webhook_service.notify_cleanup_completed(
+                cleaned_up=len(cleaned_jobs),
+                jobs=cleaned_jobs,
+                timeout_hours=timeout_hours
+            )
+        except Exception as e:
+            logger.warning(f"Failed to send cleanup webhook notification: {e}")
 
         return {
             "cleaned_up": len(cleaned_jobs),
