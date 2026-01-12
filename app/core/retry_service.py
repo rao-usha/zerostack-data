@@ -294,3 +294,133 @@ def retry_all_eligible_jobs(
             })
 
     return results
+
+
+# =============================================================================
+# Automatic Retry Functions
+# =============================================================================
+
+def auto_schedule_retry(db: Session, job: IngestionJob) -> bool:
+    """
+    Automatically schedule a failed job for retry.
+
+    Called when a job fails. If retries remain, schedules the job
+    for retry with exponential backoff.
+
+    Args:
+        db: Database session
+        job: The failed job
+
+    Returns:
+        True if retry was scheduled, False if no retries remain
+    """
+    if job.status != JobStatus.FAILED:
+        logger.warning(f"Job {job.id} is not failed, cannot schedule retry")
+        return False
+
+    if job.retry_count >= job.max_retries:
+        logger.info(f"Job {job.id} has exhausted all retries ({job.retry_count}/{job.max_retries})")
+        return False
+
+    # Calculate delay with exponential backoff
+    delay = calculate_retry_delay(job.retry_count)
+    next_retry = datetime.utcnow() + delay
+
+    job.next_retry_at = next_retry
+
+    db.commit()
+    logger.info(
+        f"Job {job.id} scheduled for auto-retry at {next_retry} "
+        f"(attempt {job.retry_count + 1}/{job.max_retries}, delay={delay})"
+    )
+
+    return True
+
+
+def get_jobs_ready_for_retry(db: Session, limit: int = 20) -> List[IngestionJob]:
+    """
+    Get jobs that are scheduled for retry and ready to run.
+
+    Args:
+        db: Database session
+        limit: Maximum number of jobs to return
+
+    Returns:
+        List of jobs ready for retry
+    """
+    now = datetime.utcnow()
+
+    return db.query(IngestionJob).filter(
+        and_(
+            IngestionJob.status == JobStatus.FAILED,
+            IngestionJob.retry_count < IngestionJob.max_retries,
+            IngestionJob.next_retry_at.isnot(None),
+            IngestionJob.next_retry_at <= now
+        )
+    ).order_by(
+        IngestionJob.next_retry_at.asc()
+    ).limit(limit).all()
+
+
+async def process_scheduled_retries(limit: int = 10) -> Dict[str, Any]:
+    """
+    Process jobs that are scheduled for retry.
+
+    This function should be called periodically by the scheduler.
+
+    Args:
+        limit: Maximum number of jobs to process
+
+    Returns:
+        Dictionary with processing results
+    """
+    from app.core.database import get_session_factory
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+
+    results = {
+        "processed": 0,
+        "jobs": [],
+        "errors": []
+    }
+
+    try:
+        jobs = get_jobs_ready_for_retry(db, limit)
+
+        if not jobs:
+            logger.debug("No jobs ready for scheduled retry")
+            return results
+
+        logger.info(f"Processing {len(jobs)} scheduled retries")
+
+        for job in jobs:
+            try:
+                # Mark job for immediate retry
+                updated = mark_job_for_immediate_retry(db, job.id)
+                if updated:
+                    # Execute the retry
+                    from app.api.v1.jobs import run_ingestion_job
+                    await run_ingestion_job(updated.id, updated.source, updated.config)
+
+                    results["processed"] += 1
+                    results["jobs"].append({
+                        "job_id": job.id,
+                        "source": job.source,
+                        "retry_count": updated.retry_count
+                    })
+            except Exception as e:
+                logger.error(f"Error processing retry for job {job.id}: {e}")
+                results["errors"].append({
+                    "job_id": job.id,
+                    "error": str(e)
+                })
+
+    except Exception as e:
+        logger.error(f"Error in process_scheduled_retries: {e}", exc_info=True)
+        results["error"] = str(e)
+
+    finally:
+        db.close()
+
+    return results

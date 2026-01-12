@@ -16,13 +16,64 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
+async def _handle_job_failure(
+    db,
+    job: IngestionJob,
+    error_message: str,
+    error_type: str = None
+):
+    """
+    Handle job failure: set status, schedule retry, send notifications.
+
+    Args:
+        db: Database session
+        job: The failed job
+        error_message: Error description
+        error_type: Type of error (exception class name)
+    """
+    from datetime import datetime
+    from app.core.retry_service import auto_schedule_retry
+    from app.core import monitoring
+
+    job.status = JobStatus.FAILED
+    job.error_message = error_message
+    if error_type:
+        job.error_details = {"error_type": error_type}
+    job.completed_at = datetime.utcnow()
+    db.commit()
+
+    # Try to schedule automatic retry
+    retry_scheduled = auto_schedule_retry(db, job)
+
+    if retry_scheduled:
+        logger.info(f"Job {job.id} failed, retry scheduled (attempt {job.retry_count + 1}/{job.max_retries})")
+    else:
+        # No more retries - send webhook notification
+        logger.warning(f"Job {job.id} failed permanently (exhausted {job.retry_count}/{job.max_retries} retries)")
+        try:
+            await monitoring.notify_job_completion(
+                job_id=job.id,
+                source=job.source,
+                status=JobStatus.FAILED,
+                error_message=error_message,
+                config=job.config
+            )
+        except Exception as e:
+            logger.error(f"Failed to send failure notification for job {job.id}: {e}")
+
+
 async def run_ingestion_job(job_id: int, source: str, config: dict):
     """
     Background task to run ingestion job.
+
+    On failure, automatically schedules retry if retries remain.
+    Sends webhook notification on final failure (no retries left).
     """
     from datetime import datetime
     from app.core.database import get_session_factory
-    
+    from app.core.retry_service import auto_schedule_retry
+    from app.core import monitoring
+
     SessionLocal = get_session_factory()
     db = SessionLocal()
     
@@ -44,10 +95,7 @@ async def run_ingestion_job(job_id: int, source: str, config: dict):
             try:
                 settings.require_census_api_key()
             except MissingCensusAPIKeyError as e:
-                job.status = JobStatus.FAILED
-                job.error_message = str(e)
-                job.completed_at = datetime.utcnow()
-                db.commit()
+                await _handle_job_failure(db, job, str(e), "MissingCensusAPIKeyError")
                 return
             
             # Call Census ingestion
@@ -62,10 +110,7 @@ async def run_ingestion_job(job_id: int, source: str, config: dict):
             
             # Validate required parameters
             if not year or not table_id:
-                job.status = JobStatus.FAILED
-                job.error_message = "Missing required config: 'year' and 'table_id' are required"
-                job.completed_at = datetime.utcnow()
-                db.commit()
+                await _handle_job_failure(db, job, "Missing required config: 'year' and 'table_id' are required", "ValidationError")
                 return
             
             # Run ingestion
@@ -84,20 +129,29 @@ async def run_ingestion_job(job_id: int, source: str, config: dict):
                 
                 # Update job with success
                 job.status = JobStatus.SUCCESS
-                job.rows_inserted = result.get("rows_inserted", 0)
+                rows_inserted = result.get("rows_inserted", 0)
+                job.rows_inserted = rows_inserted
                 job.completed_at = datetime.utcnow()
                 db.commit()
-                
+
                 logger.info(f"Job {job_id} completed successfully: {result}")
-            
+
+                # Send success notification
+                try:
+                    await monitoring.notify_job_completion(
+                        job_id=job.id,
+                        source=job.source,
+                        status=JobStatus.SUCCESS,
+                        rows_inserted=rows_inserted,
+                        config=job.config
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send success notification for job {job_id}: {e}")
+
             except Exception as e:
                 logger.exception(f"Error during Census ingestion for job {job_id}")
-                job.status = JobStatus.FAILED
-                job.error_message = str(e)
-                job.error_details = {"error_type": type(e).__name__}
-                job.completed_at = datetime.utcnow()
-                db.commit()
-        
+                await _handle_job_failure(db, job, str(e), type(e).__name__)
+
         elif source == "public_lp_strategies":
             # Call public_lp_strategies ingestion
             from app.sources.public_lp_strategies.ingest import ingest_lp_strategy_document
@@ -121,10 +175,7 @@ async def run_ingestion_job(job_id: int, source: str, config: dict):
             
             # Validate required parameters
             if not all([lp_name, program, fiscal_year, fiscal_quarter]):
-                job.status = JobStatus.FAILED
-                job.error_message = "Missing required config: 'lp_name', 'program', 'fiscal_year', 'fiscal_quarter'"
-                job.completed_at = datetime.utcnow()
-                db.commit()
+                await _handle_job_failure(db, job, "Missing required config: 'lp_name', 'program', 'fiscal_year', 'fiscal_quarter'", "ValidationError")
                 return
             
             try:
@@ -176,36 +227,38 @@ async def run_ingestion_job(job_id: int, source: str, config: dict):
                 
                 # Update job with success
                 job.status = JobStatus.SUCCESS
-                job.rows_inserted = result.get("sections_count", 0) + result.get("allocations_count", 0)
+                rows_inserted = result.get("sections_count", 0) + result.get("allocations_count", 0)
+                job.rows_inserted = rows_inserted
                 job.completed_at = datetime.utcnow()
                 db.commit()
-                
+
                 logger.info(f"Job {job_id} completed successfully: {result}")
-            
+
+                # Send success notification
+                try:
+                    await monitoring.notify_job_completion(
+                        job_id=job.id,
+                        source=job.source,
+                        status=JobStatus.SUCCESS,
+                        rows_inserted=rows_inserted,
+                        config=job.config
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send success notification for job {job_id}: {e}")
+
             except Exception as e:
                 logger.exception(f"Error during public_lp_strategies ingestion for job {job_id}")
-                job.status = JobStatus.FAILED
-                job.error_message = str(e)
-                job.error_details = {"error_type": type(e).__name__}
-                job.completed_at = datetime.utcnow()
-                db.commit()
-        
+                await _handle_job_failure(db, job, str(e), type(e).__name__)
+
         else:
-            job.status = JobStatus.FAILED
-            job.error_message = f"Unknown source: {source}"
-            job.completed_at = datetime.utcnow()
-            db.commit()
+            await _handle_job_failure(db, job, f"Unknown source: {source}", "UnknownSourceError")
     
     except Exception as e:
         logger.exception(f"Error running job {job_id}")
         job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
         if job:
-            job.status = JobStatus.FAILED
-            job.error_message = str(e)
-            job.error_details = {"error_type": type(e).__name__}
-            job.completed_at = datetime.utcnow()
-            db.commit()
-    
+            await _handle_job_failure(db, job, str(e), type(e).__name__)
+
     finally:
         db.close()
 

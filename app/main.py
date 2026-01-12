@@ -60,6 +60,10 @@ async def lifespan(app: FastAPI):
         # Register automatic stuck job cleanup (runs every 30 minutes)
         scheduler_service.register_cleanup_job(interval_minutes=30)
         logger.info("Automatic stuck job cleanup registered")
+
+        # Register automatic retry processor (runs every 5 minutes)
+        scheduler_service.register_retry_processor(interval_minutes=5)
+        logger.info("Automatic retry processor registered")
     except Exception as e:
         logger.warning(f"Failed to start scheduler: {e}")
 

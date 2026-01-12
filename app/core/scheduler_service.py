@@ -670,3 +670,63 @@ def unregister_cleanup_job() -> bool:
     except Exception as e:
         logger.error(f"Failed to unregister cleanup job: {e}")
         return False
+
+
+# =============================================================================
+# Automatic Retry Processing
+# =============================================================================
+
+def register_retry_processor(interval_minutes: int = 5) -> bool:
+    """
+    Register the automatic retry processor with the scheduler.
+
+    Processes failed jobs that are scheduled for retry.
+
+    Args:
+        interval_minutes: How often to check for jobs ready to retry (default 5 min)
+
+    Returns:
+        True if registered successfully
+    """
+    from app.core.retry_service import process_scheduled_retries
+
+    scheduler = get_scheduler()
+    job_id = "system_retry_processor"
+
+    try:
+        # Remove existing job if any
+        existing_job = scheduler.get_job(job_id)
+        if existing_job:
+            scheduler.remove_job(job_id)
+
+        # Add retry processor job
+        scheduler.add_job(
+            process_scheduled_retries,
+            trigger=IntervalTrigger(minutes=interval_minutes),
+            id=job_id,
+            name="Automatic Retry Processor",
+            replace_existing=True
+        )
+
+        logger.info(f"Registered automatic retry processor to run every {interval_minutes} minutes")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to register retry processor: {e}")
+        return False
+
+
+def unregister_retry_processor() -> bool:
+    """Remove the automatic retry processor from the scheduler."""
+    scheduler = get_scheduler()
+    job_id = "system_retry_processor"
+
+    try:
+        existing_job = scheduler.get_job(job_id)
+        if existing_job:
+            scheduler.remove_job(job_id)
+            logger.info("Unregistered automatic retry processor")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to unregister retry processor: {e}")
+        return False

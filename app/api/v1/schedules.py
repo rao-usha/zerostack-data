@@ -428,3 +428,89 @@ def disable_cleanup():
         return {"message": "Stuck job cleanup disabled"}
     else:
         raise HTTPException(status_code=500, detail="Failed to disable cleanup job")
+
+
+# =============================================================================
+# Automatic Retry Endpoints
+# =============================================================================
+
+@router.get("/retry/status")
+def get_retry_processor_status():
+    """
+    Get status of the automatic retry processor.
+
+    Returns whether the retry processor is registered and when it will next run.
+    """
+    scheduler = scheduler_service.get_scheduler()
+    job_id = "system_retry_processor"
+
+    retry_job = scheduler.get_job(job_id)
+
+    if retry_job:
+        return {
+            "enabled": True,
+            "job_id": job_id,
+            "name": retry_job.name,
+            "next_run": retry_job.next_run_time.isoformat() if retry_job.next_run_time else None,
+            "trigger": str(retry_job.trigger),
+            "backoff_settings": {
+                "base_delay_minutes": 5,
+                "max_delay_minutes": 1440,
+                "multiplier": 2
+            }
+        }
+    else:
+        return {
+            "enabled": False,
+            "job_id": job_id,
+            "message": "Retry processor is not registered"
+        }
+
+
+@router.post("/retry/enable")
+def enable_retry_processor(interval_minutes: int = 5):
+    """
+    Enable automatic retry processing.
+
+    Args:
+        interval_minutes: How often to check for jobs ready to retry (default 5 minutes)
+    """
+    success = scheduler_service.register_retry_processor(interval_minutes=interval_minutes)
+
+    if success:
+        return {
+            "message": f"Automatic retry processor enabled (runs every {interval_minutes} minutes)",
+            "interval_minutes": interval_minutes
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to enable retry processor")
+
+
+@router.post("/retry/disable")
+def disable_retry_processor():
+    """
+    Disable automatic retry processing.
+    """
+    success = scheduler_service.unregister_retry_processor()
+
+    if success:
+        return {"message": "Automatic retry processor disabled"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to disable retry processor")
+
+
+@router.post("/retry/process-now")
+async def process_retries_now(limit: int = Query(default=10, ge=1, le=50)):
+    """
+    Manually trigger processing of scheduled retries.
+
+    Args:
+        limit: Maximum number of jobs to process (default 10)
+
+    Returns:
+        Processing results including jobs retried
+    """
+    from app.core.retry_service import process_scheduled_retries
+
+    result = await process_scheduled_retries(limit=limit)
+    return result
