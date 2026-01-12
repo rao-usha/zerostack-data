@@ -56,6 +56,10 @@ async def lifespan(app: FastAPI):
             logger.info(f"Scheduler started with {count} active schedules")
         finally:
             db.close()
+
+        # Register automatic stuck job cleanup (runs every 30 minutes)
+        scheduler_service.register_cleanup_job(interval_minutes=30)
+        logger.info("Automatic stuck job cleanup registered")
     except Exception as e:
         logger.warning(f"Failed to start scheduler: {e}")
 

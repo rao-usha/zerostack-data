@@ -344,3 +344,87 @@ def create_default_schedules(db: Session = Depends(get_db)):
         "message": f"Created {len(created)} default schedules",
         "schedules": [s.name for s in created]
     }
+
+
+# =============================================================================
+# Stuck Job Cleanup Endpoints
+# =============================================================================
+
+@router.post("/cleanup/stuck-jobs")
+def cleanup_stuck_jobs(timeout_hours: int = 2):
+    """
+    Manually trigger cleanup of stuck jobs.
+
+    Jobs that have been in RUNNING status for longer than the timeout
+    will be marked as FAILED.
+
+    Args:
+        timeout_hours: Hours after which a running job is considered stuck (default 2)
+
+    Returns:
+        Cleanup results including list of cleaned up jobs
+    """
+    result = scheduler_service.cleanup_stuck_jobs(timeout_hours=timeout_hours)
+    return result
+
+
+@router.get("/cleanup/status")
+def get_cleanup_status():
+    """
+    Get status of the automatic stuck job cleanup task.
+
+    Returns whether the cleanup job is registered and when it will next run.
+    """
+    scheduler = scheduler_service.get_scheduler()
+    job_id = "system_cleanup_stuck_jobs"
+
+    cleanup_job = scheduler.get_job(job_id)
+
+    if cleanup_job:
+        return {
+            "enabled": True,
+            "job_id": job_id,
+            "name": cleanup_job.name,
+            "next_run": cleanup_job.next_run_time.isoformat() if cleanup_job.next_run_time else None,
+            "trigger": str(cleanup_job.trigger),
+            "timeout_hours": scheduler_service.STUCK_JOB_TIMEOUT_HOURS
+        }
+    else:
+        return {
+            "enabled": False,
+            "job_id": job_id,
+            "message": "Cleanup job is not registered"
+        }
+
+
+@router.post("/cleanup/enable")
+def enable_cleanup(interval_minutes: int = 30):
+    """
+    Enable automatic stuck job cleanup.
+
+    Args:
+        interval_minutes: How often to run cleanup (default 30 minutes)
+    """
+    success = scheduler_service.register_cleanup_job(interval_minutes=interval_minutes)
+
+    if success:
+        return {
+            "message": f"Stuck job cleanup enabled (runs every {interval_minutes} minutes)",
+            "interval_minutes": interval_minutes,
+            "timeout_hours": scheduler_service.STUCK_JOB_TIMEOUT_HOURS
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to enable cleanup job")
+
+
+@router.post("/cleanup/disable")
+def disable_cleanup():
+    """
+    Disable automatic stuck job cleanup.
+    """
+    success = scheduler_service.unregister_cleanup_job()
+
+    if success:
+        return {"message": "Stuck job cleanup disabled"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to disable cleanup job")

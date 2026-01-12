@@ -520,3 +520,143 @@ def create_default_schedules(db: Session) -> List[IngestionSchedule]:
             logger.info(f"Created default schedule: {template['name']}")
 
     return created
+
+
+# =============================================================================
+# Automatic Stuck Job Cleanup
+# =============================================================================
+
+# Default timeout for stuck jobs (in hours)
+STUCK_JOB_TIMEOUT_HOURS = 2
+
+
+def cleanup_stuck_jobs(timeout_hours: int = STUCK_JOB_TIMEOUT_HOURS) -> Dict[str, Any]:
+    """
+    Find and mark stuck jobs as failed.
+
+    Jobs are considered stuck if they have been in RUNNING status
+    for longer than the timeout threshold.
+
+    Args:
+        timeout_hours: Hours after which a running job is considered stuck
+
+    Returns:
+        Dictionary with cleanup results
+    """
+    from sqlalchemy import text
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+
+    try:
+        # Find stuck jobs
+        cutoff = datetime.utcnow() - timedelta(hours=timeout_hours)
+
+        stuck_jobs = db.query(IngestionJob).filter(
+            IngestionJob.status == JobStatus.RUNNING,
+            IngestionJob.started_at < cutoff
+        ).all()
+
+        if not stuck_jobs:
+            logger.info("No stuck jobs found during cleanup")
+            return {
+                "cleaned_up": 0,
+                "jobs": [],
+                "timeout_hours": timeout_hours
+            }
+
+        # Mark stuck jobs as failed
+        cleaned_jobs = []
+        for job in stuck_jobs:
+            running_hours = (datetime.utcnow() - job.started_at).total_seconds() / 3600
+
+            job.status = JobStatus.FAILED
+            job.error_message = f"Job timed out after {running_hours:.1f} hours (threshold: {timeout_hours}h) - automatically marked as failed"
+            job.completed_at = datetime.utcnow()
+
+            cleaned_jobs.append({
+                "job_id": job.id,
+                "source": job.source,
+                "running_hours": round(running_hours, 2),
+                "started_at": job.started_at.isoformat()
+            })
+
+            logger.warning(
+                f"Marked stuck job {job.id} ({job.source}) as failed - "
+                f"was running for {running_hours:.1f} hours"
+            )
+
+        db.commit()
+
+        logger.info(f"Cleaned up {len(cleaned_jobs)} stuck jobs")
+
+        return {
+            "cleaned_up": len(cleaned_jobs),
+            "jobs": cleaned_jobs,
+            "timeout_hours": timeout_hours,
+            "cleanup_time": datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Error during stuck job cleanup: {e}", exc_info=True)
+        db.rollback()
+        return {
+            "cleaned_up": 0,
+            "error": str(e),
+            "timeout_hours": timeout_hours
+        }
+
+    finally:
+        db.close()
+
+
+def register_cleanup_job(interval_minutes: int = 30) -> bool:
+    """
+    Register the stuck job cleanup task with the scheduler.
+
+    Args:
+        interval_minutes: How often to run cleanup (default 30 minutes)
+
+    Returns:
+        True if registered successfully
+    """
+    scheduler = get_scheduler()
+    job_id = "system_cleanup_stuck_jobs"
+
+    try:
+        # Remove existing job if any
+        existing_job = scheduler.get_job(job_id)
+        if existing_job:
+            scheduler.remove_job(job_id)
+
+        # Add cleanup job
+        scheduler.add_job(
+            cleanup_stuck_jobs,
+            trigger=IntervalTrigger(minutes=interval_minutes),
+            id=job_id,
+            name="Stuck Job Cleanup",
+            replace_existing=True
+        )
+
+        logger.info(f"Registered stuck job cleanup to run every {interval_minutes} minutes")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to register cleanup job: {e}")
+        return False
+
+
+def unregister_cleanup_job() -> bool:
+    """Remove the stuck job cleanup task from the scheduler."""
+    scheduler = get_scheduler()
+    job_id = "system_cleanup_stuck_jobs"
+
+    try:
+        existing_job = scheduler.get_job(job_id)
+        if existing_job:
+            scheduler.remove_job(job_id)
+            logger.info("Unregistered stuck job cleanup")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to unregister cleanup job: {e}")
+        return False
