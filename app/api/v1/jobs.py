@@ -16,6 +16,33 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
+async def _handle_job_completion(db, job: IngestionJob):
+    """
+    Handle job completion: unblock dependent jobs, update chain status.
+
+    Called after a job succeeds or fails (after retries exhausted).
+
+    Args:
+        db: Database session
+        job: The completed job
+    """
+    from app.core import dependency_service
+
+    # Check and unblock any dependent jobs
+    unblocked_jobs = dependency_service.check_and_unblock_dependent_jobs(db, job.id)
+
+    if unblocked_jobs:
+        logger.info(f"Job {job.id} completion unblocked {len(unblocked_jobs)} dependent jobs: {unblocked_jobs}")
+        # Start the unblocked jobs
+        await dependency_service.process_unblocked_jobs(db, unblocked_jobs)
+
+    # Update chain execution status if this job is part of a chain
+    execution = dependency_service.get_execution_for_job(db, job.id)
+    if execution:
+        dependency_service.update_chain_execution_status(db, execution.id)
+        logger.info(f"Updated chain execution {execution.id} status")
+
+
 async def _handle_job_failure(
     db,
     job: IngestionJob,
@@ -48,7 +75,7 @@ async def _handle_job_failure(
     if retry_scheduled:
         logger.info(f"Job {job.id} failed, retry scheduled (attempt {job.retry_count + 1}/{job.max_retries})")
     else:
-        # No more retries - send webhook notification
+        # No more retries - send webhook notification and handle completion
         logger.warning(f"Job {job.id} failed permanently (exhausted {job.retry_count}/{job.max_retries} retries)")
         try:
             await monitoring.notify_job_completion(
@@ -60,6 +87,9 @@ async def _handle_job_failure(
             )
         except Exception as e:
             logger.error(f"Failed to send failure notification for job {job.id}: {e}")
+
+        # Handle job completion (unblock dependent jobs, etc.)
+        await _handle_job_completion(db, job)
 
 
 async def run_ingestion_job(job_id: int, source: str, config: dict):
@@ -147,6 +177,9 @@ async def run_ingestion_job(job_id: int, source: str, config: dict):
                     )
                 except Exception as e:
                     logger.error(f"Failed to send success notification for job {job_id}: {e}")
+
+                # Handle job completion (unblock dependent jobs, etc.)
+                await _handle_job_completion(db, job)
 
             except Exception as e:
                 logger.exception(f"Error during Census ingestion for job {job_id}")
@@ -245,6 +278,9 @@ async def run_ingestion_job(job_id: int, source: str, config: dict):
                     )
                 except Exception as e:
                     logger.error(f"Failed to send success notification for job {job_id}: {e}")
+
+                # Handle job completion (unblock dependent jobs, etc.)
+                await _handle_job_completion(db, job)
 
             except Exception as e:
                 logger.exception(f"Error during public_lp_strategies ingestion for job {job_id}")

@@ -15,6 +15,7 @@ Base = declarative_base()
 class JobStatus(str, enum.Enum):
     """Job status enumeration - ONLY these values allowed."""
     PENDING = "pending"
+    BLOCKED = "blocked"  # Waiting for dependencies
     RUNNING = "running"
     SUCCESS = "success"
     FAILED = "failed"
@@ -1386,3 +1387,130 @@ class WebhookDelivery(Base):
             f"event='{self.event_type}', status='{self.status}')>"
         )
 
+
+# =============================================================================
+# JOB DEPENDENCY MODELS
+# =============================================================================
+
+
+class DependencyCondition(str, enum.Enum):
+    """Condition for when a dependency is satisfied."""
+    ON_SUCCESS = "on_success"  # Parent must succeed
+    ON_COMPLETE = "on_complete"  # Parent must complete (success or failure)
+    ON_FAILURE = "on_failure"  # Parent must fail (for error handling jobs)
+
+
+class JobDependency(Base):
+    """
+    Defines dependencies between ingestion jobs.
+
+    Supports DAG-style workflows where jobs can depend on other jobs.
+    A job will not start until all its dependencies are satisfied.
+    """
+    __tablename__ = "job_dependencies"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # The job that has the dependency
+    job_id = Column(Integer, nullable=False, index=True)
+
+    # The job that must complete first
+    depends_on_job_id = Column(Integer, nullable=False, index=True)
+
+    # When is the dependency satisfied?
+    condition = Column(
+        Enum(DependencyCondition, native_enum=False, length=20),
+        nullable=False,
+        default=DependencyCondition.ON_SUCCESS
+    )
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_job_dep_job', 'job_id'),
+        Index('idx_job_dep_parent', 'depends_on_job_id'),
+        UniqueConstraint('job_id', 'depends_on_job_id', name='uq_job_dependency'),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<JobDependency(job_id={self.job_id}, depends_on={self.depends_on_job_id}, "
+            f"condition='{self.condition}')>"
+        )
+
+
+class JobChain(Base):
+    """
+    Named job chain (workflow) definition.
+
+    Chains are reusable workflow templates that define a sequence of jobs
+    with their dependencies. Creating a chain instance creates all jobs
+    and dependencies automatically.
+    """
+    __tablename__ = "job_chains"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+
+    # Chain definition (JSON array of job configurations)
+    # Format: [{"source": "fred", "config": {...}, "depends_on": [0]}, ...]
+    # depends_on uses array indices
+    chain_definition = Column(JSON, nullable=False)
+
+    # State
+    is_active = Column(Integer, nullable=False, default=1)
+
+    # Statistics
+    times_executed = Column(Integer, nullable=False, default=0)
+    last_executed_at = Column(DateTime, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return (
+            f"<JobChain(id={self.id}, name='{self.name}', "
+            f"active={self.is_active}, executions={self.times_executed})>"
+        )
+
+
+class JobChainExecution(Base):
+    """
+    Tracks execution of a job chain.
+
+    Each time a chain is executed, this records all the jobs created
+    and tracks overall chain status.
+    """
+    __tablename__ = "job_chain_executions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    chain_id = Column(Integer, nullable=False, index=True)
+
+    # Status
+    status = Column(String(20), nullable=False, default='running', index=True)
+    # status values: 'running', 'success', 'partial_success', 'failed'
+
+    # Job tracking
+    job_ids = Column(JSON, nullable=False)  # Array of job IDs in this execution
+    total_jobs = Column(Integer, nullable=False, default=0)
+    completed_jobs = Column(Integer, nullable=False, default=0)
+    successful_jobs = Column(Integer, nullable=False, default=0)
+    failed_jobs = Column(Integer, nullable=False, default=0)
+
+    # Timing
+    started_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index('idx_chain_exec_chain', 'chain_id'),
+        Index('idx_chain_exec_status', 'status'),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<JobChainExecution(id={self.id}, chain_id={self.chain_id}, "
+            f"status='{self.status}', progress={self.completed_jobs}/{self.total_jobs})>"
+        )
