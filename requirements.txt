@@ -29,7 +29,7 @@ kaggle==1.6.17
 # Website contact extraction
 beautifulsoup4==4.12.2
 lxml==4.9.3
-phonenumbers==8.13.27
+phonenumbers==9.0.21
 robotexclusionrulesparser==1.7.1
 
 # Agentic Portfolio Research (for LLM-powered extraction in Phase 3)
