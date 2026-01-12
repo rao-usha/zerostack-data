@@ -249,12 +249,18 @@ async def ingest_state_coverage(
             summary_inserted = await _insert_summary_data(db, summary_table, [summary_record])
         
         # Update job status
+        total_rows = rows_inserted + summary_inserted
         if job:
-            job.status = JobStatus.SUCCESS
+            if total_rows == 0:
+                job.status = JobStatus.FAILED
+                job.error_message = "Ingestion completed but no rows were inserted"
+                logger.warning(f"Job {job_id}: No FCC broadband data returned for {state_code}")
+            else:
+                job.status = JobStatus.SUCCESS
             job.completed_at = datetime.utcnow()
-            job.rows_inserted = rows_inserted + summary_inserted
+            job.rows_inserted = total_rows
             db.commit()
-        
+
         return {
             "state_code": state_code,
             "state_name": state_name,
@@ -264,7 +270,7 @@ async def ingest_state_coverage(
             "summary_rows_inserted": summary_inserted,
             "total_records_fetched": total_fetched
         }
-    
+
     except Exception as e:
         logger.error(f"FCC state coverage ingestion failed for {state_code}: {e}", exc_info=True)
         
@@ -469,14 +475,19 @@ async def ingest_multiple_states(
                 total_summary_rows += result.get("summary_rows", 0)
         
         # Update job status
+        total_rows = total_coverage_rows + total_summary_rows
         if job:
-            if failed_states:
+            if total_rows == 0:
+                job.status = JobStatus.FAILED
+                job.error_message = "Ingestion completed but no rows were inserted"
+                logger.warning(f"Job {job_id}: No FCC broadband data returned for any state")
+            elif failed_states:
                 job.status = JobStatus.SUCCESS  # Partial success
                 job.error_message = f"Failed states: {failed_states}"
             else:
                 job.status = JobStatus.SUCCESS
             job.completed_at = datetime.utcnow()
-            job.rows_inserted = total_coverage_rows + total_summary_rows
+            job.rows_inserted = total_rows
             db.commit()
         
         return {
@@ -612,12 +623,18 @@ async def ingest_county_coverage(
                 summary_inserted = await _insert_summary_data(db, summary_table, [summary_record])
         
         # Update job status
+        total_rows = rows_inserted + summary_inserted
         if job:
-            job.status = JobStatus.SUCCESS
+            if total_rows == 0:
+                job.status = JobStatus.FAILED
+                job.error_message = "Ingestion completed but no rows were inserted"
+                logger.warning(f"Job {job_id}: No FCC broadband data returned for county {county_fips}")
+            else:
+                job.status = JobStatus.SUCCESS
             job.completed_at = datetime.utcnow()
-            job.rows_inserted = rows_inserted + summary_inserted
+            job.rows_inserted = total_rows
             db.commit()
-        
+
         return {
             "county_fips": county_fips,
             "coverage_table": coverage_table,
@@ -625,7 +642,7 @@ async def ingest_county_coverage(
             "coverage_rows_inserted": rows_inserted,
             "summary_rows_inserted": summary_inserted
         }
-    
+
     except Exception as e:
         logger.error(f"FCC county coverage ingestion failed: {e}", exc_info=True)
         

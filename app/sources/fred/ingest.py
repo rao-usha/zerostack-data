@@ -151,8 +151,8 @@ class FREDIngestor(BaseSourceIngestor):
                 )
                 rows_inserted = result.rows_inserted
 
-            # 6. Complete job
-            self.complete_job(job_id, rows_inserted)
+            # 6. Complete job (fail if no rows inserted)
+            self.complete_job(job_id, rows_inserted, require_rows=True)
 
             return {
                 "table_name": table_name,

@@ -322,14 +322,16 @@ async def _run_fred_ingestion(
     """Run FRED ingestion in background."""
     from app.core.database import get_session_factory
     from app.core.config import get_settings
-    
+    from app.core.models import IngestionJob, JobStatus
+    from datetime import datetime
+
     SessionLocal = get_session_factory()
     db = SessionLocal()
     try:
         settings = get_settings()
         # Try to get FRED API key from environment
         api_key = getattr(settings, 'fred_api_key', None)
-        
+
         await ingest.ingest_fred_category(
             db=db,
             job_id=job_id,
@@ -341,6 +343,17 @@ async def _run_fred_ingestion(
         )
     except Exception as e:
         logger.error(f"Background FRED ingestion failed: {e}", exc_info=True)
+        # Safety net: ensure job is marked as failed if exception reached here
+        try:
+            job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+            if job and job.status not in (JobStatus.SUCCESS, JobStatus.FAILED):
+                job.status = JobStatus.FAILED
+                job.error_message = str(e)
+                job.completed_at = datetime.utcnow()
+                db.commit()
+                logger.info(f"Job {job_id} marked as FAILED (safety net)")
+        except Exception as update_err:
+            logger.error(f"Failed to update job status: {update_err}")
     finally:
         db.close()
 

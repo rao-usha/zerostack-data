@@ -269,11 +269,16 @@ async def ingest_fbi_crime_estimates(
         
         # Update job status
         if job:
-            job.status = JobStatus.SUCCESS
+            if rows_inserted == 0:
+                job.status = JobStatus.FAILED
+                job.error_message = "Ingestion completed but no rows were inserted"
+                logger.warning(f"Job {job_id}: No FBI crime estimates data returned")
+            else:
+                job.status = JobStatus.SUCCESS
             job.completed_at = datetime.utcnow()
             job.rows_inserted = rows_inserted
             db.commit()
-        
+
         return {
             "table_name": table_name,
             "scope": scope,
@@ -365,11 +370,16 @@ async def ingest_fbi_crime_summarized(
         rows_inserted = await _insert_summarized_data(db, table_name, all_rows)
         
         if job:
-            job.status = JobStatus.SUCCESS
+            if rows_inserted == 0:
+                job.status = JobStatus.FAILED
+                job.error_message = "Ingestion completed but no rows were inserted"
+                logger.warning(f"Job {job_id}: No FBI summarized crime data returned")
+            else:
+                job.status = JobStatus.SUCCESS
             job.completed_at = datetime.utcnow()
             job.rows_inserted = rows_inserted
             db.commit()
-        
+
         return {
             "table_name": table_name,
             "states_fetched": len(states),
@@ -458,11 +468,16 @@ async def ingest_fbi_crime_nibrs(
         rows_inserted = await _insert_nibrs_data(db, table_name, all_rows)
         
         if job:
-            job.status = JobStatus.SUCCESS
+            if rows_inserted == 0:
+                job.status = JobStatus.FAILED
+                job.error_message = "Ingestion completed but no rows were inserted"
+                logger.warning(f"Job {job_id}: No FBI NIBRS data returned")
+            else:
+                job.status = JobStatus.SUCCESS
             job.completed_at = datetime.utcnow()
             job.rows_inserted = rows_inserted
             db.commit()
-        
+
         return {
             "table_name": table_name,
             "states_fetched": len(states),
@@ -553,17 +568,22 @@ async def ingest_fbi_hate_crime(
         rows_inserted = await _insert_hate_crime_data(db, table_name, all_rows)
         
         if job:
-            job.status = JobStatus.SUCCESS
+            if rows_inserted == 0:
+                job.status = JobStatus.FAILED
+                job.error_message = "Ingestion completed but no rows were inserted"
+                logger.warning(f"Job {job_id}: No FBI hate crime data returned")
+            else:
+                job.status = JobStatus.SUCCESS
             job.completed_at = datetime.utcnow()
             job.rows_inserted = rows_inserted
             db.commit()
-        
+
         return {
             "table_name": table_name,
             "states_fetched": len(states) if states else 0,
             "rows_inserted": rows_inserted
         }
-    
+
     except Exception as e:
         logger.error(f"FBI Hate Crime ingestion failed: {e}", exc_info=True)
         
@@ -647,17 +667,22 @@ async def ingest_fbi_leoka(
         rows_inserted = await _insert_leoka_data(db, table_name, all_rows)
         
         if job:
-            job.status = JobStatus.SUCCESS
+            if rows_inserted == 0:
+                job.status = JobStatus.FAILED
+                job.error_message = "Ingestion completed but no rows were inserted"
+                logger.warning(f"Job {job_id}: No FBI LEOKA data returned")
+            else:
+                job.status = JobStatus.SUCCESS
             job.completed_at = datetime.utcnow()
             job.rows_inserted = rows_inserted
             db.commit()
-        
+
         return {
             "table_name": table_name,
             "states_fetched": len(states) if states else 0,
             "rows_inserted": rows_inserted
         }
-    
+
     except Exception as e:
         logger.error(f"FBI LEOKA ingestion failed: {e}", exc_info=True)
         

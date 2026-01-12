@@ -37,15 +37,22 @@ class JobResponse(BaseModel):
     source: str
     status: JobStatus
     config: Dict[str, Any]
-    
+
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    
+
     rows_inserted: Optional[int] = None
     error_message: Optional[str] = None
     error_details: Optional[Dict[str, Any]] = None
-    
+
+    # Retry tracking
+    retry_count: int = 0
+    max_retries: int = 3
+    next_retry_at: Optional[datetime] = None
+    parent_job_id: Optional[int] = None
+    can_retry: bool = False
+
     model_config = {"from_attributes": True}
 
 

@@ -275,14 +275,113 @@ def list_jobs(
     List ingestion jobs with optional filtering.
     """
     query = db.query(IngestionJob)
-    
+
     if source:
         query = query.filter(IngestionJob.source == source)
     if status:
         query = query.filter(IngestionJob.status == status)
-    
+
     query = query.order_by(IngestionJob.created_at.desc()).limit(limit)
-    
+
     jobs = query.all()
     return [JobResponse.model_validate(job) for job in jobs]
+
+
+# =============================================================================
+# Retry Endpoints
+# =============================================================================
+
+@router.get("/failed/summary")
+def get_failed_jobs_summary(db: Session = Depends(get_db)):
+    """
+    Get summary of failed jobs by source.
+
+    Returns counts of retryable vs exhausted jobs.
+    """
+    from app.core.retry_service import get_failed_jobs_summary as get_summary
+    return get_summary(db)
+
+
+@router.post("/{job_id}/retry", response_model=JobResponse)
+async def retry_job(
+    job_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+) -> JobResponse:
+    """
+    Retry a failed job.
+
+    The job must be in FAILED status and have retries remaining.
+    """
+    from app.core.retry_service import mark_job_for_immediate_retry
+
+    job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status != JobStatus.FAILED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job is not in failed status (current: {job.status.value})"
+        )
+
+    if not job.can_retry:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job has exhausted all retries ({job.retry_count}/{job.max_retries})"
+        )
+
+    # Mark job for retry
+    updated_job = mark_job_for_immediate_retry(db, job_id)
+    if not updated_job:
+        raise HTTPException(status_code=500, detail="Failed to mark job for retry")
+
+    # Start background ingestion
+    background_tasks.add_task(
+        run_ingestion_job,
+        updated_job.id,
+        updated_job.source,
+        updated_job.config
+    )
+
+    logger.info(f"Retrying job {job_id} (attempt {updated_job.retry_count}/{updated_job.max_retries})")
+
+    return JobResponse.model_validate(updated_job)
+
+
+@router.post("/retry/all")
+async def retry_all_failed_jobs(
+    background_tasks: BackgroundTasks,
+    source: str = None,
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    """
+    Retry all eligible failed jobs.
+
+    Args:
+        source: Optional filter by source (e.g., "fred", "sec")
+        limit: Maximum number of jobs to retry (default 10)
+
+    Returns summary of retry operations.
+    """
+    from app.core.retry_service import retry_all_eligible_jobs
+
+    results = retry_all_eligible_jobs(db, source=source, limit=limit)
+
+    # Schedule background tasks for retried jobs
+    for job_info in results["retried"]:
+        job = db.query(IngestionJob).filter(IngestionJob.id == job_info["job_id"]).first()
+        if job:
+            background_tasks.add_task(
+                run_ingestion_job,
+                job.id,
+                job.source,
+                job.config
+            )
+
+    return {
+        "message": f"Scheduled {len(results['retried'])} jobs for retry",
+        **results
+    }
 

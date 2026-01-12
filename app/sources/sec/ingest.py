@@ -258,7 +258,13 @@ async def ingest_company_filings(
         
         # 6. Update job status
         if job:
-            job.status = JobStatus.SUCCESS
+            if total_rows_inserted == 0:
+                # Fail the job if no rows were inserted
+                job.status = JobStatus.FAILED
+                job.error_message = "Ingestion completed but no rows were inserted"
+                logger.warning(f"Job {job_id}: No filings found matching criteria")
+            else:
+                job.status = JobStatus.SUCCESS
             job.completed_at = datetime.utcnow()
             job.rows_inserted = total_rows_inserted
             db.commit()

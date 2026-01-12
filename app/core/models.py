@@ -23,11 +23,11 @@ class JobStatus(str, enum.Enum):
 class IngestionJob(Base):
     """
     Tracks all ingestion runs.
-    
+
     MANDATORY: Every ingestion operation MUST create and update a job record.
     """
     __tablename__ = "ingestion_jobs"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     source = Column(String(50), nullable=False, index=True)
     status = Column(
@@ -37,22 +37,33 @@ class IngestionJob(Base):
         index=True
     )
     config = Column(JSON, nullable=False)  # Job configuration (survey, year, table, etc.)
-    
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
-    
+
     # Results
     rows_inserted = Column(Integer, nullable=True)
     error_message = Column(Text, nullable=True)
     error_details = Column(JSON, nullable=True)  # Structured error info
-    
+
+    # Retry tracking
+    retry_count = Column(Integer, nullable=False, default=0)
+    max_retries = Column(Integer, nullable=False, default=3)
+    next_retry_at = Column(DateTime, nullable=True)  # When to retry (for scheduled retries)
+    parent_job_id = Column(Integer, nullable=True, index=True)  # Link to original job if this is a retry
+
     def __repr__(self) -> str:
         return (
             f"<IngestionJob(id={self.id}, source={self.source}, "
-            f"status={self.status}, created_at={self.created_at})>"
+            f"status={self.status}, retry_count={self.retry_count}, created_at={self.created_at})>"
         )
+
+    @property
+    def can_retry(self) -> bool:
+        """Check if job can be retried."""
+        return self.status == JobStatus.FAILED and self.retry_count < self.max_retries
 
 
 class DatasetRegistry(Base):

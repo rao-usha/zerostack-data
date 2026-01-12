@@ -28,87 +28,116 @@ async def ingest_medicare_utilization(
 ) -> Dict[str, Any]:
     """
     Ingest Medicare Provider Utilization and Payment Data.
-    
+
     This dataset contains Medicare Part B claims data for physicians and
     other healthcare practitioners.
-    
+
     Args:
         db: Database session
         job_id: Ingestion job ID for tracking
         year: Optional year filter (defaults to latest available)
         state: Optional state filter (two-letter abbreviation)
         limit: Optional limit on number of records (for testing)
-        
+
     Returns:
         Dictionary with ingestion results
     """
     start_time = datetime.utcnow()
     dataset_type = "medicare_utilization"
-    
+
     settings = get_settings()
-    
-    # 1. Get dataset metadata
-    meta = metadata.get_dataset_metadata(dataset_type)
-    table_name = meta["table_name"]
-    dataset_id = meta["socrata_dataset_id"]
-    
-    # 2. Create table if not exists
-    logger.info(f"Preparing table {table_name}")
-    create_sql = metadata.generate_create_table_sql(dataset_type)
-    db.execute(text(create_sql))
-    db.commit()
-    
-    # 3. Register dataset
-    _register_dataset(db, dataset_type, meta)
-    
-    # 4. Build SoQL WHERE clause for filters
-    where_clauses = []
-    if state:
-        where_clauses.append(f"rndrng_prvdr_state_abrvtn='{state.upper()}'")
-    
-    where_clause = " AND ".join(where_clauses) if where_clauses else None
-    
-    # 5. Initialize CMS client
-    client = CMSClient(
-        max_concurrency=settings.max_concurrency,
-        max_retries=settings.max_retries,
-        backoff_factor=settings.retry_backoff_factor
-    )
-    
+
+    # Update job to RUNNING
+    job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+    if job:
+        job.status = JobStatus.RUNNING
+        job.started_at = start_time
+        db.commit()
+
     try:
-        # 6. Fetch data from Socrata API
-        logger.info(f"Fetching data from Socrata dataset {dataset_id}")
-        records = await client.fetch_socrata_data(
-            dataset_id=dataset_id,
-            limit=1000,  # Records per page
-            where=where_clause,
-            max_records=limit
+        # 1. Get dataset metadata
+        meta = metadata.get_dataset_metadata(dataset_type)
+        table_name = meta["table_name"]
+        dataset_id = meta["socrata_dataset_id"]
+
+        # 2. Create table if not exists
+        logger.info(f"Preparing table {table_name}")
+        create_sql = metadata.generate_create_table_sql(dataset_type)
+        db.execute(text(create_sql))
+        db.commit()
+
+        # 3. Register dataset
+        _register_dataset(db, dataset_type, meta)
+
+        # 4. Build SoQL WHERE clause for filters
+        where_clauses = []
+        if state:
+            where_clauses.append(f"rndrng_prvdr_state_abrvtn='{state.upper()}'")
+
+        where_clause = " AND ".join(where_clauses) if where_clauses else None
+
+        # 5. Initialize CMS client
+        client = CMSClient(
+            max_concurrency=settings.max_concurrency,
+            max_retries=settings.max_retries,
+            backoff_factor=settings.retry_backoff_factor
         )
-        
-        logger.info(f"Fetched {len(records)} records")
-        
-        # 7. Insert data
-        if records:
-            await _batch_insert_data(db, table_name, records, meta["columns"])
-        
-        # 8. Calculate results
-        rows_inserted = len(records)
-        duration = (datetime.utcnow() - start_time).total_seconds()
-        
-        logger.info(
-            f"Successfully ingested {rows_inserted} rows into {table_name} "
-            f"in {duration:.2f}s"
-        )
-        
-        return {
-            "table_name": table_name,
-            "rows_inserted": rows_inserted,
-            "duration_seconds": duration,
-            "dataset_id": dataset_id
-        }
-    
-    finally:
-        await client.close()
+
+        try:
+            # 6. Fetch data from Socrata API
+            logger.info(f"Fetching data from Socrata dataset {dataset_id}")
+            records = await client.fetch_socrata_data(
+                dataset_id=dataset_id,
+                limit=1000,  # Records per page
+                where=where_clause,
+                max_records=limit
+            )
+
+            logger.info(f"Fetched {len(records)} records")
+
+            # 7. Insert data
+            if records:
+                await _batch_insert_data(db, table_name, records, meta["columns"])
+
+            # 8. Calculate results
+            rows_inserted = len(records)
+            duration = (datetime.utcnow() - start_time).total_seconds()
+
+            # 9. Update job status
+            if job:
+                if rows_inserted == 0:
+                    job.status = JobStatus.FAILED
+                    job.error_message = "Ingestion completed but no rows were inserted"
+                    logger.warning(f"Job {job_id}: No CMS Medicare utilization data returned")
+                else:
+                    job.status = JobStatus.SUCCESS
+                job.completed_at = datetime.utcnow()
+                job.rows_inserted = rows_inserted
+                db.commit()
+
+            logger.info(
+                f"Successfully ingested {rows_inserted} rows into {table_name} "
+                f"in {duration:.2f}s"
+            )
+
+            return {
+                "table_name": table_name,
+                "rows_inserted": rows_inserted,
+                "duration_seconds": duration,
+                "dataset_id": dataset_id
+            }
+
+        finally:
+            await client.close()
+
+    except Exception as e:
+        logger.error(f"CMS Medicare utilization ingestion failed: {e}", exc_info=True)
+        if job:
+            job.status = JobStatus.FAILED
+            job.error_message = str(e)
+            job.completed_at = datetime.utcnow()
+            db.commit()
+        raise
 
 
 async def ingest_hospital_cost_reports(
@@ -184,91 +213,120 @@ async def ingest_drug_pricing(
 ) -> Dict[str, Any]:
     """
     Ingest Medicare Part D Drug Spending data.
-    
+
     This dataset contains prescription drug costs and utilization
     for brand name and generic drugs under Medicare Part D.
-    
+
     Args:
         db: Database session
         job_id: Ingestion job ID for tracking
         year: Optional year filter
         brand_name: Optional filter by brand name
         limit: Optional limit on number of records
-        
+
     Returns:
         Dictionary with ingestion results
     """
     start_time = datetime.utcnow()
     dataset_type = "drug_pricing"
-    
+
     settings = get_settings()
-    
-    # 1. Get dataset metadata
-    meta = metadata.get_dataset_metadata(dataset_type)
-    table_name = meta["table_name"]
-    dataset_id = meta["socrata_dataset_id"]
-    
-    # 2. Create table if not exists
-    logger.info(f"Preparing table {table_name}")
-    create_sql = metadata.generate_create_table_sql(dataset_type)
-    db.execute(text(create_sql))
-    db.commit()
-    
-    # 3. Register dataset
-    _register_dataset(db, dataset_type, meta)
-    
-    # 4. Build SoQL WHERE clause for filters
-    where_clauses = []
-    if year:
-        where_clauses.append(f"year={year}")
-    if brand_name:
-        # Escape single quotes in brand name
-        safe_brand = brand_name.replace("'", "''")
-        where_clauses.append(f"brnd_name='{safe_brand}'")
-    
-    where_clause = " AND ".join(where_clauses) if where_clauses else None
-    
-    # 5. Initialize CMS client
-    client = CMSClient(
-        max_concurrency=settings.max_concurrency,
-        max_retries=settings.max_retries,
-        backoff_factor=settings.retry_backoff_factor
-    )
-    
+
+    # Update job to RUNNING
+    job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+    if job:
+        job.status = JobStatus.RUNNING
+        job.started_at = start_time
+        db.commit()
+
     try:
-        # 6. Fetch data from Socrata API
-        logger.info(f"Fetching data from Socrata dataset {dataset_id}")
-        records = await client.fetch_socrata_data(
-            dataset_id=dataset_id,
-            limit=1000,  # Records per page
-            where=where_clause,
-            max_records=limit
+        # 1. Get dataset metadata
+        meta = metadata.get_dataset_metadata(dataset_type)
+        table_name = meta["table_name"]
+        dataset_id = meta["socrata_dataset_id"]
+
+        # 2. Create table if not exists
+        logger.info(f"Preparing table {table_name}")
+        create_sql = metadata.generate_create_table_sql(dataset_type)
+        db.execute(text(create_sql))
+        db.commit()
+
+        # 3. Register dataset
+        _register_dataset(db, dataset_type, meta)
+
+        # 4. Build SoQL WHERE clause for filters
+        where_clauses = []
+        if year:
+            where_clauses.append(f"year={year}")
+        if brand_name:
+            # Escape single quotes in brand name
+            safe_brand = brand_name.replace("'", "''")
+            where_clauses.append(f"brnd_name='{safe_brand}'")
+
+        where_clause = " AND ".join(where_clauses) if where_clauses else None
+
+        # 5. Initialize CMS client
+        client = CMSClient(
+            max_concurrency=settings.max_concurrency,
+            max_retries=settings.max_retries,
+            backoff_factor=settings.retry_backoff_factor
         )
-        
-        logger.info(f"Fetched {len(records)} records")
-        
-        # 7. Insert data
-        if records:
-            await _batch_insert_data(db, table_name, records, meta["columns"])
-        
-        # 8. Calculate results
-        rows_inserted = len(records)
-        duration = (datetime.utcnow() - start_time).total_seconds()
-        
-        logger.info(
-            f"Successfully ingested {rows_inserted} rows into {table_name} "
-            f"in {duration:.2f}s"
-        )
-        
-        return {
-            "table_name": table_name,
-            "rows_inserted": rows_inserted,
-            "duration_seconds": duration,
-            "dataset_id": dataset_id
-        }
-    
-    finally:
-        await client.close()
+
+        try:
+            # 6. Fetch data from Socrata API
+            logger.info(f"Fetching data from Socrata dataset {dataset_id}")
+            records = await client.fetch_socrata_data(
+                dataset_id=dataset_id,
+                limit=1000,  # Records per page
+                where=where_clause,
+                max_records=limit
+            )
+
+            logger.info(f"Fetched {len(records)} records")
+
+            # 7. Insert data
+            if records:
+                await _batch_insert_data(db, table_name, records, meta["columns"])
+
+            # 8. Calculate results
+            rows_inserted = len(records)
+            duration = (datetime.utcnow() - start_time).total_seconds()
+
+            # 9. Update job status
+            if job:
+                if rows_inserted == 0:
+                    job.status = JobStatus.FAILED
+                    job.error_message = "Ingestion completed but no rows were inserted"
+                    logger.warning(f"Job {job_id}: No CMS drug pricing data returned")
+                else:
+                    job.status = JobStatus.SUCCESS
+                job.completed_at = datetime.utcnow()
+                job.rows_inserted = rows_inserted
+                db.commit()
+
+            logger.info(
+                f"Successfully ingested {rows_inserted} rows into {table_name} "
+                f"in {duration:.2f}s"
+            )
+
+            return {
+                "table_name": table_name,
+                "rows_inserted": rows_inserted,
+                "duration_seconds": duration,
+                "dataset_id": dataset_id
+            }
+
+        finally:
+            await client.close()
+
+    except Exception as e:
+        logger.error(f"CMS drug pricing ingestion failed: {e}", exc_info=True)
+        if job:
+            job.status = JobStatus.FAILED
+            job.error_message = str(e)
+            job.completed_at = datetime.utcnow()
+            db.commit()
+        raise
 
 
 async def _batch_insert_data(

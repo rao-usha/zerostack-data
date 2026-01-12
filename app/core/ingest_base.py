@@ -204,9 +204,34 @@ class BaseSourceIngestor(ABC):
     def complete_job(
         self,
         job_id: int,
-        rows_inserted: int
+        rows_inserted: int,
+        require_rows: bool = False,
+        warn_on_empty: bool = True
     ) -> Optional[IngestionJob]:
-        """Mark job as successfully completed."""
+        """
+        Mark job as successfully completed.
+
+        Args:
+            job_id: Job ID
+            rows_inserted: Number of rows inserted
+            require_rows: If True, fail job when rows_inserted is 0
+            warn_on_empty: If True, log a warning when no rows inserted
+
+        Returns:
+            Updated IngestionJob or None if not found
+        """
+        if rows_inserted == 0:
+            if require_rows:
+                logger.error(f"Job {job_id}: No rows inserted, marking as failed")
+                return self.update_job_status(
+                    job_id,
+                    JobStatus.FAILED,
+                    rows_inserted=0,
+                    error_message="Ingestion completed but no rows were inserted"
+                )
+            elif warn_on_empty:
+                logger.warning(f"Job {job_id}: Completed with 0 rows inserted")
+
         return self.update_job_status(
             job_id,
             JobStatus.SUCCESS,
