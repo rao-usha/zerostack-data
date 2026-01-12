@@ -20,6 +20,15 @@ class JobStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class ScheduleFrequency(str, enum.Enum):
+    """Schedule frequency options."""
+    HOURLY = "hourly"
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    CUSTOM = "custom"  # For cron expressions
+
+
 class IngestionJob(Base):
     """
     Tracks all ingestion runs.
@@ -64,6 +73,51 @@ class IngestionJob(Base):
     def can_retry(self) -> bool:
         """Check if job can be retried."""
         return self.status == JobStatus.FAILED and self.retry_count < self.max_retries
+
+
+class IngestionSchedule(Base):
+    """
+    Stores scheduled ingestion configurations.
+
+    Allows automated data refresh on configurable schedules.
+    """
+    __tablename__ = "ingestion_schedules"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False, unique=True)  # Human-readable name
+    source = Column(String(50), nullable=False, index=True)  # Data source (fred, census, etc.)
+    config = Column(JSON, nullable=False)  # Source-specific configuration
+
+    # Schedule configuration
+    frequency = Column(
+        Enum(ScheduleFrequency, native_enum=False, length=20),
+        nullable=False,
+        default=ScheduleFrequency.DAILY
+    )
+    cron_expression = Column(String(100), nullable=True)  # For custom schedules (e.g., "0 6 * * *")
+    hour = Column(Integer, nullable=True, default=6)  # Hour to run (0-23) for non-cron schedules
+    day_of_week = Column(Integer, nullable=True)  # Day of week (0=Monday) for weekly
+    day_of_month = Column(Integer, nullable=True)  # Day of month (1-31) for monthly
+
+    # State
+    is_active = Column(Integer, nullable=False, default=1)  # 1=active, 0=paused
+    last_run_at = Column(DateTime, nullable=True)
+    next_run_at = Column(DateTime, nullable=True)
+    last_job_id = Column(Integer, nullable=True)  # Last created job ID
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Metadata
+    description = Column(Text, nullable=True)
+    priority = Column(Integer, nullable=False, default=5)  # 1=highest, 10=lowest
+
+    def __repr__(self) -> str:
+        return (
+            f"<IngestionSchedule(id={self.id}, name={self.name}, "
+            f"source={self.source}, frequency={self.frequency}, active={self.is_active})>"
+        )
 
 
 class DatasetRegistry(Base):

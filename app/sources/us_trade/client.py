@@ -88,12 +88,12 @@ class USTradeClient(BaseAPIClient):
     ) -> List[Dict[str, Any]]:
         """Get US export data by Harmonized System (HS) code."""
         if fields is None:
+            # Note: Export API does not have quantity fields (QTY_1_MO, etc.)
+            # Those are only available in the imports API
             fields = [
                 "CTY_CODE", "CTY_NAME",
                 "E_COMMODITY", "E_COMMODITY_LDESC",
-                "ALL_VAL_MO", "ALL_VAL_YR",
-                "QTY_1_MO", "QTY_1_YR",
-                "UNIT_QY1"
+                "ALL_VAL_MO", "ALL_VAL_YR"
             ]
 
         params = self._build_export_params(year, month, hs_code, country, fields)
@@ -140,7 +140,8 @@ class USTradeClient(BaseAPIClient):
     ) -> List[Dict[str, Any]]:
         """Get US state-level export data."""
         if fields is None:
-            fields = ["STATE", "CTY_CODE", "CTY_NAME", "E_COMMODITY", "ALL_VAL_MO", "ALL_VAL_YR"]
+            # Note: State exports API has limited fields compared to national data
+            fields = ["STATE", "CTY_CODE", "CTY_NAME", "E_COMMODITY", "E_COMMODITY_LDESC", "ALL_VAL_MO", "ALL_VAL_YR"]
 
         params = self._build_export_params(year, month, hs_code, country, fields)
         if state:

@@ -58,7 +58,24 @@ async def ingest_medicare_utilization(
         # 1. Get dataset metadata
         meta = metadata.get_dataset_metadata(dataset_type)
         table_name = meta["table_name"]
-        dataset_id = meta["socrata_dataset_id"]
+        dataset_id = meta.get("socrata_dataset_id")
+
+        # Check if dataset is available via Socrata API
+        # CMS migrated from Socrata to DKAN format in 2024
+        if dataset_id is None:
+            error_msg = (
+                f"CMS dataset '{dataset_type}' is no longer available via Socrata API. "
+                f"CMS has migrated to a new DKAN format. Please visit {meta.get('source_url', 'data.cms.gov')} "
+                f"to download the data directly. See https://downloads.cms.gov/files/Socrata-DKAN-API-Endpoints-Mapping.pdf "
+                f"for API migration details."
+            )
+            logger.error(error_msg)
+            if job:
+                job.status = JobStatus.FAILED
+                job.error_message = error_msg
+                job.completed_at = datetime.utcnow()
+                db.commit()
+            raise ValueError(error_msg)
 
         # 2. Create table if not exists
         logger.info(f"Preparing table {table_name}")
@@ -243,7 +260,24 @@ async def ingest_drug_pricing(
         # 1. Get dataset metadata
         meta = metadata.get_dataset_metadata(dataset_type)
         table_name = meta["table_name"]
-        dataset_id = meta["socrata_dataset_id"]
+        dataset_id = meta.get("socrata_dataset_id")
+
+        # Check if dataset is available via Socrata API
+        # CMS migrated from Socrata to DKAN format in 2024
+        if dataset_id is None:
+            error_msg = (
+                f"CMS dataset '{dataset_type}' is no longer available via Socrata API. "
+                f"CMS has migrated to a new DKAN format. Please visit {meta.get('source_url', 'data.cms.gov')} "
+                f"to download the data directly. See https://downloads.cms.gov/files/Socrata-DKAN-API-Endpoints-Mapping.pdf "
+                f"for API migration details."
+            )
+            logger.error(error_msg)
+            if job:
+                job.status = JobStatus.FAILED
+                job.error_message = error_msg
+                job.completed_at = datetime.utcnow()
+                db.commit()
+            raise ValueError(error_msg)
 
         # 2. Create table if not exists
         logger.info(f"Preparing table {table_name}")

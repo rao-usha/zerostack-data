@@ -32,7 +32,8 @@ class FDICClient(BaseAPIClient):
     """
 
     SOURCE_NAME = "fdic"
-    BASE_URL = "https://banks.data.fdic.gov/api"
+    # Updated 2025: FDIC migrated API from banks.data.fdic.gov to api.fdic.gov
+    BASE_URL = "https://api.fdic.gov/banks"
 
     # Pagination limits
     MAX_LIMIT = 10000

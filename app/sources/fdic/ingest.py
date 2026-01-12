@@ -162,7 +162,6 @@ async def ingest_bank_financials(
     
     client = FDICClient(
         max_concurrency=settings.max_concurrency,
-        max_requests_per_second=settings.max_requests_per_second,
         max_retries=settings.max_retries,
         backoff_factor=settings.retry_backoff_factor
     )
@@ -277,7 +276,6 @@ async def ingest_institutions(
     
     client = FDICClient(
         max_concurrency=settings.max_concurrency,
-        max_requests_per_second=settings.max_requests_per_second,
         max_retries=settings.max_retries,
         backoff_factor=settings.retry_backoff_factor
     )
@@ -388,7 +386,6 @@ async def ingest_failed_banks(
     
     client = FDICClient(
         max_concurrency=settings.max_concurrency,
-        max_requests_per_second=settings.max_requests_per_second,
         max_retries=settings.max_retries,
         backoff_factor=settings.retry_backoff_factor
     )
@@ -502,7 +499,6 @@ async def ingest_summary_of_deposits(
     
     client = FDICClient(
         max_concurrency=settings.max_concurrency,
-        max_requests_per_second=settings.max_requests_per_second,
         max_retries=settings.max_retries,
         backoff_factor=settings.retry_backoff_factor
     )

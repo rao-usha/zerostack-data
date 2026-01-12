@@ -385,3 +385,152 @@ async def retry_all_failed_jobs(
         **results
     }
 
+
+# =============================================================================
+# Data Quality Validation Endpoints
+# =============================================================================
+
+@router.get("/{job_id}/validate")
+def validate_job_data(
+    job_id: int,
+    table_name: str,
+    expected_min_rows: int = 1,
+    db: Session = Depends(get_db)
+):
+    """
+    Validate data quality for a completed ingestion job.
+
+    Performs checks including:
+    - Row count validation
+    - Null value detection
+    - Duplicate detection
+    - Range validation for numeric fields
+
+    Args:
+        job_id: The ingestion job ID
+        table_name: The table that was populated
+        expected_min_rows: Minimum expected row count (default 1)
+
+    Returns:
+        Validation results with pass/fail status for each check
+    """
+    from app.core.data_quality import validate_ingestion_job, get_default_validation_config
+
+    # Get job to determine source
+    job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status != JobStatus.SUCCESS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job is not in success status (current: {job.status.value})"
+        )
+
+    # Get default validation config for source
+    dataset = job.config.get("dataset") if job.config else None
+    default_config = get_default_validation_config(job.source, dataset)
+
+    # Override with provided parameters
+    validation_config = {
+        **default_config,
+        "expected_min_rows": expected_min_rows
+    }
+
+    try:
+        results = validate_ingestion_job(
+            db=db,
+            job_id=job_id,
+            table_name=table_name,
+            validation_config=validation_config
+        )
+        return results
+    except Exception as e:
+        logger.error(f"Data validation failed for job {job_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
+
+
+# =============================================================================
+# Monitoring Endpoints
+# =============================================================================
+
+@router.get("/monitoring/metrics")
+def get_job_metrics(
+    hours: int = 24,
+    source: str = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Get job metrics for monitoring.
+
+    Returns success/failure rates, durations, and recent failures.
+
+    Args:
+        hours: Time window in hours (default 24)
+        source: Optional filter by source
+    """
+    from app.core.monitoring import JobMonitor
+
+    monitor = JobMonitor(db)
+    return monitor.get_job_metrics(hours=hours, source=source)
+
+
+@router.get("/monitoring/health")
+def get_source_health(db: Session = Depends(get_db)):
+    """
+    Get health status for each data source.
+
+    Returns health scores based on recent job success rates.
+    Sources are classified as:
+    - healthy: 100% success rate
+    - warning: Some failures but majority success
+    - degraded: >50% failure rate
+    - critical: 0% success rate
+    """
+    from app.core.monitoring import JobMonitor
+
+    monitor = JobMonitor(db)
+    return monitor.get_source_health()
+
+
+@router.get("/monitoring/alerts")
+def get_active_alerts(
+    failure_threshold: int = 3,
+    time_window_hours: int = 1,
+    db: Session = Depends(get_db)
+):
+    """
+    Get active alerts for job failures.
+
+    Alert types:
+    - high_failure_rate: Multiple failures for a source
+    - stuck_job: Job running longer than 2 hours
+    - data_staleness: No jobs for 24+ hours
+
+    Args:
+        failure_threshold: Number of failures to trigger alert (default 3)
+        time_window_hours: Time window for failure count (default 1)
+    """
+    from app.core.monitoring import JobMonitor
+
+    monitor = JobMonitor(db)
+    return monitor.check_alerts(
+        failure_threshold=failure_threshold,
+        time_window_hours=time_window_hours
+    )
+
+
+@router.get("/monitoring/dashboard")
+def get_monitoring_dashboard(db: Session = Depends(get_db)):
+    """
+    Get comprehensive monitoring dashboard.
+
+    Returns all metrics, health status, and alerts in one call.
+    Includes:
+    - 24h and 1h metrics
+    - Source health status
+    - Active alerts
+    """
+    from app.core.monitoring import get_monitoring_dashboard as get_dashboard
+
+    return get_dashboard(db)

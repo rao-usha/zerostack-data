@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets
+from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules
 
 # Configure logging
 logging.basicConfig(
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """
     Application lifespan context manager.
-    
+
     Runs on startup and shutdown.
     """
     # Startup
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting External Data Ingestion Service")
     logger.info(f"Log level: {settings.log_level}")
     logger.info(f"Max concurrency: {settings.max_concurrency}")
-    
+
     # Create core tables
     try:
         create_tables()
@@ -40,11 +40,37 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to create tables: {e}")
         raise
-    
+
+    # Start scheduler (optional - can be started manually via API)
+    try:
+        from app.core import scheduler_service
+        from app.core.database import get_session_factory
+
+        scheduler_service.start_scheduler()
+
+        # Load active schedules
+        SessionLocal = get_session_factory()
+        db = SessionLocal()
+        try:
+            count = scheduler_service.load_all_schedules(db)
+            logger.info(f"Scheduler started with {count} active schedules")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"Failed to start scheduler: {e}")
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down")
+
+    # Stop scheduler
+    try:
+        from app.core import scheduler_service
+        scheduler_service.stop_scheduler()
+        logger.info("Scheduler stopped")
+    except Exception as e:
+        logger.warning(f"Error stopping scheduler: {e}")
 
 
 # Create FastAPI app
@@ -645,6 +671,10 @@ Browse the endpoint sections below to see what's available:
         {
             "name": "Prediction Markets",
             "description": "🎲 **Prediction Market Intelligence** - Monitor Kalshi, Polymarket for market consensus on economic, political, sports, and world events"
+        },
+        {
+            "name": "schedules",
+            "description": "📅 **Scheduled Ingestion** - Automated data refresh with cron-based scheduling for all data sources"
         }
     ]
 )
@@ -689,6 +719,7 @@ app.include_router(fdic.router, prefix="/api/v1")
 app.include_router(irs_soi.router, prefix="/api/v1")
 app.include_router(foot_traffic.router, prefix="/api/v1")
 app.include_router(prediction_markets.router, prefix="/api/v1")
+app.include_router(schedules.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])
