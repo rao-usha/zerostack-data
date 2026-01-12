@@ -12,8 +12,8 @@ import pytest
 import os
 from datetime import datetime
 
-# Skip all tests if integration tests not enabled
-pytestmark = pytest.mark.skipif(
+# Condition for skipping integration tests
+requires_integration = pytest.mark.skipif(
     not os.environ.get("RUN_INTEGRATION_TESTS", "").lower() == "true",
     reason="Integration tests disabled. Set RUN_INTEGRATION_TESTS=true to enable."
 )
@@ -34,8 +34,9 @@ def current_year():
     return datetime.now().year
 
 
+@requires_integration
 class TestBLSClient:
-    """Tests for BLS API client."""
+    """Tests for BLS API client (requires network)."""
     
     @pytest.mark.asyncio
     async def test_fetch_unemployment_rate(self, bls_client, current_year):

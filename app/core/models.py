@@ -6,7 +6,7 @@ These tables are source-agnostic and used by all data source adapters.
 from datetime import datetime
 from typing import Optional
 from sqlalchemy import Column, Integer, String, DateTime, Text, JSON, Enum, UniqueConstraint, Index
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 import enum
 
 Base = declarative_base()
