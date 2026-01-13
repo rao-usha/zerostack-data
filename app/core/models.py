@@ -1560,3 +1560,201 @@ class SourceRateLimit(Base):
             f"<SourceRateLimit(source='{self.source}', "
             f"rps={self.requests_per_second}, burst={self.burst_capacity})>"
         )
+
+
+# =============================================================================
+# DATA QUALITY RULES ENGINE MODELS
+# =============================================================================
+
+
+class RuleType(str, enum.Enum):
+    """Types of data quality validation rules."""
+    RANGE = "range"  # Value must be within min/max
+    NOT_NULL = "not_null"  # Value must not be null
+    UNIQUE = "unique"  # Values must be unique
+    REGEX = "regex"  # Value must match pattern
+    FRESHNESS = "freshness"  # Data must be recent
+    ROW_COUNT = "row_count"  # Minimum/maximum rows
+    CUSTOM_SQL = "custom_sql"  # Custom SQL condition
+    ENUM = "enum"  # Value must be in allowed list
+    COMPARISON = "comparison"  # Compare two columns
+
+
+class RuleSeverity(str, enum.Enum):
+    """Severity levels for rule violations."""
+    ERROR = "error"  # Critical - fails validation
+    WARNING = "warning"  # Non-critical - logged but doesn't fail
+    INFO = "info"  # Informational only
+
+
+class DataQualityRule(Base):
+    """
+    Configurable data quality validation rules.
+
+    Rules can be applied to specific sources, datasets, or columns.
+    Supports various validation types with configurable thresholds.
+    """
+    __tablename__ = "data_quality_rules"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+
+    # Targeting
+    source = Column(String(50), nullable=True, index=True)  # null = all sources
+    dataset_pattern = Column(String(255), nullable=True)  # Regex pattern for dataset/table names
+    column_name = Column(String(100), nullable=True)  # Specific column (null = table-level)
+
+    # Rule configuration
+    rule_type = Column(
+        Enum(RuleType, native_enum=False, length=20),
+        nullable=False
+    )
+    severity = Column(
+        Enum(RuleSeverity, native_enum=False, length=20),
+        nullable=False,
+        default=RuleSeverity.ERROR
+    )
+
+    # Rule parameters (JSON for flexibility)
+    # Examples:
+    # RANGE: {"min": 0, "max": 100}
+    # NOT_NULL: {}
+    # REGEX: {"pattern": "^[A-Z]{2}$"}
+    # FRESHNESS: {"max_age_hours": 24}
+    # ROW_COUNT: {"min": 1, "max": 1000000}
+    # ENUM: {"allowed": ["A", "B", "C"]}
+    # COMPARISON: {"operator": ">", "compare_column": "other_col"}
+    # CUSTOM_SQL: {"condition": "column_a > column_b"}
+    parameters = Column(JSON, nullable=False, default={})
+
+    # State
+    is_enabled = Column(Integer, nullable=False, default=1)
+    priority = Column(Integer, nullable=False, default=5)  # 1=highest, 10=lowest
+
+    # Statistics
+    times_evaluated = Column(Integer, nullable=False, default=0)
+    times_passed = Column(Integer, nullable=False, default=0)
+    times_failed = Column(Integer, nullable=False, default=0)
+    last_evaluated_at = Column(DateTime, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_dq_rule_source', 'source'),
+        Index('idx_dq_rule_type', 'rule_type'),
+        Index('idx_dq_rule_enabled', 'is_enabled'),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<DataQualityRule(id={self.id}, name='{self.name}', "
+            f"type='{self.rule_type}', severity='{self.severity}')>"
+        )
+
+
+class DataQualityResult(Base):
+    """
+    Results of data quality rule evaluations.
+
+    Stores the outcome of each rule check for audit and reporting.
+    """
+    __tablename__ = "data_quality_results"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    rule_id = Column(Integer, nullable=False, index=True)
+    job_id = Column(Integer, nullable=True, index=True)  # Associated ingestion job
+
+    # Context
+    source = Column(String(50), nullable=False, index=True)
+    dataset_name = Column(String(255), nullable=True)
+    column_name = Column(String(100), nullable=True)
+
+    # Result
+    passed = Column(Integer, nullable=False)  # 1=passed, 0=failed
+    severity = Column(
+        Enum(RuleSeverity, native_enum=False, length=20),
+        nullable=False
+    )
+
+    # Details
+    message = Column(Text, nullable=True)  # Human-readable result
+    actual_value = Column(Text, nullable=True)  # What was found
+    expected_value = Column(Text, nullable=True)  # What was expected
+    sample_failures = Column(JSON, nullable=True)  # Sample of failing rows/values
+
+    # Metrics
+    rows_checked = Column(Integer, nullable=True)
+    rows_passed = Column(Integer, nullable=True)
+    rows_failed = Column(Integer, nullable=True)
+    execution_time_ms = Column(Integer, nullable=True)
+
+    # Timestamps
+    evaluated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_dq_result_rule', 'rule_id'),
+        Index('idx_dq_result_job', 'job_id'),
+        Index('idx_dq_result_passed', 'passed'),
+        Index('idx_dq_result_evaluated', 'evaluated_at'),
+    )
+
+    def __repr__(self) -> str:
+        status = "PASSED" if self.passed else "FAILED"
+        return (
+            f"<DataQualityResult(id={self.id}, rule_id={self.rule_id}, "
+            f"status={status}, severity='{self.severity}')>"
+        )
+
+
+class DataQualityReport(Base):
+    """
+    Aggregated data quality report for a job or time period.
+
+    Summarizes rule evaluations for easy monitoring and alerting.
+    """
+    __tablename__ = "data_quality_reports"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_id = Column(Integer, nullable=True, index=True)  # Associated job (null for scheduled reports)
+
+    # Scope
+    source = Column(String(50), nullable=True, index=True)
+    report_type = Column(String(50), nullable=False, default='job')  # job, daily, weekly
+
+    # Summary
+    total_rules = Column(Integer, nullable=False, default=0)
+    rules_passed = Column(Integer, nullable=False, default=0)
+    rules_failed = Column(Integer, nullable=False, default=0)
+    rules_warned = Column(Integer, nullable=False, default=0)
+
+    # By severity
+    errors = Column(Integer, nullable=False, default=0)
+    warnings = Column(Integer, nullable=False, default=0)
+    info = Column(Integer, nullable=False, default=0)
+
+    # Overall status
+    overall_status = Column(String(20), nullable=False, default='pending')
+    # Values: 'passed', 'failed', 'warning', 'pending'
+
+    # Details
+    failed_rules = Column(JSON, nullable=True)  # List of failed rule names/IDs
+    execution_time_ms = Column(Integer, nullable=True)
+
+    # Timestamps
+    started_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index('idx_dq_report_job', 'job_id'),
+        Index('idx_dq_report_status', 'overall_status'),
+        Index('idx_dq_report_started', 'started_at'),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<DataQualityReport(id={self.id}, job_id={self.job_id}, "
+            f"status='{self.overall_status}', passed={self.rules_passed}/{self.total_rules})>"
+        )
