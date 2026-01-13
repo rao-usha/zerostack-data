@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains
+from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits
 
 # Configure logging
 logging.basicConfig(
@@ -691,6 +691,10 @@ Browse the endpoint sections below to see what's available:
         {
             "name": "job-chains",
             "description": "🔗 **Job Dependency Chains** - Create DAG workflows with job dependencies, execute chains, and track progress"
+        },
+        {
+            "name": "rate-limits",
+            "description": "⚡ **Per-Source Rate Limits** - Configure and monitor rate limits for each data source API"
         }
     ]
 )
@@ -738,6 +742,7 @@ app.include_router(prediction_markets.router, prefix="/api/v1")
 app.include_router(schedules.router, prefix="/api/v1")
 app.include_router(webhooks.router, prefix="/api/v1")
 app.include_router(chains.router, prefix="/api/v1")
+app.include_router(rate_limits.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])

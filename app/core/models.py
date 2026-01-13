@@ -1514,3 +1514,49 @@ class JobChainExecution(Base):
             f"<JobChainExecution(id={self.id}, chain_id={self.chain_id}, "
             f"status='{self.status}', progress={self.completed_jobs}/{self.total_jobs})>"
         )
+
+
+# =============================================================================
+# PER-SOURCE RATE LIMIT MODELS
+# =============================================================================
+
+
+class SourceRateLimit(Base):
+    """
+    Configurable rate limits per data source.
+
+    Stores rate limit configuration for each external API source.
+    Supports token bucket algorithm with burst capacity.
+    """
+    __tablename__ = "source_rate_limits"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source = Column(String(50), nullable=False, unique=True, index=True)
+
+    # Rate limit configuration
+    requests_per_second = Column(String(20), nullable=False, default="1.0")  # Tokens added per second
+    burst_capacity = Column(Integer, nullable=False, default=10)  # Maximum tokens (burst size)
+    concurrent_limit = Column(Integer, nullable=False, default=5)  # Max concurrent requests
+
+    # Current state (for distributed rate limiting)
+    current_tokens = Column(String(20), nullable=True)  # Current token count
+    last_refill_at = Column(DateTime, nullable=True)  # Last token refill time
+
+    # Statistics
+    total_requests = Column(Integer, nullable=False, default=0)
+    total_throttled = Column(Integer, nullable=False, default=0)
+    last_request_at = Column(DateTime, nullable=True)
+
+    # Configuration
+    is_enabled = Column(Integer, nullable=False, default=1)  # 1=enabled, 0=disabled
+    description = Column(Text, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return (
+            f"<SourceRateLimit(source='{self.source}', "
+            f"rps={self.requests_per_second}, burst={self.burst_capacity})>"
+        )
