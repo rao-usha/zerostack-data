@@ -1758,3 +1758,126 @@ class DataQualityReport(Base):
             f"<DataQualityReport(id={self.id}, job_id={self.job_id}, "
             f"status='{self.overall_status}', passed={self.rules_passed}/{self.total_rules})>"
         )
+
+
+# =============================================================================
+# BULK INGESTION TEMPLATE MODELS
+# =============================================================================
+
+
+class TemplateCategory(str, enum.Enum):
+    """Categories for organizing templates."""
+    DEMOGRAPHICS = "demographics"
+    ECONOMIC = "economic"
+    FINANCIAL = "financial"
+    ENERGY = "energy"
+    HEALTHCARE = "healthcare"
+    REAL_ESTATE = "real_estate"
+    TRADE = "trade"
+    CUSTOM = "custom"
+
+
+class IngestionTemplate(Base):
+    """
+    Reusable bulk ingestion templates.
+
+    Templates define multiple jobs to run together with optional parameters.
+    Supports variable substitution for customizable ingestion patterns.
+    """
+    __tablename__ = "ingestion_templates"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False, unique=True, index=True)
+    display_name = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True)
+
+    # Categorization
+    category = Column(
+        Enum(TemplateCategory, native_enum=False, length=20),
+        nullable=False,
+        default=TemplateCategory.CUSTOM
+    )
+    tags = Column(JSON, nullable=True)  # ["census", "state-level", "demographics"]
+
+    # Template definition
+    # Format: [{"source": "census", "config": {"year": "{{year}}", ...}}, ...]
+    # Variables use {{variable_name}} syntax
+    jobs_definition = Column(JSON, nullable=False)
+
+    # Variable schema (for validation and documentation)
+    # Format: {"year": {"type": "integer", "default": 2023, "description": "..."}, ...}
+    variables = Column(JSON, nullable=True)
+
+    # Execution settings
+    use_chain = Column(Integer, nullable=False, default=0)  # 1 = create as job chain
+    parallel_execution = Column(Integer, nullable=False, default=1)  # 1 = run jobs in parallel
+
+    # State
+    is_builtin = Column(Integer, nullable=False, default=0)  # 1 = system template
+    is_enabled = Column(Integer, nullable=False, default=1)
+
+    # Statistics
+    times_executed = Column(Integer, nullable=False, default=0)
+    last_executed_at = Column(DateTime, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_template_category', 'category'),
+        Index('idx_template_enabled', 'is_enabled'),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<IngestionTemplate(id={self.id}, name='{self.name}', "
+            f"category='{self.category}', jobs={len(self.jobs_definition or [])})>"
+        )
+
+
+class TemplateExecution(Base):
+    """
+    Tracks execution of ingestion templates.
+
+    Records each time a template is run with the parameters used.
+    """
+    __tablename__ = "template_executions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    template_id = Column(Integer, nullable=False, index=True)
+    template_name = Column(String(255), nullable=False)  # Denormalized for history
+
+    # Execution parameters
+    parameters = Column(JSON, nullable=True)  # Variables used for this execution
+
+    # Status
+    status = Column(String(20), nullable=False, default='running', index=True)
+    # Values: 'running', 'success', 'partial_success', 'failed'
+
+    # Job tracking
+    job_ids = Column(JSON, nullable=False)  # Array of created job IDs
+    chain_id = Column(Integer, nullable=True)  # If executed as chain
+    total_jobs = Column(Integer, nullable=False, default=0)
+    completed_jobs = Column(Integer, nullable=False, default=0)
+    successful_jobs = Column(Integer, nullable=False, default=0)
+    failed_jobs = Column(Integer, nullable=False, default=0)
+
+    # Timing
+    started_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+    # Error tracking
+    errors = Column(JSON, nullable=True)
+
+    __table_args__ = (
+        Index('idx_template_exec_template', 'template_id'),
+        Index('idx_template_exec_status', 'status'),
+        Index('idx_template_exec_started', 'started_at'),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<TemplateExecution(id={self.id}, template='{self.template_name}', "
+            f"status='{self.status}', progress={self.completed_jobs}/{self.total_jobs})>"
+        )

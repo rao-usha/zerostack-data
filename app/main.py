@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality
+from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates
 
 # Configure logging
 logging.basicConfig(
@@ -699,6 +699,10 @@ Browse the endpoint sections below to see what's available:
         {
             "name": "data-quality",
             "description": "✅ **Data Quality Rules Engine** - Define and evaluate data quality rules with range, null, regex, freshness checks"
+        },
+        {
+            "name": "templates",
+            "description": "📋 **Bulk Ingestion Templates** - Reusable templates for multi-source data ingestion with variable substitution"
         }
     ]
 )
@@ -748,6 +752,7 @@ app.include_router(webhooks.router, prefix="/api/v1")
 app.include_router(chains.router, prefix="/api/v1")
 app.include_router(rate_limits.router, prefix="/api/v1")
 app.include_router(data_quality.router, prefix="/api/v1")
+app.include_router(templates.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])
