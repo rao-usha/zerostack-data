@@ -2123,3 +2123,75 @@ class ImpactAnalysis(Base):
 
     def __repr__(self) -> str:
         return f"<ImpactAnalysis(source='{self.source_node_name}' -> '{self.impacted_node_name}', level={self.impact_level})>"
+
+
+# =============================================================================
+# Data Export
+# =============================================================================
+
+class ExportFormat(str, enum.Enum):
+    """Supported export file formats."""
+    CSV = "csv"
+    JSON = "json"
+    PARQUET = "parquet"
+
+
+class ExportStatus(str, enum.Enum):
+    """Export job status."""
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    EXPIRED = "expired"
+
+
+class ExportJob(Base):
+    """
+    Tracks data export jobs.
+
+    Allows async export of table data to files.
+    """
+    __tablename__ = "export_jobs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # What to export
+    table_name = Column(String(255), nullable=False, index=True)
+    format = Column(
+        Enum(ExportFormat, native_enum=False, length=20),
+        nullable=False
+    )
+    status = Column(
+        Enum(ExportStatus, native_enum=False, length=20),
+        nullable=False,
+        default=ExportStatus.PENDING,
+        index=True
+    )
+
+    # Export options
+    columns = Column(JSON, nullable=True)  # List of columns, null = all
+    row_limit = Column(Integer, nullable=True)
+    filters = Column(JSON, nullable=True)  # {"date_from": "...", "date_to": "..."}
+    compress = Column(Integer, nullable=False, default=0)  # 1 = gzip
+
+    # Results
+    file_path = Column(String(500), nullable=True)
+    file_name = Column(String(255), nullable=True)
+    file_size_bytes = Column(Integer, nullable=True)
+    row_count = Column(Integer, nullable=True)
+    error_message = Column(Text, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index('idx_export_job_status', 'status'),
+        Index('idx_export_job_table', 'table_name'),
+        Index('idx_export_job_created', 'created_at'),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ExportJob(id={self.id}, table='{self.table_name}', format={self.format.value}, status={self.status.value})>"
