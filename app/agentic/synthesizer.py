@@ -8,6 +8,8 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Set
 
+from app.agentic.fuzzy_matcher import CompanyNameMatcher, similarity_ratio
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,65 +27,96 @@ SOURCE_PRIORITY = {
 class DataSynthesizer:
     """
     Synthesizes portfolio findings from multiple sources.
-    
+
     Key functions:
-    - Deduplicate companies across sources
+    - Deduplicate companies across sources (with fuzzy matching)
     - Merge records from multiple sources
     - Normalize company names
     - Calculate confidence based on source agreement
     """
-    
-    def __init__(self):
-        """Initialize the synthesizer."""
+
+    def __init__(self, fuzzy_threshold: float = 0.85):
+        """
+        Initialize the synthesizer.
+
+        Args:
+            fuzzy_threshold: Similarity threshold for fuzzy matching (0.0-1.0)
+        """
         self._name_cache: Dict[str, str] = {}  # Normalized name cache
+        self._fuzzy_matcher = CompanyNameMatcher(similarity_threshold=fuzzy_threshold)
+        self._fuzzy_threshold = fuzzy_threshold
     
     def synthesize_findings(
-        self, 
+        self,
         all_findings: List[Dict[str, Any]],
         investor_id: int,
         investor_type: str
     ) -> List[Dict[str, Any]]:
         """
-        Combine findings from multiple sources, deduplicate, and merge.
-        
+        Combine findings from multiple sources, deduplicate (with fuzzy matching), and merge.
+
         Args:
             all_findings: List of company records from various strategies
             investor_id: The investor ID to associate with records
             investor_type: 'lp' or 'family_office'
-            
+
         Returns:
             List of deduplicated, merged company records
         """
         logger.info(f"Synthesizing {len(all_findings)} findings")
-        
+
         if not all_findings:
             return []
-        
-        # Group by normalized company name
+
+        # Group by normalized company name with fuzzy matching
         seen_companies: Dict[str, Dict[str, Any]] = {}
-        
+        seen_keys: List[str] = []  # Track order and for fuzzy lookup
+
+        fuzzy_matches = 0
+
         for finding in all_findings:
             company_name = finding.get("company_name", "")
             if not company_name:
                 continue
-            
+
             # Normalize the company name
-            company_key = self.normalize_company_name(company_name)
-            
+            company_key = self._fuzzy_matcher.normalize(company_name)
+
+            # Check for exact match first
             if company_key in seen_companies:
-                # Merge with existing record
                 existing = seen_companies[company_key]
                 merged = self.merge_records(existing, finding)
                 seen_companies[company_key] = merged
+                continue
+
+            # Check for fuzzy match against existing keys
+            matched_key = None
+            for existing_key in seen_keys:
+                sim = similarity_ratio(company_key, existing_key)
+                if sim >= self._fuzzy_threshold:
+                    matched_key = existing_key
+                    fuzzy_matches += 1
+                    break
+
+            if matched_key:
+                # Fuzzy match found - merge with existing
+                existing = seen_companies[matched_key]
+                merged = self.merge_records(existing, finding)
+                merged["_fuzzy_matched"] = True
+                seen_companies[matched_key] = merged
             else:
                 # New company - add investor context
                 finding["investor_id"] = investor_id
                 finding["investor_type"] = investor_type
                 seen_companies[company_key] = finding
-        
+                seen_keys.append(company_key)
+
         result = list(seen_companies.values())
-        logger.info(f"Synthesized to {len(result)} unique companies")
-        
+        logger.info(
+            f"Synthesized to {len(result)} unique companies "
+            f"({fuzzy_matches} fuzzy matches)"
+        )
+
         return result
     
     def normalize_company_name(self, name: str) -> str:

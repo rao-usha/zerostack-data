@@ -27,15 +27,15 @@
 
 | ID | Task | Status | Agent | Files (Scope) | Dependencies |
 |----|------|--------|-------|---------------|--------------|
-| T01 | Retry Handler with Exponential Backoff | NOT_STARTED | - | `app/agentic/retry_handler.py`, `app/agentic/strategies/base.py` | None |
-| T02 | Fuzzy Matching for Deduplication | NOT_STARTED | - | `app/agentic/fuzzy_matcher.py`, `app/agentic/synthesizer.py` | None |
-| T03 | Response Caching Layer | NOT_STARTED | - | `app/agentic/cache.py`, `app/agentic/strategies/website_strategy.py` | None |
+| T01 | Retry Handler with Exponential Backoff | COMPLETE | Tab 1 | `app/agentic/retry_handler.py`, `app/agentic/strategies/base.py` | None |
+| T02 | Fuzzy Matching for Deduplication | COMPLETE | Tab 1 | `app/agentic/fuzzy_matcher.py`, `app/agentic/synthesizer.py` | None |
+| T03 | Response Caching Layer | COMPLETE | Tab 1 | `app/agentic/cache.py`, `app/agentic/strategies/website_strategy.py` | None |
 | T04 | Unit Tests for LLM Client | NOT_STARTED | - | `tests/test_llm_client.py` | None |
 | T05 | Unit Tests for Ticker Resolver | NOT_STARTED | - | `tests/test_ticker_resolver.py` | None |
 | T06 | Metrics/Monitoring for Agentic Jobs | NOT_STARTED | - | `app/agentic/metrics.py`, `app/api/v1/agentic_research.py` (metrics endpoint only) | None |
 | T07 | Scheduled Portfolio Updates | NOT_STARTED | - | `app/agentic/scheduler.py` | None |
 | T08 | Portfolio Export to CSV/Excel | NOT_STARTED | - | `app/agentic/exporter.py`, `app/api/v1/agentic_research.py` (export endpoint only) | None |
-| T09 | Annual Report Strategy - PDF Caching | NOT_STARTED | - | `app/agentic/strategies/annual_report_strategy.py` | T03 |
+| T09 | Annual Report Strategy - PDF Caching | COMPLETE | Tab 1 | `app/agentic/strategies/annual_report_strategy.py` | T03 |
 | T10 | Website Strategy - JS Rendering Support | NOT_STARTED | - | `app/agentic/strategies/website_strategy.py` | None |
 
 ---
@@ -195,6 +195,8 @@
 ```
 [SYSTEM] Parallel work queue initialized with 10 tasks
 [SYSTEM] Previous work: Export (790ca0e), USPTO (6e305f6), LLM+Ticker (bce50d5)
+[Tab 1] Completed T01, T02, T03, T09 as part of Plan 004 (Agentic Enhancements)
+[Agent-T01] Verified T01 implementation: retry_handler.py + base.py integration. Docker build OK.
 ```
 
 ---
@@ -206,6 +208,10 @@
 | - | Data Export Service | Tab 1 | 790ca0e |
 | - | USPTO Patent Data Source | Tab 2 | 6e305f6 |
 | - | LLM Client + Ticker Resolver | Tab 1 | bce50d5 |
+| T01 | Retry Handler with Exponential Backoff | Tab 1 | (Plan 004) |
+| T02 | Fuzzy Matching for Deduplication | Tab 1 | (Plan 004) |
+| T03 | Response Caching Layer | Tab 1 | (Plan 004) |
+| T09 | Annual Report PDF Caching | Tab 1 | (Plan 004) |
 
 ---
 

@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from app.agentic.retry_handler import RetryConfig, with_retry, CircuitOpenError, RetryError
+
 logger = logging.getLogger(__name__)
 
 
@@ -103,20 +105,29 @@ class BaseStrategy(ABC):
     max_requests_per_second: float = 0.5  # 1 request per 2 seconds
     max_concurrent_requests: int = 1
     timeout_seconds: int = 300  # 5 minutes max
+
+    # Retry configuration defaults
+    max_retries: int = 3
+    retry_base_delay: float = 1.0
+    retry_max_delay: float = 60.0
     
     def __init__(
         self,
         max_requests_per_second: Optional[float] = None,
         max_concurrent_requests: Optional[int] = None,
-        timeout_seconds: Optional[int] = None
+        timeout_seconds: Optional[int] = None,
+        max_retries: Optional[int] = None,
+        retry_base_delay: Optional[float] = None
     ):
         """
-        Initialize strategy with rate limiting configuration.
-        
+        Initialize strategy with rate limiting and retry configuration.
+
         Args:
             max_requests_per_second: Override default rate limit
             max_concurrent_requests: Override default concurrency
             timeout_seconds: Override default timeout
+            max_retries: Override default retry count
+            retry_base_delay: Override default retry delay
         """
         if max_requests_per_second is not None:
             self.max_requests_per_second = max_requests_per_second
@@ -124,12 +135,25 @@ class BaseStrategy(ABC):
             self.max_concurrent_requests = max_concurrent_requests
         if timeout_seconds is not None:
             self.timeout_seconds = timeout_seconds
-        
+        if max_retries is not None:
+            self.max_retries = max_retries
+        if retry_base_delay is not None:
+            self.retry_base_delay = retry_base_delay
+
         logger.info(
             f"Initialized {self.name}: "
             f"rate={self.max_requests_per_second}/s, "
             f"concurrency={self.max_concurrent_requests}, "
-            f"timeout={self.timeout_seconds}s"
+            f"timeout={self.timeout_seconds}s, "
+            f"retries={self.max_retries}"
+        )
+
+    def get_retry_config(self) -> RetryConfig:
+        """Get retry configuration for this strategy."""
+        return RetryConfig(
+            max_retries=self.max_retries,
+            base_delay=self.retry_base_delay,
+            max_delay=self.retry_max_delay
         )
     
     @abstractmethod

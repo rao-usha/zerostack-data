@@ -27,6 +27,7 @@ from urllib.parse import urljoin, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
+from app.agentic.cache import get_cache, url_to_cache_key
 from app.agentic.strategies.base import BaseStrategy, InvestorContext, StrategyResult
 
 logger = logging.getLogger(__name__)
@@ -51,10 +52,14 @@ class WebsiteStrategy(BaseStrategy):
     max_requests_per_second = 0.5  # 1 request per 2 seconds
     max_concurrent_requests = 1
     timeout_seconds = 300
-    
+
     # Scraping limits
     MAX_PAGES_PER_INVESTOR = 5
     REQUEST_TIMEOUT = 10
+
+    # Cache TTLs
+    ROBOTS_CACHE_TTL = 86400  # 24 hours for robots.txt
+    PAGE_CACHE_TTL = 3600     # 1 hour for scraped pages
     
     # Portfolio page keywords
     PORTFOLIO_KEYWORDS = [
@@ -76,7 +81,7 @@ class WebsiteStrategy(BaseStrategy):
         self._client: Optional[httpx.AsyncClient] = None
         self._rate_limiter = asyncio.Semaphore(1)
         self._last_request_time: Dict[str, float] = {}  # Per-domain rate limiting
-        self._robots_cache: Dict[str, bool] = {}  # Cache robots.txt results
+        self._cache = get_cache()  # Use shared cache for robots.txt and pages
     
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create the HTTP client."""
@@ -121,43 +126,64 @@ class WebsiteStrategy(BaseStrategy):
             except Exception as e:
                 logger.warning(f"Request failed for {url}: {e}")
                 return None
-    
+
+    async def _fetch_page_cached(self, url: str) -> Optional[str]:
+        """Fetch a page with caching (1 hour TTL)."""
+        cache_key = url_to_cache_key(url, prefix="page")
+
+        # Check cache first
+        cached_content = await self._cache.get(cache_key)
+        if cached_content is not None:
+            logger.debug(f"Page cache hit for {url[:50]}...")
+            return cached_content
+
+        # Fetch fresh content
+        response = await self._rate_limited_request(url)
+        if response and response.status_code == 200:
+            content = response.text
+            await self._cache.set(cache_key, content, ttl=self.PAGE_CACHE_TTL)
+            return content
+
+        return None
+
     async def _check_robots_txt(self, url: str) -> bool:
-        """Check if scraping is allowed by robots.txt."""
+        """Check if scraping is allowed by robots.txt (cached 24 hours)."""
         domain = urlparse(url).netloc
-        
-        # Check cache
-        if domain in self._robots_cache:
-            return self._robots_cache[domain]
-        
+        cache_key = f"robots:{domain}"
+
+        # Check cache first
+        cached_result = await self._cache.get(cache_key)
+        if cached_result is not None:
+            logger.debug(f"Robots.txt cache hit for {domain}: {cached_result}")
+            return cached_result
+
         try:
             robots_url = f"https://{domain}/robots.txt"
             response = await self._rate_limited_request(robots_url)
-            
+
             if response is None or response.status_code != 200:
                 # No robots.txt or error - assume allowed
-                self._robots_cache[domain] = True
+                await self._cache.set(cache_key, True, ttl=self.ROBOTS_CACHE_TTL)
                 return True
-            
+
             # Simple robots.txt parsing
             content = response.text.lower()
-            
+
             # Check for disallow all
             if "disallow: /" in content and "user-agent: *" in content:
                 # Check if there's a specific allow for our paths
                 if "allow:" in content:
-                    self._robots_cache[domain] = True
+                    await self._cache.set(cache_key, True, ttl=self.ROBOTS_CACHE_TTL)
                     return True
-                self._robots_cache[domain] = False
+                await self._cache.set(cache_key, False, ttl=self.ROBOTS_CACHE_TTL)
                 return False
-            
-            self._robots_cache[domain] = True
+
+            await self._cache.set(cache_key, True, ttl=self.ROBOTS_CACHE_TTL)
             return True
-        
+
         except Exception as e:
             logger.warning(f"Error checking robots.txt for {domain}: {e}")
-            # Assume allowed on error
-            self._robots_cache[domain] = True
+            # Assume allowed on error, but don't cache errors
             return True
     
     def is_applicable(self, context: InvestorContext) -> Tuple[bool, str]:
@@ -244,43 +270,42 @@ class WebsiteStrategy(BaseStrategy):
                 )
             
             reasoning_parts.append("robots.txt allows scraping")
-            
-            # Step 2: Fetch homepage
-            homepage_response = await self._rate_limited_request(website_url)
+
+            # Step 2: Fetch homepage (cached)
+            homepage_content = await self._fetch_page_cached(website_url)
             requests_made += 1
-            
-            if homepage_response is None or homepage_response.status_code != 200:
-                status = homepage_response.status_code if homepage_response else "timeout"
-                reasoning_parts.append(f"Homepage fetch failed: {status}")
+
+            if homepage_content is None:
+                reasoning_parts.append("Homepage fetch failed")
                 return self._create_result(
                     success=False,
-                    error_message=f"Failed to fetch homepage: {status}",
+                    error_message="Failed to fetch homepage",
                     reasoning="\n".join(reasoning_parts),
                     requests_made=requests_made
                 )
-            
+
             reasoning_parts.append("Homepage fetched successfully")
-            
+
             # Step 3: Find portfolio links
-            portfolio_links = self._find_portfolio_links(homepage_response.text, website_url)
+            portfolio_links = self._find_portfolio_links(homepage_content, website_url)
             reasoning_parts.append(f"Found {len(portfolio_links)} potential portfolio links")
-            
+
             if not portfolio_links:
                 # No portfolio links found on homepage - still try to extract from homepage
-                homepage_companies = self._extract_companies_from_page(homepage_response.text, website_url)
+                homepage_companies = self._extract_companies_from_page(homepage_content, website_url)
                 if homepage_companies:
                     companies.extend(homepage_companies)
                     reasoning_parts.append(f"Extracted {len(homepage_companies)} companies from homepage")
-            
-            # Step 4: Scrape portfolio pages (up to MAX_PAGES)
+
+            # Step 4: Scrape portfolio pages (up to MAX_PAGES, with caching)
             pages_scraped = 0
             for link in portfolio_links[:self.MAX_PAGES_PER_INVESTOR]:
-                page_response = await self._rate_limited_request(link)
+                page_content = await self._fetch_page_cached(link)
                 requests_made += 1
                 pages_scraped += 1
-                
-                if page_response and page_response.status_code == 200:
-                    page_companies = self._extract_companies_from_page(page_response.text, link)
+
+                if page_content:
+                    page_companies = self._extract_companies_from_page(page_content, link)
                     companies.extend(page_companies)
                     reasoning_parts.append(f"Extracted {len(page_companies)} companies from {link}")
             

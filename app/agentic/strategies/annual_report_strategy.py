@@ -13,6 +13,7 @@ Implementation:
 - Store with source_type='annual_report', confidence_level='high'
 """
 import asyncio
+import hashlib
 import io
 import logging
 import re
@@ -31,6 +32,7 @@ except ImportError:
 
 from bs4 import BeautifulSoup
 
+from app.agentic.cache import get_cache, url_to_cache_key
 from app.agentic.strategies.base import BaseStrategy, InvestorContext, StrategyResult
 
 logger = logging.getLogger(__name__)
@@ -55,10 +57,13 @@ class AnnualReportStrategy(BaseStrategy):
     max_requests_per_second = 0.5
     max_concurrent_requests = 1
     timeout_seconds = 300
-    
+
     # PDF download limits
     MAX_PDF_SIZE_MB = 50
     MAX_PAGES_TO_SCAN = 100
+
+    # Cache TTLs
+    PDF_CACHE_TTL = 86400  # 24 hours for parsed PDF results
     
     # Keywords to find annual report links
     REPORT_KEYWORDS = [
@@ -82,6 +87,7 @@ class AnnualReportStrategy(BaseStrategy):
         self._client: Optional[httpx.AsyncClient] = None
         self._rate_limiter = asyncio.Semaphore(1)
         self._last_request_time: Dict[str, float] = {}
+        self._cache = get_cache()  # Use shared cache for PDF results
     
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None:
@@ -212,23 +218,35 @@ class AnnualReportStrategy(BaseStrategy):
                     requests_made=requests_made
                 )
             
-            # Step 2: Download and parse PDFs (try up to 2)
+            # Step 2: Download and parse PDFs (try up to 2, with caching)
             for pdf_url in report_links[:2]:
+                # Check cache first for this PDF
+                cache_key = url_to_cache_key(pdf_url, prefix="pdf_holdings")
+                cached_holdings = await self._cache.get(cache_key)
+
+                if cached_holdings is not None:
+                    reasoning_parts.append(f"Cache hit for PDF: {pdf_url[:60]}...")
+                    companies.extend(cached_holdings)
+                    reasoning_parts.append(f"Retrieved {len(cached_holdings)} cached holdings")
+                    break
+
                 reasoning_parts.append(f"Downloading PDF: {pdf_url[:80]}...")
-                
+
                 pdf_content = await self._download_pdf(pdf_url)
                 requests_made += 1
-                
+
                 if not pdf_content:
                     reasoning_parts.append("PDF download failed, trying next")
                     continue
-                
+
                 # Step 3: Extract text and find portfolio section
                 holdings = self._extract_holdings_from_pdf(pdf_content, pdf_url)
-                
+
                 if holdings:
+                    # Cache the parsed results
+                    await self._cache.set(cache_key, holdings, ttl=self.PDF_CACHE_TTL)
                     companies.extend(holdings)
-                    reasoning_parts.append(f"Extracted {len(holdings)} holdings from PDF")
+                    reasoning_parts.append(f"Extracted {len(holdings)} holdings from PDF (cached)")
                     break
                 else:
                     reasoning_parts.append("No holdings found in this PDF")
