@@ -1,139 +1,242 @@
-# Parallel Development Coordination
+# Parallel Work Queue
 
-> **Both tabs: Read this file before making changes. Update your status when done.**
+> **Agents: Read this file first. Claim an unclaimed task, update status, then execute.**
 
 ---
 
-## Workflow Reminder
+## How It Works
 
 ```
-1. PLAN      → Write plan to this file, wait for user approval
-2. EXECUTE   → Only after user says "approved"
-3. TEST      → Docker rebuild, curl endpoints
-4. FIX       → If needed
-5. INTEGRATE → Tab 1 updates main.py (if needed)
-6. COMMIT    → Tab 1 commits all
-7. PUSH      → Tab 1 pushes
+1. READ    → Check the task queue below
+2. CLAIM   → Find a task with status "NOT_STARTED", change to "IN_PROGRESS [Agent X]"
+3. PLAN    → Write plan in docs/plans/PLAN_XXX_<name>.md (if needed)
+4. EXECUTE → Only touch files in YOUR task's scope
+5. TEST    → docker compose up -d --build, curl endpoints
+6. DONE    → Mark status "COMPLETE", update Communication Log
 ```
 
+**Rules:**
+- Only work on ONE task at a time
+- Don't touch files owned by other tasks
+- If task depends on another, wait for it to complete
+- Tab 1 / first agent handles final integration commits
+
 ---
 
-## Current Sprint: Agentic Portfolio Enhancements
+## Task Queue
 
-### TAB 1 - LLM Integration + Ticker Resolution
-**Status:** COMPLETE
-**Plan:** [PLAN_003_agentic_enhancements_tab1.md](docs/plans/PLAN_003_agentic_enhancements_tab1.md)
+| ID | Task | Status | Agent | Files (Scope) | Dependencies |
+|----|------|--------|-------|---------------|--------------|
+| T01 | Retry Handler with Exponential Backoff | NOT_STARTED | - | `app/agentic/retry_handler.py`, `app/agentic/strategies/base.py` | None |
+| T02 | Fuzzy Matching for Deduplication | NOT_STARTED | - | `app/agentic/fuzzy_matcher.py`, `app/agentic/synthesizer.py` | None |
+| T03 | Response Caching Layer | NOT_STARTED | - | `app/agentic/cache.py`, `app/agentic/strategies/website_strategy.py` | None |
+| T04 | Unit Tests for LLM Client | NOT_STARTED | - | `tests/test_llm_client.py` | None |
+| T05 | Unit Tests for Ticker Resolver | NOT_STARTED | - | `tests/test_ticker_resolver.py` | None |
+| T06 | Metrics/Monitoring for Agentic Jobs | NOT_STARTED | - | `app/agentic/metrics.py`, `app/api/v1/agentic_research.py` (metrics endpoint only) | None |
+| T07 | Scheduled Portfolio Updates | NOT_STARTED | - | `app/agentic/scheduler.py` | None |
+| T08 | Portfolio Export to CSV/Excel | NOT_STARTED | - | `app/agentic/exporter.py`, `app/api/v1/agentic_research.py` (export endpoint only) | None |
+| T09 | Annual Report Strategy - PDF Caching | NOT_STARTED | - | `app/agentic/strategies/annual_report_strategy.py` | T03 |
+| T10 | Website Strategy - JS Rendering Support | NOT_STARTED | - | `app/agentic/strategies/website_strategy.py` | None |
 
-**Owner files (ONLY touch these):**
-- `app/agentic/llm_client.py` (create)
-- `app/agentic/ticker_resolver.py` (create)
-- `app/agentic/strategies/news_strategy.py` (modify)
-- `app/agentic/strategies/sec_13f_strategy.py` (modify)
-- `app/core/config.py` (modify - LLM settings only)
+---
+
+## Task Details
+
+### T01: Retry Handler with Exponential Backoff
+**Goal:** Add robust retry logic for all HTTP requests in strategies.
 
 **Scope:**
-1. Create LLM client wrapper (OpenAI + Anthropic support)
-2. Wire LLM to news_strategy.py for article extraction
-3. Create ticker resolver using yfinance
-4. Update SEC 13F strategy to resolve tickers to company names
+- Create `app/agentic/retry_handler.py` with:
+  - Async retry decorator
+  - Exponential backoff with jitter
+  - Max retries config (default 3)
+  - Circuit breaker for persistent failures
+  - Special handling for HTTP 429
+- Update `app/agentic/strategies/base.py` to use retry handler
+
+**Plan:** `docs/plans/PLAN_T01_retry_handler.md`
 
 ---
 
-### TAB 2 - Error Handling + Fuzzy Matching + Caching
-**Status:** PENDING_APPROVAL
-**Plan:** [PLAN_004_agentic_enhancements_tab2.md](docs/plans/PLAN_004_agentic_enhancements_tab2.md)
-
-**Owner files (ONLY touch these):**
-- `app/agentic/retry_handler.py` (create)
-- `app/agentic/fuzzy_matcher.py` (create)
-- `app/agentic/cache.py` (create)
-- `app/agentic/strategies/base.py` (modify)
-- `app/agentic/synthesizer.py` (modify)
-- `app/agentic/strategies/website_strategy.py` (modify)
-- `app/agentic/strategies/annual_report_strategy.py` (modify)
+### T02: Fuzzy Matching for Deduplication
+**Goal:** Improve company name matching using string similarity.
 
 **Scope:**
-1. Create retry handler with exponential backoff
-2. Add fuzzy matching for better deduplication
-3. Create caching layer for expensive operations
+- Create `app/agentic/fuzzy_matcher.py` with:
+  - Levenshtein distance calculation
+  - Configurable similarity threshold (default 0.85)
+  - Company name normalization
+  - Batch matching support
+- Update `app/agentic/synthesizer.py` to use fuzzy matching in deduplication
+
+**Plan:** `docs/plans/PLAN_T02_fuzzy_matcher.md`
 
 ---
 
-## PLANS (Stored in docs/plans/)
+### T03: Response Caching Layer
+**Goal:** Cache expensive HTTP responses to reduce API calls.
 
-| Plan | File | Status | Approved |
-|------|------|--------|----------|
-| Tab 1: Export & Integration | [PLAN_001](docs/plans/PLAN_001_export_integration.md) | COMPLETE | [x] |
-| Tab 2: USPTO Patents | [PLAN_002](docs/plans/PLAN_002_uspto_patents.md) | SKIPPED | [ ] |
-| Tab 1: LLM + Ticker | [PLAN_003](docs/plans/PLAN_003_agentic_enhancements_tab1.md) | APPROVED | [x] |
-| Tab 2: Retry + Fuzzy + Cache | [PLAN_004](docs/plans/PLAN_004_agentic_enhancements_tab2.md) | APPROVED | [x] |
+**Scope:**
+- Create `app/agentic/cache.py` with:
+  - In-memory TTL cache (fallback)
+  - Optional Redis backend
+  - Cache decorator for async functions
+  - Key generation helpers
+- Update `app/agentic/strategies/website_strategy.py` to cache pages
 
-**Instructions:**
-1. Read your assigned plan file
-2. Wait for user to check the box [x] in this table
-3. Only then start coding
-4. Update status after each phase
+**Plan:** `docs/plans/PLAN_T03_cache.md`
 
 ---
 
-## Status Updates
+### T04: Unit Tests for LLM Client
+**Goal:** Test LLM client with mocked responses.
 
-| Tab | Phase | Status | Last Updated | Notes |
-|-----|-------|--------|--------------|-------|
-| Tab 1 | TEST | COMPLETE | 2026-01-14 | LLM client + Ticker resolver done |
-| Tab 2 | EXECUTE | IN_PROGRESS | 2026-01-14 | Retry + Fuzzy + Cache |
+**Scope:**
+- Create `tests/test_llm_client.py` with:
+  - Test OpenAI completion (mocked)
+  - Test Anthropic completion (mocked)
+  - Test retry logic
+  - Test JSON parsing
+  - Test cost calculation
+
+**Plan:** None needed (straightforward)
 
 ---
 
-## Integration Checklist (After both approved & done)
+### T05: Unit Tests for Ticker Resolver
+**Goal:** Test ticker resolution with mocked yfinance.
 
-- [x] Tab 1 code complete (LLM + Ticker)
-- [ ] Tab 2 code complete (Retry + Fuzzy + Cache)
-- [ ] Docker rebuild successful
-- [ ] All strategies tested
-- [ ] Tab 1 commits all changes
-- [ ] Tab 1 pushes
-- [ ] CI passes
+**Scope:**
+- Create `tests/test_ticker_resolver.py` with:
+  - Test single ticker resolution
+  - Test batch resolution
+  - Test CUSIP fallback
+  - Test cache behavior
+  - Test error handling
+
+**Plan:** None needed (straightforward)
+
+---
+
+### T06: Metrics/Monitoring for Agentic Jobs
+**Goal:** Track success rates, timing, and costs for agentic collection.
+
+**Scope:**
+- Create `app/agentic/metrics.py` with:
+  - Job success/failure counters
+  - Strategy execution times
+  - Token usage tracking
+  - Cost per investor stats
+- Add `GET /api/v1/agentic/metrics` endpoint
+
+**Plan:** `docs/plans/PLAN_T06_metrics.md`
+
+---
+
+### T07: Scheduled Portfolio Updates
+**Goal:** Automatically refresh portfolio data on a schedule.
+
+**Scope:**
+- Create `app/agentic/scheduler.py` with:
+  - Integration with existing APScheduler
+  - Quarterly refresh for all investors
+  - Priority queue for stale data
+  - Incremental updates (only new data)
+
+**Plan:** `docs/plans/PLAN_T07_scheduler.md`
+
+---
+
+### T08: Portfolio Export to CSV/Excel
+**Goal:** Export portfolio data for analysis.
+
+**Scope:**
+- Create `app/agentic/exporter.py` with:
+  - Export to CSV
+  - Export to Excel (with formatting)
+  - Include all portfolio fields
+  - Optional filters
+- Add `GET /api/v1/agentic/portfolio/{id}/export` endpoint
+
+**Plan:** `docs/plans/PLAN_T08_exporter.md`
+
+---
+
+### T09: Annual Report Strategy - PDF Caching
+**Goal:** Cache parsed PDF results to avoid re-parsing.
+
+**Scope:**
+- Update `app/agentic/strategies/annual_report_strategy.py` to:
+  - Use cache layer from T03
+  - Cache by URL hash
+  - 24-hour TTL
+
+**Dependencies:** T03 must be complete first.
+
+**Plan:** None needed (small change)
+
+---
+
+### T10: Website Strategy - JS Rendering Support
+**Goal:** Handle JavaScript-rendered pages with Playwright.
+
+**Scope:**
+- Update `app/agentic/strategies/website_strategy.py` to:
+  - Detect JS-heavy pages
+  - Use Playwright for rendering
+  - Fallback to httpx for static pages
+
+**Plan:** `docs/plans/PLAN_T10_js_rendering.md`
 
 ---
 
 ## Communication Log
 
 ```
-[TAB 1] Export feature COMPLETE and pushed (790ca0e)
-[TAB 1] New sprint: Agentic enhancements
-[TAB 1] PLAN_003 written - LLM Integration + Ticker Resolution
-[TAB 2] PLAN_004 written - Error Handling + Fuzzy Matching + Caching
-[TAB 1] COMPLETE - llm_client.py, ticker_resolver.py created
-[TAB 1] COMPLETE - news_strategy.py and sec_13f_strategy.py updated
-[TAB 1] Waiting for Tab 2 to complete
+[SYSTEM] Parallel work queue initialized with 10 tasks
+[SYSTEM] Previous work: Export (790ca0e), USPTO (6e305f6), LLM+Ticker (bce50d5)
 ```
 
 ---
 
-## File Ownership Summary (NO OVERLAP)
+## Completed Tasks
 
-| File | Tab 1 | Tab 2 |
-|------|-------|-------|
-| `app/agentic/llm_client.py` | ✅ | ❌ |
-| `app/agentic/ticker_resolver.py` | ✅ | ❌ |
-| `app/agentic/strategies/news_strategy.py` | ✅ | ❌ |
-| `app/agentic/strategies/sec_13f_strategy.py` | ✅ | ❌ |
-| `app/core/config.py` | ✅ (LLM only) | ❌ |
-| `app/agentic/retry_handler.py` | ❌ | ✅ |
-| `app/agentic/fuzzy_matcher.py` | ❌ | ✅ |
-| `app/agentic/cache.py` | ❌ | ✅ |
-| `app/agentic/strategies/base.py` | ❌ | ✅ |
-| `app/agentic/synthesizer.py` | ❌ | ✅ |
-| `app/agentic/strategies/website_strategy.py` | ❌ | ✅ |
-| `app/agentic/strategies/annual_report_strategy.py` | ❌ | ✅ |
+| ID | Task | Completed By | Commit |
+|----|------|--------------|--------|
+| - | Data Export Service | Tab 1 | 790ca0e |
+| - | USPTO Patent Data Source | Tab 2 | 6e305f6 |
+| - | LLM Client + Ticker Resolver | Tab 1 | bce50d5 |
 
 ---
 
-## Rules
+## Instructions for New Agents
 
-1. **Read your PLAN file before starting**
-2. **Wait for user to say "approved" before coding**
-3. **Only touch files in YOUR section**
-4. **Update status after each phase**
-5. **Tab 1 handles final commit and push**
+1. **Read this entire file**
+2. **Find a task with status `NOT_STARTED`** in the Task Queue table
+3. **Claim it** by changing status to `IN_PROGRESS [Your ID]` (e.g., `IN_PROGRESS [Agent-3]`)
+4. **Check Dependencies** - if task depends on another, wait for it
+5. **Read the Task Details section** for your task
+6. **Create a plan file** if indicated (or skip if "None needed")
+7. **Execute the task** - only touch files in your scope
+8. **Test thoroughly** - `docker compose up -d --build`
+9. **Mark as COMPLETE** when done
+10. **Add entry to Communication Log**
+
+---
+
+## File Ownership Quick Reference
+
+| File | Owner Task |
+|------|------------|
+| `app/agentic/retry_handler.py` | T01 |
+| `app/agentic/strategies/base.py` | T01 |
+| `app/agentic/fuzzy_matcher.py` | T02 |
+| `app/agentic/synthesizer.py` | T02 |
+| `app/agentic/cache.py` | T03 |
+| `app/agentic/strategies/website_strategy.py` | T03, T10 |
+| `tests/test_llm_client.py` | T04 |
+| `tests/test_ticker_resolver.py` | T05 |
+| `app/agentic/metrics.py` | T06 |
+| `app/agentic/scheduler.py` | T07 |
+| `app/agentic/exporter.py` | T08 |
+| `app/agentic/strategies/annual_report_strategy.py` | T09 |
