@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.agentic.portfolio_agent import PortfolioResearchAgent, InvestorContext
+from app.agentic.metrics import get_metrics_collector
 
 logger = logging.getLogger(__name__)
 
@@ -916,7 +917,7 @@ async def get_investor_themes(
 async def get_portfolio_stats(db: Session = Depends(get_db)):
     """
     📊 Get overall portfolio collection statistics.
-    
+
     Returns:
     - Total LPs and FOs with portfolio data
     - Total companies tracked
@@ -927,45 +928,45 @@ async def get_portfolio_stats(db: Session = Depends(get_db)):
         # Count investors with portfolio data
         lp_count = db.execute(
             text("""
-                SELECT COUNT(DISTINCT investor_id) 
-                FROM portfolio_companies 
+                SELECT COUNT(DISTINCT investor_id)
+                FROM portfolio_companies
                 WHERE investor_type = 'lp'
             """)
         ).fetchone()[0]
-        
+
         fo_count = db.execute(
             text("""
-                SELECT COUNT(DISTINCT investor_id) 
-                FROM portfolio_companies 
+                SELECT COUNT(DISTINCT investor_id)
+                FROM portfolio_companies
                 WHERE investor_type = 'family_office'
             """)
         ).fetchone()[0]
-        
+
         # Total companies
         total_companies = db.execute(
             text("SELECT COUNT(*) FROM portfolio_companies")
         ).fetchone()[0]
-        
+
         # Source breakdown
         source_breakdown = db.execute(
             text("""
-                SELECT source_type, COUNT(*) 
-                FROM portfolio_companies 
+                SELECT source_type, COUNT(*)
+                FROM portfolio_companies
                 GROUP BY source_type
             """)
         ).fetchall()
-        
+
         # Job statistics
         job_stats = db.execute(
             text("""
-                SELECT 
+                SELECT
                     status, COUNT(*) as count,
                     AVG(companies_found) as avg_companies
                 FROM agentic_collection_jobs
                 GROUP BY status
             """)
         ).fetchall()
-        
+
         return {
             "coverage": {
                 "lps_with_data": lp_count,
@@ -981,7 +982,137 @@ async def get_portfolio_stats(db: Session = Depends(get_db)):
                 for row in job_stats
             }
         }
-    
+
     except Exception as e:
         logger.error(f"Error getting portfolio stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/metrics", response_model=dict)
+async def get_agentic_metrics():
+    """
+    📈 Get real-time metrics for agentic collection system.
+
+    Returns comprehensive metrics including:
+    - **Job metrics**: Success/failure rates, throughput, duration
+    - **Strategy metrics**: Per-strategy performance and costs
+    - **Resource usage**: Token consumption, API costs
+    - **Active jobs**: Currently running collection jobs
+
+    This endpoint is designed for monitoring dashboards and alerting systems.
+
+    **Example Response:**
+    ```json
+    {
+        "uptime_seconds": 3600,
+        "jobs": {
+            "total_jobs": 100,
+            "by_status": {"pending": 2, "running": 3, "successful": 90, "failed": 5},
+            "success_rate": 94.74,
+            "avg_duration_seconds": 45.2
+        },
+        "strategies": {
+            "sec_13f": {"executions": 50, "success_rate": 98.0, ...},
+            "website_scraping": {"executions": 80, "success_rate": 85.0, ...}
+        },
+        "summary": {
+            "total_companies_found": 5000,
+            "total_cost_usd": 12.50,
+            "avg_cost_per_job": 0.125
+        }
+    }
+    ```
+    """
+    try:
+        metrics = get_metrics_collector()
+        return metrics.get_metrics()
+    except Exception as e:
+        logger.error(f"Error getting metrics: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/metrics/strategy/{strategy_name}", response_model=dict)
+async def get_strategy_metrics(strategy_name: str):
+    """
+    📊 Get detailed metrics for a specific collection strategy.
+
+    **Available strategies:**
+    - `sec_13f`: SEC 13F filing extraction
+    - `website_scraping`: Website portfolio page scraping
+    - `annual_report_pdf`: PDF annual report parsing
+
+    Returns:
+    - Execution count and success rate
+    - Average duration and companies found
+    - Token usage and costs
+    """
+    try:
+        metrics = get_metrics_collector()
+        strategy_metrics = metrics.get_strategy_metrics(strategy_name)
+
+        if not strategy_metrics:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No metrics found for strategy: {strategy_name}"
+            )
+
+        return strategy_metrics
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting strategy metrics: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/metrics/investor/{investor_id}", response_model=dict)
+async def get_investor_collection_metrics(
+    investor_id: int,
+    investor_type: str = Query(..., description="'lp' or 'family_office'")
+):
+    """
+    💰 Get collection metrics for a specific investor.
+
+    Returns:
+    - Number of collection jobs run
+    - Last collection date
+    - Total companies collected
+    - Total collection cost
+    - Strategies used
+    """
+    try:
+        metrics = get_metrics_collector()
+        investor_metrics = metrics.get_investor_metrics(investor_id, investor_type)
+
+        if not investor_metrics:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No metrics found for {investor_type} {investor_id}"
+            )
+
+        return investor_metrics
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting investor metrics: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/metrics/top-cost-investors", response_model=dict)
+async def get_top_cost_investors(limit: int = Query(10, ge=1, le=100)):
+    """
+    💸 Get investors with highest collection costs.
+
+    Useful for identifying expensive data collection patterns
+    and optimizing resource usage.
+    """
+    try:
+        metrics = get_metrics_collector()
+        top_investors = metrics.get_top_investors_by_cost(limit)
+
+        return {
+            "limit": limit,
+            "investors": top_investors
+        }
+    except Exception as e:
+        logger.error(f"Error getting top cost investors: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
