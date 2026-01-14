@@ -448,7 +448,13 @@ class Settings(BaseSettings):
         default=None,
         description="Foursquare Places API key for POI data"
     )
-    
+
+    # USPTO PatentsView API (Required for patent data)
+    uspto_patentsview_api_key: Optional[str] = Field(
+        default=None,
+        description="USPTO PatentsView API key for patent data"
+    )
+
     # Google Popular Times scraping (Free but ToS risk)
     foot_traffic_enable_google_scraping: bool = Field(
         default=False,
@@ -652,6 +658,7 @@ class Settings(BaseSettings):
         "foursquare": ("foursquare_api_key", "https://developer.foursquare.com/"),
         "openai": ("openai_api_key", "https://platform.openai.com/api-keys"),
         "anthropic": ("anthropic_api_key", "https://console.anthropic.com/"),
+        "uspto": ("uspto_patentsview_api_key", "https://patentsview-support.atlassian.net/servicedesk/customer/portal/1"),
     }
 
     def get_api_key(self, source: str, required: bool = False) -> Optional[str]:

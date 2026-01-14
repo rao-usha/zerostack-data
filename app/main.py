@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export
+from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto
 
 # Configure logging
 logging.basicConfig(
@@ -711,6 +711,10 @@ Browse the endpoint sections below to see what's available:
         {
             "name": "export",
             "description": "📤 **Data Export** - Export table data to CSV, JSON, or Parquet files"
+        },
+        {
+            "name": "uspto",
+            "description": "🔬 **USPTO Patent Data** - US patent search, inventors, assignees, and CPC classifications via PatentsView API"
         }
     ]
 )
@@ -763,6 +767,7 @@ app.include_router(data_quality.router, prefix="/api/v1")
 app.include_router(templates.router, prefix="/api/v1")
 app.include_router(lineage.router, prefix="/api/v1")
 app.include_router(export.router, prefix="/api/v1")
+app.include_router(uspto.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])
@@ -776,7 +781,7 @@ def root():
         "service": "External Data Ingestion Service",
         "version": "0.1.0",
         "status": "running",
-        "sources": ["census", "fred", "eia", "sec", "realestate", "noaa", "cms", "kaggle", "international_econ", "fbi_crime", "bts", "bea", "fema", "data_commons", "yelp", "us_trade", "cftc_cot", "usda", "bls", "fcc_broadband", "treasury", "fdic", "irs_soi", "agentic_portfolio", "foot_traffic", "prediction_markets"],
+        "sources": ["census", "fred", "eia", "sec", "realestate", "noaa", "cms", "kaggle", "international_econ", "fbi_crime", "bts", "bea", "fema", "data_commons", "yelp", "us_trade", "cftc_cot", "usda", "bls", "fcc_broadband", "treasury", "fdic", "irs_soi", "agentic_portfolio", "foot_traffic", "prediction_markets", "uspto"],
         "documentation": {
             "swagger_ui": "/docs",
             "redoc": "/redoc",

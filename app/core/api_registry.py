@@ -382,6 +382,21 @@ API_REGISTRY: Dict[str, APIConfig] = {
         rate_limit_per_minute=100,
         notes="POI data. Free tier available."
     ),
+
+    # -------------------------------------------------------------------------
+    # PATENTS
+    # -------------------------------------------------------------------------
+    "uspto": APIConfig(
+        source_name="uspto",
+        base_url="https://search.patentsview.org/api/v1",
+        api_key_requirement=APIKeyRequirement.REQUIRED,
+        config_key="uspto_patentsview_api_key",
+        signup_url="https://patentsview-support.atlassian.net/servicedesk/customer/portal/1/group/1/create/18",
+        max_concurrency=2,
+        rate_limit_per_minute=45,
+        timeout_seconds=60.0,
+        notes="PatentsView API. 45 req/min, max 1000 records/request. Free API key required."
+    ),
 }
 
 

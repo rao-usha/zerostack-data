@@ -11,7 +11,7 @@ This file tracks multiple parallel implementation efforts being worked on simult
 | Plan | Description | Status | Assigned |
 |------|-------------|--------|----------|
 | [PLAN_001](PLAN_001_export_integration.md) | Export & Integration | PENDING_APPROVAL | Tab 1 |
-| [PLAN_002](PLAN_002_uspto_patents.md) | USPTO Patent Data Source | APPROVED | Tab 2 |
+| [PLAN_002](PLAN_002_uspto_patents.md) | USPTO Patent Data Source | COMPLETED | Tab 2 |
 
 ---
 
@@ -40,12 +40,29 @@ Summary: Enable users to export ingested data from PostgreSQL tables to CSV, JSO
 
 ## Plan 002: USPTO Patent Data Source
 
-**Status:** APPROVED
+**Status:** COMPLETED
 **Assigned:** Tab 2
 
 Summary: Integrate USPTO PatentsView API to ingest US patent data including patents, inventors, assignees, and classifications.
 
-**Last Update:** User approved (2026-01-14). Ready to implement.
+**Last Update:** Implementation completed (2026-01-14).
+
+**Files Created:**
+- `app/sources/uspto/__init__.py` - Module init
+- `app/sources/uspto/client.py` - PatentsView API client
+- `app/sources/uspto/metadata.py` - Field definitions and CPC mappings
+- `app/sources/uspto/ingest.py` - Ingestion logic
+- `app/api/v1/uspto.py` - REST API endpoints
+
+**API Endpoints:**
+- `GET /api/v1/uspto/patents` - Search patents
+- `GET /api/v1/uspto/patents/{id}` - Get patent
+- `GET /api/v1/uspto/assignees` - Search assignees
+- `GET /api/v1/uspto/inventors` - Search inventors
+- `GET /api/v1/uspto/cpc-codes` - Get CPC codes
+- `POST /api/v1/uspto/ingest/assignee` - Ingest by assignee
+- `POST /api/v1/uspto/ingest/cpc` - Ingest by CPC code
+- `POST /api/v1/uspto/ingest/search` - Ingest by search query
 
 ---
 
