@@ -30,7 +30,7 @@
 | T01 | Retry Handler with Exponential Backoff | COMPLETE | Tab 1 | `app/agentic/retry_handler.py`, `app/agentic/strategies/base.py` | None |
 | T02 | Fuzzy Matching for Deduplication | COMPLETE | Tab 1 | `app/agentic/fuzzy_matcher.py`, `app/agentic/synthesizer.py` | None |
 | T03 | Response Caching Layer | COMPLETE | Tab 1 | `app/agentic/cache.py`, `app/agentic/strategies/website_strategy.py` | None |
-| T04 | Unit Tests for LLM Client | IN_PROGRESS [Tab 1] | Tab 1 | `tests/test_llm_client.py` | None |
+| T04 | Unit Tests for LLM Client | COMPLETE | Tab 1 | `tests/test_llm_client.py` | None |
 | T05 | Unit Tests for Ticker Resolver | COMPLETE | Agent-T05 | `tests/test_ticker_resolver.py` | None |
 | T06 | Metrics/Monitoring for Agentic Jobs | NOT_STARTED | - | `app/agentic/metrics.py`, `app/api/v1/agentic_research.py` (metrics endpoint only) | None |
 | T07 | Scheduled Portfolio Updates | NOT_STARTED | - | `app/agentic/scheduler.py` | None |
@@ -198,6 +198,7 @@
 [Tab 1] Completed T01, T02, T03, T09 as part of Plan 004 (Agentic Enhancements)
 [Agent-T01] Verified T01 implementation: retry_handler.py + base.py integration. Docker build OK.
 [Agent-T05] T05 COMPLETE: Created tests/test_ticker_resolver.py with 48 tests (all passing). Covers: normalize_ticker, resolve_ticker_sync, resolve_ticker async, batch resolution, CUSIP fallback via SEC EDGAR, TickerResolver.resolve_holdings, cache behavior, and error handling. All mocked (yfinance, httpx).
+[Tab 1] T04 COMPLETE: Created tests/test_llm_client.py with 36 tests (34 passed, 2 skipped). Covers: LLMResponse, OpenAI/Anthropic completion, retry logic, JSON parsing, cost calculation, token tracking.
 ```
 
 ---
@@ -214,6 +215,7 @@
 | T03 | Response Caching Layer | Tab 1 | (Plan 004) |
 | T09 | Annual Report PDF Caching | Tab 1 | (Plan 004) |
 | T05 | Unit Tests for Ticker Resolver | Agent-T05 | (not committed) |
+| T04 | Unit Tests for LLM Client | Tab 1 | (pending) |
 
 ---
 
