@@ -1881,3 +1881,245 @@ class TemplateExecution(Base):
             f"<TemplateExecution(id={self.id}, template='{self.template_name}', "
             f"status='{self.status}', progress={self.completed_jobs}/{self.total_jobs})>"
         )
+
+
+# =============================================================================
+# Data Lineage Tracking
+# =============================================================================
+
+class LineageNodeType(str, enum.Enum):
+    """Types of nodes in the lineage graph."""
+    EXTERNAL_API = "external_api"  # External data source (Census, FRED, etc.)
+    DATABASE_TABLE = "database_table"  # PostgreSQL table
+    INGESTION_JOB = "ingestion_job"  # Job that moved/transformed data
+    DATASET = "dataset"  # Logical dataset (may span multiple tables)
+    FILE = "file"  # File export (CSV, Parquet, etc.)
+    TRANSFORMATION = "transformation"  # Data transformation step
+
+
+class LineageEdgeType(str, enum.Enum):
+    """Types of relationships between lineage nodes."""
+    PRODUCES = "produces"  # Job produces dataset
+    CONSUMES = "consumes"  # Job consumes from source
+    DERIVES_FROM = "derives_from"  # Dataset derived from another
+    STORED_IN = "stored_in"  # Data stored in table
+    EXPORTED_TO = "exported_to"  # Data exported to file
+
+
+class LineageNode(Base):
+    """
+    Represents a node in the data lineage graph.
+
+    Nodes can be data sources, tables, jobs, or transformations.
+    """
+    __tablename__ = "lineage_nodes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Node identification
+    node_type = Column(
+        Enum(LineageNodeType, native_enum=False, length=30),
+        nullable=False,
+        index=True
+    )
+    node_id = Column(String(255), nullable=False)  # Unique identifier within type
+    name = Column(String(255), nullable=False)  # Human-readable name
+
+    # Metadata
+    description = Column(Text, nullable=True)
+    properties = Column(JSON, nullable=True)  # Type-specific properties
+    # For EXTERNAL_API: {"source": "census", "endpoint": "/acs5"}
+    # For DATABASE_TABLE: {"schema": "public", "table": "fred_series", "columns": [...]}
+    # For INGESTION_JOB: {"job_id": 123, "source": "fred", "config": {...}}
+
+    # Source tracking
+    source = Column(String(50), nullable=True, index=True)  # Data source name
+
+    # Versioning
+    version = Column(Integer, nullable=False, default=1)
+    is_current = Column(Integer, nullable=False, default=1)  # Is this the current version
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('node_type', 'node_id', 'version', name='uq_lineage_node'),
+        Index('idx_lineage_node_type_id', 'node_type', 'node_id'),
+        Index('idx_lineage_node_source', 'source'),
+    )
+
+    def __repr__(self) -> str:
+        return f"<LineageNode(id={self.id}, type={self.node_type.value}, name='{self.name}')>"
+
+
+class LineageEdge(Base):
+    """
+    Represents a directed edge between lineage nodes.
+
+    Edges show data flow and dependencies.
+    """
+    __tablename__ = "lineage_edges"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Edge endpoints
+    source_node_id = Column(Integer, nullable=False, index=True)  # FK to lineage_nodes.id
+    target_node_id = Column(Integer, nullable=False, index=True)  # FK to lineage_nodes.id
+
+    # Relationship type
+    edge_type = Column(
+        Enum(LineageEdgeType, native_enum=False, length=30),
+        nullable=False
+    )
+
+    # Metadata
+    properties = Column(JSON, nullable=True)  # Edge-specific properties
+    # For PRODUCES: {"rows": 1000, "columns": ["col1", "col2"]}
+    # For DERIVES_FROM: {"transformation": "aggregation", "columns_used": [...]}
+
+    # Job reference (if edge created by a job)
+    job_id = Column(Integer, nullable=True, index=True)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('source_node_id', 'target_node_id', 'edge_type', name='uq_lineage_edge'),
+        Index('idx_lineage_edge_source', 'source_node_id'),
+        Index('idx_lineage_edge_target', 'target_node_id'),
+    )
+
+    def __repr__(self) -> str:
+        return f"<LineageEdge(id={self.id}, {self.source_node_id} --{self.edge_type.value}--> {self.target_node_id})>"
+
+
+class LineageEvent(Base):
+    """
+    Records individual lineage events for audit trail.
+
+    Captures every data operation for complete history.
+    """
+    __tablename__ = "lineage_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Event type
+    event_type = Column(String(30), nullable=False, index=True)
+    # Values: 'ingest', 'transform', 'export', 'delete', 'schema_change'
+
+    # Related entities
+    job_id = Column(Integer, nullable=True, index=True)
+    node_id = Column(Integer, nullable=True, index=True)  # FK to lineage_nodes.id
+    source = Column(String(50), nullable=True, index=True)
+
+    # Event details
+    description = Column(Text, nullable=True)
+    properties = Column(JSON, nullable=True)
+    # For ingest: {"rows": 1000, "table": "fred_series", "api_url": "..."}
+    # For schema_change: {"old_columns": [...], "new_columns": [...]}
+
+    # Data quality metrics
+    rows_affected = Column(Integer, nullable=True)
+    bytes_processed = Column(Integer, nullable=True)
+
+    # Error tracking
+    success = Column(Integer, nullable=False, default=1)
+    error_message = Column(Text, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_lineage_event_type', 'event_type'),
+        Index('idx_lineage_event_job', 'job_id'),
+        Index('idx_lineage_event_created', 'created_at'),
+    )
+
+    def __repr__(self) -> str:
+        return f"<LineageEvent(id={self.id}, type='{self.event_type}', job_id={self.job_id})>"
+
+
+class DatasetVersion(Base):
+    """
+    Tracks versions of datasets for historical analysis.
+
+    Each ingestion creates a new version snapshot.
+    """
+    __tablename__ = "dataset_versions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Dataset identification
+    dataset_name = Column(String(255), nullable=False, index=True)  # e.g., "fred_gdp", "census_acs5_b01001"
+    source = Column(String(50), nullable=False, index=True)
+    table_name = Column(String(255), nullable=False)  # Actual database table
+
+    # Version info
+    version = Column(Integer, nullable=False, default=1)
+    is_current = Column(Integer, nullable=False, default=1)
+
+    # Schema snapshot
+    schema_hash = Column(String(64), nullable=True)  # Hash of column definitions
+    schema_definition = Column(JSON, nullable=True)  # Column names, types
+
+    # Statistics
+    row_count = Column(Integer, nullable=True)
+    size_bytes = Column(Integer, nullable=True)
+
+    # Data range (for time-series data)
+    min_date = Column(DateTime, nullable=True)
+    max_date = Column(DateTime, nullable=True)
+
+    # Provenance
+    job_id = Column(Integer, nullable=True, index=True)  # Job that created this version
+    lineage_node_id = Column(Integer, nullable=True)  # FK to lineage_nodes.id
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    superseded_at = Column(DateTime, nullable=True)  # When this version was replaced
+
+    __table_args__ = (
+        UniqueConstraint('dataset_name', 'version', name='uq_dataset_version'),
+        Index('idx_dataset_version_name', 'dataset_name'),
+        Index('idx_dataset_version_source', 'source'),
+        Index('idx_dataset_version_current', 'is_current'),
+    )
+
+    def __repr__(self) -> str:
+        return f"<DatasetVersion(id={self.id}, dataset='{self.dataset_name}', v{self.version}, current={self.is_current})>"
+
+
+class ImpactAnalysis(Base):
+    """
+    Pre-computed impact analysis for schema changes.
+
+    Shows which downstream datasets/jobs would be affected.
+    """
+    __tablename__ = "impact_analysis"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Source of change
+    source_node_id = Column(Integer, nullable=False, index=True)  # FK to lineage_nodes.id
+    source_node_name = Column(String(255), nullable=False)
+
+    # Impacted entity
+    impacted_node_id = Column(Integer, nullable=False, index=True)  # FK to lineage_nodes.id
+    impacted_node_name = Column(String(255), nullable=False)
+    impacted_node_type = Column(String(30), nullable=False)
+
+    # Impact details
+    impact_level = Column(Integer, nullable=False, default=1)  # Hops from source (1=direct, 2=indirect, etc.)
+    impact_path = Column(JSON, nullable=True)  # Path of node IDs from source to impacted
+
+    # Timestamps
+    computed_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_impact_source', 'source_node_id'),
+        Index('idx_impact_impacted', 'impacted_node_id'),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ImpactAnalysis(source='{self.source_node_name}' -> '{self.impacted_node_name}', level={self.impact_level})>"
