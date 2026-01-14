@@ -24,13 +24,8 @@ from app.agentic.strategies.base import BaseStrategy, InvestorContext, StrategyR
 
 logger = logging.getLogger(__name__)
 
-# Try to import OpenAI
-try:
-    import openai
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
-    openai = None
+# Import LLM client
+from app.agentic.llm_client import get_llm_client, LLMClient
 
 
 class NewsStrategy(BaseStrategy):
@@ -88,7 +83,7 @@ Return ONLY the JSON object, no other text."""
         self._client: Optional[httpx.AsyncClient] = None
         self._rate_limiter = asyncio.Semaphore(1)
         self._last_request_time = 0.0
-        self._openai_client = None
+        self._llm_client: Optional[LLMClient] = None
     
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None:
@@ -123,15 +118,11 @@ Return ONLY the JSON object, no other text."""
                 logger.warning(f"Request failed for {url}: {e}")
                 return None
     
-    def _get_openai_client(self):
-        """Get or create OpenAI client."""
-        if self._openai_client is None and OPENAI_AVAILABLE:
-            from app.core.config import get_settings
-            settings = get_settings()
-            api_key = settings.get_openai_api_key()
-            if api_key:
-                self._openai_client = openai.OpenAI(api_key=api_key)
-        return self._openai_client
+    def _get_llm_client(self) -> Optional[LLMClient]:
+        """Get or create LLM client (supports OpenAI and Anthropic)."""
+        if self._llm_client is None:
+            self._llm_client = get_llm_client()
+        return self._llm_client
     
     def is_applicable(self, context: InvestorContext) -> Tuple[bool, str]:
         """
@@ -373,45 +364,38 @@ Return ONLY the JSON object, no other text."""
             return None
     
     async def _extract_with_llm(
-        self, 
-        article_text: str, 
+        self,
+        article_text: str,
         investor_name: str,
         source_url: str
     ) -> Tuple[Optional[Dict], int]:
         """
         Extract investment info using LLM or fallback to pattern matching.
-        
+
         Returns: (extracted_data, tokens_used)
         """
         tokens_used = 0
-        
+
         # Try LLM extraction first
-        client = self._get_openai_client()
-        if client:
+        llm_client = self._get_llm_client()
+        if llm_client and llm_client.is_available:
             try:
                 prompt = self.EXTRACTION_PROMPT.format(
                     investor_name=investor_name,
                     article_text=article_text[:3000]  # Limit for context
                 )
-                
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",  # Cost-effective model
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=500,
-                    temperature=0.1
-                )
-                
-                tokens_used = response.usage.total_tokens if response.usage else 0
-                
-                # Parse response
-                content = response.choices[0].message.content
-                try:
-                    data = json.loads(content)
+
+                response = await llm_client.complete(prompt)
+                tokens_used = response.total_tokens
+
+                # Parse response as JSON
+                data = response.parse_json()
+                if data:
                     investments = data.get('investments', [])
-                    
+
                     companies = []
                     co_investors_all = []
-                    
+
                     for inv in investments:
                         if inv.get('company_name'):
                             companies.append({
@@ -423,7 +407,7 @@ Return ONLY the JSON object, no other text."""
                                 "source_url": source_url,
                                 "current_holding": 1,
                             })
-                            
+
                             # Track co-investors
                             for co_inv in inv.get('co_investors', []):
                                 if co_inv:
@@ -431,15 +415,14 @@ Return ONLY the JSON object, no other text."""
                                         "co_investor_name": co_inv,
                                         "deal_name": inv['company_name']
                                     })
-                    
+
                     return {"companies": companies, "co_investors": co_investors_all}, tokens_used
-                
-                except json.JSONDecodeError:
+                else:
                     logger.warning("LLM returned non-JSON response")
-            
+
             except Exception as e:
                 logger.warning(f"LLM extraction failed: {e}")
-        
+
         # Fallback to pattern matching
         return self._extract_with_patterns(article_text, investor_name, source_url), tokens_used
     

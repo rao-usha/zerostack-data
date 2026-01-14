@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import httpx
 
 from app.agentic.strategies.base import BaseStrategy, InvestorContext, StrategyResult
+from app.agentic.ticker_resolver import TickerResolver
 
 logger = logging.getLogger(__name__)
 
@@ -251,6 +252,20 @@ class SEC13FStrategy(BaseStrategy):
                     "current_holding": 1,
                 }
                 companies.append(company)
+
+            # Step 5: Resolve tickers/CUSIPs to full company names where needed
+            try:
+                resolver = TickerResolver(use_cusip_fallback=True)
+                companies = await resolver.resolve_holdings(
+                    companies,
+                    ticker_field="company_ticker",
+                    cusip_field="company_cusip",
+                    name_field="company_name"
+                )
+                reasoning_parts.append(f"Ticker resolution: {resolver.stats}")
+            except Exception as e:
+                logger.warning(f"Ticker resolution failed: {e}")
+                reasoning_parts.append(f"Ticker resolution skipped: {e}")
             
             reasoning_parts.append(f"Found {len(companies)} holdings from 13F filing dated {most_recent.get('filingDate')}")
             
