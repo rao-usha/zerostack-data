@@ -23,206 +23,274 @@
 
 ---
 
-## Task Queue
+## Phase 1 Summary: Agentic Infrastructure (T01-T10) ✅
+
+Phase 1 built the core infrastructure for automated portfolio data collection.
+
+| ID | Task | What It Does | Key Files |
+|----|------|--------------|-----------|
+| T01 | Retry Handler | Exponential backoff with jitter, circuit breaker, HTTP 429 handling | `retry_handler.py`, `strategies/base.py` |
+| T02 | Fuzzy Matching | Levenshtein distance for company name deduplication (85% threshold) | `fuzzy_matcher.py`, `synthesizer.py` |
+| T03 | Response Caching | In-memory TTL cache with optional Redis, async decorator | `cache.py` |
+| T04 | LLM Client Tests | 36 unit tests for OpenAI/Anthropic, retry logic, JSON parsing | `tests/test_llm_client.py` |
+| T05 | Ticker Resolver Tests | 48 tests for ticker resolution, CUSIP fallback, batch operations | `tests/test_ticker_resolver.py` |
+| T06 | Metrics & Monitoring | Job/strategy/investor metrics, 4 API endpoints, real-time tracking | `metrics.py`, `agentic_research.py` |
+| T07 | Scheduled Updates | APScheduler integration, quarterly refresh, priority queue for stale data | `scheduler.py` |
+| T08 | Portfolio Export | CSV/Excel export with multi-sheet formatting, filters | `exporter.py`, export endpoint |
+| T09 | PDF Caching | 24-hour cache for parsed annual report PDFs | `annual_report_strategy.py` |
+| T10 | JS Rendering | Playwright for JavaScript-heavy pages, static fallback | `website_strategy.py` |
+
+**Phase 1 Achievements:**
+- ✅ Robust error handling and retry logic across all data collection
+- ✅ Intelligent deduplication with fuzzy matching
+- ✅ Performance optimization via caching (HTTP, PDF, robots.txt)
+- ✅ Comprehensive test coverage (84+ tests)
+- ✅ Real-time metrics and monitoring
+- ✅ Automated scheduling for data freshness
+- ✅ Data export for analysis workflows
+
+---
+
+## Phase 2: Bringing Data to People (T11-T20)
+
+**Mission:** Make collected data accessible, searchable, and actionable for end users.
+
+### Task Queue
 
 | ID | Task | Status | Agent | Files (Scope) | Dependencies |
 |----|------|--------|-------|---------------|--------------|
-| T01 | Retry Handler with Exponential Backoff | COMPLETE | Tab 1 | `app/agentic/retry_handler.py`, `app/agentic/strategies/base.py` | None |
-| T02 | Fuzzy Matching for Deduplication | COMPLETE | Tab 1 | `app/agentic/fuzzy_matcher.py`, `app/agentic/synthesizer.py` | None |
-| T03 | Response Caching Layer | COMPLETE | Tab 1 | `app/agentic/cache.py`, `app/agentic/strategies/website_strategy.py` | None |
-| T04 | Unit Tests for LLM Client | COMPLETE | Tab 1 | `tests/test_llm_client.py` | None |
-| T05 | Unit Tests for Ticker Resolver | COMPLETE | Agent-T05 | `tests/test_ticker_resolver.py` | None |
-| T06 | Metrics/Monitoring for Agentic Jobs | COMPLETE | Tab 1 | `app/agentic/metrics.py`, `app/api/v1/agentic_research.py` (metrics endpoint only) | None |
-| T07 | Scheduled Portfolio Updates | COMPLETE | Tab 1 | `app/agentic/scheduler.py` | None |
-| T08 | Portfolio Export to CSV/Excel | COMPLETE | Tab 1 | `app/agentic/exporter.py`, `app/api/v1/agentic_research.py` (export endpoint only) | None |
-| T09 | Annual Report Strategy - PDF Caching | COMPLETE | Tab 1 | `app/agentic/strategies/annual_report_strategy.py` | T03 |
-| T10 | Website Strategy - JS Rendering Support | NOT_STARTED | - | `app/agentic/strategies/website_strategy.py` | None |
+| T11 | Portfolio Change Alerts | NOT_STARTED | - | `app/notifications/alerts.py`, `app/api/v1/alerts.py` | None |
+| T12 | Full-Text Search API | NOT_STARTED | - | `app/search/engine.py`, `app/api/v1/search.py` | None |
+| T13 | Dashboard Analytics API | NOT_STARTED | - | `app/analytics/dashboard.py`, `app/api/v1/analytics.py` | None |
+| T14 | Webhook Integrations | NOT_STARTED | - | `app/integrations/webhooks.py`, `app/api/v1/webhooks.py` | None |
+| T15 | Email Digest Reports | NOT_STARTED | - | `app/notifications/digest.py`, `app/notifications/templates/` | T11 |
+| T16 | GraphQL API Layer | NOT_STARTED | - | `app/graphql/schema.py`, `app/graphql/resolvers.py` | None |
+| T17 | Portfolio Comparison Tool | NOT_STARTED | - | `app/analytics/comparison.py`, `app/api/v1/compare.py` | None |
+| T18 | Investor Similarity & Recommendations | NOT_STARTED | - | `app/analytics/recommendations.py`, `app/api/v1/discover.py` | T12 |
+| T19 | Public API with Auth & Rate Limits | NOT_STARTED | - | `app/api/public/`, `app/auth/api_keys.py` | None |
+| T20 | Saved Searches & Watchlists | NOT_STARTED | - | `app/users/watchlists.py`, `app/api/v1/watchlists.py` | T12 |
 
 ---
 
 ## Task Details
 
-### T01: Retry Handler with Exponential Backoff
-**Goal:** Add robust retry logic for all HTTP requests in strategies.
+### T11: Portfolio Change Alerts
+**Goal:** Notify users when portfolio data changes (new holdings, exits, value changes).
 
 **Scope:**
-- Create `app/agentic/retry_handler.py` with:
-  - Async retry decorator
-  - Exponential backoff with jitter
-  - Max retries config (default 3)
-  - Circuit breaker for persistent failures
-  - Special handling for HTTP 429
-- Update `app/agentic/strategies/base.py` to use retry handler
+- Create `app/notifications/alerts.py` with:
+  - Change detection (new companies, removed companies, value changes)
+  - Alert rules engine (threshold-based triggers)
+  - Multi-channel support (in-app, email, webhook)
+  - Alert history and acknowledgment
+- Add `POST /api/v1/alerts/subscribe` - subscribe to investor alerts
+- Add `GET /api/v1/alerts` - list user's alerts
+- Add `DELETE /api/v1/alerts/{id}` - unsubscribe
 
-**Plan:** `docs/plans/PLAN_T01_retry_handler.md`
+**Plan:** `docs/plans/PLAN_T11_alerts.md`
 
 ---
 
-### T02: Fuzzy Matching for Deduplication
-**Goal:** Improve company name matching using string similarity.
+### T12: Full-Text Search API
+**Goal:** Enable fast, typo-tolerant search across investors, companies, and portfolios.
 
 **Scope:**
-- Create `app/agentic/fuzzy_matcher.py` with:
-  - Levenshtein distance calculation
-  - Configurable similarity threshold (default 0.85)
-  - Company name normalization
-  - Batch matching support
-- Update `app/agentic/synthesizer.py` to use fuzzy matching in deduplication
+- Create `app/search/engine.py` with:
+  - PostgreSQL full-text search (GIN indexes)
+  - Fuzzy matching for typo tolerance
+  - Faceted search (filter by type, industry, location)
+  - Search result ranking and relevance scoring
+  - Search suggestions/autocomplete
+- Add `GET /api/v1/search` - unified search endpoint
+- Add `GET /api/v1/search/suggest` - autocomplete suggestions
 
-**Plan:** `docs/plans/PLAN_T02_fuzzy_matcher.md`
+**Plan:** `docs/plans/PLAN_T12_search.md`
 
 ---
 
-### T03: Response Caching Layer
-**Goal:** Cache expensive HTTP responses to reduce API calls.
+### T13: Dashboard Analytics API
+**Goal:** Provide pre-computed analytics for frontend dashboards.
 
 **Scope:**
-- Create `app/agentic/cache.py` with:
-  - In-memory TTL cache (fallback)
-  - Optional Redis backend
-  - Cache decorator for async functions
-  - Key generation helpers
-- Update `app/agentic/strategies/website_strategy.py` to cache pages
+- Create `app/analytics/dashboard.py` with:
+  - Portfolio growth over time
+  - Industry distribution trends
+  - Top performers and movers
+  - Data quality scores
+  - Collection activity summary
+- Add `GET /api/v1/analytics/overview` - system-wide stats
+- Add `GET /api/v1/analytics/investor/{id}` - investor-specific analytics
+- Add `GET /api/v1/analytics/trends` - time-series data
 
-**Plan:** `docs/plans/PLAN_T03_cache.md`
+**Plan:** `docs/plans/PLAN_T13_dashboard.md`
 
 ---
 
-### T04: Unit Tests for LLM Client
-**Goal:** Test LLM client with mocked responses.
+### T14: Webhook Integrations
+**Goal:** Push data updates to external systems (Slack, CRMs, data warehouses).
 
 **Scope:**
-- Create `tests/test_llm_client.py` with:
-  - Test OpenAI completion (mocked)
-  - Test Anthropic completion (mocked)
-  - Test retry logic
-  - Test JSON parsing
-  - Test cost calculation
+- Create `app/integrations/webhooks.py` with:
+  - Webhook registration and management
+  - Event types (portfolio.updated, investor.new, alert.triggered)
+  - Retry logic with exponential backoff
+  - Webhook signature verification (HMAC)
+  - Delivery logs and debugging
+- Add `POST /api/v1/webhooks` - register webhook
+- Add `GET /api/v1/webhooks` - list webhooks
+- Add `POST /api/v1/webhooks/{id}/test` - send test payload
 
-**Plan:** None needed (straightforward)
+**Plan:** `docs/plans/PLAN_T14_webhooks.md`
 
 ---
 
-### T05: Unit Tests for Ticker Resolver
-**Goal:** Test ticker resolution with mocked yfinance.
+### T15: Email Digest Reports
+**Goal:** Send periodic email summaries of portfolio changes and alerts.
 
 **Scope:**
-- Create `tests/test_ticker_resolver.py` with:
-  - Test single ticker resolution
-  - Test batch resolution
-  - Test CUSIP fallback
-  - Test cache behavior
-  - Test error handling
+- Create `app/notifications/digest.py` with:
+  - Daily/weekly/monthly digest options
+  - HTML email templates (responsive)
+  - Digest content aggregation
+  - Unsubscribe handling
+- Create `app/notifications/templates/` with:
+  - `digest_daily.html`
+  - `digest_weekly.html`
+  - `alert_notification.html`
+- Add `POST /api/v1/digests/subscribe` - configure digest preferences
+- Add `GET /api/v1/digests/preview` - preview next digest
 
-**Plan:** None needed (straightforward)
+**Dependencies:** T11 (alerts) for change detection logic
+
+**Plan:** `docs/plans/PLAN_T15_digest.md`
 
 ---
 
-### T06: Metrics/Monitoring for Agentic Jobs
-**Goal:** Track success rates, timing, and costs for agentic collection.
+### T16: GraphQL API Layer
+**Goal:** Provide flexible data querying for complex frontend needs.
 
 **Scope:**
-- Create `app/agentic/metrics.py` with:
-  - Job success/failure counters
-  - Strategy execution times
-  - Token usage tracking
-  - Cost per investor stats
-- Add `GET /api/v1/agentic/metrics` endpoint
+- Create `app/graphql/schema.py` with:
+  - Investor type (LP, FamilyOffice)
+  - PortfolioCompany type with connections
+  - CoInvestor relationships
+  - Query types for all entities
+- Create `app/graphql/resolvers.py` with:
+  - DataLoader for N+1 prevention
+  - Pagination (cursor-based)
+  - Field-level permissions
+- Add `POST /graphql` endpoint
 
-**Plan:** `docs/plans/PLAN_T06_metrics.md`
+**Plan:** `docs/plans/PLAN_T16_graphql.md`
 
 ---
 
-### T07: Scheduled Portfolio Updates
-**Goal:** Automatically refresh portfolio data on a schedule.
+### T17: Portfolio Comparison Tool
+**Goal:** Compare portfolios side-by-side (investor vs investor, or over time).
 
 **Scope:**
-- Create `app/agentic/scheduler.py` with:
-  - Integration with existing APScheduler
-  - Quarterly refresh for all investors
-  - Priority queue for stale data
-  - Incremental updates (only new data)
+- Create `app/analytics/comparison.py` with:
+  - Portfolio overlap calculation
+  - Unique holdings identification
+  - Industry allocation diff
+  - Time-based comparison (Q1 vs Q2)
+  - Exportable comparison reports
+- Add `POST /api/v1/compare/portfolios` - compare two investors
+- Add `GET /api/v1/compare/investor/{id}/history` - compare over time
 
-**Plan:** `docs/plans/PLAN_T07_scheduler.md`
+**Plan:** `docs/plans/PLAN_T17_comparison.md`
 
 ---
 
-### T08: Portfolio Export to CSV/Excel
-**Goal:** Export portfolio data for analysis.
+### T18: Investor Similarity & Recommendations
+**Goal:** Find similar investors based on portfolio overlap and investment patterns.
 
 **Scope:**
-- Create `app/agentic/exporter.py` with:
-  - Export to CSV
-  - Export to Excel (with formatting)
-  - Include all portfolio fields
-  - Optional filters
-- Add `GET /api/v1/agentic/portfolio/{id}/export` endpoint
+- Create `app/analytics/recommendations.py` with:
+  - Similarity scoring (Jaccard index on holdings)
+  - Investment pattern clustering
+  - "Investors like X also invest in Y" recommendations
+  - Similar company suggestions
+- Add `GET /api/v1/discover/similar/{investor_id}` - find similar investors
+- Add `GET /api/v1/discover/recommended/{investor_id}` - recommended companies
 
-**Plan:** `docs/plans/PLAN_T08_exporter.md`
+**Dependencies:** T12 (search) for efficient lookups
+
+**Plan:** `docs/plans/PLAN_T18_recommendations.md`
 
 ---
 
-### T09: Annual Report Strategy - PDF Caching
-**Goal:** Cache parsed PDF results to avoid re-parsing.
+### T19: Public API with Auth & Rate Limits
+**Goal:** Expose data via authenticated public API for external developers.
 
 **Scope:**
-- Update `app/agentic/strategies/annual_report_strategy.py` to:
-  - Use cache layer from T03
-  - Cache by URL hash
-  - 24-hour TTL
+- Create `app/api/public/` with:
+  - Versioned public endpoints (v1)
+  - OpenAPI documentation
+  - Response envelope (data, meta, errors)
+- Create `app/auth/api_keys.py` with:
+  - API key generation and management
+  - Rate limiting (token bucket)
+  - Usage tracking and quotas
+  - Scope-based permissions
+- Add `POST /api/v1/api-keys` - generate API key
+- Add `GET /api/v1/api-keys/usage` - check usage stats
 
-**Dependencies:** T03 must be complete first.
-
-**Plan:** None needed (small change)
+**Plan:** `docs/plans/PLAN_T19_public_api.md`
 
 ---
 
-### T10: Website Strategy - JS Rendering Support
-**Goal:** Handle JavaScript-rendered pages with Playwright.
+### T20: Saved Searches & Watchlists
+**Goal:** Let users save searches and track specific investors/companies.
 
 **Scope:**
-- Update `app/agentic/strategies/website_strategy.py` to:
-  - Detect JS-heavy pages
-  - Use Playwright for rendering
-  - Fallback to httpx for static pages
+- Create `app/users/watchlists.py` with:
+  - Watchlist CRUD operations
+  - Saved search queries
+  - Watchlist sharing (public/private)
+  - Change notifications for watched items
+- Add `POST /api/v1/watchlists` - create watchlist
+- Add `GET /api/v1/watchlists` - list user's watchlists
+- Add `POST /api/v1/watchlists/{id}/items` - add to watchlist
+- Add `POST /api/v1/searches/save` - save search query
 
-**Plan:** `docs/plans/PLAN_T10_js_rendering.md`
+**Dependencies:** T12 (search) for saved search execution
+
+**Plan:** `docs/plans/PLAN_T20_watchlists.md`
 
 ---
 
 ## Communication Log
 
 ```
-[SYSTEM] Parallel work queue initialized with 10 tasks
-[SYSTEM] Previous work: Export (790ca0e), USPTO (6e305f6), LLM+Ticker (bce50d5)
-[Tab 1] Completed T01, T02, T03, T09 as part of Plan 004 (Agentic Enhancements)
-[Agent-T01] Verified T01 implementation: retry_handler.py + base.py integration. Docker build OK.
-[Agent-T05] T05 COMPLETE: Created tests/test_ticker_resolver.py with 48 tests (all passing). Covers: normalize_ticker, resolve_ticker_sync, resolve_ticker async, batch resolution, CUSIP fallback via SEC EDGAR, TickerResolver.resolve_holdings, cache behavior, and error handling. All mocked (yfinance, httpx).
-[Tab 1] T04 COMPLETE: Created tests/test_llm_client.py with 36 tests (34 passed, 2 skipped). Covers: LLMResponse, OpenAI/Anthropic completion, retry logic, JSON parsing, cost calculation, token tracking.
-[Tab 1] T06 COMPLETE: Created app/agentic/metrics.py + 4 metrics endpoints. Tracks: job success/failure, strategy execution times, token usage, cost per investor.
-[Agent-T06] Verified T06: Fixed missing router registration in main.py (agentic_research.router not included). Docker build OK. GET /api/v1/agentic/metrics returns: uptime, job metrics, strategy metrics, summary.
-[Tab 1] T07 COMPLETE: Created app/agentic/scheduler.py with quarterly refresh, priority queue for stale data, and incremental update support. Integrates with existing APScheduler.
-[Tab 1] T08 COMPLETE: Created app/agentic/exporter.py with CSV and Excel export. Excel includes Portfolio, Summary, and By Source sheets with formatting. Added GET /api/v1/agentic/portfolio/{id}/export endpoint.
+[SYSTEM] Phase 1 (T01-T10) complete. Phase 2 initialized with 10 new tasks.
+[SYSTEM] Phase 2 focus: Bringing data to people - accessibility, search, notifications, integrations.
 ```
 
 ---
 
-## Completed Tasks
+## Completed Tasks (All Phases)
 
+### Phase 1: Agentic Infrastructure
 | ID | Task | Completed By | Commit |
 |----|------|--------------|--------|
-| - | Data Export Service | Tab 1 | 790ca0e |
-| - | USPTO Patent Data Source | Tab 2 | 6e305f6 |
-| - | LLM Client + Ticker Resolver | Tab 1 | bce50d5 |
-| T01 | Retry Handler with Exponential Backoff | Tab 1 | (Plan 004) |
-| T02 | Fuzzy Matching for Deduplication | Tab 1 | (Plan 004) |
-| T03 | Response Caching Layer | Tab 1 | (Plan 004) |
-| T09 | Annual Report PDF Caching | Tab 1 | (Plan 004) |
-| T05 | Unit Tests for Ticker Resolver | Agent-T05 | (not committed) |
+| T01 | Retry Handler with Exponential Backoff | Tab 1 | Plan 004 |
+| T02 | Fuzzy Matching for Deduplication | Tab 1 | Plan 004 |
+| T03 | Response Caching Layer | Tab 1 | Plan 004 |
 | T04 | Unit Tests for LLM Client | Tab 1 | 490e43c |
+| T05 | Unit Tests for Ticker Resolver | Agent-T05 | - |
 | T06 | Metrics/Monitoring for Agentic Jobs | Tab 1 | 3f629b5 |
 | T07 | Scheduled Portfolio Updates | Tab 1 | 5ef2e5e |
-| T08 | Portfolio Export to CSV/Excel | Tab 1 | (pending) |
+| T08 | Portfolio Export to CSV/Excel | Tab 1 | 88918b3 |
+| T09 | Annual Report PDF Caching | Tab 1 | Plan 004 |
+| T10 | Website Strategy - JS Rendering | Agent-T10 | (pending) |
+
+### Pre-Phase Work
+| Task | Completed By | Commit |
+|------|--------------|--------|
+| Data Export Service | Tab 1 | 790ca0e |
+| USPTO Patent Data Source | Tab 2 | 6e305f6 |
+| LLM Client + Ticker Resolver | Tab 1 | bce50d5 |
 
 ---
 
@@ -243,6 +311,7 @@
 
 ## File Ownership Quick Reference
 
+### Phase 1 Files
 | File | Owner Task |
 |------|------------|
 | `app/agentic/retry_handler.py` | T01 |
@@ -257,3 +326,27 @@
 | `app/agentic/scheduler.py` | T07 |
 | `app/agentic/exporter.py` | T08 |
 | `app/agentic/strategies/annual_report_strategy.py` | T09 |
+
+### Phase 2 Files
+| File | Owner Task |
+|------|------------|
+| `app/notifications/alerts.py` | T11 |
+| `app/api/v1/alerts.py` | T11 |
+| `app/search/engine.py` | T12 |
+| `app/api/v1/search.py` | T12 |
+| `app/analytics/dashboard.py` | T13 |
+| `app/api/v1/analytics.py` | T13 |
+| `app/integrations/webhooks.py` | T14 |
+| `app/api/v1/webhooks.py` | T14 |
+| `app/notifications/digest.py` | T15 |
+| `app/notifications/templates/` | T15 |
+| `app/graphql/schema.py` | T16 |
+| `app/graphql/resolvers.py` | T16 |
+| `app/analytics/comparison.py` | T17 |
+| `app/api/v1/compare.py` | T17 |
+| `app/analytics/recommendations.py` | T18 |
+| `app/api/v1/discover.py` | T18 |
+| `app/api/public/` | T19 |
+| `app/auth/api_keys.py` | T19 |
+| `app/users/watchlists.py` | T20 |
+| `app/api/v1/watchlists.py` | T20 |
