@@ -221,7 +221,8 @@
 | T05 | Unit Tests for Ticker Resolver | Agent-T05 | (not committed) |
 | T04 | Unit Tests for LLM Client | Tab 1 | 490e43c |
 | T06 | Metrics/Monitoring for Agentic Jobs | Tab 1 | 3f629b5 |
-| T07 | Scheduled Portfolio Updates | Tab 1 | (pending) |
+| T07 | Scheduled Portfolio Updates | Tab 1 | 5ef2e5e |
+| T08 | Portfolio Export to CSV/Excel | Tab 1 | (pending) |
 
 ---
 

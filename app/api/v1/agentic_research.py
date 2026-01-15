@@ -13,9 +13,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from fastapi.responses import Response
+
 from app.core.database import get_db
 from app.agentic.portfolio_agent import PortfolioResearchAgent, InvestorContext
 from app.agentic.metrics import get_metrics_collector
+from app.agentic.exporter import export_portfolio, ExportFormat
 
 logger = logging.getLogger(__name__)
 
@@ -656,6 +659,112 @@ async def get_portfolio_companies(
     
     except Exception as e:
         logger.error(f"Error getting portfolio companies: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/portfolio/{investor_id}/export")
+async def export_portfolio_data(
+    investor_id: int,
+    investor_type: str = Query(..., description="'lp' or 'family_office'"),
+    format: str = Query("csv", description="Export format: 'csv' or 'xlsx'"),
+    source_type: Optional[str] = Query(None, description="Filter by source type"),
+    db: Session = Depends(get_db)
+):
+    """
+    📥 Export portfolio data to CSV or Excel.
+
+    **Formats:**
+    - `csv`: Simple comma-separated values (UTF-8 with BOM for Excel compatibility)
+    - `xlsx`: Excel workbook with multiple sheets and formatting
+
+    **Excel Export Includes:**
+    - **Portfolio** sheet: All holdings with full details
+    - **Summary** sheet: Key metrics and top industries
+    - **By Source** sheet: Breakdown by data source
+
+    **Example Usage:**
+    ```
+    GET /api/v1/agentic/portfolio/123/export?investor_type=lp&format=xlsx
+    ```
+
+    Returns file download with appropriate content-type headers.
+    """
+    try:
+        # Validate format
+        try:
+            export_format = ExportFormat(format.lower())
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid format '{format}'. Use 'csv' or 'xlsx'"
+            )
+
+        # Get investor info
+        if investor_type == "lp":
+            investor_query = text("SELECT name FROM lp_fund WHERE id = :investor_id")
+        elif investor_type == "family_office":
+            investor_query = text("SELECT name FROM family_offices WHERE id = :investor_id")
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="investor_type must be 'lp' or 'family_office'"
+            )
+
+        investor_row = db.execute(investor_query, {"investor_id": investor_id}).fetchone()
+
+        if not investor_row:
+            raise HTTPException(status_code=404, detail="Investor not found")
+
+        investor_name = investor_row[0]
+
+        # Build query for portfolio companies
+        query = """
+            SELECT
+                id, company_name, company_industry, company_stage,
+                investment_type, investment_date, market_value_usd, shares_held,
+                ownership_percentage, source_type, confidence_level, source_url,
+                collected_date, ticker_symbol, cusip, company_description
+            FROM portfolio_companies
+            WHERE investor_id = :investor_id AND investor_type = :investor_type
+        """
+        params = {"investor_id": investor_id, "investor_type": investor_type}
+
+        if source_type:
+            query += " AND source_type = :source_type"
+            params["source_type"] = source_type
+
+        query += " ORDER BY company_name"
+
+        rows = db.execute(text(query), params).fetchall()
+
+        if not rows:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No portfolio data found for {investor_type} {investor_id}"
+            )
+
+        # Export data
+        content, filename, content_type = export_portfolio(
+            rows=rows,
+            investor_name=investor_name,
+            investor_type=investor_type,
+            investor_id=investor_id,
+            format=export_format,
+        )
+
+        return Response(
+            content=content,
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(len(content)),
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error exporting portfolio: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
