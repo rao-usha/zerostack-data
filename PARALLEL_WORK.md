@@ -59,8 +59,8 @@ Phase 1 built the core infrastructure for automated portfolio data collection.
 
 | ID | Task | Status | Agent | Files (Scope) | Dependencies |
 |----|------|--------|-------|---------------|--------------|
-| T11 | Portfolio Change Alerts | NOT_STARTED | - | `app/notifications/alerts.py`, `app/api/v1/alerts.py` | None |
-| T12 | Full-Text Search API | NOT_STARTED | - | `app/search/engine.py`, `app/api/v1/search.py` | None |
+| T11 | Portfolio Change Alerts | COMPLETE | Tab 1 | `app/notifications/alerts.py`, `app/api/v1/alerts.py` | None |
+| T12 | Full-Text Search API | IN_PROGRESS | Tab 2 | `app/search/engine.py`, `app/api/v1/search.py` | None |
 | T13 | Dashboard Analytics API | NOT_STARTED | - | `app/analytics/dashboard.py`, `app/api/v1/analytics.py` | None |
 | T14 | Webhook Integrations | NOT_STARTED | - | `app/integrations/webhooks.py`, `app/api/v1/webhooks.py` | None |
 | T15 | Email Digest Reports | NOT_STARTED | - | `app/notifications/digest.py`, `app/notifications/templates/` | T11 |
@@ -265,6 +265,10 @@ Phase 1 built the core infrastructure for automated portfolio data collection.
 ```
 [SYSTEM] Phase 1 (T01-T10) complete. Phase 2 initialized with 10 new tasks.
 [SYSTEM] Phase 2 focus: Bringing data to people - accessibility, search, notifications, integrations.
+[Agent-T10] T10 COMPLETE: Implemented JS rendering support in website_strategy.py. Added Playwright for JS-heavy page detection and rendering with smart fallback to httpx for static pages. Features: SPA framework detection (React/Vue/Angular), empty content indicators, domain learning for known JS sites, content comparison to validate JS rendering improvement.
+[Tab 1] T10 committed and pushed (fe9951f). Starting T11 - Portfolio Change Alerts.
+[Tab 2] Claiming T12 - Full-Text Search API. Writing plan for user approval.
+[Tab 1] T11 COMPLETE: Portfolio Change Alerts implemented. Features: subscription management, change detection engine (new/removed holdings, value/shares changes), alert lifecycle (pending/acknowledged/expired), 8 API endpoints. Tables: alert_subscriptions, portfolio_alerts, portfolio_snapshots.
 ```
 
 ---
@@ -283,7 +287,7 @@ Phase 1 built the core infrastructure for automated portfolio data collection.
 | T07 | Scheduled Portfolio Updates | Tab 1 | 5ef2e5e |
 | T08 | Portfolio Export to CSV/Excel | Tab 1 | 88918b3 |
 | T09 | Annual Report PDF Caching | Tab 1 | Plan 004 |
-| T10 | Website Strategy - JS Rendering | Agent-T10 | (pending) |
+| T10 | Website Strategy - JS Rendering | Agent-T10 | fe9951f |
 
 ### Pre-Phase Work
 | Task | Completed By | Commit |
