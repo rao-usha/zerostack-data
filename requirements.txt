@@ -42,6 +42,9 @@ pdfplumber>=0.10.0  # PDF parsing for annual reports
 PyPDF2>=3.0.0  # Alternative PDF parsing
 yfinance>=0.2.0  # Stock ticker to company name lookup
 
+# JS-rendered page support
+playwright>=1.40.0  # Browser automation for JS-heavy pages
+
 
 
 

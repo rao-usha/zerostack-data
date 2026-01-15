@@ -16,6 +16,11 @@ Safeguards:
 - Respect robots.txt
 - Max 5 pages per investor (prevent runaway)
 - Timeout: 10 seconds per request
+
+JS Rendering Support (T10):
+- Detects JavaScript-heavy pages that render content dynamically
+- Uses Playwright for JS rendering when needed
+- Falls back to httpx for static pages (faster)
 """
 import asyncio
 import logging
@@ -31,6 +36,14 @@ from app.agentic.cache import get_cache, url_to_cache_key
 from app.agentic.strategies.base import BaseStrategy, InvestorContext, StrategyResult
 
 logger = logging.getLogger(__name__)
+
+# Optional Playwright import - graceful fallback if not installed
+try:
+    from playwright.async_api import async_playwright, Browser, BrowserContext
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+    logger.info("Playwright not installed - JS rendering disabled. Install with: pip install playwright && playwright install chromium")
 
 
 class WebsiteStrategy(BaseStrategy):
@@ -56,10 +69,38 @@ class WebsiteStrategy(BaseStrategy):
     # Scraping limits
     MAX_PAGES_PER_INVESTOR = 5
     REQUEST_TIMEOUT = 10
+    PLAYWRIGHT_TIMEOUT = 30000  # 30 seconds for JS rendering
 
     # Cache TTLs
     ROBOTS_CACHE_TTL = 86400  # 24 hours for robots.txt
     PAGE_CACHE_TTL = 3600     # 1 hour for scraped pages
+
+    # JS Detection - indicators that a page needs JavaScript rendering
+    JS_FRAMEWORK_INDICATORS = [
+        # React
+        '<div id="root"></div>',
+        '<div id="app"></div>',
+        'data-reactroot',
+        '__NEXT_DATA__',
+        # Vue
+        '<div id="__nuxt">',
+        'data-v-',
+        # Angular
+        'ng-version',
+        '<app-root>',
+        # Generic SPA indicators
+        'window.__INITIAL_STATE__',
+        'window.__PRELOADED_STATE__',
+    ]
+
+    # Content indicators that suggest JS hasn't loaded
+    EMPTY_CONTENT_INDICATORS = [
+        'loading...',
+        'please wait',
+        'javascript required',
+        'enable javascript',
+        '<noscript>',
+    ]
     
     # Portfolio page keywords
     PORTFOLIO_KEYWORDS = [
@@ -75,13 +116,21 @@ class WebsiteStrategy(BaseStrategy):
         self,
         max_requests_per_second: Optional[float] = None,
         max_concurrent_requests: Optional[int] = None,
-        timeout_seconds: Optional[int] = None
+        timeout_seconds: Optional[int] = None,
+        enable_js_rendering: bool = True
     ):
         super().__init__(max_requests_per_second, max_concurrent_requests, timeout_seconds)
         self._client: Optional[httpx.AsyncClient] = None
         self._rate_limiter = asyncio.Semaphore(1)
         self._last_request_time: Dict[str, float] = {}  # Per-domain rate limiting
         self._cache = get_cache()  # Use shared cache for robots.txt and pages
+
+        # Playwright state for JS rendering
+        self._enable_js_rendering = enable_js_rendering and PLAYWRIGHT_AVAILABLE
+        self._playwright = None
+        self._browser: Optional["Browser"] = None
+        self._browser_context: Optional["BrowserContext"] = None
+        self._js_domains: Set[str] = set()  # Track domains that need JS rendering
     
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create the HTTP client."""
@@ -97,10 +146,61 @@ class WebsiteStrategy(BaseStrategy):
         return self._client
     
     async def close(self):
-        """Close the HTTP client."""
+        """Close the HTTP client and Playwright browser."""
         if self._client:
             await self._client.aclose()
             self._client = None
+
+        # Clean up Playwright resources
+        if self._browser_context:
+            try:
+                await self._browser_context.close()
+            except Exception:
+                pass
+            self._browser_context = None
+
+        if self._browser:
+            try:
+                await self._browser.close()
+            except Exception:
+                pass
+            self._browser = None
+
+        if self._playwright:
+            try:
+                await self._playwright.stop()
+            except Exception:
+                pass
+            self._playwright = None
+
+    async def _get_browser(self) -> Optional["Browser"]:
+        """Get or create Playwright browser instance (lazy initialization)."""
+        if not self._enable_js_rendering:
+            return None
+
+        if self._browser is None:
+            try:
+                self._playwright = await async_playwright().start()
+                self._browser = await self._playwright.chromium.launch(
+                    headless=True,
+                    args=[
+                        "--disable-gpu",
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-setuid-sandbox",
+                    ]
+                )
+                self._browser_context = await self._browser.new_context(
+                    user_agent=self.USER_AGENT,
+                    viewport={"width": 1280, "height": 720}
+                )
+                logger.info("Playwright browser initialized for JS rendering")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Playwright browser: {e}")
+                self._enable_js_rendering = False
+                return None
+
+        return self._browser
     
     async def _rate_limited_request(self, url: str) -> Optional[httpx.Response]:
         """Make a rate-limited request with per-domain tracking."""
@@ -127,8 +227,95 @@ class WebsiteStrategy(BaseStrategy):
                 logger.warning(f"Request failed for {url}: {e}")
                 return None
 
-    async def _fetch_page_cached(self, url: str) -> Optional[str]:
-        """Fetch a page with caching (1 hour TTL)."""
+    def _is_js_heavy_page(self, html_content: str) -> bool:
+        """
+        Detect if a page likely needs JavaScript rendering.
+
+        Checks for:
+        1. SPA framework indicators (React, Vue, Angular)
+        2. Empty content placeholders
+        3. Minimal meaningful content despite having JS indicators
+        """
+        if not html_content:
+            return False
+
+        content_lower = html_content.lower()
+
+        # Check for JS framework indicators
+        for indicator in self.JS_FRAMEWORK_INDICATORS:
+            if indicator.lower() in content_lower:
+                logger.debug(f"Found JS framework indicator: {indicator}")
+                return True
+
+        # Check for empty content indicators
+        for indicator in self.EMPTY_CONTENT_INDICATORS:
+            if indicator in content_lower:
+                logger.debug(f"Found empty content indicator: {indicator}")
+                return True
+
+        # Check for very little actual content with lots of script tags
+        soup = BeautifulSoup(html_content, "lxml")
+        script_count = len(soup.find_all("script"))
+        text_content = soup.get_text(strip=True)
+
+        # If lots of scripts but very little text, likely JS-rendered
+        if script_count > 10 and len(text_content) < 500:
+            logger.debug(f"High script count ({script_count}) with little text ({len(text_content)} chars)")
+            return True
+
+        return False
+
+    async def _fetch_page_playwright(self, url: str) -> Optional[str]:
+        """
+        Fetch a page using Playwright with JavaScript rendering.
+
+        Used for pages that render content dynamically via JavaScript.
+        """
+        if not self._enable_js_rendering:
+            logger.debug("JS rendering disabled, skipping Playwright fetch")
+            return None
+
+        browser = await self._get_browser()
+        if not browser:
+            return None
+
+        try:
+            page = await self._browser_context.new_page()
+            try:
+                # Navigate to page with timeout
+                await page.goto(url, wait_until="networkidle", timeout=self.PLAYWRIGHT_TIMEOUT)
+
+                # Wait a bit more for any lazy-loaded content
+                await page.wait_for_timeout(1000)
+
+                # Get the fully rendered HTML
+                content = await page.content()
+                logger.info(f"Successfully fetched JS-rendered page: {url[:50]}...")
+                return content
+
+            finally:
+                await page.close()
+
+        except Exception as e:
+            logger.warning(f"Playwright fetch failed for {url}: {e}")
+            return None
+
+    async def _fetch_page_cached(self, url: str, force_js: bool = False) -> Optional[str]:
+        """
+        Fetch a page with caching and smart JS rendering fallback.
+
+        Strategy:
+        1. Check cache first
+        2. If domain is known to need JS, use Playwright directly
+        3. Try httpx first (faster)
+        4. If content looks JS-heavy, retry with Playwright
+        5. Cache the final result
+
+        Args:
+            url: The URL to fetch
+            force_js: Force Playwright rendering (skip httpx attempt)
+        """
+        domain = urlparse(url).netloc
         cache_key = url_to_cache_key(url, prefix="page")
 
         # Check cache first
@@ -137,12 +324,56 @@ class WebsiteStrategy(BaseStrategy):
             logger.debug(f"Page cache hit for {url[:50]}...")
             return cached_content
 
-        # Fetch fresh content
+        # Check if domain is known to need JS rendering
+        use_playwright = force_js or domain in self._js_domains
+
+        if use_playwright and self._enable_js_rendering:
+            # Go straight to Playwright for known JS-heavy domains
+            content = await self._fetch_page_playwright(url)
+            if content:
+                await self._cache.set(cache_key, content, ttl=self.PAGE_CACHE_TTL)
+                return content
+
+        # Try httpx first (faster for static pages)
         response = await self._rate_limited_request(url)
         if response and response.status_code == 200:
             content = response.text
+
+            # Check if content looks JS-heavy and needs rendering
+            if self._is_js_heavy_page(content) and self._enable_js_rendering:
+                logger.info(f"Detected JS-heavy page, retrying with Playwright: {url[:50]}...")
+
+                # Remember this domain needs JS rendering
+                self._js_domains.add(domain)
+
+                # Fetch with Playwright
+                js_content = await self._fetch_page_playwright(url)
+                if js_content:
+                    # Verify JS rendering produced more content
+                    soup_static = BeautifulSoup(content, "lxml")
+                    soup_js = BeautifulSoup(js_content, "lxml")
+
+                    static_text_len = len(soup_static.get_text(strip=True))
+                    js_text_len = len(soup_js.get_text(strip=True))
+
+                    if js_text_len > static_text_len * 1.5:
+                        # JS rendering produced significantly more content
+                        logger.info(f"JS rendering improved content: {static_text_len} -> {js_text_len} chars")
+                        content = js_content
+                    else:
+                        logger.debug(f"JS rendering didn't improve content much, using static")
+                        # Remove from JS domains since it didn't help
+                        self._js_domains.discard(domain)
+
             await self._cache.set(cache_key, content, ttl=self.PAGE_CACHE_TTL)
             return content
+
+        # If httpx failed, try Playwright as fallback
+        if self._enable_js_rendering:
+            content = await self._fetch_page_playwright(url)
+            if content:
+                await self._cache.set(cache_key, content, ttl=self.PAGE_CACHE_TTL)
+                return content
 
         return None
 
