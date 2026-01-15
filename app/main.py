@@ -768,6 +768,7 @@ app.include_router(templates.router, prefix="/api/v1")
 app.include_router(lineage.router, prefix="/api/v1")
 app.include_router(export.router, prefix="/api/v1")
 app.include_router(uspto.router, prefix="/api/v1")
+app.include_router(agentic_research.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Root"])

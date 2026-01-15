@@ -34,7 +34,7 @@
 | T05 | Unit Tests for Ticker Resolver | COMPLETE | Agent-T05 | `tests/test_ticker_resolver.py` | None |
 | T06 | Metrics/Monitoring for Agentic Jobs | COMPLETE | Tab 1 | `app/agentic/metrics.py`, `app/api/v1/agentic_research.py` (metrics endpoint only) | None |
 | T07 | Scheduled Portfolio Updates | COMPLETE | Tab 1 | `app/agentic/scheduler.py` | None |
-| T08 | Portfolio Export to CSV/Excel | NOT_STARTED | - | `app/agentic/exporter.py`, `app/api/v1/agentic_research.py` (export endpoint only) | None |
+| T08 | Portfolio Export to CSV/Excel | COMPLETE | Tab 1 | `app/agentic/exporter.py`, `app/api/v1/agentic_research.py` (export endpoint only) | None |
 | T09 | Annual Report Strategy - PDF Caching | COMPLETE | Tab 1 | `app/agentic/strategies/annual_report_strategy.py` | T03 |
 | T10 | Website Strategy - JS Rendering Support | NOT_STARTED | - | `app/agentic/strategies/website_strategy.py` | None |
 
@@ -202,6 +202,7 @@
 [Tab 1] T06 COMPLETE: Created app/agentic/metrics.py + 4 metrics endpoints. Tracks: job success/failure, strategy execution times, token usage, cost per investor.
 [Agent-T06] Verified T06: Fixed missing router registration in main.py (agentic_research.router not included). Docker build OK. GET /api/v1/agentic/metrics returns: uptime, job metrics, strategy metrics, summary.
 [Tab 1] T07 COMPLETE: Created app/agentic/scheduler.py with quarterly refresh, priority queue for stale data, and incremental update support. Integrates with existing APScheduler.
+[Tab 1] T08 COMPLETE: Created app/agentic/exporter.py with CSV and Excel export. Excel includes Portfolio, Summary, and By Source sheets with formatting. Added GET /api/v1/agentic/portfolio/{id}/export endpoint.
 ```
 
 ---
