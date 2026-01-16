@@ -89,7 +89,7 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 | T22 | Company Data Enrichment | COMPLETE | Tab 1 | `app/enrichment/company.py`, `app/api/v1/enrichment.py` | None |
 | T23 | Investment Trend Analysis | COMPLETE | Tab 2 | `app/analytics/trends.py`, `app/api/v1/trends.py` | None |
 | T24 | News & Event Feed | COMPLETE | Tab 2 | `app/news/aggregator.py`, `app/api/v1/news.py` | None |
-| T25 | Custom Report Builder | NOT_STARTED | - | `app/reports/builder.py`, `app/api/v1/reports.py` | None |
+| T25 | Custom Report Builder | COMPLETE | Tab 2 | `app/reports/builder.py`, `app/api/v1/reports.py` | None |
 | T26 | Bulk Portfolio Import | COMPLETE | Tab 1 | `app/import_data/portfolio.py`, `app/api/v1/import_portfolio.py` | None |
 | T27 | LP Profile Enrichment | IN_PROGRESS | Tab 1 | `app/enrichment/investor.py` | None |
 | T28 | Deal Flow Tracker | NOT_STARTED | - | `app/deals/tracker.py`, `app/api/v1/deals.py` | None |
@@ -526,6 +526,7 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 [Tab 1] Claiming T24 - News & Event Feed. Writing plan for user approval.
 [Tab 1] T24 claimed by Tab 2, switching to T26 - Bulk Portfolio Import. Writing plan for user approval.
 [Tab 1] T26 COMPLETE: Bulk Portfolio Import implemented. Features: CSV/Excel file upload, column validation, fuzzy investor matching, preview with errors/warnings, import execution, rollback support, import history. 6 endpoints: POST /import/upload, GET /import/{id}/preview, POST /import/{id}/confirm, GET /import/{id}/status, GET /import/history, POST /import/{id}/rollback. Tables: portfolio_imports.
+[Tab 1] Claiming T27 - LP Profile Enrichment. Writing plan for user approval.
 ```
 
 ---
