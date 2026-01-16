@@ -51,28 +51,263 @@ Phase 1 built the core infrastructure for automated portfolio data collection.
 
 ---
 
-## Phase 2: Bringing Data to People (T11-T20)
+## Phase 2 Summary: Bringing Data to People (T11-T20) ✅
 
-**Mission:** Make collected data accessible, searchable, and actionable for end users.
+Phase 2 made collected data accessible, searchable, and actionable for end users.
+
+| ID | Task | What It Does | Key Files |
+|----|------|--------------|-----------|
+| T11 | Portfolio Change Alerts | Subscription-based alerts for portfolio changes (new/removed holdings) | `alerts.py`, `api/v1/alerts.py` |
+| T12 | Full-Text Search API | PostgreSQL FTS with fuzzy matching, faceted search, autocomplete | `search/engine.py`, `api/v1/search.py` |
+| T13 | Dashboard Analytics API | System overview, investor analytics, trends, industry breakdown | `analytics/dashboard.py`, `api/v1/analytics.py` |
+| T16 | GraphQL API Layer | Strawberry GraphQL with nested relationships, DataLoader | `graphql/schema.py`, `graphql/resolvers.py` |
+| T17 | Portfolio Comparison Tool | Side-by-side comparison, Jaccard similarity, historical diff | `analytics/comparison.py`, `api/v1/compare.py` |
+| T18 | Investor Similarity | Find similar investors, "also invest in" recommendations | `analytics/recommendations.py`, `api/v1/discover.py` |
+| T19 | Public API with Auth | API key auth, rate limiting, usage tracking | `auth/api_keys.py`, `api/v1/public.py` |
+| T20 | Watchlists & Saved Searches | Track investors/companies, save and re-execute searches | `users/watchlists.py`, `api/v1/watchlists.py` |
+
+**Phase 2 Achievements:**
+- ✅ Full-text search with typo tolerance across 4000+ records
+- ✅ Real-time portfolio change alerts with subscriptions
+- ✅ Pre-computed analytics for dashboards
+- ✅ GraphQL API for flexible frontend queries
+- ✅ Portfolio comparison and similarity analysis
+- ✅ Public API with authentication and rate limiting
+- ✅ User watchlists and saved searches
+
+---
+
+## Phase 3: Investment Intelligence (T21-T30)
+
+**Mission:** Transform raw data into actionable investment intelligence through network analysis, enrichment, and advanced analytics.
 
 ### Task Queue
 
 | ID | Task | Status | Agent | Files (Scope) | Dependencies |
 |----|------|--------|-------|---------------|--------------|
-| T11 | Portfolio Change Alerts | COMPLETE | Tab 1 | `app/notifications/alerts.py`, `app/api/v1/alerts.py` | None |
-| T12 | Full-Text Search API | COMPLETE | Tab 2 | `app/search/engine.py`, `app/api/v1/search.py` | None |
-| T13 | Dashboard Analytics API | COMPLETE | Tab 1 | `app/analytics/dashboard.py`, `app/api/v1/analytics.py` | None |
-| T14 | Webhook Integrations | SKIPPED | - | `app/integrations/webhooks.py`, `app/api/v1/webhooks.py` | None |
-| T15 | Email Digest Reports | SKIPPED | - | `app/notifications/digest.py`, `app/notifications/templates/` | T11 |
-| T16 | GraphQL API Layer | COMPLETE | Tab 1 | `app/graphql/schema.py`, `app/graphql/resolvers.py` | None |
-| T17 | Portfolio Comparison Tool | COMPLETE | Tab 2 | `app/analytics/comparison.py`, `app/api/v1/compare.py` | None |
-| T18 | Investor Similarity & Recommendations | COMPLETE | Tab 2 | `app/analytics/recommendations.py`, `app/api/v1/discover.py` | T12 |
-| T19 | Public API with Auth & Rate Limits | IN_PROGRESS | Tab 2 | `app/api/public/`, `app/auth/api_keys.py` | None |
-| T20 | Saved Searches & Watchlists | COMPLETE | Tab 2 | `app/users/watchlists.py`, `app/api/v1/watchlists.py` | T12 |
+| T21 | Co-investor Network Graph | COMPLETE | Tab 1 | `app/network/graph.py`, `app/api/v1/network.py` | None |
+| T22 | Company Data Enrichment | NOT_STARTED | - | `app/enrichment/company.py`, `app/api/v1/enrichment.py` | None |
+| T23 | Investment Trend Analysis | NOT_STARTED | - | `app/analytics/trends.py`, `app/api/v1/trends.py` | None |
+| T24 | News & Event Feed | NOT_STARTED | - | `app/news/aggregator.py`, `app/api/v1/news.py` | None |
+| T25 | Custom Report Builder | NOT_STARTED | - | `app/reports/builder.py`, `app/api/v1/reports.py` | None |
+| T26 | Bulk Portfolio Import | NOT_STARTED | - | `app/import/portfolio.py`, `app/api/v1/import.py` | None |
+| T27 | LP Profile Enrichment | NOT_STARTED | - | `app/enrichment/investor.py` | None |
+| T28 | Deal Flow Tracker | NOT_STARTED | - | `app/deals/tracker.py`, `app/api/v1/deals.py` | None |
+| T29 | Market Benchmarks | NOT_STARTED | - | `app/analytics/benchmarks.py`, `app/api/v1/benchmarks.py` | T23 |
+| T30 | User Auth & Workspaces | NOT_STARTED | - | `app/users/auth.py`, `app/users/workspaces.py` | T19 |
 
 ---
 
 ## Task Details
+
+### Phase 3 Tasks
+
+### T21: Co-investor Network Graph
+**Goal:** Build network data structure showing investor relationships based on shared investments.
+
+**Scope:**
+- Create `app/network/graph.py` with:
+  - Co-investor relationship calculation (shared portfolio companies)
+  - Relationship strength scoring (# shared investments, recency)
+  - Network centrality metrics (most connected LPs)
+  - Cluster detection (investor groups with high overlap)
+  - Graph export for visualization (nodes/edges JSON)
+- Add `GET /api/v1/network/investor/{id}` - get investor's co-investor network
+- Add `GET /api/v1/network/graph` - full network data for visualization
+- Add `GET /api/v1/network/clusters` - detected investor clusters
+- Add `GET /api/v1/network/central` - most connected investors
+
+**Plan:** `docs/plans/PLAN_T21_network.md`
+
+---
+
+### T22: Company Data Enrichment
+**Goal:** Enrich portfolio company data with financials, funding, and growth metrics.
+
+**Scope:**
+- Create `app/enrichment/company.py` with:
+  - SEC EDGAR integration (revenue, assets from 10-K/10-Q)
+  - Funding data aggregation (rounds, valuations)
+  - Employee count tracking (LinkedIn, company sites)
+  - Industry classification enrichment
+  - Company status (active, acquired, IPO, bankrupt)
+- Add `POST /api/v1/enrichment/company/{id}` - trigger enrichment job
+- Add `GET /api/v1/enrichment/company/{id}/status` - enrichment status
+- Add `GET /api/v1/companies/{id}/financials` - get enriched data
+- Add `POST /api/v1/enrichment/batch` - bulk enrichment
+
+**Plan:** `docs/plans/PLAN_T22_company_enrichment.md`
+
+---
+
+### T23: Investment Trend Analysis
+**Goal:** Surface investment trends across LP portfolios (sector rotation, emerging themes).
+
+**Scope:**
+- Create `app/analytics/trends.py` with:
+  - Sector allocation trends over time
+  - Emerging sector detection (accelerating investment)
+  - Declining sector detection (divestment patterns)
+  - Geographic trends (where money is flowing)
+  - Stage trends (early vs late stage shifts)
+  - LP behavior clustering (growth-focused vs value-focused)
+- Add `GET /api/v1/trends/sectors` - sector allocation trends
+- Add `GET /api/v1/trends/emerging` - hot sectors with momentum
+- Add `GET /api/v1/trends/geographic` - investment by region
+- Add `GET /api/v1/trends/stages` - investment stage trends
+
+**Plan:** `docs/plans/PLAN_T23_trends.md`
+
+---
+
+### T24: News & Event Feed
+**Goal:** Aggregate news and events relevant to tracked investors and portfolio companies.
+
+**Scope:**
+- Create `app/news/aggregator.py` with:
+  - SEC filing alerts (13F, 13D, 8-K, 10-K)
+  - Company news aggregation (RSS, news APIs)
+  - Funding announcement detection
+  - M&A and IPO tracking
+  - Event deduplication and relevance scoring
+- Add `GET /api/v1/news/feed` - personalized news feed
+- Add `GET /api/v1/news/investor/{id}` - news for specific investor
+- Add `GET /api/v1/news/company/{id}` - news for specific company
+- Add `GET /api/v1/events/calendar` - upcoming events (earnings, filings)
+
+**Plan:** `docs/plans/PLAN_T24_news.md`
+
+---
+
+### T25: Custom Report Builder
+**Goal:** Generate customizable PDF/Excel reports for sharing insights.
+
+**Scope:**
+- Create `app/reports/builder.py` with:
+  - Report templates (investor profile, portfolio summary, comparison)
+  - Dynamic content sections (charts, tables, text)
+  - PDF generation (WeasyPrint or ReportLab)
+  - Excel generation (multi-sheet with charts)
+  - Scheduled report generation
+  - Report history and versioning
+- Add `POST /api/v1/reports/generate` - create report
+- Add `GET /api/v1/reports/templates` - available templates
+- Add `GET /api/v1/reports/{id}` - download generated report
+- Add `POST /api/v1/reports/schedule` - schedule recurring reports
+
+**Plan:** `docs/plans/PLAN_T25_reports.md`
+
+---
+
+### T26: Bulk Portfolio Import
+**Goal:** Allow users to upload their own portfolio data via CSV/Excel.
+
+**Scope:**
+- Create `app/import/portfolio.py` with:
+  - CSV/Excel parsing with flexible column mapping
+  - Data validation and error reporting
+  - Company name matching (fuzzy match to existing)
+  - Duplicate detection and merge strategies
+  - Import preview before commit
+  - Import history and rollback
+- Add `POST /api/v1/import/upload` - upload file
+- Add `POST /api/v1/import/preview` - preview import results
+- Add `POST /api/v1/import/confirm` - confirm and execute import
+- Add `GET /api/v1/import/history` - past imports
+- Add `POST /api/v1/import/{id}/rollback` - undo import
+
+**Plan:** `docs/plans/PLAN_T26_import.md`
+
+---
+
+### T27: LP Profile Enrichment
+**Goal:** Enrich investor profiles with contact data, AUM history, and preferences.
+
+**Scope:**
+- Create `app/enrichment/investor.py` with:
+  - Contact information lookup (key personnel)
+  - AUM history tracking over time
+  - Investment preference extraction (sectors, stages, geography)
+  - Commitment pace analysis (how often they invest)
+  - LP classification refinement
+- Add `POST /api/v1/enrichment/investor/{id}` - trigger enrichment
+- Add `GET /api/v1/investors/{id}/contacts` - key contacts
+- Add `GET /api/v1/investors/{id}/aum-history` - AUM over time
+- Add `GET /api/v1/investors/{id}/preferences` - investment preferences
+
+**Plan:** `docs/plans/PLAN_T27_lp_enrichment.md`
+
+---
+
+### T28: Deal Flow Tracker
+**Goal:** Track potential investment opportunities through a pipeline.
+
+**Scope:**
+- Create `app/deals/tracker.py` with:
+  - Deal/opportunity CRUD
+  - Pipeline stages (sourced, reviewing, due diligence, closed)
+  - Deal tagging and categorization
+  - Activity logging (notes, meetings, documents)
+  - Deal scoring and prioritization
+  - Team collaboration (assign, comment)
+- Add `POST /api/v1/deals` - create deal
+- Add `GET /api/v1/deals` - list deals with filters
+- Add `PATCH /api/v1/deals/{id}` - update deal stage
+- Add `POST /api/v1/deals/{id}/activities` - log activity
+- Add `GET /api/v1/deals/pipeline` - pipeline summary
+
+**Plan:** `docs/plans/PLAN_T28_deals.md`
+
+---
+
+### T29: Market Benchmarks
+**Goal:** Compare LP performance and allocations against market benchmarks.
+
+**Scope:**
+- Create `app/analytics/benchmarks.py` with:
+  - Peer group construction (similar LPs by type, size)
+  - Allocation benchmarks (median sector allocation by LP type)
+  - Diversification scoring vs peers
+  - Performance proxies (portfolio company outcomes)
+  - Benchmark trend tracking
+- Add `GET /api/v1/benchmarks/investor/{id}` - investor vs benchmark
+- Add `GET /api/v1/benchmarks/peer-group/{id}` - peer comparison
+- Add `GET /api/v1/benchmarks/sectors` - sector allocation benchmarks
+- Add `GET /api/v1/benchmarks/diversification` - diversification scores
+
+**Dependencies:** T23 (trends) for baseline data
+
+**Plan:** `docs/plans/PLAN_T29_benchmarks.md`
+
+---
+
+### T30: User Auth & Workspaces
+**Goal:** Add user authentication and team workspaces for collaboration.
+
+**Scope:**
+- Create `app/users/auth.py` with:
+  - JWT-based authentication
+  - User registration and login
+  - Password reset flow
+  - OAuth integration (Google, Microsoft)
+  - Session management
+- Create `app/users/workspaces.py` with:
+  - Team/workspace creation
+  - Member invitations and roles (admin, member, viewer)
+  - Shared watchlists and saved searches
+  - Workspace-scoped data isolation
+- Add `POST /api/v1/auth/register` - user registration
+- Add `POST /api/v1/auth/login` - login, get JWT
+- Add `POST /api/v1/workspaces` - create workspace
+- Add `POST /api/v1/workspaces/{id}/invite` - invite member
+
+**Dependencies:** T19 (API keys) for auth foundation
+
+**Plan:** `docs/plans/PLAN_T30_auth.md`
+
+---
+
+### Phase 2 Tasks (Archived)
 
 ### T11: Portfolio Change Alerts
 **Goal:** Notify users when portfolio data changes (new holdings, exits, value changes).
@@ -281,6 +516,11 @@ Phase 1 built the core infrastructure for automated portfolio data collection.
 [Tab 2] Claiming T19 - Public API with Auth & Rate Limits. Writing detailed plan for user approval.
 [Tab 1] Claiming T16 - GraphQL API Layer. Writing detailed plan for user approval.
 [Tab 1] T16 COMPLETE: GraphQL API Layer implemented using Strawberry GraphQL. Features: LPFund/FamilyOffice/PortfolioCompany types with nested relationships, search query (integrates with T12), analytics overview (integrates with T13), industry breakdown, top movers. Queries: lpFund, lpFunds, familyOffice, familyOffices, portfolioCompany, portfolioCompanies, search, analyticsOverview, industryBreakdown, topMovers. Endpoint: POST /graphql with GraphQL Playground at GET /graphql.
+[Tab 2] T19 COMPLETE: Public API with Auth & Rate Limits implemented. Features: API key generation (SHA-256 hashed storage, nxd_ prefix), rate limiting (per-minute and per-day with token bucket), usage tracking (per-key, per-endpoint, daily breakdown), scope-based access (read/write/admin), key revocation. 9 endpoints: POST/GET/PATCH/DELETE /api-keys, GET /api-keys/{id}/usage, GET /public/investors, GET /public/investors/{id}, GET /public/search. Rate limit headers: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset.
+[SYSTEM] Phase 2 (T11-T20) complete (8/10, T14-T15 skipped). Phase 3 initialized with 10 new tasks.
+[SYSTEM] Phase 3 focus: Investment Intelligence - network analysis, data enrichment, trends, reports, deal tracking.
+[Tab 1] Claiming T21 - Co-investor Network Graph. Writing plan for user approval.
+[Tab 1] T21 COMPLETE: Co-investor Network Graph implemented. Features: network graph from co_investments + shared portfolios, centrality metrics (degree, weighted degree), investor ego networks (depth 1-3), cluster detection (connected components), path finding between investors. 5 endpoints: GET /network/graph, GET /network/investor/{id}, GET /network/central, GET /network/clusters, GET /network/path. Output compatible with D3.js/Cytoscape visualization.
 ```
 
 ---
@@ -300,6 +540,20 @@ Phase 1 built the core infrastructure for automated portfolio data collection.
 | T08 | Portfolio Export to CSV/Excel | Tab 1 | 88918b3 |
 | T09 | Annual Report PDF Caching | Tab 1 | Plan 004 |
 | T10 | Website Strategy - JS Rendering | Agent-T10 | fe9951f |
+
+### Phase 2: Bringing Data to People
+| ID | Task | Completed By | Commit |
+|----|------|--------------|--------|
+| T11 | Portfolio Change Alerts | Tab 1 | - |
+| T12 | Full-Text Search API | Tab 2 | - |
+| T13 | Dashboard Analytics API | Tab 1 | - |
+| T14 | Webhook Integrations | SKIPPED | - |
+| T15 | Email Digest Reports | SKIPPED | - |
+| T16 | GraphQL API Layer | Tab 1 | - |
+| T17 | Portfolio Comparison Tool | Tab 2 | - |
+| T18 | Investor Similarity & Recommendations | Tab 2 | - |
+| T19 | Public API with Auth & Rate Limits | Tab 2 | - |
+| T20 | Saved Searches & Watchlists | Tab 2 | - |
 
 ### Pre-Phase Work
 | Task | Completed By | Commit |
@@ -362,7 +616,32 @@ Phase 1 built the core infrastructure for automated portfolio data collection.
 | `app/api/v1/compare.py` | T17 |
 | `app/analytics/recommendations.py` | T18 |
 | `app/api/v1/discover.py` | T18 |
-| `app/api/public/` | T19 |
+| `app/auth/__init__.py` | T19 |
 | `app/auth/api_keys.py` | T19 |
+| `app/api/v1/api_keys.py` | T19 |
+| `app/api/v1/public.py` | T19 |
 | `app/users/watchlists.py` | T20 |
 | `app/api/v1/watchlists.py` | T20 |
+
+### Phase 3 Files
+| File | Owner Task |
+|------|------------|
+| `app/network/graph.py` | T21 |
+| `app/api/v1/network.py` | T21 |
+| `app/enrichment/company.py` | T22 |
+| `app/api/v1/enrichment.py` | T22, T27 |
+| `app/analytics/trends.py` | T23 |
+| `app/api/v1/trends.py` | T23 |
+| `app/news/aggregator.py` | T24 |
+| `app/api/v1/news.py` | T24 |
+| `app/reports/builder.py` | T25 |
+| `app/api/v1/reports.py` | T25 |
+| `app/import/portfolio.py` | T26 |
+| `app/api/v1/import.py` | T26 |
+| `app/enrichment/investor.py` | T27 |
+| `app/deals/tracker.py` | T28 |
+| `app/api/v1/deals.py` | T28 |
+| `app/analytics/benchmarks.py` | T29 |
+| `app/api/v1/benchmarks.py` | T29 |
+| `app/users/auth.py` | T30 |
+| `app/users/workspaces.py` | T30 |
