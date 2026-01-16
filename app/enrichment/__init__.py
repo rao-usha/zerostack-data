@@ -1,9 +1,11 @@
 """
-Company data enrichment module.
+Company and Investor data enrichment module.
 
-Provides enrichment of portfolio company data with financials,
-funding, employees, and industry classification.
+Provides enrichment of:
+- Portfolio company data (financials, funding, employees, industry)
+- Investor profiles (contacts, AUM history, preferences)
 """
 from app.enrichment.company import CompanyEnrichmentEngine
+from app.enrichment.investor import InvestorEnrichmentEngine
 
-__all__ = ["CompanyEnrichmentEngine"]
+__all__ = ["CompanyEnrichmentEngine", "InvestorEnrichmentEngine"]
