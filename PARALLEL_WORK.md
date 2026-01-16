@@ -60,15 +60,15 @@ Phase 1 built the core infrastructure for automated portfolio data collection.
 | ID | Task | Status | Agent | Files (Scope) | Dependencies |
 |----|------|--------|-------|---------------|--------------|
 | T11 | Portfolio Change Alerts | COMPLETE | Tab 1 | `app/notifications/alerts.py`, `app/api/v1/alerts.py` | None |
-| T12 | Full-Text Search API | IN_PROGRESS | Tab 2 | `app/search/engine.py`, `app/api/v1/search.py` | None |
-| T13 | Dashboard Analytics API | NOT_STARTED | - | `app/analytics/dashboard.py`, `app/api/v1/analytics.py` | None |
+| T12 | Full-Text Search API | COMPLETE | Tab 2 | `app/search/engine.py`, `app/api/v1/search.py` | None |
+| T13 | Dashboard Analytics API | COMPLETE | Tab 1 | `app/analytics/dashboard.py`, `app/api/v1/analytics.py` | None |
 | T14 | Webhook Integrations | NOT_STARTED | - | `app/integrations/webhooks.py`, `app/api/v1/webhooks.py` | None |
 | T15 | Email Digest Reports | NOT_STARTED | - | `app/notifications/digest.py`, `app/notifications/templates/` | T11 |
 | T16 | GraphQL API Layer | NOT_STARTED | - | `app/graphql/schema.py`, `app/graphql/resolvers.py` | None |
 | T17 | Portfolio Comparison Tool | NOT_STARTED | - | `app/analytics/comparison.py`, `app/api/v1/compare.py` | None |
-| T18 | Investor Similarity & Recommendations | NOT_STARTED | - | `app/analytics/recommendations.py`, `app/api/v1/discover.py` | T12 |
+| T18 | Investor Similarity & Recommendations | COMPLETE | Tab 2 | `app/analytics/recommendations.py`, `app/api/v1/discover.py` | T12 |
 | T19 | Public API with Auth & Rate Limits | NOT_STARTED | - | `app/api/public/`, `app/auth/api_keys.py` | None |
-| T20 | Saved Searches & Watchlists | NOT_STARTED | - | `app/users/watchlists.py`, `app/api/v1/watchlists.py` | T12 |
+| T20 | Saved Searches & Watchlists | IN_PROGRESS | Tab 2 | `app/users/watchlists.py`, `app/api/v1/watchlists.py` | T12 |
 
 ---
 
@@ -269,6 +269,12 @@ Phase 1 built the core infrastructure for automated portfolio data collection.
 [Tab 1] T10 committed and pushed (fe9951f). Starting T11 - Portfolio Change Alerts.
 [Tab 2] Claiming T12 - Full-Text Search API. Writing plan for user approval.
 [Tab 1] T11 COMPLETE: Portfolio Change Alerts implemented. Features: subscription management, change detection engine (new/removed holdings, value/shares changes), alert lifecycle (pending/acknowledged/expired), 8 API endpoints. Tables: alert_subscriptions, portfolio_alerts, portfolio_snapshots.
+[Tab 1] Starting T13 - Dashboard Analytics API.
+[Tab 2] T12 COMPLETE: Full-Text Search API implemented. Features: PostgreSQL FTS with GIN indexes, pg_trgm fuzzy matching for typos, faceted filtering (type/industry/location), autocomplete suggestions. Indexed 4034 records (27 investors, 4007 companies). Endpoints: GET /search, GET /search/suggest, POST /search/reindex, GET /search/stats. Performance: <200ms P95.
+[Tab 2] Claiming T18 - Investor Similarity & Recommendations. Writing plan for user approval.
+[Tab 2] T18 COMPLETE: Investor Similarity & Recommendations implemented. Features: Jaccard similarity scoring, similar investors endpoint, company recommendations ("investors like X also invest in Y"), portfolio overlap analysis. Endpoints: GET /discover/similar/{id}, GET /discover/recommended/{id}, GET /discover/overlap. Performance: <200ms.
+[Tab 2] Claiming T20 - Saved Searches & Watchlists. Writing detailed plan for user approval.
+[Tab 1] T13 COMPLETE: Dashboard Analytics API implemented. Features: system overview (investor coverage, portfolio totals, collection stats, alert stats), investor analytics (portfolio summary, industry distribution, top holdings, data quality score), trends (time-series for collections/companies/alerts), top movers (recent portfolio changes), industry breakdown (aggregate distribution). 5 endpoints: GET /analytics/overview, /analytics/investor/{id}, /analytics/trends, /analytics/top-movers, /analytics/industry-breakdown.
 ```
 
 ---
