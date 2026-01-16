@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news
+from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news, reports, deals
 from app.graphql import graphql_app
 
 # Configure logging
@@ -752,6 +752,14 @@ Browse the endpoint sections below to see what's available:
         {
             "name": "News",
             "description": "📰 **News & Events** - Aggregated news from SEC EDGAR, Google News, and press releases for investors and portfolio companies"
+        },
+        {
+            "name": "Reports",
+            "description": "📊 **Custom Reports** - Generate investor profiles, portfolio summaries, and trend analysis as HTML/Excel reports"
+        },
+        {
+            "name": "deals",
+            "description": "💼 **Deal Flow Tracker** - Track investment opportunities through pipeline stages from sourcing to close"
         }
     ]
 )
@@ -819,6 +827,8 @@ app.include_router(trends.router, prefix="/api/v1")
 app.include_router(enrichment.router, prefix="/api/v1")
 app.include_router(import_portfolio.router, prefix="/api/v1")
 app.include_router(news.router, prefix="/api/v1")
+app.include_router(reports.router, prefix="/api/v1")
+app.include_router(deals.router, prefix="/api/v1")
 
 # GraphQL API
 app.include_router(graphql_app, prefix="/graphql", tags=["graphql"])

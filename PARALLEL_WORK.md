@@ -92,8 +92,8 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 | T25 | Custom Report Builder | COMPLETE | Tab 2 | `app/reports/builder.py`, `app/api/v1/reports.py` | None |
 | T26 | Bulk Portfolio Import | COMPLETE | Tab 1 | `app/import_data/portfolio.py`, `app/api/v1/import_portfolio.py` | None |
 | T27 | LP Profile Enrichment | COMPLETE | Tab 1 | `app/enrichment/investor.py` | None |
-| T28 | Deal Flow Tracker | IN_PROGRESS | Tab 2 | `app/deals/tracker.py`, `app/api/v1/deals.py` | None |
-| T29 | Market Benchmarks | NOT_STARTED | - | `app/analytics/benchmarks.py`, `app/api/v1/benchmarks.py` | T23 |
+| T28 | Deal Flow Tracker | COMPLETE | Tab 2 | `app/deals/tracker.py`, `app/api/v1/deals.py` | None |
+| T29 | Market Benchmarks | IN_PROGRESS | Tab 1 | `app/analytics/benchmarks.py`, `app/api/v1/benchmarks.py` | T23 |
 | T30 | User Auth & Workspaces | NOT_STARTED | - | `app/users/auth.py`, `app/users/workspaces.py` | T19 |
 
 ---
@@ -528,6 +528,8 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 [Tab 1] T26 COMPLETE: Bulk Portfolio Import implemented. Features: CSV/Excel file upload, column validation, fuzzy investor matching, preview with errors/warnings, import execution, rollback support, import history. 6 endpoints: POST /import/upload, GET /import/{id}/preview, POST /import/{id}/confirm, GET /import/{id}/status, GET /import/history, POST /import/{id}/rollback. Tables: portfolio_imports.
 [Tab 1] Claiming T27 - LP Profile Enrichment. Writing plan for user approval.
 [Tab 1] T27 COMPLETE: LP Profile Enrichment implemented. Features: portfolio-based preference analysis (sectors, stages, regions), commitment pace calculation (investments/year, timing), contact extraction, AUM history tracking. 5 endpoints: POST /enrichment/investor/{id}, GET /enrichment/investor/{id}/status, GET /investors/{id}/contacts, GET /investors/{id}/aum-history, GET /investors/{id}/preferences. Tables: investor_contacts, investor_aum_history, investor_preferences.
+[Tab 2] T28 COMPLETE: Deal Flow Tracker implemented. Features: deal CRUD (create/get/update/delete), pipeline stages (sourced/reviewing/due_diligence/negotiation/closed_won/closed_lost/passed), activity logging (meetings/notes/calls/emails/documents), pipeline summary with counts by stage/priority, filtering (stage/sector/assignee/priority), priority ordering. 9 endpoints: POST/GET/PATCH/DELETE /deals, POST/GET /deals/{id}/activities, GET /deals/pipeline, GET /deals/stages. Tables: deals, deal_activities.
+[Tab 1] Claiming T29 - Market Benchmarks. Writing plan for user approval.
 ```
 
 ---
