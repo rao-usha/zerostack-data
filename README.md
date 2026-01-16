@@ -26,8 +26,8 @@ Stop writing custom code for each data provider. Use one consistent REST API to 
 | **Analytics** | Recommendations | ✅ COMPLETE | Investor similarity, portfolio overlap |
 | **Analytics** | Watchlists | ✅ COMPLETE | Saved searches and tracking |
 | **Analytics** | Portfolio Alerts | ✅ COMPLETE | Change detection (internal tracking) |
-| **Analytics** | Portfolio Comparison | 🔄 IN PROGRESS | Side-by-side investor analysis |
-| **Access** | GraphQL API | 📋 PLANNED | Flexible query layer |
+| **Analytics** | Portfolio Comparison | ✅ COMPLETE | Side-by-side investor analysis |
+| **Access** | GraphQL API | ✅ COMPLETE | Flexible query layer at /graphql |
 | **Access** | Public API + Auth | 📋 PLANNED | API keys and rate limits for external access |
 
 ---
@@ -283,10 +283,10 @@ MAX_REQUESTS_PER_SECOND=10
 | T13 | Dashboard Analytics API | ✅ COMPLETE |
 | T14 | Webhook Integrations | ⏭️ SKIPPED |
 | T15 | Email Digest Reports | ⏭️ SKIPPED |
-| T16 | GraphQL API Layer | 📋 PLANNED |
-| T17 | Portfolio Comparison Tool | 🔄 IN PROGRESS |
+| T16 | GraphQL API Layer | ✅ COMPLETE |
+| T17 | Portfolio Comparison Tool | ✅ COMPLETE |
 | T18 | Investor Similarity | ✅ COMPLETE |
-| T19 | Public API with Auth | 📋 PLANNED |
+| T19 | Public API with Auth | 🔄 IN PROGRESS |
 | T20 | Saved Searches & Watchlists | ✅ COMPLETE |
 
 ---
@@ -381,9 +381,7 @@ pytest tests/test_llm_client.py -v
 ## What's Next
 
 ### Remaining Tasks
-1. **T16 - GraphQL API** - Flexible query layer for complex data needs
-2. **T17 - Portfolio Comparison** - Side-by-side investor analysis (in progress)
-3. **T19 - Public API with Auth** - API keys and rate limits for external access
+1. **T19 - Public API with Auth** - API keys and rate limits for external access (in progress)
 
 ### Future Enhancements
 - Response caching with Redis

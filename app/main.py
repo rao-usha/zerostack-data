@@ -10,7 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics
+from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public
+from app.graphql import graphql_app
 
 # Configure logging
 logging.basicConfig(
@@ -723,6 +724,18 @@ Browse the endpoint sections below to see what's available:
         {
             "name": "Dashboard Analytics",
             "description": "📊 **Dashboard Analytics** - Pre-computed analytics for frontend dashboards: system overview, investor insights, trends, and industry breakdowns"
+        },
+        {
+            "name": "Portfolio Comparison",
+            "description": "🔀 **Portfolio Comparison** - Compare investor portfolios side-by-side, track historical changes, and analyze industry allocations"
+        },
+        {
+            "name": "API Keys",
+            "description": "🔑 **API Key Management** - Create, list, update, and revoke API keys for public API access"
+        },
+        {
+            "name": "Public API",
+            "description": "🌐 **Public API** - Protected endpoints for external developers with API key authentication and rate limiting"
         }
     ]
 )
@@ -782,6 +795,12 @@ app.include_router(search.router, prefix="/api/v1")
 app.include_router(discover.router, prefix="/api/v1")
 app.include_router(watchlists.router, prefix="/api/v1")
 app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(compare.router, prefix="/api/v1")
+app.include_router(api_keys.router, prefix="/api/v1")
+app.include_router(public.router, prefix="/api/v1")
+
+# GraphQL API
+app.include_router(graphql_app, prefix="/graphql", tags=["graphql"])
 
 
 @app.get("/", tags=["Root"])

@@ -258,10 +258,10 @@ saved_searches           - Saved search queries
 | T13 | Dashboard Analytics API | COMPLETE | External access |
 | T14 | Webhook Integrations | SKIPPED | Out of scope - pushes TO external |
 | T15 | Email Digest Reports | SKIPPED | Out of scope - pushes TO users |
-| T16 | GraphQL API Layer | NOT_STARTED | External access |
-| T17 | Portfolio Comparison Tool | IN_PROGRESS | External access |
+| T16 | GraphQL API Layer | COMPLETE | Strawberry GraphQL at /graphql |
+| T17 | Portfolio Comparison Tool | COMPLETE | Side-by-side investor analysis |
 | T18 | Investor Similarity | COMPLETE | External access |
-| T19 | Public API with Auth | NOT_STARTED | External access |
+| T19 | Public API with Auth | IN_PROGRESS | API keys and rate limits |
 | T20 | Saved Searches & Watchlists | COMPLETE | External access |
 
 ### Platform Philosophy

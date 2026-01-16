@@ -64,10 +64,10 @@ Phase 1 built the core infrastructure for automated portfolio data collection.
 | T13 | Dashboard Analytics API | COMPLETE | Tab 1 | `app/analytics/dashboard.py`, `app/api/v1/analytics.py` | None |
 | T14 | Webhook Integrations | SKIPPED | - | `app/integrations/webhooks.py`, `app/api/v1/webhooks.py` | None |
 | T15 | Email Digest Reports | SKIPPED | - | `app/notifications/digest.py`, `app/notifications/templates/` | T11 |
-| T16 | GraphQL API Layer | NOT_STARTED | - | `app/graphql/schema.py`, `app/graphql/resolvers.py` | None |
-| T17 | Portfolio Comparison Tool | IN_PROGRESS | Tab 2 | `app/analytics/comparison.py`, `app/api/v1/compare.py` | None |
+| T16 | GraphQL API Layer | COMPLETE | Tab 1 | `app/graphql/schema.py`, `app/graphql/resolvers.py` | None |
+| T17 | Portfolio Comparison Tool | COMPLETE | Tab 2 | `app/analytics/comparison.py`, `app/api/v1/compare.py` | None |
 | T18 | Investor Similarity & Recommendations | COMPLETE | Tab 2 | `app/analytics/recommendations.py`, `app/api/v1/discover.py` | T12 |
-| T19 | Public API with Auth & Rate Limits | NOT_STARTED | - | `app/api/public/`, `app/auth/api_keys.py` | None |
+| T19 | Public API with Auth & Rate Limits | IN_PROGRESS | Tab 2 | `app/api/public/`, `app/auth/api_keys.py` | None |
 | T20 | Saved Searches & Watchlists | COMPLETE | Tab 2 | `app/users/watchlists.py`, `app/api/v1/watchlists.py` | T12 |
 
 ---
@@ -277,6 +277,10 @@ Phase 1 built the core infrastructure for automated portfolio data collection.
 [Tab 1] T13 COMPLETE: Dashboard Analytics API implemented. Features: system overview (investor coverage, portfolio totals, collection stats, alert stats), investor analytics (portfolio summary, industry distribution, top holdings, data quality score), trends (time-series for collections/companies/alerts), top movers (recent portfolio changes), industry breakdown (aggregate distribution). 5 endpoints: GET /analytics/overview, /analytics/investor/{id}, /analytics/trends, /analytics/top-movers, /analytics/industry-breakdown.
 [Tab 2] T20 COMPLETE: Saved Searches & Watchlists implemented. Features: watchlist CRUD (create/update/delete), watchlist items (add/remove/list investors/companies), saved searches (create/update/delete/execute), duplicate prevention (409 on duplicates), user isolation, item count triggers. 12 endpoints covering POST/GET/PATCH/DELETE for /watchlists, /watchlists/{id}/items, /searches/saved. Integration with T12 search engine for saved search execution.
 [Tab 2] Claiming T17 - Portfolio Comparison Tool. Writing detailed plan for user approval.
+[Tab 2] T17 COMPLETE: Portfolio Comparison Tool implemented. Features: side-by-side portfolio comparison (overlap count, Jaccard similarity, unique holdings), historical diff (additions/removals over time), industry allocation comparison. 3 endpoints: POST /compare/portfolios, GET /compare/investor/{id}/history, GET /compare/industry. Performance: 166ms.
+[Tab 2] Claiming T19 - Public API with Auth & Rate Limits. Writing detailed plan for user approval.
+[Tab 1] Claiming T16 - GraphQL API Layer. Writing detailed plan for user approval.
+[Tab 1] T16 COMPLETE: GraphQL API Layer implemented using Strawberry GraphQL. Features: LPFund/FamilyOffice/PortfolioCompany types with nested relationships, search query (integrates with T12), analytics overview (integrates with T13), industry breakdown, top movers. Queries: lpFund, lpFunds, familyOffice, familyOffices, portfolioCompany, portfolioCompanies, search, analyticsOverview, industryBreakdown, topMovers. Endpoint: POST /graphql with GraphQL Playground at GET /graphql.
 ```
 
 ---

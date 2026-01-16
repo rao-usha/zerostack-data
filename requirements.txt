@@ -45,6 +45,9 @@ yfinance>=0.2.0  # Stock ticker to company name lookup
 # JS-rendered page support
 playwright>=1.40.0  # Browser automation for JS-heavy pages
 
+# GraphQL API
+strawberry-graphql[fastapi]>=0.220.0
+
 
 
 
