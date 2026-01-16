@@ -91,7 +91,7 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 | T24 | News & Event Feed | COMPLETE | Tab 2 | `app/news/aggregator.py`, `app/api/v1/news.py` | None |
 | T25 | Custom Report Builder | NOT_STARTED | - | `app/reports/builder.py`, `app/api/v1/reports.py` | None |
 | T26 | Bulk Portfolio Import | COMPLETE | Tab 1 | `app/import_data/portfolio.py`, `app/api/v1/import_portfolio.py` | None |
-| T27 | LP Profile Enrichment | NOT_STARTED | - | `app/enrichment/investor.py` | None |
+| T27 | LP Profile Enrichment | IN_PROGRESS | Tab 1 | `app/enrichment/investor.py` | None |
 | T28 | Deal Flow Tracker | NOT_STARTED | - | `app/deals/tracker.py`, `app/api/v1/deals.py` | None |
 | T29 | Market Benchmarks | NOT_STARTED | - | `app/analytics/benchmarks.py`, `app/api/v1/benchmarks.py` | T23 |
 | T30 | User Auth & Workspaces | NOT_STARTED | - | `app/users/auth.py`, `app/users/workspaces.py` | T19 |
