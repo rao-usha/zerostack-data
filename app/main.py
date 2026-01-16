@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network
+from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment
 from app.graphql import graphql_app
 
 # Configure logging
@@ -736,6 +736,14 @@ Browse the endpoint sections below to see what's available:
         {
             "name": "Public API",
             "description": "🌐 **Public API** - Protected endpoints for external developers with API key authentication and rate limiting"
+        },
+        {
+            "name": "Trends",
+            "description": "📈 **Investment Trends** - Sector rotation, emerging themes, geographic shifts, and allocation trends across LP portfolios"
+        },
+        {
+            "name": "enrichment",
+            "description": "🔬 **Company Data Enrichment** - Enrich portfolio companies with SEC financials, funding data, employee counts, and industry classification"
         }
     ]
 )
@@ -799,6 +807,8 @@ app.include_router(compare.router, prefix="/api/v1")
 app.include_router(api_keys.router, prefix="/api/v1")
 app.include_router(public.router, prefix="/api/v1")
 app.include_router(network.router, prefix="/api/v1")
+app.include_router(trends.router, prefix="/api/v1")
+app.include_router(enrichment.router, prefix="/api/v1")
 
 # GraphQL API
 app.include_router(graphql_app, prefix="/graphql", tags=["graphql"])
