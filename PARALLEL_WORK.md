@@ -88,7 +88,7 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 | T21 | Co-investor Network Graph | COMPLETE | Tab 1 | `app/network/graph.py`, `app/api/v1/network.py` | None |
 | T22 | Company Data Enrichment | COMPLETE | Tab 1 | `app/enrichment/company.py`, `app/api/v1/enrichment.py` | None |
 | T23 | Investment Trend Analysis | COMPLETE | Tab 2 | `app/analytics/trends.py`, `app/api/v1/trends.py` | None |
-| T24 | News & Event Feed | NOT_STARTED | - | `app/news/aggregator.py`, `app/api/v1/news.py` | None |
+| T24 | News & Event Feed | IN_PROGRESS | Tab 1 | `app/news/aggregator.py`, `app/api/v1/news.py` | None |
 | T25 | Custom Report Builder | NOT_STARTED | - | `app/reports/builder.py`, `app/api/v1/reports.py` | None |
 | T26 | Bulk Portfolio Import | NOT_STARTED | - | `app/import/portfolio.py`, `app/api/v1/import.py` | None |
 | T27 | LP Profile Enrichment | NOT_STARTED | - | `app/enrichment/investor.py` | None |
@@ -523,6 +523,7 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 [Tab 1] T21 COMPLETE: Co-investor Network Graph implemented. Features: network graph from co_investments + shared portfolios, centrality metrics (degree, weighted degree), investor ego networks (depth 1-3), cluster detection (connected components), path finding between investors. 5 endpoints: GET /network/graph, GET /network/investor/{id}, GET /network/central, GET /network/clusters, GET /network/path. Output compatible with D3.js/Cytoscape visualization.
 [Tab 1] Claiming T22 - Company Data Enrichment. Writing plan for user approval.
 [Tab 1] T22 COMPLETE: Company Data Enrichment implemented. Features: SEC EDGAR integration (company tickers, financials from 10-K/10-Q), funding data placeholder, employee data placeholder, industry classification (keyword-based), company status tracking, job tracking. 5 endpoints: POST /enrichment/company/{name}, GET /enrichment/company/{name}/status, GET /enrichment/companies/{name}, GET /enrichment/companies, POST /enrichment/batch. Tables: company_enrichment, enrichment_jobs.
+[Tab 1] Claiming T24 - News & Event Feed. Writing plan for user approval.
 ```
 
 ---
