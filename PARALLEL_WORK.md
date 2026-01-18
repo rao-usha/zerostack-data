@@ -106,7 +106,7 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 
 | ID | Task | Status | Agent | Files (Scope) | Dependencies |
 |----|------|--------|-------|---------------|--------------|
-| T31 | SEC Form D Filings | IN_PROGRESS | Tab 1 | `app/sources/sec_form_d/`, `app/api/v1/form_d.py` | None |
+| T31 | SEC Form D Filings | COMPLETE | Tab 1 | `app/sources/sec_form_d/`, `app/api/v1/form_d.py` | None |
 | T32 | SEC Form ADV Data | NOT_STARTED | - | `app/sources/sec_form_adv/`, `app/api/v1/form_adv.py` | None |
 | T33 | OpenCorporates Integration | NOT_STARTED | - | `app/sources/opencorporates/`, `app/api/v1/corporate_registry.py` | None |
 | T34 | GitHub Repository Analytics | NOT_STARTED | - | `app/sources/github/`, `app/api/v1/github.py` | None |
@@ -750,6 +750,7 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 [SYSTEM] Phase 3 complete (T21-T30). Phase 4 initialized with 10 new tasks.
 [SYSTEM] Phase 4 focus: Data Expansion & Predictive Intelligence - new data sources, ML scoring, entity resolution.
 [Tab 1] Claiming T31 - SEC Form D Filings. Writing plan for user approval.
+[Tab 1] T31 COMPLETE: SEC Form D Filings implemented. Features: Form D client for EDGAR API, XML parser for all Form D fields (issuer, offering, investors, exemptions), PostgreSQL storage with JSON fields for related persons/compensation, search with filters. 8 endpoints: GET /form-d/search, /form-d/issuer/{cik}, /form-d/recent, /form-d/filing/{accession}, /form-d/stats, /form-d/industries, /form-d/exemptions, POST /form-d/ingest. Table: form_d_filings.
 ```
 
 ---
