@@ -94,7 +94,28 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 | T27 | LP Profile Enrichment | COMPLETE | Tab 1 | `app/enrichment/investor.py` | None |
 | T28 | Deal Flow Tracker | COMPLETE | Tab 2 | `app/deals/tracker.py`, `app/api/v1/deals.py` | None |
 | T29 | Market Benchmarks | COMPLETE | Tab 1 | `app/analytics/benchmarks.py`, `app/api/v1/benchmarks.py` | T23 |
-| T30 | User Auth & Workspaces | IN_PROGRESS | Tab 2 | `app/users/auth.py`, `app/users/workspaces.py` | T19 |
+| T30 | User Auth & Workspaces | COMPLETE | Tab 2 | `app/users/auth.py`, `app/users/workspaces.py` | T19 |
+
+---
+
+## Phase 4: Data Expansion & Predictive Intelligence (T31-T40)
+
+**Mission:** Expand data coverage with new sources and add predictive/ML capabilities for investment insights.
+
+### Task Queue
+
+| ID | Task | Status | Agent | Files (Scope) | Dependencies |
+|----|------|--------|-------|---------------|--------------|
+| T31 | SEC Form D Filings | IN_PROGRESS | Tab 1 | `app/sources/sec_form_d/`, `app/api/v1/form_d.py` | None |
+| T32 | SEC Form ADV Data | NOT_STARTED | - | `app/sources/sec_form_adv/`, `app/api/v1/form_adv.py` | None |
+| T33 | OpenCorporates Integration | NOT_STARTED | - | `app/sources/opencorporates/`, `app/api/v1/corporate_registry.py` | None |
+| T34 | GitHub Repository Analytics | NOT_STARTED | - | `app/sources/github/`, `app/api/v1/github.py` | None |
+| T35 | Web Traffic Data (SimilarWeb) | NOT_STARTED | - | `app/sources/web_traffic/`, `app/api/v1/web_traffic.py` | None |
+| T36 | Company Scoring Model | NOT_STARTED | - | `app/ml/company_scorer.py`, `app/api/v1/scores.py` | T22 |
+| T37 | Entity Resolution Service | NOT_STARTED | - | `app/core/entity_resolver.py`, `app/api/v1/entities.py` | None |
+| T38 | Glassdoor Company Data | NOT_STARTED | - | `app/sources/glassdoor/`, `app/api/v1/glassdoor.py` | None |
+| T39 | App Store Rankings | NOT_STARTED | - | `app/sources/app_stores/`, `app/api/v1/app_rankings.py` | None |
+| T40 | Predictive Deal Scoring | NOT_STARTED | - | `app/ml/deal_scorer.py`, `app/api/v1/predictions.py` | T28, T36 |
 
 ---
 
@@ -304,6 +325,200 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 **Dependencies:** T19 (API keys) for auth foundation
 
 **Plan:** `docs/plans/PLAN_T30_auth.md`
+
+---
+
+### Phase 4 Tasks
+
+### T31: SEC Form D Filings
+**Goal:** Ingest private placement filings to track unregistered securities offerings.
+
+**Scope:**
+- Create `app/sources/sec_form_d/` with:
+  - Form D filing search and download from SEC EDGAR
+  - Parse XML filings for offering details
+  - Extract issuer info, offering amount, investor types
+  - Track amendments and related filings
+- Add `GET /api/v1/form-d/search` - search filings by company/date
+- Add `GET /api/v1/form-d/issuer/{cik}` - filings by issuer
+- Add `GET /api/v1/form-d/recent` - recent private placements
+- Add `POST /api/v1/form-d/ingest` - trigger ingestion job
+
+**Why:** Form D reveals early-stage funding rounds, fund formations, and private offerings not visible elsewhere.
+
+---
+
+### T32: SEC Form ADV Data
+**Goal:** Ingest investment adviser registration data for LP/fund intelligence.
+
+**Scope:**
+- Create `app/sources/sec_form_adv/` with:
+  - Form ADV Part 1 and Part 2 parsing
+  - Extract AUM, client types, fee structures
+  - Identify key personnel and ownership
+  - Track regulatory history and disclosures
+- Add `GET /api/v1/form-adv/search` - search advisers
+- Add `GET /api/v1/form-adv/adviser/{crd}` - adviser details
+- Add `GET /api/v1/form-adv/aum-rankings` - top advisers by AUM
+- Add `POST /api/v1/form-adv/ingest` - trigger ingestion
+
+**Why:** Form ADV provides official AUM data, fee structures, and personnel info for investment advisers.
+
+---
+
+### T33: OpenCorporates Integration
+**Goal:** Access global company registry data for entity verification.
+
+**Scope:**
+- Create `app/sources/opencorporates/` with:
+  - Company search across 140+ jurisdictions
+  - Officer and director lookups
+  - Corporate structure mapping
+  - Incorporation date and status tracking
+- Add `GET /api/v1/corporate/search` - global company search
+- Add `GET /api/v1/corporate/company/{jurisdiction}/{number}` - company details
+- Add `GET /api/v1/corporate/officers/{company_id}` - officers list
+- Add `GET /api/v1/corporate/network/{company_id}` - corporate relationships
+
+**Why:** Verifies company existence, tracks international subsidiaries, identifies beneficial owners.
+
+---
+
+### T34: GitHub Repository Analytics
+**Goal:** Track developer activity as a proxy for tech company health.
+
+**Scope:**
+- Create `app/sources/github/` with:
+  - Organization and repository discovery
+  - Commit activity and contributor trends
+  - Stars, forks, issues metrics over time
+  - Language and dependency analysis
+  - Developer velocity scoring
+- Add `GET /api/v1/github/org/{org}` - organization overview
+- Add `GET /api/v1/github/org/{org}/repos` - repository list
+- Add `GET /api/v1/github/org/{org}/activity` - activity trends
+- Add `GET /api/v1/github/org/{org}/score` - developer velocity score
+
+**Why:** GitHub activity correlates with engineering team health and product velocity.
+
+---
+
+### T35: Web Traffic Data
+**Goal:** Track website traffic as alternative data for company performance.
+
+**Scope:**
+- Create `app/sources/web_traffic/` with:
+  - Monthly visit estimates
+  - Traffic source breakdown (direct, search, referral)
+  - Geographic distribution
+  - Competitor benchmarking
+  - Trend detection
+- Add `GET /api/v1/traffic/domain/{domain}` - traffic overview
+- Add `GET /api/v1/traffic/domain/{domain}/history` - historical trends
+- Add `GET /api/v1/traffic/compare` - compare multiple domains
+- Add `GET /api/v1/traffic/rankings/{category}` - category rankings
+
+**Why:** Web traffic is a leading indicator for consumer companies and SaaS products.
+
+---
+
+### T36: Company Scoring Model
+**Goal:** ML-based scoring model for portfolio company health assessment.
+
+**Scope:**
+- Create `app/ml/company_scorer.py` with:
+  - Feature engineering from enriched data (T22)
+  - Composite scoring (0-100) based on multiple signals
+  - Category scores: growth, stability, market position
+  - Confidence intervals and explainability
+  - Model versioning and A/B testing
+- Add `GET /api/v1/scores/company/{name}` - company score
+- Add `GET /api/v1/scores/portfolio/{investor_id}` - portfolio scores
+- Add `GET /api/v1/scores/rankings` - top/bottom scored companies
+- Add `GET /api/v1/scores/methodology` - scoring methodology
+
+**Dependencies:** T22 (Company Data Enrichment)
+
+**Why:** Quantifies company health into actionable scores for portfolio monitoring.
+
+---
+
+### T37: Entity Resolution Service
+**Goal:** Intelligent matching and deduplication across data sources.
+
+**Scope:**
+- Create `app/core/entity_resolver.py` with:
+  - Fuzzy name matching with configurable thresholds
+  - Multi-attribute matching (name + location + industry)
+  - Canonical entity ID assignment
+  - Match confidence scoring
+  - Manual override capability
+  - Merge/split entity management
+- Add `GET /api/v1/entities/resolve` - resolve entity name
+- Add `GET /api/v1/entities/{id}/aliases` - entity aliases
+- Add `POST /api/v1/entities/merge` - merge duplicate entities
+- Add `GET /api/v1/entities/duplicates` - potential duplicates
+
+**Why:** Clean entity matching is critical for accurate cross-source data integration.
+
+---
+
+### T38: Glassdoor Company Data
+**Goal:** Integrate company reviews and salary data for talent intelligence.
+
+**Scope:**
+- Create `app/sources/glassdoor/` with:
+  - Company rating and review aggregation
+  - Salary data by role and location
+  - CEO approval ratings
+  - Interview difficulty and experience
+  - Company culture insights
+- Add `GET /api/v1/glassdoor/company/{name}` - company overview
+- Add `GET /api/v1/glassdoor/company/{name}/salaries` - salary data
+- Add `GET /api/v1/glassdoor/company/{name}/reviews` - review summary
+- Add `GET /api/v1/glassdoor/compare` - compare companies
+
+**Why:** Employee sentiment and compensation data reveals company culture and talent competitiveness.
+
+---
+
+### T39: App Store Rankings
+**Goal:** Track mobile app performance for consumer tech companies.
+
+**Scope:**
+- Create `app/sources/app_stores/` with:
+  - iOS App Store and Google Play tracking
+  - Rankings by category and country
+  - Download estimates
+  - Rating trends and review sentiment
+  - Version history and update frequency
+- Add `GET /api/v1/apps/search` - search apps
+- Add `GET /api/v1/apps/{app_id}` - app details
+- Add `GET /api/v1/apps/{app_id}/rankings` - ranking history
+- Add `GET /api/v1/apps/company/{company}` - company's apps
+
+**Why:** App store metrics are leading indicators for consumer mobile companies.
+
+---
+
+### T40: Predictive Deal Scoring
+**Goal:** ML model to score deal opportunities in the pipeline.
+
+**Scope:**
+- Create `app/ml/deal_scorer.py` with:
+  - Feature engineering from deal attributes
+  - Integration with company scores (T36)
+  - Win probability prediction
+  - Optimal timing recommendations
+  - Similar successful deals identification
+- Add `GET /api/v1/predictions/deal/{id}` - deal score
+- Add `GET /api/v1/predictions/pipeline` - scored pipeline
+- Add `GET /api/v1/predictions/similar/{deal_id}` - similar deals
+- Add `GET /api/v1/predictions/insights` - pipeline insights
+
+**Dependencies:** T28 (Deal Flow Tracker), T36 (Company Scoring)
+
+**Why:** Prioritizes deal pipeline based on predicted success probability.
 
 ---
 
@@ -531,6 +746,10 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 [Tab 2] T28 COMPLETE: Deal Flow Tracker implemented. Features: deal CRUD (create/get/update/delete), pipeline stages (sourced/reviewing/due_diligence/negotiation/closed_won/closed_lost/passed), activity logging (meetings/notes/calls/emails/documents), pipeline summary with counts by stage/priority, filtering (stage/sector/assignee/priority), priority ordering. 9 endpoints: POST/GET/PATCH/DELETE /deals, POST/GET /deals/{id}/activities, GET /deals/pipeline, GET /deals/stages. Tables: deals, deal_activities.
 [Tab 1] Claiming T29 - Market Benchmarks. Writing plan for user approval.
 [Tab 1] T29 COMPLETE: Market Benchmarks implemented. Features: peer group construction (by type/size), sector allocation benchmarks (P25/median/P75), HHI-based diversification scoring, investor vs benchmark comparison. 4 endpoints: GET /benchmarks/investor/{id}, GET /benchmarks/peer-group/{id}, GET /benchmarks/sectors, GET /benchmarks/diversification.
+[Tab 2] T30 COMPLETE: User Auth & Workspaces implemented. Features: JWT authentication (bcrypt hashing, 1-hour access tokens, 7-day refresh tokens), user registration/login/logout, password reset flow, workspace CRUD, member invitation with email tokens, role-based access (admin/member/viewer). 19 endpoints total: 9 auth + 10 workspace. Tables: users, workspaces, workspace_members, workspace_invitations, password_reset_tokens, refresh_tokens.
+[SYSTEM] Phase 3 complete (T21-T30). Phase 4 initialized with 10 new tasks.
+[SYSTEM] Phase 4 focus: Data Expansion & Predictive Intelligence - new data sources, ML scoring, entity resolution.
+[Tab 1] Claiming T31 - SEC Form D Filings. Writing plan for user approval.
 ```
 
 ---
