@@ -128,8 +128,8 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 | ID | Task | Status | Agent | Files (Scope) | Dependencies |
 |----|------|--------|-------|---------------|--------------|
 | T41 | Agentic Company Researcher | COMPLETE | Tab 2 | `app/agents/company_researcher.py`, `app/api/v1/agents.py` | T22, T36 |
-| T42 | Agentic Due Diligence | NOT_STARTED | - | `app/agents/due_diligence.py` | T41 |
-| T43 | Agentic News Monitor | NOT_STARTED | - | `app/agents/news_monitor.py`, `app/api/v1/monitors.py` | T24 |
+| T42 | Agentic Due Diligence | COMPLETE | Tab 2 | `app/agents/due_diligence.py`, `app/api/v1/diligence.py` | T41 |
+| T43 | Agentic News Monitor | IN_PROGRESS | Tab 1 | `app/agents/news_monitor.py`, `app/api/v1/monitors.py` | T24 |
 | T44 | Agentic Competitive Intel | NOT_STARTED | - | `app/agents/competitive_intel.py` | T41, T35 |
 | T45 | Agentic Data Hunter | NOT_STARTED | - | `app/agents/data_hunter.py` | T22, T37 |
 | T46 | Agentic Anomaly Detector | NOT_STARTED | - | `app/agents/anomaly_detector.py`, `app/api/v1/anomalies.py` | T36 |
@@ -979,6 +979,7 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 [Tab 2] T39 COMPLETE: App Store Rankings implemented. Features: iTunes Search API integration (free, no auth), iOS app search/lookup with caching, rating history tracking, ranking position recording, company-app linking, Android app manual entry, developer search, top apps, app comparison. 14 endpoints: GET /apps/search, /apps/ios/{id}, /apps/android/{id}, /apps/{id}/ratings, /apps/{id}/rankings, /apps/company/{name}, /apps/developer/{name}, /apps/top, /apps/stats, POST /apps/android, /apps/rankings, /apps/company/link, /apps/compare, DELETE /apps/{id}. Tables: app_store_apps, app_store_rankings, app_store_rating_history, company_app_portfolios.
 [Tab 2] T41 COMPLETE: Agentic Company Researcher implemented. Features: autonomous research agent that queries all data sources in parallel, synthesizes findings into unified profile, identifies data gaps, calculates confidence scores, caches results (7-day TTL), background job execution with thread-safe sessions. 10 endpoints: POST /agents/research/company, /agents/research/batch, GET /agents/research/jobs, /agents/research/stats, /agents/research/company/{name}, /agents/research/{job_id}, DELETE /agents/research/{job_id}, GET /agents/sources. Tables: research_jobs, research_cache. Queries 9 data sources: enrichment, github, glassdoor, app_store, web_traffic, news, sec_filings, corporate_registry, scoring.
 [Tab 1] T48 COMPLETE: Natural Language Query implemented. After researching MCP criticisms (context bloat, security issues, "full circle" problem), chose simpler approach: Python client + Claude skill file. Features: NexdataClient class with 20+ curated API methods, convenience functions for common queries, comprehensive skill file with query patterns and examples. Files: scripts/nexdata_client.py, .claude/skills/nexdata.md. No extra servers needed - leverages Claude Code's native abilities.
+[Tab 2] T42 COMPLETE: Agentic Due Diligence implemented. Features: automated DD report generation using T41 company research as foundation, red flag detection across 6 categories (legal, financial, team, market, competitive, operational), risk scoring (0-100) with levels (low/moderate/high/critical), structured DD memo generation with executive summary and recommendations, 3 templates (standard/quick/deep), 30-day result caching. 6 endpoints: POST /diligence/start, GET /diligence/{job_id}, /diligence/company/{name}, /diligence/templates, /diligence/jobs, /diligence/stats. Tables: diligence_jobs, diligence_templates, diligence_cache.
 ```
 
 ---
