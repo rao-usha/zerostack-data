@@ -109,8 +109,8 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 | T31 | SEC Form D Filings | COMPLETE | Tab 1 | `app/sources/sec_form_d/`, `app/api/v1/form_d.py` | None |
 | T32 | SEC Form ADV Data | COMPLETE | Tab 1 | `app/sources/sec_form_adv/`, `app/api/v1/form_adv.py` | None |
 | T33 | OpenCorporates Integration | COMPLETE | Tab 2 | `app/sources/opencorporates/`, `app/api/v1/corporate_registry.py` | None |
-| T34 | GitHub Repository Analytics | NOT_STARTED | - | `app/sources/github/`, `app/api/v1/github.py` | None |
-| T35 | Web Traffic Data (SimilarWeb) | NOT_STARTED | - | `app/sources/web_traffic/`, `app/api/v1/web_traffic.py` | None |
+| T34 | GitHub Repository Analytics | COMPLETE | Tab 1 | `app/sources/github/`, `app/api/v1/github.py` | None |
+| T35 | Web Traffic Data (SimilarWeb) | IN_PROGRESS | Tab 2 | `app/sources/web_traffic/`, `app/api/v1/web_traffic.py` | None |
 | T36 | Company Scoring Model | NOT_STARTED | - | `app/ml/company_scorer.py`, `app/api/v1/scores.py` | T22 |
 | T37 | Entity Resolution Service | NOT_STARTED | - | `app/core/entity_resolver.py`, `app/api/v1/entities.py` | None |
 | T38 | Glassdoor Company Data | NOT_STARTED | - | `app/sources/glassdoor/`, `app/api/v1/glassdoor.py` | None |
@@ -412,17 +412,21 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 
 **Scope:**
 - Create `app/sources/web_traffic/` with:
-  - Monthly visit estimates
+  - Monthly visit estimates (SimilarWeb if available)
   - Traffic source breakdown (direct, search, referral)
   - Geographic distribution
   - Competitor benchmarking
-  - Trend detection
-- Add `GET /api/v1/traffic/domain/{domain}` - traffic overview
-- Add `GET /api/v1/traffic/domain/{domain}/history` - historical trends
-- Add `GET /api/v1/traffic/compare` - compare multiple domains
-- Add `GET /api/v1/traffic/rankings/{category}` - category rankings
+  - Tranco rankings (free, top 1M domains)
+- Add `GET /api/v1/web-traffic/domain/{domain}` - traffic overview
+- Add `GET /api/v1/web-traffic/domain/{domain}/history` - historical trends
+- Add `GET /api/v1/web-traffic/compare` - compare multiple domains
+- Add `GET /api/v1/web-traffic/rankings` - top domain rankings
+- Add `GET /api/v1/web-traffic/search` - search domains by keyword
+- Add `GET /api/v1/web-traffic/providers` - list available providers
 
 **Why:** Web traffic is a leading indicator for consumer companies and SaaS products.
+
+**Plan:** `docs/plans/PLAN_T35_web_traffic.md`
 
 ---
 
@@ -758,6 +762,7 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 [Tab 1] Claiming T32 - SEC Form ADV Data. Writing plan for user approval.
 [Tab 2] T33 COMPLETE: OpenCorporates Integration implemented. Features: company search across 140+ jurisdictions, company details by jurisdiction/number, officers and filings for companies, officer search, jurisdictions list. 6 endpoints: GET /corporate-registry/search, /corporate-registry/company/{jurisdiction}/{number}, /corporate-registry/company/{jurisdiction}/{number}/officers, /corporate-registry/company/{jurisdiction}/{number}/filings, /corporate-registry/officers/search, /corporate-registry/jurisdictions. Requires OPENCORPORATES_API_KEY env var for data access.
 [Tab 1] T32 COMPLETE: SEC Form ADV Data implemented. Features: investment adviser search with filters (name/state/AUM), adviser details by CRD number, AUM rankings, aggregate stats (by state/organization type), sample data ingestion. 6 endpoints: GET /form-adv/search, /form-adv/adviser/{crd_number}, /form-adv/aum-rankings, /form-adv/stats, /form-adv/by-state, POST /form-adv/ingest. Table: form_adv_advisers with 76 columns for full Form ADV Part 1 data.
+[Tab 1] T34 COMPLETE: GitHub Repository Analytics implemented. Features: org overview with velocity scoring, repo list with metrics (stars/forks/languages), activity trends (commit frequency, trends), contributor tracking, velocity score (0-100) with breakdown. 9 endpoints: GET /github/org/{org}, POST /github/org/{org}/fetch, GET /github/org/{org}/repos, /github/org/{org}/activity, /github/org/{org}/contributors, /github/org/{org}/score, /github/repo/{owner}/{repo}, /github/search, /github/stats. Tables: github_organizations, github_repositories, github_activity_snapshots, github_contributors. Requires GITHUB_TOKEN for API access.
 ```
 
 ---
