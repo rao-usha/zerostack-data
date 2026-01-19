@@ -16,7 +16,11 @@ services:
       retries: 5
 
   api:
-    build: .
+    build:
+      context: .
+      args:
+        # Set to 1 to install Playwright browsers (~500MB) for JS-rendered page scraping
+        INSTALL_BROWSERS: ${INSTALL_BROWSERS:-0}
     ports:
       - "8001:8000"  # Use port 8001 on host to avoid conflicts
     environment:
