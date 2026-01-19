@@ -129,7 +129,7 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 |----|------|--------|-------|---------------|--------------|
 | T41 | Agentic Company Researcher | COMPLETE | Tab 2 | `app/agents/company_researcher.py`, `app/api/v1/agents.py` | T22, T36 |
 | T42 | Agentic Due Diligence | COMPLETE | Tab 2 | `app/agents/due_diligence.py`, `app/api/v1/diligence.py` | T41 |
-| T43 | Agentic News Monitor | IN_PROGRESS | Tab 1 | `app/agents/news_monitor.py`, `app/api/v1/monitors.py` | T24 |
+| T43 | Agentic News Monitor | COMPLETE | Tab 1 | `app/agents/news_monitor.py`, `app/api/v1/monitors.py` | T24 |
 | T44 | Agentic Competitive Intel | NOT_STARTED | - | `app/agents/competitive_intel.py` | T41, T35 |
 | T45 | Agentic Data Hunter | NOT_STARTED | - | `app/agents/data_hunter.py` | T22, T37 |
 | T46 | Agentic Anomaly Detector | NOT_STARTED | - | `app/agents/anomaly_detector.py`, `app/api/v1/anomalies.py` | T36 |
