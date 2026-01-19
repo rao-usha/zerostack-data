@@ -111,11 +111,11 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 | T33 | OpenCorporates Integration | COMPLETE | Tab 2 | `app/sources/opencorporates/`, `app/api/v1/corporate_registry.py` | None |
 | T34 | GitHub Repository Analytics | COMPLETE | Tab 1 | `app/sources/github/`, `app/api/v1/github.py` | None |
 | T35 | Web Traffic Data (SimilarWeb) | COMPLETE | Tab 2 | `app/sources/web_traffic/`, `app/api/v1/web_traffic.py` | None |
-| T36 | Company Scoring Model | NOT_STARTED | - | `app/ml/company_scorer.py`, `app/api/v1/scores.py` | T22 |
-| T37 | Entity Resolution Service | NOT_STARTED | - | `app/core/entity_resolver.py`, `app/api/v1/entities.py` | None |
-| T38 | Glassdoor Company Data | NOT_STARTED | - | `app/sources/glassdoor/`, `app/api/v1/glassdoor.py` | None |
-| T39 | App Store Rankings | NOT_STARTED | - | `app/sources/app_stores/`, `app/api/v1/app_rankings.py` | None |
-| T40 | Predictive Deal Scoring | NOT_STARTED | - | `app/ml/deal_scorer.py`, `app/api/v1/predictions.py` | T28, T36 |
+| T36 | Company Scoring Model | COMPLETE | Tab 2 | `app/ml/company_scorer.py`, `app/api/v1/scores.py` | T22 |
+| T37 | Entity Resolution Service | COMPLETE | Tab 1 | `app/core/entity_resolver.py`, `app/api/v1/entities.py` | None |
+| T38 | Glassdoor Company Data | COMPLETE | Tab 2 | `app/sources/glassdoor/`, `app/api/v1/glassdoor.py` | None |
+| T39 | App Store Rankings | COMPLETE | Tab 2 | `app/sources/app_stores/`, `app/api/v1/app_rankings.py` | None |
+| T40 | Predictive Deal Scoring | IN_PROGRESS | Tab 1 | `app/ml/deal_scorer.py`, `app/api/v1/predictions.py` | T28, T36 |
 
 ---
 
@@ -764,6 +764,10 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 [Tab 1] T32 COMPLETE: SEC Form ADV Data implemented. Features: investment adviser search with filters (name/state/AUM), adviser details by CRD number, AUM rankings, aggregate stats (by state/organization type), sample data ingestion. 6 endpoints: GET /form-adv/search, /form-adv/adviser/{crd_number}, /form-adv/aum-rankings, /form-adv/stats, /form-adv/by-state, POST /form-adv/ingest. Table: form_adv_advisers with 76 columns for full Form ADV Part 1 data.
 [Tab 1] T34 COMPLETE: GitHub Repository Analytics implemented. Features: org overview with velocity scoring, repo list with metrics (stars/forks/languages), activity trends (commit frequency, trends), contributor tracking, velocity score (0-100) with breakdown. 9 endpoints: GET /github/org/{org}, POST /github/org/{org}/fetch, GET /github/org/{org}/repos, /github/org/{org}/activity, /github/org/{org}/contributors, /github/org/{org}/score, /github/repo/{owner}/{repo}, /github/search, /github/stats. Tables: github_organizations, github_repositories, github_activity_snapshots, github_contributors. Requires GITHUB_TOKEN for API access.
 [Tab 2] T35 COMPLETE: Web Traffic Data implemented. Features: multi-provider support (Tranco free rankings + SimilarWeb paid), domain traffic overview with Tranco rank, domain comparison (side-by-side ranking), domain search by keyword, top 1M domain rankings from Tranco. 6 endpoints: GET /web-traffic/domain/{domain}, /web-traffic/domain/{domain}/history, /web-traffic/compare, /web-traffic/rankings, /web-traffic/search, /web-traffic/providers. Optional SIMILARWEB_API_KEY for detailed traffic data.
+[Tab 2] T36 COMPLETE: Company Scoring Model implemented. Features: weighted category scoring (growth 30%, stability 25%, market 25%, tech 20%), composite 0-100 score with A-F tiers, confidence calculation, score caching (7-day TTL), methodology docs, batch scoring. 5 endpoints: GET /scores/company/{name}, /scores/portfolio/{id}, /scores/rankings, /scores/methodology, POST /scores/batch. Table: company_scores.
+[Tab 2] T38 COMPLETE: Glassdoor Company Data implemented. Features: company ratings (overall, work-life balance, compensation, culture, career, management), sentiment scores (CEO approval, recommend, outlook), salary data with bulk import, review summaries, company comparison, search, rankings. 10 endpoints covering /glassdoor/company, /glassdoor/salaries, /glassdoor/reviews, /glassdoor/compare, /glassdoor/search, /glassdoor/rankings. Tables: glassdoor_companies, glassdoor_salaries, glassdoor_review_summaries.
+[Tab 1] T37 COMPLETE: Entity Resolution Service implemented. Features: multi-stage matching (identifiers, domain, name+location, name-only), canonical entity IDs with alias tracking, confidence scoring (auto-merge ≥0.90), merge/split with audit trail, manual overrides. 10 endpoints: GET /entities/resolve, /entities/search, /entities/stats, /entities/duplicates, /entities/{id}, /entities/{id}/aliases, /entities/by-identifier/{type}/{value}, POST /entities/merge, /entities/{id}/split, /entities/{id}/aliases. Tables: canonical_entities, entity_aliases, entity_merge_history.
+[Tab 2] T39 COMPLETE: App Store Rankings implemented. Features: iTunes Search API integration (free, no auth), iOS app search/lookup with caching, rating history tracking, ranking position recording, company-app linking, Android app manual entry, developer search, top apps, app comparison. 14 endpoints: GET /apps/search, /apps/ios/{id}, /apps/android/{id}, /apps/{id}/ratings, /apps/{id}/rankings, /apps/company/{name}, /apps/developer/{name}, /apps/top, /apps/stats, POST /apps/android, /apps/rankings, /apps/company/link, /apps/compare, DELETE /apps/{id}. Tables: app_store_apps, app_store_rankings, app_store_rating_history, company_app_portfolios.
 ```
 
 ---
