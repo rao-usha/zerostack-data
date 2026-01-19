@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news, reports, deals, benchmarks, auth, workspaces, form_d, corporate_registry, form_adv, web_traffic, github, scores, entities, glassdoor, app_rankings
+from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news, reports, deals, benchmarks, auth, workspaces, form_d, corporate_registry, form_adv, web_traffic, github, scores, entities, glassdoor, app_rankings, predictions
 from app.graphql import graphql_app
 
 # Configure logging
@@ -796,6 +796,10 @@ Browse the endpoint sections below to see what's available:
         {
             "name": "App Store Rankings",
             "description": "📱 **App Store Rankings** - iOS and Android app metrics, ratings, and ranking history"
+        },
+        {
+            "name": "Deal Predictions",
+            "description": "🎯 **Predictive Deal Scoring** - Win probability predictions, pipeline insights, and similar deal analysis"
         }
     ]
 )
@@ -877,6 +881,7 @@ app.include_router(scores.router, prefix="/api/v1")
 app.include_router(entities.router, prefix="/api/v1")
 app.include_router(glassdoor.router, prefix="/api/v1")
 app.include_router(app_rankings.router, prefix="/api/v1")
+app.include_router(predictions.router, prefix="/api/v1")
 
 # GraphQL API
 app.include_router(graphql_app, prefix="/graphql", tags=["graphql"])
