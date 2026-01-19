@@ -53,8 +53,8 @@ class WatchItemResponse(BaseModel):
     min_relevance: float
     alert_enabled: bool
     digest_enabled: bool
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
 
 
 class MatchedWatch(BaseModel):

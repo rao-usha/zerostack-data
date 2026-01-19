@@ -1,7 +1,7 @@
 # Plan T43: Agentic News Monitor
 
 **Task ID:** T43
-**Status:** PLANNING
+**Status:** COMPLETE
 **Agent:** Tab 1
 **Date:** 2026-01-19
 
@@ -9,7 +9,7 @@
 
 ## Approval
 
-- [ ] Approved by user (pending)
+- [x] Approved by user (2026-01-19)
 
 ---
 
@@ -413,10 +413,10 @@ Simple template-based digest (no LLM):
 
 ## Success Criteria
 
-- [ ] Watch list CRUD working
-- [ ] News matched to watch items with relevance scores
-- [ ] Personalized feed returns matched news sorted by relevance
-- [ ] Digest generated with summary and stats
-- [ ] Breaking alerts identified (high impact news)
-- [ ] Stats endpoint shows monitoring activity
+- [x] Watch list CRUD working
+- [x] News matched to watch items with relevance scores
+- [x] Personalized feed returns matched news sorted by relevance
+- [x] Digest generated with summary and stats
+- [x] Breaking alerts identified (high impact news)
+- [x] Stats endpoint shows monitoring activity
 

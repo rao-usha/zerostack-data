@@ -249,7 +249,7 @@ class NewsMonitor:
             INSERT INTO news_watch_items
             (watch_type, watch_value, event_types, min_relevance, alert_enabled, digest_enabled)
             VALUES (:watch_type, :watch_value, :event_types, :min_relevance, :alert_enabled, :digest_enabled)
-            RETURNING id, created_at
+            RETURNING id, created_at, updated_at
         """)
 
         result = self.db.execute(query, {
@@ -272,6 +272,7 @@ class NewsMonitor:
             alert_enabled=alert_enabled,
             digest_enabled=digest_enabled,
             created_at=row[1],
+            updated_at=row[2],
         )
 
     def _get_watch_by_value(self, watch_type: str, watch_value: str) -> Optional[WatchItem]:
