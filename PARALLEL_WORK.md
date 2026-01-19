@@ -115,7 +115,216 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 | T37 | Entity Resolution Service | COMPLETE | Tab 1 | `app/core/entity_resolver.py`, `app/api/v1/entities.py` | None |
 | T38 | Glassdoor Company Data | COMPLETE | Tab 2 | `app/sources/glassdoor/`, `app/api/v1/glassdoor.py` | None |
 | T39 | App Store Rankings | COMPLETE | Tab 2 | `app/sources/app_stores/`, `app/api/v1/app_rankings.py` | None |
-| T40 | Predictive Deal Scoring | IN_PROGRESS | Tab 1 | `app/ml/deal_scorer.py`, `app/api/v1/predictions.py` | T28, T36 |
+| T40 | Predictive Deal Scoring | COMPLETE | Tab 1 | `app/ml/deal_scorer.py`, `app/api/v1/predictions.py` | T28, T36 |
+
+---
+
+## Phase 5: Agentic Data Intelligence (T41-T50)
+
+**Mission:** Build autonomous AI agents that research, analyze, and synthesize data across all sources with minimal human intervention.
+
+### Task Queue
+
+| ID | Task | Status | Agent | Files (Scope) | Dependencies |
+|----|------|--------|-------|---------------|--------------|
+| T41 | Agentic Company Researcher | COMPLETE | Tab 2 | `app/agents/company_researcher.py`, `app/api/v1/agents.py` | T22, T36 |
+| T42 | Agentic Due Diligence | NOT_STARTED | - | `app/agents/due_diligence.py` | T41 |
+| T43 | Agentic News Monitor | NOT_STARTED | - | `app/agents/news_monitor.py`, `app/api/v1/monitors.py` | T24 |
+| T44 | Agentic Competitive Intel | NOT_STARTED | - | `app/agents/competitive_intel.py` | T41, T35 |
+| T45 | Agentic Data Hunter | NOT_STARTED | - | `app/agents/data_hunter.py` | T22, T37 |
+| T46 | Agentic Anomaly Detector | NOT_STARTED | - | `app/agents/anomaly_detector.py`, `app/api/v1/anomalies.py` | T36 |
+| T47 | Agentic Report Writer | NOT_STARTED | - | `app/agents/report_writer.py` | T41, T42 |
+| T48 | Natural Language Query | IN_PROGRESS | Tab 1 | `mcp_server/`, `app/api/v1/ask.py` | T12 |
+| T49 | Agentic Market Scanner | NOT_STARTED | - | `app/agents/market_scanner.py` | T23, T43 |
+| T50 | Multi-Agent Orchestrator | NOT_STARTED | - | `app/agents/orchestrator.py`, `app/api/v1/workflows.py` | T41-T49 |
+
+### Phase 5 Task Details
+
+#### T41: Agentic Company Researcher
+**Goal:** AI agent that autonomously researches any company across all data sources.
+
+**Features:**
+- Input: Company name or domain
+- Agent autonomously queries: SEC filings, GitHub, Glassdoor, App Store, web traffic, news
+- Synthesizes findings into structured profile
+- Identifies data gaps and attempts to fill them
+- Generates confidence scores for each data point
+- Caches results, refreshes stale data automatically
+
+**Endpoints:**
+- `POST /api/v1/agents/research/company` - Start research job
+- `GET /api/v1/agents/research/{job_id}` - Get research status/results
+- `GET /api/v1/agents/research/company/{name}` - Get cached research
+
+---
+
+#### T42: Agentic Due Diligence
+**Goal:** Automated due diligence reports for investment targets.
+
+**Features:**
+- Runs T41 company research as foundation
+- Red flag detection (lawsuits, negative news, executive departures)
+- Competitive positioning analysis
+- Financial health assessment (if public data available)
+- Team/leadership analysis via LinkedIn signals
+- Market timing signals
+- Generates structured DD memo with risk scores
+
+**Endpoints:**
+- `POST /api/v1/agents/diligence/start` - Start DD process
+- `GET /api/v1/agents/diligence/{job_id}` - Get DD status/report
+- `GET /api/v1/agents/diligence/templates` - DD report templates
+
+---
+
+#### T43: Agentic News Monitor
+**Goal:** AI agent that continuously monitors and summarizes relevant news.
+
+**Features:**
+- Watch lists for companies, investors, sectors, keywords
+- Real-time news ingestion from multiple sources
+- AI-powered relevance scoring and categorization
+- Daily/weekly digest generation
+- Breaking news alerts with impact assessment
+- Sentiment tracking over time
+
+**Endpoints:**
+- `POST /api/v1/monitors/news/watch` - Add to watch list
+- `GET /api/v1/monitors/news/feed` - Get personalized news feed
+- `GET /api/v1/monitors/news/digest` - Get AI-generated digest
+- `GET /api/v1/monitors/news/alerts` - Breaking news alerts
+
+---
+
+#### T44: Agentic Competitive Intel
+**Goal:** Auto-generate competitive landscape analysis.
+
+**Features:**
+- Input: Company name
+- Agent identifies competitors via multiple signals (industry, keywords, similar customers)
+- Builds comparison matrix across all available metrics
+- Tracks competitive movements (funding, hires, product launches)
+- Generates "competitive moat" assessment
+- Updates automatically when new data arrives
+
+**Endpoints:**
+- `POST /api/v1/agents/competitive/analyze` - Start competitive analysis
+- `GET /api/v1/agents/competitive/{company}` - Get competitive landscape
+- `GET /api/v1/agents/competitive/{company}/changes` - Recent competitive changes
+
+---
+
+#### T45: Agentic Data Hunter
+**Goal:** AI agent that finds and fills missing data autonomously.
+
+**Features:**
+- Scans database for incomplete records (missing revenue, employees, funding, etc.)
+- Prioritizes by importance and likelihood of finding data
+- Searches web, APIs, documents for missing information
+- Validates found data against multiple sources
+- Updates records with provenance tracking
+- Learns which sources are reliable for which data types
+
+**Endpoints:**
+- `POST /api/v1/agents/hunter/start` - Start data hunting job
+- `GET /api/v1/agents/hunter/queue` - View data gaps queue
+- `GET /api/v1/agents/hunter/stats` - Hunting success metrics
+
+---
+
+#### T46: Agentic Anomaly Detector
+**Goal:** AI that detects unusual patterns and changes in portfolio data.
+
+**Features:**
+- Monitors all data streams for anomalies
+- Detects: sudden rating drops, unusual funding patterns, executive exits, traffic spikes/drops
+- Correlates anomalies across data sources
+- Assigns severity scores and probable causes
+- Learns normal patterns per company/sector
+- Proactive alerts before problems escalate
+
+**Endpoints:**
+- `GET /api/v1/anomalies/recent` - Recent detected anomalies
+- `GET /api/v1/anomalies/company/{name}` - Anomalies for company
+- `POST /api/v1/anomalies/investigate` - Deep dive on anomaly
+- `GET /api/v1/anomalies/patterns` - Learned normal patterns
+
+---
+
+#### T47: Agentic Report Writer
+**Goal:** AI agent that generates natural language reports from data.
+
+**Features:**
+- Multiple report types: investor profile, company deep-dive, market overview, portfolio summary
+- Pulls data from all sources automatically
+- Generates executive summary + detailed sections
+- Includes charts/visualizations
+- Customizable templates and tone
+- Export to PDF, DOCX, HTML
+
+**Endpoints:**
+- `POST /api/v1/agents/reports/generate` - Generate report
+- `GET /api/v1/agents/reports/{id}` - Get generated report
+- `GET /api/v1/agents/reports/templates` - Available templates
+- `POST /api/v1/agents/reports/custom` - Custom report spec
+
+---
+
+#### T48: Natural Language Query
+**Goal:** Ask questions in plain English, get answers from all data.
+
+**Features:**
+- "What companies did Sequoia invest in last year?"
+- "Show me fintech companies with >4.0 Glassdoor rating"
+- "Compare Stripe and Square across all metrics"
+- "What's the average employee count for Series B companies?"
+- Converts NL to structured queries across all endpoints
+- Explains reasoning and data sources used
+- Handles follow-up questions with context
+
+**Endpoints:**
+- `POST /api/v1/ask` - Ask a question
+- `GET /api/v1/ask/history` - Query history
+- `POST /api/v1/ask/followup` - Follow-up question
+
+---
+
+#### T49: Agentic Market Scanner
+**Goal:** AI agent that identifies market trends and opportunities.
+
+**Features:**
+- Scans all data for emerging patterns
+- Identifies: hot sectors, funding trends, geographic shifts, talent movements
+- Generates weekly market intelligence briefs
+- Spots early signals before they become obvious
+- Compares current market to historical patterns
+- Customizable focus areas per user
+
+**Endpoints:**
+- `GET /api/v1/agents/market/scan` - Current market signals
+- `GET /api/v1/agents/market/trends` - Emerging trends
+- `GET /api/v1/agents/market/opportunities` - Spotted opportunities
+- `GET /api/v1/agents/market/brief` - Weekly market brief
+
+---
+
+#### T50: Multi-Agent Orchestrator
+**Goal:** Coordinate multiple agents to complete complex research tasks.
+
+**Features:**
+- Define workflows combining multiple agents
+- Example: "Full DD" = Company Research → Competitive Intel → News Monitor → Due Diligence → Report
+- Parallel execution where possible
+- Progress tracking and partial results
+- Failure handling and retry logic
+- Workflow templates for common tasks
+- Custom workflow builder
+
+**Endpoints:**
+- `POST /api/v1/workflows/start` - Start workflow
+- `GET /api/v1/workflows/{id}` - Workflow status
+- `GET /api/v1/workflows/templates` - Predefined workflows
+- `POST /api/v1/workflows/custom` - Create custom workflow
 
 ---
 
@@ -768,6 +977,7 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 [Tab 2] T38 COMPLETE: Glassdoor Company Data implemented. Features: company ratings (overall, work-life balance, compensation, culture, career, management), sentiment scores (CEO approval, recommend, outlook), salary data with bulk import, review summaries, company comparison, search, rankings. 10 endpoints covering /glassdoor/company, /glassdoor/salaries, /glassdoor/reviews, /glassdoor/compare, /glassdoor/search, /glassdoor/rankings. Tables: glassdoor_companies, glassdoor_salaries, glassdoor_review_summaries.
 [Tab 1] T37 COMPLETE: Entity Resolution Service implemented. Features: multi-stage matching (identifiers, domain, name+location, name-only), canonical entity IDs with alias tracking, confidence scoring (auto-merge ≥0.90), merge/split with audit trail, manual overrides. 10 endpoints: GET /entities/resolve, /entities/search, /entities/stats, /entities/duplicates, /entities/{id}, /entities/{id}/aliases, /entities/by-identifier/{type}/{value}, POST /entities/merge, /entities/{id}/split, /entities/{id}/aliases. Tables: canonical_entities, entity_aliases, entity_merge_history.
 [Tab 2] T39 COMPLETE: App Store Rankings implemented. Features: iTunes Search API integration (free, no auth), iOS app search/lookup with caching, rating history tracking, ranking position recording, company-app linking, Android app manual entry, developer search, top apps, app comparison. 14 endpoints: GET /apps/search, /apps/ios/{id}, /apps/android/{id}, /apps/{id}/ratings, /apps/{id}/rankings, /apps/company/{name}, /apps/developer/{name}, /apps/top, /apps/stats, POST /apps/android, /apps/rankings, /apps/company/link, /apps/compare, DELETE /apps/{id}. Tables: app_store_apps, app_store_rankings, app_store_rating_history, company_app_portfolios.
+[Tab 2] T41 COMPLETE: Agentic Company Researcher implemented. Features: autonomous research agent that queries all data sources in parallel, synthesizes findings into unified profile, identifies data gaps, calculates confidence scores, caches results (7-day TTL), background job execution with thread-safe sessions. 10 endpoints: POST /agents/research/company, /agents/research/batch, GET /agents/research/jobs, /agents/research/stats, /agents/research/company/{name}, /agents/research/{job_id}, DELETE /agents/research/{job_id}, GET /agents/sources. Tables: research_jobs, research_cache. Queries 9 data sources: enrichment, github, glassdoor, app_store, web_traffic, news, sec_filings, corporate_registry, scoring.
 ```
 
 ---
