@@ -107,8 +107,8 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 | ID | Task | Status | Agent | Files (Scope) | Dependencies |
 |----|------|--------|-------|---------------|--------------|
 | T31 | SEC Form D Filings | COMPLETE | Tab 1 | `app/sources/sec_form_d/`, `app/api/v1/form_d.py` | None |
-| T32 | SEC Form ADV Data | NOT_STARTED | - | `app/sources/sec_form_adv/`, `app/api/v1/form_adv.py` | None |
-| T33 | OpenCorporates Integration | NOT_STARTED | - | `app/sources/opencorporates/`, `app/api/v1/corporate_registry.py` | None |
+| T32 | SEC Form ADV Data | IN_PROGRESS | Tab 1 | `app/sources/sec_form_adv/`, `app/api/v1/form_adv.py` | None |
+| T33 | OpenCorporates Integration | COMPLETE | Tab 2 | `app/sources/opencorporates/`, `app/api/v1/corporate_registry.py` | None |
 | T34 | GitHub Repository Analytics | NOT_STARTED | - | `app/sources/github/`, `app/api/v1/github.py` | None |
 | T35 | Web Traffic Data (SimilarWeb) | NOT_STARTED | - | `app/sources/web_traffic/`, `app/api/v1/web_traffic.py` | None |
 | T36 | Company Scoring Model | NOT_STARTED | - | `app/ml/company_scorer.py`, `app/api/v1/scores.py` | T22 |
@@ -375,12 +375,16 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
   - Officer and director lookups
   - Corporate structure mapping
   - Incorporation date and status tracking
-- Add `GET /api/v1/corporate/search` - global company search
-- Add `GET /api/v1/corporate/company/{jurisdiction}/{number}` - company details
-- Add `GET /api/v1/corporate/officers/{company_id}` - officers list
-- Add `GET /api/v1/corporate/network/{company_id}` - corporate relationships
+- Add `GET /api/v1/corporate-registry/search` - company search
+- Add `GET /api/v1/corporate-registry/company/{jurisdiction}/{number}` - company details
+- Add `GET /api/v1/corporate-registry/company/{jurisdiction}/{number}/officers` - officers list
+- Add `GET /api/v1/corporate-registry/company/{jurisdiction}/{number}/filings` - filing history
+- Add `GET /api/v1/corporate-registry/officers/search` - officer search
+- Add `GET /api/v1/corporate-registry/jurisdictions` - list jurisdictions
 
 **Why:** Verifies company existence, tracks international subsidiaries, identifies beneficial owners.
+
+**Plan:** `docs/plans/PLAN_T33_opencorporates.md`
 
 ---
 
@@ -751,6 +755,8 @@ Phase 2 made collected data accessible, searchable, and actionable for end users
 [SYSTEM] Phase 4 focus: Data Expansion & Predictive Intelligence - new data sources, ML scoring, entity resolution.
 [Tab 1] Claiming T31 - SEC Form D Filings. Writing plan for user approval.
 [Tab 1] T31 COMPLETE: SEC Form D Filings implemented. Features: Form D client for EDGAR API, XML parser for all Form D fields (issuer, offering, investors, exemptions), PostgreSQL storage with JSON fields for related persons/compensation, search with filters. 8 endpoints: GET /form-d/search, /form-d/issuer/{cik}, /form-d/recent, /form-d/filing/{accession}, /form-d/stats, /form-d/industries, /form-d/exemptions, POST /form-d/ingest. Table: form_d_filings.
+[Tab 1] Claiming T32 - SEC Form ADV Data. Writing plan for user approval.
+[Tab 2] T33 COMPLETE: OpenCorporates Integration implemented. Features: company search across 140+ jurisdictions, company details by jurisdiction/number, officers and filings for companies, officer search, jurisdictions list. 6 endpoints: GET /corporate-registry/search, /corporate-registry/company/{jurisdiction}/{number}, /corporate-registry/company/{jurisdiction}/{number}/officers, /corporate-registry/company/{jurisdiction}/{number}/filings, /corporate-registry/officers/search, /corporate-registry/jurisdictions. Requires OPENCORPORATES_API_KEY env var for data access.
 ```
 
 ---
