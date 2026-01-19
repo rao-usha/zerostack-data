@@ -117,3 +117,31 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
 - **Use TodoWrite for multi-step tasks**
 - **Check CI after every push**
 - **Ask user before making architectural decisions**
+
+---
+
+## Querying the Nexdata API
+
+The API runs at `http://localhost:8001`. Use the Python client for data queries:
+
+```python
+from scripts.nexdata_client import NexdataClient
+client = NexdataClient()
+
+# Search investors
+investors = client.search_investors("Sequoia")
+
+# Get portfolio
+portfolio = client.get_portfolio(investor_id)
+
+# Get company health score
+score = client.get_company_score("Stripe")
+
+# Get deal predictions
+prediction = client.get_deal_prediction(deal_id)
+
+# Get pipeline insights
+insights = client.get_pipeline_insights()
+```
+
+For full API documentation, see `.claude/skills/nexdata.md`.
