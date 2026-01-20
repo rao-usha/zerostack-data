@@ -48,6 +48,16 @@ services:
       - ./.kaggle:/home/appuser/.kaggle:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "3001:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+
 volumes:
   postgres_data:
 

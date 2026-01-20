@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexdata - Investment Intelligence</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --primary: #6366f1;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --accent: #06b6d4;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+        }
+        .logo { display: flex; align-items: center; gap: 0.75rem; }
+        .logo h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .tagline { color: var(--text-muted); font-size: 0.875rem; }
+        .status { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--text-muted); }
+        .health-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--error); }
+        .health-dot.healthy { background: var(--success); }
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            padding: 1rem 2rem;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+        }
+        .tab {
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+        .tab:hover { background: var(--bg-input); color: var(--text); }
+        .tab.active { background: var(--primary); border-color: var(--primary); color: white; }
+        .content { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .card-title { font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; }
+        .search-box { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
+        .search-input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1rem;
+        }
+        .search-input:focus { outline: none; border-color: var(--primary); }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+        }
+        .btn:disabled { opacity: 0.5; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; }
+        .stat-card { background: var(--bg-input); padding: 1rem; border-radius: 8px; text-align: center; }
+        .stat-value { font-size: 2rem; font-weight: 700; color: var(--primary); }
+        .stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
+        .result-item {
+            padding: 1rem;
+            background: var(--bg-input);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .score-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            background: var(--success);
+            color: white;
+        }
+        .loading { text-align: center; padding: 2rem; color: var(--text-muted); }
+        .empty { text-align: center; padding: 3rem; color: var(--text-muted); }
+        .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+        .footer {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border);
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+        }
+        .footer a { color: var(--accent); text-decoration: none; }
+        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+        #results { margin-top: 1rem; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <span style="font-size: 1.5rem;">📈</span>
+            <h1>Nexdata</h1>
+            <span class="tagline">Investment Intelligence</span>
+        </div>
+        <div class="status">
+            <span class="health-dot" id="health-dot"></span>
+            <span id="health-status">Checking...</span>
+        </div>
+    </header>
+
+    <nav class="tabs">
+        <button class="tab active" onclick="showTab('research')">🔬 Research</button>
+        <button class="tab" onclick="showTab('scores')">📊 Scores</button>
+        <button class="tab" onclick="showTab('market')">📈 Market</button>
+        <button class="tab" onclick="showTab('network')">🕸️ Network</button>
+    </nav>
+
+    <main class="content">
+        <!-- Research Tab -->
+        <div id="tab-research">
+            <div class="card">
+                <h2 class="card-title">🔬 Company Research</h2>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;">AI-powered research across 9+ data sources</p>
+                <div class="search-box">
+                    <input type="text" class="search-input" id="company-input" placeholder="Enter company name (e.g., Stripe, OpenAI)" onkeydown="if(event.key==='Enter')runResearch()">
+                    <button class="btn" onclick="runResearch()" id="research-btn">Research</button>
+                </div>
+                <div id="research-results"></div>
+            </div>
+        </div>
+
+        <!-- Scores Tab -->
+        <div id="tab-scores" class="hidden">
+            <div class="card">
+                <h2 class="card-title">📊 Company Scores</h2>
+                <div class="search-box">
+                    <input type="text" class="search-input" id="score-input" placeholder="Enter company name" onkeydown="if(event.key==='Enter')getScore()">
+                    <button class="btn" onclick="getScore()">Get Score</button>
+                </div>
+                <div id="score-results"></div>
+            </div>
+        </div>
+
+        <!-- Market Tab -->
+        <div id="tab-market" class="hidden">
+            <div class="card">
+                <h2 class="card-title">📈 Weekly Market Brief</h2>
+                <button class="btn" onclick="getMarketBrief()" style="margin-bottom: 1rem;">Load Brief</button>
+                <div id="market-results"></div>
+            </div>
+            <div class="card">
+                <h2 class="card-title">📡 Market Signals</h2>
+                <button class="btn" onclick="triggerScan()">Run Scan</button>
+                <div id="signal-results" style="margin-top: 1rem;"></div>
+            </div>
+        </div>
+
+        <!-- Network Tab -->
+        <div id="tab-network" class="hidden">
+            <div class="card">
+                <h2 class="card-title">🕸️ Most Connected Investors</h2>
+                <button class="btn" onclick="getNetwork()">Load Network</button>
+                <div id="network-results" style="margin-top: 1rem;"></div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <a href="http://localhost:8001/docs" target="_blank">API Docs</a>
+        <span>•</span>
+        <a href="http://localhost:8001/graphql" target="_blank">GraphQL</a>
+        <span>•</span>
+        <span>600+ Endpoints • 25+ Data Sources</span>
+    </footer>
+
+    <script>
+        const API = '/api/v1';
+
+        // Check health
+        fetch('/api/v1/deals')
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById('health-dot').classList.add('healthy');
+                document.getElementById('health-status').textContent = 'API Connected';
+            })
+            .catch(() => {
+                document.getElementById('health-status').textContent = 'API Offline';
+            });
+
+        function showTab(tab) {
+            document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.content > div').forEach(t => t.classList.add('hidden'));
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tab).classList.remove('hidden');
+        }
+
+        async function runResearch() {
+            const name = document.getElementById('company-input').value;
+            if (!name) return;
+
+            const btn = document.getElementById('research-btn');
+            const results = document.getElementById('research-results');
+            btn.disabled = true;
+            btn.textContent = 'Researching...';
+            results.innerHTML = '<div class="loading">Querying data sources...</div>';
+
+            try {
+                // Start research
+                const res = await fetch(`${API}/agents/research/company`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({company_name: name})
+                });
+                const data = await res.json();
+
+                // Get score
+                const scoreRes = await fetch(`${API}/scores/company/${encodeURIComponent(name)}`);
+                const score = scoreRes.ok ? await scoreRes.json() : null;
+
+                let html = '';
+                if (score) {
+                    html += `
+                        <div class="card" style="margin-top: 1rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h3>${name}</h3>
+                                <span class="score-badge">${score.composite_score?.toFixed(0) || 'N/A'} (${score.tier || 'N/A'})</span>
+                            </div>
+                            <div class="stats-grid" style="margin-top: 1rem;">
+                                ${Object.entries(score.category_scores || {}).map(([k,v]) => `
+                                    <div class="stat-card">
+                                        <div class="stat-value">${v}</div>
+                                        <div class="stat-label">${k}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <p style="color: var(--text-muted); margin-top: 1rem; font-size: 0.875rem;">
+                                Confidence: ${((score.confidence || 0) * 100).toFixed(0)}%
+                            </p>
+                        </div>
+                    `;
+                }
+
+                if (data.job_id) {
+                    html += `<p style="color: var(--text-muted); margin-top: 1rem;">Research job started: ${data.job_id}</p>`;
+                }
+
+                results.innerHTML = html || '<p>No results</p>';
+            } catch (err) {
+                results.innerHTML = `<p style="color: var(--error);">Error: ${err.message}</p>`;
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Research';
+        }
+
+        async function getScore() {
+            const name = document.getElementById('score-input').value;
+            if (!name) return;
+
+            const results = document.getElementById('score-results');
+            results.innerHTML = '<div class="loading">Loading...</div>';
+
+            try {
+                const res = await fetch(`${API}/scores/company/${encodeURIComponent(name)}`);
+                const score = await res.json();
+
+                results.innerHTML = `
+                    <div style="margin-top: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h3>${score.company_name || name}</h3>
+                            <span class="score-badge">${score.composite_score?.toFixed(0) || 'N/A'} (${score.tier || 'N/A'})</span>
+                        </div>
+                        <div class="stats-grid" style="margin-top: 1rem;">
+                            ${Object.entries(score.category_scores || {}).map(([k,v]) => `
+                                <div class="stat-card">
+                                    <div class="stat-value">${v}</div>
+                                    <div class="stat-label">${k}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                results.innerHTML = `<p style="color: var(--error);">Error: ${err.message}</p>`;
+            }
+        }
+
+        async function getMarketBrief() {
+            const results = document.getElementById('market-results');
+            results.innerHTML = '<div class="loading">Loading...</div>';
+
+            try {
+                const res = await fetch(`${API}/market/brief?period_type=weekly`);
+                const brief = await res.json();
+
+                results.innerHTML = `
+                    <p style="margin-bottom: 1rem;">${brief.summary}</p>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value">${brief.stats?.total_signals || 0}</div>
+                            <div class="stat-label">Signals</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" style="color: var(--success);">${brief.stats?.accelerating || 0}</div>
+                            <div class="stat-label">Accelerating</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" style="color: var(--error);">${brief.stats?.decelerating || 0}</div>
+                            <div class="stat-label">Decelerating</div>
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                results.innerHTML = `<p style="color: var(--error);">Error: ${err.message}</p>`;
+            }
+        }
+
+        async function triggerScan() {
+            const results = document.getElementById('signal-results');
+            results.innerHTML = '<div class="loading">Scanning...</div>';
+
+            try {
+                const res = await fetch(`${API}/market/scan/trigger`, { method: 'POST' });
+                const data = await res.json();
+
+                if (data.signals?.length) {
+                    results.innerHTML = data.signals.map(s => `
+                        <div class="result-item">
+                            <div>
+                                <strong>${s.signal_type?.replace('_', ' ')}</strong>
+                                <p style="color: var(--text-muted); font-size: 0.875rem;">${s.description}</p>
+                            </div>
+                            <span class="score-badge">${((s.strength || 0) * 100).toFixed(0)}%</span>
+                        </div>
+                    `).join('');
+                } else {
+                    results.innerHTML = '<p style="color: var(--text-muted);">No signals detected. Try ingesting some data first.</p>';
+                }
+            } catch (err) {
+                results.innerHTML = `<p style="color: var(--error);">Error: ${err.message}</p>`;
+            }
+        }
+
+        async function getNetwork() {
+            const results = document.getElementById('network-results');
+            results.innerHTML = '<div class="loading">Loading...</div>';
+
+            try {
+                const res = await fetch(`${API}/network/central?limit=15`);
+                const investors = await res.json();
+
+                if (investors?.length) {
+                    results.innerHTML = investors.map((inv, i) => `
+                        <div class="result-item">
+                            <div>
+                                <span style="color: var(--text-muted);">#${i+1}</span>
+                                <strong style="margin-left: 0.5rem;">${inv.name}</strong>
+                                <span style="color: var(--text-muted); margin-left: 0.5rem;">${inv.location || ''}</span>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-muted); margin-right: 0.5rem;">${inv.degree} connections</span>
+                                <span class="score-badge" style="background: var(--accent);">${inv.type?.replace('_', ' ')}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    results.innerHTML = '<p style="color: var(--text-muted);">No network data available.</p>';
+                }
+            } catch (err) {
+                results.innerHTML = `<p style="color: var(--error);">Error: ${err.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
