@@ -3,6 +3,15 @@ Agentic Company Researcher.
 
 Autonomous AI agent that researches any company across all data sources,
 synthesizes findings into a structured profile, and identifies data gaps.
+
+ENHANCED: Now actively collects data from external APIs, not just querying local DB.
+When you request research on "Stripe", the agent will:
+1. Call GitHub API to fetch organization data
+2. Query Tranco for web traffic rankings
+3. Look up SEC filings
+4. Query all other available sources
+5. Store all collected data persistently
+6. Synthesize into a comprehensive profile
 """
 
 import asyncio
@@ -16,6 +25,31 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+
+# Company name to GitHub org/domain mappings for well-known companies
+COMPANY_MAPPINGS = {
+    "stripe": {"github": "stripe", "domain": "stripe.com"},
+    "openai": {"github": "openai", "domain": "openai.com"},
+    "anthropic": {"github": "anthropics", "domain": "anthropic.com"},
+    "databricks": {"github": "databricks", "domain": "databricks.com"},
+    "figma": {"github": "figma", "domain": "figma.com"},
+    "notion": {"github": "makenotion", "domain": "notion.so"},
+    "discord": {"github": "discord", "domain": "discord.com"},
+    "canva": {"github": "canva", "domain": "canva.com"},
+    "plaid": {"github": "plaid", "domain": "plaid.com"},
+    "ramp": {"github": "ramp-development", "domain": "ramp.com"},
+    "brex": {"github": "brexhq", "domain": "brex.com"},
+    "vercel": {"github": "vercel", "domain": "vercel.com"},
+    "supabase": {"github": "supabase", "domain": "supabase.com"},
+    "linear": {"github": "linear", "domain": "linear.app"},
+    "retool": {"github": "tryretool", "domain": "retool.com"},
+    "hashicorp": {"github": "hashicorp", "domain": "hashicorp.com"},
+    "datadog": {"github": "DataDog", "domain": "datadoghq.com"},
+    "snowflake": {"github": "snowflakedb", "domain": "snowflake.com"},
+    "mongodb": {"github": "mongodb", "domain": "mongodb.com"},
+    "elastic": {"github": "elastic", "domain": "elastic.co"},
+}
 
 
 class ResearchStatus(str, Enum):
@@ -391,17 +425,41 @@ class CompanyResearchAgent:
             return None
 
     async def _query_github(self, company_name: str) -> Optional[Dict]:
-        """Query GitHub organization data (T34)."""
-        # Try company name as org
-        org_name = company_name.lower().replace(" ", "").replace(",", "").replace(".", "")
+        """
+        Query GitHub organization data (T34).
+
+        ENHANCED: Now actually fetches from GitHub API if data is missing or stale.
+        """
+        # Get GitHub org name from mappings or derive from company name
+        normalized = company_name.lower().replace(" ", "").replace(",", "").replace(".", "")
+        mapping = COMPANY_MAPPINGS.get(normalized, {})
+        org_name = mapping.get("github", normalized)
+
+        # First check if we have fresh data (less than 24 hours old)
         query = text("""
             SELECT * FROM github_organizations
             WHERE LOWER(login) = LOWER(:name) OR LOWER(name) LIKE LOWER(:pattern)
+            ORDER BY last_fetched_at DESC NULLS LAST
             LIMIT 1
         """)
         try:
             result = self.db.execute(query, {"name": org_name, "pattern": f"%{company_name}%"})
             row = result.mappings().fetchone()
+
+            # Check if data is fresh (fetched within last 24 hours)
+            is_fresh = False
+            if row and row.get("last_fetched_at"):
+                age = datetime.utcnow() - row["last_fetched_at"]
+                is_fresh = age < timedelta(hours=24)
+
+            # If no data or stale data, fetch fresh from GitHub API
+            if not row or not is_fresh:
+                logger.info(f"Fetching fresh GitHub data for org: {org_name}")
+                fresh_data = await self._fetch_github_from_api(org_name)
+                if fresh_data:
+                    return fresh_data
+
+            # Return existing data if available
             if row:
                 return {
                     "org_name": row.get("name"),
@@ -411,13 +469,44 @@ class CompanyResearchAgent:
                     "total_forks": row.get("total_forks"),
                     "total_contributors": row.get("total_contributors"),
                     "velocity_score": row.get("velocity_score"),
-                    "primary_language": row.get("primary_language"),
+                    "primary_language": row.get("primary_languages")[0] if row.get("primary_languages") else None,
                     "github_url": f"https://github.com/{row.get('login')}",
+                    "data_freshness": "cached",
                 }
             return None
         except Exception as e:
             logger.warning(f"GitHub query failed: {e}")
             self.db.rollback()
+            return None
+
+    async def _fetch_github_from_api(self, org_name: str) -> Optional[Dict]:
+        """Fetch GitHub data from API and store it."""
+        try:
+            from app.sources.github.ingest import GitHubAnalyticsService
+
+            # Create service with a fresh session for this operation
+            service = GitHubAnalyticsService(self.db)
+
+            # Fetch organization (this calls GitHub API and stores in DB)
+            org_data = await service.fetch_organization(org_name)
+
+            if org_data:
+                logger.info(f"Successfully fetched GitHub data for {org_name}")
+                return {
+                    "org_name": org_data.get("name"),
+                    "login": org_data.get("login"),
+                    "public_repos": org_data.get("public_repos"),
+                    "total_stars": org_data.get("metrics", {}).get("total_stars", 0),
+                    "total_forks": org_data.get("metrics", {}).get("total_forks", 0),
+                    "total_contributors": org_data.get("metrics", {}).get("repo_count", 0),
+                    "velocity_score": org_data.get("velocity_score"),
+                    "primary_language": org_data.get("metrics", {}).get("primary_languages", [None])[0],
+                    "github_url": f"https://github.com/{org_data.get('login')}",
+                    "data_freshness": "fresh",
+                }
+            return None
+        except Exception as e:
+            logger.warning(f"GitHub API fetch failed for {org_name}: {e}")
             return None
 
     async def _query_glassdoor(self, company_name: str) -> Optional[Dict]:
@@ -480,13 +569,56 @@ class CompanyResearchAgent:
             return None
 
     async def _query_web_traffic(self, company_name: str, domain: Optional[str]) -> Optional[Dict]:
-        """Query web traffic data (T35)."""
-        # Would integrate with web traffic client
-        # For now, return None as we'd need domain
-        if not domain:
+        """
+        Query web traffic data (T35).
+
+        ENHANCED: Now actually fetches from Tranco rankings.
+        """
+        # Get domain from mappings or use provided domain
+        normalized = company_name.lower().replace(" ", "").replace(",", "").replace(".", "")
+        mapping = COMPANY_MAPPINGS.get(normalized, {})
+
+        # Determine domain to look up
+        lookup_domain = domain or mapping.get("domain")
+        if not lookup_domain:
+            # Try to derive domain from company name
+            lookup_domain = f"{normalized}.com"
+
+        try:
+            from app.sources.web_traffic.client import WebTrafficClient
+
+            client = WebTrafficClient()
+            traffic_data = client.get_domain_traffic(lookup_domain)
+            client.close()
+
+            if traffic_data and traffic_data.get("tranco_rank"):
+                logger.info(f"Got web traffic data for {lookup_domain}: rank #{traffic_data['tranco_rank']}")
+                return {
+                    "domain": lookup_domain,
+                    "tranco_rank": traffic_data.get("tranco_rank"),
+                    "providers_used": traffic_data.get("providers_used", []),
+                    "data_freshness": "fresh",
+                }
+
+            # Also try without the domain suffix if it didn't work
+            if not traffic_data.get("tranco_rank") and "." in lookup_domain:
+                base_name = lookup_domain.split(".")[0]
+                for suffix in [".com", ".io", ".co", ".org", ".net"]:
+                    alt_domain = base_name + suffix
+                    if alt_domain != lookup_domain:
+                        traffic_data = client.get_domain_traffic(alt_domain)
+                        if traffic_data and traffic_data.get("tranco_rank"):
+                            return {
+                                "domain": alt_domain,
+                                "tranco_rank": traffic_data.get("tranco_rank"),
+                                "providers_used": traffic_data.get("providers_used", []),
+                                "data_freshness": "fresh",
+                            }
+
             return None
-        # TODO: Call TrancoClient to get rank
-        return None
+        except Exception as e:
+            logger.warning(f"Web traffic query failed for {lookup_domain}: {e}")
+            return None
 
     async def _query_news(self, company_name: str) -> Optional[Dict]:
         """Query news data (T24)."""
@@ -688,6 +820,18 @@ class CompanyResearchAgent:
                 "industry_group": sec.get("industry_group"),
             }
 
+        # Web traffic
+        web_traffic = results.get(DataSource.WEB_TRAFFIC.value, {})
+        if web_traffic:
+            profile["web_traffic"] = {
+                "domain": web_traffic.get("domain"),
+                "tranco_rank": web_traffic.get("tranco_rank"),
+                "providers": web_traffic.get("providers_used", []),
+            }
+            # Update domain in profile if we found it
+            if web_traffic.get("domain") and not profile.get("domain"):
+                profile["domain"] = web_traffic.get("domain")
+
         # Recent news
         news = results.get(DataSource.NEWS.value, {})
         if news:
@@ -731,6 +875,8 @@ class CompanyResearchAgent:
             gaps.append("scoring_data")
         if not profile.get("news") or profile["news"].get("article_count", 0) == 0:
             gaps.append("news_data")
+        if not profile.get("web_traffic"):
+            gaps.append("web_traffic_data")
 
         return gaps
 
