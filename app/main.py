@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news, reports, deals, benchmarks, auth, workspaces, form_d, corporate_registry, form_adv, web_traffic, github, scores, entities, glassdoor, app_rankings, predictions, agents, diligence, monitors, competitive, hunter
+from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news, reports, deals, benchmarks, auth, workspaces, form_d, corporate_registry, form_adv, web_traffic, github, scores, entities, glassdoor, app_rankings, predictions, agents, diligence, monitors, competitive, hunter, anomalies, market
 from app.graphql import graphql_app
 
 # Configure logging
@@ -812,6 +812,10 @@ Browse the endpoint sections below to see what's available:
         {
             "name": "Data Hunter",
             "description": "🎯 **Autonomous Data Hunter** - AI agent that finds and fills missing data with provenance tracking"
+        },
+        {
+            "name": "Anomaly Detection",
+            "description": "🚨 **Anomaly Detection** - AI agent that detects unusual patterns and changes across data sources"
         }
     ]
 )
@@ -899,6 +903,8 @@ app.include_router(diligence.router, prefix="/api/v1")
 app.include_router(monitors.router, prefix="/api/v1")
 app.include_router(competitive.router, prefix="/api/v1")
 app.include_router(hunter.router, prefix="/api/v1")
+app.include_router(anomalies.router, prefix="/api/v1")
+app.include_router(market.router, prefix="/api/v1")
 
 # GraphQL API
 app.include_router(graphql_app, prefix="/graphql", tags=["graphql"])
