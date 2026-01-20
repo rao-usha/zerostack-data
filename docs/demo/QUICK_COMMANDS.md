@@ -54,11 +54,29 @@ curl http://localhost:8001/api/v1/web-traffic/domain/stripe.com
 # Full-text search
 curl "http://localhost:8001/api/v1/search?q=fintech"
 
+# Autocomplete suggestions
+curl "http://localhost:8001/api/v1/search/suggest?prefix=strip"
+
 # Find similar investors
 curl http://localhost:8001/api/v1/discover/similar/1
 
 # Investment trends
 curl http://localhost:8001/api/v1/trends/emerging
+```
+
+---
+
+## 🕸️ Network Analysis
+
+```bash
+# Most connected investors (shows real data)
+curl http://localhost:8001/api/v1/network/central
+
+# Co-investor network for CalPERS
+curl "http://localhost:8001/api/v1/network/investor/1?investor_type=lp"
+
+# Deal predictions with win probability
+curl http://localhost:8001/api/v1/predictions/pipeline
 ```
 
 ---

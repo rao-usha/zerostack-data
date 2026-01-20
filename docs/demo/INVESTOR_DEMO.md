@@ -185,7 +185,7 @@ curl http://localhost:8001/api/v1/predictions/pipeline
 curl "http://localhost:8001/api/v1/search?q=fintech%20payments"
 
 # Autocomplete suggestions
-curl "http://localhost:8001/api/v1/search/suggest?q=strip"
+curl "http://localhost:8001/api/v1/search/suggest?prefix=strip"
 ```
 
 ### Find Similar Investors
