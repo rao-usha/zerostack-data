@@ -1,6 +1,10 @@
-# Demo Guide - External Data Ingestion Service
+# Nexdata Demo Guide
 
-Quick guide to demonstrate the capabilities of the External Data Ingestion Service.
+> Comprehensive guide for demonstrating Nexdata's AI-powered data ingestion and investment intelligence platform.
+
+**Base URL:** `http://localhost:8001`
+**API Docs:** `http://localhost:8001/docs`
+**GraphQL:** `http://localhost:8001/graphql`
 
 ## 🚀 Quick Start Demo (30 seconds)
 
@@ -314,6 +318,127 @@ After the demo, share:
 3. **Job tracking** for observability
 4. **Safety first** - rate limits, error handling, job tracking
 5. **Production ready** - auto-restart, health checks, logging
+
+---
+
+## 🤖 Agentic AI Features (The "Wow" Demos)
+
+### Autonomous Company Research
+*One call triggers research across 9+ sources in parallel*
+
+```bash
+# Start research on any company
+curl -X POST http://localhost:8001/api/v1/agents/research/company \
+  -H "Content-Type: application/json" \
+  -d '{"company_name": "Stripe"}'
+
+# Check results (usually ready in 2-5 seconds)
+curl http://localhost:8001/api/v1/agents/research/{job_id}
+```
+
+**What it queries:**
+- SEC filings (Form D, 10-K, 13F)
+- GitHub (repos, activity, contributors)
+- Glassdoor (ratings, reviews)
+- App Store (rankings, ratings)
+- Web traffic (Tranco data)
+- News (recent coverage)
+- Corporate registry
+
+---
+
+### Automated Due Diligence
+*Complete DD report in under 60 seconds*
+
+```bash
+# Start DD process
+curl -X POST http://localhost:8001/api/v1/diligence/start \
+  -H "Content-Type: application/json" \
+  -d '{"company_name": "Anthropic", "template": "standard"}'
+
+# Get results
+curl http://localhost:8001/api/v1/diligence/{job_id}
+```
+
+**Output includes:**
+- Risk score (0-100)
+- Risk level (low/moderate/high/critical)
+- Red flags by category (financial, legal, team, market, operations, tech)
+- Executive summary with recommendation
+- Structured memo for investment committee
+
+---
+
+### Company Health Scoring
+*ML-powered quantified assessment*
+
+```bash
+curl http://localhost:8001/api/v1/scores/company/Stripe
+```
+
+**Output:**
+```json
+{
+  "company_name": "Stripe",
+  "composite_score": 72.5,
+  "tier": "B",
+  "category_scores": {
+    "growth": 85,
+    "stability": 70,
+    "market": 65,
+    "tech": 80
+  }
+}
+```
+
+---
+
+### Portfolio Intelligence
+
+```bash
+# Co-investor network
+curl http://localhost:8001/api/v1/network/investor/{id}
+
+# Investment trends
+curl http://localhost:8001/api/v1/trends/sectors
+
+# Compare portfolios
+curl -X POST http://localhost:8001/api/v1/compare/portfolios \
+  -d '{"investor_ids": [1, 2]}' -H "Content-Type: application/json"
+```
+
+---
+
+### Search & Discovery
+
+```bash
+# Full-text search (typo-tolerant)
+curl "http://localhost:8001/api/v1/search?q=fintech%20payments"
+
+# Autocomplete
+curl "http://localhost:8001/api/v1/search/suggest?q=strip"
+
+# Find similar investors
+curl http://localhost:8001/api/v1/discover/similar/{id}
+```
+
+---
+
+## 📊 Data Source Quick Reference
+
+| Source | Endpoint | Example |
+|--------|----------|---------|
+| Census | `/api/v1/census/` | Population, income, housing |
+| FRED | `/api/v1/fred/` | GDP, unemployment, CPI |
+| EIA | `/api/v1/eia/` | Energy prices, generation |
+| SEC | `/api/v1/sec/` | 10-K, 13F, Form D filings |
+| BLS | `/api/v1/bls/` | Employment, wages |
+| Treasury | `/api/v1/treasury/` | Rates, yields |
+| GitHub | `/api/v1/github/` | Repos, activity |
+| Glassdoor | `/api/v1/glassdoor/` | Ratings, reviews |
+| App Store | `/api/v1/apps/` | Rankings, ratings |
+
+**Total: 25+ sources, 100+ endpoints**
 
 ---
 
