@@ -72,6 +72,7 @@ class DataSource(str, Enum):
     SEC_FILINGS = "sec_filings"
     CORPORATE_REGISTRY = "corporate_registry"
     SCORING = "scoring"
+    WEB_SCRAPE = "web_scrape"  # Scrape company website for info
 
 
 class CompanyResearchAgent:
@@ -84,15 +85,16 @@ class CompanyResearchAgent:
 
     # Source weights for confidence calculation
     SOURCE_WEIGHTS = {
-        DataSource.ENRICHMENT: 0.20,
+        DataSource.ENRICHMENT: 0.15,
         DataSource.GITHUB: 0.10,
-        DataSource.GLASSDOOR: 0.15,
-        DataSource.APP_STORE: 0.10,
+        DataSource.GLASSDOOR: 0.12,
+        DataSource.APP_STORE: 0.08,
         DataSource.WEB_TRAFFIC: 0.10,
         DataSource.NEWS: 0.10,
         DataSource.SEC_FILINGS: 0.10,
         DataSource.CORPORATE_REGISTRY: 0.05,
         DataSource.SCORING: 0.10,
+        DataSource.WEB_SCRAPE: 0.10,  # Web scraping for company info
     }
 
     def __init__(self, db: Session):
@@ -387,6 +389,8 @@ class CompanyResearchAgent:
                 return await self._query_corporate_registry(company_name)
             elif source == DataSource.SCORING.value:
                 return await self._query_scoring(company_name)
+            elif source == DataSource.WEB_SCRAPE.value:
+                return await self._query_web_scrape(company_name, domain)
             else:
                 return {"error": f"Unknown source: {source}"}
         except Exception as e:
@@ -621,7 +625,12 @@ class CompanyResearchAgent:
             return None
 
     async def _query_news(self, company_name: str) -> Optional[Dict]:
-        """Query news data (T24)."""
+        """
+        Query news data (T24).
+
+        ENHANCED: Now fetches from Google News RSS if no local data.
+        """
+        # First check local database
         query = text("""
             SELECT title, source, published_at, url
             FROM news_articles
@@ -645,16 +654,104 @@ class CompanyResearchAgent:
                 return {
                     "recent_articles": articles,
                     "article_count": len(articles),
+                    "data_source": "database",
                 }
-            return None
         except Exception as e:
             logger.warning(f"News query failed: {e}")
             self.db.rollback()
+
+        # If no local data, fetch from Google News
+        logger.info(f"Fetching news from Google News for: {company_name}")
+        return await self._fetch_news_from_google(company_name)
+
+    async def _fetch_news_from_google(self, company_name: str) -> Optional[Dict]:
+        """Fetch news from Google News RSS feed and summarize with LLM."""
+        try:
+            from app.news.sources.google_news import GoogleNewsSource
+
+            news_source = GoogleNewsSource()
+            try:
+                # Fetch news for this company
+                items = await news_source.fetch(
+                    queries=[f'"{company_name}" company'],
+                    company_names=[company_name]
+                )
+
+                if items:
+                    articles = []
+                    for item in items[:5]:  # Limit to 5 articles
+                        articles.append({
+                            "title": item.get("title"),
+                            "source": item.get("source", "Google News"),
+                            "date": item.get("published_at").isoformat() if item.get("published_at") else None,
+                            "url": item.get("url"),
+                            "event_type": item.get("event_type"),
+                        })
+
+                    logger.info(f"Found {len(articles)} news articles for {company_name}")
+
+                    # Generate AI summary of the news
+                    summary = await self._summarize_news_with_llm(company_name, articles)
+
+                    return {
+                        "recent_articles": articles,
+                        "article_count": len(articles),
+                        "content_summary": summary,
+                        "data_source": "google_news",
+                        "data_freshness": "fresh",
+                    }
+            finally:
+                await news_source.close()
+
+            return None
+        except Exception as e:
+            logger.warning(f"Google News fetch failed for {company_name}: {e}")
+            return None
+
+    async def _summarize_news_with_llm(self, company_name: str, articles: List[Dict]) -> Optional[str]:
+        """Use LLM to create a concise summary of recent news."""
+        try:
+            from app.agentic.llm_client import get_llm_client
+
+            llm = get_llm_client()
+            if not llm:
+                logger.info("No LLM API key configured, skipping news summary")
+                return None
+
+            # Build prompt with article titles
+            article_list = "\n".join([
+                f"- {a.get('title', 'Untitled')} ({a.get('event_type', 'news')})"
+                for a in articles
+            ])
+
+            prompt = f"""Analyze these recent news headlines about {company_name} and write a 2-3 sentence executive summary of what's happening with the company. Focus on the most important business developments.
+
+Recent headlines:
+{article_list}
+
+Write a concise summary (2-3 sentences) for an investor audience:"""
+
+            system_prompt = "You are a financial analyst summarizing company news. Be concise and factual. Focus on business implications."
+
+            logger.info(f"Generating news summary for {company_name}")
+            response = await llm.complete(prompt, system_prompt=system_prompt)
+
+            summary = response.content.strip()
+            logger.info(f"Generated summary ({response.total_tokens} tokens, ${response.cost_usd:.4f})")
+
+            return summary
+
+        except Exception as e:
+            logger.warning(f"LLM summarization failed: {e}")
             return None
 
     async def _query_sec(self, company_name: str) -> Optional[Dict]:
-        """Query SEC filings data."""
-        # Check Form D filings
+        """
+        Query SEC filings data.
+
+        ENHANCED: Now searches SEC EDGAR API for company filings.
+        """
+        # First check local Form D filings
         query = text("""
             SELECT issuer_name, cik, total_amount_sold, total_offering_amount,
                    date_of_first_sale, industry_group
@@ -674,18 +771,139 @@ class CompanyResearchAgent:
                     "offering_amount": row["total_offering_amount"],
                     "first_sale_date": str(row["date_of_first_sale"]) if row["date_of_first_sale"] else None,
                     "industry_group": row["industry_group"],
+                    "data_source": "local_db",
                 }
-            return None
         except Exception as e:
-            logger.warning(f"SEC query failed: {e}")
+            logger.warning(f"SEC local query failed: {e}")
             self.db.rollback()
+
+        # If no local data, search SEC EDGAR API
+        logger.info(f"Searching SEC EDGAR for: {company_name}")
+        return await self._fetch_sec_from_edgar(company_name)
+
+    async def _fetch_sec_from_edgar(self, company_name: str) -> Optional[Dict]:
+        """Fetch company filings from SEC EDGAR API."""
+        try:
+            import httpx
+
+            # Search SEC full-text search for company
+            # SEC provides a company search endpoint
+            search_url = "https://efts.sec.gov/LATEST/search-index"
+
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                # Try company tickers endpoint first (for well-known companies)
+                try:
+                    ticker_resp = await client.get(
+                        "https://www.sec.gov/cgi-bin/browse-edgar",
+                        params={
+                            "action": "getcompany",
+                            "company": company_name,
+                            "type": "",
+                            "dateb": "",
+                            "owner": "include",
+                            "count": "10",
+                            "output": "atom"
+                        },
+                        headers={"User-Agent": "Nexdata Research Bot (compliance@nexdata.ai)"}
+                    )
+
+                    if ticker_resp.status_code == 200:
+                        # Parse the Atom feed for company info
+                        import xml.etree.ElementTree as ET
+                        try:
+                            root = ET.fromstring(ticker_resp.text)
+                            ns = {'atom': 'http://www.w3.org/2005/Atom'}
+
+                            entries = root.findall('.//atom:entry', ns)
+                            if entries:
+                                # Get first matching company
+                                entry = entries[0]
+                                title = entry.find('atom:title', ns)
+                                summary = entry.find('atom:summary', ns)
+                                link = entry.find('atom:link', ns)
+
+                                # Extract CIK from link
+                                cik = None
+                                if link is not None:
+                                    href = link.get('href', '')
+                                    import re
+                                    cik_match = re.search(r'CIK=(\d+)', href)
+                                    if cik_match:
+                                        cik = cik_match.group(1)
+
+                                if title is not None:
+                                    logger.info(f"Found SEC filing for {company_name}: {title.text}")
+                                    return {
+                                        "issuer_name": title.text.split(' - ')[0] if title.text else company_name,
+                                        "cik": cik,
+                                        "filing_type": title.text.split(' - ')[-1] if title.text and ' - ' in title.text else None,
+                                        "summary": summary.text[:200] if summary is not None and summary.text else None,
+                                        "sec_url": link.get('href') if link is not None else None,
+                                        "data_source": "sec_edgar",
+                                        "data_freshness": "fresh",
+                                    }
+                        except ET.ParseError:
+                            pass
+
+                except Exception as e:
+                    logger.debug(f"SEC EDGAR search failed: {e}")
+
+            return None
+
+        except Exception as e:
+            logger.warning(f"SEC EDGAR fetch failed for {company_name}: {e}")
             return None
 
     async def _query_corporate_registry(self, company_name: str) -> Optional[Dict]:
-        """Query corporate registry data (T33)."""
-        # Would integrate with OpenCorporates
-        # Returns None for now - would need API call
-        return None
+        """
+        Query corporate registry data (T33).
+
+        ENHANCED: Now searches OpenCorporates API for company registrations.
+        """
+        logger.info(f"Searching OpenCorporates for: {company_name}")
+
+        try:
+            from app.sources.opencorporates.client import OpenCorporatesClient
+
+            client = OpenCorporatesClient()
+
+            # Search for company (try US jurisdictions first)
+            results = client.search_companies(
+                query=company_name,
+                jurisdiction="us_de",  # Delaware (most US companies)
+                per_page=5
+            )
+
+            if not results.get("companies"):
+                # Try without jurisdiction filter
+                results = client.search_companies(
+                    query=company_name,
+                    per_page=5
+                )
+
+            if results.get("companies"):
+                company = results["companies"][0]  # Best match
+                logger.info(f"Found corporate registry data for {company_name}: {company.get('name')}")
+
+                return {
+                    "registered_name": company.get("name"),
+                    "company_number": company.get("company_number"),
+                    "jurisdiction": company.get("jurisdiction_code"),
+                    "incorporation_date": company.get("incorporation_date"),
+                    "company_type": company.get("company_type"),
+                    "status": company.get("current_status"),
+                    "registered_address": company.get("registered_address"),
+                    "registry_url": company.get("registry_url"),
+                    "opencorporates_url": company.get("opencorporates_url"),
+                    "data_source": "opencorporates",
+                    "data_freshness": "fresh",
+                }
+
+            return None
+
+        except Exception as e:
+            logger.warning(f"OpenCorporates search failed for {company_name}: {e}")
+            return None
 
     async def _query_scoring(self, company_name: str) -> Optional[Dict]:
         """Query company score (T36)."""
@@ -712,6 +930,152 @@ class CompanyResearchAgent:
         except Exception as e:
             logger.warning(f"Scoring query failed: {e}")
             self.db.rollback()
+            return None
+
+    async def _query_web_scrape(self, company_name: str, domain: Optional[str]) -> Optional[Dict]:
+        """
+        Scrape company website for info like employee count, revenue, about info.
+
+        AGENTIC: Goes to company website and extracts structured data.
+        """
+        # Get domain from mappings or use provided
+        normalized = company_name.lower().replace(" ", "").replace(",", "").replace(".", "")
+        mapping = COMPANY_MAPPINGS.get(normalized, {})
+        target_domain = domain or mapping.get("domain")
+
+        if not target_domain:
+            target_domain = f"{normalized}.com"
+
+        logger.info(f"Web scraping company info from: {target_domain}")
+
+        try:
+            import httpx
+            from bs4 import BeautifulSoup
+
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+                # Try to fetch About page
+                urls_to_try = [
+                    f"https://{target_domain}/about",
+                    f"https://{target_domain}/about-us",
+                    f"https://{target_domain}/company",
+                    f"https://www.{target_domain}/about",
+                    f"https://{target_domain}",
+                ]
+
+                page_content = None
+                fetched_url = None
+
+                for url in urls_to_try:
+                    try:
+                        response = await client.get(url, headers={
+                            "User-Agent": "Mozilla/5.0 (compatible; NexdataBot/1.0; +https://nexdata.ai)"
+                        })
+                        if response.status_code == 200:
+                            page_content = response.text
+                            fetched_url = url
+                            logger.info(f"Successfully fetched: {url}")
+                            break
+                    except Exception:
+                        continue
+
+                if not page_content:
+                    return None
+
+                # Parse HTML
+                soup = BeautifulSoup(page_content, "lxml")
+
+                # Extract useful information
+                result = {
+                    "source_url": fetched_url,
+                    "data_freshness": "fresh",
+                }
+
+                # Get page title and description
+                title = soup.find("title")
+                if title:
+                    result["page_title"] = title.get_text().strip()
+
+                meta_desc = soup.find("meta", attrs={"name": "description"})
+                if meta_desc and meta_desc.get("content"):
+                    result["description"] = meta_desc["content"][:500]
+
+                # Try to extract employee count from text
+                text_content = soup.get_text().lower()
+
+                # Look for employee patterns
+                import re
+                employee_patterns = [
+                    r'(\d{1,3}(?:,\d{3})*)\+?\s*employees',
+                    r'team of\s*(\d{1,3}(?:,\d{3})*)\+?',
+                    r'(\d{1,3}(?:,\d{3})*)\+?\s*team members',
+                    r'workforce of\s*(\d{1,3}(?:,\d{3})*)',
+                ]
+
+                for pattern in employee_patterns:
+                    match = re.search(pattern, text_content)
+                    if match:
+                        emp_count = match.group(1).replace(",", "")
+                        try:
+                            result["estimated_employees"] = int(emp_count)
+                            logger.info(f"Found employee count: {emp_count}")
+                            break
+                        except ValueError:
+                            pass
+
+                # Look for funding/valuation mentions
+                funding_patterns = [
+                    r'\$(\d+(?:\.\d+)?)\s*(billion|million|B|M)\s*(?:valuation|valued)',
+                    r'raised\s*\$(\d+(?:\.\d+)?)\s*(billion|million|B|M)',
+                    r'\$(\d+(?:\.\d+)?)\s*(billion|million|B|M)\s*in\s*funding',
+                ]
+
+                for pattern in funding_patterns:
+                    match = re.search(pattern, text_content, re.IGNORECASE)
+                    if match:
+                        amount = float(match.group(1))
+                        unit = match.group(2).upper()
+                        if unit in ["BILLION", "B"]:
+                            amount *= 1_000_000_000
+                        elif unit in ["MILLION", "M"]:
+                            amount *= 1_000_000
+                        result["funding_mentioned"] = amount
+                        logger.info(f"Found funding mention: ${amount:,.0f}")
+                        break
+
+                # Look for founded year
+                founded_patterns = [
+                    r'founded\s*(?:in\s*)?(\d{4})',
+                    r'since\s*(\d{4})',
+                    r'established\s*(?:in\s*)?(\d{4})',
+                ]
+
+                for pattern in founded_patterns:
+                    match = re.search(pattern, text_content)
+                    if match:
+                        year = int(match.group(1))
+                        if 1900 <= year <= 2026:
+                            result["founded_year"] = year
+                            break
+
+                # Get social links
+                social_links = {}
+                for link in soup.find_all("a", href=True):
+                    href = link["href"]
+                    if "linkedin.com" in href:
+                        social_links["linkedin"] = href
+                    elif "twitter.com" in href or "x.com" in href:
+                        social_links["twitter"] = href
+
+                if social_links:
+                    result["social_links"] = social_links
+
+                if len(result) > 2:  # More than just source_url and freshness
+                    return result
+
+                return None
+
+        except Exception as e:
+            logger.warning(f"Web scrape failed for {target_domain}: {e}")
             return None
 
     def _update_progress(
@@ -815,9 +1179,32 @@ class CompanyResearchAgent:
         sec = results.get(DataSource.SEC_FILINGS.value, {})
         if sec:
             profile["sec_filings"] = {
+                "issuer_name": sec.get("issuer_name"),
+                "cik": sec.get("cik"),
                 "form_d_total_raised": sec.get("total_raised"),
                 "form_d_offering_amount": sec.get("offering_amount"),
                 "industry_group": sec.get("industry_group"),
+                "filing_type": sec.get("filing_type"),
+                "sec_url": sec.get("sec_url"),
+                "data_source": sec.get("data_source"),
+            }
+            # Update CIK in identifiers if found
+            if sec.get("cik") and "identifiers" in profile:
+                profile["identifiers"]["cik"] = sec.get("cik")
+
+        # Corporate registry
+        corp_reg = results.get(DataSource.CORPORATE_REGISTRY.value, {})
+        if corp_reg:
+            profile["corporate_registry"] = {
+                "registered_name": corp_reg.get("registered_name"),
+                "company_number": corp_reg.get("company_number"),
+                "jurisdiction": corp_reg.get("jurisdiction"),
+                "incorporation_date": corp_reg.get("incorporation_date"),
+                "company_type": corp_reg.get("company_type"),
+                "status": corp_reg.get("status"),
+                "registered_address": corp_reg.get("registered_address"),
+                "registry_url": corp_reg.get("registry_url"),
+                "opencorporates_url": corp_reg.get("opencorporates_url"),
             }
 
         # Web traffic
@@ -838,6 +1225,7 @@ class CompanyResearchAgent:
             profile["news"] = {
                 "recent_articles": news.get("recent_articles", []),
                 "article_count": news.get("article_count", 0),
+                "content_summary": news.get("content_summary"),  # AI-generated summary
             }
 
         # Company score
@@ -851,6 +1239,32 @@ class CompanyResearchAgent:
                 "market": scoring.get("market_score"),
                 "tech": scoring.get("tech_score"),
             }
+
+        # Web scrape data (fills gaps from website)
+        web_scrape = results.get(DataSource.WEB_SCRAPE.value, {})
+        if web_scrape:
+            profile["web_scraped"] = {
+                "source_url": web_scrape.get("source_url"),
+                "description": web_scrape.get("description"),
+                "founded_year": web_scrape.get("founded_year"),
+                "social_links": web_scrape.get("social_links", {}),
+            }
+
+            # Fill in missing team data
+            if web_scrape.get("estimated_employees"):
+                if "team" not in profile:
+                    profile["team"] = {}
+                if not profile["team"].get("employee_count"):
+                    profile["team"]["employee_count"] = web_scrape.get("estimated_employees")
+                    profile["team"]["employee_source"] = "website_scrape"
+
+            # Fill in missing funding data
+            if web_scrape.get("funding_mentioned"):
+                if "financials" not in profile:
+                    profile["financials"] = {}
+                if not profile["financials"].get("funding_total"):
+                    profile["financials"]["funding_total"] = web_scrape.get("funding_mentioned")
+                    profile["financials"]["funding_source"] = "website_mention"
 
         # Identify data gaps
         profile["data_gaps"] = self._identify_gaps(profile)

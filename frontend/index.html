@@ -115,6 +115,89 @@
         .loading { text-align: center; padding: 2rem; color: var(--text-muted); }
         .empty { text-align: center; padding: 3rem; color: var(--text-muted); }
         .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+        /* Agent Progress Styles */
+        .agent-log {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.8rem;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+        .log-entry {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid #1e293b;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+        .log-entry:last-child { border-bottom: none; }
+        .log-time { color: #6b7280; min-width: 80px; }
+        .log-icon { min-width: 20px; text-align: center; }
+        .log-msg { flex: 1; }
+        .log-pending { color: #94a3b8; }
+        .log-running { color: #fbbf24; }
+        .log-success { color: #22c55e; }
+        .log-error { color: #ef4444; }
+        .log-info { color: #60a5fa; }
+        .source-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+        .source-chip {
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            text-align: center;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+        }
+        .source-chip.pending { border-color: #6b7280; color: #6b7280; }
+        .source-chip.running { border-color: #fbbf24; color: #fbbf24; background: rgba(251, 191, 36, 0.1); }
+        .source-chip.success { border-color: #22c55e; color: #22c55e; background: rgba(34, 197, 94, 0.1); }
+        .source-chip.failed { border-color: #ef4444; color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+        .progress-bar {
+            height: 4px;
+            background: var(--bg-input);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            transition: width 0.3s ease;
+        }
+        .profile-section {
+            background: var(--bg-input);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 0.5rem;
+        }
+        .profile-section h4 {
+            color: var(--accent);
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .profile-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+        }
+        .profile-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+        }
+        .profile-label { color: var(--text-muted); }
+        .profile-value { color: var(--text); font-weight: 500; }
         .footer {
             display: flex;
             justify-content: center;
@@ -235,6 +318,56 @@
             document.getElementById('tab-' + tab).classList.remove('hidden');
         }
 
+        // Source display names
+        const SOURCE_NAMES = {
+            'enrichment': '📊 Enrichment',
+            'github': '🐙 GitHub API',
+            'glassdoor': '💼 Glassdoor',
+            'app_store': '📱 App Store',
+            'web_traffic': '🌐 Web Traffic',
+            'news': '📰 Google News',
+            'sec_filings': '📄 SEC Filings',
+            'corporate_registry': '🏢 Corp Registry',
+            'scoring': '📈 Scoring',
+            'web_scrape': '🔍 Website Scrape'
+        };
+
+        let logEntries = [];
+        let pollInterval = null;
+
+        function addLog(msg, type = 'info') {
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            const icons = { pending: '⏳', running: '🔄', success: '✅', error: '❌', info: '💡' };
+            logEntries.push({ time, msg, type, icon: icons[type] || '•' });
+            updateLogDisplay();
+        }
+
+        function updateLogDisplay() {
+            const logEl = document.getElementById('agent-log');
+            if (!logEl) return;
+            logEl.innerHTML = logEntries.map(e => `
+                <div class="log-entry">
+                    <span class="log-time">${e.time}</span>
+                    <span class="log-icon">${e.icon}</span>
+                    <span class="log-msg log-${e.type}">${e.msg}</span>
+                </div>
+            `).join('');
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function updateSourceChips(requested, completed, failed) {
+            const chipContainer = document.getElementById('source-chips');
+            if (!chipContainer) return;
+
+            const failedSources = failed.map(f => f.source);
+            chipContainer.innerHTML = requested.map(src => {
+                let status = 'pending';
+                if (completed.includes(src)) status = 'success';
+                else if (failedSources.includes(src)) status = 'failed';
+                return `<div class="source-chip ${status}">${SOURCE_NAMES[src] || src}</div>`;
+            }).join('');
+        }
+
         async function runResearch() {
             const name = document.getElementById('company-input').value;
             if (!name) return;
@@ -243,55 +376,322 @@
             const results = document.getElementById('research-results');
             btn.disabled = true;
             btn.textContent = 'Researching...';
-            results.innerHTML = '<div class="loading">Querying data sources...</div>';
+            logEntries = [];
+
+            // Initial UI with progress tracking
+            results.innerHTML = `
+                <div class="card" style="margin-top: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3>🔬 Researching: ${name}</h3>
+                        <span id="status-badge" class="score-badge" style="background: var(--warning);">Starting...</span>
+                    </div>
+                    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: 0%"></div></div>
+                    <div id="source-chips" class="source-grid"></div>
+                    <div class="agent-log" id="agent-log"></div>
+                    <div id="profile-results" style="margin-top: 1rem;"></div>
+                </div>
+            `;
+
+            addLog(`Starting research for "${name}"`, 'info');
+            addLog('Initializing data collection agent...', 'pending');
 
             try {
-                // Start research
+                // Start research with force_refresh to see all actions
+                addLog('Sending research request to API...', 'running');
                 const res = await fetch(`${API}/agents/research/company`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({company_name: name})
+                    body: JSON.stringify({company_name: name, force_refresh: true})
                 });
                 const data = await res.json();
 
-                // Get score
-                const scoreRes = await fetch(`${API}/scores/company/${encodeURIComponent(name)}`);
-                const score = scoreRes.ok ? await scoreRes.json() : null;
-
-                let html = '';
-                if (score) {
-                    html += `
-                        <div class="card" style="margin-top: 1rem;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <h3>${name}</h3>
-                                <span class="score-badge">${score.composite_score?.toFixed(0) || 'N/A'} (${score.tier || 'N/A'})</span>
-                            </div>
-                            <div class="stats-grid" style="margin-top: 1rem;">
-                                ${Object.entries(score.category_scores || {}).map(([k,v]) => `
-                                    <div class="stat-card">
-                                        <div class="stat-value">${v}</div>
-                                        <div class="stat-label">${k}</div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                            <p style="color: var(--text-muted); margin-top: 1rem; font-size: 0.875rem;">
-                                Confidence: ${((score.confidence || 0) * 100).toFixed(0)}%
-                            </p>
-                        </div>
-                    `;
+                if (data.status === 'cached') {
+                    addLog('Found cached research (less than 7 days old)', 'success');
+                    displayProfile(data.result?.profile || data.result, name);
+                    btn.disabled = false;
+                    btn.textContent = 'Research';
+                    document.getElementById('status-badge').textContent = 'Cached';
+                    document.getElementById('status-badge').style.background = 'var(--accent)';
+                    document.getElementById('progress-fill').style.width = '100%';
+                    return;
                 }
 
-                if (data.job_id) {
-                    html += `<p style="color: var(--text-muted); margin-top: 1rem;">Research job started: ${data.job_id}</p>`;
+                if (!data.job_id) {
+                    addLog('Error: No job ID returned', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Research';
+                    return;
                 }
 
-                results.innerHTML = html || '<p>No results</p>';
+                addLog(`Job created: ${data.job_id}`, 'success');
+                addLog(`Querying ${data.estimated_sources || 9} data sources in parallel...`, 'info');
+
+                // Initialize source chips
+                const allSources = ['enrichment', 'github', 'glassdoor', 'app_store', 'web_traffic', 'news', 'sec_filings', 'corporate_registry', 'scoring', 'web_scrape'];
+                updateSourceChips(allSources, [], []);
+
+                // Poll for status
+                let lastCompleted = [];
+                let lastFailed = [];
+
+                pollInterval = setInterval(async () => {
+                    try {
+                        const statusRes = await fetch(`${API}/agents/research/${data.job_id}`);
+                        const status = await statusRes.json();
+
+                        // Update progress bar
+                        const progress = (status.progress || 0) * 100;
+                        document.getElementById('progress-fill').style.width = `${progress}%`;
+
+                        // Log new completions
+                        const newCompleted = (status.sources_completed || []).filter(s => !lastCompleted.includes(s));
+                        newCompleted.forEach(src => {
+                            addLog(`${SOURCE_NAMES[src] || src}: Data collected successfully`, 'success');
+                            // Add special log for news with AI summary
+                            if (src === 'news') {
+                                addLog('🤖 AI generating news summary...', 'info');
+                            }
+                        });
+                        lastCompleted = status.sources_completed || [];
+
+                        // Log new failures
+                        const newFailed = (status.sources_failed || []).filter(f => !lastFailed.some(lf => lf.source === f.source));
+                        newFailed.forEach(f => {
+                            addLog(`${SOURCE_NAMES[f.source] || f.source}: ${f.error || 'No data found'}`, 'error');
+                        });
+                        lastFailed = status.sources_failed || [];
+
+                        // Update source chips
+                        updateSourceChips(status.sources_requested || allSources, lastCompleted, lastFailed);
+
+                        // Check if done
+                        if (['completed', 'partial', 'failed'].includes(status.status)) {
+                            clearInterval(pollInterval);
+
+                            const badge = document.getElementById('status-badge');
+                            if (status.status === 'completed') {
+                                badge.textContent = 'Complete';
+                                badge.style.background = 'var(--success)';
+                                addLog('All sources queried successfully!', 'success');
+                            } else if (status.status === 'partial') {
+                                badge.textContent = 'Partial';
+                                badge.style.background = 'var(--warning)';
+                                addLog(`Research complete with ${lastCompleted.length}/${allSources.length} sources`, 'info');
+                            } else {
+                                badge.textContent = 'Failed';
+                                badge.style.background = 'var(--error)';
+                                addLog('Research failed - no data sources returned data', 'error');
+                            }
+
+                            // Display profile
+                            if (status.results?.profile) {
+                                addLog('Synthesizing company profile...', 'info');
+                                addLog(`Confidence score: ${((status.results.confidence || 0) * 100).toFixed(0)}%`, 'info');
+                                displayProfile(status.results.profile, name, status.results.confidence);
+                            }
+
+                            btn.disabled = false;
+                            btn.textContent = 'Research';
+                        }
+                    } catch (pollErr) {
+                        console.error('Poll error:', pollErr);
+                    }
+                }, 1000); // Poll every second
+
             } catch (err) {
-                results.innerHTML = `<p style="color: var(--error);">Error: ${err.message}</p>`;
+                addLog(`Error: ${err.message}`, 'error');
+                btn.disabled = false;
+                btn.textContent = 'Research';
+                if (pollInterval) clearInterval(pollInterval);
+            }
+        }
+
+        function displayProfile(profile, name, confidence) {
+            const container = document.getElementById('profile-results');
+            if (!container || !profile) return;
+
+            let html = '<h3 style="margin-bottom: 1rem;">📋 Company Profile</h3>';
+
+            // Tech Presence
+            if (profile.tech_presence) {
+                const tp = profile.tech_presence;
+                html += `
+                    <div class="profile-section">
+                        <h4>🐙 Tech Presence (GitHub)</h4>
+                        <div class="profile-grid">
+                            <div class="profile-item"><span class="profile-label">Organization</span><span class="profile-value">${tp.github_org || 'N/A'}</span></div>
+                            <div class="profile-item"><span class="profile-label">Repos</span><span class="profile-value">${tp.public_repos?.toLocaleString() || 'N/A'}</span></div>
+                            <div class="profile-item"><span class="profile-label">Stars</span><span class="profile-value">${tp.total_stars?.toLocaleString() || 'N/A'}</span></div>
+                            <div class="profile-item"><span class="profile-label">Forks</span><span class="profile-value">${tp.total_forks?.toLocaleString() || 'N/A'}</span></div>
+                            <div class="profile-item"><span class="profile-label">Velocity Score</span><span class="profile-value">${tp.velocity_score || 'N/A'}</span></div>
+                            <div class="profile-item"><span class="profile-label">Primary Lang</span><span class="profile-value">${tp.primary_language || 'N/A'}</span></div>
+                        </div>
+                    </div>
+                `;
             }
 
-            btn.disabled = false;
-            btn.textContent = 'Research';
+            // Web Traffic
+            if (profile.web_traffic) {
+                const wt = profile.web_traffic;
+                html += `
+                    <div class="profile-section">
+                        <h4>🌐 Web Traffic</h4>
+                        <div class="profile-grid">
+                            <div class="profile-item"><span class="profile-label">Domain</span><span class="profile-value">${wt.domain || 'N/A'}</span></div>
+                            <div class="profile-item"><span class="profile-label">Tranco Rank</span><span class="profile-value">#${wt.tranco_rank?.toLocaleString() || 'N/A'}</span></div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Employer Brand
+            if (profile.employer_brand) {
+                const eb = profile.employer_brand;
+                html += `
+                    <div class="profile-section">
+                        <h4>💼 Employer Brand (Glassdoor)</h4>
+                        <div class="profile-grid">
+                            <div class="profile-item"><span class="profile-label">Overall Rating</span><span class="profile-value">${eb.overall_rating?.toFixed(1) || 'N/A'}/5.0</span></div>
+                            <div class="profile-item"><span class="profile-label">CEO Approval</span><span class="profile-value">${eb.ceo_approval ? (eb.ceo_approval * 100).toFixed(0) + '%' : 'N/A'}</span></div>
+                            <div class="profile-item"><span class="profile-label">Work-Life Balance</span><span class="profile-value">${eb.work_life_balance?.toFixed(1) || 'N/A'}</span></div>
+                            <div class="profile-item"><span class="profile-label">Compensation</span><span class="profile-value">${eb.compensation_rating?.toFixed(1) || 'N/A'}</span></div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Mobile Presence
+            if (profile.mobile_presence && profile.mobile_presence.app_count > 0) {
+                const mp = profile.mobile_presence;
+                html += `
+                    <div class="profile-section">
+                        <h4>📱 Mobile Presence</h4>
+                        <div class="profile-grid">
+                            <div class="profile-item"><span class="profile-label">Apps</span><span class="profile-value">${mp.app_count || 0}</span></div>
+                            <div class="profile-item"><span class="profile-label">Avg Rating</span><span class="profile-value">${mp.avg_rating?.toFixed(1) || 'N/A'}</span></div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Health Score
+            if (profile.health_score) {
+                const hs = profile.health_score;
+                html += `
+                    <div class="profile-section">
+                        <h4>📈 Health Score</h4>
+                        <div class="profile-grid">
+                            <div class="profile-item"><span class="profile-label">Composite</span><span class="profile-value" style="color: var(--primary); font-size: 1.25rem;">${hs.composite?.toFixed(0) || 'N/A'}</span></div>
+                            <div class="profile-item"><span class="profile-label">Tier</span><span class="profile-value">${hs.tier || 'N/A'}</span></div>
+                            <div class="profile-item"><span class="profile-label">Growth</span><span class="profile-value">${hs.growth?.toFixed(0) || 'N/A'}</span></div>
+                            <div class="profile-item"><span class="profile-label">Stability</span><span class="profile-value">${hs.stability?.toFixed(0) || 'N/A'}</span></div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // News with AI Summary
+            if (profile.news && profile.news.article_count > 0) {
+                html += `
+                    <div class="profile-section">
+                        <h4>📰 Recent News</h4>
+                        ${profile.news.content_summary ? `
+                            <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(6, 182, 212, 0.1)); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 3px solid var(--primary);">
+                                <div style="font-size: 0.75rem; color: var(--primary); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">🤖 AI Summary</div>
+                                <div style="font-size: 0.9rem; line-height: 1.5;">${profile.news.content_summary}</div>
+                            </div>
+                        ` : ''}
+                        <div style="font-size: 0.875rem;">
+                            ${profile.news.recent_articles.slice(0, 3).map(a => `
+                                <div style="margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);">
+                                    <a href="${a.url || '#'}" target="_blank" style="color: var(--accent); text-decoration: none;">
+                                        ${a.title || 'Untitled'}
+                                    </a>
+                                    <div style="color: var(--text-muted); font-size: 0.75rem;">
+                                        ${a.source || 'Unknown'} • ${a.date ? new Date(a.date).toLocaleDateString() : 'No date'}
+                                        ${a.event_type ? `• <span style="color: var(--primary);">${a.event_type}</span>` : ''}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // SEC Filings
+            if (profile.sec_filings && (profile.sec_filings.cik || profile.sec_filings.issuer_name)) {
+                const sec = profile.sec_filings;
+                html += `
+                    <div class="profile-section">
+                        <h4>📄 SEC Filings</h4>
+                        <div class="profile-grid">
+                            ${sec.issuer_name ? `<div class="profile-item"><span class="profile-label">Issuer</span><span class="profile-value">${sec.issuer_name}</span></div>` : ''}
+                            ${sec.cik ? `<div class="profile-item"><span class="profile-label">CIK</span><span class="profile-value">${sec.cik}</span></div>` : ''}
+                            ${sec.filing_type ? `<div class="profile-item"><span class="profile-label">Filing Type</span><span class="profile-value">${sec.filing_type}</span></div>` : ''}
+                            ${sec.form_d_total_raised ? `<div class="profile-item"><span class="profile-label">Total Raised</span><span class="profile-value">$${(sec.form_d_total_raised/1000000).toFixed(1)}M</span></div>` : ''}
+                            ${sec.sec_url ? `<div class="profile-item"><span class="profile-label">SEC Link</span><a href="${sec.sec_url}" target="_blank" style="color: var(--accent);">View Filing</a></div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Corporate Registry
+            if (profile.corporate_registry) {
+                const cr = profile.corporate_registry;
+                html += `
+                    <div class="profile-section">
+                        <h4>🏢 Corporate Registry</h4>
+                        <div class="profile-grid">
+                            ${cr.registered_name ? `<div class="profile-item"><span class="profile-label">Registered Name</span><span class="profile-value">${cr.registered_name}</span></div>` : ''}
+                            ${cr.jurisdiction ? `<div class="profile-item"><span class="profile-label">Jurisdiction</span><span class="profile-value">${cr.jurisdiction.toUpperCase()}</span></div>` : ''}
+                            ${cr.incorporation_date ? `<div class="profile-item"><span class="profile-label">Incorporated</span><span class="profile-value">${cr.incorporation_date}</span></div>` : ''}
+                            ${cr.company_type ? `<div class="profile-item"><span class="profile-label">Type</span><span class="profile-value">${cr.company_type}</span></div>` : ''}
+                            ${cr.status ? `<div class="profile-item"><span class="profile-label">Status</span><span class="profile-value" style="color: ${cr.status === 'Active' ? 'var(--success)' : 'var(--warning)'};">${cr.status}</span></div>` : ''}
+                            ${cr.opencorporates_url ? `<div class="profile-item"><span class="profile-label">Registry</span><a href="${cr.opencorporates_url}" target="_blank" style="color: var(--accent);">OpenCorporates</a></div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Web Scraped Info
+            if (profile.web_scraped) {
+                const ws = profile.web_scraped;
+                html += `
+                    <div class="profile-section">
+                        <h4>🔍 From Company Website</h4>
+                        <div class="profile-grid">
+                            ${ws.description ? `<div class="profile-item" style="grid-column: span 2;"><span class="profile-label">Description</span><span class="profile-value" style="font-size: 0.8rem;">${ws.description.substring(0, 150)}...</span></div>` : ''}
+                            ${ws.founded_year ? `<div class="profile-item"><span class="profile-label">Founded</span><span class="profile-value">${ws.founded_year}</span></div>` : ''}
+                            ${ws.source_url ? `<div class="profile-item"><span class="profile-label">Source</span><a href="${ws.source_url}" target="_blank" style="color: var(--accent);">Visit</a></div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Data Gaps
+            if (profile.data_gaps && profile.data_gaps.length > 0) {
+                html += `
+                    <div class="profile-section" style="border: 1px solid var(--warning);">
+                        <h4 style="color: var(--warning);">⚠️ Data Gaps</h4>
+                        <p style="font-size: 0.875rem; color: var(--text-muted);">
+                            Missing: ${profile.data_gaps.map(g => g.replace('_', ' ')).join(', ')}
+                        </p>
+                    </div>
+                `;
+            }
+
+            // Confidence
+            if (confidence !== undefined) {
+                html += `
+                    <div style="margin-top: 1rem; text-align: center;">
+                        <span class="score-badge" style="background: var(--primary); padding: 0.5rem 1.5rem; font-size: 1rem;">
+                            Research Confidence: ${(confidence * 100).toFixed(0)}%
+                        </span>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
         }
 
         async function getScore() {
