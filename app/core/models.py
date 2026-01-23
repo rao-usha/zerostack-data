@@ -221,22 +221,32 @@ class CensusVariableMetadata(Base):
 class LpFund(Base):
     """
     Represents a public Limited Partner (LP) fund such as CalPERS, CalSTRS, etc.
-    
+
     These are public pension funds, sovereign wealth funds, and endowments
     that publicly disclose their investment strategies.
     """
     __tablename__ = "lp_fund"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False, unique=True, index=True)  # e.g., "CalPERS"
     formal_name = Column(Text, nullable=True)  # e.g., "California Public Employees' Retirement System"
     lp_type = Column(String(100), nullable=False, index=True)  # e.g., 'public_pension', 'sovereign_wealth', 'endowment'
     jurisdiction = Column(String(100), nullable=True)  # e.g., 'CA', 'NY', 'TX'
     website_url = Column(Text, nullable=True)
-    
+
+    # Extended metadata for collection system
+    region = Column(String(50), nullable=True, index=True)  # us, europe, asia, middle_east, oceania
+    country_code = Column(String(10), nullable=True, index=True)  # ISO alpha-2 (US, GB, JP, etc.)
+    aum_usd_billions = Column(String(50), nullable=True)  # AUM in billions USD
+    has_cafr = Column(Integer, nullable=False, default=0)  # 1 = publishes annual report
+    sec_crd_number = Column(String(50), nullable=True, index=True)  # For Form ADV lookup
+    collection_priority = Column(Integer, nullable=False, default=5)  # 1=highest, 10=lowest
+    last_collection_at = Column(DateTime, nullable=True)  # Last successful collection
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+    updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+
     def __repr__(self) -> str:
         return f"<LpFund(id={self.id}, name='{self.name}', lp_type='{self.lp_type}')>"
 
@@ -583,6 +593,169 @@ class LpKeyContact(Base):
         return (
             f"<LpKeyContact(id={self.id}, lp_id={self.lp_id}, "
             f"name='{self.full_name}', role='{self.role_category}')>"
+        )
+
+
+class LpGovernanceMember(Base):
+    """
+    Board members, trustees, and committee members for LP funds.
+
+    Tracks governance structure including:
+    - Board of trustees/directors
+    - Investment committee members
+    - Other governing bodies
+
+    Data from: Official websites, annual reports, SEC filings
+    """
+    __tablename__ = "lp_governance_member"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lp_id = Column(Integer, nullable=False, index=True)  # FK to lp_fund.id
+
+    # Person details
+    full_name = Column(Text, nullable=False)
+    title = Column(Text, nullable=True)  # e.g., "Chair", "Trustee", "Board Member"
+
+    # Governance role
+    governance_role = Column(String(100), nullable=False, index=True)
+    # governance_role values: 'board_chair', 'board_member', 'trustee',
+    #                         'investment_committee_chair', 'investment_committee_member',
+    #                         'audit_committee', 'risk_committee', 'executive_director'
+
+    committee_name = Column(String(200), nullable=True)  # e.g., "Investment Committee"
+
+    # Representation (who they represent)
+    representing = Column(String(200), nullable=True)
+    # e.g., "State Treasurer", "Retiree Representative", "Public Member"
+
+    # Tenure
+    start_date = Column(DateTime, nullable=True)
+    end_date = Column(DateTime, nullable=True)
+    term_expires = Column(DateTime, nullable=True)
+    is_current = Column(Integer, default=1)  # 0 or 1 (boolean)
+
+    # Additional info
+    bio_text = Column(Text, nullable=True)
+    bio_url = Column(Text, nullable=True)
+
+    # Data provenance
+    source_type = Column(String(100), nullable=True)  # 'website', 'annual_report', 'sec_filing'
+    source_url = Column(Text, nullable=True)
+    collected_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_lp_governance_role', 'governance_role'),
+        Index('idx_lp_governance_current', 'is_current'),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<LpGovernanceMember(id={self.id}, lp_id={self.lp_id}, "
+            f"name='{self.full_name}', role='{self.governance_role}')>"
+        )
+
+
+class LpBoardMeeting(Base):
+    """
+    Board and committee meeting records with document links.
+
+    Tracks meeting schedules and public documents:
+    - Agendas and meeting materials
+    - Minutes (when publicly available)
+    - Video recordings (for public meetings)
+    """
+    __tablename__ = "lp_board_meeting"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lp_id = Column(Integer, nullable=False, index=True)  # FK to lp_fund.id
+
+    # Meeting details
+    meeting_date = Column(DateTime, nullable=False, index=True)
+    meeting_type = Column(String(100), nullable=False, index=True)
+    # meeting_type values: 'board_regular', 'board_special', 'investment_committee',
+    #                      'audit_committee', 'risk_committee', 'annual_meeting'
+
+    meeting_title = Column(Text, nullable=True)  # e.g., "Regular Board Meeting - January 2025"
+
+    # Document links
+    agenda_url = Column(Text, nullable=True)
+    minutes_url = Column(Text, nullable=True)
+    materials_url = Column(Text, nullable=True)  # Supporting materials/presentations
+    video_url = Column(Text, nullable=True)
+
+    # Meeting content summary (if extracted)
+    summary_text = Column(Text, nullable=True)
+    key_decisions = Column(JSON, nullable=True)  # List of key decisions made
+
+    # Data provenance
+    source_url = Column(Text, nullable=True)
+    collected_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_lp_meeting_type', 'meeting_type'),
+        UniqueConstraint('lp_id', 'meeting_date', 'meeting_type', name='uq_lp_meeting'),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<LpBoardMeeting(id={self.id}, lp_id={self.lp_id}, "
+            f"date='{self.meeting_date}', type='{self.meeting_type}')>"
+        )
+
+
+class LpPerformanceReturn(Base):
+    """
+    Historical performance returns for LP funds.
+
+    Tracks investment returns over time with benchmark comparisons.
+    Data from CAFRs, annual reports, and official disclosures.
+    """
+    __tablename__ = "lp_performance_return"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lp_id = Column(Integer, nullable=False, index=True)  # FK to lp_fund.id
+
+    # Time period
+    fiscal_year = Column(Integer, nullable=False, index=True)
+    period_end_date = Column(DateTime, nullable=True)  # Specific date if available
+
+    # Total fund returns (as percentages, e.g., 8.5 for 8.5%)
+    one_year_return_pct = Column(String(50), nullable=True)
+    three_year_return_pct = Column(String(50), nullable=True)
+    five_year_return_pct = Column(String(50), nullable=True)
+    ten_year_return_pct = Column(String(50), nullable=True)
+    twenty_year_return_pct = Column(String(50), nullable=True)
+    since_inception_return_pct = Column(String(50), nullable=True)
+
+    # Benchmark comparison
+    benchmark_name = Column(String(200), nullable=True)  # e.g., "60/40 Policy Benchmark"
+    benchmark_one_year_pct = Column(String(50), nullable=True)
+    benchmark_three_year_pct = Column(String(50), nullable=True)
+    benchmark_five_year_pct = Column(String(50), nullable=True)
+    benchmark_ten_year_pct = Column(String(50), nullable=True)
+
+    # Value added (vs benchmark)
+    value_added_one_year_bps = Column(String(50), nullable=True)  # Basis points
+    value_added_five_year_bps = Column(String(50), nullable=True)
+
+    # Asset values
+    total_fund_value_usd = Column(String(50), nullable=True)  # End of period value
+    net_cash_flow_usd = Column(String(50), nullable=True)  # Contributions - Distributions
+
+    # Data provenance
+    source_type = Column(String(100), nullable=True)  # 'cafr', 'annual_report', 'website'
+    source_url = Column(Text, nullable=True)
+    collected_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_lp_performance_year', 'fiscal_year'),
+        UniqueConstraint('lp_id', 'fiscal_year', name='uq_lp_performance_year'),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<LpPerformanceReturn(id={self.id}, lp_id={self.lp_id}, "
+            f"FY{self.fiscal_year}, 1yr={self.one_year_return_pct}%)>"
         )
 
 
@@ -2195,3 +2368,214 @@ class ExportJob(Base):
 
     def __repr__(self) -> str:
         return f"<ExportJob(id={self.id}, table='{self.table_name}', format={self.format.value}, status={self.status.value})>"
+
+
+# =============================================================================
+# LP COLLECTION SYSTEM MODELS
+# =============================================================================
+
+
+class LpCollectionSourceType(str, enum.Enum):
+    """Types of data collection sources for LPs."""
+    WEBSITE = "website"  # LP website crawl
+    SEC_ADV = "sec_adv"  # SEC Form ADV
+    CAFR = "cafr"  # Comprehensive Annual Financial Report
+    NEWS = "news"  # News/press releases
+    GOVERNANCE = "governance"  # Board/committee information
+    PERFORMANCE = "performance"  # Investment returns
+
+
+class LpCollectionStatus(str, enum.Enum):
+    """Status of a collection run."""
+    PENDING = "pending"
+    RUNNING = "running"
+    SUCCESS = "success"
+    PARTIAL = "partial"  # Some items succeeded, some failed
+    FAILED = "failed"
+
+
+class LpCollectionRun(Base):
+    """
+    Tracks each LP data collection attempt per LP/source combination.
+
+    Records collection metrics, errors, and timing for monitoring and debugging.
+    """
+    __tablename__ = "lp_collection_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lp_id = Column(Integer, nullable=False, index=True)  # FK to lp_fund.id
+    source_type = Column(
+        Enum(LpCollectionSourceType, native_enum=False, length=30),
+        nullable=False,
+        index=True
+    )
+    job_id = Column(Integer, nullable=True, index=True)  # FK to ingestion_jobs.id (if part of batch)
+
+    # Status
+    status = Column(
+        Enum(LpCollectionStatus, native_enum=False, length=20),
+        nullable=False,
+        default=LpCollectionStatus.PENDING,
+        index=True
+    )
+
+    # Collection metrics
+    items_found = Column(Integer, nullable=False, default=0)
+    items_inserted = Column(Integer, nullable=False, default=0)
+    items_updated = Column(Integer, nullable=False, default=0)
+    items_skipped = Column(Integer, nullable=False, default=0)
+
+    # Error tracking
+    error_message = Column(Text, nullable=True)
+    error_details = Column(JSON, nullable=True)  # Structured error info
+    warnings = Column(JSON, nullable=True)  # List of non-fatal warnings
+
+    # Timing
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    duration_seconds = Column(Integer, nullable=True)
+
+    # Request tracking
+    requests_made = Column(Integer, nullable=False, default=0)
+    bytes_downloaded = Column(Integer, nullable=False, default=0)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_lp_collection_run_lp_source', 'lp_id', 'source_type'),
+        Index('idx_lp_collection_run_status', 'status'),
+        Index('idx_lp_collection_run_created', 'created_at'),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<LpCollectionRun(id={self.id}, lp_id={self.lp_id}, "
+            f"source={self.source_type.value}, status={self.status.value})>"
+        )
+
+
+class LpCollectionFrequency(str, enum.Enum):
+    """Frequency options for LP collection schedules."""
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    QUARTERLY = "quarterly"
+
+
+class LpCollectionSchedule(Base):
+    """
+    Per-LP collection schedules for automated data refresh.
+
+    Supports different frequencies and source types with circuit-breaking
+    for repeated failures.
+    """
+    __tablename__ = "lp_collection_schedules"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lp_id = Column(Integer, nullable=False, index=True)  # FK to lp_fund.id
+    source_type = Column(
+        Enum(LpCollectionSourceType, native_enum=False, length=30),
+        nullable=False
+    )
+
+    # Schedule configuration
+    frequency = Column(
+        Enum(LpCollectionFrequency, native_enum=False, length=20),
+        nullable=False,
+        default=LpCollectionFrequency.WEEKLY
+    )
+    day_of_week = Column(Integer, nullable=True)  # 0=Monday, for weekly
+    day_of_month = Column(Integer, nullable=True)  # 1-31, for monthly
+    hour = Column(Integer, nullable=False, default=2)  # Hour to run (0-23)
+
+    # State
+    is_active = Column(Integer, nullable=False, default=1)  # 1=active, 0=paused
+    last_run_at = Column(DateTime, nullable=True)
+    next_run_at = Column(DateTime, nullable=True)
+    last_run_id = Column(Integer, nullable=True)  # FK to lp_collection_runs.id
+
+    # Circuit breaker
+    consecutive_failures = Column(Integer, nullable=False, default=0)
+    max_failures_before_pause = Column(Integer, nullable=False, default=3)
+    paused_until = Column(DateTime, nullable=True)  # Auto-pause on repeated failures
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('lp_id', 'source_type', name='uq_lp_collection_schedule'),
+        Index('idx_lp_collection_schedule_active', 'is_active'),
+        Index('idx_lp_collection_schedule_next_run', 'next_run_at'),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<LpCollectionSchedule(id={self.id}, lp_id={self.lp_id}, "
+            f"source={self.source_type.value}, frequency={self.frequency.value}, active={self.is_active})>"
+        )
+
+
+class LpCollectionJob(Base):
+    """
+    Tracks batch LP collection jobs (orchestrates multiple LpCollectionRuns).
+
+    A single job can collect data for multiple LPs across multiple sources.
+    """
+    __tablename__ = "lp_collection_jobs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Job configuration
+    job_type = Column(String(50), nullable=False, index=True)
+    # job_type values: 'single_lp', 'batch', 'stale_refresh', 'scheduled'
+
+    config = Column(JSON, nullable=False)  # Job configuration (lp_types, regions, sources, etc.)
+
+    # Filtering
+    lp_types = Column(JSON, nullable=True)  # ["public_pension", "sovereign_wealth"]
+    regions = Column(JSON, nullable=True)  # ["us", "europe"]
+    sources = Column(JSON, nullable=True)  # ["website", "sec_adv"]
+    mode = Column(String(20), nullable=False, default='incremental')  # 'incremental' or 'full'
+    max_age_days = Column(Integer, nullable=True, default=90)  # Re-collect if older than
+
+    # Status
+    status = Column(String(20), nullable=False, default='pending', index=True)
+    # Values: 'pending', 'running', 'success', 'partial', 'failed'
+
+    # Progress tracking
+    total_lps = Column(Integer, nullable=False, default=0)
+    completed_lps = Column(Integer, nullable=False, default=0)
+    successful_lps = Column(Integer, nullable=False, default=0)
+    failed_lps = Column(Integer, nullable=False, default=0)
+
+    # Aggregate metrics
+    total_items_found = Column(Integer, nullable=False, default=0)
+    total_items_inserted = Column(Integer, nullable=False, default=0)
+    total_items_updated = Column(Integer, nullable=False, default=0)
+
+    # Run IDs
+    run_ids = Column(JSON, nullable=True)  # List of LpCollectionRun IDs
+
+    # Error summary
+    errors = Column(JSON, nullable=True)  # List of error summaries
+
+    # Timing
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_lp_collection_job_status', 'status'),
+        Index('idx_lp_collection_job_type', 'job_type'),
+        Index('idx_lp_collection_job_created', 'created_at'),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<LpCollectionJob(id={self.id}, type='{self.job_type}', "
+            f"status='{self.status}', progress={self.completed_lps}/{self.total_lps})>"
+        )
