@@ -253,22 +253,67 @@ curl -H "X-API-Key: nxd_abc123" http://localhost:8001/api/v1/public/investors
 
 ## Key Metrics to Mention
 
-- **100+ API endpoints** across 25+ data sources
-- **50+ database tables** for comprehensive data storage
+- **550+ API endpoints** across 40+ data sources
+- **60+ database tables** for comprehensive data storage
+- **8 autonomous AI agents** for research, DD, and analysis
 - **9 data sources** queried in parallel for company research
 - **6 risk categories** analyzed in due diligence
+- **4 report templates** for instant document generation
 - **Sub-second response times** for most queries
 - **7-day caching** for expensive operations
 
 ---
 
+## 9. NEW: AI-Powered Features (The Showstoppers)
+
+### Anomaly Detection
+```bash
+# Scan for anomalies
+curl -X POST http://localhost:8001/api/v1/anomalies/scan \
+  -H "Content-Type: application/json" \
+  -d '{"company_name": "Stripe"}'
+
+# Get recent anomalies
+curl http://localhost:8001/api/v1/anomalies/recent
+```
+
+**Talking point:** "AI monitors your portfolio 24/7 and alerts you to unusual patterns."
+
+### AI Report Generation
+```bash
+# Generate a company profile report
+curl -X POST http://localhost:8001/api/v1/ai-reports/generate \
+  -H "Content-Type: application/json" \
+  -d '{"report_type": "company_profile", "entity_name": "Stripe"}'
+
+# See available templates
+curl http://localhost:8001/api/v1/ai-reports/templates
+```
+
+**Talking point:** "Generate investor memos, DD reports, and company profiles instantly."
+
+### Competitive Intelligence
+```bash
+# Full competitive landscape
+curl http://localhost:8001/api/v1/competitive/Stripe
+
+# Moat assessment
+curl http://localhost:8001/api/v1/competitive/Stripe/moat
+```
+
+**Talking point:** "Automated competitive analysis with moat scoring - network effects, switching costs, brand."
+
+---
+
 ## Differentiators
 
-1. **Agentic AI** - Not just data aggregation, autonomous research agents
+1. **Agentic AI** - Not just data aggregation, 8 autonomous research agents
 2. **Due Diligence Automation** - What takes analysts days, done in seconds
-3. **Unified Data Model** - SEC + GitHub + Glassdoor + App Store all connected
-4. **Investment-Focused** - Built for PE/VC workflows, not generic business intel
-5. **API-First** - Easy to integrate into existing tools and workflows
+3. **AI Report Writer** - Instant document generation from live data
+4. **Anomaly Detection** - Proactive alerts when things change
+5. **Unified Data Model** - SEC + GitHub + Glassdoor + App Store all connected
+6. **Investment-Focused** - Built for PE/VC workflows, not generic business intel
+7. **API-First** - Easy to integrate into existing tools and workflows
 
 ---
 

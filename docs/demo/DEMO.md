@@ -4,6 +4,24 @@
 
 ---
 
+## Live Demo Dashboard
+
+**For the best demo experience, use the interactive web dashboard:**
+
+```bash
+# Start API
+docker-compose up -d
+
+# Serve dashboard
+cd demo && python -m http.server 8080
+
+# Open http://localhost:8080
+```
+
+See `/demo/README.md` for full instructions.
+
+---
+
 ## The 30-Second "Holy Shit" Moment
 
 Run this:
@@ -96,8 +114,11 @@ Scroll through the endpoints:
 - `/api/v1/github/` - Developer velocity metrics
 - `/api/v1/glassdoor/` - Employee sentiment
 - `/api/v1/form-d/` - Private placement data
+- `/api/v1/anomalies/` - AI anomaly detection
+- `/api/v1/ai-reports/` - AI report generation
+- `/api/v1/competitive/` - Competitive intelligence
 
-*"25 data sources. 100+ endpoints. One API."*
+*"40+ data sources. 550+ endpoints. One API."*
 
 ### Act 5: The Kicker (30 sec)
 
@@ -120,12 +141,12 @@ curl localhost:8001/api/v1/discover/similar/123
 
 ### Investment Research
 ```bash
-curl -X POST localhost:8001/api/v1/agents/research/company -d '{"company_name": "OpenAI"}'
+curl -X POST localhost:8001/api/v1/agents/research/company -d '{"company_name": "OpenAI"}' -H "Content-Type: application/json"
 ```
 
 ### Due Diligence
 ```bash
-curl -X POST localhost:8001/api/v1/diligence/start -d '{"company_name": "Databricks", "template": "quick"}'
+curl -X POST localhost:8001/api/v1/diligence/start -d '{"company_name": "Databricks", "template": "quick"}' -H "Content-Type: application/json"
 ```
 
 ### Company Scoring
@@ -135,18 +156,92 @@ curl localhost:8001/api/v1/scores/company/Snowflake
 
 ### Investor Network
 ```bash
-curl localhost:8001/api/v1/network/investor/123
+curl localhost:8001/api/v1/network/investor/1
 ```
 
-### Sector Trends
+### Competitive Intelligence
 ```bash
-curl localhost:8001/api/v1/trends/sectors
+curl localhost:8001/api/v1/competitive/Stripe
 ```
 
-### Portfolio Comparison
+### AI-Generated Report
 ```bash
-curl -X POST localhost:8001/api/v1/compare/portfolios -d '{"investor_ids": [1, 2]}'
+curl -X POST localhost:8001/api/v1/ai-reports/generate -d '{"report_type": "company_profile", "entity_name": "Stripe"}' -H "Content-Type: application/json"
 ```
+
+---
+
+## NEW: Phase 5 Agentic Features
+
+### Anomaly Detection
+```bash
+# Scan for anomalies across all data
+curl -X POST localhost:8001/api/v1/anomalies/scan -d '{"company_name": "Stripe"}' -H "Content-Type: application/json"
+
+# Get recent anomalies
+curl localhost:8001/api/v1/anomalies/recent?limit=10
+```
+
+*"AI automatically detects unusual patterns - score drops, employee changes, traffic spikes - and alerts you."*
+
+### AI Report Writer
+```bash
+# Generate a company profile report
+curl -X POST localhost:8001/api/v1/ai-reports/generate \
+  -d '{"report_type": "company_profile", "entity_name": "OpenAI"}' -H "Content-Type: application/json"
+
+# List available templates
+curl localhost:8001/api/v1/ai-reports/templates
+
+# Export report as markdown
+curl localhost:8001/api/v1/ai-reports/rpt_abc123/export?format=markdown
+```
+
+*"Generate investor memos, company profiles, and DD reports in seconds - not hours."*
+
+### Data Hunter (Gap Detection)
+```bash
+# Scan for data gaps
+curl -X POST localhost:8001/api/v1/hunter/scan -d '{"company_name": "Stripe"}' -H "Content-Type: application/json"
+
+# View gap queue
+curl localhost:8001/api/v1/hunter/queue
+
+# Check hunting stats
+curl localhost:8001/api/v1/hunter/stats
+```
+
+*"AI identifies what data is missing and automatically hunts for it across sources."*
+
+### Competitive Intelligence
+```bash
+# Full competitive analysis
+curl localhost:8001/api/v1/competitive/Stripe
+
+# Competitive moat assessment
+curl localhost:8001/api/v1/competitive/Stripe/moat
+
+# Compare companies head-to-head
+curl -X POST localhost:8001/api/v1/competitive/compare \
+  -d '{"companies": ["Stripe", "PayPal", "Square"]}' -H "Content-Type: application/json"
+```
+
+*"Automated competitive landscape analysis with moat scoring and market positioning."*
+
+### News Monitoring
+```bash
+# Get news feed
+curl localhost:8001/api/v1/news/feed?limit=10
+
+# Set up a watch
+curl -X POST localhost:8001/api/v1/monitors/news/watch \
+  -d '{"query": "fintech acquisition", "alert_threshold": 0.8}' -H "Content-Type: application/json"
+
+# Get daily digest
+curl localhost:8001/api/v1/monitors/news/digest
+```
+
+*"Real-time news monitoring with AI-powered relevance scoring and alerts."*
 
 ---
 

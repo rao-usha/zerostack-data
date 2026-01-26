@@ -101,6 +101,31 @@ curl http://localhost:8001/api/v1/diligence/{JOB_ID}
 
 ---
 
+---
+
+## 🤖 Phase 5: Agentic AI Features
+
+```bash
+# Anomaly Detection - AI spots unusual patterns
+curl -X POST http://localhost:8001/api/v1/anomalies/scan \
+  -d '{"company_name": "Stripe"}' -H "Content-Type: application/json"
+
+# AI Report Writer - Generate instant reports
+curl -X POST http://localhost:8001/api/v1/ai-reports/generate \
+  -d '{"report_type": "company_profile", "entity_name": "Stripe"}' -H "Content-Type: application/json"
+
+# Competitive Intelligence - Moat and landscape analysis
+curl http://localhost:8001/api/v1/competitive/Stripe
+
+# Data Hunter - Find missing data automatically
+curl http://localhost:8001/api/v1/hunter/stats
+
+# News Monitoring - Real-time alerts
+curl http://localhost:8001/api/v1/monitors/news/stats
+```
+
+---
+
 ## 💬 One-Liners for Each Feature
 
 | Feature | What to Say |
@@ -111,3 +136,6 @@ curl http://localhost:8001/api/v1/diligence/{JOB_ID}
 | Data Breadth | "SEC, GitHub, Glassdoor, App Store, web traffic - all unified" |
 | Network Graph | "See who invests alongside who, find the most connected LPs" |
 | Deal Predictions | "Win probability scoring to prioritize your pipeline" |
+| **Anomaly Detection** | "AI monitors 24/7 and alerts you when things change" |
+| **Report Writer** | "Generate investor memos and DD reports instantly" |
+| **Competitive Intel** | "Automated moat scoring and landscape analysis" |

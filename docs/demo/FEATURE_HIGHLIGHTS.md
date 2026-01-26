@@ -80,13 +80,16 @@ Transform weeks of DD work into minutes.
 
 | Metric | Value |
 |--------|-------|
-| API Endpoints | 100+ |
-| Data Sources | 25+ |
-| Database Tables | 50+ |
+| API Endpoints | **550+** |
+| Data Sources | **40+** |
+| Database Tables | 60+ |
+| AI Agents | **8** |
 | Research Sources (parallel) | 9 |
 | DD Risk Categories | 6 |
+| Report Templates | 4 |
 | Typical Research Time | <10 seconds |
 | Typical DD Time | <60 seconds |
+| Typical Report Generation | <5 seconds |
 
 ---
 
@@ -124,12 +127,14 @@ Transform weeks of DD work into minutes.
 
 ---
 
-## Roadmap Highlights (Phase 5 - In Progress)
+## Roadmap Highlights (Phase 5 - Mostly Complete)
 
 - ✅ Autonomous Company Research Agent
 - ✅ Automated Due Diligence
 - ✅ News Monitoring Agent
-- 🔄 Competitive Intelligence Agent
-- 🔄 Anomaly Detection
+- ✅ Competitive Intelligence Agent
+- ✅ Anomaly Detection Agent
+- ✅ AI Report Writer Agent
+- ✅ Data Hunter Agent (Gap Detection)
 - 🔄 Multi-Agent Orchestration
 - 🔄 Natural Language Queries ("Show me fintech companies with >4.0 Glassdoor rating")
