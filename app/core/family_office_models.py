@@ -4,7 +4,7 @@ Family Office tracking models.
 This is separate from SEC Form ADV data - this table tracks ALL family offices
 regardless of registration status, and includes manually researched data.
 """
-from sqlalchemy import Column, Integer, String, Text, Date, DateTime, Boolean, ARRAY, JSON
+from sqlalchemy import Column, Integer, String, Text, Date, DateTime, Boolean, JSON
 from sqlalchemy.sql import func
 from app.core.models import Base
 
@@ -65,26 +65,26 @@ class FamilyOffice(Base):
     estimated_wealth = Column(String(100))  # e.g., "$100B+", "$10-50B"
     
     # Investment Profile
-    investment_focus = Column(ARRAY(String))  
+    investment_focus = Column(JSON)  
     # e.g., ["Private Equity", "Venture Capital", "Real Estate", "Public Equities"]
     
-    sectors_of_interest = Column(ARRAY(String))  
+    sectors_of_interest = Column(JSON)  
     # e.g., ["AI/ML", "Healthcare", "Climate Tech", "Fintech"]
     
-    geographic_focus = Column(ARRAY(String))  
+    geographic_focus = Column(JSON)  
     # e.g., ["North America", "Europe", "Asia Pacific"]
     
-    stage_preference = Column(ARRAY(String))  
+    stage_preference = Column(JSON)  
     # e.g., ["Seed", "Series A-B", "Growth", "Late Stage"]
     
     check_size_range = Column(String(100))  # e.g., "$1M-$10M", "$10M-$50M"
     
     # Investment Philosophy
     investment_thesis = Column(Text)  # Free-form notes about their approach
-    notable_investments = Column(ARRAY(String))  # List of known investments
+    notable_investments = Column(JSON)  # List of known investments
     
     # Data Sources & Verification
-    data_sources = Column(ARRAY(String))  
+    data_sources = Column(JSON)  
     # e.g., ["Company Website", "LinkedIn", "13F Filing", "News Article"]
     
     sec_crd_number = Column(String(50))  # If registered, link to Form ADV
@@ -137,12 +137,12 @@ class FamilyOfficeContact(Base):
     
     # Professional Background
     bio = Column(Text)
-    previous_experience = Column(ARRAY(String))
-    education = Column(ARRAY(String))
+    previous_experience = Column(JSON)
+    education = Column(JSON)
     
     # Areas of Focus
-    investment_areas = Column(ARRAY(String))  # Their specific areas
-    sectors = Column(ARRAY(String))
+    investment_areas = Column(JSON)  # Their specific areas
+    sectors = Column(JSON)
     
     # Status
     is_primary_contact = Column(Boolean, default=False)
