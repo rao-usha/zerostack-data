@@ -1,5 +1,5 @@
 """
-Type definitions for the LP collection system.
+Type definitions for the Family Office collection system.
 
 Defines data classes for:
 - Collection configuration
@@ -13,99 +13,99 @@ from enum import Enum
 from typing import List, Optional, Dict, Any
 
 
-class LpCollectionSource(str, Enum):
-    """Available data collection sources."""
+class FoCollectionSource(str, Enum):
+    """Available data collection sources for family offices."""
     WEBSITE = "website"
-    SEC_ADV = "sec_adv"
     SEC_13F = "sec_13f"
-    FORM_990 = "form_990"
-    CAFR = "cafr"
+    SEC_ADV = "sec_adv"
     NEWS = "news"
-    GOVERNANCE = "governance"
-    PERFORMANCE = "performance"
+    CRUNCHBASE = "crunchbase"
+    DEALS = "deals"
 
 
-class CollectionMode(str, Enum):
+class FoCollectionMode(str, Enum):
     """Collection mode options."""
     INCREMENTAL = "incremental"  # Only collect if stale
     FULL = "full"  # Force full re-collection
 
 
 @dataclass
-class CollectionConfig:
+class FoCollectionConfig:
     """
-    Configuration for a collection job.
+    Configuration for a family office collection job.
 
     Attributes:
-        lp_types: Filter by LP types (public_pension, sovereign_wealth, etc.)
-        regions: Filter by regions (us, europe, asia, middle_east, oceania)
+        fo_types: Filter by FO types (single_family, multi_family)
+        regions: Filter by regions (us, europe, asia, middle_east)
         sources: Which sources to collect from
         mode: Collection mode (incremental or full)
         max_age_days: Re-collect data older than this (for incremental)
-        max_concurrent_lps: Maximum concurrent LP collections
+        max_concurrent_fos: Maximum concurrent FO collections
         rate_limit_delay: Delay between requests in seconds
-        max_retries: Maximum retry attempts per LP
+        max_retries: Maximum retry attempts per FO
     """
-    lp_types: Optional[List[str]] = None
+    fo_types: Optional[List[str]] = None
     regions: Optional[List[str]] = None
-    sources: List[LpCollectionSource] = field(default_factory=lambda: [LpCollectionSource.WEBSITE])
-    mode: CollectionMode = CollectionMode.INCREMENTAL
+    sources: List[FoCollectionSource] = field(
+        default_factory=lambda: [FoCollectionSource.WEBSITE]
+    )
+    mode: FoCollectionMode = FoCollectionMode.INCREMENTAL
     max_age_days: int = 90
-    max_concurrent_lps: int = 5
+    max_concurrent_fos: int = 5
     rate_limit_delay: float = 2.0
     max_retries: int = 3
 
-    # Optional LP ID filter for single LP collection
-    lp_id: Optional[int] = None
-    lp_ids: Optional[List[int]] = None
+    # Optional FO ID filter
+    fo_id: Optional[int] = None
+    fo_ids: Optional[List[int]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
-            "lp_types": self.lp_types,
+            "fo_types": self.fo_types,
             "regions": self.regions,
             "sources": [s.value for s in self.sources],
             "mode": self.mode.value,
             "max_age_days": self.max_age_days,
-            "max_concurrent_lps": self.max_concurrent_lps,
+            "max_concurrent_fos": self.max_concurrent_fos,
             "rate_limit_delay": self.rate_limit_delay,
             "max_retries": self.max_retries,
-            "lp_id": self.lp_id,
-            "lp_ids": self.lp_ids,
+            "fo_id": self.fo_id,
+            "fo_ids": self.fo_ids,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CollectionConfig":
+    def from_dict(cls, data: Dict[str, Any]) -> "FoCollectionConfig":
         """Create from dictionary."""
-        sources = [LpCollectionSource(s) for s in data.get("sources", ["website"])]
-        mode = CollectionMode(data.get("mode", "incremental"))
+        sources = [FoCollectionSource(s) for s in data.get("sources", ["website"])]
+        mode = FoCollectionMode(data.get("mode", "incremental"))
         return cls(
-            lp_types=data.get("lp_types"),
+            fo_types=data.get("fo_types"),
             regions=data.get("regions"),
             sources=sources,
             mode=mode,
             max_age_days=data.get("max_age_days", 90),
-            max_concurrent_lps=data.get("max_concurrent_lps", 5),
+            max_concurrent_fos=data.get("max_concurrent_fos", 5),
             rate_limit_delay=data.get("rate_limit_delay", 2.0),
             max_retries=data.get("max_retries", 3),
-            lp_id=data.get("lp_id"),
-            lp_ids=data.get("lp_ids"),
+            fo_id=data.get("fo_id"),
+            fo_ids=data.get("fo_ids"),
         )
 
 
 @dataclass
-class CollectedItem:
+class FoCollectedItem:
     """
-    A single collected data item.
+    A single collected data item for family offices.
 
     Attributes:
-        item_type: Type of item (contact, document, allocation, etc.)
+        item_type: Type of item (contact, investment, deal, etc.)
         data: The collected data
         source_url: Where the data was found
         confidence: Confidence level (high, medium, low)
         is_new: Whether this is a new item (not update)
     """
-    item_type: str  # contact, document, allocation, projection, etc.
+    item_type: str  # contact, investment, deal, portfolio_company, etc.
     data: Dict[str, Any]
     source_url: Optional[str] = None
     confidence: str = "medium"
@@ -123,13 +123,13 @@ class CollectedItem:
 
 
 @dataclass
-class CollectionResult:
+class FoCollectionResult:
     """
-    Result of a collection operation for a single LP/source combination.
+    Result of a collection operation for a single FO/source combination.
 
     Attributes:
-        lp_id: LP fund ID
-        lp_name: LP fund name
+        fo_id: Family office ID
+        fo_name: Family office name
         source: Collection source used
         success: Whether collection succeeded
         items: List of collected items
@@ -140,11 +140,11 @@ class CollectionResult:
         started_at: When collection started
         completed_at: When collection completed
     """
-    lp_id: int
-    lp_name: str
-    source: LpCollectionSource
+    fo_id: int
+    fo_name: str
+    source: FoCollectionSource
     success: bool = False
-    items: List[CollectedItem] = field(default_factory=list)
+    items: List[FoCollectedItem] = field(default_factory=list)
     error_message: Optional[str] = None
     warnings: List[str] = field(default_factory=list)
     requests_made: int = 0
@@ -177,8 +177,8 @@ class CollectionResult:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage/serialization."""
         return {
-            "lp_id": self.lp_id,
-            "lp_name": self.lp_name,
+            "fo_id": self.fo_id,
+            "fo_name": self.fo_name,
             "source": self.source.value,
             "success": self.success,
             "items_found": self.items_found,
@@ -193,70 +193,70 @@ class CollectionResult:
 
 
 @dataclass
-class JobProgress:
+class FoJobProgress:
     """
     Progress tracking for a collection job.
-
-    Attributes:
-        job_id: Job ID in database
-        total_lps: Total LPs to process
-        completed_lps: LPs completed so far
-        successful_lps: LPs that succeeded
-        failed_lps: LPs that failed
-        current_lp: Currently processing LP name
     """
     job_id: int
-    total_lps: int = 0
-    completed_lps: int = 0
-    successful_lps: int = 0
-    failed_lps: int = 0
-    current_lp: Optional[str] = None
+    total_fos: int = 0
+    completed_fos: int = 0
+    successful_fos: int = 0
+    failed_fos: int = 0
+    current_fo: Optional[str] = None
 
     @property
     def progress_pct(self) -> float:
         """Progress as percentage."""
-        if self.total_lps == 0:
+        if self.total_fos == 0:
             return 0.0
-        return (self.completed_lps / self.total_lps) * 100
+        return (self.completed_fos / self.total_fos) * 100
 
     @property
     def is_complete(self) -> bool:
         """Whether job is complete."""
-        return self.completed_lps >= self.total_lps
+        return self.completed_fos >= self.total_fos
 
 
 @dataclass
-class LpRegistryEntry:
+class FoRegistryEntry:
     """
-    Entry from the expanded LP registry.
+    Entry from the expanded family office registry.
 
-    Mirrors the structure in expanded_lp_registry.json.
+    Mirrors the structure in expanded_family_office_registry.json.
     """
     name: str
-    formal_name: str
-    lp_type: str
-    jurisdiction: str
+    fo_type: str  # single_family, multi_family
+    principal_family: Optional[str]
+    principal_name: Optional[str]
+    estimated_aum_billions: Optional[float]
     region: str
     country_code: str
-    website_url: str
-    aum_usd_billions: Optional[str] = None
-    has_cafr: bool = False
+    city: Optional[str]
+    state_province: Optional[str]
+    website_url: Optional[str]
+    investment_focus: Optional[List[str]]
+    sectors_of_interest: Optional[List[str]]
+    geographic_focus: Optional[List[str]]
+    check_size_range: Optional[str]
     collection_priority: int = 5
-    sec_crd_number: Optional[str] = None
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "LpRegistryEntry":
+    def from_dict(cls, data: Dict[str, Any]) -> "FoRegistryEntry":
         """Create from dictionary."""
         return cls(
             name=data["name"],
-            formal_name=data["formal_name"],
-            lp_type=data["lp_type"],
-            jurisdiction=data["jurisdiction"],
+            fo_type=data["fo_type"],
+            principal_family=data.get("principal_family"),
+            principal_name=data.get("principal_name"),
+            estimated_aum_billions=data.get("estimated_aum_billions"),
             region=data["region"],
             country_code=data["country_code"],
-            website_url=data["website_url"],
-            aum_usd_billions=data.get("aum_usd_billions"),
-            has_cafr=data.get("has_cafr", False),
+            city=data.get("city"),
+            state_province=data.get("state_province"),
+            website_url=data.get("website_url"),
+            investment_focus=data.get("investment_focus"),
+            sectors_of_interest=data.get("sectors_of_interest"),
+            geographic_focus=data.get("geographic_focus"),
+            check_size_range=data.get("check_size_range"),
             collection_priority=data.get("collection_priority", 5),
-            sec_crd_number=data.get("sec_crd_number"),
         )

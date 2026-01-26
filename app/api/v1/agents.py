@@ -11,6 +11,7 @@ from typing import Optional, List
 
 from app.core.database import get_db
 from app.agents.company_researcher import CompanyResearchAgent, ResearchStatus
+from app.agents.deep_researcher import DeepResearchAgent
 
 router = APIRouter(prefix="/agents", tags=["Agentic Intelligence"])
 
@@ -42,6 +43,79 @@ class ResearchJobResponse(BaseModel):
     result: Optional[dict] = None
     error: Optional[str] = None
 
+
+class DeepResearchRequest(BaseModel):
+    """Request for deep multi-turn research."""
+    company_name: str = Field(..., description="Company name to deeply research")
+    include_follow_ups: bool = Field(True, description="Run follow-up analysis prompts")
+
+
+# ============================================================================
+# DEEP RESEARCH ENDPOINTS (Multi-turn LLM Analysis)
+# ============================================================================
+
+@router.post("/deep-research")
+async def start_deep_research(
+    request: DeepResearchRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Start deep multi-turn research on a company.
+
+    This performs comprehensive investment analysis using structured prompts:
+    1. Collects data from all sources (GitHub, SEC, News, etc.)
+    2. Runs initial investment analysis prompt through LLM
+    3. Performs follow-up analyses: competitive positioning, risk deep-dive
+    4. Generates final investment recommendation
+
+    Returns job_id to track progress. Use GET /agents/deep-research/{job_id} for status.
+
+    **Note**: Requires OPENAI_API_KEY or ANTHROPIC_API_KEY configured.
+    """
+    agent = DeepResearchAgent(db)
+
+    job_id = await agent.start_deep_research(
+        company_name=request.company_name,
+        include_follow_ups=request.include_follow_ups
+    )
+
+    return {
+        "status": "started",
+        "job_id": job_id,
+        "company_name": request.company_name,
+        "message": "Deep research started. Poll GET /agents/deep-research/{job_id} for status.",
+        "phases": ["collecting", "analyzing", "synthesizing", "complete"],
+        "include_follow_ups": request.include_follow_ups
+    }
+
+
+@router.get("/deep-research/{job_id}")
+def get_deep_research_status(
+    job_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Get status and results of a deep research job.
+
+    Phases:
+    - collecting: Gathering data from all sources
+    - analyzing: Running LLM analysis prompts
+    - synthesizing: Combining analyses into final report
+    - complete: Research finished
+    - failed: Research failed (check error_message)
+    """
+    agent = DeepResearchAgent(db)
+    result = agent.get_job_status(job_id)
+
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Deep research job {job_id} not found")
+
+    return result
+
+
+# ============================================================================
+# STANDARD RESEARCH ENDPOINTS
+# ============================================================================
 
 @router.get("/sources")
 def list_available_sources(db: Session = Depends(get_db)):

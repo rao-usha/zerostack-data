@@ -21,10 +21,12 @@ from app.core.models import (
     LpGovernanceMember,
     LpBoardMeeting,
     LpPerformanceReturn,
+    LpStrategySnapshot,
     LpCollectionRun,
     LpCollectionJob,
     LpCollectionSourceType,
     LpCollectionStatus,
+    PortfolioCompany,
 )
 from app.sources.lp_collection.types import (
     CollectionConfig,
@@ -36,6 +38,8 @@ from app.sources.lp_collection.types import (
 from app.sources.lp_collection.base_collector import BaseCollector
 from app.sources.lp_collection.website_source import WebsiteCollector
 from app.sources.lp_collection.sec_adv_source import SecAdvCollector
+from app.sources.lp_collection.sec_13f_source import Sec13fCollector
+from app.sources.lp_collection.form_990_source import Form990Collector
 from app.sources.lp_collection.cafr_source import CafrCollector
 from app.sources.lp_collection.news_source import NewsCollector
 from app.sources.lp_collection.governance_source import GovernanceCollector
@@ -50,6 +54,8 @@ logger = logging.getLogger(__name__)
 COLLECTORS: Dict[LpCollectionSource, Type[BaseCollector]] = {
     LpCollectionSource.WEBSITE: WebsiteCollector,
     LpCollectionSource.SEC_ADV: SecAdvCollector,
+    LpCollectionSource.SEC_13F: Sec13fCollector,
+    LpCollectionSource.FORM_990: Form990Collector,
     LpCollectionSource.CAFR: CafrCollector,
     LpCollectionSource.NEWS: NewsCollector,
     LpCollectionSource.GOVERNANCE: GovernanceCollector,
@@ -343,6 +349,12 @@ class LpCollectionOrchestrator:
                     self._persist_board_meeting(lp_id, item)
                 elif item.item_type == "performance_return":
                     self._persist_performance_return(lp_id, item)
+                elif item.item_type == "13f_holding":
+                    self._persist_13f_holding(lp_id, item)
+                elif item.item_type in ("990_org_info", "990_financials"):
+                    self._persist_990_data(lp_id, item)
+                elif item.item_type == "strategy_snapshot":
+                    self._persist_strategy_snapshot(lp_id, item)
                 # Add handlers for other item types as needed
                 self.db.flush()  # Flush after each item to catch constraint errors early
             except Exception as e:
@@ -551,6 +563,143 @@ class LpCollectionOrchestrator:
                 if value:
                     setattr(perf, field, value)
             self.db.add(perf)
+            item.is_new = True
+
+        self.db.commit()
+
+    def _persist_13f_holding(self, lp_id: int, item: CollectedItem) -> None:
+        """
+        Persist 13F holding data to PortfolioCompany table.
+
+        SEC 13F filings provide authoritative data on institutional holdings
+        including CUSIP, shares held, and market values.
+        """
+        data = item.data
+        cusip = data.get("cusip")
+        issuer_name = data.get("issuer_name")
+        report_date_str = data.get("report_date")
+
+        if not cusip or not issuer_name:
+            return
+
+        # Parse report date
+        report_date = None
+        if report_date_str:
+            try:
+                report_date = datetime.fromisoformat(report_date_str)
+            except ValueError:
+                try:
+                    report_date = datetime.strptime(report_date_str, "%Y-%m-%d")
+                except ValueError:
+                    report_date = datetime.utcnow()
+
+        # Check for existing holding (same LP, cusip, and report period)
+        existing = self.db.query(PortfolioCompany).filter(
+            PortfolioCompany.investor_id == lp_id,
+            PortfolioCompany.investor_type == "lp",
+            PortfolioCompany.company_cusip == cusip,
+            PortfolioCompany.source_type == "sec_13f",
+        ).first()
+
+        if existing:
+            # Update existing holding with newer data
+            if report_date and (not existing.investment_date or report_date > existing.investment_date):
+                existing.shares_held = data.get("shares")
+                existing.market_value_usd = data.get("value_usd")
+                existing.investment_date = report_date
+                existing.updated_at = datetime.utcnow()
+            item.is_new = False
+        else:
+            # Create new holding
+            holding = PortfolioCompany(
+                investor_id=lp_id,
+                investor_type="lp",
+                company_name=issuer_name,
+                company_cusip=cusip,
+                investment_type="public_equity",
+                investment_date=report_date,
+                shares_held=data.get("shares"),
+                market_value_usd=data.get("value_usd"),
+                current_holding=1,
+                source_type="sec_13f",
+                source_url=item.source_url,
+                confidence_level="high",  # SEC filings are authoritative
+                collected_date=datetime.utcnow(),
+                collection_method="sec_13f_collector",
+            )
+            self.db.add(holding)
+            item.is_new = True
+
+        self.db.commit()
+
+    def _persist_990_data(self, lp_id: int, item: CollectedItem) -> None:
+        """
+        Persist Form 990 data to LP record.
+
+        Updates LP record with financial data from Form 990 filings.
+        """
+        data = item.data
+
+        # Update LP record with Form 990 data
+        lp = self.db.query(LpFund).filter(LpFund.id == lp_id).first()
+        if lp:
+            # Update EIN if not already set
+            ein = data.get("ein")
+            if ein and not getattr(lp, "ein", None):
+                # Would need to add ein column to LpFund if not present
+                pass
+
+            # Update AUM from total assets
+            total_assets = data.get("total_assets")
+            if total_assets:
+                try:
+                    aum_billions = float(total_assets) / 1_000_000_000
+                    if not lp.aum_usd_billions or float(lp.aum_usd_billions or 0) < aum_billions:
+                        lp.aum_usd_billions = f"{aum_billions:.2f}"
+                except (ValueError, TypeError):
+                    pass
+
+            self.db.commit()
+
+        # Log item as persisted (data is mostly informational)
+        item.is_new = True
+
+    def _persist_strategy_snapshot(self, lp_id: int, item: CollectedItem) -> None:
+        """
+        Persist strategy snapshot data.
+
+        Creates or updates strategy snapshot with allocation data.
+        """
+        data = item.data
+        fiscal_year = data.get("fiscal_year")
+
+        if not fiscal_year:
+            return
+
+        # Check for existing snapshot
+        existing = self.db.query(LpStrategySnapshot).filter(
+            LpStrategySnapshot.lp_id == lp_id,
+            LpStrategySnapshot.fiscal_year == fiscal_year,
+            LpStrategySnapshot.program == "total_fund",
+            LpStrategySnapshot.fiscal_quarter == "Q4",  # Annual data
+        ).first()
+
+        if existing:
+            # Update existing snapshot
+            if data.get("total_aum_usd"):
+                existing.summary_text = f"Total assets: ${data.get('total_aum_usd')}"
+            item.is_new = False
+        else:
+            # Create new snapshot
+            snapshot = LpStrategySnapshot(
+                lp_id=lp_id,
+                program="total_fund",
+                fiscal_year=fiscal_year,
+                fiscal_quarter="Q4",
+                summary_text=f"Total assets: ${data.get('total_aum_usd')}" if data.get('total_aum_usd') else None,
+                created_at=datetime.utcnow(),
+            )
+            self.db.add(snapshot)
             item.is_new = True
 
         self.db.commit()

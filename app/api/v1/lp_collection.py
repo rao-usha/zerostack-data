@@ -13,7 +13,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -28,6 +28,11 @@ from app.core.models import (
     LpGovernanceMember,
     LpBoardMeeting,
     LpPerformanceReturn,
+    LpStrategySnapshot,
+    LpAssetClassTargetAllocation,
+    LpManagerOrVehicleExposure,
+    LpKeyContact,
+    PortfolioCompany,
 )
 from app.sources.lp_collection.types import (
     CollectionConfig,
@@ -207,13 +212,14 @@ async def create_collection_job(
     db.refresh(job)
 
     # Run collection in background
-    async def run_job():
+    def run_job_sync():
+        """Run the async collection job in a new event loop."""
         try:
-            await orchestrator.run_collection_job()
+            asyncio.run(orchestrator.run_collection_job())
         except Exception as e:
             logger.error(f"Error in collection job {job.id}: {e}")
 
-    background_tasks.add_task(asyncio.create_task, run_job())
+    background_tasks.add_task(run_job_sync)
 
     return CollectionJobResponse(
         job_id=job.id,
@@ -682,43 +688,64 @@ async def seed_lps_from_registry(
     """
     Seed the database with LPs from the expanded registry.
 
-    Creates LpFund records for all LPs in the registry that don't already exist.
+    Uses upsert logic - creates new records and updates existing ones.
+    Safe to run multiple times.
     """
     registry = get_lp_registry()
 
     created = 0
+    updated = 0
     skipped = 0
 
     for lp_entry in registry.all_lps:
-        # Check if already exists
-        existing = db.query(LpFund).filter(LpFund.name == lp_entry.name).first()
+        try:
+            # Check if already exists
+            existing = db.query(LpFund).filter(LpFund.name == lp_entry.name).first()
 
-        if existing:
+            if existing:
+                # Update existing record
+                existing.formal_name = lp_entry.formal_name
+                existing.lp_type = lp_entry.lp_type
+                existing.jurisdiction = lp_entry.jurisdiction
+                existing.website_url = lp_entry.website_url
+                existing.region = lp_entry.region
+                existing.country_code = lp_entry.country_code
+                existing.aum_usd_billions = lp_entry.aum_usd_billions
+                existing.has_cafr = 1 if lp_entry.has_cafr else 0
+                existing.sec_crd_number = lp_entry.sec_crd_number
+                existing.collection_priority = lp_entry.collection_priority
+                updated += 1
+            else:
+                # Create new LP
+                lp = LpFund(
+                    name=lp_entry.name,
+                    formal_name=lp_entry.formal_name,
+                    lp_type=lp_entry.lp_type,
+                    jurisdiction=lp_entry.jurisdiction,
+                    website_url=lp_entry.website_url,
+                    region=lp_entry.region,
+                    country_code=lp_entry.country_code,
+                    aum_usd_billions=lp_entry.aum_usd_billions,
+                    has_cafr=1 if lp_entry.has_cafr else 0,
+                    sec_crd_number=lp_entry.sec_crd_number,
+                    collection_priority=lp_entry.collection_priority,
+                )
+                db.add(lp)
+                created += 1
+
+            # Commit after each LP to avoid bulk insert issues
+            db.commit()
+
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"Error seeding LP {lp_entry.name}: {e}")
             skipped += 1
             continue
 
-        # Create new LP
-        lp = LpFund(
-            name=lp_entry.name,
-            formal_name=lp_entry.formal_name,
-            lp_type=lp_entry.lp_type,
-            jurisdiction=lp_entry.jurisdiction,
-            website_url=lp_entry.website_url,
-            region=lp_entry.region,
-            country_code=lp_entry.country_code,
-            aum_usd_billions=lp_entry.aum_usd_billions,
-            has_cafr=1 if lp_entry.has_cafr else 0,
-            sec_crd_number=lp_entry.sec_crd_number,
-            collection_priority=lp_entry.collection_priority,
-        )
-        db.add(lp)
-        created += 1
-
-    db.commit()
-
     return {
-        "message": f"Seeded {created} LPs from registry",
+        "message": f"Seeded {created} new LPs, updated {updated}, skipped {skipped}",
         "created": created,
+        "updated": updated,
         "skipped": skipped,
         "total_in_registry": registry.lp_count,
     }
@@ -959,6 +986,284 @@ async def collect_lp_performance(
     except Exception as e:
         logger.error(f"Error collecting performance for {lp.name}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# LP Query Endpoints
+# =============================================================================
+
+
+@router.get("/lps/{lp_id}/allocation-history")
+async def get_lp_allocation_history(
+    lp_id: int,
+    years: int = Query(default=5, le=20, description="Number of years of history"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get allocation history for an LP.
+
+    Returns strategy snapshots showing asset allocation over time.
+    """
+    lp = db.query(LpFund).filter(LpFund.id == lp_id).first()
+    if not lp:
+        raise HTTPException(status_code=404, detail="LP not found")
+
+    # Get strategy snapshots
+    snapshots = db.query(LpStrategySnapshot).filter(
+        LpStrategySnapshot.lp_id == lp_id
+    ).order_by(LpStrategySnapshot.fiscal_year.desc()).limit(years).all()
+
+    # Get asset class allocations
+    allocations = db.query(LpAssetClassTargetAllocation).filter(
+        LpAssetClassTargetAllocation.lp_id == lp_id
+    ).order_by(LpAssetClassTargetAllocation.fiscal_year.desc()).all()
+
+    return {
+        "lp_id": lp_id,
+        "lp_name": lp.name,
+        "snapshots": [
+            {
+                "fiscal_year": s.fiscal_year,
+                "fiscal_quarter": s.fiscal_quarter,
+                "program": s.program,
+                "summary_text": s.summary_text,
+                "risk_positioning": s.risk_positioning,
+                "liquidity_profile": s.liquidity_profile,
+                "tilt_description": s.tilt_description,
+            }
+            for s in snapshots
+        ],
+        "allocations": [
+            {
+                "fiscal_year": a.fiscal_year,
+                "asset_class": a.asset_class,
+                "target_allocation_pct": a.target_allocation_pct,
+                "actual_allocation_pct": a.actual_allocation_pct,
+            }
+            for a in allocations
+        ],
+    }
+
+
+@router.get("/lps/{lp_id}/holdings")
+async def get_lp_holdings(
+    lp_id: int,
+    limit: int = Query(default=100, le=500),
+    db: Session = Depends(get_db),
+):
+    """
+    Get 13F holdings for an LP (for institutional investors).
+
+    Returns portfolio companies from SEC 13F filings.
+    """
+    lp = db.query(LpFund).filter(LpFund.id == lp_id).first()
+    if not lp:
+        raise HTTPException(status_code=404, detail="LP not found")
+
+    # Get portfolio companies from 13F
+    holdings = db.query(PortfolioCompany).filter(
+        PortfolioCompany.investor_id == lp_id,
+        PortfolioCompany.investor_type == "lp"
+    ).limit(limit).all()
+
+    # market_value_usd is stored as string, convert safely
+    total_value = 0
+    for h in holdings:
+        try:
+            if h.market_value_usd:
+                total_value += float(h.market_value_usd)
+        except (ValueError, TypeError):
+            pass
+
+    return {
+        "lp_id": lp_id,
+        "lp_name": lp.name,
+        "total_holdings": len(holdings),
+        "total_market_value_usd": total_value,
+        "holdings": [
+            {
+                "id": h.id,
+                "company_name": h.company_name,
+                "cusip": h.company_cusip,
+                "ticker_symbol": h.company_ticker,
+                "shares_held": h.shares_held,
+                "market_value_usd": h.market_value_usd,
+                "investment_type": h.investment_type,
+                "investment_date": h.investment_date,
+                "source_type": h.source_type,
+            }
+            for h in holdings
+        ],
+    }
+
+
+@router.get("/lps/{lp_id}/managers")
+async def get_lp_managers(
+    lp_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Get external managers for an LP.
+
+    Returns fund managers, GPs, and investment vehicles used by the LP.
+    Manager exposures are linked through strategy snapshots.
+    """
+    lp = db.query(LpFund).filter(LpFund.id == lp_id).first()
+    if not lp:
+        raise HTTPException(status_code=404, detail="LP not found")
+
+    # Get strategy snapshot IDs for this LP
+    snapshot_ids = db.query(LpStrategySnapshot.id).filter(
+        LpStrategySnapshot.lp_id == lp_id
+    ).all()
+    snapshot_id_list = [s[0] for s in snapshot_ids]
+
+    if not snapshot_id_list:
+        return {
+            "lp_id": lp_id,
+            "lp_name": lp.name,
+            "total_managers": 0,
+            "managers": [],
+        }
+
+    # Get manager exposures via strategy snapshots
+    exposures = db.query(LpManagerOrVehicleExposure).filter(
+        LpManagerOrVehicleExposure.strategy_id.in_(snapshot_id_list)
+    ).all()
+
+    return {
+        "lp_id": lp_id,
+        "lp_name": lp.name,
+        "total_managers": len(exposures),
+        "managers": [
+            {
+                "id": e.id,
+                "manager_name": e.manager_name,
+                "vehicle_name": e.vehicle_name,
+                "vehicle_type": e.vehicle_type,
+                "asset_class": e.asset_class,
+            }
+            for e in exposures
+        ],
+    }
+
+
+@router.get("/lps/{lp_id}/contacts")
+async def get_lp_contacts(
+    lp_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Get key contacts for an LP.
+
+    Returns investment officers, board members, and other personnel.
+    """
+    lp = db.query(LpFund).filter(LpFund.id == lp_id).first()
+    if not lp:
+        raise HTTPException(status_code=404, detail="LP not found")
+
+    # Use raw SQL to avoid column mismatch issues
+    from sqlalchemy import text
+    result = db.execute(text("""
+        SELECT id, lp_id, full_name, title, email, phone, linkedin_url, source_type, source_url
+        FROM lp_key_contact
+        WHERE lp_id = :lp_id
+    """), {"lp_id": lp_id})
+
+    contacts = []
+    for row in result:
+        contacts.append({
+            "id": row[0],
+            "full_name": row[2],
+            "title": row[3],
+            "email": row[4],
+            "phone": row[5],
+            "linkedin_url": row[6],
+            "source_type": row[7],
+            "source_url": row[8],
+        })
+
+    return {
+        "lp_id": lp_id,
+        "lp_name": lp.name,
+        "contact_count": len(contacts),
+        "contacts": contacts,
+    }
+
+
+@router.get("/lps/{lp_id}/summary")
+async def get_lp_summary(
+    lp_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Get a comprehensive summary of an LP.
+
+    Includes basic info, recent allocations, performance, and contacts.
+    """
+    lp = db.query(LpFund).filter(LpFund.id == lp_id).first()
+    if not lp:
+        raise HTTPException(status_code=404, detail="LP not found")
+
+    # Get latest strategy snapshot
+    latest_snapshot = db.query(LpStrategySnapshot).filter(
+        LpStrategySnapshot.lp_id == lp_id
+    ).order_by(LpStrategySnapshot.fiscal_year.desc()).first()
+
+    # Get latest performance
+    latest_performance = db.query(LpPerformanceReturn).filter(
+        LpPerformanceReturn.lp_id == lp_id
+    ).order_by(LpPerformanceReturn.fiscal_year.desc()).first()
+
+    # Count contacts, holdings, managers using raw SQL to avoid model mismatch
+    from sqlalchemy import text
+    contact_count = db.execute(text(
+        "SELECT COUNT(*) FROM lp_key_contact WHERE lp_id = :lp_id"
+    ), {"lp_id": lp_id}).scalar() or 0
+    holding_count = db.query(PortfolioCompany).filter(
+        PortfolioCompany.investor_id == lp_id,
+        PortfolioCompany.investor_type == "lp"
+    ).count()
+    # Manager count via strategy snapshots
+    snapshot_ids = db.query(LpStrategySnapshot.id).filter(
+        LpStrategySnapshot.lp_id == lp_id
+    ).all()
+    snapshot_id_list = [s[0] for s in snapshot_ids]
+    manager_count = 0
+    if snapshot_id_list:
+        manager_count = db.query(LpManagerOrVehicleExposure).filter(
+            LpManagerOrVehicleExposure.strategy_id.in_(snapshot_id_list)
+        ).count()
+
+    return {
+        "lp": {
+            "id": lp.id,
+            "name": lp.name,
+            "formal_name": lp.formal_name,
+            "lp_type": lp.lp_type,
+            "jurisdiction": lp.jurisdiction,
+            "region": lp.region,
+            "country_code": lp.country_code,
+            "website_url": lp.website_url,
+            "aum_usd_billions": lp.aum_usd_billions,
+        },
+        "latest_snapshot": {
+            "fiscal_year": latest_snapshot.fiscal_year if latest_snapshot else None,
+            "program": latest_snapshot.program if latest_snapshot else None,
+            "summary_text": latest_snapshot.summary_text if latest_snapshot else None,
+            "risk_positioning": latest_snapshot.risk_positioning if latest_snapshot else None,
+        } if latest_snapshot else None,
+        "latest_performance": {
+            "fiscal_year": latest_performance.fiscal_year if latest_performance else None,
+            "one_year_return_pct": latest_performance.one_year_return_pct if latest_performance else None,
+            "five_year_return_pct": latest_performance.five_year_return_pct if latest_performance else None,
+        } if latest_performance else None,
+        "counts": {
+            "contacts": contact_count,
+            "holdings": holding_count,
+            "managers": manager_count,
+        },
+    }
 
 
 # =============================================================================

@@ -120,6 +120,78 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
 
 ---
 
+## Long-Running Task Protocol
+
+For complex multi-step tasks that may take extended time or could be interrupted:
+
+### 1. CREATE TASK LIST
+Use TaskCreate to break down work into trackable tasks:
+```
+- Create task for each major phase
+- Include clear descriptions and success criteria
+- Mark dependencies between tasks
+```
+
+### 2. EXECUTE WITH CHECKPOINTS
+For each task:
+```
+1. Mark task as "in_progress" before starting
+2. Complete the work
+3. Mark task as "completed" when done
+4. If blocked, note the blocker and move on
+```
+
+### 3. CHECKPOINT FORMAT
+After completing significant work, update task with:
+```
+Last completed: [specific action]
+Next action: [what to do next]
+Blockers: [any issues]
+Resume: [how to continue if interrupted]
+```
+
+### 4. ON RESUME
+If session was interrupted:
+```
+1. Use TaskList to see current state
+2. Use TaskGet on in_progress tasks
+3. Continue from last checkpoint
+4. Don't repeat completed work
+```
+
+### 5. TASK LIST EXAMPLE
+
+```markdown
+## Comprehensive Investor Data Expansion
+
+### Phase 1: Database Setup
+- [x] Create lp_aum_history table
+- [x] Create lp_allocation_history table
+- [ ] Create lp_13f_holding table (IN PROGRESS)
+- [ ] Create lp_manager_commitment table
+
+### Phase 2: Collectors
+- [ ] SEC 13F collector
+- [ ] Form 990 collector
+- [ ] CAFR parser with LLM
+
+### Checkpoint
+Last: Created allocation history table
+Next: Create 13F holding table
+Resume: Run remaining CREATE TABLE statements
+```
+
+### 6. COMPLETION
+When all tasks done:
+```
+1. Mark all tasks as completed
+2. Summarize what was accomplished
+3. Note any remaining issues or follow-ups
+4. Commit changes with comprehensive message
+```
+
+---
+
 ## Querying the Nexdata API
 
 The API runs at `http://localhost:8001`. Use the Python client for data queries:

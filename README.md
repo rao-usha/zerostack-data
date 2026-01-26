@@ -28,7 +28,13 @@ Stop writing custom code for each data provider. Use one consistent REST API to 
 | **Analytics** | Portfolio Alerts | ✅ COMPLETE | Change detection (internal tracking) |
 | **Analytics** | Portfolio Comparison | ✅ COMPLETE | Side-by-side investor analysis |
 | **Access** | GraphQL API | ✅ COMPLETE | Flexible query layer at /graphql |
-| **Access** | Public API + Auth | 📋 PLANNED | API keys and rate limits for external access |
+| **Access** | Public API + Auth | ✅ COMPLETE | API keys and rate limits |
+| **Agentic AI** | Company Research | ✅ COMPLETE | Multi-source company intelligence |
+| **Agentic AI** | Due Diligence | ✅ COMPLETE | Automated DD with risk scoring |
+| **Agentic AI** | Market Scanner | ✅ COMPLETE | Signal detection and monitoring |
+| **Agentic AI** | Report Writer | ✅ COMPLETE | AI-generated investment reports |
+
+**Full checklist:** [docs/MASTER_CHECKLIST.md](docs/MASTER_CHECKLIST.md)
 
 ---
 
@@ -261,33 +267,25 @@ MAX_REQUESTS_PER_SECOND=10
 
 ## Development Status
 
-### Phase 1: Agentic Infrastructure - COMPLETE
-| Task | Description | Status |
-|------|-------------|--------|
-| T01 | Retry Handler (exponential backoff) | ✅ |
-| T02 | Fuzzy Matching (85% threshold) | ✅ |
-| T03 | Response Caching | ✅ |
-| T04 | LLM Client Tests (36 tests) | ✅ |
-| T05 | Ticker Resolver Tests (48 tests) | ✅ |
-| T06 | Metrics & Monitoring | ✅ |
-| T07 | Scheduled Updates | ✅ |
-| T08 | Portfolio Export (CSV/Excel) | ✅ |
-| T09 | PDF Caching | ✅ |
-| T10 | JS Rendering (Playwright) | ✅ |
+**All 5 phases complete!** See [docs/MASTER_CHECKLIST.md](docs/MASTER_CHECKLIST.md) for full details.
 
-### Phase 2: Data Delivery - IN PROGRESS
-| Task | Description | Status |
-|------|-------------|--------|
-| T11 | Portfolio Change Alerts | ✅ COMPLETE |
-| T12 | Full-Text Search API | ✅ COMPLETE |
-| T13 | Dashboard Analytics API | ✅ COMPLETE |
-| T14 | Webhook Integrations | ⏭️ SKIPPED |
-| T15 | Email Digest Reports | ⏭️ SKIPPED |
-| T16 | GraphQL API Layer | ✅ COMPLETE |
-| T17 | Portfolio Comparison Tool | ✅ COMPLETE |
-| T18 | Investor Similarity | ✅ COMPLETE |
-| T19 | Public API with Auth | 🔄 IN PROGRESS |
-| T20 | Saved Searches & Watchlists | ✅ COMPLETE |
+| Phase | Tasks | Status |
+|-------|-------|--------|
+| Phase 1: Agentic Infrastructure | T01-T10 | ✅ COMPLETE |
+| Phase 2: Data Delivery | T11-T20 | ✅ COMPLETE |
+| Phase 3: Investment Intelligence | T21-T30 | ✅ COMPLETE |
+| Phase 4: Data Expansion | T31-T40 | ✅ COMPLETE |
+| Phase 5: Agentic AI | T41-T50 | ✅ COMPLETE |
+
+### Current Data
+| Metric | Count |
+|--------|-------|
+| LPs Tracked | 564 |
+| Family Offices | 308 |
+| Portfolio Companies | 5,236 |
+| Prediction Markets | 18 |
+| GitHub Repos | 293 |
+| News Items | 398 |
 
 ---
 

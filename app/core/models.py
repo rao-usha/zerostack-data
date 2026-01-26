@@ -2379,6 +2379,8 @@ class LpCollectionSourceType(str, enum.Enum):
     """Types of data collection sources for LPs."""
     WEBSITE = "website"  # LP website crawl
     SEC_ADV = "sec_adv"  # SEC Form ADV
+    SEC_13F = "sec_13f"  # SEC Form 13F institutional holdings
+    FORM_990 = "form_990"  # IRS Form 990 for nonprofits
     CAFR = "cafr"  # Comprehensive Annual Financial Report
     NEWS = "news"  # News/press releases
     GOVERNANCE = "governance"  # Board/committee information

@@ -160,6 +160,53 @@ class FamilyOfficeContact(Base):
         return f"<FamilyOfficeContact {self.full_name} - {self.title}>"
 
 
+class FamilyOfficeInvestment(Base):
+    """
+    Track family office investments and deal activity.
+
+    Stores information about investments collected from:
+    - News articles
+    - Press releases
+    - SEC Form D filings
+    - Crunchbase/PitchBook (public data)
+    """
+    __tablename__ = "family_office_investment"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    family_office_id = Column(Integer, nullable=False, index=True)
+
+    # Company/Investment Target
+    company_name = Column(String(500), nullable=False, index=True)
+    company_website = Column(String(500))
+
+    # Investment Details
+    investment_date = Column(Date, index=True)
+    investment_type = Column(String(50))  # venture, private_equity, real_estate, etc.
+    investment_stage = Column(String(50))  # seed, series_a, growth, buyout, etc.
+    investment_amount_usd = Column(String(50))  # Using string for flexibility
+
+    # Ownership & Role
+    ownership_pct = Column(String(20))  # Percentage owned
+    board_seat = Column(Boolean)
+    lead_investor = Column(Boolean)
+
+    # Status & Exit
+    status = Column(String(50))  # active, exited, written_off
+    exit_date = Column(Date)
+    exit_type = Column(String(50))  # ipo, acquisition, secondary, etc.
+    exit_multiple = Column(String(20))
+
+    # Data Source
+    source_type = Column(String(50))  # news, sec_form_d, website, etc.
+    source_url = Column(Text)
+
+    # Timestamps
+    collected_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    def __repr__(self):
+        return f"<FamilyOfficeInvestment {self.company_name} by FO {self.family_office_id}>"
+
+
 class FamilyOfficeInteraction(Base):
     """
     Track interactions, outreach, and engagement with family offices.

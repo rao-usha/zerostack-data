@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexdata - AI Investment Intelligence Platform</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark: #1e1e2e;
+            --darker: #11111b;
+            --light: #cdd6f4;
+            --muted: #6c7086;
+            --surface: #181825;
+            --surface2: #313244;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--darker);
+            color: var(--light);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        header {
+            background: linear-gradient(135deg, var(--dark) 0%, var(--surface) 100%);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--surface2);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stats {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+
+        /* Main Layout */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 2rem;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 1rem;
+            height: fit-content;
+            position: sticky;
+            top: 100px;
+        }
+
+        .nav-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .nav-section-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 0.5rem;
+            padding-left: 0.75rem;
+        }
+
+        .nav-btn {
+            display: block;
+            width: 100%;
+            padding: 0.75rem;
+            background: transparent;
+            border: none;
+            color: var(--light);
+            text-align: left;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover {
+            background: var(--surface2);
+        }
+
+        .nav-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .nav-btn .icon {
+            margin-right: 0.5rem;
+        }
+
+        /* Main Content */
+        .main {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Demo Card */
+        .demo-section {
+            background: var(--surface);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .demo-header {
+            background: var(--surface2);
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .demo-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .demo-badge {
+            background: var(--primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .demo-badge.new {
+            background: var(--secondary);
+        }
+
+        .demo-content {
+            padding: 1.5rem;
+        }
+
+        .demo-description {
+            color: var(--muted);
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+
+        /* Input Group */
+        .input-group {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .input-group input, .input-group select {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            background: var(--darker);
+            border: 1px solid var(--surface2);
+            border-radius: 8px;
+            color: var(--light);
+            font-size: 0.9rem;
+        }
+
+        .input-group input:focus, .input-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .run-btn {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .run-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .run-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .run-btn.loading::after {
+            content: '';
+            width: 14px;
+            height: 14px;
+            border: 2px solid transparent;
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Results */
+        .result-container {
+            background: var(--darker);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .result-header {
+            background: var(--surface2);
+            padding: 0.5rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+        }
+
+        .result-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--secondary);
+        }
+
+        .status-dot.error {
+            background: var(--danger);
+        }
+
+        .result-time {
+            color: var(--muted);
+        }
+
+        .result-body {
+            padding: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .result-body pre {
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* Highlight Box */
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%);
+            border: 1px solid var(--primary);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .highlight-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+
+        .highlight-content {
+            font-size: 0.9rem;
+        }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .metric-card {
+            background: var(--darker);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .metric-value.good {
+            color: var(--secondary);
+        }
+
+        .metric-value.warning {
+            color: var(--warning);
+        }
+
+        .metric-value.bad {
+            color: var(--danger);
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: var(--muted);
+            margin-top: 0.25rem;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .quick-btn {
+            padding: 0.5rem 1rem;
+            background: var(--surface2);
+            border: none;
+            border-radius: 20px;
+            color: var(--light);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .quick-btn:hover {
+            background: var(--primary);
+        }
+
+        /* Hidden sections */
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, var(--surface) 0%, var(--dark) 100%);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .hero h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .hero p {
+            color: var(--muted);
+            font-size: 1.1rem;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--darker);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--surface2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--muted);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="logo">Nexdata</div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value">559</div>
+                    <div class="stat-label">API Endpoints</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">40+</div>
+                    <div class="stat-label">Data Sources</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">8</div>
+                    <div class="stat-label">AI Agents</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="api-status">...</div>
+                    <div class="stat-label">API Status</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <aside class="sidebar">
+            <div class="nav-section">
+                <div class="nav-section-title">Core Features</div>
+                <button class="nav-btn active" onclick="showSection('research')">
+                    <span class="icon">🔍</span> Company Research
+                </button>
+                <button class="nav-btn" onclick="showSection('diligence')">
+                    <span class="icon">📋</span> Due Diligence
+                </button>
+                <button class="nav-btn" onclick="showSection('scores')">
+                    <span class="icon">📊</span> Health Scores
+                </button>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">AI Agents (NEW)</div>
+                <button class="nav-btn" onclick="showSection('reports')">
+                    <span class="icon">📝</span> Report Writer
+                </button>
+                <button class="nav-btn" onclick="showSection('anomalies')">
+                    <span class="icon">⚠️</span> Anomaly Detection
+                </button>
+                <button class="nav-btn" onclick="showSection('competitive')">
+                    <span class="icon">🏆</span> Competitive Intel
+                </button>
+                <button class="nav-btn" onclick="showSection('hunter')">
+                    <span class="icon">🎯</span> Data Hunter
+                </button>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Data Sources</div>
+                <button class="nav-btn" onclick="showSection('datasources')">
+                    <span class="icon">💾</span> Browse Sources
+                </button>
+                <button class="nav-btn" onclick="showSection('news')">
+                    <span class="icon">📰</span> News Feed
+                </button>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Portfolio</div>
+                <button class="nav-btn" onclick="showSection('network')">
+                    <span class="icon">🕸️</span> Investor Network
+                </button>
+                <button class="nav-btn" onclick="showSection('predictions')">
+                    <span class="icon">🎲</span> Deal Predictions
+                </button>
+            </div>
+        </aside>
+
+        <main class="main">
+            <!-- Company Research -->
+            <section id="research" class="section active">
+                <div class="hero">
+                    <h1>Autonomous Company Research</h1>
+                    <p>Enter a company name. AI queries 9+ data sources in parallel.</p>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Company Research Agent</span>
+                        <span class="demo-badge">Core Feature</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="demo-description">
+                            Autonomous AI agent that researches any company by querying SEC filings, GitHub, Glassdoor, App Store, web traffic, news, and more - all in parallel.
+                        </div>
+
+                        <div class="quick-actions">
+                            <button class="quick-btn" onclick="setCompany('research', 'Stripe')">Stripe</button>
+                            <button class="quick-btn" onclick="setCompany('research', 'OpenAI')">OpenAI</button>
+                            <button class="quick-btn" onclick="setCompany('research', 'Anthropic')">Anthropic</button>
+                            <button class="quick-btn" onclick="setCompany('research', 'Databricks')">Databricks</button>
+                            <button class="quick-btn" onclick="setCompany('research', 'Snowflake')">Snowflake</button>
+                        </div>
+
+                        <div class="input-group">
+                            <input type="text" id="research-company" placeholder="Enter company name..." value="Stripe">
+                            <button class="run-btn" onclick="runResearch()">
+                                Run Research
+                            </button>
+                        </div>
+
+                        <div id="research-result"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Due Diligence -->
+            <section id="diligence" class="section">
+                <div class="hero">
+                    <h1>Automated Due Diligence</h1>
+                    <p>Complete DD reports with risk scoring in under 60 seconds.</p>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Due Diligence Agent</span>
+                        <span class="demo-badge">Core Feature</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="demo-description">
+                            AI-powered due diligence that analyzes 6 risk categories: financial, legal, team, market, operations, and technology. Returns risk score, red flags, and IC-ready memo.
+                        </div>
+
+                        <div class="quick-actions">
+                            <button class="quick-btn" onclick="setCompany('dd', 'Stripe')">Stripe</button>
+                            <button class="quick-btn" onclick="setCompany('dd', 'Anthropic')">Anthropic</button>
+                            <button class="quick-btn" onclick="setCompany('dd', 'Figma')">Figma</button>
+                        </div>
+
+                        <div class="input-group">
+                            <input type="text" id="dd-company" placeholder="Enter company name..." value="Stripe">
+                            <select id="dd-template">
+                                <option value="quick">Quick DD</option>
+                                <option value="standard">Standard DD</option>
+                                <option value="deep">Deep Dive DD</option>
+                            </select>
+                            <button class="run-btn" onclick="runDD()">
+                                Run DD
+                            </button>
+                        </div>
+
+                        <div id="dd-result"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Health Scores -->
+            <section id="scores" class="section">
+                <div class="hero">
+                    <h1>ML-Powered Health Scores</h1>
+                    <p>Quantified company health with A-F tiers and confidence levels.</p>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Company Scoring Engine</span>
+                        <span class="demo-badge">Core Feature</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="demo-description">
+                            Machine learning model that scores companies across growth, stability, market position, and tech velocity. Weighted composite with confidence intervals.
+                        </div>
+
+                        <div class="quick-actions">
+                            <button class="quick-btn" onclick="setCompany('scores', 'Stripe')">Stripe</button>
+                            <button class="quick-btn" onclick="setCompany('scores', 'Apple')">Apple</button>
+                            <button class="quick-btn" onclick="setCompany('scores', 'Microsoft')">Microsoft</button>
+                        </div>
+
+                        <div class="input-group">
+                            <input type="text" id="scores-company" placeholder="Enter company name..." value="Stripe">
+                            <button class="run-btn" onclick="runScores()">
+                                Get Score
+                            </button>
+                        </div>
+
+                        <div id="scores-result"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- AI Report Writer -->
+            <section id="reports" class="section">
+                <div class="hero">
+                    <h1>AI Report Writer</h1>
+                    <p>Generate investor memos, company profiles, and DD reports instantly.</p>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Report Generation Agent</span>
+                        <span class="demo-badge new">NEW</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="demo-description">
+                            AI agent that generates comprehensive natural language reports from live data. Supports multiple report types and customizable templates.
+                        </div>
+
+                        <div class="quick-actions">
+                            <button class="quick-btn" onclick="setCompany('reports', 'Stripe')">Stripe</button>
+                            <button class="quick-btn" onclick="setCompany('reports', 'OpenAI')">OpenAI</button>
+                        </div>
+
+                        <div class="input-group">
+                            <input type="text" id="reports-company" placeholder="Enter company name..." value="Stripe">
+                            <select id="report-type">
+                                <option value="company_profile">Company Profile</option>
+                                <option value="due_diligence">Due Diligence Report</option>
+                                <option value="competitive_landscape">Competitive Landscape</option>
+                            </select>
+                            <select id="report-template">
+                                <option value="full_report">Full Report</option>
+                                <option value="executive_brief">Executive Brief</option>
+                                <option value="investor_memo">Investor Memo</option>
+                                <option value="quick_overview">Quick Overview</option>
+                            </select>
+                            <button class="run-btn" onclick="runReport()">
+                                Generate
+                            </button>
+                        </div>
+
+                        <div id="reports-result"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Anomaly Detection -->
+            <section id="anomalies" class="section">
+                <div class="hero">
+                    <h1>Anomaly Detection</h1>
+                    <p>AI monitors your data 24/7 and alerts you when things change.</p>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Anomaly Detection Agent</span>
+                        <span class="demo-badge new">NEW</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="demo-description">
+                            Detects unusual patterns across scores, employees, traffic, ratings, and GitHub activity. Auto-correlates anomalies and suggests probable causes.
+                        </div>
+
+                        <div class="input-group">
+                            <input type="text" id="anomaly-company" placeholder="Enter company name (or leave blank for all)..." value="Stripe">
+                            <button class="run-btn" onclick="runAnomalyScan()">
+                                Scan for Anomalies
+                            </button>
+                        </div>
+
+                        <div id="anomalies-result"></div>
+                    </div>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Recent Anomalies</span>
+                    </div>
+                    <div class="demo-content">
+                        <button class="run-btn" onclick="getRecentAnomalies()">
+                            Load Recent Anomalies
+                        </button>
+                        <div id="recent-anomalies-result"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Competitive Intelligence -->
+            <section id="competitive" class="section">
+                <div class="hero">
+                    <h1>Competitive Intelligence</h1>
+                    <p>Automated competitive landscape analysis with moat scoring.</p>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Competitive Analysis Agent</span>
+                        <span class="demo-badge new">NEW</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="demo-description">
+                            Analyzes competitive landscape, identifies competitors, and scores competitive moat across 5 dimensions: network effects, switching costs, cost advantages, brand, and technology.
+                        </div>
+
+                        <div class="quick-actions">
+                            <button class="quick-btn" onclick="setCompany('competitive', 'Stripe')">Stripe</button>
+                            <button class="quick-btn" onclick="setCompany('competitive', 'PayPal')">PayPal</button>
+                            <button class="quick-btn" onclick="setCompany('competitive', 'Square')">Square</button>
+                        </div>
+
+                        <div class="input-group">
+                            <input type="text" id="competitive-company" placeholder="Enter company name..." value="Stripe">
+                            <button class="run-btn" onclick="runCompetitive()">
+                                Analyze
+                            </button>
+                        </div>
+
+                        <div id="competitive-result"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Data Hunter -->
+            <section id="hunter" class="section">
+                <div class="hero">
+                    <h1>Data Hunter</h1>
+                    <p>AI identifies missing data and automatically hunts for it.</p>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Data Gap Detection</span>
+                        <span class="demo-badge new">NEW</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="demo-description">
+                            Scans your data for gaps, prioritizes what's missing, and automatically searches for data across all available sources.
+                        </div>
+
+                        <div class="input-group">
+                            <input type="text" id="hunter-company" placeholder="Enter company name..." value="Stripe">
+                            <button class="run-btn" onclick="runHunterScan()">
+                                Scan for Gaps
+                            </button>
+                        </div>
+
+                        <div id="hunter-result"></div>
+                    </div>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Hunter Statistics</span>
+                    </div>
+                    <div class="demo-content">
+                        <button class="run-btn" onclick="getHunterStats()">
+                            Load Stats
+                        </button>
+                        <div id="hunter-stats-result"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Data Sources -->
+            <section id="datasources" class="section">
+                <div class="hero">
+                    <h1>Data Sources</h1>
+                    <p>40+ integrated data sources - SEC, GitHub, Glassdoor, and more.</p>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Glassdoor - Employee Sentiment</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="input-group">
+                            <input type="text" id="glassdoor-company" placeholder="Enter company name..." value="Stripe">
+                            <button class="run-btn" onclick="runGlassdoor()">
+                                Get Ratings
+                            </button>
+                        </div>
+                        <div id="glassdoor-result"></div>
+                    </div>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">App Store - Mobile Presence</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="input-group">
+                            <input type="text" id="apps-query" placeholder="Search apps..." value="stripe">
+                            <button class="run-btn" onclick="runAppSearch()">
+                                Search
+                            </button>
+                        </div>
+                        <div id="apps-result"></div>
+                    </div>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Web Traffic - Tranco Rankings</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="input-group">
+                            <input type="text" id="traffic-domain" placeholder="Enter domain..." value="stripe.com">
+                            <button class="run-btn" onclick="runTraffic()">
+                                Get Ranking
+                            </button>
+                        </div>
+                        <div id="traffic-result"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- News Feed -->
+            <section id="news" class="section">
+                <div class="hero">
+                    <h1>News Monitor</h1>
+                    <p>Real-time news monitoring with AI-powered relevance scoring.</p>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Latest News Feed</span>
+                    </div>
+                    <div class="demo-content">
+                        <button class="run-btn" onclick="getNewsFeed()">
+                            Load News Feed
+                        </button>
+                        <div id="news-result"></div>
+                    </div>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">News Monitor Stats</span>
+                    </div>
+                    <div class="demo-content">
+                        <button class="run-btn" onclick="getNewsStats()">
+                            Load Stats
+                        </button>
+                        <div id="news-stats-result"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Investor Network -->
+            <section id="network" class="section">
+                <div class="hero">
+                    <h1>Investor Network</h1>
+                    <p>Map co-investment relationships and find connected investors.</p>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Most Central Investors</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="demo-description">
+                            Find the most connected investors in the network based on co-investment relationships.
+                        </div>
+                        <button class="run-btn" onclick="getCentralInvestors()">
+                            Load Network
+                        </button>
+                        <div id="network-result"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Deal Predictions -->
+            <section id="predictions" class="section">
+                <div class="hero">
+                    <h1>Deal Predictions</h1>
+                    <p>ML-powered win probability scoring for your pipeline.</p>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Pipeline Predictions</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="demo-description">
+                            Predictive scoring model that estimates win probability for each deal in your pipeline based on historical patterns.
+                        </div>
+                        <button class="run-btn" onclick="getPipelinePredictions()">
+                            Load Predictions
+                        </button>
+                        <div id="predictions-result"></div>
+                    </div>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Deal Pipeline Summary</span>
+                    </div>
+                    <div class="demo-content">
+                        <button class="run-btn" onclick="getPipelineSummary()">
+                            Load Pipeline
+                        </button>
+                        <div id="pipeline-result"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8001';
+
+        // Check API status on load
+        async function checkApiStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/health`);
+                const data = await res.json();
+                document.getElementById('api-status').textContent = data.status === 'healthy' ? '✓ Live' : '✗ Down';
+                document.getElementById('api-status').style.color = data.status === 'healthy' ? '#10b981' : '#ef4444';
+            } catch (e) {
+                document.getElementById('api-status').textContent = '✗ Down';
+                document.getElementById('api-status').style.color = '#ef4444';
+            }
+        }
+        checkApiStatus();
+
+        // Show section
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(sectionId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Set company in input
+        function setCompany(section, company) {
+            const input = document.getElementById(`${section}-company`) ||
+                          document.getElementById(`${section === 'dd' ? 'dd' : section}-company`);
+            if (input) input.value = company;
+        }
+
+        // Render result
+        function renderResult(containerId, data, time, isError = false) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = `
+                <div class="result-container">
+                    <div class="result-header">
+                        <div class="result-status">
+                            <span class="status-dot ${isError ? 'error' : ''}"></span>
+                            <span>${isError ? 'Error' : 'Success'}</span>
+                        </div>
+                        <span class="result-time">${time}ms</span>
+                    </div>
+                    <div class="result-body">
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render metrics
+        function renderMetrics(containerId, metrics) {
+            const container = document.getElementById(containerId);
+            let html = '<div class="metrics-grid">';
+            for (const [key, value] of Object.entries(metrics)) {
+                const colorClass = typeof value === 'number' ?
+                    (value >= 70 ? 'good' : value >= 40 ? 'warning' : 'bad') : '';
+                html += `
+                    <div class="metric-card">
+                        <div class="metric-value ${colorClass}">${value}</div>
+                        <div class="metric-label">${key.replace(/_/g, ' ')}</div>
+                    </div>
+                `;
+            }
+            html += '</div>';
+            container.innerHTML += html;
+        }
+
+        // API Calls
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            const start = Date.now();
+            const options = {
+                method,
+                headers: { 'Content-Type': 'application/json' }
+            };
+            if (body) options.body = JSON.stringify(body);
+
+            const res = await fetch(`${API_BASE}${endpoint}`, options);
+            const data = await res.json();
+            const time = Date.now() - start;
+            return { data, time, ok: res.ok };
+        }
+
+        // Run Company Research
+        async function runResearch() {
+            const company = document.getElementById('research-company').value;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall('/api/v1/agents/research/company', 'POST', { company_name: company });
+                renderResult('research-result', data, time, !ok);
+
+                if (ok && data.result?.profile) {
+                    const profile = data.result.profile;
+                    if (profile.health_score) {
+                        renderMetrics('research-result', {
+                            'Health Score': profile.health_score.composite?.toFixed(0) || 'N/A',
+                            'Tier': profile.health_score.tier || 'N/A',
+                            'Growth': profile.health_score.growth?.toFixed(0) || 'N/A',
+                            'Stability': profile.health_score.stability?.toFixed(0) || 'N/A'
+                        });
+                    }
+                }
+            } catch (e) {
+                renderResult('research-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Run Due Diligence
+        async function runDD() {
+            const company = document.getElementById('dd-company').value;
+            const template = document.getElementById('dd-template').value;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall('/api/v1/diligence/start', 'POST', {
+                    company_name: company,
+                    template: template
+                });
+
+                if (ok && data.job_id) {
+                    // Poll for results
+                    await new Promise(r => setTimeout(r, 2000));
+                    const result = await apiCall(`/api/v1/diligence/${data.job_id}`);
+                    renderResult('dd-result', result.data, time + 2000, !result.ok);
+
+                    if (result.ok && result.data.result) {
+                        const dd = result.data.result;
+                        renderMetrics('dd-result', {
+                            'Risk Score': dd.risk_score?.toFixed(0) || 'N/A',
+                            'Risk Level': dd.risk_level || 'N/A',
+                            'Red Flags': dd.red_flags?.length || 0,
+                            'Confidence': ((dd.confidence || 0) * 100).toFixed(0) + '%'
+                        });
+                    }
+                } else {
+                    renderResult('dd-result', data, time, !ok);
+                }
+            } catch (e) {
+                renderResult('dd-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Run Scores
+        async function runScores() {
+            const company = document.getElementById('scores-company').value;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall(`/api/v1/scores/company/${encodeURIComponent(company)}`);
+                renderResult('scores-result', data, time, !ok);
+
+                if (ok) {
+                    renderMetrics('scores-result', {
+                        'Composite': data.composite_score?.toFixed(0) || 'N/A',
+                        'Tier': data.tier || 'N/A',
+                        'Growth': data.category_scores?.growth?.toFixed(0) || 'N/A',
+                        'Stability': data.category_scores?.stability?.toFixed(0) || 'N/A',
+                        'Market': data.category_scores?.market_position?.toFixed(0) || 'N/A',
+                        'Tech': data.category_scores?.tech_velocity?.toFixed(0) || 'N/A'
+                    });
+                }
+            } catch (e) {
+                renderResult('scores-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Run Report Generation
+        async function runReport() {
+            const company = document.getElementById('reports-company').value;
+            const reportType = document.getElementById('report-type').value;
+            const template = document.getElementById('report-template').value;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall('/api/v1/ai-reports/generate', 'POST', {
+                    report_type: reportType,
+                    entity_name: company,
+                    template: template
+                });
+
+                if (ok && data.report_id) {
+                    // Get full report
+                    const result = await apiCall(`/api/v1/ai-reports/${data.report_id}`);
+                    renderResult('reports-result', result.data, time, !result.ok);
+
+                    if (result.ok && result.data.content_markdown) {
+                        document.getElementById('reports-result').innerHTML += `
+                            <div class="highlight-box">
+                                <div class="highlight-title">Report Preview</div>
+                                <div class="highlight-content">
+                                    <pre style="white-space: pre-wrap;">${result.data.content_markdown.substring(0, 1000)}...</pre>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    renderResult('reports-result', data, time, !ok);
+                }
+            } catch (e) {
+                renderResult('reports-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Run Anomaly Scan
+        async function runAnomalyScan() {
+            const company = document.getElementById('anomaly-company').value;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const body = company ? { company_name: company } : {};
+                const { data, time, ok } = await apiCall('/api/v1/anomalies/scan', 'POST', body);
+                renderResult('anomalies-result', data, time, !ok);
+
+                if (ok) {
+                    renderMetrics('anomalies-result', {
+                        'Records Scanned': data.records_scanned || 0,
+                        'Anomalies Found': data.anomalies_found || 0
+                    });
+                }
+            } catch (e) {
+                renderResult('anomalies-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Get Recent Anomalies
+        async function getRecentAnomalies() {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall('/api/v1/anomalies/recent?limit=10');
+                renderResult('recent-anomalies-result', data, time, !ok);
+            } catch (e) {
+                renderResult('recent-anomalies-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Run Competitive Analysis
+        async function runCompetitive() {
+            const company = document.getElementById('competitive-company').value;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall(`/api/v1/competitive/${encodeURIComponent(company)}`);
+                renderResult('competitive-result', data, time, !ok);
+
+                if (ok && data.moat_assessment) {
+                    renderMetrics('competitive-result', {
+                        'Overall Moat': data.moat_assessment.overall_score?.toFixed(0) || 'N/A',
+                        'Moat Level': data.moat_assessment.overall_moat || 'N/A',
+                        'Network Effects': data.moat_assessment.scores?.network_effects?.toFixed(0) || 'N/A',
+                        'Switching Costs': data.moat_assessment.scores?.switching_costs?.toFixed(0) || 'N/A',
+                        'Brand': data.moat_assessment.scores?.brand?.toFixed(0) || 'N/A',
+                        'Competitors': data.competitors?.length || 0
+                    });
+                }
+            } catch (e) {
+                renderResult('competitive-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Run Hunter Scan
+        async function runHunterScan() {
+            const company = document.getElementById('hunter-company').value;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall('/api/v1/hunter/scan', 'POST', { company_name: company });
+                renderResult('hunter-result', data, time, !ok);
+            } catch (e) {
+                renderResult('hunter-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Get Hunter Stats
+        async function getHunterStats() {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall('/api/v1/hunter/stats');
+                renderResult('hunter-stats-result', data, time, !ok);
+
+                if (ok) {
+                    renderMetrics('hunter-stats-result', {
+                        'Total Gaps': data.total_gaps || 0,
+                        'Fill Rate': (data.fill_rate * 100 || 0).toFixed(0) + '%'
+                    });
+                }
+            } catch (e) {
+                renderResult('hunter-stats-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Glassdoor
+        async function runGlassdoor() {
+            const company = document.getElementById('glassdoor-company').value;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall(`/api/v1/glassdoor/company/${encodeURIComponent(company)}`);
+                renderResult('glassdoor-result', data, time, !ok);
+
+                if (ok && data.ratings) {
+                    renderMetrics('glassdoor-result', {
+                        'Overall': data.ratings.overall?.toFixed(1) || 'N/A',
+                        'Work-Life': data.ratings.work_life_balance?.toFixed(1) || 'N/A',
+                        'Compensation': data.ratings.compensation_benefits?.toFixed(1) || 'N/A',
+                        'Culture': data.ratings.culture_values?.toFixed(1) || 'N/A'
+                    });
+                }
+            } catch (e) {
+                renderResult('glassdoor-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // App Search
+        async function runAppSearch() {
+            const query = document.getElementById('apps-query').value;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall(`/api/v1/apps/search?q=${encodeURIComponent(query)}&limit=5`);
+                renderResult('apps-result', data, time, !ok);
+            } catch (e) {
+                renderResult('apps-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Web Traffic
+        async function runTraffic() {
+            const domain = document.getElementById('traffic-domain').value;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall(`/api/v1/web-traffic/domain/${encodeURIComponent(domain)}`);
+                renderResult('traffic-result', data, time, !ok);
+
+                if (ok) {
+                    renderMetrics('traffic-result', {
+                        'Tranco Rank': data.tranco_rank ? `#${data.tranco_rank.toLocaleString()}` : 'N/A'
+                    });
+                }
+            } catch (e) {
+                renderResult('traffic-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // News Feed
+        async function getNewsFeed() {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall('/api/v1/news/feed?limit=10');
+                renderResult('news-result', data, time, !ok);
+
+                if (ok) {
+                    renderMetrics('news-result', {
+                        'Total Items': data.total || 0,
+                        'Shown': data.items?.length || 0
+                    });
+                }
+            } catch (e) {
+                renderResult('news-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // News Stats
+        async function getNewsStats() {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall('/api/v1/monitors/news/stats');
+                renderResult('news-stats-result', data, time, !ok);
+
+                if (ok) {
+                    renderMetrics('news-stats-result', {
+                        'Watch Items': data.watch_items || 0,
+                        'Matches Today': data.matches_today || 0,
+                        'Unread': data.unread || 0
+                    });
+                }
+            } catch (e) {
+                renderResult('news-stats-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Central Investors
+        async function getCentralInvestors() {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall('/api/v1/network/central');
+                renderResult('network-result', data, time, !ok);
+            } catch (e) {
+                renderResult('network-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Pipeline Predictions
+        async function getPipelinePredictions() {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall('/api/v1/predictions/pipeline');
+                renderResult('predictions-result', data, time, !ok);
+
+                if (ok && data.summary) {
+                    renderMetrics('predictions-result', {
+                        'Total Deals': data.summary.total_deals || 0,
+                        'Avg Win Prob': ((data.summary.avg_probability || 0) * 100).toFixed(0) + '%',
+                        'Expected Wins': data.summary.expected_wins?.toFixed(1) || 0
+                    });
+                }
+            } catch (e) {
+                renderResult('predictions-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Pipeline Summary
+        async function getPipelineSummary() {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall('/api/v1/deals/pipeline');
+                renderResult('pipeline-result', data, time, !ok);
+
+                if (ok) {
+                    renderMetrics('pipeline-result', {
+                        'Total Deals': data.total_deals || 0,
+                        'Active': data.active_deals || 0,
+                        'Recent Activity': data.recent_activity || 0
+                    });
+                }
+            } catch (e) {
+                renderResult('pipeline-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+    </script>
+</body>
+</html>

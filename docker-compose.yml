@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: nexdata_dev_password
       POSTGRES_DB: nexdata
     ports:
-      - "5433:5432"  # Use port 5433 on host to avoid conflict
+      - "5434:5432"  # Use port 5434 on host to avoid conflict
     volumes:
       - postgres_data:/var/lib/postgresql/data  # Named volume for data persistence
     healthcheck:
