@@ -24,47 +24,89 @@ from app.sources.lp_collection.types import (
 logger = logging.getLogger(__name__)
 
 
-# Patterns to identify governance pages
+# Patterns to identify governance pages (ordered by specificity)
 GOVERNANCE_PAGE_PATTERNS = [
+    # Most specific paths first
+    "/about-us/our-plan/our-board",
+    "/about-us/board-of-trustees",
+    "/about-us/leadership",
+    "/about-us/our-board",
+    "/about/board-of-trustees",
+    "/about/leadership",
+    "/about/our-board",
+    "/about/board",
+    "/en-ca/about-us/our-plan/our-board",  # OTPP style
+    "/en/about/board",
+    # Standard paths
+    "/board-of-trustees",
+    "/board-of-directors",
+    "/investment-committee",
     "/board",
     "/trustees",
     "/leadership",
     "/governance",
-    "/about-us",
-    "/about",
     "/our-team",
     "/who-we-are",
-    "/board-of-trustees",
-    "/board-of-directors",
-    "/investment-committee",
+    "/executive-team",
+    "/management-team",
+    # Generic fallbacks
+    "/about-us",
+    "/about",
 ]
 
-# Role patterns for extraction
+# Role patterns for extraction (ordered by specificity - most specific first)
 GOVERNANCE_ROLE_PATTERNS = {
     "board_chair": [
-        r"chair(?:man|woman|person)?(?:\s+of\s+the\s+board)?",
+        r"^chair$",
+        r"^chairman$",
+        r"^chairwoman$",
+        r"^chairperson$",
+        r"chair(?:man|woman|person)?\s+of\s+the\s+board",
+        r"board\s+chair",
         r"presiding\s+(?:member|officer)",
     ],
-    "board_member": [
-        r"board\s+member",
-        r"director",
-        r"member\s+of\s+the\s+board",
+    "vice_chair": [
+        r"vice[- ]?chair(?:man|woman|person)?",
+        r"deputy\s+chair",
     ],
     "trustee": [
-        r"trustee",
+        r"^trustee$",
         r"board\s+of\s+trustees",
+        r"appointed\s+trustee",
+        r"elected\s+trustee",
     ],
     "investment_committee_chair": [
         r"investment\s+committee\s+chair",
         r"chair.*investment\s+committee",
+        r"cio",
+        r"chief\s+investment",
     ],
     "investment_committee_member": [
-        r"investment\s+committee(?:\s+member)?",
+        r"investment\s+committee",
+        r"investment\s+board",
+    ],
+    "audit_committee_chair": [
+        r"audit\s+committee\s+chair",
+        r"chair.*audit\s+committee",
+    ],
+    "audit_committee_member": [
+        r"audit\s+committee",
     ],
     "executive_director": [
         r"executive\s+director",
-        r"ceo",
+        r"^ceo$",
+        r"chief\s+executive\s+officer",
         r"chief\s+executive",
+        r"^president$",
+        r"president\s+and\s+ceo",
+    ],
+    "board_member": [
+        r"board\s+member",
+        r"^director$",
+        r"^member$",
+        r"member\s+of\s+the\s+board",
+        r"appointed\s+(?:by|member)",
+        r"elected\s+(?:by|member)",
     ],
 }
 
@@ -204,73 +246,218 @@ class GovernanceCollector(BaseCollector):
     ) -> List[CollectedItem]:
         """Extract governance member information from HTML."""
         items = []
-        html_lower = html.lower()
-
-        # Common patterns for member listings
-        # Pattern 1: Name followed by title/role
-        name_title_pattern = re.compile(
-            r'<(?:h[2-4]|strong|b)[^>]*>\s*([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*</(?:h[2-4]|strong|b)>'
-            r'[^<]*<[^>]*>\s*([^<]+)',
-            re.IGNORECASE
-        )
-
-        # Pattern 2: Card/list item with name and role
-        card_pattern = re.compile(
-            r'class="[^"]*(?:member|trustee|director|team)[^"]*"[^>]*>.*?'
-            r'([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'
-            r'.*?(?:title|role|position)[^>]*>([^<]+)',
-            re.IGNORECASE | re.DOTALL
-        )
-
         seen_names = set()
 
-        # Try pattern 1
-        for match in name_title_pattern.finditer(html):
-            name = match.group(1).strip()
-            title = match.group(2).strip()
-
+        # Helper to add member if valid
+        def add_member(name: str, title: str, confidence: str = "medium"):
+            name = name.strip()
             if self._is_valid_name(name) and name not in seen_names:
                 seen_names.add(name)
                 item = self._create_governance_item(
-                    lp_id, lp_name, name, title, source_url
+                    lp_id, lp_name, name, title.strip(), source_url, confidence
                 )
                 if item:
                     items.append(item)
 
-        # Try pattern 2 if pattern 1 didn't find much
-        if len(items) < 3:
-            for match in card_pattern.finditer(html):
-                name = match.group(1).strip()
-                title = match.group(2).strip()
+        # Pattern 1: "Role: Name" format (e.g., "Chair: John Smith")
+        # Handles: <p>Chair: Debbie Stein</p>, Vice-Chair: Name, etc.
+        role_name_pattern = re.compile(
+            r'(?:^|>)\s*'
+            r'(Chair(?:man|woman|person)?|Vice[- ]?Chair(?:man|woman|person)?|'
+            r'President|CEO|Executive\s+Director|Trustee|Director|Member)'
+            r'\s*:\s*'
+            r'([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'
+            r'\s*(?:<|$)',
+            re.IGNORECASE | re.MULTILINE
+        )
+        for match in role_name_pattern.finditer(html):
+            title = match.group(1).strip()
+            name = match.group(2).strip()
+            add_member(name, title, "high")
 
-                if self._is_valid_name(name) and name not in seen_names:
-                    seen_names.add(name)
-                    item = self._create_governance_item(
-                        lp_id, lp_name, name, title, source_url
-                    )
-                    if item:
-                        items.append(item)
+        # Pattern 2: "Members: Name1, Name2 and Name3" format
+        members_list_pattern = re.compile(
+            r'(?:Members|Board\s+Members|Trustees|Directors)\s*:\s*'
+            r'([A-Z][^<]{10,200}?)(?:<|$)',
+            re.IGNORECASE
+        )
+        for match in members_list_pattern.finditer(html):
+            names_text = match.group(1)
+            # Split by comma and "and"
+            names = re.split(r'\s*,\s*|\s+and\s+', names_text)
+            for name in names:
+                # Clean up name (remove trailing punctuation)
+                name = re.sub(r'[.,;:\s]+$', '', name.strip())
+                add_member(name, "Board Member", "medium")
+
+        # Pattern 3: List items with "Name, Organization" format
+        # Handles: <li>Marie Moftah, L'Association des enseignantes...</li>
+        li_name_org_pattern = re.compile(
+            r'<li[^>]*>\s*'
+            r'([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'
+            r'\s*,\s*'
+            r'([^<]+)'
+            r'\s*</li>',
+            re.IGNORECASE
+        )
+        for match in li_name_org_pattern.finditer(html):
+            name = match.group(1).strip()
+            org = match.group(2).strip()
+            # Use org as title/representing info
+            add_member(name, f"Board Member ({org[:100]})", "medium")
+
+        # Pattern 4: Header tag followed by title/role (original pattern, improved)
+        name_title_pattern = re.compile(
+            r'<(?:h[2-5]|strong|b)[^>]*>\s*'
+            r'([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'
+            r'\s*</(?:h[2-5]|strong|b)>'
+            r'[^<]{0,50}<[^>]*>\s*([^<]+)',
+            re.IGNORECASE
+        )
+        for match in name_title_pattern.finditer(html):
+            name = match.group(1).strip()
+            title = match.group(2).strip()
+            add_member(name, title, "medium")
+
+        # Pattern 5: Card/div with class containing member/trustee/director
+        card_pattern = re.compile(
+            r'class="[^"]*(?:member|trustee|director|team|board|staff|person|profile)[^"]*"[^>]*>'
+            r'[^<]*(?:<[^>]+>[^<]*)*?'
+            r'([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'
+            r'[^<]*(?:<[^>]+>[^<]*)*?'
+            r'(?:title|role|position|job)[^>]*>([^<]+)',
+            re.IGNORECASE | re.DOTALL
+        )
+        for match in card_pattern.finditer(html):
+            name = match.group(1).strip()
+            title = match.group(2).strip()
+            add_member(name, title, "medium")
+
+        # Pattern 6: Structured data / JSON-LD for board members
+        json_person_pattern = re.compile(
+            r'"@type"\s*:\s*"Person"[^}]*"name"\s*:\s*"([^"]+)"[^}]*"jobTitle"\s*:\s*"([^"]+)"',
+            re.IGNORECASE
+        )
+        for match in json_person_pattern.finditer(html):
+            name = match.group(1).strip()
+            title = match.group(2).strip()
+            add_member(name, title, "high")
+
+        # Pattern 7: Simple name in governance context (fallback)
+        # Look for names near governance keywords
+        if len(items) < 3:
+            governance_section = self._find_governance_section(html)
+            if governance_section:
+                simple_name_pattern = re.compile(
+                    r'(?:^|[>\s])([A-Z][a-z]+\s+(?:[A-Z]\.?\s+)?[A-Z][a-z]+)(?:[,<\s]|$)'
+                )
+                for match in simple_name_pattern.finditer(governance_section):
+                    name = match.group(1).strip()
+                    add_member(name, "Board Member", "low")
 
         return items
 
+    def _find_governance_section(self, html: str) -> Optional[str]:
+        """Find the section of HTML most likely to contain governance info."""
+        # Look for sections with governance-related headers
+        section_pattern = re.compile(
+            r'(?:<(?:section|div|article)[^>]*>)?'
+            r'[^<]*<(?:h[1-4])[^>]*>[^<]*'
+            r'(?:Board|Trustees?|Directors?|Leadership|Governance|Committee)'
+            r'[^<]*</(?:h[1-4])>'
+            r'([\s\S]{0,5000}?)'
+            r'(?:</(?:section|div|article)>|<(?:h[1-4])[^>]*>)',
+            re.IGNORECASE
+        )
+        match = section_pattern.search(html)
+        if match:
+            return match.group(1)
+        return None
+
     def _is_valid_name(self, name: str) -> bool:
         """Check if extracted string looks like a person's name."""
-        if not name or len(name) < 5:
+        if not name or len(name) < 5 or len(name) > 60:
             return False
 
         # Must have at least first and last name
         parts = name.split()
-        if len(parts) < 2:
+        if len(parts) < 2 or len(parts) > 5:
             return False
 
-        # Check for common non-name patterns
+        # Each part should start with capital letter and have reasonable pattern
+        for part in parts:
+            # Allow initials (single letter with optional period)
+            if len(part) <= 2:
+                continue
+            if not part[0].isupper():
+                return False
+            # Name parts should have mostly lowercase after first letter
+            if len(part) > 3 and part[1:].isupper():
+                return False  # Likely an acronym like "OPERS"
+
+        # Check for common non-name patterns (organization names, categories, etc.)
         non_names = [
+            # Generic web/nav terms
             "board", "committee", "member", "trustee", "director",
             "about", "contact", "home", "login", "menu", "search",
-            "privacy", "terms", "copyright", "read more"
+            "privacy", "terms", "copyright", "read more", "click here",
+            "learn more", "view all", "see more", "our team", "our board",
+            # Organization terms
+            "investment committee", "audit committee", "annual report",
+            "pension fund", "pension plan", "retirement system",
+            "foundation", "association", "corporation", "institute",
+            "university", "college", "school", "district",
+            # Common non-person phrases
+            "ontario teachers", "natural resources", "allowed is",
+            "venture growth", "real estate", "capital markets",
+            "total fund", "private capital", "news releases",
+            "general plans", "safety plans", "retiree healthcare",
+            "leadership team", "executive team", "management team",
+            "policy", "strategy", "governance", "oversight",
+            "stakeholder", "relations", "services", "resources",
+            "portfolio", "solutions", "operations", "affairs",
+            # URL/tech
+            "http", "www", ".com", ".org", ".gov", ".edu",
         ]
         name_lower = name.lower()
         if any(non in name_lower for non in non_names):
+            return False
+
+        # Check if any part looks like an acronym (all caps, 2+ chars)
+        for part in parts:
+            if len(part) >= 2 and part.isupper():
+                return False
+
+        # Name parts should be reasonable length (2-15 chars each)
+        for part in parts:
+            if len(part) > 15:
+                return False
+
+        # Should not contain numbers or special characters (except periods, hyphens, apostrophes)
+        if re.search(r'[0-9@#$%^&*()+=\[\]{}|\\/<>]', name):
+            return False
+
+        # First name should look like a name (not a category word)
+        first_name = parts[0].lower()
+        category_words = [
+            "general", "safety", "public", "private", "corporate",
+            "state", "federal", "national", "local", "regional",
+            "early", "senior", "junior", "middle", "total",
+            "annual", "quarterly", "monthly", "weekly", "daily",
+            "our", "your", "their", "the", "this", "that",
+            "new", "old", "current", "former", "past", "future",
+        ]
+        if first_name in category_words:
+            return False
+
+        # Last word should also not be a category/nav word
+        last_word = parts[-1].lower()
+        nav_words = [
+            "management", "history", "mission", "vision", "values",
+            "overview", "information", "details", "news", "updates",
+            "benefits", "plans", "programs", "services", "contact",
+        ]
+        if last_word in nav_words:
             return False
 
         return True
@@ -282,12 +469,15 @@ class GovernanceCollector(BaseCollector):
         name: str,
         title: str,
         source_url: str,
+        confidence: str = "medium",
     ) -> Optional[CollectedItem]:
         """Create a governance member CollectedItem."""
         # Determine governance role from title
         role = self._categorize_governance_role(title)
+
+        # Default to board_member if no specific role found but name is valid
         if not role:
-            return None
+            role = "board_member"
 
         # Determine who they represent
         representing = self._extract_representation(title)
@@ -305,7 +495,7 @@ class GovernanceCollector(BaseCollector):
                 "source_type": "website",
             },
             source_url=source_url,
-            confidence="medium",
+            confidence=confidence,
         )
 
     def _categorize_governance_role(self, title: str) -> Optional[str]:
