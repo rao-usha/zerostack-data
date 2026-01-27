@@ -446,6 +446,11 @@ class GovernanceCollector(BaseCollector):
             "annual", "quarterly", "monthly", "weekly", "daily",
             "our", "your", "their", "the", "this", "that",
             "new", "old", "current", "former", "past", "future",
+            # Business/corporate terms
+            "responsible", "sustainable", "strategic", "global",
+            "business", "corporate", "financial", "investment",
+            "join", "discover", "explore", "learn", "read",
+            "view", "see", "click", "download", "subscribe",
         ]
         if first_name in category_words:
             return False
@@ -456,8 +461,23 @@ class GovernanceCollector(BaseCollector):
             "management", "history", "mission", "vision", "values",
             "overview", "information", "details", "news", "updates",
             "benefits", "plans", "programs", "services", "contact",
+            # More business terms
+            "investor", "insurer", "employer", "citizen", "business",
+            "ethics", "report", "governance", "compliance", "risk",
+            "us", "here", "more", "all", "now",
         ]
         if last_word in nav_words:
+            return False
+
+        # Reject common two-word non-name phrases
+        full_lower = name.lower()
+        non_name_phrases = [
+            "join us", "contact us", "about us", "follow us",
+            "read more", "learn more", "view more", "see more",
+            "click here", "sign up", "log in", "sign in",
+            "remuneration report", "annual report", "business ethics",
+        ]
+        if full_lower in non_name_phrases:
             return False
 
         return True
