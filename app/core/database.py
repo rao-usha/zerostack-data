@@ -9,6 +9,8 @@ from app.core.config import get_settings
 from app.core.models import Base
 # Import SEC models so they're registered with SQLAlchemy
 from app.sources.sec import models as sec_models
+# Import PE models for PE Intelligence Platform
+from app.core import pe_models
 import logging
 
 logger = logging.getLogger(__name__)
