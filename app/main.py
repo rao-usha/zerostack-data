@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news, reports, deals, benchmarks, auth, workspaces, form_d, corporate_registry, form_adv, web_traffic, github, scores, entities, glassdoor, app_rankings, predictions, agents, diligence, monitors, competitive, hunter, anomalies, market, reports_gen, lp_collection, fo_collection, pe_firms, pe_companies, pe_people, pe_deals
+from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news, reports, deals, benchmarks, auth, workspaces, form_d, corporate_registry, form_adv, web_traffic, github, scores, entities, glassdoor, app_rankings, predictions, agents, diligence, monitors, competitive, hunter, anomalies, market, reports_gen, lp_collection, fo_collection, pe_firms, pe_companies, pe_people, pe_deals, people, companies_leadership, collection_jobs, people_portfolios, peer_sets, people_watchlists, people_analytics, people_reports, people_data_quality, people_jobs
 from app.graphql import graphql_app
 
 # Configure logging
@@ -828,6 +828,30 @@ Browse the endpoint sections below to see what's available:
         {
             "name": "Family Office Collection",
             "description": "👨‍👩‍👧 **Family Office Data Collection** - Continuous data collection for 300+ family offices worldwide"
+        },
+        {
+            "name": "People & Leadership",
+            "description": "👥 **People & Leadership** - Executive search, leadership profiles, and career history"
+        },
+        {
+            "name": "Company Leadership",
+            "description": "🏢 **Company Leadership** - Company leadership teams, org charts, and leadership changes"
+        },
+        {
+            "name": "Collection Jobs",
+            "description": "⚙️ **People Collection Jobs** - Manage leadership data collection jobs and batch processing"
+        },
+        {
+            "name": "People Portfolios",
+            "description": "📁 **PE Portfolios** - Track leadership across portfolio companies"
+        },
+        {
+            "name": "Peer Sets & Benchmarking",
+            "description": "📊 **Peer Benchmarking** - Compare leadership structures across peer companies"
+        },
+        {
+            "name": "People Watchlists",
+            "description": "👁️ **Executive Watchlists** - Track specific executives and get change alerts"
         }
     ]
 )
@@ -926,6 +950,18 @@ app.include_router(pe_firms.router, prefix="/api/v1")
 app.include_router(pe_companies.router, prefix="/api/v1")
 app.include_router(pe_people.router, prefix="/api/v1")
 app.include_router(pe_deals.router, prefix="/api/v1")
+
+# People & Org Chart Intelligence
+app.include_router(people.router, prefix="/api/v1")
+app.include_router(companies_leadership.router, prefix="/api/v1")
+app.include_router(collection_jobs.router, prefix="/api/v1")
+app.include_router(people_portfolios.router, prefix="/api/v1")
+app.include_router(peer_sets.router, prefix="/api/v1")
+app.include_router(people_watchlists.router, prefix="/api/v1")
+app.include_router(people_analytics.router, prefix="/api/v1")
+app.include_router(people_reports.router, prefix="/api/v1")
+app.include_router(people_data_quality.router, prefix="/api/v1")
+app.include_router(people_jobs.router, prefix="/api/v1")
 
 # GraphQL API
 app.include_router(graphql_app, prefix="/graphql", tags=["graphql"])

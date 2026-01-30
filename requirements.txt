@@ -10,6 +10,8 @@ python-multipart==0.0.21
 
 # HTTP client
 httpx==0.25.2
+aiohttp>=3.9.0  # Async HTTP for people collection agents
+tenacity>=8.2.0  # Retry logic for collection agents
 
 # Testing
 pytest==7.4.3

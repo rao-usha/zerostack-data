@@ -11,6 +11,8 @@ from app.core.models import Base
 from app.sources.sec import models as sec_models
 # Import PE models for PE Intelligence Platform
 from app.core import pe_models
+# Import People & Org Chart models
+from app.core import people_models
 import logging
 
 logger = logging.getLogger(__name__)
