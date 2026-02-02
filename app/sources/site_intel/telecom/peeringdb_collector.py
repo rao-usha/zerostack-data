@@ -211,6 +211,10 @@ class PeeringDBCollector(BaseCollector):
                     state = potential_state
                     city = parts[0].strip()
 
+        # proto_ipv4/ipv6 are booleans, convert to 1/0 for integer columns
+        ipv4 = record.get("proto_ipv4")
+        ipv6 = record.get("proto_ipv6")
+
         return {
             "peeringdb_id": pdb_id,
             "name": name,
@@ -222,8 +226,8 @@ class PeeringDBCollector(BaseCollector):
             "longitude": self._safe_float(record.get("longitude")),
             "website": record.get("website"),
             "network_count": net_counts.get(pdb_id, 0),
-            "ipv4_prefixes": record.get("proto_ipv4"),
-            "ipv6_prefixes": record.get("proto_ipv6"),
+            "ipv4_prefixes": 1 if ipv4 else 0,
+            "ipv6_prefixes": 1 if ipv6 else 0,
             "source": "peeringdb",
             "collected_at": datetime.utcnow(),
         }
@@ -261,11 +265,11 @@ class PeeringDBCollector(BaseCollector):
                 inserted, _ = self.bulk_upsert(
                     DataCenterFacility,
                     records,
-                    unique_columns=["peeringdb_fac_id"],
+                    unique_columns=["peeringdb_id"],
                     update_columns=[
                         "name", "city", "state", "country", "address",
-                        "latitude", "longitude", "website", "owner_org",
-                        "available_sqft", "colo_type", "collected_at"
+                        "latitude", "longitude", "website", "operator",
+                        "collected_at"
                     ],
                 )
                 return {"processed": len(data), "inserted": inserted}
@@ -287,7 +291,7 @@ class PeeringDBCollector(BaseCollector):
         city = record.get("city")
 
         return {
-            "peeringdb_fac_id": pdb_id,
+            "peeringdb_id": pdb_id,
             "name": record.get("name"),
             "city": city,
             "state": state,
@@ -296,9 +300,7 @@ class PeeringDBCollector(BaseCollector):
             "latitude": self._safe_float(record.get("latitude")),
             "longitude": self._safe_float(record.get("longitude")),
             "website": record.get("website"),
-            "owner_org": record.get("org_name"),
-            "available_sqft": self._safe_int(record.get("available_voltage")),  # PeeringDB doesn't always have sqft
-            "colo_type": self._determine_colo_type(record),
+            "operator": record.get("org_name"),
             "source": "peeringdb",
             "collected_at": datetime.utcnow(),
         }

@@ -105,6 +105,12 @@ class BaseCollector(ABC):
             await self._client.aclose()
             self._client = None
 
+    async def apply_rate_limit(self):
+        """Apply rate limiting delay between requests."""
+        import asyncio
+        if self.rate_limit_delay > 0:
+            await asyncio.sleep(self.rate_limit_delay)
+
     def get_default_headers(self) -> Dict[str, str]:
         """Get default headers for requests. Override for custom headers."""
         headers = {
