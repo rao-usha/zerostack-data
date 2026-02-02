@@ -1,0 +1,1087 @@
+"""
+SQLAlchemy models for Site Intelligence Platform.
+
+Tables for industrial and data center site selection across 8 domains:
+- Power Infrastructure
+- Telecom/Fiber Infrastructure
+- Transportation Infrastructure
+- Labor Market
+- Risk & Environmental
+- Incentives & Real Estate
+- Freight & Logistics
+- Site Scoring
+"""
+from datetime import datetime
+from typing import Optional
+from sqlalchemy import (
+    Column, Integer, BigInteger, String, DateTime, Date, Text, JSON,
+    Boolean, Numeric, ForeignKey, Index, UniqueConstraint, Enum
+)
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.orm import relationship
+import enum
+
+# Import Base from main models to share the same declarative base
+from app.core.models import Base
+
+# Try to import GeoAlchemy2, fall back gracefully if not available
+try:
+    from geoalchemy2 import Geometry
+    HAS_POSTGIS = True
+except ImportError:
+    HAS_POSTGIS = False
+    Geometry = None
+
+
+# =============================================================================
+# DOMAIN 1: POWER INFRASTRUCTURE
+# =============================================================================
+
+class PowerPlant(Base):
+    """Power plant registry from EIA."""
+    __tablename__ = "power_plant"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    eia_plant_id = Column(String(20), unique=True, index=True)
+    name = Column(String(255), nullable=False)
+    operator_name = Column(String(255))
+    state = Column(String(2), index=True)
+    county = Column(String(100))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    primary_fuel = Column(String(50), index=True)  # natural_gas, coal, solar, wind, nuclear
+    nameplate_capacity_mw = Column(Numeric(12, 2))
+    summer_capacity_mw = Column(Numeric(12, 2))
+    winter_capacity_mw = Column(Numeric(12, 2))
+    operating_year = Column(Integer)
+    grid_region = Column(String(20))  # PJM, ERCOT, CAISO, etc.
+    balancing_authority = Column(String(100))
+    nerc_region = Column(String(10))
+    co2_rate_tons_mwh = Column(Numeric(8, 4))
+    source = Column(String(50), default='eia')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_power_plant_location', 'latitude', 'longitude'),
+    )
+
+
+class Substation(Base):
+    """Electrical substations from HIFLD."""
+    __tablename__ = "substation"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    hifld_id = Column(String(50), unique=True, index=True)
+    name = Column(String(255))
+    state = Column(String(2), index=True)
+    county = Column(String(100))
+    city = Column(String(100))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    substation_type = Column(String(50))  # transmission, distribution
+    max_voltage_kv = Column(Numeric(10, 2), index=True)
+    min_voltage_kv = Column(Numeric(10, 2))
+    owner = Column(String(255))
+    status = Column(String(30))  # operational, planned, retired
+    source = Column(String(50), default='hifld')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_substation_location', 'latitude', 'longitude'),
+    )
+
+
+class UtilityTerritory(Base):
+    """Utility service territories from EIA."""
+    __tablename__ = "utility_territory"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    eia_utility_id = Column(Integer, index=True)
+    utility_name = Column(String(255), nullable=False)
+    utility_type = Column(String(50))  # investor_owned, municipal, coop
+    state = Column(String(2), index=True)
+    # Geometry stored as GeoJSON in JSONB for compatibility
+    geometry_geojson = Column(JSON)
+    customers_residential = Column(Integer)
+    customers_commercial = Column(Integer)
+    customers_industrial = Column(Integer)
+    avg_rate_residential = Column(Numeric(8, 4))  # $/kWh
+    avg_rate_commercial = Column(Numeric(8, 4))
+    avg_rate_industrial = Column(Numeric(8, 4))
+    source = Column(String(50), default='eia')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+class InterconnectionQueue(Base):
+    """Grid interconnection queue entries."""
+    __tablename__ = "interconnection_queue"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    iso_region = Column(String(20), nullable=False, index=True)  # PJM, CAISO, ERCOT
+    queue_id = Column(String(50))
+    project_name = Column(String(500))
+    developer = Column(String(255))
+    fuel_type = Column(String(50))
+    capacity_mw = Column(Numeric(12, 2))
+    state = Column(String(2))
+    county = Column(String(100))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    point_of_interconnection = Column(String(255))
+    queue_date = Column(Date)
+    target_cod = Column(Date)  # Commercial Operation Date
+    status = Column(String(50))  # active, withdrawn, completed
+    study_phase = Column(String(50))  # feasibility, system_impact, facilities
+    upgrade_cost_million = Column(Numeric(12, 2))
+    source = Column(String(50))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('iso_region', 'queue_id', name='uq_interconnection_queue'),
+        Index('idx_interconnection_queue_location', 'latitude', 'longitude'),
+    )
+
+
+class ElectricityPrice(Base):
+    """Electricity pricing by region/utility."""
+    __tablename__ = "electricity_price"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    geography_type = Column(String(20))  # state, utility, iso_zone
+    geography_id = Column(String(50))
+    geography_name = Column(String(255))
+    period_year = Column(Integer, nullable=False)
+    period_month = Column(Integer)
+    sector = Column(String(30))  # residential, commercial, industrial
+    avg_price_cents_kwh = Column(Numeric(8, 4))
+    total_sales_mwh = Column(BigInteger)
+    total_revenue_thousand = Column(BigInteger)
+    customer_count = Column(Integer)
+    source = Column(String(50), default='eia')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('geography_type', 'geography_id', 'period_year', 'period_month', 'sector',
+                        name='uq_electricity_price'),
+        Index('idx_electricity_price_geo', 'geography_type', 'geography_id'),
+    )
+
+
+class RenewableResource(Base):
+    """Solar/wind resource potential from NREL."""
+    __tablename__ = "renewable_resource"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    resource_type = Column(String(20), nullable=False)  # solar, wind
+    latitude = Column(Numeric(10, 7), nullable=False)
+    longitude = Column(Numeric(10, 7), nullable=False)
+    state = Column(String(2))
+    county = Column(String(100))
+    # Solar fields
+    ghi_kwh_m2_day = Column(Numeric(8, 4))  # Global Horizontal Irradiance
+    dni_kwh_m2_day = Column(Numeric(8, 4))  # Direct Normal Irradiance
+    # Wind fields
+    wind_speed_100m_ms = Column(Numeric(6, 2))  # meters/second at 100m
+    wind_power_density_w_m2 = Column(Numeric(8, 2))
+    capacity_factor_pct = Column(Numeric(5, 2))
+    source = Column(String(50), default='nrel')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_renewable_resource_location', 'latitude', 'longitude'),
+        Index('idx_renewable_resource_type', 'resource_type'),
+    )
+
+
+# =============================================================================
+# DOMAIN 2: TELECOM/FIBER INFRASTRUCTURE
+# =============================================================================
+
+class BroadbandAvailability(Base):
+    """Broadband availability by location from FCC."""
+    __tablename__ = "broadband_availability"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    location_id = Column(String(50))  # FCC location ID
+    block_geoid = Column(String(15), index=True)  # Census block
+    state = Column(String(2), index=True)
+    county = Column(String(100))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    provider_name = Column(String(255))
+    technology = Column(String(50))  # fiber, cable, fixed_wireless, dsl
+    max_download_mbps = Column(Integer)
+    max_upload_mbps = Column(Integer)
+    is_business_service = Column(Boolean)
+    fcc_filing_date = Column(Date)
+    source = Column(String(50), default='fcc')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_broadband_location', 'latitude', 'longitude'),
+    )
+
+
+class InternetExchange(Base):
+    """Internet Exchange Points from PeeringDB."""
+    __tablename__ = "internet_exchange"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    peeringdb_id = Column(Integer, unique=True, index=True)
+    name = Column(String(255), nullable=False)
+    name_long = Column(String(500))
+    city = Column(String(100))
+    state = Column(String(50))
+    country = Column(String(3))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    website = Column(String(500))
+    network_count = Column(Integer)  # Number of connected networks
+    ipv4_prefixes = Column(Integer)
+    ipv6_prefixes = Column(Integer)
+    speed_gbps = Column(Integer)  # Total exchange capacity
+    policy_general = Column(String(50))  # open, selective, restrictive
+    source = Column(String(50), default='peeringdb')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_ix_location', 'latitude', 'longitude'),
+    )
+
+
+class DataCenterFacility(Base):
+    """Data center facilities from PeeringDB."""
+    __tablename__ = "data_center_facility"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    peeringdb_id = Column(Integer, unique=True, index=True)
+    name = Column(String(255), nullable=False)
+    operator = Column(String(255))
+    address = Column(String(500))
+    city = Column(String(100))
+    state = Column(String(50))
+    country = Column(String(3))
+    postal_code = Column(String(20))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    website = Column(String(500))
+    network_count = Column(Integer)  # Networks present
+    ix_count = Column(Integer)  # IX connections
+    floor_space_sqft = Column(Integer)
+    power_mw = Column(Numeric(8, 2))
+    pue = Column(Numeric(4, 2))  # Power Usage Effectiveness
+    tier_certification = Column(String(20))  # Tier I, II, III, IV
+    source = Column(String(50), default='peeringdb')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_dc_facility_location', 'latitude', 'longitude'),
+    )
+
+
+class SubmarineCableLanding(Base):
+    """Submarine cable landing points."""
+    __tablename__ = "submarine_cable_landing"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cable_name = Column(String(255), nullable=False)
+    landing_point_name = Column(String(255))
+    city = Column(String(100))
+    state = Column(String(50))
+    country = Column(String(3))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    cable_length_km = Column(Integer)
+    capacity_tbps = Column(Numeric(10, 2))
+    rfs_date = Column(Date)  # Ready for Service
+    owners = Column(JSON)  # Array of owner names
+    source = Column(String(50), default='telegeography')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_submarine_cable_location', 'latitude', 'longitude'),
+    )
+
+
+class NetworkLatency(Base):
+    """Network latency measurements."""
+    __tablename__ = "network_latency"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source_city = Column(String(100))
+    source_country = Column(String(3))
+    source_latitude = Column(Numeric(10, 7))
+    source_longitude = Column(Numeric(10, 7))
+    target_city = Column(String(100))
+    target_country = Column(String(3))
+    target_latitude = Column(Numeric(10, 7))
+    target_longitude = Column(Numeric(10, 7))
+    measurement_date = Column(Date)
+    latency_ms_avg = Column(Numeric(8, 2))
+    latency_ms_min = Column(Numeric(8, 2))
+    latency_ms_max = Column(Numeric(8, 2))
+    latency_ms_p95 = Column(Numeric(8, 2))
+    sample_count = Column(Integer)
+    source = Column(String(50))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+# =============================================================================
+# DOMAIN 3: TRANSPORTATION INFRASTRUCTURE
+# =============================================================================
+
+class IntermodalTerminal(Base):
+    """Intermodal terminals (rail/truck) from BTS NTAD."""
+    __tablename__ = "intermodal_terminal"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ntad_id = Column(String(50), index=True)
+    name = Column(String(255), nullable=False)
+    operator = Column(String(255))
+    terminal_type = Column(String(50))  # ramp, port, warehouse
+    railroad = Column(String(100))  # BNSF, UP, CSX, NS, etc.
+    address = Column(String(500))
+    city = Column(String(100))
+    state = Column(String(2), index=True)
+    county = Column(String(100))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    annual_lifts = Column(Integer)  # Container lifts per year
+    track_miles = Column(Numeric(6, 2))
+    parking_spaces = Column(Integer)
+    has_on_dock_rail = Column(Boolean)
+    source = Column(String(50), default='bts')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_intermodal_location', 'latitude', 'longitude'),
+    )
+
+
+class RailLine(Base):
+    """Rail network segments from FRA."""
+    __tablename__ = "rail_line"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    fra_line_id = Column(String(50), index=True)
+    railroad = Column(String(100))
+    track_type = Column(String(50))  # mainline, branch, yard
+    track_class = Column(Integer)  # FRA class 1-9
+    max_speed_mph = Column(Integer)
+    annual_tonnage_million = Column(Numeric(10, 2))
+    state = Column(String(2))
+    county = Column(String(100))
+    # Geometry stored as GeoJSON
+    geometry_geojson = Column(JSON)
+    source = Column(String(50), default='fra')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Port(Base):
+    """Ports from USACE."""
+    __tablename__ = "port"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    port_code = Column(String(10), nullable=False, unique=True, index=True)  # UN/LOCODE
+    name = Column(String(255), nullable=False)
+    port_type = Column(String(50))  # seaport, river, great_lakes
+    city = Column(String(100))
+    state = Column(String(2), index=True)
+    country = Column(String(3))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    has_container_terminal = Column(Boolean)
+    has_bulk_terminal = Column(Boolean)
+    has_liquid_terminal = Column(Boolean)
+    has_roro_terminal = Column(Boolean)
+    channel_depth_ft = Column(Integer)
+    source = Column(String(50), default='usace')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_port_location', 'latitude', 'longitude'),
+    )
+
+
+class PortThroughput(Base):
+    """Port throughput metrics (time series)."""
+    __tablename__ = "port_throughput"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    port_id = Column(Integer, ForeignKey('port.id'), index=True)
+    period_year = Column(Integer, nullable=False)
+    period_month = Column(Integer)
+    teu_import = Column(Integer)
+    teu_export = Column(Integer)
+    teu_total = Column(Integer)
+    tonnage_import_thousand = Column(Numeric(12, 2))
+    tonnage_export_thousand = Column(Numeric(12, 2))
+    tonnage_total_thousand = Column(Numeric(12, 2))
+    vessel_calls = Column(Integer)
+    source = Column(String(50))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('port_id', 'period_year', 'period_month', 'source', name='uq_port_throughput'),
+    )
+
+
+class Airport(Base):
+    """Airports with cargo facilities from FAA."""
+    __tablename__ = "airport"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    faa_code = Column(String(10), index=True)
+    icao_code = Column(String(10))
+    name = Column(String(255), nullable=False)
+    city = Column(String(100))
+    state = Column(String(2), index=True)
+    country = Column(String(3))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    airport_type = Column(String(50))  # large_hub, medium_hub, small_hub, cargo
+    has_cargo_facility = Column(Boolean)
+    longest_runway_ft = Column(Integer)
+    cargo_tonnage_annual = Column(Numeric(12, 2))
+    source = Column(String(50), default='faa')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_airport_location', 'latitude', 'longitude'),
+    )
+
+
+class FreightCorridor(Base):
+    """Highway freight corridors from FHWA."""
+    __tablename__ = "freight_corridor"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    corridor_name = Column(String(255))
+    corridor_type = Column(String(50))  # primary, critical_urban, critical_rural
+    route_number = Column(String(50))
+    state = Column(String(2))
+    truck_aadt = Column(Integer)  # Average Annual Daily Truck Traffic
+    # Geometry stored as GeoJSON
+    geometry_geojson = Column(JSON)
+    source = Column(String(50), default='fhwa')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+class HeavyHaulRoute(Base):
+    """Heavy haul routes for transformers, generators, etc."""
+    __tablename__ = "heavy_haul_route"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    route_name = Column(String(255))
+    state = Column(String(2), index=True)
+    max_weight_lbs = Column(Integer)
+    max_height_ft = Column(Numeric(5, 2))
+    max_width_ft = Column(Numeric(5, 2))
+    max_length_ft = Column(Numeric(5, 2))
+    permit_required = Column(Boolean)
+    restrictions = Column(Text)
+    # Geometry stored as GeoJSON
+    geometry_geojson = Column(JSON)
+    source = Column(String(50))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+# =============================================================================
+# DOMAIN 4: LABOR MARKET
+# =============================================================================
+
+class LaborMarketArea(Base):
+    """Labor market area definitions."""
+    __tablename__ = "labor_market_area"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    area_type = Column(String(30), nullable=False)  # metro, county, state
+    area_code = Column(String(20), nullable=False)  # FIPS or CBSA code
+    area_name = Column(String(255))
+    state = Column(String(2), index=True)
+    population = Column(Integer)
+    labor_force = Column(Integer)
+    employment = Column(Integer)
+    unemployment_rate = Column(Numeric(5, 2))
+    # Geometry stored as GeoJSON
+    geometry_geojson = Column(JSON)
+    source = Column(String(50))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('area_type', 'area_code', name='uq_labor_market_area'),
+        Index('idx_labor_area_type_code', 'area_type', 'area_code'),
+    )
+
+
+class OccupationalWage(Base):
+    """Occupational employment and wages from BLS OES."""
+    __tablename__ = "occupational_wage"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    area_type = Column(String(30))
+    area_code = Column(String(20), index=True)
+    area_name = Column(String(255))
+    occupation_code = Column(String(20), index=True)  # SOC code
+    occupation_title = Column(String(255))
+    employment = Column(Integer)
+    mean_hourly_wage = Column(Numeric(10, 2))
+    median_hourly_wage = Column(Numeric(10, 2))
+    pct_10_hourly = Column(Numeric(10, 2))
+    pct_25_hourly = Column(Numeric(10, 2))
+    pct_75_hourly = Column(Numeric(10, 2))
+    pct_90_hourly = Column(Numeric(10, 2))
+    mean_annual_wage = Column(Numeric(12, 2))
+    median_annual_wage = Column(Numeric(12, 2))
+    period_year = Column(Integer, nullable=False)
+    period_month = Column(Integer)
+    source = Column(String(50), default='bls_oes')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('area_code', 'occupation_code', 'period_year', name='uq_occupational_wage'),
+    )
+
+
+class IndustryEmployment(Base):
+    """Industry employment by county from BLS QCEW."""
+    __tablename__ = "industry_employment"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    area_fips = Column(String(10), index=True)
+    area_name = Column(String(255))
+    industry_code = Column(String(10), index=True)  # NAICS
+    industry_title = Column(String(255))
+    ownership = Column(String(30))  # private, federal, state, local
+    period_year = Column(Integer, nullable=False)
+    period_quarter = Column(Integer)
+    establishments = Column(Integer)
+    avg_monthly_employment = Column(Integer)
+    total_wages_thousand = Column(BigInteger)
+    avg_weekly_wage = Column(Numeric(10, 2))
+    source = Column(String(50), default='bls_qcew')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+class CommuteFlow(Base):
+    """Commuting patterns from Census LEHD."""
+    __tablename__ = "commute_flow"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    home_county_fips = Column(String(10), index=True)
+    home_county_name = Column(String(255))
+    home_state = Column(String(2))
+    work_county_fips = Column(String(10), index=True)
+    work_county_name = Column(String(255))
+    work_state = Column(String(2))
+    worker_count = Column(Integer)
+    avg_earnings = Column(Numeric(10, 2))
+    avg_age = Column(Numeric(4, 1))
+    period_year = Column(Integer, nullable=False)
+    source = Column(String(50), default='census_lehd')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+class EducationalAttainment(Base):
+    """Educational attainment by area from Census ACS."""
+    __tablename__ = "educational_attainment"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    area_fips = Column(String(10), index=True)
+    area_name = Column(String(255))
+    area_type = Column(String(30))
+    population_25_plus = Column(Integer)
+    pct_high_school = Column(Numeric(5, 2))
+    pct_some_college = Column(Numeric(5, 2))
+    pct_associates = Column(Numeric(5, 2))
+    pct_bachelors = Column(Numeric(5, 2))
+    pct_graduate = Column(Numeric(5, 2))
+    period_year = Column(Integer, nullable=False)
+    source = Column(String(50), default='census_acs')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+# =============================================================================
+# DOMAIN 5: RISK & ENVIRONMENTAL
+# =============================================================================
+
+class FloodZone(Base):
+    """Flood zones from FEMA NFHL."""
+    __tablename__ = "flood_zone"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    zone_code = Column(String(20))  # A, AE, AH, AO, V, VE, X
+    zone_description = Column(String(255))
+    is_high_risk = Column(Boolean)  # Zone A/V = high risk
+    is_coastal = Column(Boolean)
+    base_flood_elevation_ft = Column(Numeric(8, 2))
+    state = Column(String(2), index=True)
+    county = Column(String(100))
+    # Geometry stored as GeoJSON
+    geometry_geojson = Column(JSON)
+    effective_date = Column(Date)
+    source = Column(String(50), default='fema')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+class SeismicHazard(Base):
+    """Seismic hazard data from USGS."""
+    __tablename__ = "seismic_hazard"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    latitude = Column(Numeric(10, 7), nullable=False)
+    longitude = Column(Numeric(10, 7), nullable=False)
+    pga_2pct_50yr = Column(Numeric(8, 4))  # Peak Ground Acceleration (g)
+    pga_10pct_50yr = Column(Numeric(8, 4))
+    spectral_1sec_2pct = Column(Numeric(8, 4))
+    spectral_02sec_2pct = Column(Numeric(8, 4))
+    site_class = Column(String(10))  # A, B, C, D, E
+    seismic_design_category = Column(String(5))  # A, B, C, D, E, F
+    source = Column(String(50), default='usgs')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_seismic_location', 'latitude', 'longitude'),
+    )
+
+
+class FaultLine(Base):
+    """Active faults from USGS."""
+    __tablename__ = "fault_line"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    fault_name = Column(String(255))
+    fault_type = Column(String(50))  # strike_slip, normal, reverse
+    slip_rate_mm_yr = Column(Numeric(8, 2))
+    age = Column(String(50))  # historic, holocene, quaternary
+    # Geometry stored as GeoJSON
+    geometry_geojson = Column(JSON)
+    source = Column(String(50), default='usgs')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+class NationalRiskIndex(Base):
+    """FEMA National Risk Index by county."""
+    __tablename__ = "national_risk_index"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    county_fips = Column(String(5), unique=True, nullable=False, index=True)
+    county_name = Column(String(100))
+    state = Column(String(2), index=True)
+    # Overall scores
+    risk_score = Column(Numeric(10, 4))
+    risk_rating = Column(String(20))  # Very Low, Relatively Low, etc.
+    # Individual hazard scores (JSON for flexibility)
+    hazard_scores = Column(JSON)  # {earthquake: {score, rating}, flood: {...}, ...}
+    # Key individual scores
+    earthquake_score = Column(Numeric(10, 4))
+    flood_score = Column(Numeric(10, 4))
+    tornado_score = Column(Numeric(10, 4))
+    hurricane_score = Column(Numeric(10, 4))
+    wildfire_score = Column(Numeric(10, 4))
+    # Social vulnerability
+    social_vulnerability = Column(Numeric(10, 4))
+    community_resilience = Column(Numeric(10, 4))
+    expected_annual_loss = Column(Numeric(15, 2))  # dollars
+    source = Column(String(50), default='fema_nri')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_nri_state', 'state'),
+    )
+
+
+class ClimateData(Base):
+    """Climate normals and extremes from NOAA."""
+    __tablename__ = "climate_data"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    station_id = Column(String(20), index=True)
+    station_name = Column(String(255))
+    state = Column(String(2), index=True)
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    elevation_ft = Column(Integer)
+    # Temperature (Fahrenheit)
+    avg_temp_annual = Column(Numeric(5, 1))
+    avg_temp_jan = Column(Numeric(5, 1))
+    avg_temp_jul = Column(Numeric(5, 1))
+    record_high = Column(Numeric(5, 1))
+    record_low = Column(Numeric(5, 1))
+    days_above_90 = Column(Integer)
+    days_below_32 = Column(Integer)
+    # Precipitation
+    precip_annual_inches = Column(Numeric(6, 2))
+    snowfall_annual_inches = Column(Numeric(6, 2))
+    # Degree days (for HVAC sizing)
+    cooling_degree_days = Column(Integer)
+    heating_degree_days = Column(Integer)
+    # Extremes
+    max_wind_mph = Column(Integer)
+    tornado_risk_score = Column(Integer)  # 1-10
+    hurricane_risk_score = Column(Integer)  # 1-10
+    source = Column(String(50), default='noaa')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_climate_location', 'latitude', 'longitude'),
+    )
+
+
+class EnvironmentalFacility(Base):
+    """Environmental permits/facilities from EPA."""
+    __tablename__ = "environmental_facility"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    epa_id = Column(String(50), index=True)
+    facility_name = Column(String(255))
+    facility_type = Column(String(100))
+    address = Column(String(500))
+    city = Column(String(100))
+    state = Column(String(2), index=True)
+    zip = Column(String(10))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    permits = Column(JSON)  # Array: RCRA, CAA, CWA, etc.
+    violations_5yr = Column(Integer)
+    is_superfund = Column(Boolean)
+    is_brownfield = Column(Boolean)
+    source = Column(String(50), default='epa')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_env_facility_location', 'latitude', 'longitude'),
+    )
+
+
+class Wetland(Base):
+    """Wetlands from NWI."""
+    __tablename__ = "wetland"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nwi_code = Column(String(20))
+    wetland_type = Column(String(100))
+    modifier = Column(String(50))
+    # Geometry stored as GeoJSON
+    geometry_geojson = Column(JSON)
+    acres = Column(Numeric(12, 2))
+    state = Column(String(2), index=True)
+    source = Column(String(50), default='usfws')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+# =============================================================================
+# DOMAIN 6: INCENTIVES & REAL ESTATE
+# =============================================================================
+
+class OpportunityZone(Base):
+    """Opportunity Zones from CDFI Fund."""
+    __tablename__ = "opportunity_zone"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tract_geoid = Column(String(15), unique=True, index=True)  # Census tract FIPS
+    state = Column(String(2), index=True)
+    county = Column(String(100))
+    tract_name = Column(String(255))
+    designation_date = Column(Date)
+    is_low_income = Column(Boolean)
+    is_contiguous = Column(Boolean)
+    # Geometry stored as GeoJSON
+    geometry_geojson = Column(JSON)
+    source = Column(String(50), default='cdfi')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ForeignTradeZone(Base):
+    """Foreign Trade Zones from FTZ Board."""
+    __tablename__ = "foreign_trade_zone"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ftz_number = Column(Integer, unique=True, index=True)
+    zone_name = Column(String(255))
+    grantee = Column(String(255))
+    operator = Column(String(255))
+    state = Column(String(2), index=True)
+    city = Column(String(100))
+    address = Column(String(500))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    acreage = Column(Numeric(10, 2))
+    subzones = Column(Integer)
+    status = Column(String(30))  # active, pending
+    activation_date = Column(Date)
+    source = Column(String(50), default='ftzb')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_ftz_location', 'latitude', 'longitude'),
+    )
+
+
+class IncentiveProgram(Base):
+    """State/local incentive programs."""
+    __tablename__ = "incentive_program"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    program_name = Column(String(500), nullable=False)
+    program_type = Column(String(100))  # tax_credit, grant, abatement, financing
+    geography_type = Column(String(30))  # state, county, city
+    geography_name = Column(String(255))
+    state = Column(String(2), index=True)
+    target_industries = Column(JSON)  # Array of industries
+    target_investments = Column(JSON)  # manufacturing, data_center, warehouse
+    min_investment = Column(BigInteger)
+    min_jobs = Column(Integer)
+    max_benefit = Column(BigInteger)
+    benefit_duration_years = Column(Integer)
+    description = Column(Text)
+    requirements = Column(Text)
+    application_url = Column(String(500))
+    source = Column(String(50))
+    source_url = Column(String(500))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+class IncentiveDeal(Base):
+    """Disclosed incentive deals from Good Jobs First."""
+    __tablename__ = "incentive_deal"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    gjf_id = Column(String(100), unique=True, index=True)  # Good Jobs First record ID
+    company_name = Column(String(255), index=True)
+    parent_company = Column(String(255))
+    subsidy_type = Column(String(100))
+    subsidy_value = Column(BigInteger)
+    year = Column(Integer, index=True)
+    state = Column(String(2), index=True)
+    city = Column(String(100))
+    county = Column(String(100))
+    program_name = Column(String(500))
+    jobs_announced = Column(Integer)
+    jobs_created = Column(Integer)
+    investment_announced = Column(BigInteger)
+    naics_code = Column(String(10))
+    industry = Column(String(255))
+    source = Column(String(50), default='goodjobsfirst')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+class IndustrialSite(Base):
+    """Available industrial sites from EDOs."""
+    __tablename__ = "industrial_site"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    site_name = Column(String(255))
+    site_type = Column(String(50))  # greenfield, building, spec_building
+    address = Column(String(500))
+    city = Column(String(100))
+    state = Column(String(2), index=True)
+    county = Column(String(100))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    acreage = Column(Numeric(10, 2))
+    building_sqft = Column(Integer)
+    available_sqft = Column(Integer)
+    asking_price = Column(BigInteger)
+    asking_price_per_sqft = Column(Numeric(10, 2))
+    zoning = Column(String(100))
+    utilities_available = Column(JSON)  # electric, gas, water, sewer, fiber
+    rail_served = Column(Boolean)
+    highway_access = Column(String(255))
+    edo_name = Column(String(255))
+    contact_email = Column(String(255))
+    contact_phone = Column(String(50))
+    listing_url = Column(String(500))
+    source = Column(String(50))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_industrial_site_location', 'latitude', 'longitude'),
+    )
+
+
+class ZoningDistrict(Base):
+    """Zoning districts."""
+    __tablename__ = "zoning_district"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    jurisdiction = Column(String(255))
+    state = Column(String(2), index=True)
+    zone_code = Column(String(50))
+    zone_name = Column(String(255))
+    zone_category = Column(String(50))  # industrial, commercial, residential, mixed
+    allows_manufacturing = Column(Boolean)
+    allows_warehouse = Column(Boolean)
+    allows_data_center = Column(Boolean)
+    max_height_ft = Column(Integer)
+    max_far = Column(Numeric(6, 2))  # Floor Area Ratio
+    min_lot_sqft = Column(Integer)
+    setback_front_ft = Column(Integer)
+    setback_side_ft = Column(Integer)
+    setback_rear_ft = Column(Integer)
+    parking_ratio = Column(String(100))
+    # Geometry stored as GeoJSON
+    geometry_geojson = Column(JSON)
+    source = Column(String(50))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+# =============================================================================
+# DOMAIN 7: FREIGHT & LOGISTICS
+# =============================================================================
+
+class FreightRateIndex(Base):
+    """Freight rate indices (container, trucking)."""
+    __tablename__ = "freight_rate_index"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    index_name = Column(String(100), nullable=False)
+    index_code = Column(String(50), nullable=False, index=True)
+    route_origin = Column(String(100))
+    route_destination = Column(String(100))
+    mode = Column(String(30), nullable=False)  # ocean, trucking, rail, air
+    rate_date = Column(Date, nullable=False)
+    rate_value = Column(Numeric(12, 2))
+    rate_unit = Column(String(30))  # per_feu, per_mile, per_ton
+    currency = Column(String(3), default='USD')
+    change_pct_wow = Column(Numeric(8, 4))
+    change_pct_mom = Column(Numeric(8, 4))
+    change_pct_yoy = Column(Numeric(8, 4))
+    source = Column(String(50))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('index_code', 'rate_date', name='uq_freight_rate_index'),
+    )
+
+
+class TruckingLaneRate(Base):
+    """Trucking spot rates by lane."""
+    __tablename__ = "trucking_lane_rate"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    origin_market = Column(String(100), index=True)
+    origin_state = Column(String(2))
+    destination_market = Column(String(100), index=True)
+    destination_state = Column(String(2))
+    equipment_type = Column(String(30))  # van, reefer, flatbed
+    rate_date = Column(Date, nullable=False)
+    rate_per_mile = Column(Numeric(8, 4))
+    fuel_surcharge = Column(Numeric(8, 4))
+    total_rate_per_mile = Column(Numeric(8, 4))
+    load_count = Column(Integer)
+    source = Column(String(50))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
+class WarehouseFacility(Base):
+    """Warehouse/3PL facilities."""
+    __tablename__ = "warehouse_facility"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    facility_name = Column(String(255))
+    operator_name = Column(String(255), nullable=False)
+    facility_type = Column(String(50))  # distribution, fulfillment, cold_storage, cross_dock
+    address = Column(String(500))
+    city = Column(String(100))
+    state = Column(String(2), index=True)
+    county = Column(String(100))
+    zip = Column(String(10))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    sqft_total = Column(Integer)
+    sqft_available = Column(Integer)
+    clear_height_ft = Column(Integer)
+    dock_doors = Column(Integer)
+    drive_in_doors = Column(Integer)
+    trailer_parking = Column(Integer)
+    has_cold_storage = Column(Boolean)
+    has_freezer = Column(Boolean)
+    has_hazmat = Column(Boolean)
+    has_ftz = Column(Boolean)
+    has_rail = Column(Boolean)
+    certifications = Column(JSON)
+    asking_rent_psf = Column(Numeric(8, 2))
+    source = Column(String(50))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_warehouse_location', 'latitude', 'longitude'),
+    )
+
+
+# =============================================================================
+# DOMAIN 8: SITE SCORING
+# =============================================================================
+
+class SiteScoreConfig(Base):
+    """Site scoring configuration."""
+    __tablename__ = "site_score_config"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    config_name = Column(String(100), nullable=False)
+    use_case = Column(String(50), nullable=False)  # data_center, warehouse, manufacturing
+    factor_weights = Column(JSON, nullable=False)
+    description = Column(Text)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class SiteScore(Base):
+    """Cached site scores."""
+    __tablename__ = "site_score"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    latitude = Column(Numeric(10, 7), nullable=False)
+    longitude = Column(Numeric(10, 7), nullable=False)
+    config_id = Column(Integer, ForeignKey('site_score_config.id'), index=True)
+    overall_score = Column(Numeric(5, 2))  # 0-100
+    factor_scores = Column(JSON)  # Individual factor scores
+    computed_at = Column(DateTime, default=datetime.utcnow)
+    valid_until = Column(DateTime)
+
+    __table_args__ = (
+        UniqueConstraint('latitude', 'longitude', 'config_id', name='uq_site_score'),
+        Index('idx_site_score_location', 'latitude', 'longitude'),
+    )
+
+
+# =============================================================================
+# COLLECTION JOB TRACKING
+# =============================================================================
+
+class SiteIntelCollectionJob(Base):
+    """Site intelligence collection job tracking."""
+    __tablename__ = "site_intel_collection_job"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    domain = Column(String(50), nullable=False)  # power, telecom, transport, etc.
+    source = Column(String(50), nullable=False)  # eia, fcc, bts, etc.
+    job_type = Column(String(50), nullable=False)  # full_sync, incremental, single_item
+    status = Column(String(20), default='pending')  # pending, running, success, failed
+    config = Column(JSON)
+
+    # Progress tracking
+    total_items = Column(Integer, default=0)
+    processed_items = Column(Integer, default=0)
+    inserted_items = Column(Integer, default=0)
+    updated_items = Column(Integer, default=0)
+    failed_items = Column(Integer, default=0)
+
+    # Timing
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+
+    # Error handling
+    error_message = Column(Text)
+    error_details = Column(JSON)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_site_intel_job_domain', 'domain'),
+        Index('idx_site_intel_job_status', 'status'),
+        Index('idx_site_intel_job_created', 'created_at'),
+    )

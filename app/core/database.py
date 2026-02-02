@@ -13,6 +13,8 @@ from app.sources.sec import models as sec_models
 from app.core import pe_models
 # Import People & Org Chart models
 from app.core import people_models
+# Import Site Intelligence Platform models
+from app.core import models_site_intel
 import logging
 
 logger = logging.getLogger(__name__)

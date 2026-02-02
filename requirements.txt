@@ -55,6 +55,10 @@ PyJWT>=2.8.0
 bcrypt>=4.1.0
 email-validator>=2.1.0
 
+# Geospatial (for Site Intelligence Platform)
+geoalchemy2>=0.14.0
+shapely>=2.0.0
+
 
 
 
