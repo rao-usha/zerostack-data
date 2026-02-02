@@ -198,11 +198,10 @@ class BLSLaborCollector(BaseCollector):
                 inserted, _ = self.bulk_upsert(
                     LaborMarketArea,
                     records,
-                    unique_columns=["area_code"],
+                    unique_columns=["area_type", "area_code"],
                     update_columns=[
-                        "area_name", "area_type", "state", "unemployment_rate",
-                        "labor_force", "employed", "unemployed",
-                        "data_year", "data_period", "collected_at"
+                        "area_name", "state", "unemployment_rate",
+                        "labor_force", "employment", "collected_at"
                     ],
                 )
                 return {"processed": len(all_data), "inserted": inserted}
@@ -224,10 +223,7 @@ class BLSLaborCollector(BaseCollector):
             "state": state,
             "unemployment_rate": self._safe_float(data.get("value")),
             "labor_force": None,  # Would need separate series
-            "employed": None,
-            "unemployed": None,
-            "data_year": int(data.get("year", 0)),
-            "data_period": data.get("period"),
+            "employment": None,
             "source": "bls_laus",
             "collected_at": datetime.utcnow(),
         }
@@ -304,11 +300,11 @@ class BLSLaborCollector(BaseCollector):
 
             logger.info(f"Fetched {len(all_records)} occupational wage records")
 
-            # Deduplicate by state/occupation (keep latest)
+            # Deduplicate by area/occupation/year (keep latest)
             unique_records = {}
             for record in all_records:
-                key = f"{record['state']}_{record['occupation_code']}"
-                if key not in unique_records or record['data_year'] > unique_records[key]['data_year']:
+                key = f"{record['area_code']}_{record['occupation_code']}_{record['period_year']}"
+                if key not in unique_records:
                     unique_records[key] = record
 
             records = list(unique_records.values())
@@ -318,11 +314,10 @@ class BLSLaborCollector(BaseCollector):
                 inserted, _ = self.bulk_upsert(
                     OccupationalWage,
                     records,
-                    unique_columns=["area_code", "occupation_code"],
+                    unique_columns=["area_code", "occupation_code", "period_year"],
                     update_columns=[
-                        "area_name", "state", "occupation_title",
-                        "employment", "mean_annual_wage", "median_annual_wage",
-                        "pct_10_wage", "pct_90_wage", "data_year", "collected_at"
+                        "area_type", "area_name", "occupation_title",
+                        "employment", "mean_annual_wage", "collected_at"
                     ],
                 )
                 return {"processed": len(all_records), "inserted": inserted}
@@ -344,17 +339,14 @@ class BLSLaborCollector(BaseCollector):
             return None
 
         return {
+            "area_type": "state",
             "area_code": f"ST{fips}",
             "area_name": state,
-            "state": state,
             "occupation_code": occ_code,
             "occupation_title": occ_name,
             "employment": None,  # Would need separate series
             "mean_annual_wage": value,
-            "median_annual_wage": None,
-            "pct_10_wage": None,
-            "pct_90_wage": None,
-            "data_year": int(data.get("year", 0)),
+            "period_year": int(data.get("year", 0)),
             "source": "bls_oes",
             "collected_at": datetime.utcnow(),
         }
