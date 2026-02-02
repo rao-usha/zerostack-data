@@ -1,21 +1,54 @@
 # Plan: Data Collection Sprint
 
-**Status:** IN PROGRESS
-**Date:** 2026-01-25
+**Status:** ACTIVE - BUGS FIXED
+**Date:** 2026-01-25 (Updated: 2026-02-02)
 **Goal:** Run existing collectors to populate comprehensive investor data
 
 ---
 
-## Current State
+## Sprint Results (2026-02-02)
 
-| Metric | Current | After Sprint |
-|--------|---------|--------------|
-| Portfolio Holdings | 5,236 | 10,000+ |
-| Form 990 Data | 0 | 150+ orgs |
-| CAFR Data | 249 | 500+ records |
-| LP Allocation History | 0 | 200+ records |
-| FO Investments | 0 | 500+ deals |
-| FO Websites | 28% | 60%+ |
+| Metric | Before | After | Target | Notes |
+|--------|--------|-------|--------|-------|
+| Total LPs | 564 | 564 | - | Registry complete |
+| LPs Collected Today | 0 | 17 | 50+ | Individual collection works |
+| Endowments with Data | ~50 | 75 | 94 | 80% coverage |
+| Public Pensions with Data | ~100 | 153 | 228 | 67% coverage |
+| LP Key Contacts | 3,173 | 3,173 | 4,000+ | Good baseline |
+| Governance Members | 35 | 38 | 200+ | Needs more collection |
+| Form 990 Successes | 0 | 87 | 150+ | Working well |
+| CAFR Successes | 0 | 10 | 200+ | Needs improvement |
+| **SEC 13F Holdings** | 4,334 | 4,359 | 8,000+ | **FIXED** - Now working |
+
+### Bugs Fixed (2026-02-02)
+
+1. ✅ **SEC 13F XML Parsing** - Fixed regex pattern to find infotable files with numeric names (e.g., `46994.xml`)
+   - Updated `_fetch_infotable_from_index()` in `sec_13f_source.py`
+   - Fixed XML namespace handling in `_parse_13f_xml()`
+   - Tested: CalPERS now returns 343 holdings, Gates Foundation returns 97 holdings
+
+2. ✅ **FO Persistence Bug** - Fixed "property 'items_new' has no setter" error
+   - Removed direct assignment to computed property
+   - Set `item.is_new` in `_persist_deal()` and `_persist_contact()` methods
+
+### Remaining Issues
+
+- ⚠️ **Batch Job Timeouts** - Large batch jobs overwhelm API
+  - **Recommendation**: Use individual LP collection instead of batch jobs
+- ⚠️ **Many LPs don't file 13F** - Not all pensions/endowments file 13F forms
+
+### What Works
+
+- ✅ Form 990 collection (ProPublica API)
+- ✅ Website collection for contacts
+- ✅ Governance collection for board members
+- ✅ Individual LP collection via `/collect/{lp_id}`
+- ✅ **SEC 13F holdings extraction** (FIXED)
+- ✅ **FO collection persistence** (FIXED)
+
+---
+
+## Original Plan
 
 ---
 
@@ -162,6 +195,23 @@ After collection runs complete:
 
 ## Checkpoint
 
-**Last completed:** Plan created
-**Next action:** Start Phase 1 - SEC 13F collection job
-**Resume:** Run curl commands to start collection jobs
+**Last completed:** 2026-02-02 Bug fixes
+**Results:**
+- ✅ SEC 13F XML parsing FIXED - CalPERS: 343 holdings, Gates Foundation: 97 holdings
+- ✅ FO persistence bug FIXED - No more "items_new setter" error
+- Form 990 collection working (87 successes, 48 items)
+- CAFR collection partially working (10 successes)
+- Total 13F holdings: 4,359 from 10 LPs
+
+**Next action:**
+1. Run SEC 13F collection on more LPs with known CIKs
+2. Run batch Form 990 collection for endowments/foundations
+3. Continue individual collection for high-value LPs
+
+**To continue collection:**
+```bash
+# Collect individual LP (recommended approach)
+curl -X POST "http://localhost:8001/api/v1/lp-collection/collect/{lp_id}" \
+  -H "Content-Type: application/json" \
+  -d '{"sources": ["form_990", "website", "governance"]}'
+```

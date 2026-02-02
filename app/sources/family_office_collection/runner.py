@@ -204,8 +204,8 @@ class FoCollectionOrchestrator:
                 if result.success and result.items and fo_db_id:
                     try:
                         persisted = self._persist_items(fo_db_id, result.items)
-                        result.items_new = persisted
-                        logger.info(f"Persisted {persisted} items for {fo.name} from {source.value}")
+                        # Note: items_new is computed from item.is_new flags set during persist
+                        logger.info(f"Persisted {persisted} new items for {fo.name} from {source.value}")
                     except Exception as persist_error:
                         logger.error(f"Error persisting items for {fo.name}: {persist_error}")
                         result.warnings.append(f"Failed to persist: {persist_error}")
@@ -318,6 +318,7 @@ class FoCollectionOrchestrator:
             if data.get("lead_investor") is not None:
                 existing.lead_investor = data["lead_investor"]
             self.db.commit()
+            item.is_new = False
             return False  # Not new
 
         # Create new investment record
@@ -336,6 +337,7 @@ class FoCollectionOrchestrator:
         )
         self.db.add(investment)
         self.db.commit()
+        item.is_new = True
         return True
 
     def _persist_contact(self, fo_db_id: int, item: FoCollectedItem) -> bool:
@@ -363,6 +365,7 @@ class FoCollectionOrchestrator:
             if data.get("linkedin_url") and not existing.linkedin_url:
                 existing.linkedin_url = data["linkedin_url"]
             self.db.commit()
+            item.is_new = False
             return False
 
         # Create new contact
@@ -380,6 +383,7 @@ class FoCollectionOrchestrator:
         )
         self.db.add(contact)
         self.db.commit()
+        item.is_new = True
         return True
 
     def _parse_date(self, date_str: Optional[str]):

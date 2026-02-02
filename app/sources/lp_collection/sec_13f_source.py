@@ -347,44 +347,35 @@ class Sec13fCollector(BaseCollector):
         # Format accession number for URL (remove dashes)
         accession_formatted = accession.replace("-", "")
 
-        # Get filing index to find the infotable
-        index_url = (
-            f"https://www.sec.gov/cgi-bin/browse-edgar?"
-            f"action=getcompany&CIK={cik}&type=13F-HR&dateb=&owner=include&count=1"
-        )
-
-        # Try to fetch the infotable XML directly
-        # Most 13F filings have a file named *infotable.xml
         base_url = f"https://www.sec.gov/Archives/edgar/data/{cik.lstrip('0')}/{accession_formatted}/"
-
-        # Try common infotable filename patterns
-        infotable_patterns = [
-            "infotable.xml",
-            "primary_doc.xml",
-            f"{accession_formatted}-infotable.xml",
-        ]
 
         holdings_data = None
         source_url = None
 
-        for pattern in infotable_patterns:
-            url = base_url + pattern
-            response = await self._fetch_url(url)
+        # First, get the filing index to discover all XML files
+        holdings_data, source_url = await self._fetch_infotable_from_index(
+            cik, accession_formatted
+        )
 
-            if response and response.status_code == 200:
-                try:
-                    holdings_data = self._parse_13f_xml(response.text)
-                    source_url = url
-                    break
-                except Exception as e:
-                    logger.debug(f"Could not parse {url}: {e}")
-                    continue
-
-        # If XML not found, try to get filing index and find infotable
+        # If not found via index, try common patterns as fallback
         if not holdings_data:
-            holdings_data, source_url = await self._fetch_infotable_from_index(
-                cik, accession_formatted
-            )
+            infotable_patterns = [
+                "infotable.xml",
+                f"{accession_formatted}-infotable.xml",
+            ]
+
+            for pattern in infotable_patterns:
+                url = base_url + pattern
+                response = await self._fetch_url(url)
+
+                if response and response.status_code == 200:
+                    try:
+                        holdings_data = self._parse_13f_xml(response.text)
+                        source_url = url
+                        break
+                    except Exception as e:
+                        logger.debug(f"Could not parse {url}: {e}")
+                        continue
 
         if not holdings_data:
             logger.warning(f"Could not find infotable for filing {accession}")
@@ -428,7 +419,12 @@ class Sec13fCollector(BaseCollector):
         """
         Fetch infotable by parsing filing index page.
 
-        Falls back to this method if direct XML URL doesn't work.
+        SEC 13F infotables often have numeric filenames (e.g., 46994.xml)
+        rather than predictable names. This method:
+        1. Fetches the filing index page
+        2. Finds all XML files listed
+        3. Sorts them by size (largest first, as infotables are typically larger)
+        4. Tries to parse each as a 13F infotable
         """
         # Get filing index page
         index_url = f"https://www.sec.gov/Archives/edgar/data/{cik.lstrip('0')}/{accession}/"
@@ -438,21 +434,42 @@ class Sec13fCollector(BaseCollector):
         if not response or response.status_code != 200:
             return None, None
 
-        # Look for infotable link in the index
         html = response.text
 
-        # Find XML files that might be the infotable
-        xml_pattern = re.compile(r'href="([^"]+(?:infotable|info_table)[^"]*\.xml)"', re.IGNORECASE)
-        matches = xml_pattern.findall(html)
+        # Find all XML files with their sizes
+        # SEC index HTML format: <td><a href="/path/file.xml"><img...>file.xml</a></td><td>SIZE</td>
+        xml_files = []
 
-        for match in matches:
-            xml_url = index_url + match if not match.startswith("http") else match
+        # Pattern to find XML file entries with size (handles <img> tags)
+        file_pattern = re.compile(
+            r'href="([^"]*?([^/"]+\.xml))"[^>]*>.*?</a></td>\s*<td[^>]*>(\d*)</td>',
+            re.IGNORECASE | re.DOTALL
+        )
+        matches = file_pattern.findall(html)
+
+        for full_path, filename, size_str in matches:
+            # Skip primary_doc.xml as it contains form metadata, not holdings
+            if filename.lower() == "primary_doc.xml":
+                continue
+            size = int(size_str) if size_str else 0
+            xml_files.append((filename, size))
+
+        # Sort by size descending (infotable is usually the largest XML)
+        xml_files.sort(key=lambda x: x[1], reverse=True)
+
+        logger.debug(f"Found {len(xml_files)} XML files in index: {xml_files}")
+
+        # Try each XML file, largest first
+        for filename, size in xml_files:
+            xml_url = index_url + filename
             xml_response = await self._fetch_url(xml_url)
 
             if xml_response and xml_response.status_code == 200:
                 try:
                     holdings = self._parse_13f_xml(xml_response.text)
-                    return holdings, xml_url
+                    if holdings:  # Found valid holdings data
+                        logger.debug(f"Successfully parsed infotable from {filename} ({len(holdings)} holdings)")
+                        return holdings, xml_url
                 except Exception as e:
                     logger.debug(f"Could not parse {xml_url}: {e}")
                     continue
@@ -463,6 +480,11 @@ class Sec13fCollector(BaseCollector):
         """
         Parse 13F infotable XML to extract holdings.
 
+        Handles various SEC XML formats including:
+        - Files with default namespace (xmlns="...")
+        - Files with prefixed namespaces (ns1:infoTable)
+        - Files without namespaces
+
         Args:
             xml_content: Raw XML string
 
@@ -472,55 +494,45 @@ class Sec13fCollector(BaseCollector):
         holdings = []
 
         try:
-            # Handle namespace variations
-            xml_content = re.sub(r'\sxmlns[^=]*="[^"]*"', '', xml_content)
-            root = ET.fromstring(xml_content)
+            # Check if content looks like a 13F infotable
+            if "infoTable" not in xml_content.lower() and "infotable" not in xml_content.lower():
+                logger.debug("XML does not appear to be a 13F infotable")
+                return []
 
-            # Find all infoTable entries
-            # 13F XML structure: informationTable > infoTable (repeated)
-            info_tables = root.findall(".//infoTable") or root.findall(".//infotable")
+            # Method 1: Try parsing with namespace stripping
+            # Remove all namespace declarations and prefixes for simpler parsing
+            clean_xml = xml_content
 
+            # Remove namespace declarations
+            clean_xml = re.sub(r'\sxmlns(?::[^=]*)?\s*=\s*"[^"]*"', '', clean_xml)
+
+            # Remove namespace prefixes from tags (e.g., ns1:infoTable -> infoTable)
+            clean_xml = re.sub(r'<(/?)(\w+):', r'<\1', clean_xml)
+
+            try:
+                root = ET.fromstring(clean_xml)
+            except ET.ParseError:
+                # Method 2: If cleaning fails, try raw XML with namespace-aware search
+                root = ET.fromstring(xml_content)
+
+            # Find all infoTable entries - try multiple approaches
+            info_tables = []
+
+            # Try without namespace
+            info_tables = root.findall(".//infoTable")
             if not info_tables:
-                # Try alternative path
+                info_tables = root.findall(".//infotable")
+
+            # Try with wildcard namespace
+            if not info_tables:
                 info_tables = root.findall(".//{*}infoTable")
 
+            # Try direct children if this is the informationTable root
+            if not info_tables and root.tag.lower().endswith("informationtable"):
+                info_tables = list(root)
+
             for entry in info_tables:
-                holding = {}
-
-                # Extract fields (handle case variations)
-                for field, paths in [
-                    ("issuer", ["nameOfIssuer", "issuer"]),
-                    ("class", ["titleOfClass", "class"]),
-                    ("cusip", ["cusip", "CUSIP"]),
-                    ("value", ["value"]),
-                    ("shares", ["shrsOrPrnAmt/sshPrnamt", "sshPrnamt", "shares"]),
-                    ("shareType", ["shrsOrPrnAmt/sshPrnamtType", "sshPrnamtType"]),
-                    ("putCall", ["putCall"]),
-                    ("investmentDiscretion", ["investmentDiscretion"]),
-                    ("votingAuthoritySole", ["votingAuthority/Sole", "votingAuthSole"]),
-                    ("votingAuthorityShared", ["votingAuthority/Shared", "votingAuthShared"]),
-                    ("votingAuthorityNone", ["votingAuthority/None", "votingAuthNone"]),
-                ]:
-                    for path in paths:
-                        elem = entry.find(path)
-                        if elem is None:
-                            # Try case-insensitive
-                            for child in entry.iter():
-                                if child.tag.lower() == path.lower().split("/")[-1]:
-                                    elem = child
-                                    break
-                        if elem is not None and elem.text:
-                            holding[field] = elem.text.strip()
-                            break
-
-                # Convert numeric fields
-                if "value" in holding:
-                    # Value is in thousands in 13F
-                    try:
-                        holding["value"] = str(int(holding["value"]) * 1000)
-                    except ValueError:
-                        pass
-
+                holding = self._extract_holding_from_entry(entry)
                 if holding.get("cusip"):
                     holdings.append(holding)
 
@@ -529,6 +541,59 @@ class Sec13fCollector(BaseCollector):
             raise
 
         return holdings
+
+    def _extract_holding_from_entry(self, entry: ET.Element) -> Dict[str, Any]:
+        """
+        Extract holding data from a single infoTable XML element.
+
+        Args:
+            entry: XML Element representing one holding
+
+        Returns:
+            Dictionary with holding fields
+        """
+        holding = {}
+
+        # Field mappings: (output_field, list of possible XML paths)
+        field_mappings = [
+            ("issuer", ["nameOfIssuer", "issuer"]),
+            ("class", ["titleOfClass", "class"]),
+            ("cusip", ["cusip", "CUSIP"]),
+            ("value", ["value"]),
+            ("shares", ["shrsOrPrnAmt/sshPrnamt", "sshPrnamt", "shares"]),
+            ("shareType", ["shrsOrPrnAmt/sshPrnamtType", "sshPrnamtType"]),
+            ("putCall", ["putCall"]),
+            ("investmentDiscretion", ["investmentDiscretion"]),
+            ("votingAuthoritySole", ["votingAuthority/Sole", "votingAuthSole", "Sole"]),
+            ("votingAuthorityShared", ["votingAuthority/Shared", "votingAuthShared", "Shared"]),
+            ("votingAuthorityNone", ["votingAuthority/None", "votingAuthNone", "None"]),
+        ]
+
+        for field, paths in field_mappings:
+            for path in paths:
+                elem = entry.find(path)
+                if elem is None:
+                    # Try case-insensitive search through all descendants
+                    target_tag = path.lower().split("/")[-1]
+                    for child in entry.iter():
+                        # Handle namespaced tags by taking only the local name
+                        local_tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+                        if local_tag.lower() == target_tag:
+                            elem = child
+                            break
+                if elem is not None and elem.text:
+                    holding[field] = elem.text.strip()
+                    break
+
+        # Convert numeric fields
+        if "value" in holding:
+            # Value is in thousands in 13F filings
+            try:
+                holding["value"] = str(int(holding["value"]) * 1000)
+            except ValueError:
+                pass
+
+        return holding
 
     def get_known_ciks(self) -> Dict[str, str]:
         """Return dictionary of known LP CIKs."""
