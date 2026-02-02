@@ -408,16 +408,22 @@ class PeopleCollectionOrchestrator:
         first_name = name_parts[0] if name_parts else None
         last_name = name_parts[-1] if len(name_parts) > 1 else None
 
+        # Convert empty strings to None to avoid unique constraint violations
+        linkedin_url = extracted.linkedin_url if extracted.linkedin_url else None
+        email = extracted.email if extracted.email else None
+        photo_url = extracted.photo_url if extracted.photo_url else None
+        bio = extracted.bio if extracted.bio else None
+
         return Person(
             full_name=extracted.full_name,
             first_name=extracted.first_name or first_name,
             last_name=extracted.last_name or last_name,
             suffix=extracted.suffix,
-            linkedin_url=extracted.linkedin_url,
-            email=extracted.email,
-            photo_url=extracted.photo_url,
-            bio=extracted.bio,
-            bio_source="website",
+            linkedin_url=linkedin_url,
+            email=email,
+            photo_url=photo_url,
+            bio=bio,
+            bio_source="website" if bio else None,
             data_sources=["website"],
             confidence_score=0.8 if extracted.confidence == ExtractionConfidence.HIGH else 0.6,
             last_verified_date=date.today(),

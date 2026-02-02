@@ -15,7 +15,12 @@ from pydantic import BaseModel, Field
 
 from app.core.database import get_db
 from app.core.people_models import PeopleCollectionJob
-from app.jobs.people_collection_scheduler import PeopleCollectionScheduler
+from app.jobs.people_collection_scheduler import (
+    PeopleCollectionScheduler,
+    process_pending_jobs,
+    get_people_schedule_status,
+    register_people_collection_schedules,
+)
 from app.jobs.change_monitor import ChangeMonitor, AlertDigestGenerator
 
 
@@ -312,6 +317,51 @@ async def cleanup_stuck_jobs(
     return {
         "cleaned_up": count,
         "max_age_hours": max_age_hours,
+    }
+
+
+@router.post("/process")
+async def process_jobs(
+    max_jobs: int = Query(5, ge=1, le=20, description="Max jobs to process"),
+):
+    """
+    Manually trigger processing of pending collection jobs.
+
+    This picks up pending jobs and executes them using the
+    PeopleCollectionOrchestrator.
+    """
+    result = await process_pending_jobs(max_jobs=max_jobs)
+    return result
+
+
+@router.get("/schedules/status")
+async def get_schedule_status():
+    """
+    Get status of all people collection scheduled jobs.
+
+    Shows next run times for:
+    - Job processor (every 10 min)
+    - Weekly website refresh (Sundays 2 AM)
+    - Daily SEC check (weekdays 6 PM)
+    - Daily news scan (8 AM)
+    - Stuck job cleanup (every 2 hours)
+    """
+    return get_people_schedule_status()
+
+
+@router.post("/schedules/register")
+async def register_schedules():
+    """
+    Register people collection schedules with APScheduler.
+
+    Call this if schedules are not running after a restart.
+    """
+    results = register_people_collection_schedules()
+    registered = sum(1 for v in results.values() if v)
+    return {
+        "registered": registered,
+        "total": len(results),
+        "details": results,
     }
 
 

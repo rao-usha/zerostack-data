@@ -313,3 +313,367 @@ def schedule_news_scan(db: Session, limit: int = 50) -> Optional[int]:
     )
 
     return job.id
+
+
+# =============================================================================
+# Job Processor - Executes Pending Jobs
+# =============================================================================
+
+async def process_pending_jobs(max_jobs: int = 5) -> Dict[str, Any]:
+    """
+    Process pending people collection jobs.
+
+    This is the main job processor that picks up pending jobs and executes them
+    using the PeopleCollectionOrchestrator.
+
+    Args:
+        max_jobs: Maximum number of jobs to process in one run
+
+    Returns:
+        Summary of processed jobs
+    """
+    from app.core.database import get_session_factory
+    from app.sources.people_collection.orchestrator import PeopleCollectionOrchestrator
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+
+    results = {
+        "processed": 0,
+        "successful": 0,
+        "failed": 0,
+        "jobs": [],
+    }
+
+    try:
+        scheduler = PeopleCollectionScheduler(db)
+
+        # Get pending jobs
+        pending_jobs = scheduler.get_pending_jobs()[:max_jobs]
+
+        if not pending_jobs:
+            logger.debug("No pending people collection jobs to process")
+            return results
+
+        logger.info(f"Processing {len(pending_jobs)} pending people collection jobs")
+
+        orchestrator = PeopleCollectionOrchestrator(db)
+
+        for job in pending_jobs:
+            job_result = {
+                "job_id": job.id,
+                "job_type": job.job_type,
+                "status": "unknown",
+            }
+
+            try:
+                # Mark job as running
+                scheduler.mark_job_running(job.id)
+
+                # Determine sources based on job type
+                sources = _get_sources_for_job_type(job.job_type)
+
+                # Get company IDs
+                company_ids = job.company_ids or ([job.company_id] if job.company_id else [])
+
+                if not company_ids:
+                    scheduler.mark_job_failed(job.id, ["No companies specified for job"])
+                    job_result["status"] = "failed"
+                    job_result["error"] = "No companies specified"
+                    results["failed"] += 1
+                    results["jobs"].append(job_result)
+                    continue
+
+                # Execute collection
+                batch_result = await orchestrator.collect_batch(
+                    company_ids=company_ids,
+                    sources=sources,
+                )
+
+                # Update job with results
+                scheduler.mark_job_complete(
+                    job_id=job.id,
+                    people_found=batch_result.total_people_found,
+                    people_created=batch_result.total_people_created,
+                    people_updated=0,  # TODO: track this in batch result
+                    changes_detected=batch_result.total_changes_detected,
+                    errors=[r.errors[0] if r.errors else None for r in batch_result.results if not r.success],
+                )
+
+                job_result["status"] = "success"
+                job_result["people_found"] = batch_result.total_people_found
+                job_result["people_created"] = batch_result.total_people_created
+                results["successful"] += 1
+
+                logger.info(
+                    f"Job {job.id} completed: {batch_result.successful}/{batch_result.total_companies} companies, "
+                    f"{batch_result.total_people_found} people found"
+                )
+
+            except Exception as e:
+                logger.exception(f"Error processing job {job.id}: {e}")
+                scheduler.mark_job_failed(job.id, [str(e)])
+                job_result["status"] = "failed"
+                job_result["error"] = str(e)
+                results["failed"] += 1
+
+            results["processed"] += 1
+            results["jobs"].append(job_result)
+
+        return results
+
+    except Exception as e:
+        logger.error(f"Error in job processor: {e}", exc_info=True)
+        return {**results, "error": str(e)}
+
+    finally:
+        db.close()
+
+
+def _get_sources_for_job_type(job_type: str) -> List[str]:
+    """Map job type to collection sources."""
+    mapping = {
+        "website_crawl": ["website"],
+        "sec_parse": ["sec"],
+        "sec_8k_check": ["sec"],
+        "news_scan": ["news"],
+        "full_refresh": ["website", "sec", "news"],
+        "single_company": ["website"],
+    }
+    return mapping.get(job_type, ["website"])
+
+
+# =============================================================================
+# APScheduler Registration
+# =============================================================================
+
+def register_people_collection_schedules() -> Dict[str, bool]:
+    """
+    Register all people collection scheduled jobs with APScheduler.
+
+    Returns:
+        Dictionary of job_id -> registration success
+    """
+    from apscheduler.triggers.cron import CronTrigger
+    from apscheduler.triggers.interval import IntervalTrigger
+    from app.core.scheduler_service import get_scheduler
+
+    scheduler = get_scheduler()
+    results = {}
+
+    # 1. Job processor - runs every 10 minutes to process pending jobs
+    try:
+        scheduler.add_job(
+            process_pending_jobs,
+            trigger=IntervalTrigger(minutes=10),
+            id="people_job_processor",
+            name="People Collection Job Processor",
+            replace_existing=True,
+        )
+        results["people_job_processor"] = True
+        logger.info("Registered people job processor (every 10 min)")
+    except Exception as e:
+        logger.error(f"Failed to register job processor: {e}")
+        results["people_job_processor"] = False
+
+    # 2. Weekly website refresh - Sundays at 2 AM
+    try:
+        scheduler.add_job(
+            _scheduled_website_refresh,
+            trigger=CronTrigger(day_of_week="sun", hour=2, minute=0),
+            id="people_weekly_website_refresh",
+            name="Weekly Website Leadership Refresh",
+            replace_existing=True,
+        )
+        results["people_weekly_website_refresh"] = True
+        logger.info("Registered weekly website refresh (Sundays 2 AM)")
+    except Exception as e:
+        logger.error(f"Failed to register website refresh: {e}")
+        results["people_weekly_website_refresh"] = False
+
+    # 3. Daily SEC check - weekdays at 6 PM (after market close)
+    try:
+        scheduler.add_job(
+            _scheduled_sec_check,
+            trigger=CronTrigger(day_of_week="mon-fri", hour=18, minute=0),
+            id="people_daily_sec_check",
+            name="Daily SEC 8-K Leadership Check",
+            replace_existing=True,
+        )
+        results["people_daily_sec_check"] = True
+        logger.info("Registered daily SEC check (weekdays 6 PM)")
+    except Exception as e:
+        logger.error(f"Failed to register SEC check: {e}")
+        results["people_daily_sec_check"] = False
+
+    # 4. Daily news scan - daily at 8 AM
+    try:
+        scheduler.add_job(
+            _scheduled_news_scan,
+            trigger=CronTrigger(hour=8, minute=0),
+            id="people_daily_news_scan",
+            name="Daily News Leadership Scan",
+            replace_existing=True,
+        )
+        results["people_daily_news_scan"] = True
+        logger.info("Registered daily news scan (8 AM)")
+    except Exception as e:
+        logger.error(f"Failed to register news scan: {e}")
+        results["people_daily_news_scan"] = False
+
+    # 5. Stuck job cleanup - every 2 hours
+    try:
+        scheduler.add_job(
+            _cleanup_stuck_people_jobs,
+            trigger=IntervalTrigger(hours=2),
+            id="people_stuck_job_cleanup",
+            name="People Collection Stuck Job Cleanup",
+            replace_existing=True,
+        )
+        results["people_stuck_job_cleanup"] = True
+        logger.info("Registered stuck job cleanup (every 2 hours)")
+    except Exception as e:
+        logger.error(f"Failed to register cleanup: {e}")
+        results["people_stuck_job_cleanup"] = False
+
+    return results
+
+
+def unregister_people_collection_schedules() -> Dict[str, bool]:
+    """Remove all people collection scheduled jobs."""
+    from app.core.scheduler_service import get_scheduler
+
+    scheduler = get_scheduler()
+    job_ids = [
+        "people_job_processor",
+        "people_weekly_website_refresh",
+        "people_daily_sec_check",
+        "people_daily_news_scan",
+        "people_stuck_job_cleanup",
+    ]
+
+    results = {}
+    for job_id in job_ids:
+        try:
+            job = scheduler.get_job(job_id)
+            if job:
+                scheduler.remove_job(job_id)
+            results[job_id] = True
+        except Exception as e:
+            logger.error(f"Failed to unregister {job_id}: {e}")
+            results[job_id] = False
+
+    return results
+
+
+def get_people_schedule_status() -> Dict[str, Any]:
+    """Get status of people collection scheduled jobs."""
+    from app.core.scheduler_service import get_scheduler
+
+    scheduler = get_scheduler()
+    job_ids = [
+        "people_job_processor",
+        "people_weekly_website_refresh",
+        "people_daily_sec_check",
+        "people_daily_news_scan",
+        "people_stuck_job_cleanup",
+    ]
+
+    jobs = []
+    for job_id in job_ids:
+        job = scheduler.get_job(job_id)
+        if job:
+            jobs.append({
+                "id": job.id,
+                "name": job.name,
+                "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+                "trigger": str(job.trigger),
+                "active": True,
+            })
+        else:
+            jobs.append({
+                "id": job_id,
+                "name": job_id.replace("people_", "").replace("_", " ").title(),
+                "next_run": None,
+                "trigger": None,
+                "active": False,
+            })
+
+    return {
+        "scheduler_running": scheduler.running,
+        "scheduled_jobs": jobs,
+        "checked_at": datetime.utcnow().isoformat(),
+    }
+
+
+# =============================================================================
+# Scheduled Job Wrappers (called by APScheduler)
+# =============================================================================
+
+async def _scheduled_website_refresh():
+    """APScheduler wrapper for website refresh."""
+    from app.core.database import get_session_factory
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+
+    try:
+        job_id = schedule_website_refresh(db, limit=50)
+        if job_id:
+            logger.info(f"Scheduled website refresh job {job_id}")
+            # Immediately process the job
+            await process_pending_jobs(max_jobs=1)
+        return {"job_id": job_id}
+    finally:
+        db.close()
+
+
+async def _scheduled_sec_check():
+    """APScheduler wrapper for SEC check."""
+    from app.core.database import get_session_factory
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+
+    try:
+        job_id = schedule_sec_check(db, limit=30)
+        if job_id:
+            logger.info(f"Scheduled SEC check job {job_id}")
+            await process_pending_jobs(max_jobs=1)
+        return {"job_id": job_id}
+    finally:
+        db.close()
+
+
+async def _scheduled_news_scan():
+    """APScheduler wrapper for news scan."""
+    from app.core.database import get_session_factory
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+
+    try:
+        job_id = schedule_news_scan(db, limit=50)
+        if job_id:
+            logger.info(f"Scheduled news scan job {job_id}")
+            await process_pending_jobs(max_jobs=1)
+        return {"job_id": job_id}
+    finally:
+        db.close()
+
+
+async def _cleanup_stuck_people_jobs():
+    """APScheduler wrapper for stuck job cleanup."""
+    from app.core.database import get_session_factory
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+
+    try:
+        scheduler = PeopleCollectionScheduler(db)
+        count = scheduler.cleanup_stuck_jobs(max_age_hours=4)
+        if count > 0:
+            logger.info(f"Cleaned up {count} stuck people collection jobs")
+        return {"cleaned_up": count}
+    finally:
+        db.close()

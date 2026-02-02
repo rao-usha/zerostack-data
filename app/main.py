@@ -67,6 +67,15 @@ async def lifespan(app: FastAPI):
         # Register automatic retry processor (runs every 5 minutes)
         scheduler_service.register_retry_processor(interval_minutes=5)
         logger.info("Automatic retry processor registered")
+
+        # Register people collection schedules
+        try:
+            from app.jobs.people_collection_scheduler import register_people_collection_schedules
+            people_results = register_people_collection_schedules()
+            registered_count = sum(1 for v in people_results.values() if v)
+            logger.info(f"People collection schedules registered: {registered_count}/{len(people_results)}")
+        except Exception as e:
+            logger.warning(f"Failed to register people collection schedules: {e}")
     except Exception as e:
         logger.warning(f"Failed to start scheduler: {e}")
 
