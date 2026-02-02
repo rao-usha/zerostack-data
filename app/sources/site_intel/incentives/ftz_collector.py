@@ -46,7 +46,7 @@ FTZ_SEED_DATA = [
     # Virginia
     {"ftz_number": 20, "zone_name": "Suffolk", "grantee": "Virginia Port Authority", "state": "VA", "city": "Suffolk", "latitude": 36.7282, "longitude": -76.5836},
     {"ftz_number": 137, "zone_name": "Washington Dulles", "grantee": "Metropolitan Washington Airports Authority", "state": "VA", "city": "Dulles", "latitude": 38.9531, "longitude": -77.4565},
-    {"ftz_number": 138, "zone_name": "Franklin County", "grantee": "County of Franklin", "state": "VA", "city": "Rocky Mount", "latitude": 36.9976, "longitude": -79.8920},
+    {"ftz_number": 238, "zone_name": "Franklin County", "grantee": "County of Franklin", "state": "VA", "city": "Rocky Mount", "latitude": 36.9976, "longitude": -79.8920},
     {"ftz_number": 185, "zone_name": "Culpeper County", "grantee": "County of Culpeper", "state": "VA", "city": "Culpeper", "latitude": 38.4729, "longitude": -77.9966},
     {"ftz_number": 187, "zone_name": "Richmond", "grantee": "Greater Richmond Partnership", "state": "VA", "city": "Richmond", "latitude": 37.5407, "longitude": -77.4360},
     # California
