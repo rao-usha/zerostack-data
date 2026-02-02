@@ -124,7 +124,7 @@ class EIAPowerCollector(BaseCollector):
             while True:
                 params = {
                     "api_key": self.api_key,
-                    "frequency": "annual",
+                    "frequency": "monthly",  # EIA v2 requires monthly for this endpoint
                     "data[0]": "nameplate-capacity-mw",
                     "data[1]": "summer-capacity-mw",
                     "data[2]": "winter-capacity-mw",
