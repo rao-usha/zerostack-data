@@ -62,8 +62,9 @@ class CDFIOpportunityZoneCollector(BaseCollector):
     default_timeout = 120.0
     rate_limit_delay = 0.3
 
-    # CDFI OZ data endpoint (ArcGIS)
-    OZ_URL = "https://services.arcgis.com/VTyQ9soqVukalItT/arcgis/rest/services/Opportunity_Zones/FeatureServer/0/query"
+    # HUD Opportunity Zones data endpoint (ArcGIS) - Updated Jan 2026
+    # Layer 13 contains designated Opportunity Zones
+    OZ_URL = "https://services.arcgis.com/VTyQ9soqVukalItT/arcgis/rest/services/Opportunity_Zones/FeatureServer/13/query"
 
     def __init__(self, db: Session, api_key: Optional[str] = None, **kwargs):
         super().__init__(db, api_key, **kwargs)
@@ -121,16 +122,12 @@ class CDFIOpportunityZoneCollector(BaseCollector):
             offset = 0
             page_size = 2000
 
-            # Build state filter
+            # Build state filter using STUSAB field (state abbreviation)
             state_filter = ""
             if config.states:
-                fips_list = []
-                for state in config.states:
-                    fips = STATE_TO_FIPS.get(state)
-                    if fips:
-                        fips_list.append(f"SUBSTRING(GEOID, 1, 2) = '{fips}'")
-                if fips_list:
-                    state_filter = " OR ".join(fips_list)
+                # HUD data uses STUSAB for state abbreviation
+                state_list = ", ".join(f"'{s}'" for s in config.states)
+                state_filter = f"STUSAB IN ({state_list})"
 
             while True:
                 params = {
@@ -171,9 +168,10 @@ class CDFIOpportunityZoneCollector(BaseCollector):
                     unique_columns=["tract_geoid"],
                     update_columns=[
                         "state", "county", "tract_name", "is_low_income",
-                        "is_contiguous", "designation_date", "collected_at"
+                        "is_contiguous", "designation_date", "source", "collected_at"
                     ],
                 )
+                logger.info(f"Inserted/updated {inserted} Opportunity Zone records")
                 return {"processed": len(all_zones), "inserted": inserted}
 
             return {"processed": 0, "inserted": 0}
@@ -183,34 +181,47 @@ class CDFIOpportunityZoneCollector(BaseCollector):
             return {"processed": 0, "inserted": 0, "error": str(e)}
 
     def _transform_oz_record(self, feature: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Transform CDFI OZ feature to database format."""
+        """Transform HUD/CDFI OZ feature to database format."""
         attrs = feature.get("attributes", {})
 
-        geoid = attrs.get("GEOID") or attrs.get("GEOID10") or attrs.get("TRACTCE")
+        # HUD format uses GEOID10, fallback to other common field names
+        geoid = attrs.get("GEOID10") or attrs.get("GEOID") or attrs.get("TRACTCE")
         if not geoid:
             return None
 
-        # Extract state from GEOID (first 2 digits)
-        state_fips = str(geoid)[:2]
-        state = FIPS_TO_STATE.get(state_fips)
+        # Get state - HUD provides STUSAB (state abbreviation) directly
+        state = attrs.get("STUSAB")
+        if not state:
+            # Fallback: extract from GEOID (first 2 digits are state FIPS)
+            state_fips = str(geoid)[:2]
+            state = FIPS_TO_STATE.get(state_fips)
 
-        # Extract county FIPS (digits 3-5)
-        county_fips = str(geoid)[2:5] if len(str(geoid)) >= 5 else None
+        # Get county name from STATE_NAME or construct from FIPS
+        county_name = attrs.get("COUNTY_NAME") or attrs.get("NAMELSAD")
+        if not county_name:
+            # County FIPS is digits 3-5 of GEOID
+            county_fips = str(geoid)[2:5] if len(str(geoid)) >= 5 else None
+            county_name = f"County {county_fips}" if county_fips else None
 
-        # Determine if low-income community
+        # Get tract info
+        tract = attrs.get("TRACT") or (str(geoid)[5:] if len(str(geoid)) >= 11 else None)
+        tract_name = attrs.get("NAME") or attrs.get("TRACT_NAME") or f"Tract {tract}" if tract else None
+
+        # HUD designated OZ data - all tracts in this layer are designated OZs
+        # Low-income status is implied by designation (all OZs are either LIC or contiguous)
         lic_type = attrs.get("LIC_TYPE") or attrs.get("TYPE") or ""
-        is_low_income = "LIC" in lic_type.upper() or attrs.get("LIC") == 1
-        is_contiguous = "CONTIGUOUS" in lic_type.upper() or attrs.get("CONTIGUOUS") == 1
+        is_low_income = "LIC" in lic_type.upper() if lic_type else True  # Default True for designated OZs
+        is_contiguous = "CONTIGUOUS" in lic_type.upper() if lic_type else False
 
         return {
             "tract_geoid": str(geoid),
             "state": state,
-            "county": attrs.get("COUNTY") or attrs.get("NAMELSAD"),
-            "tract_name": attrs.get("NAME") or attrs.get("TRACT_NAME"),
+            "county": county_name,
+            "tract_name": tract_name,
             "is_low_income": is_low_income,
             "is_contiguous": is_contiguous,
             "designation_date": self._parse_date(attrs.get("DESIGNATED") or attrs.get("DESIGNATION_DATE")),
-            "source": "cdfi",
+            "source": "hud_oz",
             "collected_at": datetime.utcnow(),
         }
 
