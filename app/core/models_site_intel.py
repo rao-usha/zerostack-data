@@ -1242,7 +1242,7 @@ class ThreePLCompany(Base):
     __tablename__ = "three_pl_company"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    company_name = Column(String(255), nullable=False, index=True)
+    company_name = Column(String(255), nullable=False, unique=True, index=True)
     parent_company = Column(String(255))
     headquarters_city = Column(String(100))
     headquarters_state = Column(String(2), index=True)
