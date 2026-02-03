@@ -39,6 +39,7 @@ services:
       YELP_API_KEY: ${YELP_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      EIA_API_KEY: ${EIA_API_KEY:-}
       MAX_CONCURRENCY: 4
       LOG_LEVEL: INFO
     depends_on:
