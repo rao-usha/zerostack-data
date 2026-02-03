@@ -266,6 +266,13 @@ class SiteIntelOrchestrator:
                 SiteIntelSource.LOOPNET,
                 SiteIntelSource.TRANSPORT_TOPICS,
             ],
+            SiteIntelDomain.WATER_UTILITIES: [
+                SiteIntelSource.USGS_WATER,
+                SiteIntelSource.EPA_SDWIS,
+                SiteIntelSource.EIA_GAS,
+                SiteIntelSource.OPENEI_URDB,
+                SiteIntelSource.EIA_ELECTRICITY,
+            ],
             SiteIntelDomain.SCORING: [],
         }
         return source_map.get(domain, [])

@@ -12,7 +12,7 @@ from app.core.config import get_settings
 from app.core.database import create_tables
 from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news, reports, deals, benchmarks, auth, workspaces, form_d, corporate_registry, form_adv, web_traffic, github, scores, entities, glassdoor, app_rankings, predictions, agents, diligence, monitors, competitive, hunter, anomalies, market, reports_gen, lp_collection, fo_collection, pe_firms, pe_companies, pe_people, pe_deals, people, companies_leadership, collection_jobs, people_portfolios, peer_sets, people_watchlists, people_analytics, people_reports, people_data_quality, people_jobs, workflows
 # Site Intelligence Platform
-from app.api.v1 import site_intel_power, site_intel_telecom, site_intel_transport, site_intel_labor, site_intel_risk, site_intel_incentives, site_intel_logistics, site_intel_sites
+from app.api.v1 import site_intel_power, site_intel_telecom, site_intel_transport, site_intel_labor, site_intel_risk, site_intel_incentives, site_intel_logistics, site_intel_water_utilities, site_intel_sites
 from app.graphql import graphql_app
 
 # Configure logging
@@ -982,6 +982,7 @@ app.include_router(site_intel_labor.router, prefix="/api/v1")
 app.include_router(site_intel_risk.router, prefix="/api/v1")
 app.include_router(site_intel_incentives.router, prefix="/api/v1")
 app.include_router(site_intel_logistics.router, prefix="/api/v1")
+app.include_router(site_intel_water_utilities.router, prefix="/api/v1")
 app.include_router(site_intel_sites.router, prefix="/api/v1")
 
 # Multi-Agent Orchestrator

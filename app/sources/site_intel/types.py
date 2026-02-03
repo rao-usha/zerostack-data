@@ -22,6 +22,7 @@ class SiteIntelDomain(str, Enum):
     RISK = "risk"
     INCENTIVES = "incentives"
     LOGISTICS = "logistics"
+    WATER_UTILITIES = "water_utilities"
     SCORING = "scoring"
 
 
@@ -86,6 +87,13 @@ class SiteIntelSource(str, Enum):
     BTS_CARGO = "bts_cargo"  # BTS T-100 air cargo
     LOOPNET = "loopnet"
     TRANSPORT_TOPICS = "transport_topics"
+
+    # Water & Utilities
+    USGS_WATER = "usgs_water"  # USGS streamflow and groundwater monitoring
+    EPA_SDWIS = "epa_sdwis"  # EPA Safe Drinking Water Information System
+    EIA_GAS = "eia_gas"  # EIA natural gas pipelines and storage
+    OPENEI_URDB = "openei_urdb"  # OpenEI Utility Rate Database
+    EIA_ELECTRICITY = "eia_electricity"  # EIA electricity prices and consumption
 
 
 class CollectionStatus(str, Enum):

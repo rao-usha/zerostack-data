@@ -1,7 +1,7 @@
 """
 SQLAlchemy models for Site Intelligence Platform.
 
-Tables for industrial and data center site selection across 8 domains:
+Tables for industrial and data center site selection across 9 domains:
 - Power Infrastructure
 - Telecom/Fiber Infrastructure
 - Transportation Infrastructure
@@ -9,6 +9,7 @@ Tables for industrial and data center site selection across 8 domains:
 - Risk & Environmental
 - Incentives & Real Estate
 - Freight & Logistics
+- Water & Utilities
 - Site Scoring
 """
 from datetime import datetime
@@ -1337,7 +1338,243 @@ class WarehouseListing(Base):
 
 
 # =============================================================================
-# DOMAIN 8: SITE SCORING
+# DOMAIN 8: WATER & UTILITIES
+# =============================================================================
+
+class WaterMonitoringSite(Base):
+    """USGS water monitoring stations with real-time data."""
+    __tablename__ = "water_monitoring_site"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    site_number = Column(String(20), unique=True, nullable=False, index=True)
+    site_name = Column(String(500), nullable=False)
+    site_type = Column(String(50), index=True)  # stream, well, spring, lake, estuary
+    state = Column(String(2), index=True)
+    county = Column(String(100))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    drainage_area_sq_mi = Column(Numeric(12, 2))
+    aquifer_code = Column(String(50))
+    aquifer_name = Column(String(255))
+    well_depth_ft = Column(Numeric(10, 2))
+    # Latest readings
+    latest_streamflow_cfs = Column(Numeric(12, 2))  # Cubic feet per second
+    latest_gage_height_ft = Column(Numeric(10, 2))
+    latest_water_temp_c = Column(Numeric(6, 2))
+    latest_dissolved_oxygen = Column(Numeric(6, 2))  # mg/L
+    latest_ph = Column(Numeric(4, 2))
+    latest_turbidity = Column(Numeric(8, 2))  # NTU
+    measurement_date = Column(DateTime)
+    # Data availability
+    has_streamflow = Column(Boolean, default=False)
+    has_groundwater = Column(Boolean, default=False)
+    has_quality = Column(Boolean, default=False)
+    source = Column(String(50), default='usgs')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_water_monitoring_location', 'latitude', 'longitude'),
+        Index('idx_water_monitoring_type', 'site_type'),
+    )
+
+
+class PublicWaterSystem(Base):
+    """EPA SDWIS public water infrastructure."""
+    __tablename__ = "public_water_system"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pwsid = Column(String(15), unique=True, nullable=False, index=True)  # e.g., "CA1234567"
+    pws_name = Column(String(500), nullable=False)
+    pws_type = Column(String(30), index=True)  # CWS (community), TNCWS, NTNCWS
+    state = Column(String(2), index=True)
+    county = Column(String(100))
+    city = Column(String(100))
+    zip_code = Column(String(10))
+    # Service area
+    population_served = Column(Integer, index=True)
+    service_connections = Column(Integer)
+    service_area_type = Column(String(50))  # residential, commercial, industrial, mixed
+    # Water source
+    primary_source_code = Column(String(10))  # GW (groundwater), SW (surface), GU (purchased ground), SW (purchased surface)
+    primary_source_name = Column(String(255))
+    source_water_protection = Column(Boolean)
+    # Infrastructure
+    treatment_plant_count = Column(Integer)
+    storage_capacity_mg = Column(Numeric(12, 2))  # Million gallons
+    distribution_miles = Column(Numeric(10, 2))
+    # Status
+    is_active = Column(Boolean, default=True)
+    compliance_status = Column(String(50))  # compliant, non_compliant, pending
+    last_compliance_date = Column(Date)
+    # Contact
+    admin_contact_name = Column(String(255))
+    admin_contact_phone = Column(String(20))
+    source = Column(String(50), default='epa_sdwis')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_pws_population', 'population_served'),
+        Index('idx_pws_state_city', 'state', 'city'),
+    )
+
+
+class WaterSystemViolation(Base):
+    """EPA water quality violations."""
+    __tablename__ = "water_system_violation"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pwsid = Column(String(15), nullable=False, index=True)
+    violation_id = Column(String(50), unique=True, nullable=False, index=True)
+    violation_type = Column(String(50), index=True)  # MCL, MRDL, TT, monitoring, reporting
+    contaminant_code = Column(String(10))
+    contaminant_name = Column(String(255))
+    contaminant_group = Column(String(100))  # disinfectants, organics, inorganics, microorganisms
+    violation_date = Column(Date, nullable=False)
+    compliance_period = Column(String(20))  # e.g., "2024-Q1"
+    is_health_based = Column(Boolean, default=False)
+    severity_level = Column(String(20))  # tier1, tier2, tier3
+    enforcement_action = Column(String(100))
+    enforcement_date = Column(Date)
+    returned_to_compliance = Column(Boolean, default=False)
+    returned_to_compliance_date = Column(Date)
+    public_notification_date = Column(Date)
+    source = Column(String(50), default='epa_sdwis')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_violation_date', 'violation_date'),
+        Index('idx_violation_type', 'violation_type'),
+        Index('idx_violation_pwsid', 'pwsid'),
+    )
+
+
+class NaturalGasPipeline(Base):
+    """EIA interstate/intrastate natural gas pipelines."""
+    __tablename__ = "natural_gas_pipeline"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pipeline_id = Column(String(50), unique=True, nullable=False, index=True)
+    pipeline_name = Column(String(255), nullable=False)
+    operator_name = Column(String(255))
+    operator_id = Column(String(20))
+    # Route
+    origin_state = Column(String(2))
+    origin_location = Column(String(255))
+    destination_state = Column(String(2))
+    destination_location = Column(String(255))
+    states_crossed = Column(ARRAY(String(2)))
+    # Capacity
+    capacity_mmcfd = Column(Numeric(12, 2))  # Million cubic feet per day
+    diameter_inches = Column(Numeric(6, 2))
+    length_miles = Column(Numeric(10, 2))
+    # Type
+    pipeline_type = Column(String(30), index=True)  # interstate, intrastate, gathering
+    is_bidirectional = Column(Boolean, default=False)
+    commodity = Column(String(50), default='natural_gas')  # natural_gas, ngl, propane
+    # Location for mapping
+    latitude = Column(Numeric(10, 7))  # Midpoint or start
+    longitude = Column(Numeric(10, 7))
+    geometry_geojson = Column(JSON)
+    # Status
+    status = Column(String(30))  # operational, planned, under_construction
+    in_service_date = Column(Date)
+    source = Column(String(50), default='eia')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_gas_pipeline_location', 'latitude', 'longitude'),
+        Index('idx_gas_pipeline_type', 'pipeline_type'),
+    )
+
+
+class NaturalGasStorage(Base):
+    """EIA underground natural gas storage facilities."""
+    __tablename__ = "natural_gas_storage"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    facility_id = Column(String(50), unique=True, nullable=False, index=True)
+    facility_name = Column(String(255), nullable=False)
+    operator_name = Column(String(255))
+    operator_id = Column(String(20))
+    # Location
+    state = Column(String(2), index=True)
+    county = Column(String(100))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    # Storage type
+    storage_type = Column(String(30), index=True)  # depleted_field, salt_cavern, aquifer
+    field_name = Column(String(255))
+    reservoir_depth_ft = Column(Integer)
+    # Capacity
+    base_gas_bcf = Column(Numeric(12, 4))  # Billion cubic feet (cushion gas)
+    working_gas_bcf = Column(Numeric(12, 4))  # Available for withdrawal
+    total_capacity_bcf = Column(Numeric(12, 4))
+    deliverability_mmcfd = Column(Numeric(12, 2))  # Max withdrawal rate
+    injection_capacity_mmcfd = Column(Numeric(12, 2))
+    # Current status
+    current_inventory_bcf = Column(Numeric(12, 4))
+    inventory_date = Column(Date)
+    utilization_pct = Column(Numeric(5, 2))
+    # Status
+    status = Column(String(30))  # operational, planned, inactive
+    in_service_year = Column(Integer)
+    source = Column(String(50), default='eia')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_gas_storage_location', 'latitude', 'longitude'),
+        Index('idx_gas_storage_type', 'storage_type'),
+    )
+
+
+class UtilityRate(Base):
+    """OpenEI/EIA utility electricity rates."""
+    __tablename__ = "utility_rate"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    utility_id = Column(String(50), nullable=False, index=True)
+    utility_name = Column(String(255), nullable=False)
+    state = Column(String(2), index=True)
+    service_territory = Column(String(255))
+    # Rate details
+    rate_schedule_id = Column(String(100), unique=True, nullable=False, index=True)
+    rate_schedule_name = Column(String(500))
+    customer_class = Column(String(30), index=True)  # residential, commercial, industrial
+    sector = Column(String(30))  # general, lighting, agricultural, etc.
+    # Pricing structure
+    energy_rate_kwh = Column(Numeric(10, 6))  # Base $/kWh rate
+    demand_charge_kw = Column(Numeric(10, 4))  # $/kW demand charge
+    fixed_monthly_charge = Column(Numeric(10, 2))  # Fixed monthly fee
+    minimum_charge = Column(Numeric(10, 2))
+    # Rate tiers (JSON for flexibility)
+    energy_tiers = Column(JSON)  # [{kwh_limit, rate}, ...]
+    demand_tiers = Column(JSON)  # [{kw_limit, rate}, ...]
+    # Time of use
+    has_time_of_use = Column(Boolean, default=False)
+    tou_periods = Column(JSON)  # {peak: {start, end, rate}, off_peak: {...}}
+    has_demand_charges = Column(Boolean, default=False)
+    has_net_metering = Column(Boolean, default=False)
+    # Power factor
+    power_factor_adjustment = Column(Boolean, default=False)
+    min_power_factor = Column(Numeric(4, 2))
+    # Dates
+    effective_date = Column(Date)
+    end_date = Column(Date)
+    approved_date = Column(Date)
+    # Metadata
+    description = Column(Text)
+    source = Column(String(50))  # openei, eia, utility_website
+    source_url = Column(String(500))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_utility_rate_class', 'customer_class'),
+        Index('idx_utility_rate_state', 'state'),
+    )
+
+
+# =============================================================================
+# DOMAIN 9: SITE SCORING
 # =============================================================================
 
 class SiteScoreConfig(Base):
