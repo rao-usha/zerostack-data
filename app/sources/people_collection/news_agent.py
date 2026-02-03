@@ -16,11 +16,12 @@ Enhanced with:
 """
 
 import asyncio
+import base64
 import logging
 import re
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, date, timedelta
-from urllib.parse import urljoin, urlparse, quote_plus
+from urllib.parse import urljoin, urlparse, quote_plus, unquote
 
 from bs4 import BeautifulSoup
 
@@ -707,7 +708,22 @@ class NewsAgent(BaseCollector):
                             continue
 
                         title_text = title_elem.get_text(strip=True)
-                        link_url = link_elem.get_text(strip=True)
+                        raw_link = link_elem.get_text(strip=True)
+
+                        # Decode Google News redirect URL to get actual article URL
+                        link_url = self._decode_google_news_url(raw_link)
+                        if not link_url:
+                            logger.debug(f"[NewsAgent] Could not decode Google News URL: {raw_link[:50]}")
+                            continue
+
+                        # If still a Google URL, try following the redirect
+                        if 'news.google.com' in link_url:
+                            real_url = await self._follow_google_redirect(link_url)
+                            if real_url:
+                                link_url = real_url
+                            else:
+                                logger.debug(f"[NewsAgent] Could not resolve Google redirect, skipping")
+                                continue
 
                         # Check relevance
                         if not self._is_leadership_related(title_text):
@@ -715,6 +731,7 @@ class NewsAgent(BaseCollector):
 
                         articles_found += 1
                         logger.debug(f"[NewsAgent] Google News match: {title_text[:60]}")
+                        logger.debug(f"[NewsAgent] Real article URL: {link_url[:80]}")
 
                         # Parse date if available
                         pub_date = None
@@ -1089,6 +1106,93 @@ class NewsAgent(BaseCollector):
                     })
 
         return articles[:10]
+
+    def _decode_google_news_url(self, google_url: str) -> Optional[str]:
+        """
+        Decode a Google News RSS URL to get the actual article URL.
+
+        Google News RSS wraps article URLs in their redirect system.
+        The format is: https://news.google.com/rss/articles/CBMi[base64]...
+
+        This method extracts the real article URL.
+        """
+        if not google_url:
+            return None
+
+        # If it's not a Google News URL, return as-is
+        if 'news.google.com' not in google_url:
+            return google_url
+
+        try:
+            # Method 1: Try to extract from the URL path
+            # Google News URLs contain base64-encoded data after /articles/
+            if '/articles/' in google_url:
+                # Extract the encoded part
+                encoded_part = google_url.split('/articles/')[-1].split('?')[0]
+
+                # Google uses a modified base64 with CBMi prefix
+                # The actual URL is encoded after CBMi
+                if encoded_part.startswith('CBMi'):
+                    # Remove CBMi prefix and decode
+                    encoded_url = encoded_part[4:]
+
+                    # Add padding if needed
+                    padding = 4 - (len(encoded_url) % 4)
+                    if padding != 4:
+                        encoded_url += '=' * padding
+
+                    try:
+                        # Try URL-safe base64 decode
+                        decoded = base64.urlsafe_b64decode(encoded_url)
+                        # The decoded content may have a prefix byte, skip non-printable chars
+                        decoded_str = decoded.decode('utf-8', errors='ignore')
+
+                        # Find URL in the decoded string
+                        url_match = re.search(r'https?://[^\s<>"\']+', decoded_str)
+                        if url_match:
+                            real_url = url_match.group(0)
+                            logger.debug(f"[NewsAgent] Decoded Google News URL: {real_url[:60]}")
+                            return real_url
+                    except Exception as e:
+                        logger.debug(f"[NewsAgent] Base64 decode failed: {e}")
+
+            # Method 2: Follow the redirect
+            # If decoding fails, we'll return the Google URL and let fetch_url follow redirects
+            # But mark it so we know to handle it specially
+            logger.debug(f"[NewsAgent] Could not decode, will follow redirect: {google_url[:60]}")
+            return google_url
+
+        except Exception as e:
+            logger.debug(f"[NewsAgent] Error decoding Google News URL: {e}")
+            return google_url
+
+    async def _follow_google_redirect(self, google_url: str) -> Optional[str]:
+        """
+        Follow a Google News redirect to get the actual article URL.
+
+        Uses a HEAD request to follow redirects without downloading content.
+        """
+        try:
+            import aiohttp
+            from aiohttp import ClientTimeout
+
+            timeout = ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.head(
+                    google_url,
+                    headers=self.DEFAULT_HEADERS,
+                    allow_redirects=True,
+                    max_redirects=5,
+                ) as response:
+                    # The final URL after redirects
+                    final_url = str(response.url)
+                    if 'news.google.com' not in final_url:
+                        logger.debug(f"[NewsAgent] Followed redirect to: {final_url[:60]}")
+                        return final_url
+        except Exception as e:
+            logger.debug(f"[NewsAgent] Redirect follow failed: {e}")
+
+        return None
 
     def _deduplicate_changes(
         self,
