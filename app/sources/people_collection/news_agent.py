@@ -729,15 +729,18 @@ class NewsAgent(BaseCollector):
                                 pass
 
                         # Check if it's from a trusted PR distribution service
-                        # These are more likely to have structured content
                         is_pr_service = any(
                             domain in link_url.lower()
                             for domain in self.PR_DISTRIBUTION_DOMAINS
                         )
 
-                        # For PR services, fetch and parse the full article
-                        if is_pr_service:
-                            logger.debug(f"[NewsAgent] Fetching PR service article: {link_url[:60]}")
+                        # Fetch and parse ANY leadership article (not just PR services)
+                        # Limit to first 5 non-PR articles to avoid overload
+                        should_parse = is_pr_service or articles_parsed < 5
+
+                        if should_parse:
+                            source_type = "pr_service" if is_pr_service else "news_article"
+                            logger.debug(f"[NewsAgent] Fetching {source_type}: {link_url[:60]}")
                             result.pages_checked += 1
                             result.page_urls.append(link_url)
 
@@ -762,9 +765,7 @@ class NewsAgent(BaseCollector):
                                     )
                                 changes.extend(parse_result.changes)
                         else:
-                            # For other sources, just log that we found it
-                            # (could be enhanced to parse these too)
-                            logger.debug(f"[NewsAgent] Non-PR source, skipping full parse: {link_url[:50]}")
+                            logger.debug(f"[NewsAgent] Skipping (limit reached): {link_url[:50]}")
 
                     except Exception as e:
                         logger.debug(f"[NewsAgent] Error processing Google News item: {e}")
