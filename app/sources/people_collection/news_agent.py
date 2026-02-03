@@ -246,6 +246,18 @@ class NewsAgent(BaseCollector):
                 all_changes.extend(google_changes)
                 logger.info(f"[NewsAgent] Google News: Found {len(google_changes)} changes")
 
+            # 4. Search PR distribution services directly (bypasses company website blocking)
+            logger.info(f"[NewsAgent] Step 4: Searching PR distribution services")
+            pr_changes = await self._search_pr_services(company_name, days_back, result)
+            all_changes.extend(pr_changes)
+            logger.info(f"[NewsAgent] PR Services: Found {len(pr_changes)} changes")
+
+            # 5. Search financial news sites (Yahoo Finance, MarketWatch)
+            logger.info(f"[NewsAgent] Step 5: Searching financial news sites")
+            finance_changes = await self._search_finance_news(company_name, days_back, result)
+            all_changes.extend(finance_changes)
+            logger.info(f"[NewsAgent] Finance News: Found {len(finance_changes)} changes")
+
             # Deduplicate changes
             unique_changes = self._deduplicate_changes(all_changes)
 
@@ -766,6 +778,316 @@ class NewsAgent(BaseCollector):
         )
 
         return changes
+
+    async def _search_pr_services(
+        self,
+        company_name: str,
+        days_back: int,
+        result: CollectionResult,
+    ) -> List[LeadershipChange]:
+        """
+        Search PR distribution services directly for leadership announcements.
+
+        These services host press releases and are more reliably accessible
+        than company websites that may block scrapers.
+        """
+        changes = []
+
+        # Normalize company name for search (remove Inc, Corp, etc)
+        search_name = self._normalize_company_for_search(company_name)
+
+        # PR Newswire search
+        try:
+            logger.debug(f"[NewsAgent] Searching PR Newswire for {search_name}")
+            prnewswire_url = f"https://www.prnewswire.com/search/news/?keyword={quote_plus(search_name)}+executive+OR+CEO+OR+leadership&page=1&pagesize=10"
+
+            result.pages_checked += 1
+            html = await self.fetch_url(prnewswire_url)
+
+            if html:
+                pr_links = self._extract_pr_newswire_links(html, days_back)
+                logger.info(f"[NewsAgent] PR Newswire: Found {len(pr_links)} potential releases")
+
+                for pr_info in pr_links[:5]:  # Limit to 5
+                    if self._is_leadership_related(pr_info['title']):
+                        result.pages_checked += 1
+                        result.page_urls.append(pr_info['url'])
+
+                        pr_html = await self.fetch_url(pr_info['url'])
+                        if pr_html:
+                            pr = PressRelease(
+                                title=pr_info['title'],
+                                content=pr_html,
+                                publish_date=pr_info.get('date'),
+                                source_url=pr_info['url'],
+                                company_name=company_name,
+                                source_type="prnewswire",
+                            )
+                            parse_result = await self.parser.parse(pr)
+                            if parse_result.changes:
+                                logger.info(f"[NewsAgent] PR Newswire: {len(parse_result.changes)} changes from {pr_info['title'][:40]}")
+                            changes.extend(parse_result.changes)
+        except Exception as e:
+            logger.debug(f"[NewsAgent] PR Newswire search error: {e}")
+
+        # Business Wire search
+        try:
+            logger.debug(f"[NewsAgent] Searching Business Wire for {search_name}")
+            bizwire_url = f"https://www.businesswire.com/portal/site/home/news/?searchtype=news&searchterm={quote_plus(search_name)}+CEO+OR+executive"
+
+            result.pages_checked += 1
+            html = await self.fetch_url(bizwire_url)
+
+            if html:
+                bw_links = self._extract_business_wire_links(html, days_back)
+                logger.info(f"[NewsAgent] Business Wire: Found {len(bw_links)} potential releases")
+
+                for pr_info in bw_links[:5]:
+                    if self._is_leadership_related(pr_info['title']):
+                        result.pages_checked += 1
+                        result.page_urls.append(pr_info['url'])
+
+                        pr_html = await self.fetch_url(pr_info['url'])
+                        if pr_html:
+                            pr = PressRelease(
+                                title=pr_info['title'],
+                                content=pr_html,
+                                publish_date=pr_info.get('date'),
+                                source_url=pr_info['url'],
+                                company_name=company_name,
+                                source_type="businesswire",
+                            )
+                            parse_result = await self.parser.parse(pr)
+                            if parse_result.changes:
+                                logger.info(f"[NewsAgent] Business Wire: {len(parse_result.changes)} changes from {pr_info['title'][:40]}")
+                            changes.extend(parse_result.changes)
+        except Exception as e:
+            logger.debug(f"[NewsAgent] Business Wire search error: {e}")
+
+        # GlobeNewswire search
+        try:
+            logger.debug(f"[NewsAgent] Searching GlobeNewswire for {search_name}")
+            globe_url = f"https://www.globenewswire.com/search/tag/executive%20changes?query={quote_plus(search_name)}"
+
+            result.pages_checked += 1
+            html = await self.fetch_url(globe_url)
+
+            if html:
+                globe_links = self._extract_globenewswire_links(html, days_back)
+                logger.info(f"[NewsAgent] GlobeNewswire: Found {len(globe_links)} potential releases")
+
+                for pr_info in globe_links[:5]:
+                    if self._is_leadership_related(pr_info['title']):
+                        result.pages_checked += 1
+                        result.page_urls.append(pr_info['url'])
+
+                        pr_html = await self.fetch_url(pr_info['url'])
+                        if pr_html:
+                            pr = PressRelease(
+                                title=pr_info['title'],
+                                content=pr_html,
+                                publish_date=pr_info.get('date'),
+                                source_url=pr_info['url'],
+                                company_name=company_name,
+                                source_type="globenewswire",
+                            )
+                            parse_result = await self.parser.parse(pr)
+                            if parse_result.changes:
+                                logger.info(f"[NewsAgent] GlobeNewswire: {len(parse_result.changes)} changes")
+                            changes.extend(parse_result.changes)
+        except Exception as e:
+            logger.debug(f"[NewsAgent] GlobeNewswire search error: {e}")
+
+        return changes
+
+    async def _search_finance_news(
+        self,
+        company_name: str,
+        days_back: int,
+        result: CollectionResult,
+    ) -> List[LeadershipChange]:
+        """
+        Search financial news sites for leadership announcements.
+
+        Yahoo Finance, MarketWatch, and Reuters often carry executive
+        appointment news and are more accessible than company sites.
+        """
+        changes = []
+        search_name = self._normalize_company_for_search(company_name)
+
+        # Yahoo Finance News RSS
+        try:
+            logger.debug(f"[NewsAgent] Searching Yahoo Finance for {search_name}")
+            # Yahoo Finance RSS feed for company news
+            yahoo_rss = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={quote_plus(search_name)}&region=US&lang=en-US"
+
+            result.pages_checked += 1
+            content = await self.fetch_url(yahoo_rss)
+
+            if content:
+                soup = BeautifulSoup(content, 'xml')
+                items = soup.find_all('item')
+
+                leadership_items = 0
+                for item in items[:10]:
+                    title_elem = item.find('title')
+                    link_elem = item.find('link')
+
+                    if not title_elem:
+                        continue
+
+                    title = title_elem.get_text(strip=True)
+                    if self._is_leadership_related(title):
+                        leadership_items += 1
+                        if link_elem:
+                            link = link_elem.get_text(strip=True)
+                            result.page_urls.append(link)
+                            logger.debug(f"[NewsAgent] Yahoo Finance match: {title[:50]}")
+
+                logger.info(f"[NewsAgent] Yahoo Finance: {leadership_items} leadership items found")
+        except Exception as e:
+            logger.debug(f"[NewsAgent] Yahoo Finance search error: {e}")
+
+        # MarketWatch search
+        try:
+            logger.debug(f"[NewsAgent] Searching MarketWatch for {search_name}")
+            mw_url = f"https://www.marketwatch.com/search?q={quote_plus(search_name + ' CEO OR executive appointment')}&ts=0&ns=y"
+
+            result.pages_checked += 1
+            html = await self.fetch_url(mw_url)
+
+            if html:
+                mw_links = self._extract_marketwatch_links(html, days_back)
+                logger.info(f"[NewsAgent] MarketWatch: Found {len(mw_links)} results")
+
+                for article in mw_links[:3]:
+                    if self._is_leadership_related(article['title']):
+                        logger.debug(f"[NewsAgent] MarketWatch match: {article['title'][:50]}")
+                        result.page_urls.append(article['url'])
+        except Exception as e:
+            logger.debug(f"[NewsAgent] MarketWatch search error: {e}")
+
+        return changes
+
+    def _normalize_company_for_search(self, company_name: str) -> str:
+        """Normalize company name for search queries."""
+        # Remove common suffixes
+        suffixes = [
+            ', Inc.', ', Inc', ' Inc.', ' Inc',
+            ', Corp.', ', Corp', ' Corp.', ' Corp',
+            ', LLC', ' LLC',
+            ', Ltd.', ', Ltd', ' Ltd.', ' Ltd',
+            ', Co.', ', Co', ' Co.', ' Co',
+            ' Company', ' Corporation', ' International',
+        ]
+
+        name = company_name
+        for suffix in suffixes:
+            if name.endswith(suffix):
+                name = name[:-len(suffix)]
+                break
+
+        return name.strip()
+
+    def _extract_pr_newswire_links(
+        self,
+        html: str,
+        days_back: int,
+    ) -> List[Dict[str, Any]]:
+        """Extract press release links from PR Newswire search results."""
+        soup = BeautifulSoup(html, 'html.parser')
+        releases = []
+
+        # PR Newswire uses specific card structure
+        for card in soup.find_all(['div', 'article'], class_=lambda x: x and 'card' in str(x).lower()):
+            link = card.find('a', href=True)
+            if link:
+                href = link.get('href', '')
+                title = link.get_text(strip=True)
+
+                if href and title and '/news-releases/' in href:
+                    full_url = urljoin('https://www.prnewswire.com', href)
+                    releases.append({
+                        'url': full_url,
+                        'title': title,
+                        'date': None,
+                    })
+
+        return releases[:10]
+
+    def _extract_business_wire_links(
+        self,
+        html: str,
+        days_back: int,
+    ) -> List[Dict[str, Any]]:
+        """Extract press release links from Business Wire search results."""
+        soup = BeautifulSoup(html, 'html.parser')
+        releases = []
+
+        for item in soup.find_all(['div', 'li'], class_=lambda x: x and any(kw in str(x).lower() for kw in ['result', 'news', 'headline'])):
+            link = item.find('a', href=True)
+            if link:
+                href = link.get('href', '')
+                title = link.get_text(strip=True)
+
+                if href and title:
+                    full_url = urljoin('https://www.businesswire.com', href)
+                    releases.append({
+                        'url': full_url,
+                        'title': title,
+                        'date': None,
+                    })
+
+        return releases[:10]
+
+    def _extract_globenewswire_links(
+        self,
+        html: str,
+        days_back: int,
+    ) -> List[Dict[str, Any]]:
+        """Extract press release links from GlobeNewswire search results."""
+        soup = BeautifulSoup(html, 'html.parser')
+        releases = []
+
+        for item in soup.find_all(['div', 'article'], class_=lambda x: x and 'article' in str(x).lower()):
+            link = item.find('a', href=True)
+            if link:
+                href = link.get('href', '')
+                title = link.get_text(strip=True)
+
+                if href and title and '/news-release/' in href:
+                    full_url = urljoin('https://www.globenewswire.com', href)
+                    releases.append({
+                        'url': full_url,
+                        'title': title,
+                        'date': None,
+                    })
+
+        return releases[:10]
+
+    def _extract_marketwatch_links(
+        self,
+        html: str,
+        days_back: int,
+    ) -> List[Dict[str, Any]]:
+        """Extract article links from MarketWatch search results."""
+        soup = BeautifulSoup(html, 'html.parser')
+        articles = []
+
+        for item in soup.find_all(['div', 'article'], class_=lambda x: x and 'article' in str(x).lower()):
+            link = item.find('a', href=True)
+            if link:
+                href = link.get('href', '')
+                title = link.get_text(strip=True)
+
+                if href and title:
+                    articles.append({
+                        'url': href,
+                        'title': title,
+                        'date': None,
+                    })
+
+        return articles[:10]
 
     def _deduplicate_changes(
         self,
