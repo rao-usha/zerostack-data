@@ -81,6 +81,12 @@ class EIAElectricityCollector(BaseCollector):
 
     async def collect(self, config: CollectionConfig) -> CollectionResult:
         """Execute EIA electricity data collection."""
+        if not self.api_key:
+            return self.create_result(
+                status=CollectionStatus.FAILED,
+                error_message="EIA_API_KEY not configured. Get free key at https://www.eia.gov/opendata/register.php"
+            )
+
         total_inserted = 0
         total_processed = 0
         errors = []
@@ -94,13 +100,6 @@ class EIAElectricityCollector(BaseCollector):
             total_processed += prices_result.get("processed", 0)
             if prices_result.get("error"):
                 errors.append({"source": "state_prices", "error": prices_result["error"]})
-
-            # If no data from API, load sample data
-            if total_processed == 0:
-                logger.info("No API data retrieved, loading sample data...")
-                sample_result = await self._load_sample_data(config)
-                total_inserted = sample_result.get("inserted", 0)
-                total_processed = sample_result.get("processed", 0)
 
             status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
 
@@ -122,10 +121,6 @@ class EIAElectricityCollector(BaseCollector):
     async def _collect_state_prices(self, config: CollectionConfig) -> Dict[str, Any]:
         """Collect state-level electricity prices from EIA."""
         try:
-            if not self.api_key:
-                logger.warning("No EIA API key configured, skipping API collection")
-                return {"processed": 0, "inserted": 0}
-
             client = await self.get_client()
             await self.apply_rate_limit()
 
@@ -255,101 +250,3 @@ class EIAElectricityCollector(BaseCollector):
             return float(value)
         except (ValueError, TypeError):
             return None
-
-    async def _load_sample_data(self, config: CollectionConfig) -> Dict[str, Any]:
-        """Load sample data when API is unavailable."""
-        # Sample state average prices (2024 data, cents/kWh converted to $/kWh)
-        sample_prices = [
-            # Industrial rates - lowest prices in US
-            {"state": "TX", "state_name": "Texas", "customer_class": "industrial",
-             "energy_rate_kwh": 0.0712, "period": "2024-12"},
-            {"state": "OK", "state_name": "Oklahoma", "customer_class": "industrial",
-             "energy_rate_kwh": 0.0695, "period": "2024-12"},
-            {"state": "LA", "state_name": "Louisiana", "customer_class": "industrial",
-             "energy_rate_kwh": 0.0689, "period": "2024-12"},
-            {"state": "WY", "state_name": "Wyoming", "customer_class": "industrial",
-             "energy_rate_kwh": 0.0725, "period": "2024-12"},
-            {"state": "WA", "state_name": "Washington", "customer_class": "industrial",
-             "energy_rate_kwh": 0.0512, "period": "2024-12"},
-            {"state": "ID", "state_name": "Idaho", "customer_class": "industrial",
-             "energy_rate_kwh": 0.0589, "period": "2024-12"},
-            # Mid-range industrial
-            {"state": "OH", "state_name": "Ohio", "customer_class": "industrial",
-             "energy_rate_kwh": 0.0812, "period": "2024-12"},
-            {"state": "PA", "state_name": "Pennsylvania", "customer_class": "industrial",
-             "energy_rate_kwh": 0.0856, "period": "2024-12"},
-            {"state": "IL", "state_name": "Illinois", "customer_class": "industrial",
-             "energy_rate_kwh": 0.0789, "period": "2024-12"},
-            {"state": "MI", "state_name": "Michigan", "customer_class": "industrial",
-             "energy_rate_kwh": 0.0925, "period": "2024-12"},
-            {"state": "IN", "state_name": "Indiana", "customer_class": "industrial",
-             "energy_rate_kwh": 0.0845, "period": "2024-12"},
-            # Higher-cost industrial
-            {"state": "CA", "state_name": "California", "customer_class": "industrial",
-             "energy_rate_kwh": 0.1589, "period": "2024-12"},
-            {"state": "NY", "state_name": "New York", "customer_class": "industrial",
-             "energy_rate_kwh": 0.1245, "period": "2024-12"},
-            {"state": "MA", "state_name": "Massachusetts", "customer_class": "industrial",
-             "energy_rate_kwh": 0.1356, "period": "2024-12"},
-            {"state": "CT", "state_name": "Connecticut", "customer_class": "industrial",
-             "energy_rate_kwh": 0.1478, "period": "2024-12"},
-            {"state": "NJ", "state_name": "New Jersey", "customer_class": "industrial",
-             "energy_rate_kwh": 0.1125, "period": "2024-12"},
-            # Commercial rates
-            {"state": "TX", "state_name": "Texas", "customer_class": "commercial",
-             "energy_rate_kwh": 0.0895, "period": "2024-12"},
-            {"state": "CA", "state_name": "California", "customer_class": "commercial",
-             "energy_rate_kwh": 0.1856, "period": "2024-12"},
-            {"state": "OH", "state_name": "Ohio", "customer_class": "commercial",
-             "energy_rate_kwh": 0.0978, "period": "2024-12"},
-            {"state": "PA", "state_name": "Pennsylvania", "customer_class": "commercial",
-             "energy_rate_kwh": 0.1012, "period": "2024-12"},
-            {"state": "IL", "state_name": "Illinois", "customer_class": "commercial",
-             "energy_rate_kwh": 0.0956, "period": "2024-12"},
-            {"state": "NY", "state_name": "New York", "customer_class": "commercial",
-             "energy_rate_kwh": 0.1456, "period": "2024-12"},
-            {"state": "WA", "state_name": "Washington", "customer_class": "commercial",
-             "energy_rate_kwh": 0.0756, "period": "2024-12"},
-        ]
-
-        # Filter by states if specified
-        if config.states:
-            sample_prices = [p for p in sample_prices if p["state"] in config.states]
-
-        # Filter by customer class if specified
-        if config.options and config.options.get("customer_class"):
-            sample_prices = [p for p in sample_prices if p["customer_class"] == config.options["customer_class"]]
-
-        records = []
-        for price in sample_prices:
-            try:
-                effective_date = datetime.strptime(f"{price['period']}-01", "%Y-%m-%d").date()
-            except (ValueError, TypeError):
-                effective_date = datetime(2024, 12, 1).date()
-
-            record = {
-                "rate_schedule_id": f"EIA_{price['state']}_{price['customer_class'].upper()[:3]}_{price['period']}",
-                "utility_id": f"EIA_{price['state']}",
-                "utility_name": f"{price['state_name']} State Average",
-                "state": price["state"],
-                "rate_schedule_name": f"{price['state_name']} {price['customer_class'].title()} Average Rate ({price['period']})",
-                "customer_class": price["customer_class"],
-                "energy_rate_kwh": price["energy_rate_kwh"],
-                "has_time_of_use": False,
-                "has_demand_charges": False,
-                "effective_date": effective_date,
-                "source": "eia_sample",
-                "collected_at": datetime.utcnow(),
-            }
-            records.append(record)
-
-        if records:
-            inserted, _ = self.bulk_upsert(
-                UtilityRate,
-                records,
-                unique_columns=["rate_schedule_id"],
-            )
-            logger.info(f"Loaded {inserted} sample EIA electricity prices")
-            return {"processed": len(records), "inserted": inserted}
-
-        return {"processed": 0, "inserted": 0}

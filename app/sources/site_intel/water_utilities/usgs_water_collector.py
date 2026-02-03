@@ -103,13 +103,6 @@ class USGSWaterCollector(BaseCollector):
                     logger.error(f"Failed to collect USGS data for {state}: {e}")
                     errors.append({"state": state, "error": str(e)})
 
-            # If no data from API, use sample data
-            if total_processed == 0:
-                logger.info("No API data retrieved, loading sample data...")
-                sample_result = await self._load_sample_data(config)
-                total_inserted = sample_result.get("inserted", 0)
-                total_processed = sample_result.get("processed", 0)
-
             status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
 
             return self.create_result(
@@ -252,87 +245,3 @@ class USGSWaterCollector(BaseCollector):
             return float(value)
         except (ValueError, TypeError):
             return None
-
-    async def _load_sample_data(self, config: CollectionConfig) -> Dict[str, Any]:
-        """Load sample data when API is unavailable."""
-        sample_sites = [
-            # Texas
-            {"site_number": "08158000", "site_name": "Colorado River at Austin, TX", "site_type": "stream",
-             "state": "TX", "county": "Travis", "latitude": 30.2947, "longitude": -97.6947,
-             "drainage_area_sq_mi": 27600, "latest_streamflow_cfs": 1250.5},
-            {"site_number": "08068000", "site_name": "West Fork San Jacinto River, TX", "site_type": "stream",
-             "state": "TX", "county": "Harris", "latitude": 30.0822, "longitude": -95.4564,
-             "drainage_area_sq_mi": 1740, "latest_streamflow_cfs": 485.2},
-            {"site_number": "293556098265601", "site_name": "Edwards Aquifer Well, San Antonio", "site_type": "well",
-             "state": "TX", "county": "Bexar", "latitude": 29.5989, "longitude": -98.4489,
-             "well_depth_ft": 650, "aquifer_name": "Edwards Aquifer"},
-            # California
-            {"site_number": "11446500", "site_name": "American River at Fair Oaks, CA", "site_type": "stream",
-             "state": "CA", "county": "Sacramento", "latitude": 38.6369, "longitude": -121.2264,
-             "drainage_area_sq_mi": 1888, "latest_streamflow_cfs": 2150.8},
-            {"site_number": "11425500", "site_name": "Sacramento River at Verona, CA", "site_type": "stream",
-             "state": "CA", "county": "Sutter", "latitude": 38.7761, "longitude": -121.5978,
-             "drainage_area_sq_mi": 21251, "latest_streamflow_cfs": 12500.0},
-            {"site_number": "364558121282301", "site_name": "Central Valley Aquifer Well", "site_type": "well",
-             "state": "CA", "county": "San Joaquin", "latitude": 36.7661, "longitude": -121.4731,
-             "well_depth_ft": 400, "aquifer_name": "Central Valley Aquifer"},
-            # Ohio
-            {"site_number": "03255000", "site_name": "Ohio River at Cincinnati, OH", "site_type": "stream",
-             "state": "OH", "county": "Hamilton", "latitude": 39.1022, "longitude": -84.5069,
-             "drainage_area_sq_mi": 76580, "latest_streamflow_cfs": 45000.0},
-            {"site_number": "03246500", "site_name": "Scioto River at Columbus, OH", "site_type": "stream",
-             "state": "OH", "county": "Franklin", "latitude": 39.9558, "longitude": -83.0078,
-             "drainage_area_sq_mi": 1629, "latest_streamflow_cfs": 850.5},
-            # Pennsylvania
-            {"site_number": "01474500", "site_name": "Schuylkill River at Philadelphia, PA", "site_type": "stream",
-             "state": "PA", "county": "Philadelphia", "latitude": 40.0117, "longitude": -75.1869,
-             "drainage_area_sq_mi": 1893, "latest_streamflow_cfs": 2800.0},
-            {"site_number": "03049500", "site_name": "Allegheny River at Pittsburgh, PA", "site_type": "stream",
-             "state": "PA", "county": "Allegheny", "latitude": 40.4472, "longitude": -79.9917,
-             "drainage_area_sq_mi": 11410, "latest_streamflow_cfs": 8500.0},
-            # Illinois
-            {"site_number": "05586100", "site_name": "Illinois River at Valley City, IL", "site_type": "stream",
-             "state": "IL", "county": "Pike", "latitude": 39.7014, "longitude": -90.6492,
-             "drainage_area_sq_mi": 26743, "latest_streamflow_cfs": 15000.0},
-            {"site_number": "05536500", "site_name": "Des Plaines River at Riverside, IL", "site_type": "stream",
-             "state": "IL", "county": "Cook", "latitude": 41.8336, "longitude": -87.8222,
-             "drainage_area_sq_mi": 630, "latest_streamflow_cfs": 425.0},
-        ]
-
-        # Filter by states if specified
-        if config.states:
-            sample_sites = [s for s in sample_sites if s["state"] in config.states]
-
-        records = []
-        for site in sample_sites:
-            record = {
-                "site_number": site["site_number"],
-                "site_name": site["site_name"],
-                "site_type": site["site_type"],
-                "state": site["state"],
-                "county": site.get("county"),
-                "latitude": site["latitude"],
-                "longitude": site["longitude"],
-                "drainage_area_sq_mi": site.get("drainage_area_sq_mi"),
-                "aquifer_name": site.get("aquifer_name"),
-                "well_depth_ft": site.get("well_depth_ft"),
-                "latest_streamflow_cfs": site.get("latest_streamflow_cfs"),
-                "has_streamflow": site["site_type"] == "stream",
-                "has_groundwater": site["site_type"] == "well",
-                "has_quality": False,
-                "measurement_date": datetime.utcnow(),
-                "source": "usgs_sample",
-                "collected_at": datetime.utcnow(),
-            }
-            records.append(record)
-
-        if records:
-            inserted, _ = self.bulk_upsert(
-                WaterMonitoringSite,
-                records,
-                unique_columns=["site_number"],
-            )
-            logger.info(f"Loaded {inserted} sample USGS monitoring sites")
-            return {"processed": len(records), "inserted": inserted}
-
-        return {"processed": 0, "inserted": 0}

@@ -98,13 +98,6 @@ class EPASDWISCollector(BaseCollector):
                 if violation_result.get("error"):
                     errors.append({"source": "violations", "error": violation_result["error"]})
 
-            # If no data from API, load sample data
-            if total_processed == 0:
-                logger.info("No API data retrieved, loading sample data...")
-                sample_result = await self._load_sample_data(config)
-                total_inserted = sample_result.get("inserted", 0)
-                total_processed = sample_result.get("processed", 0)
-
             status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
 
             return self.create_result(
@@ -340,81 +333,3 @@ class EPASDWISCollector(BaseCollector):
             return datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
         except (ValueError, TypeError):
             return None
-
-    async def _load_sample_data(self, config: CollectionConfig) -> Dict[str, Any]:
-        """Load sample data when API is unavailable."""
-        sample_systems = [
-            # Texas - Large systems
-            {"pwsid": "TX0010001", "pws_name": "City of Houston Water Department", "pws_type": "community",
-             "state": "TX", "county": "Harris", "city": "Houston", "population_served": 2100000,
-             "service_connections": 650000, "primary_source_code": "SW", "primary_source_name": "surface_water"},
-            {"pwsid": "TX0570003", "pws_name": "San Antonio Water System", "pws_type": "community",
-             "state": "TX", "county": "Bexar", "city": "San Antonio", "population_served": 1900000,
-             "service_connections": 520000, "primary_source_code": "GW", "primary_source_name": "groundwater"},
-            {"pwsid": "TX0610001", "pws_name": "Dallas Water Utilities", "pws_type": "community",
-             "state": "TX", "county": "Dallas", "city": "Dallas", "population_served": 1350000,
-             "service_connections": 425000, "primary_source_code": "SW", "primary_source_name": "surface_water"},
-            # California
-            {"pwsid": "CA1910067", "pws_name": "Los Angeles DWP", "pws_type": "community",
-             "state": "CA", "county": "Los Angeles", "city": "Los Angeles", "population_served": 4000000,
-             "service_connections": 730000, "primary_source_code": "SWP", "primary_source_name": "purchased_surface"},
-            {"pwsid": "CA3710020", "pws_name": "San Diego PUD", "pws_type": "community",
-             "state": "CA", "county": "San Diego", "city": "San Diego", "population_served": 1400000,
-             "service_connections": 285000, "primary_source_code": "SWP", "primary_source_name": "purchased_surface"},
-            {"pwsid": "CA0110005", "pws_name": "East Bay MUD", "pws_type": "community",
-             "state": "CA", "county": "Alameda", "city": "Oakland", "population_served": 1400000,
-             "service_connections": 400000, "primary_source_code": "SW", "primary_source_name": "surface_water"},
-            # Ohio
-            {"pwsid": "OH3100113", "pws_name": "Cleveland Division of Water", "pws_type": "community",
-             "state": "OH", "county": "Cuyahoga", "city": "Cleveland", "population_served": 1500000,
-             "service_connections": 430000, "primary_source_code": "SW", "primary_source_name": "surface_water"},
-            {"pwsid": "OH2500318", "pws_name": "Greater Cincinnati Water Works", "pws_type": "community",
-             "state": "OH", "county": "Hamilton", "city": "Cincinnati", "population_served": 1000000,
-             "service_connections": 260000, "primary_source_code": "SW", "primary_source_name": "surface_water"},
-            # Pennsylvania
-            {"pwsid": "PA1510001", "pws_name": "Philadelphia Water Department", "pws_type": "community",
-             "state": "PA", "county": "Philadelphia", "city": "Philadelphia", "population_served": 1700000,
-             "service_connections": 500000, "primary_source_code": "SW", "primary_source_name": "surface_water"},
-            {"pwsid": "PA0290002", "pws_name": "Pittsburgh Water Authority", "pws_type": "community",
-             "state": "PA", "county": "Allegheny", "city": "Pittsburgh", "population_served": 600000,
-             "service_connections": 180000, "primary_source_code": "SW", "primary_source_name": "surface_water"},
-            # Illinois
-            {"pwsid": "IL0316000", "pws_name": "City of Chicago Water", "pws_type": "community",
-             "state": "IL", "county": "Cook", "city": "Chicago", "population_served": 5500000,
-             "service_connections": 950000, "primary_source_code": "SW", "primary_source_name": "surface_water"},
-        ]
-
-        # Filter by states if specified
-        if config.states:
-            sample_systems = [s for s in sample_systems if s["state"] in config.states]
-
-        records = []
-        for system in sample_systems:
-            record = {
-                "pwsid": system["pwsid"],
-                "pws_name": system["pws_name"],
-                "pws_type": system["pws_type"],
-                "state": system["state"],
-                "county": system.get("county"),
-                "city": system.get("city"),
-                "population_served": system.get("population_served"),
-                "service_connections": system.get("service_connections"),
-                "primary_source_code": system.get("primary_source_code"),
-                "primary_source_name": system.get("primary_source_name"),
-                "is_active": True,
-                "compliance_status": "compliant",
-                "source": "epa_sdwis_sample",
-                "collected_at": datetime.utcnow(),
-            }
-            records.append(record)
-
-        if records:
-            inserted, _ = self.bulk_upsert(
-                PublicWaterSystem,
-                records,
-                unique_columns=["pwsid"],
-            )
-            logger.info(f"Loaded {inserted} sample public water systems")
-            return {"processed": len(records), "inserted": inserted}
-
-        return {"processed": 0, "inserted": 0}

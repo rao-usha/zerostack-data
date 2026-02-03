@@ -71,6 +71,12 @@ class EIAGasCollector(BaseCollector):
 
     async def collect(self, config: CollectionConfig) -> CollectionResult:
         """Execute EIA natural gas data collection."""
+        if not self.api_key:
+            return self.create_result(
+                status=CollectionStatus.FAILED,
+                error_message="EIA_API_KEY not configured. Get free key at https://www.eia.gov/opendata/register.php"
+            )
+
         total_inserted = 0
         total_processed = 0
         errors = []
@@ -92,13 +98,6 @@ class EIAGasCollector(BaseCollector):
             if storage_result.get("error"):
                 errors.append({"source": "storage", "error": storage_result["error"]})
 
-            # If no data from API, load sample data
-            if total_processed == 0:
-                logger.info("No API data retrieved, loading sample data...")
-                sample_result = await self._load_sample_data(config)
-                total_inserted = sample_result.get("inserted", 0)
-                total_processed = sample_result.get("processed", 0)
-
             status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
 
             return self.create_result(
@@ -119,10 +118,6 @@ class EIAGasCollector(BaseCollector):
     async def _collect_pipelines(self, config: CollectionConfig) -> Dict[str, Any]:
         """Collect natural gas pipeline data from EIA."""
         try:
-            if not self.api_key:
-                logger.warning("No EIA API key configured, skipping API collection")
-                return {"processed": 0, "inserted": 0}
-
             client = await self.get_client()
             await self.apply_rate_limit()
 
@@ -204,9 +199,6 @@ class EIAGasCollector(BaseCollector):
     async def _collect_storage(self, config: CollectionConfig) -> Dict[str, Any]:
         """Collect natural gas storage facility data from EIA."""
         try:
-            if not self.api_key:
-                return {"processed": 0, "inserted": 0}
-
             client = await self.get_client()
             await self.apply_rate_limit()
 
@@ -300,137 +292,3 @@ class EIAGasCollector(BaseCollector):
             return float(value)
         except (ValueError, TypeError):
             return None
-
-    async def _load_sample_data(self, config: CollectionConfig) -> Dict[str, Any]:
-        """Load sample data when API is unavailable."""
-        # Sample pipelines - major interstate systems
-        sample_pipelines = [
-            {"pipeline_id": "TEXGATEWAY", "pipeline_name": "Texas Eastern Pipeline", "operator_name": "Enbridge",
-             "origin_state": "TX", "destination_state": "NJ", "capacity_mmcfd": 10000,
-             "pipeline_type": "interstate", "states_crossed": ["TX", "LA", "MS", "AL", "TN", "KY", "OH", "PA", "NJ"]},
-            {"pipeline_id": "TRANSCO", "pipeline_name": "Transcontinental Gas Pipeline", "operator_name": "Williams",
-             "origin_state": "TX", "destination_state": "NY", "capacity_mmcfd": 15000,
-             "pipeline_type": "interstate", "states_crossed": ["TX", "LA", "MS", "AL", "GA", "SC", "NC", "VA", "MD", "PA", "NJ", "NY"]},
-            {"pipeline_id": "COLUMBIA", "pipeline_name": "Columbia Gas Transmission", "operator_name": "TC Energy",
-             "origin_state": "LA", "destination_state": "NY", "capacity_mmcfd": 5800,
-             "pipeline_type": "interstate", "states_crossed": ["LA", "KY", "WV", "OH", "PA", "NY"]},
-            {"pipeline_id": "NATURAL", "pipeline_name": "Natural Gas Pipeline of America", "operator_name": "Kinder Morgan",
-             "origin_state": "TX", "destination_state": "IL", "capacity_mmcfd": 7500,
-             "pipeline_type": "interstate", "states_crossed": ["TX", "OK", "KS", "NE", "IA", "IL"]},
-            {"pipeline_id": "ELMCREEK", "pipeline_name": "El Paso Natural Gas", "operator_name": "Kinder Morgan",
-             "origin_state": "TX", "destination_state": "CA", "capacity_mmcfd": 5500,
-             "pipeline_type": "interstate", "states_crossed": ["TX", "NM", "AZ", "CA"]},
-            {"pipeline_id": "ROCKIES", "pipeline_name": "Rockies Express Pipeline", "operator_name": "Tallgrass",
-             "origin_state": "CO", "destination_state": "OH", "capacity_mmcfd": 1800,
-             "pipeline_type": "interstate", "states_crossed": ["CO", "WY", "NE", "MO", "IL", "IN", "OH"]},
-            {"pipeline_id": "GULFSTREAM", "pipeline_name": "Gulfstream Natural Gas", "operator_name": "Williams",
-             "origin_state": "MS", "destination_state": "FL", "capacity_mmcfd": 1300,
-             "pipeline_type": "interstate", "states_crossed": ["MS", "AL", "FL"]},
-            {"pipeline_id": "PERMIAN", "pipeline_name": "Permian Highway Pipeline", "operator_name": "Kinder Morgan",
-             "origin_state": "TX", "destination_state": "TX", "capacity_mmcfd": 2100,
-             "pipeline_type": "intrastate", "states_crossed": ["TX"], "latitude": 31.9, "longitude": -102.1},
-        ]
-
-        # Sample storage facilities
-        sample_storage = [
-            {"facility_id": "MOSS_BLUFF", "facility_name": "Moss Bluff Storage", "operator_name": "Kinder Morgan",
-             "state": "TX", "county": "Liberty", "latitude": 30.2, "longitude": -94.6,
-             "storage_type": "salt_cavern", "total_capacity_bcf": 15.5, "working_gas_bcf": 12.0,
-             "deliverability_mmcfd": 1500},
-            {"facility_id": "MIDCONTINENT", "facility_name": "Mid-Continent Storage", "operator_name": "ONEOK",
-             "state": "OK", "county": "Wagoner", "latitude": 35.9, "longitude": -95.4,
-             "storage_type": "depleted_field", "total_capacity_bcf": 24.0, "working_gas_bcf": 18.0,
-             "deliverability_mmcfd": 800},
-            {"facility_id": "WILD_GOOSE", "facility_name": "Wild Goose Storage", "operator_name": "Pacific Gas Electric",
-             "state": "CA", "county": "Butte", "latitude": 39.4, "longitude": -121.9,
-             "storage_type": "depleted_field", "total_capacity_bcf": 75.0, "working_gas_bcf": 50.0,
-             "deliverability_mmcfd": 600},
-            {"facility_id": "ALISO_CANYON", "facility_name": "Aliso Canyon", "operator_name": "Southern California Gas",
-             "state": "CA", "county": "Los Angeles", "latitude": 34.3, "longitude": -118.6,
-             "storage_type": "depleted_field", "total_capacity_bcf": 86.0, "working_gas_bcf": 34.0,
-             "deliverability_mmcfd": 1800},
-            {"facility_id": "WESTERN_CAVE", "facility_name": "Western Kentucky Gas Storage", "operator_name": "Texas Gas",
-             "state": "KY", "county": "Henderson", "latitude": 37.8, "longitude": -87.6,
-             "storage_type": "aquifer", "total_capacity_bcf": 12.0, "working_gas_bcf": 8.0,
-             "deliverability_mmcfd": 300},
-            {"facility_id": "STAGECOACH", "facility_name": "Stagecoach South", "operator_name": "Crestwood",
-             "state": "NY", "county": "Chemung", "latitude": 42.1, "longitude": -76.8,
-             "storage_type": "salt_cavern", "total_capacity_bcf": 6.0, "working_gas_bcf": 5.0,
-             "deliverability_mmcfd": 600},
-            {"facility_id": "SENECA_LAKE", "facility_name": "Seneca Lake Storage", "operator_name": "Crestwood",
-             "state": "NY", "county": "Schuyler", "latitude": 42.4, "longitude": -76.9,
-             "storage_type": "salt_cavern", "total_capacity_bcf": 1.5, "working_gas_bcf": 1.2,
-             "deliverability_mmcfd": 250},
-        ]
-
-        # Filter by states if specified
-        if config.states:
-            sample_pipelines = [p for p in sample_pipelines
-                               if p.get("origin_state") in config.states or p.get("destination_state") in config.states]
-            sample_storage = [s for s in sample_storage if s.get("state") in config.states]
-
-        total_inserted = 0
-        total_processed = 0
-
-        # Insert pipelines
-        pipeline_records = []
-        for pipeline in sample_pipelines:
-            record = {
-                "pipeline_id": pipeline["pipeline_id"],
-                "pipeline_name": pipeline["pipeline_name"],
-                "operator_name": pipeline.get("operator_name"),
-                "origin_state": pipeline.get("origin_state"),
-                "destination_state": pipeline.get("destination_state"),
-                "states_crossed": pipeline.get("states_crossed"),
-                "capacity_mmcfd": pipeline.get("capacity_mmcfd"),
-                "pipeline_type": pipeline.get("pipeline_type", "interstate"),
-                "latitude": pipeline.get("latitude"),
-                "longitude": pipeline.get("longitude"),
-                "status": "operational",
-                "source": "eia_sample",
-                "collected_at": datetime.utcnow(),
-            }
-            pipeline_records.append(record)
-
-        if pipeline_records:
-            inserted, _ = self.bulk_upsert(
-                NaturalGasPipeline,
-                pipeline_records,
-                unique_columns=["pipeline_id"],
-            )
-            total_inserted += inserted
-            total_processed += len(pipeline_records)
-            logger.info(f"Loaded {inserted} sample natural gas pipelines")
-
-        # Insert storage facilities
-        storage_records = []
-        for storage in sample_storage:
-            record = {
-                "facility_id": storage["facility_id"],
-                "facility_name": storage["facility_name"],
-                "operator_name": storage.get("operator_name"),
-                "state": storage.get("state"),
-                "county": storage.get("county"),
-                "latitude": storage.get("latitude"),
-                "longitude": storage.get("longitude"),
-                "storage_type": storage.get("storage_type"),
-                "total_capacity_bcf": storage.get("total_capacity_bcf"),
-                "working_gas_bcf": storage.get("working_gas_bcf"),
-                "deliverability_mmcfd": storage.get("deliverability_mmcfd"),
-                "status": "operational",
-                "source": "eia_sample",
-                "collected_at": datetime.utcnow(),
-            }
-            storage_records.append(record)
-
-        if storage_records:
-            inserted, _ = self.bulk_upsert(
-                NaturalGasStorage,
-                storage_records,
-                unique_columns=["facility_id"],
-            )
-            total_inserted += inserted
-            total_processed += len(storage_records)
-            logger.info(f"Loaded {inserted} sample natural gas storage facilities")
-
-        return {"processed": total_processed, "inserted": total_inserted}
