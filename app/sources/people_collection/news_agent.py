@@ -710,28 +710,26 @@ class NewsAgent(BaseCollector):
                         title_text = title_elem.get_text(strip=True)
                         raw_link = link_elem.get_text(strip=True)
 
+                        # Check relevance first (before URL processing)
+                        if not self._is_leadership_related(title_text):
+                            continue
+
+                        articles_found += 1
+
                         # Decode Google News redirect URL to get actual article URL
                         link_url = self._decode_google_news_url(raw_link)
                         if not link_url:
-                            logger.debug(f"[NewsAgent] Could not decode Google News URL: {raw_link[:50]}")
-                            continue
+                            link_url = raw_link  # Fallback to original URL
 
                         # If still a Google URL, try following the redirect
                         if 'news.google.com' in link_url:
                             real_url = await self._follow_google_redirect(link_url)
                             if real_url:
                                 link_url = real_url
-                            else:
-                                logger.debug(f"[NewsAgent] Could not resolve Google redirect, skipping")
-                                continue
+                            # If redirect fails, still try to fetch - aiohttp might handle it
 
-                        # Check relevance
-                        if not self._is_leadership_related(title_text):
-                            continue
-
-                        articles_found += 1
-                        logger.debug(f"[NewsAgent] Google News match: {title_text[:60]}")
-                        logger.debug(f"[NewsAgent] Real article URL: {link_url[:80]}")
+                        logger.info(f"[NewsAgent] Google News article: {title_text[:50]}")
+                        logger.info(f"[NewsAgent] Article URL: {link_url[:80]}")
 
                         # Parse date if available
                         pub_date = None
