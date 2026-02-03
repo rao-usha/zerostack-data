@@ -58,41 +58,55 @@ class LLMExtractor:
                 self._client = openai.OpenAI()
         return self._client
 
-    async def _call_llm(self, prompt: str) -> Optional[str]:
+    async def _call_llm(self, prompt: str, retry_count: int = 0) -> Optional[str]:
         """
         Call the LLM with a prompt and return the response.
 
         Handles both sync clients in an async context.
+        Includes retry logic for transient failures.
         """
         import asyncio
 
         client = self._get_client()
+        max_retries = self.config.retry_attempts
 
-        try:
-            if self.config.provider == "anthropic":
-                # Run sync client in thread pool
-                response = await asyncio.to_thread(
-                    client.messages.create,
-                    model=self.config.model,
-                    max_tokens=self.config.max_tokens,
-                    temperature=self.config.temperature,
-                    messages=[{"role": "user", "content": prompt}],
-                )
-                return response.content[0].text
-            else:
-                # OpenAI
-                response = await asyncio.to_thread(
-                    client.chat.completions.create,
-                    model=self.config.model,
-                    max_tokens=self.config.max_tokens,
-                    temperature=self.config.temperature,
-                    messages=[{"role": "user", "content": prompt}],
-                )
-                return response.choices[0].message.content
+        for attempt in range(max_retries):
+            try:
+                if self.config.provider == "anthropic":
+                    # Run sync client in thread pool
+                    response = await asyncio.to_thread(
+                        client.messages.create,
+                        model=self.config.model,
+                        max_tokens=self.config.max_tokens,
+                        temperature=self.config.temperature,
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    result = response.content[0].text
+                else:
+                    # OpenAI
+                    response = await asyncio.to_thread(
+                        client.chat.completions.create,
+                        model=self.config.model,
+                        max_tokens=self.config.max_tokens,
+                        temperature=self.config.temperature,
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    result = response.choices[0].message.content
 
-        except Exception as e:
-            logger.error(f"LLM call failed: {e}")
-            return None
+                logger.debug(f"[LLMExtractor] LLM response length: {len(result) if result else 0} chars")
+                return result
+
+            except Exception as e:
+                logger.warning(f"[LLMExtractor] LLM call attempt {attempt + 1}/{max_retries} failed: {e}")
+                if attempt < max_retries - 1:
+                    wait_time = self.config.retry_delay_seconds * (2 ** attempt)
+                    logger.info(f"[LLMExtractor] Retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"[LLMExtractor] LLM call failed after {max_retries} attempts: {e}")
+                    return None
+
+        return None
 
     def _parse_json_response(self, response: str) -> Optional[Dict]:
         """Parse JSON from LLM response, handling common issues."""
@@ -198,40 +212,88 @@ class LLMExtractor:
         """
         Extract leadership information from an HTML page.
 
+        Uses a two-pass approach:
+        1. First try with standard prompt
+        2. If empty, retry with simplified/focused prompt
+
         Args:
-            html: Raw HTML content
+            html: Raw HTML content (already cleaned text)
             company_name: Name of the company
             page_url: URL of the page
 
         Returns:
             LeadershipPageResult with extracted people
         """
-        # Clean HTML for LLM
-        cleaned_html = self._clean_html_for_llm(html)
+        # The html parameter is actually already cleaned text from HTMLCleaner
+        cleaned_text = html
+        text_length = len(cleaned_text)
+
+        logger.info(f"[LLMExtractor] Extracting from {page_url} ({text_length} chars)")
 
         # Build prompt
         prompt = LEADERSHIP_EXTRACTION_PROMPT.format(
             company_name=company_name,
             page_url=page_url,
-            html_content=cleaned_html,
+            html_content=cleaned_text,
         )
 
         # Call LLM
         response = await self._call_llm(prompt)
-        data = self._parse_json_response(response)
 
-        if not data:
+        if not response:
+            logger.warning(f"[LLMExtractor] No response from LLM for {page_url}")
             return LeadershipPageResult(
                 company_name=company_name,
                 page_url=page_url,
                 page_type="unknown",
                 people=[],
                 extraction_confidence=ExtractionConfidence.LOW,
-                extraction_notes="Failed to parse LLM response",
+                extraction_notes="LLM returned no response",
+            )
+
+        data = self._parse_json_response(response)
+
+        if not data:
+            logger.warning(
+                f"[LLMExtractor] Failed to parse JSON from LLM response for {page_url}. "
+                f"Response preview: {response[:200]}..."
+            )
+            return LeadershipPageResult(
+                company_name=company_name,
+                page_url=page_url,
+                page_type="unknown",
+                people=[],
+                extraction_confidence=ExtractionConfidence.LOW,
+                extraction_notes="Failed to parse LLM response as JSON",
             )
 
         # Parse people
+        people = self._parse_people_from_response(data, page_url)
+
+        # If no people found, try with simplified prompt
+        if len(people) == 0 and text_length > 100:
+            logger.info(f"[LLMExtractor] No people found, trying simplified extraction for {page_url}")
+            people = await self._try_simplified_extraction(cleaned_text, company_name, page_url)
+
+        logger.info(f"[LLMExtractor] Extracted {len(people)} people from {page_url}")
+
+        return LeadershipPageResult(
+            company_name=company_name,
+            page_url=page_url,
+            page_type=data.get("page_type", "leadership"),
+            people=people,
+            extraction_confidence=ExtractionConfidence(data.get("extraction_confidence", "medium")),
+            extraction_notes=data.get("notes"),
+        )
+
+    def _parse_people_from_response(
+        self,
+        data: Dict,
+        page_url: str,
+    ) -> List[ExtractedPerson]:
+        """Parse people from LLM response data."""
         people = []
+
         for p in data.get("people", []):
             try:
                 # Normalize and enhance
@@ -242,8 +304,14 @@ class LLMExtractor:
                 if title_level == "unknown":
                     title_level = self._infer_title_level(title).value
 
+                full_name = p.get("full_name", "").strip()
+
+                # Skip invalid names
+                if not full_name or len(full_name) < 3:
+                    continue
+
                 person = ExtractedPerson(
-                    full_name=p.get("full_name", ""),
+                    full_name=full_name,
                     title=title,
                     title_normalized=title_normalized,
                     title_level=TitleLevel(title_level) if title_level else TitleLevel.UNKNOWN,
@@ -260,16 +328,62 @@ class LLMExtractor:
                 )
                 people.append(person)
             except Exception as e:
-                logger.warning(f"Failed to parse person: {e}")
+                logger.warning(f"[LLMExtractor] Failed to parse person: {e}")
 
-        return LeadershipPageResult(
-            company_name=company_name,
-            page_url=page_url,
-            page_type=data.get("page_type", "leadership"),
-            people=people,
-            extraction_confidence=ExtractionConfidence(data.get("extraction_confidence", "medium")),
-            extraction_notes=data.get("notes"),
-        )
+        return people
+
+    async def _try_simplified_extraction(
+        self,
+        text: str,
+        company_name: str,
+        page_url: str,
+    ) -> List[ExtractedPerson]:
+        """
+        Try extraction with a simplified, more focused prompt.
+
+        Used as fallback when standard extraction returns empty.
+        """
+        # Use a simplified prompt that's more direct
+        simplified_prompt = f"""Extract all people with their job titles from this text.
+
+Company: {company_name}
+
+Return JSON format:
+{{"people": [{{"full_name": "First Last", "title": "Job Title"}}]}}
+
+Rules:
+1. Only include people who work at {company_name}
+2. Each person must have both a name and title
+3. Return valid JSON only
+
+Text:
+{text[:50000]}"""
+
+        response = await self._call_llm(simplified_prompt)
+        if not response:
+            return []
+
+        data = self._parse_json_response(response)
+        if not data:
+            return []
+
+        people = []
+        for p in data.get("people", []):
+            full_name = p.get("full_name", "").strip()
+            title = p.get("title", "").strip()
+
+            if full_name and len(full_name) >= 3 and title:
+                people.append(ExtractedPerson(
+                    full_name=full_name,
+                    title=title,
+                    title_level=self._infer_title_level(title),
+                    confidence=ExtractionConfidence.LOW,
+                    source_url=page_url,
+                    extraction_notes="Extracted via simplified fallback prompt",
+                ))
+
+        logger.info(f"[LLMExtractor] Simplified extraction found {len(people)} people")
+        return people
 
     async def extract_changes_from_press_release(
         self,

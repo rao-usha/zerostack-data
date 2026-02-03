@@ -266,20 +266,49 @@ Filing Text:
 # =============================================================================
 
 LEADERSHIP_URL_PATTERNS: List[str] = [
+    # Standard about/leadership patterns
     "/about/leadership",
     "/about/team",
     "/about/our-team",
     "/about/management",
     "/about/executives",
+    "/about/people",
+    "/about/staff",
+    "/about/our-people",
+    "/about/our-leadership",
+    "/about/executive-team",
+    "/about/management-team",
+    "/about/leadership-team",
+
+    # About-us variants
     "/about-us/leadership",
     "/about-us/team",
     "/about-us/management",
+    "/about-us/our-team",
+    "/about-us/people",
+    "/about-us/executive-team",
+    "/about-us/leadership-team",
+    "/about-us/management-team",
+
+    # Company section patterns
     "/company/leadership",
     "/company/team",
     "/company/management",
     "/company/about/leadership",
+    "/company/about/team",
+    "/company/about-us/team",
+    "/company/about-us/leadership",
+    "/company/people",
+    "/company/our-team",
+
+    # Corporate patterns
     "/corporate/leadership",
     "/corporate/management",
+    "/corporate/team",
+    "/corporate/about/leadership",
+    "/corporate/executive-team",
+
+    # Root-level patterns
     "/leadership",
     "/leadership-team",
     "/our-leadership",
@@ -289,25 +318,108 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     "/management-team",
     "/executives",
     "/executive-team",
+    "/people",
+    "/staff",
+    "/our-people",
+    "/meet-the-team",
+    "/meet-our-team",
+
+    # Who we are patterns
+    "/who-we-are/leadership",
+    "/who-we-are/team",
+    "/who-we-are/our-team",
+    "/who-we-are/people",
+    "/who-we-are/management",
+
+    # Board/governance patterns
     "/about/board",
     "/about/board-of-directors",
     "/corporate/board",
+    "/corporate/board-of-directors",
+    "/governance/board",
+    "/governance/board-of-directors",
     "/investors/corporate-governance/board-of-directors",
-    "/who-we-are/leadership",
-    "/who-we-are/team",
+    "/investor-relations/corporate-governance/board",
+    "/investor-relations/leadership",
+    "/ir/governance/board",
+    "/board",
+    "/board-of-directors",
+    "/directors",
+
+    # International/localized patterns
+    "/en/about/team",
+    "/en/about/leadership",
+    "/en/company/team",
+    "/en/team",
+    "/en/leadership",
+    "/en-us/about/team",
+    "/en-us/about/leadership",
+    "/us/about/team",
+    "/us/about/leadership",
+    "/en-gb/about/team",
+
+    # SaaS/tech company patterns
+    "/company",  # Many SaaS sites put team on /company
+    "/about",    # Sometimes team is on main about page
+    "/careers/team",  # Some show team on careers
+    "/careers/leadership",
+
+    # Founders/partners patterns (for smaller companies)
+    "/founders",
+    "/partners",
+    "/our-founders",
+    "/about/founders",
+
+    # Additional variants
+    "/info/leadership",
+    "/info/team",
+    "/pages/leadership",
+    "/pages/team",
+    "/site/leadership",
+    "/our-company/leadership",
+    "/our-company/team",
 ]
 
 LEADERSHIP_LINK_PATTERNS: List[str] = [
+    # Primary leadership keywords
     r"leadership",
-    r"team",
+    r"leadership team",
+    r"executive team",
+    r"executive leadership",
+    r"senior leadership",
+    r"management team",
     r"management",
     r"executives",
-    r"our people",
-    r"about us",
-    r"who we are",
-    r"board of directors",
+
+    # Team keywords
+    r"team",
+    r"our team",
+    r"the team",
     r"meet the team",
     r"meet our team",
+
+    # People keywords
+    r"our people",
+    r"people",
+    r"staff",
+    r"our staff",
+
+    # About keywords
+    r"about us",
+    r"about$",  # Just "About" link
+    r"who we are",
+    r"company",
+
+    # Board keywords
+    r"board of directors",
+    r"board",
+    r"directors",
+    r"governance",
+
+    # Founders/partners
+    r"founders",
+    r"partners",
+    r"our founders",
 ]
 
 

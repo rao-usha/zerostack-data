@@ -5,13 +5,15 @@ Finds pages that contain leadership/team information by:
 1. Trying common URL patterns
 2. Crawling the homepage for relevant links
 3. Checking sitemap.xml
+4. Google search fallback (site:domain.com leadership team)
 """
 
 import asyncio
 import logging
 import re
+import os
 from typing import Optional, List, Set, Tuple
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, quote_plus
 
 from bs4 import BeautifulSoup
 
@@ -22,6 +24,10 @@ from app.sources.people_collection.config import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Google Custom Search API (optional - for search fallback)
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")
 
 
 class PageFinder(BaseCollector):
@@ -155,6 +161,12 @@ class PageFinder(BaseCollector):
         """
         Find leadership/team pages on a company website.
 
+        Strategies (in order):
+        1. Try common URL patterns directly
+        2. Crawl homepage for relevant links
+        3. Check sitemap.xml
+        4. Google search fallback (if API configured)
+
         Args:
             website_url: Base website URL (e.g., https://example.com)
             max_pages: Maximum number of pages to return
@@ -171,32 +183,208 @@ class PageFinder(BaseCollector):
             website_url = "https://" + website_url
         base_url = f"{parsed.scheme or 'https'}://{parsed.netloc or website_url.replace('https://', '').replace('http://', '').split('/')[0]}"
 
-        logger.info(f"Finding leadership pages for {base_url}")
+        logger.info(f"[PageFinder] Finding leadership pages for {base_url}")
 
         # Strategy 1: Try common URL patterns directly
+        logger.debug(f"[PageFinder] Strategy 1: Trying {len(LEADERSHIP_URL_PATTERNS)} URL patterns")
         pattern_pages = await self._try_url_patterns(base_url)
         found_pages.extend(pattern_pages)
+        logger.info(f"[PageFinder] URL patterns found {len(pattern_pages)} pages")
 
         # Strategy 2: Crawl homepage for links
         if len(found_pages) < max_pages:
+            logger.debug(f"[PageFinder] Strategy 2: Crawling homepage for links")
             homepage_pages = await self._crawl_homepage(base_url)
+            new_count = 0
             for page in homepage_pages:
                 if page['url'] not in [p['url'] for p in found_pages]:
                     found_pages.append(page)
+                    new_count += 1
+            logger.info(f"[PageFinder] Homepage crawl found {new_count} additional pages")
 
         # Strategy 3: Check sitemap
         if len(found_pages) < max_pages:
+            logger.debug(f"[PageFinder] Strategy 3: Checking sitemap.xml")
             sitemap_pages = await self._check_sitemap(base_url)
+            new_count = 0
             for page in sitemap_pages:
                 if page['url'] not in [p['url'] for p in found_pages]:
                     found_pages.append(page)
+                    new_count += 1
+            logger.info(f"[PageFinder] Sitemap found {new_count} additional pages")
+
+        # Strategy 4: Google search fallback (if still no pages and API configured)
+        if len(found_pages) == 0:
+            logger.info(f"[PageFinder] Strategy 4: Trying Google search fallback")
+            google_pages = await self._google_search_fallback(base_url)
+            found_pages.extend(google_pages)
+            logger.info(f"[PageFinder] Google search found {len(google_pages)} pages")
 
         # Sort by score and limit
         found_pages.sort(key=lambda x: x['score'], reverse=True)
         result = found_pages[:max_pages]
 
-        logger.info(f"Found {len(result)} leadership pages for {base_url}")
+        if result:
+            logger.info(f"[PageFinder] Found {len(result)} leadership pages for {base_url}")
+            for page in result:
+                logger.debug(f"[PageFinder] - {page['url']} (score={page['score']}, type={page['page_type']})")
+        else:
+            logger.warning(
+                f"[PageFinder] No leadership pages found for {base_url}. "
+                f"Website may have non-standard structure, require JavaScript, "
+                f"or block automated access."
+            )
+
         return result
+
+    async def _google_search_fallback(self, base_url: str) -> List[dict]:
+        """
+        Use Google Custom Search API to find leadership pages.
+
+        Requires GOOGLE_API_KEY and GOOGLE_CSE_ID environment variables.
+        Falls back to DuckDuckGo if Google API not configured.
+        """
+        found = []
+
+        # Try Google first if configured
+        if GOOGLE_API_KEY and GOOGLE_CSE_ID:
+            found = await self._google_api_search(base_url)
+            if found:
+                return found
+
+        # Fall back to DuckDuckGo HTML scraping (no API needed)
+        found = await self._duckduckgo_search(base_url)
+
+        return found
+
+    async def _google_api_search(self, base_url: str) -> List[dict]:
+        """Search using Google Custom Search API."""
+        found = []
+
+        # Extract domain for site: search
+        parsed = urlparse(base_url)
+        domain = parsed.netloc
+
+        # Search queries to try
+        queries = [
+            f"site:{domain} leadership team",
+            f"site:{domain} about team executives",
+            f"site:{domain} management board directors",
+        ]
+
+        for query in queries:
+            try:
+                search_url = (
+                    f"https://www.googleapis.com/customsearch/v1"
+                    f"?key={GOOGLE_API_KEY}"
+                    f"&cx={GOOGLE_CSE_ID}"
+                    f"&q={quote_plus(query)}"
+                    f"&num=5"
+                )
+
+                data = await self.fetch_json(search_url, use_cache=False)
+
+                if data and "items" in data:
+                    for item in data["items"]:
+                        url = item.get("link", "")
+
+                        # Only include if on the same domain
+                        if not self._is_same_domain(base_url, url):
+                            continue
+
+                        if url in self._visited_urls:
+                            continue
+
+                        self._visited_urls.add(url)
+                        score = self._score_leadership_url(url, item.get("title", ""))
+
+                        if score > 0:
+                            page_type = self._infer_page_type(url)
+                            found.append({
+                                'url': url,
+                                'page_type': page_type,
+                                'score': score,
+                                'source': 'google_search',
+                                'title': item.get("title"),
+                            })
+
+                # If we found pages, don't need more queries
+                if found:
+                    break
+
+                # Rate limit between queries
+                await asyncio.sleep(0.5)
+
+            except Exception as e:
+                logger.warning(f"[PageFinder] Google API search error: {e}")
+
+        return found
+
+    async def _duckduckgo_search(self, base_url: str) -> List[dict]:
+        """
+        Search using DuckDuckGo HTML (no API key required).
+
+        Note: This is a fallback and may be rate limited.
+        """
+        found = []
+
+        parsed = urlparse(base_url)
+        domain = parsed.netloc
+
+        query = f"site:{domain} leadership team executives"
+        search_url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
+
+        try:
+            # DuckDuckGo needs different headers
+            html = await self.fetch_url(search_url)
+
+            if not html:
+                logger.debug("[PageFinder] DuckDuckGo returned no results")
+                return found
+
+            soup = BeautifulSoup(html, 'html.parser')
+
+            # DuckDuckGo HTML results are in .result__a links
+            for link in soup.select('.result__a'):
+                href = link.get('href', '')
+
+                # DuckDuckGo wraps URLs, need to extract
+                if 'uddg=' in href:
+                    # URL is encoded in uddg parameter
+                    import urllib.parse
+                    parsed_href = urllib.parse.urlparse(href)
+                    params = urllib.parse.parse_qs(parsed_href.query)
+                    if 'uddg' in params:
+                        href = params['uddg'][0]
+
+                # Only include same domain
+                if not self._is_same_domain(base_url, href):
+                    continue
+
+                if href in self._visited_urls:
+                    continue
+
+                self._visited_urls.add(href)
+                title = link.get_text(strip=True)
+                score = self._score_leadership_url(href, title)
+
+                if score > 0:
+                    page_type = self._infer_page_type(href)
+                    found.append({
+                        'url': href,
+                        'page_type': page_type,
+                        'score': score,
+                        'source': 'duckduckgo_search',
+                        'title': title,
+                    })
+
+                if len(found) >= 5:
+                    break
+
+        except Exception as e:
+            logger.warning(f"[PageFinder] DuckDuckGo search error: {e}")
+
+        return found
 
     async def _try_url_patterns(self, base_url: str) -> List[dict]:
         """Try common leadership URL patterns."""
