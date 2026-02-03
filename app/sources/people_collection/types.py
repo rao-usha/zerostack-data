@@ -239,6 +239,11 @@ class CollectionResult(BaseModel):
     errors: List[str] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
 
+    # Diagnostic info (for debugging)
+    pages_checked: int = Field(0, description="Number of pages crawled (website)")
+    page_urls: List[str] = Field(default_factory=list, description="URLs of pages checked")
+    filings_checked: int = Field(0, description="Number of SEC filings checked")
+
     # Timing
     started_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None

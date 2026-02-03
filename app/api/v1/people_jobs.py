@@ -535,3 +535,164 @@ async def get_change_summary(
     summary = monitor.get_change_summary(days=days)
 
     return summary
+
+
+# =============================================================================
+# Diagnostic Endpoints
+# =============================================================================
+
+@router.post("/test/{company_id}")
+async def test_collection(
+    company_id: int,
+    sources: str = Query("website", description="Comma-separated sources: website,sec,news"),
+    db: Session = Depends(get_db),
+):
+    """
+    Run collection for a single company with full diagnostics.
+
+    This endpoint is for debugging why collections may not find people.
+    Returns detailed information about:
+    - Company data availability (website URL, CIK)
+    - Which agents ran and their results
+    - Pages checked and extraction results
+    - Errors at each step
+
+    Use this to understand why a specific company returned 0 people.
+    """
+    from app.sources.people_collection.orchestrator import PeopleCollectionOrchestrator
+
+    source_list = [s.strip() for s in sources.split(",")]
+
+    orchestrator = PeopleCollectionOrchestrator(db_session=db)
+    diagnostics = await orchestrator.collect_company_with_diagnostics(
+        company_id=company_id,
+        sources=source_list,
+    )
+
+    return diagnostics.to_dict()
+
+
+@router.get("/test/company-check/{company_id}")
+async def check_company_data(
+    company_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Check if a company has the required data for collection.
+
+    Returns information about:
+    - Whether company exists
+    - Whether website URL is configured
+    - Whether SEC CIK is configured
+    - Last crawl dates
+    """
+    from app.core.people_models import IndustrialCompany
+
+    company = db.query(IndustrialCompany).filter(
+        IndustrialCompany.id == company_id
+    ).first()
+
+    if not company:
+        return {
+            "found": False,
+            "company_id": company_id,
+            "error": "Company not found in database",
+        }
+
+    return {
+        "found": True,
+        "company_id": company_id,
+        "name": company.name,
+        "data_availability": {
+            "has_website": bool(company.website),
+            "website_url": company.website,
+            "has_cik": bool(company.cik),
+            "cik": company.cik,
+        },
+        "crawl_history": {
+            "last_crawled_date": company.last_crawled_date.isoformat() if company.last_crawled_date else None,
+            "leadership_last_updated": company.leadership_last_updated.isoformat() if company.leadership_last_updated else None,
+        },
+        "collection_ready": {
+            "website_collection": bool(company.website),
+            "sec_collection": bool(company.cik),
+            "news_collection": True,  # Always available
+        },
+        "recommendations": _get_collection_recommendations(company),
+    }
+
+
+def _get_collection_recommendations(company) -> List[str]:
+    """Generate recommendations for improving collection for a company."""
+    recommendations = []
+
+    if not company.website:
+        recommendations.append(
+            "Add website URL to enable website-based leadership collection"
+        )
+    if not company.cik:
+        recommendations.append(
+            "Add SEC CIK to enable SEC filing-based leadership collection"
+        )
+    if company.website and company.last_crawled_date is None:
+        recommendations.append(
+            "Website configured but never crawled - run collection"
+        )
+    if company.cik and company.leadership_last_updated is None:
+        recommendations.append(
+            "CIK configured but SEC filings never parsed - run SEC collection"
+        )
+
+    if not recommendations:
+        recommendations.append("Company is fully configured for collection")
+
+    return recommendations
+
+
+@router.get("/test/batch-check")
+async def check_batch_readiness(
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """
+    Check collection readiness for multiple companies.
+
+    Returns summary of how many companies are ready for each collection type.
+    """
+    from app.core.people_models import IndustrialCompany
+    from sqlalchemy import func
+
+    # Count totals
+    total = db.query(func.count(IndustrialCompany.id)).scalar()
+    with_website = db.query(func.count(IndustrialCompany.id)).filter(
+        IndustrialCompany.website.isnot(None),
+        IndustrialCompany.website != "",
+    ).scalar()
+    with_cik = db.query(func.count(IndustrialCompany.id)).filter(
+        IndustrialCompany.cik.isnot(None),
+        IndustrialCompany.cik != "",
+    ).scalar()
+    never_crawled = db.query(func.count(IndustrialCompany.id)).filter(
+        IndustrialCompany.last_crawled_date.is_(None),
+    ).scalar()
+
+    # Get sample companies without website
+    missing_website = db.query(IndustrialCompany).filter(
+        IndustrialCompany.website.is_(None) | (IndustrialCompany.website == ""),
+    ).limit(5).all()
+
+    return {
+        "summary": {
+            "total_companies": total,
+            "with_website_url": with_website,
+            "with_sec_cik": with_cik,
+            "never_crawled": never_crawled,
+        },
+        "percentages": {
+            "website_ready": round(with_website / total * 100, 1) if total > 0 else 0,
+            "sec_ready": round(with_cik / total * 100, 1) if total > 0 else 0,
+        },
+        "sample_missing_website": [
+            {"id": c.id, "name": c.name} for c in missing_website
+        ],
+    }

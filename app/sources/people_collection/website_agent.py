@@ -79,17 +79,27 @@ class WebsiteAgent(BaseCollector):
             started_at=started_at,
         )
 
+        # Track page URLs for diagnostics
+        result.page_urls = []
+
         try:
             # Step 1: Find leadership pages
-            logger.info(f"Finding leadership pages for {company_name} at {website_url}")
+            logger.info(f"[WebsiteAgent] Finding leadership pages for {company_name} at {website_url}")
             pages = await self.page_finder.find_leadership_pages(website_url, max_pages)
 
             if not pages:
-                result.warnings.append("No leadership pages found")
-                logger.warning(f"No leadership pages found for {company_name}")
+                result.warnings.append(f"No leadership pages found at {website_url}")
+                logger.warning(
+                    f"[WebsiteAgent] No leadership pages found for {company_name}. "
+                    f"Tried URL patterns but none returned 200 OK. "
+                    f"Website may have non-standard structure or be JavaScript-rendered."
+                )
                 return self._finalize_result(result)
 
-            logger.info(f"Found {len(pages)} potential leadership pages for {company_name}")
+            logger.info(f"[WebsiteAgent] Found {len(pages)} potential leadership pages for {company_name}")
+            for page in pages:
+                logger.debug(f"[WebsiteAgent] Page: {page['url']} (type={page.get('page_type')}, score={page.get('score')})")
+                result.page_urls.append(page['url'])
 
             # Step 2: Extract people from each page
             all_people: List[ExtractedPerson] = []
@@ -99,6 +109,8 @@ class WebsiteAgent(BaseCollector):
                 page_url = page_info['url']
                 page_type = page_info.get('page_type', 'unknown')
 
+                logger.info(f"[WebsiteAgent] Extracting from page: {page_url}")
+
                 try:
                     page_result = await self._extract_from_page(
                         page_url, company_name, page_type
@@ -106,27 +118,52 @@ class WebsiteAgent(BaseCollector):
                     page_results.append(page_result)
                     all_people.extend(page_result.people)
 
+                    logger.info(
+                        f"[WebsiteAgent] Extracted {len(page_result.people)} people from {page_url} "
+                        f"(confidence={page_result.extraction_confidence})"
+                    )
+                    if page_result.extraction_notes:
+                        logger.debug(f"[WebsiteAgent] Notes: {page_result.extraction_notes}")
+
                 except Exception as e:
-                    logger.warning(f"Error extracting from {page_url}: {e}")
+                    logger.warning(f"[WebsiteAgent] Error extracting from {page_url}: {e}")
                     result.warnings.append(f"Failed to extract from {page_url}: {str(e)}")
 
             # Step 3: Deduplicate people
+            logger.info(f"[WebsiteAgent] Deduplicating {len(all_people)} raw extractions")
             unique_people = self._deduplicate_people(all_people)
+            logger.info(f"[WebsiteAgent] After dedup: {len(unique_people)} unique people")
 
             # Step 4: Validate and filter
             valid_people = self._validate_people(unique_people, company_name)
+            filtered_count = len(unique_people) - len(valid_people)
+            if filtered_count > 0:
+                logger.info(f"[WebsiteAgent] Validation filtered out {filtered_count} people")
 
             # Update result
             result.extracted_people = valid_people
             result.people_found = len(valid_people)
+            result.pages_checked = len(pages)
             result.success = len(valid_people) > 0
 
             if not valid_people:
-                result.warnings.append("No valid people extracted after filtering")
+                if len(all_people) == 0:
+                    result.warnings.append(
+                        "LLM extraction returned 0 people - page may be JS-rendered or format not recognized"
+                    )
+                elif len(unique_people) == 0:
+                    result.warnings.append(
+                        f"All {len(all_people)} extracted people were duplicates"
+                    )
+                else:
+                    result.warnings.append(
+                        f"All {len(unique_people)} people failed validation (name/title checks)"
+                    )
 
             logger.info(
-                f"Collected {len(valid_people)} people from {company_name} "
-                f"({len(all_people)} raw, {len(unique_people)} after dedup)"
+                f"[WebsiteAgent] Final result for {company_name}: "
+                f"{len(valid_people)} valid people "
+                f"(raw={len(all_people)}, deduped={len(unique_people)}, pages={len(pages)})"
             )
 
         except Exception as e:
@@ -143,51 +180,76 @@ class WebsiteAgent(BaseCollector):
         page_type: str,
     ) -> LeadershipPageResult:
         """Extract leadership data from a single page."""
-        logger.debug(f"Extracting from {page_url}")
+        logger.debug(f"[WebsiteAgent] Extracting from {page_url}")
 
         # Fetch page
         html = await self.fetch_url(page_url)
         if not html:
+            logger.warning(f"[WebsiteAgent] Failed to fetch page: {page_url}")
             return LeadershipPageResult(
                 company_name=company_name,
                 page_url=page_url,
                 page_type=page_type,
                 people=[],
                 extraction_confidence=ExtractionConfidence.LOW,
-                extraction_notes="Failed to fetch page",
+                extraction_notes="Failed to fetch page - may be blocked, timeout, or 404",
             )
+
+        logger.debug(f"[WebsiteAgent] Fetched {len(html)} bytes from {page_url}")
 
         # Clean HTML
         cleaned = self.html_cleaner.clean(html)
+        logger.debug(
+            f"[WebsiteAgent] Cleaned HTML: {len(cleaned.text)} chars, "
+            f"has_leadership_content={cleaned.has_leadership_content}"
+        )
 
         if not cleaned.has_leadership_content:
-            logger.debug(f"No leadership content detected at {page_url}")
+            logger.debug(f"[WebsiteAgent] No leadership keywords detected at {page_url}")
             # Still try extraction in case detection missed something
 
         # Try structured extraction first (faster, no LLM cost)
         structured_people = self._extract_structured(html, page_url, company_name)
+        logger.debug(f"[WebsiteAgent] Structured extraction found {len(structured_people)} people")
 
         # If structured extraction found people, use those
         if len(structured_people) >= 3:
-            logger.debug(f"Used structured extraction for {page_url}: {len(structured_people)} people")
+            logger.info(
+                f"[WebsiteAgent] Using structured extraction for {page_url}: "
+                f"{len(structured_people)} people (skipping LLM)"
+            )
             return LeadershipPageResult(
                 company_name=company_name,
                 page_url=page_url,
                 page_type=page_type,
                 people=structured_people,
                 extraction_confidence=ExtractionConfidence.MEDIUM,
-                extraction_notes="Structured extraction from HTML",
+                extraction_notes="Structured extraction from HTML cards/patterns",
             )
 
         # Fall back to LLM extraction
-        logger.debug(f"Using LLM extraction for {page_url}")
+        logger.info(f"[WebsiteAgent] Using LLM extraction for {page_url}")
         result = await self.llm_extractor.extract_leadership_from_html(
             cleaned.text, company_name, page_url
         )
 
+        logger.info(
+            f"[WebsiteAgent] LLM extraction result: {len(result.people)} people, "
+            f"confidence={result.extraction_confidence}"
+        )
+
+        if len(result.people) == 0:
+            logger.warning(
+                f"[WebsiteAgent] LLM returned 0 people for {page_url}. "
+                f"This could indicate: JS-rendered content, unusual HTML structure, "
+                f"or page doesn't actually contain leadership info. "
+                f"Cleaned text length: {len(cleaned.text)} chars"
+            )
+
         # Merge with structured results (LLM might find more)
         if structured_people:
             result.people = self._merge_people_lists(result.people, structured_people)
+            logger.debug(f"[WebsiteAgent] After merge: {len(result.people)} people")
 
         return result
 

@@ -8,8 +8,10 @@ and handles the full pipeline from collection to database storage.
 
 import asyncio
 import logging
+import traceback
 from datetime import datetime, date
 from typing import List, Optional, Dict, Any
+from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
@@ -33,6 +35,98 @@ from app.sources.people_collection.types import (
 from app.sources.people_collection.config import COLLECTION_SETTINGS
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class DiagnosticInfo:
+    """Diagnostic information for debugging collection issues."""
+    company_id: int
+    company_name: str
+
+    # Data availability
+    has_website: bool = False
+    website_url: Optional[str] = None
+    has_cik: bool = False
+    cik: Optional[str] = None
+
+    # Agent results
+    website_agent_ran: bool = False
+    website_pages_found: int = 0
+    website_pages_checked: List[str] = field(default_factory=list)
+    website_people_extracted: int = 0
+    website_errors: List[str] = field(default_factory=list)
+    website_duration_ms: int = 0
+
+    sec_agent_ran: bool = False
+    sec_filings_found: int = 0
+    sec_people_extracted: int = 0
+    sec_changes_extracted: int = 0
+    sec_errors: List[str] = field(default_factory=list)
+    sec_duration_ms: int = 0
+
+    news_agent_ran: bool = False
+    news_releases_found: int = 0
+    news_changes_extracted: int = 0
+    news_errors: List[str] = field(default_factory=list)
+    news_duration_ms: int = 0
+
+    # Storage results
+    people_stored_created: int = 0
+    people_stored_updated: int = 0
+    changes_stored: int = 0
+    storage_errors: List[str] = field(default_factory=list)
+
+    # Overall
+    total_duration_ms: int = 0
+    success: bool = False
+    failure_reason: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "company": {
+                "id": self.company_id,
+                "name": self.company_name,
+                "has_website": self.has_website,
+                "website_url": self.website_url,
+                "has_cik": self.has_cik,
+                "cik": self.cik,
+            },
+            "website_agent": {
+                "ran": self.website_agent_ran,
+                "pages_found": self.website_pages_found,
+                "pages_checked": self.website_pages_checked,
+                "people_extracted": self.website_people_extracted,
+                "errors": self.website_errors,
+                "duration_ms": self.website_duration_ms,
+            },
+            "sec_agent": {
+                "ran": self.sec_agent_ran,
+                "filings_found": self.sec_filings_found,
+                "people_extracted": self.sec_people_extracted,
+                "changes_extracted": self.sec_changes_extracted,
+                "errors": self.sec_errors,
+                "duration_ms": self.sec_duration_ms,
+            },
+            "news_agent": {
+                "ran": self.news_agent_ran,
+                "releases_found": self.news_releases_found,
+                "changes_extracted": self.news_changes_extracted,
+                "errors": self.news_errors,
+                "duration_ms": self.news_duration_ms,
+            },
+            "storage": {
+                "people_created": self.people_stored_created,
+                "people_updated": self.people_stored_updated,
+                "changes_stored": self.changes_stored,
+                "errors": self.storage_errors,
+            },
+            "summary": {
+                "total_duration_ms": self.total_duration_ms,
+                "success": self.success,
+                "failure_reason": self.failure_reason,
+            },
+        }
 
 
 class PeopleCollectionOrchestrator:
@@ -94,6 +188,7 @@ class PeopleCollectionOrchestrator:
             ).first()
 
             if not company:
+                logger.error(f"Company {company_id} not found in database")
                 return CollectionResult(
                     company_id=company_id,
                     company_name="Unknown",
@@ -102,6 +197,11 @@ class PeopleCollectionOrchestrator:
                     errors=[f"Company {company_id} not found"],
                     started_at=started_at,
                 )
+
+            logger.info(
+                f"Starting collection for {company.name} (id={company_id}): "
+                f"website={company.website}, cik={company.cik}, sources={sources}"
+            )
 
             result = CollectionResult(
                 company_id=company_id,
@@ -125,21 +225,39 @@ class PeopleCollectionOrchestrator:
             all_people: List[ExtractedPerson] = []
             all_changes: List[LeadershipChange] = []
 
-            if "website" in sources and company.website:
-                website_result = await self._collect_from_website(company, session)
-                all_people.extend(website_result.get("people", []))
-                result.errors.extend(website_result.get("errors", []))
+            if "website" in sources:
+                if company.website:
+                    logger.info(f"Running WebsiteAgent for {company.name}")
+                    website_result = await self._collect_from_website(company, session)
+                    people_count = len(website_result.get("people", []))
+                    all_people.extend(website_result.get("people", []))
+                    result.errors.extend(website_result.get("errors", []))
+                    logger.info(f"WebsiteAgent found {people_count} people for {company.name}")
+                else:
+                    logger.warning(f"Skipping WebsiteAgent for {company.name} - no website URL")
+                    result.warnings.append("No website URL configured")
 
-            if "sec" in sources and company.cik:
-                sec_result = await self._collect_from_sec(company, session)
-                all_people.extend(sec_result.get("people", []))
-                all_changes.extend(sec_result.get("changes", []))
-                result.errors.extend(sec_result.get("errors", []))
+            if "sec" in sources:
+                if company.cik:
+                    logger.info(f"Running SECAgent for {company.name} (CIK: {company.cik})")
+                    sec_result = await self._collect_from_sec(company, session)
+                    people_count = len(sec_result.get("people", []))
+                    changes_count = len(sec_result.get("changes", []))
+                    all_people.extend(sec_result.get("people", []))
+                    all_changes.extend(sec_result.get("changes", []))
+                    result.errors.extend(sec_result.get("errors", []))
+                    logger.info(f"SECAgent found {people_count} people, {changes_count} changes for {company.name}")
+                else:
+                    logger.warning(f"Skipping SECAgent for {company.name} - no CIK")
+                    result.warnings.append("No SEC CIK configured")
 
             if "news" in sources:
+                logger.info(f"Running NewsAgent for {company.name}")
                 news_result = await self._collect_from_news(company, session)
+                changes_count = len(news_result.get("changes", []))
                 all_changes.extend(news_result.get("changes", []))
                 result.errors.extend(news_result.get("errors", []))
+                logger.info(f"NewsAgent found {changes_count} changes for {company.name}")
 
             # Deduplicate and store people
             result.people_found = len(all_people)
@@ -533,6 +651,248 @@ class PeopleCollectionOrchestrator:
 
             except Exception as e:
                 logger.warning(f"Failed to store change: {e}")
+
+    async def collect_company_with_diagnostics(
+        self,
+        company_id: int,
+        sources: List[str] = None,
+    ) -> DiagnosticInfo:
+        """
+        Collect leadership data with full diagnostic information.
+
+        This method is identical to collect_company but returns detailed
+        diagnostic info for debugging why collections may fail.
+
+        Args:
+            company_id: Database ID of the company
+            sources: List of sources to collect from
+
+        Returns:
+            DiagnosticInfo with detailed collection diagnostics
+        """
+        if sources is None:
+            sources = ["website"]
+
+        session = self._get_session()
+        started_at = datetime.utcnow()
+
+        # Initialize diagnostics
+        diag = DiagnosticInfo(company_id=company_id, company_name="Unknown")
+
+        try:
+            # Get company
+            company = session.query(IndustrialCompany).filter(
+                IndustrialCompany.id == company_id
+            ).first()
+
+            if not company:
+                diag.failure_reason = f"Company {company_id} not found in database"
+                logger.error(f"[DIAG] {diag.failure_reason}")
+                return diag
+
+            diag.company_name = company.name
+            diag.has_website = bool(company.website)
+            diag.website_url = company.website
+            diag.has_cik = bool(company.cik)
+            diag.cik = company.cik
+
+            logger.info(f"[DIAG] Starting collection for {company.name} (id={company_id})")
+            logger.info(f"[DIAG] Company data: website={company.website}, cik={company.cik}")
+            logger.info(f"[DIAG] Sources requested: {sources}")
+
+            all_people: List[ExtractedPerson] = []
+            all_changes: List[LeadershipChange] = []
+
+            # Website collection
+            if "website" in sources:
+                if company.website:
+                    logger.info(f"[DIAG] Running WebsiteAgent for {company.name}")
+                    agent_start = datetime.utcnow()
+                    diag.website_agent_ran = True
+
+                    try:
+                        website_result = await self._collect_from_website_with_diag(
+                            company, session, diag
+                        )
+                        all_people.extend(website_result.get("people", []))
+                        diag.website_people_extracted = len(website_result.get("people", []))
+                        diag.website_errors = website_result.get("errors", [])
+
+                        logger.info(
+                            f"[DIAG] WebsiteAgent completed: "
+                            f"{diag.website_pages_found} pages found, "
+                            f"{diag.website_people_extracted} people extracted"
+                        )
+
+                    except Exception as e:
+                        error_msg = f"WebsiteAgent exception: {str(e)}\n{traceback.format_exc()}"
+                        diag.website_errors.append(error_msg)
+                        logger.error(f"[DIAG] {error_msg}")
+
+                    diag.website_duration_ms = int(
+                        (datetime.utcnow() - agent_start).total_seconds() * 1000
+                    )
+                else:
+                    logger.warning(f"[DIAG] Skipping WebsiteAgent - company has no website URL")
+                    diag.website_errors.append("Company has no website URL configured")
+
+            # SEC collection
+            if "sec" in sources:
+                if company.cik:
+                    logger.info(f"[DIAG] Running SECAgent for {company.name} (CIK: {company.cik})")
+                    agent_start = datetime.utcnow()
+                    diag.sec_agent_ran = True
+
+                    try:
+                        sec_result = await self._collect_from_sec(company, session)
+                        all_people.extend(sec_result.get("people", []))
+                        all_changes.extend(sec_result.get("changes", []))
+                        diag.sec_people_extracted = len(sec_result.get("people", []))
+                        diag.sec_changes_extracted = len(sec_result.get("changes", []))
+                        diag.sec_errors = sec_result.get("errors", [])
+
+                        logger.info(
+                            f"[DIAG] SECAgent completed: "
+                            f"{diag.sec_people_extracted} people, "
+                            f"{diag.sec_changes_extracted} changes"
+                        )
+
+                    except Exception as e:
+                        error_msg = f"SECAgent exception: {str(e)}\n{traceback.format_exc()}"
+                        diag.sec_errors.append(error_msg)
+                        logger.error(f"[DIAG] {error_msg}")
+
+                    diag.sec_duration_ms = int(
+                        (datetime.utcnow() - agent_start).total_seconds() * 1000
+                    )
+                else:
+                    logger.warning(f"[DIAG] Skipping SECAgent - company has no CIK")
+                    diag.sec_errors.append("Company has no SEC CIK configured")
+
+            # News collection
+            if "news" in sources:
+                logger.info(f"[DIAG] Running NewsAgent for {company.name}")
+                agent_start = datetime.utcnow()
+                diag.news_agent_ran = True
+
+                try:
+                    news_result = await self._collect_from_news(company, session)
+                    all_changes.extend(news_result.get("changes", []))
+                    diag.news_changes_extracted = len(news_result.get("changes", []))
+                    diag.news_errors = news_result.get("errors", [])
+
+                    logger.info(
+                        f"[DIAG] NewsAgent completed: "
+                        f"{diag.news_changes_extracted} changes"
+                    )
+
+                except Exception as e:
+                    error_msg = f"NewsAgent exception: {str(e)}\n{traceback.format_exc()}"
+                    diag.news_errors.append(error_msg)
+                    logger.error(f"[DIAG] {error_msg}")
+
+                diag.news_duration_ms = int(
+                    (datetime.utcnow() - agent_start).total_seconds() * 1000
+                )
+
+            # Store results
+            logger.info(f"[DIAG] Storing {len(all_people)} people, {len(all_changes)} changes")
+
+            try:
+                stored = await self._store_people(all_people, company, session)
+                diag.people_stored_created = stored["created"]
+                diag.people_stored_updated = stored["updated"]
+                session.commit()
+
+                logger.info(
+                    f"[DIAG] Stored: {diag.people_stored_created} created, "
+                    f"{diag.people_stored_updated} updated"
+                )
+
+            except Exception as e:
+                error_msg = f"Storage exception: {str(e)}\n{traceback.format_exc()}"
+                diag.storage_errors.append(error_msg)
+                logger.error(f"[DIAG] {error_msg}")
+                session.rollback()
+
+            # Determine success
+            total_people = diag.website_people_extracted + diag.sec_people_extracted
+            diag.success = total_people > 0 or not diag.website_errors
+
+            if not diag.success:
+                if not diag.has_website and not diag.has_cik:
+                    diag.failure_reason = "Company has neither website nor CIK configured"
+                elif diag.website_errors:
+                    diag.failure_reason = f"Website collection failed: {diag.website_errors[0]}"
+                else:
+                    diag.failure_reason = "No people found from any source"
+
+            diag.total_duration_ms = int(
+                (datetime.utcnow() - started_at).total_seconds() * 1000
+            )
+
+            logger.info(
+                f"[DIAG] Collection completed for {company.name}: "
+                f"success={diag.success}, people={total_people}, "
+                f"duration={diag.total_duration_ms}ms"
+            )
+
+            return diag
+
+        except Exception as e:
+            diag.failure_reason = f"Unexpected error: {str(e)}"
+            logger.exception(f"[DIAG] Unexpected error collecting {company_id}: {e}")
+            return diag
+
+        finally:
+            if not self._provided_session:
+                session.close()
+
+    async def _collect_from_website_with_diag(
+        self,
+        company: IndustrialCompany,
+        session: Session,
+        diag: DiagnosticInfo,
+    ) -> Dict[str, Any]:
+        """Collect from website with diagnostic tracking."""
+        try:
+            from app.sources.people_collection.website_agent import WebsiteAgent
+
+            if self._website_agent is None:
+                self._website_agent = WebsiteAgent()
+
+            logger.info(f"[DIAG] WebsiteAgent collecting from {company.website}")
+
+            result = await self._website_agent.collect(
+                company_id=company.id,
+                company_name=company.name,
+                website_url=company.website,
+            )
+
+            # Extract diagnostic info from result
+            diag.website_pages_found = getattr(result, 'pages_checked', 0)
+            if hasattr(result, 'page_urls'):
+                diag.website_pages_checked = result.page_urls or []
+
+            logger.info(
+                f"[DIAG] WebsiteAgent raw result: "
+                f"people={len(result.extracted_people)}, "
+                f"errors={result.errors}, "
+                f"warnings={result.warnings}"
+            )
+
+            return {
+                "people": result.extracted_people,
+                "errors": result.errors + result.warnings,
+            }
+
+        except ImportError as e:
+            logger.error(f"[DIAG] WebsiteAgent import error: {e}")
+            return {"people": [], "errors": [f"WebsiteAgent not available: {e}"]}
+
+        except Exception as e:
+            logger.exception(f"[DIAG] WebsiteAgent collection error: {e}")
+            return {"people": [], "errors": [f"WebsiteAgent error: {str(e)}"]}
 
     async def refresh_company(
         self,
