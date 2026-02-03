@@ -68,16 +68,18 @@ class ThreePLCollector(BaseCollector):
         try:
             logger.info("Collecting 3PL company data...")
 
-            all_companies = []
-
             # Collect from Transport Topics
             companies_result = await self._collect_companies(config)
-            all_companies.extend(companies_result.get("records", []))
+            all_companies = companies_result.get("records", [])
 
-            # If no data from web, use sample data
             if not all_companies:
-                logger.info("Using sample 3PL company data")
-                all_companies = self._get_sample_companies()
+                logger.warning("No 3PL company data retrieved from sources")
+                return self.create_result(
+                    status=CollectionStatus.SUCCESS,
+                    total=0,
+                    processed=0,
+                    inserted=0,
+                )
 
             # Transform and insert records
             records = []
@@ -131,6 +133,9 @@ class ThreePLCollector(BaseCollector):
     async def _collect_companies(self, config: CollectionConfig) -> Dict[str, Any]:
         """
         Collect 3PL company data from Transport Topics and other sources.
+
+        TODO: Implement actual scraping with Playwright for JS-rendered content.
+        Transport Topics Top 100: https://www.ttnews.com/top100/logistics
         """
         try:
             client = await self.get_client()
@@ -139,12 +144,17 @@ class ThreePLCollector(BaseCollector):
             await self.apply_rate_limit()
 
             try:
-                # Would scrape Transport Topics Top 100 page
+                # Attempt to fetch Transport Topics Top 100 page
+                # Note: This page requires JS rendering - needs Playwright implementation
                 response = await client.get("/top-100-logistics-companies")
 
                 if response.status_code == 200:
-                    # Would parse HTML for company data
-                    pass
+                    # TODO: Parse HTML for company data
+                    # This requires implementing HTML parsing or using Playwright
+                    # for JS-rendered content
+                    logger.info("Transport Topics page fetched - parsing not yet implemented")
+                else:
+                    logger.warning(f"Transport Topics returned {response.status_code}")
 
             except Exception as e:
                 logger.warning(f"Could not fetch from Transport Topics: {e}")
@@ -154,353 +164,6 @@ class ThreePLCollector(BaseCollector):
         except Exception as e:
             logger.error(f"Failed to collect companies: {e}", exc_info=True)
             return {"records": [], "error": str(e)}
-
-    def _get_sample_companies(self) -> List[Dict[str, Any]]:
-        """Generate sample 3PL company data based on industry rankings."""
-
-        # Top 3PL companies (approximate data based on public information)
-        companies = [
-            {
-                "company_name": "C.H. Robinson Worldwide",
-                "headquarters_city": "Eden Prairie",
-                "headquarters_state": "MN",
-                "website": "https://www.chrobinson.com",
-                "annual_revenue_million": 23500,
-                "revenue_year": 2023,
-                "employee_count": 15000,
-                "facility_count": 275,
-                "services": ["freight_brokerage", "transportation", "global_forwarding", "managed_services"],
-                "industries_served": ["retail", "manufacturing", "food_beverage", "automotive"],
-                "regions_served": ["North America", "Europe", "Asia Pacific", "Latin America"],
-                "states_coverage": ["MN", "TX", "CA", "IL", "OH", "PA", "GA", "FL", "NY", "WA"],
-                "transport_topics_rank": 1,
-                "armstrong_rank": 1,
-                "has_cold_chain": True,
-                "has_hazmat": True,
-                "has_ecommerce_fulfillment": True,
-                "has_cross_dock": True,
-                "is_asset_based": False,
-                "is_non_asset": True,
-            },
-            {
-                "company_name": "XPO Inc.",
-                "parent_company": "XPO Logistics",
-                "headquarters_city": "Greenwich",
-                "headquarters_state": "CT",
-                "website": "https://www.xpo.com",
-                "annual_revenue_million": 12200,
-                "revenue_year": 2023,
-                "employee_count": 38000,
-                "facility_count": 500,
-                "services": ["ltl", "truckload", "last_mile", "managed_transportation"],
-                "industries_served": ["retail", "ecommerce", "industrial", "manufacturing"],
-                "regions_served": ["North America", "Europe"],
-                "states_coverage": ["CT", "TX", "CA", "FL", "OH", "IL", "PA", "GA", "NC", "MI"],
-                "transport_topics_rank": 2,
-                "armstrong_rank": 4,
-                "has_cold_chain": False,
-                "has_hazmat": True,
-                "has_ecommerce_fulfillment": True,
-                "has_cross_dock": True,
-                "is_asset_based": True,
-                "is_non_asset": False,
-            },
-            {
-                "company_name": "UPS Supply Chain Solutions",
-                "parent_company": "United Parcel Service",
-                "headquarters_city": "Atlanta",
-                "headquarters_state": "GA",
-                "website": "https://www.ups.com/supplychain",
-                "annual_revenue_million": 11500,
-                "revenue_year": 2023,
-                "employee_count": 45000,
-                "facility_count": 1000,
-                "services": ["warehousing", "fulfillment", "freight_forwarding", "customs_brokerage"],
-                "industries_served": ["healthcare", "retail", "technology", "industrial"],
-                "regions_served": ["Global"],
-                "states_coverage": ["GA", "KY", "TX", "CA", "NJ", "PA", "OH", "IL", "FL", "NY"],
-                "transport_topics_rank": 3,
-                "armstrong_rank": 2,
-                "has_cold_chain": True,
-                "has_hazmat": True,
-                "has_ecommerce_fulfillment": True,
-                "has_cross_dock": True,
-                "is_asset_based": True,
-                "is_non_asset": False,
-            },
-            {
-                "company_name": "J.B. Hunt Transport Services",
-                "headquarters_city": "Lowell",
-                "headquarters_state": "AR",
-                "website": "https://www.jbhunt.com",
-                "annual_revenue_million": 12000,
-                "revenue_year": 2023,
-                "employee_count": 35000,
-                "facility_count": 350,
-                "services": ["intermodal", "dedicated", "truckload", "brokerage", "final_mile"],
-                "industries_served": ["retail", "manufacturing", "consumer_goods"],
-                "regions_served": ["North America"],
-                "states_coverage": ["AR", "TX", "CA", "IL", "OH", "PA", "GA", "NC", "TN", "MO"],
-                "transport_topics_rank": 4,
-                "armstrong_rank": 5,
-                "has_cold_chain": True,
-                "has_hazmat": True,
-                "has_ecommerce_fulfillment": True,
-                "has_cross_dock": True,
-                "is_asset_based": True,
-                "is_non_asset": False,
-            },
-            {
-                "company_name": "FedEx Logistics",
-                "parent_company": "FedEx Corporation",
-                "headquarters_city": "Memphis",
-                "headquarters_state": "TN",
-                "website": "https://www.fedex.com/logistics",
-                "annual_revenue_million": 10500,
-                "revenue_year": 2023,
-                "employee_count": 30000,
-                "facility_count": 650,
-                "services": ["freight_forwarding", "customs_brokerage", "warehousing", "fulfillment"],
-                "industries_served": ["healthcare", "technology", "industrial", "retail"],
-                "regions_served": ["Global"],
-                "states_coverage": ["TN", "TX", "CA", "IL", "PA", "OH", "GA", "FL", "NY", "NJ"],
-                "transport_topics_rank": 5,
-                "armstrong_rank": 3,
-                "has_cold_chain": True,
-                "has_hazmat": True,
-                "has_ecommerce_fulfillment": True,
-                "has_cross_dock": True,
-                "is_asset_based": True,
-                "is_non_asset": False,
-            },
-            {
-                "company_name": "DHL Supply Chain",
-                "parent_company": "Deutsche Post DHL Group",
-                "headquarters_city": "Westerville",
-                "headquarters_state": "OH",
-                "website": "https://www.dhl.com/supplychain",
-                "annual_revenue_million": 9800,
-                "revenue_year": 2023,
-                "employee_count": 50000,
-                "facility_count": 500,
-                "services": ["warehousing", "transportation", "value_added_services", "returns_management"],
-                "industries_served": ["retail", "technology", "automotive", "healthcare", "consumer"],
-                "regions_served": ["Global"],
-                "states_coverage": ["OH", "CA", "TX", "IL", "PA", "GA", "FL", "NJ", "NY", "MI"],
-                "transport_topics_rank": 6,
-                "armstrong_rank": 6,
-                "has_cold_chain": True,
-                "has_hazmat": True,
-                "has_ecommerce_fulfillment": True,
-                "has_cross_dock": True,
-                "is_asset_based": True,
-                "is_non_asset": False,
-            },
-            {
-                "company_name": "Ryder System",
-                "headquarters_city": "Miami",
-                "headquarters_state": "FL",
-                "website": "https://www.ryder.com",
-                "annual_revenue_million": 9500,
-                "revenue_year": 2023,
-                "employee_count": 40000,
-                "facility_count": 800,
-                "services": ["dedicated_transportation", "fleet_management", "warehousing", "last_mile"],
-                "industries_served": ["retail", "industrial", "automotive", "food_beverage"],
-                "regions_served": ["North America"],
-                "states_coverage": ["FL", "TX", "CA", "GA", "IL", "OH", "PA", "MI", "NC", "TN"],
-                "transport_topics_rank": 7,
-                "armstrong_rank": 8,
-                "has_cold_chain": True,
-                "has_hazmat": True,
-                "has_ecommerce_fulfillment": True,
-                "has_cross_dock": True,
-                "is_asset_based": True,
-                "is_non_asset": False,
-            },
-            {
-                "company_name": "Kuehne + Nagel",
-                "parent_company": "Kuehne + Nagel International AG",
-                "headquarters_city": "Jersey City",
-                "headquarters_state": "NJ",
-                "website": "https://www.kuehne-nagel.com",
-                "annual_revenue_million": 8500,
-                "revenue_year": 2023,
-                "employee_count": 20000,
-                "facility_count": 200,
-                "services": ["ocean_freight", "air_freight", "road_logistics", "contract_logistics"],
-                "industries_served": ["pharma", "aerospace", "automotive", "consumer", "industrial"],
-                "regions_served": ["Global"],
-                "states_coverage": ["NJ", "CA", "TX", "IL", "GA", "FL", "NY", "OH", "PA", "WA"],
-                "transport_topics_rank": 8,
-                "armstrong_rank": 7,
-                "has_cold_chain": True,
-                "has_hazmat": True,
-                "has_ecommerce_fulfillment": True,
-                "has_cross_dock": True,
-                "is_asset_based": False,
-                "is_non_asset": True,
-            },
-            {
-                "company_name": "Expeditors International",
-                "headquarters_city": "Seattle",
-                "headquarters_state": "WA",
-                "website": "https://www.expeditors.com",
-                "annual_revenue_million": 8200,
-                "revenue_year": 2023,
-                "employee_count": 18000,
-                "facility_count": 350,
-                "services": ["ocean_forwarding", "air_forwarding", "customs_brokerage", "order_management"],
-                "industries_served": ["retail", "technology", "aerospace", "oil_gas"],
-                "regions_served": ["Global"],
-                "states_coverage": ["WA", "CA", "TX", "IL", "NY", "NJ", "GA", "OH", "MI", "PA"],
-                "transport_topics_rank": 9,
-                "armstrong_rank": 9,
-                "has_cold_chain": True,
-                "has_hazmat": True,
-                "has_ecommerce_fulfillment": True,
-                "has_cross_dock": True,
-                "is_asset_based": False,
-                "is_non_asset": True,
-            },
-            {
-                "company_name": "Coyote Logistics",
-                "parent_company": "UPS",
-                "headquarters_city": "Chicago",
-                "headquarters_state": "IL",
-                "website": "https://www.coyote.com",
-                "annual_revenue_million": 5500,
-                "revenue_year": 2023,
-                "employee_count": 4500,
-                "facility_count": 35,
-                "services": ["freight_brokerage", "ltl", "intermodal", "managed_transportation"],
-                "industries_served": ["retail", "manufacturing", "food_beverage", "consumer"],
-                "regions_served": ["North America"],
-                "states_coverage": ["IL", "TX", "CA", "GA", "OH", "PA", "FL", "NC", "MO", "IN"],
-                "transport_topics_rank": 10,
-                "armstrong_rank": 12,
-                "has_cold_chain": True,
-                "has_hazmat": True,
-                "has_ecommerce_fulfillment": False,
-                "has_cross_dock": True,
-                "is_asset_based": False,
-                "is_non_asset": True,
-            },
-            {
-                "company_name": "GEODIS",
-                "parent_company": "SNCF Group",
-                "headquarters_city": "Brentwood",
-                "headquarters_state": "TN",
-                "website": "https://www.geodis.com",
-                "annual_revenue_million": 5200,
-                "revenue_year": 2023,
-                "employee_count": 10000,
-                "facility_count": 175,
-                "services": ["freight_forwarding", "contract_logistics", "distribution", "road_transport"],
-                "industries_served": ["technology", "automotive", "retail", "healthcare"],
-                "regions_served": ["Global"],
-                "states_coverage": ["TN", "CA", "TX", "IL", "GA", "PA", "OH", "NJ", "MI", "KY"],
-                "transport_topics_rank": 11,
-                "armstrong_rank": 11,
-                "has_cold_chain": True,
-                "has_hazmat": True,
-                "has_ecommerce_fulfillment": True,
-                "has_cross_dock": True,
-                "is_asset_based": True,
-                "is_non_asset": False,
-            },
-            {
-                "company_name": "NFI Industries",
-                "headquarters_city": "Camden",
-                "headquarters_state": "NJ",
-                "website": "https://www.nfiindustries.com",
-                "annual_revenue_million": 4800,
-                "revenue_year": 2023,
-                "employee_count": 14500,
-                "facility_count": 400,
-                "services": ["dedicated_transportation", "warehousing", "intermodal", "real_estate"],
-                "industries_served": ["retail", "manufacturing", "food_beverage", "consumer_goods"],
-                "regions_served": ["North America"],
-                "states_coverage": ["NJ", "CA", "TX", "PA", "IL", "GA", "FL", "OH", "NC", "TN"],
-                "transport_topics_rank": 12,
-                "armstrong_rank": 14,
-                "has_cold_chain": True,
-                "has_hazmat": True,
-                "has_ecommerce_fulfillment": True,
-                "has_cross_dock": True,
-                "is_asset_based": True,
-                "is_non_asset": False,
-            },
-            {
-                "company_name": "Echo Global Logistics",
-                "parent_company": "The Jordan Company",
-                "headquarters_city": "Chicago",
-                "headquarters_state": "IL",
-                "website": "https://www.echo.com",
-                "annual_revenue_million": 4500,
-                "revenue_year": 2023,
-                "employee_count": 3200,
-                "facility_count": 30,
-                "services": ["freight_brokerage", "managed_transportation", "ltl", "intermodal"],
-                "industries_served": ["retail", "manufacturing", "food_beverage", "industrial"],
-                "regions_served": ["North America"],
-                "states_coverage": ["IL", "TX", "CA", "GA", "OH", "PA", "FL", "NC", "MI", "MO"],
-                "transport_topics_rank": 13,
-                "armstrong_rank": 16,
-                "has_cold_chain": True,
-                "has_hazmat": True,
-                "has_ecommerce_fulfillment": False,
-                "has_cross_dock": True,
-                "is_asset_based": False,
-                "is_non_asset": True,
-            },
-            {
-                "company_name": "Americold Logistics",
-                "headquarters_city": "Atlanta",
-                "headquarters_state": "GA",
-                "website": "https://www.americold.com",
-                "annual_revenue_million": 3100,
-                "revenue_year": 2023,
-                "employee_count": 15000,
-                "facility_count": 245,
-                "services": ["cold_storage", "transportation", "value_added_services"],
-                "industries_served": ["food_beverage", "retail", "foodservice"],
-                "regions_served": ["North America", "Europe", "Asia Pacific", "South America"],
-                "states_coverage": ["GA", "CA", "TX", "FL", "PA", "WA", "IL", "OH", "NC", "WI"],
-                "transport_topics_rank": 14,
-                "armstrong_rank": 18,
-                "has_cold_chain": True,
-                "has_hazmat": False,
-                "has_ecommerce_fulfillment": True,
-                "has_cross_dock": True,
-                "is_asset_based": True,
-                "is_non_asset": False,
-            },
-            {
-                "company_name": "Lineage Logistics",
-                "headquarters_city": "Novi",
-                "headquarters_state": "MI",
-                "website": "https://www.lineagelogistics.com",
-                "annual_revenue_million": 5000,
-                "revenue_year": 2023,
-                "employee_count": 25000,
-                "facility_count": 480,
-                "services": ["cold_storage", "transportation", "fulfillment", "technology_solutions"],
-                "industries_served": ["food_beverage", "retail", "pharma", "foodservice"],
-                "regions_served": ["Global"],
-                "states_coverage": ["MI", "CA", "TX", "PA", "OH", "GA", "WA", "IL", "FL", "NC"],
-                "transport_topics_rank": 15,
-                "armstrong_rank": 15,
-                "has_cold_chain": True,
-                "has_hazmat": False,
-                "has_ecommerce_fulfillment": True,
-                "has_cross_dock": True,
-                "is_asset_based": True,
-                "is_non_asset": False,
-            },
-        ]
-
-        return companies
 
     def _transform_company(self, company: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Transform raw company data to database format."""

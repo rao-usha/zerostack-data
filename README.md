@@ -376,10 +376,114 @@ pytest tests/test_llm_client.py -v
 
 ---
 
+## 3PL Data Collection Status
+
+### What's Implemented ✅
+
+| Component | Status | Description |
+|-----------|--------|-------------|
+| **Database Model** | ✅ Complete | `ThreePLCompany` table with 25+ fields |
+| **API Endpoints** | ✅ Complete | Search and coverage endpoints |
+| **Collector Framework** | ✅ Complete | `ThreePLCollector` with transform logic |
+
+**Database Fields Available:**
+- Company basics: name, parent company, HQ location, website
+- Financials: revenue, employees, facility count
+- Services: JSON array (warehousing, transportation, fulfillment, etc.)
+- Industries: JSON array (retail, manufacturing, automotive, etc.)
+- Geographic coverage: regions, states, countries
+- Rankings: Armstrong & Associates, Transport Topics
+- Capabilities: cold chain, hazmat, e-commerce, cross-dock, asset model
+
+**API Endpoints:**
+```
+GET /api/v1/site-intel/logistics/3pl-companies
+    ?state=TX
+    &has_cold_chain=true
+    &min_revenue=1000
+    &limit=50
+
+GET /api/v1/site-intel/logistics/3pl-companies/{company_id}/coverage
+```
+
+### What's Needed 🔴
+
+| Task | Priority | Notes |
+|------|----------|-------|
+| **Remove sample data** | P0 | `_get_sample_companies()` in collector needs removal |
+| **Real data sources** | P0 | See data source options below |
+| **Contact enrichment** | P1 | Executive contacts, sales contacts |
+| **Technology data** | P2 | TMS/WMS vendors, integrations |
+| **Certifications** | P2 | C-TPAT, ISO, SmartWay, etc. |
+
+### Potential Data Sources
+
+| Source | Type | Access | Coverage |
+|--------|------|--------|----------|
+| **Transport Topics Top 100** | Web scraping | Free (JS render) | Top 100 by revenue |
+| **Armstrong & Associates** | API/Subscription | Paid (~$2K/yr) | Top 50 global 3PLs |
+| **SEC EDGAR** | API | Free | Public 3PLs only (XPO, CHR, JBHT, etc.) |
+| **FreightWaves SONAR** | API | Paid | Market data, limited company profiles |
+| **LinkedIn Sales Navigator** | API | Paid | Contact data, company profiles |
+| **ZoomInfo/Apollo** | API | Paid | Contact data enrichment |
+| **Crunchbase** | API | Freemium | Funding, M&A, company profiles |
+
+### Recommended Next Steps
+
+1. **Phase 1: Public Data** (No cost)
+   - Implement Transport Topics scraping with Playwright
+   - Pull SEC filings for public 3PLs (XPO, C.H. Robinson, J.B. Hunt, etc.)
+   - Scrape company websites for basic info
+
+2. **Phase 2: Enrichment** (API costs)
+   - Evaluate Armstrong & Associates subscription
+   - Add Crunchbase for funding/M&A data
+   - Consider ZoomInfo for contact enrichment
+
+3. **Phase 3: Real-time** (Future)
+   - FreightWaves integration for market signals
+   - News monitoring for M&A, capacity changes
+
+---
+
+## Site Intelligence Platform Status
+
+### Collectors Working ✅
+
+| Collector | Source | Records | Notes |
+|-----------|--------|---------|-------|
+| EIA Electricity | EIA API | 500+ | State average prices by sector |
+| USGS Water | USGS API | 1,780+ | Monitoring sites with real-time data |
+| EIA Power | EIA API | 24+ | Electricity prices (plants API needs fix) |
+
+### Collectors Needing Updates 🔴
+
+| Collector | Issue | Fix Needed |
+|-----------|-------|------------|
+| **HIFLD Substations** | API URL invalid | Find new ArcGIS endpoint |
+| **EPA SDWIS** | Table not available | EPA reorganized API - find new table |
+| **EIA Gas** | API returns 400 | Update API parameters |
+| **OpenEI URDB** | Returns 403 | Check API access/rate limits |
+
+### Sample Data Removed ✅
+
+All synthetic/sample data has been removed from collectors for training data purity:
+- `eia_collector.py` (power)
+- `hifld_collector.py` (power)
+- `usgs_water_collector.py`
+- `epa_sdwis_collector.py`
+- `eia_gas_collector.py`
+- `openei_rates_collector.py`
+- `eia_electricity_collector.py`
+- `three_pl_collector.py` (logistics)
+
+---
+
 ## What's Next
 
 ### Remaining Tasks
-1. **T19 - Public API with Auth** - API keys and rate limits for external access (in progress)
+1. **Fix broken collectors** - Update API endpoints for HIFLD, EPA, EIA Gas, OpenEI
+2. **Implement 3PL real data** - Transport Topics scraping with Playwright, SEC enrichment
 
 ### Future Enhancements
 - Response caching with Redis
