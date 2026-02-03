@@ -703,6 +703,7 @@ class NewsAgent(BaseCollector):
                         title_elem = item.find('title')
                         link_elem = item.find('link')
                         pub_date_elem = item.find('pubDate')
+                        source_elem = item.find('source')
 
                         if not title_elem or not link_elem:
                             continue
@@ -710,26 +711,53 @@ class NewsAgent(BaseCollector):
                         title_text = title_elem.get_text(strip=True)
                         raw_link = link_elem.get_text(strip=True)
 
+                        # Get source info (domain of original article)
+                        source_name = source_elem.get_text(strip=True) if source_elem else None
+                        source_url = source_elem.get('url') if source_elem else None
+                        logger.debug(f"[NewsAgent] Source: {source_name} - {source_url}")
+
                         # Check relevance first (before URL processing)
                         if not self._is_leadership_related(title_text):
                             continue
 
                         articles_found += 1
 
-                        # Decode Google News redirect URL to get actual article URL
-                        link_url = self._decode_google_news_url(raw_link)
-                        if not link_url:
-                            link_url = raw_link  # Fallback to original URL
+                        # Try to get the actual article URL
+                        # Strategy 1: If source is a known PR service, search there directly
+                        link_url = None
+                        if source_url:
+                            source_domain = source_url.rstrip('/')
+                            # For Business Wire, PR Newswire, etc. - go directly to their site
+                            if 'businesswire.com' in source_domain:
+                                # Business Wire: search for exact title
+                                search_title = title_text.split(' - ')[0].strip()[:60]
+                                link_url = f"https://www.businesswire.com/news/home/?searchTerm={quote_plus(search_title)}"
+                            elif 'prnewswire.com' in source_domain:
+                                search_title = title_text.split(' - ')[0].strip()[:60]
+                                link_url = f"https://www.prnewswire.com/search/news/?keyword={quote_plus(search_title)}"
+                            elif 'globenewswire.com' in source_domain:
+                                search_title = title_text.split(' - ')[0].strip()[:60]
+                                link_url = f"https://www.globenewswire.com/en/search/tag/{quote_plus(search_title)}"
 
-                        # If still a Google URL, try following the redirect
-                        if 'news.google.com' in link_url:
-                            real_url = await self._follow_google_redirect(link_url)
-                            if real_url:
+                        # Strategy 2: Try decoding the Google News URL
+                        if not link_url or 'news.google.com' in (link_url or ''):
+                            decoded_url = self._decode_google_news_url(raw_link)
+                            if decoded_url and 'news.google.com' not in decoded_url:
+                                link_url = decoded_url
+
+                        # Strategy 3: Follow redirect (last resort)
+                        if not link_url or 'news.google.com' in link_url:
+                            real_url = await self._follow_google_redirect(raw_link)
+                            if real_url and 'news.google.com' not in real_url:
                                 link_url = real_url
-                            # If redirect fails, still try to fetch - aiohttp might handle it
+
+                        # If still no URL, use source_url as base (won't have article but might help)
+                        if not link_url or 'news.google.com' in link_url:
+                            link_url = source_url if source_url else raw_link
 
                         logger.info(f"[NewsAgent] Google News article: {title_text[:50]}")
-                        logger.info(f"[NewsAgent] Article URL: {link_url[:80]}")
+                        logger.info(f"[NewsAgent] Source: {source_name or 'unknown'}")
+                        logger.info(f"[NewsAgent] Article URL: {link_url[:80] if link_url else 'none'}")
 
                         # Parse date if available
                         pub_date = None
@@ -744,8 +772,9 @@ class NewsAgent(BaseCollector):
                                 pass
 
                         # Check if it's from a trusted PR distribution service
+                        check_url = (link_url or '') + (source_url or '')
                         is_pr_service = any(
-                            domain in link_url.lower()
+                            domain in check_url.lower()
                             for domain in self.PR_DISTRIBUTION_DOMAINS
                         )
 
@@ -753,9 +782,9 @@ class NewsAgent(BaseCollector):
                         # Limit to first 5 non-PR articles to avoid overload
                         should_parse = is_pr_service or articles_parsed < 5
 
-                        if should_parse:
+                        if should_parse and link_url:
                             source_type = "pr_service" if is_pr_service else "news_article"
-                            logger.debug(f"[NewsAgent] Fetching {source_type}: {link_url[:60]}")
+                            logger.info(f"[NewsAgent] Fetching {source_type}: {link_url[:60]}")
                             result.pages_checked += 1
                             result.page_urls.append(link_url)
 
@@ -1109,10 +1138,10 @@ class NewsAgent(BaseCollector):
         """
         Decode a Google News RSS URL to get the actual article URL.
 
-        Google News RSS wraps article URLs in their redirect system.
-        The format is: https://news.google.com/rss/articles/CBMi[base64]...
+        Google News RSS wraps article URLs in their redirect system using protobuf.
+        The format is: https://news.google.com/rss/articles/[protobuf-encoded-data]
 
-        This method extracts the real article URL.
+        This method tries multiple decoding strategies.
         """
         if not google_url:
             return None
@@ -1122,41 +1151,56 @@ class NewsAgent(BaseCollector):
             return google_url
 
         try:
-            # Method 1: Try to extract from the URL path
-            # Google News URLs contain base64-encoded data after /articles/
             if '/articles/' in google_url:
-                # Extract the encoded part
                 encoded_part = google_url.split('/articles/')[-1].split('?')[0]
 
-                # Google uses a modified base64 with CBMi prefix
-                # The actual URL is encoded after CBMi
-                if encoded_part.startswith('CBMi'):
-                    # Remove CBMi prefix and decode
-                    encoded_url = encoded_part[4:]
-
-                    # Add padding if needed
-                    padding = 4 - (len(encoded_url) % 4)
-                    if padding != 4:
-                        encoded_url += '=' * padding
-
+                # Try multiple decoding strategies
+                for attempt in range(4):
                     try:
-                        # Try URL-safe base64 decode
-                        decoded = base64.urlsafe_b64decode(encoded_url)
-                        # The decoded content may have a prefix byte, skip non-printable chars
-                        decoded_str = decoded.decode('utf-8', errors='ignore')
+                        # Strategy 1: Decode full encoded part
+                        if attempt == 0:
+                            to_decode = encoded_part
+                        # Strategy 2: Skip CBMi prefix (4 chars)
+                        elif attempt == 1 and encoded_part.startswith('CBMi'):
+                            to_decode = encoded_part[4:]
+                        # Strategy 3: Skip just CB prefix (2 chars)
+                        elif attempt == 2 and encoded_part.startswith('CB'):
+                            to_decode = encoded_part[2:]
+                        # Strategy 4: Skip first 5 chars (protobuf header varies)
+                        elif attempt == 3:
+                            to_decode = encoded_part[5:]
+                        else:
+                            continue
 
-                        # Find URL in the decoded string
-                        url_match = re.search(r'https?://[^\s<>"\']+', decoded_str)
-                        if url_match:
-                            real_url = url_match.group(0)
-                            logger.debug(f"[NewsAgent] Decoded Google News URL: {real_url[:60]}")
-                            return real_url
+                        # Try different padding
+                        for extra_padding in range(4):
+                            try:
+                                padded = to_decode + '=' * extra_padding
+                                decoded = base64.urlsafe_b64decode(padded)
+
+                                # Try UTF-8 decode
+                                try:
+                                    decoded_str = decoded.decode('utf-8', errors='ignore')
+                                except:
+                                    decoded_str = decoded.decode('latin-1', errors='ignore')
+
+                                # Look for URL pattern in decoded data
+                                url_match = re.search(r'https?://[^\s<>"\'\x00-\x1f]+', decoded_str)
+                                if url_match:
+                                    url = url_match.group(0).rstrip('.')
+                                    # Verify it's not a Google URL
+                                    if 'google.com' not in url and 'goo.gl' not in url:
+                                        logger.info(f"[NewsAgent] Decoded URL (strategy {attempt+1}): {url[:60]}")
+                                        return url
+                                break  # Padding worked, move to next strategy
+                            except Exception:
+                                continue
+
                     except Exception as e:
-                        logger.debug(f"[NewsAgent] Base64 decode failed: {e}")
+                        logger.debug(f"[NewsAgent] Decode attempt {attempt+1} failed: {e}")
+                        continue
 
-            # Method 2: Follow the redirect
-            # If decoding fails, we'll return the Google URL and let fetch_url follow redirects
-            # But mark it so we know to handle it specially
+            # If decoding fails, return original URL - will use _follow_google_redirect
             logger.debug(f"[NewsAgent] Could not decode, will follow redirect: {google_url[:60]}")
             return google_url
 
@@ -1168,25 +1212,100 @@ class NewsAgent(BaseCollector):
         """
         Follow a Google News redirect to get the actual article URL.
 
-        Uses a HEAD request to follow redirects without downloading content.
+        Google News uses JavaScript redirects, so we need to fetch the page
+        and extract the real URL from the HTML content.
         """
+        logger.info(f"[NewsAgent] Following redirect for: {google_url[:60]}...")
         try:
             import aiohttp
             from aiohttp import ClientTimeout
 
-            timeout = ClientTimeout(total=10)
+            timeout = ClientTimeout(total=15)
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.head(
+                # First try HEAD to see if there's an HTTP redirect
+                try:
+                    async with session.head(
+                        google_url,
+                        headers=self.DEFAULT_HEADERS,
+                        allow_redirects=True,
+                        max_redirects=5,
+                    ) as response:
+                        final_url = str(response.url)
+                        logger.info(f"[NewsAgent] HEAD redirect result: {final_url[:60]}")
+                        if 'news.google.com' not in final_url:
+                            return final_url
+                except Exception as e:
+                    logger.info(f"[NewsAgent] HEAD request failed: {e}")
+
+                # HEAD didn't work, fetch the page and look for JS/meta redirect
+                logger.info(f"[NewsAgent] Trying GET request...")
+                async with session.get(
                     google_url,
                     headers=self.DEFAULT_HEADERS,
                     allow_redirects=True,
-                    max_redirects=5,
                 ) as response:
-                    # The final URL after redirects
-                    final_url = str(response.url)
-                    if 'news.google.com' not in final_url:
-                        logger.debug(f"[NewsAgent] Followed redirect to: {final_url[:60]}")
-                        return final_url
+                    html = await response.text()
+                    logger.info(f"[NewsAgent] Got page content, length: {len(html)}")
+
+                    # Method 1: Look for data-n-au attribute (article URL)
+                    match = re.search(r'data-n-au="([^"]+)"', html)
+                    if match:
+                        url = match.group(1)
+                        if url.startswith('http'):
+                            logger.info(f"[NewsAgent] Extracted URL from data-n-au: {url[:60]}")
+                            return url
+
+                    # Method 2: Look for "url" in JSON data
+                    match = re.search(r'"url"\s*:\s*"(https?://[^"]+)"', html)
+                    if match:
+                        url = match.group(1).replace('\\u002F', '/').replace('\\/', '/')
+                        if 'news.google.com' not in url:
+                            logger.info(f"[NewsAgent] Extracted URL from JSON: {url[:60]}")
+                            return url
+
+                    # Method 3: Look for canonical URL
+                    match = re.search(r'<link[^>]+rel="canonical"[^>]+href="([^"]+)"', html)
+                    if match:
+                        url = match.group(1)
+                        if 'news.google.com' not in url:
+                            logger.info(f"[NewsAgent] Extracted canonical URL: {url[:60]}")
+                            return url
+
+                    # Method 4: Look for og:url meta tag
+                    match = re.search(r'<meta[^>]+property="og:url"[^>]+content="([^"]+)"', html)
+                    if match:
+                        url = match.group(1)
+                        if 'news.google.com' not in url:
+                            logger.info(f"[NewsAgent] Extracted og:url: {url[:60]}")
+                            return url
+
+                    # Method 5: Look for window.location redirect
+                    match = re.search(r'window\.location\s*=\s*["\']([^"\']+)["\']', html)
+                    if match:
+                        url = match.group(1)
+                        if url.startswith('http') and 'news.google.com' not in url:
+                            logger.info(f"[NewsAgent] Extracted JS redirect: {url[:60]}")
+                            return url
+
+                    # Method 6: Look for meta refresh
+                    match = re.search(r'<meta[^>]+http-equiv="refresh"[^>]+content="[^"]*url=([^"]+)"', html, re.I)
+                    if match:
+                        url = match.group(1)
+                        if url.startswith('http') and 'news.google.com' not in url:
+                            logger.info(f"[NewsAgent] Extracted meta refresh: {url[:60]}")
+                            return url
+
+                    # Method 7: Look for any href that's not Google
+                    urls_found = re.findall(r'href="(https?://[^"]+)"', html)
+                    for url in urls_found:
+                        if 'google' not in url.lower() and 'gstatic' not in url.lower():
+                            logger.info(f"[NewsAgent] Found href URL: {url[:60]}")
+                            return url
+
+                    # Log sample of content for debugging
+                    logger.info(f"[NewsAgent] Page sample: {html[:500]}")
+                    logger.info(f"[NewsAgent] Could not extract URL from Google News page")
+
         except Exception as e:
             logger.debug(f"[NewsAgent] Redirect follow failed: {e}")
 
