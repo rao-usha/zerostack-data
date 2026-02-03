@@ -257,6 +257,14 @@ class SiteIntelOrchestrator:
             SiteIntelDomain.LOGISTICS: [
                 SiteIntelSource.FREIGHTOS,
                 SiteIntelSource.USDA_AMS,
+                SiteIntelSource.FMCSA,
+                SiteIntelSource.DREWRY,
+                SiteIntelSource.SCFI,
+                SiteIntelSource.USACE,
+                SiteIntelSource.BTS_CARGO,
+                SiteIntelSource.CENSUS_TRADE,
+                SiteIntelSource.LOOPNET,
+                SiteIntelSource.TRANSPORT_TOPICS,
             ],
             SiteIntelDomain.SCORING: [],
         }

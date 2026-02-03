@@ -1010,6 +1010,332 @@ class WarehouseFacility(Base):
     )
 
 
+class ContainerFreightIndex(Base):
+    """Container freight rate indices from multiple providers (Freightos, Drewry, SCFI, CCFI)."""
+    __tablename__ = "container_freight_index"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    index_code = Column(String(50), nullable=False, index=True)  # FBX01, WCI, SCFI, CCFI
+    provider = Column(String(50), nullable=False, index=True)  # freightos, drewry, scfi, ccfi
+    route_origin_region = Column(String(100))  # Asia, Europe, etc.
+    route_origin_port = Column(String(100))  # Shanghai, Rotterdam, etc.
+    route_destination_region = Column(String(100))
+    route_destination_port = Column(String(100))
+    container_type = Column(String(20))  # 20ft, 40ft, 40hc, reefer
+    rate_value = Column(Numeric(12, 2))  # USD per container
+    rate_date = Column(Date, nullable=False)
+    change_pct_wow = Column(Numeric(8, 4))  # Week-over-week
+    change_pct_mom = Column(Numeric(8, 4))  # Month-over-month
+    change_pct_yoy = Column(Numeric(8, 4))  # Year-over-year
+    source = Column(String(50))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('index_code', 'rate_date', name='uq_container_freight_index'),
+        Index('idx_container_freight_route', 'route_origin_region', 'route_destination_region'),
+    )
+
+
+class UsdaTruckRate(Base):
+    """USDA AMS agricultural refrigerated truck rates by lane."""
+    __tablename__ = "usda_truck_rate"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    origin_region = Column(String(100), nullable=False, index=True)  # Central Valley, Imperial Valley
+    origin_state = Column(String(2))
+    destination_city = Column(String(100), nullable=False)
+    destination_state = Column(String(2), index=True)
+    commodity = Column(String(100), index=True)  # Produce, Vegetables, Citrus
+    mileage_band = Column(String(30))  # local (<200), short (200-500), medium (500-1000), long (1000+)
+    rate_per_mile = Column(Numeric(8, 4))
+    rate_per_truckload = Column(Numeric(10, 2))
+    fuel_price = Column(Numeric(6, 3))  # Diesel price at time of rate
+    report_date = Column(Date, nullable=False)
+    source = Column(String(50), default='usda_ams')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('origin_region', 'destination_city', 'commodity', 'report_date',
+                        name='uq_usda_truck_rate'),
+        Index('idx_usda_truck_lane', 'origin_state', 'destination_state'),
+    )
+
+
+class MotorCarrier(Base):
+    """FMCSA motor carrier registry."""
+    __tablename__ = "motor_carrier"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    dot_number = Column(String(20), unique=True, nullable=False, index=True)
+    mc_number = Column(String(20), index=True)
+    legal_name = Column(String(500), nullable=False)
+    dba_name = Column(String(500))
+    physical_address = Column(String(500))
+    physical_city = Column(String(100))
+    physical_state = Column(String(2), index=True)
+    physical_zip = Column(String(10))
+    mailing_address = Column(String(500))
+    mailing_city = Column(String(100))
+    mailing_state = Column(String(2))
+    mailing_zip = Column(String(10))
+    telephone = Column(String(20))
+    email = Column(String(255))
+    power_units = Column(Integer)  # Number of trucks
+    drivers = Column(Integer)
+    mcs150_date = Column(Date)  # Last MCS-150 filing date
+    mcs150_mileage = Column(BigInteger)  # Annual mileage from MCS-150
+    carrier_operation = Column(String(50))  # interstate, intrastate_hazmat, intrastate_non_hazmat
+    cargo_carried = Column(JSON)  # List of cargo types
+    operation_classification = Column(String(50))  # authorized_for_hire, exempt_for_hire, private
+    is_active = Column(Boolean, default=True)
+    out_of_service_date = Column(Date)
+    source = Column(String(50), default='fmcsa')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_motor_carrier_state', 'physical_state'),
+        Index('idx_motor_carrier_size', 'power_units'),
+    )
+
+
+class CarrierSafety(Base):
+    """FMCSA SMS safety scores and inspection data."""
+    __tablename__ = "carrier_safety"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    dot_number = Column(String(20), nullable=False, index=True)
+    safety_rating = Column(String(30))  # Satisfactory, Conditional, Unsatisfactory, None
+    rating_date = Column(Date)
+    # BASIC (Behavior Analysis Safety Improvement Categories) scores (0-100, higher = worse)
+    unsafe_driving_score = Column(Numeric(6, 2))
+    hours_of_service_score = Column(Numeric(6, 2))
+    driver_fitness_score = Column(Numeric(6, 2))
+    controlled_substances_score = Column(Numeric(6, 2))
+    vehicle_maintenance_score = Column(Numeric(6, 2))
+    hazmat_compliance_score = Column(Numeric(6, 2))
+    crash_indicator_score = Column(Numeric(6, 2))
+    # Inspection data
+    vehicle_oos_rate = Column(Numeric(6, 2))  # Out of service rate %
+    driver_oos_rate = Column(Numeric(6, 2))
+    total_inspections = Column(Integer)
+    total_violations = Column(Integer)
+    total_crashes = Column(Integer)
+    fatal_crashes = Column(Integer)
+    injury_crashes = Column(Integer)
+    tow_crashes = Column(Integer)
+    inspection_date = Column(Date)  # Date of last inspection data
+    source = Column(String(50), default='fmcsa')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('dot_number', 'inspection_date', name='uq_carrier_safety'),
+        Index('idx_carrier_safety_rating', 'safety_rating'),
+    )
+
+
+class PortThroughputMonthly(Base):
+    """Enhanced port throughput metrics time series."""
+    __tablename__ = "port_throughput_monthly"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    port_code = Column(String(10), nullable=False, index=True)  # UN/LOCODE
+    port_name = Column(String(255))
+    period_year = Column(Integer, nullable=False)
+    period_month = Column(Integer, nullable=False)
+    # TEU breakdown
+    teu_loaded_import = Column(Integer)
+    teu_loaded_export = Column(Integer)
+    teu_empty_import = Column(Integer)
+    teu_empty_export = Column(Integer)
+    teu_total = Column(Integer)
+    # Vessel data
+    container_vessel_calls = Column(Integer)
+    avg_berthing_hours = Column(Numeric(8, 2))
+    avg_vessel_turnaround_hours = Column(Numeric(8, 2))
+    # Tonnage
+    tonnage_import = Column(BigInteger)
+    tonnage_export = Column(BigInteger)
+    tonnage_total = Column(BigInteger)
+    # Cargo types
+    bulk_tonnage = Column(BigInteger)
+    breakbulk_tonnage = Column(BigInteger)
+    roro_units = Column(Integer)
+    source = Column(String(50))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('port_code', 'period_year', 'period_month', name='uq_port_throughput_monthly'),
+        Index('idx_port_throughput_period', 'period_year', 'period_month'),
+    )
+
+
+class AirCargoStats(Base):
+    """Airport cargo statistics from BTS T-100."""
+    __tablename__ = "air_cargo_stats"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    airport_code = Column(String(10), nullable=False, index=True)  # FAA code
+    airport_name = Column(String(255))
+    period_year = Column(Integer, nullable=False)
+    period_month = Column(Integer, nullable=False)
+    # Freight in pounds/tons
+    freight_tons_enplaned = Column(Numeric(12, 2))  # Outbound
+    freight_tons_deplaned = Column(Numeric(12, 2))  # Inbound
+    freight_tons_total = Column(Numeric(12, 2))
+    # Domestic vs international
+    freight_domestic = Column(Numeric(12, 2))
+    freight_international = Column(Numeric(12, 2))
+    # Mail
+    mail_tons = Column(Numeric(12, 2))
+    # Carrier breakdown (JSON: {carrier_code: tons, ...})
+    carrier_breakdown = Column(JSON)
+    # Aircraft movements
+    cargo_aircraft_departures = Column(Integer)
+    cargo_aircraft_arrivals = Column(Integer)
+    source = Column(String(50), default='bts')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('airport_code', 'period_year', 'period_month', name='uq_air_cargo_stats'),
+        Index('idx_air_cargo_period', 'period_year', 'period_month'),
+    )
+
+
+class TradeGatewayStats(Base):
+    """Import/export statistics by port/customs district."""
+    __tablename__ = "trade_gateway_stats"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    customs_district = Column(String(50), index=True)  # e.g., "Los Angeles, CA"
+    district_code = Column(String(10))  # USITC district code
+    port_code = Column(String(10), index=True)  # UN/LOCODE if applicable
+    port_name = Column(String(255))
+    period_year = Column(Integer, nullable=False)
+    period_month = Column(Integer, nullable=False)
+    # Trade values (in millions USD)
+    import_value_million = Column(Numeric(14, 2))
+    export_value_million = Column(Numeric(14, 2))
+    trade_balance_million = Column(Numeric(14, 2))  # export - import
+    # Top commodities (JSON arrays)
+    top_import_hs_codes = Column(JSON)  # [{hs_code, description, value_million}, ...]
+    top_export_hs_codes = Column(JSON)
+    # Top trading partners (JSON arrays)
+    top_import_countries = Column(JSON)  # [{country, value_million}, ...]
+    top_export_countries = Column(JSON)
+    # Mode breakdown (percentages)
+    vessel_pct = Column(Numeric(5, 2))
+    air_pct = Column(Numeric(5, 2))
+    truck_pct = Column(Numeric(5, 2))
+    rail_pct = Column(Numeric(5, 2))
+    other_pct = Column(Numeric(5, 2))
+    source = Column(String(50), default='census')
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('customs_district', 'period_year', 'period_month', name='uq_trade_gateway_stats'),
+        Index('idx_trade_gateway_period', 'period_year', 'period_month'),
+    )
+
+
+class ThreePLCompany(Base):
+    """3PL company directory and rankings."""
+    __tablename__ = "three_pl_company"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    company_name = Column(String(255), nullable=False, index=True)
+    parent_company = Column(String(255))
+    headquarters_city = Column(String(100))
+    headquarters_state = Column(String(2), index=True)
+    headquarters_country = Column(String(3), default='USA')
+    website = Column(String(500))
+    # Financials
+    annual_revenue_million = Column(Numeric(12, 2))
+    revenue_year = Column(Integer)
+    employee_count = Column(Integer)
+    facility_count = Column(Integer)
+    # Services offered (JSON array)
+    services = Column(JSON)  # ["warehousing", "transportation", "freight_forwarding", ...]
+    # Industries served (JSON array)
+    industries_served = Column(JSON)  # ["retail", "manufacturing", "automotive", ...]
+    # Geographic coverage
+    regions_served = Column(JSON)  # ["North America", "Asia Pacific", ...]
+    states_coverage = Column(ARRAY(String(2)))  # States with facilities
+    countries_coverage = Column(JSON)
+    # Rankings
+    armstrong_rank = Column(Integer)  # Armstrong & Associates ranking
+    transport_topics_rank = Column(Integer)  # Transport Topics Top 100
+    # Specializations
+    has_cold_chain = Column(Boolean)
+    has_hazmat = Column(Boolean)
+    has_ecommerce_fulfillment = Column(Boolean)
+    has_cross_dock = Column(Boolean)
+    is_asset_based = Column(Boolean)  # Owns trucks/warehouses
+    is_non_asset = Column(Boolean)  # Broker model
+    source = Column(String(50))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_3pl_revenue', 'annual_revenue_million'),
+        Index('idx_3pl_rank', 'transport_topics_rank'),
+    )
+
+
+class WarehouseListing(Base):
+    """Active warehouse/industrial property listings."""
+    __tablename__ = "warehouse_listing"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    listing_id = Column(String(100), unique=True, nullable=False, index=True)
+    source = Column(String(50), nullable=False)  # loopnet, costar, edo
+    property_name = Column(String(255))
+    listing_type = Column(String(30))  # for_lease, for_sale, for_sublease
+    property_type = Column(String(50))  # warehouse, distribution, manufacturing, flex
+    address = Column(String(500))
+    city = Column(String(100), index=True)
+    state = Column(String(2), nullable=False, index=True)
+    zip = Column(String(10))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    # Size
+    total_sqft = Column(Integer)
+    available_sqft = Column(Integer)
+    min_divisible_sqft = Column(Integer)
+    land_acres = Column(Numeric(10, 2))
+    # Building specs
+    clear_height_ft = Column(Integer)
+    dock_doors = Column(Integer)
+    drive_in_doors = Column(Integer)
+    column_spacing = Column(String(50))  # e.g., "50x50"
+    floor_load_capacity = Column(String(50))  # e.g., "4000 psf"
+    year_built = Column(Integer)
+    # Features
+    has_rail_spur = Column(Boolean)
+    has_cold_storage = Column(Boolean)
+    has_freezer = Column(Boolean)
+    has_sprinkler = Column(Boolean)
+    has_fenced_yard = Column(Boolean)
+    trailer_parking_spaces = Column(Integer)
+    # Pricing
+    asking_rent_psf = Column(Numeric(8, 2))  # Per sq ft per year
+    asking_rent_nnn = Column(Boolean)  # Triple net lease
+    asking_price = Column(BigInteger)  # For sale price
+    # Listing info
+    listing_date = Column(Date)
+    broker_name = Column(String(255))
+    broker_company = Column(String(255))
+    broker_phone = Column(String(50))
+    listing_url = Column(String(500))
+    is_active = Column(Boolean, default=True)
+    collected_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_warehouse_listing_location', 'latitude', 'longitude'),
+        Index('idx_warehouse_listing_size', 'total_sqft'),
+        Index('idx_warehouse_listing_state', 'state', 'city'),
+    )
+
+
 # =============================================================================
 # DOMAIN 8: SITE SCORING
 # =============================================================================

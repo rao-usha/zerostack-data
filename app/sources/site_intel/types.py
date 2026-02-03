@@ -78,6 +78,14 @@ class SiteIntelSource(str, Enum):
     # Logistics
     FREIGHTOS = "freightos"
     USDA_AMS = "usda_ams"
+    FMCSA = "fmcsa"
+    DREWRY = "drewry"
+    SCFI = "scfi"
+    CCFI = "ccfi"
+    CENSUS_TRADE = "census_trade"
+    BTS_CARGO = "bts_cargo"  # BTS T-100 air cargo
+    LOOPNET = "loopnet"
+    TRANSPORT_TOPICS = "transport_topics"
 
 
 class CollectionStatus(str, Enum):
