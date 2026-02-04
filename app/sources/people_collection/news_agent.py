@@ -745,11 +745,33 @@ class NewsAgent(BaseCollector):
                             if decoded_url and 'news.google.com' not in decoded_url:
                                 link_url = decoded_url
 
-                        # Strategy 3: Follow redirect (last resort)
+                        # Strategy 3: Follow redirect
                         if not link_url or 'news.google.com' in link_url:
                             real_url = await self._follow_google_redirect(raw_link)
                             if real_url and 'news.google.com' not in real_url:
                                 link_url = real_url
+
+                        # Strategy 4: Use Google site search to find the article
+                        if (not link_url or 'news.google.com' in link_url) and source_url:
+                            search_title = title_text.split(' - ')[0].strip()[:50]
+                            site_domain = urlparse(source_url).netloc
+                            google_search_url = f"https://www.google.com/search?q=site:{site_domain}+{quote_plus(search_title)}"
+                            logger.info(f"[NewsAgent] Trying Google site search: {google_search_url[:60]}...")
+
+                            # Fetch Google search results and extract first URL
+                            search_html = await self.fetch_url(google_search_url)
+                            if search_html:
+                                # Look for URLs in search results
+                                url_matches = re.findall(
+                                    rf'href="/url\?q=(https?://[^"&]+{re.escape(site_domain)}[^"&]*)',
+                                    search_html
+                                )
+                                for url in url_matches[:3]:
+                                    decoded_url = unquote(url)
+                                    if site_domain in decoded_url and '/search?' not in decoded_url:
+                                        link_url = decoded_url
+                                        logger.info(f"[NewsAgent] Found via Google search: {link_url[:60]}")
+                                        break
 
                         # If still no URL, use source_url as base (won't have article but might help)
                         if not link_url or 'news.google.com' in link_url:
