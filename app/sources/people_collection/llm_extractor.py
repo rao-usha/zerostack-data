@@ -572,7 +572,7 @@ Text:
         sections = []
         filing_text_lower = filing_text.lower()
 
-        # Strategy: Find "Director Since" markers which only appear in actual bios
+        # Strategy 1: Find "Director Since" markers which only appear in actual bios
         # This avoids TOC entries which contain keywords but no actual names
         director_since_positions = []
         search_start = 0
@@ -595,6 +595,29 @@ Text:
             section = filing_text[start:end]
             sections.append(f"--- Section: DIRECTOR BIOGRAPHIES ---\n{section}")
             logger.info(f"[LLMExtractor] Found {len(director_since_positions)} director bios starting at {first_bio}")
+
+        # Strategy 2: Find multiple "AGE:" markers (indicates bio section even in complex HTML)
+        if not sections:
+            age_positions = []
+            search_start = 0
+            while True:
+                idx = filing_text_lower.find("age:", search_start)
+                if idx < 0:
+                    break
+                age_positions.append(idx)
+                search_start = idx + 10
+                if len(age_positions) >= 20:
+                    break
+
+            # If we find 3+ age markers, likely a bio section
+            if len(age_positions) >= 3:
+                first_age = min(age_positions)
+                # Go back to find start of bio section
+                start = max(0, first_age - 3000)
+                end = min(len(filing_text), first_age + 60000)
+                section = filing_text[start:end]
+                sections.append(f"--- Section: DIRECTOR BIOGRAPHIES (AGE MARKERS) ---\n{section}")
+                logger.info(f"[LLMExtractor] Found {len(age_positions)} AGE markers, extracting bio section from {first_age}")
 
         # Also look for executive officer sections using "Age:" pattern after exec keywords
         exec_keywords = ["named executive officers", "executive officers", "our executive officers"]
