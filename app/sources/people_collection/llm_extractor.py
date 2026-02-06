@@ -70,6 +70,13 @@ class LLMExtractor:
         client = self._get_client()
         max_retries = self.config.retry_attempts
 
+        # Log prompt details for debugging
+        logger.info(
+            f"[LLMExtractor] Calling {self.config.provider}/{self.config.model} "
+            f"with prompt length: {len(prompt)} chars"
+        )
+        logger.debug(f"[LLMExtractor] Prompt preview: {prompt[:500]}...")
+
         for attempt in range(max_retries):
             try:
                 if self.config.provider == "anthropic":
@@ -93,11 +100,14 @@ class LLMExtractor:
                     )
                     result = response.choices[0].message.content
 
-                logger.debug(f"[LLMExtractor] LLM response length: {len(result) if result else 0} chars")
+                logger.info(f"[LLMExtractor] LLM response received: {len(result) if result else 0} chars")
+                logger.debug(f"[LLMExtractor] Response preview: {result[:500] if result else 'None'}...")
                 return result
 
             except Exception as e:
                 logger.warning(f"[LLMExtractor] LLM call attempt {attempt + 1}/{max_retries} failed: {e}")
+                import traceback
+                logger.debug(f"[LLMExtractor] Error traceback: {traceback.format_exc()}")
                 if attempt < max_retries - 1:
                     wait_time = self.config.retry_delay_seconds * (2 ** attempt)
                     logger.info(f"[LLMExtractor] Retrying in {wait_time}s...")
@@ -256,7 +266,7 @@ class LLMExtractor:
         if not data:
             logger.warning(
                 f"[LLMExtractor] Failed to parse JSON from LLM response for {page_url}. "
-                f"Response preview: {response[:200]}..."
+                f"Full response: {response[:1000]}..."
             )
             return LeadershipPageResult(
                 company_name=company_name,
@@ -264,8 +274,18 @@ class LLMExtractor:
                 page_type="unknown",
                 people=[],
                 extraction_confidence=ExtractionConfidence.LOW,
-                extraction_notes="Failed to parse LLM response as JSON",
+                extraction_notes=f"Failed to parse LLM response as JSON. Response: {response[:200]}...",
             )
+
+        # Log parsed data
+        logger.info(
+            f"[LLMExtractor] Parsed JSON for {page_url}: "
+            f"people count={len(data.get('people', []))}, "
+            f"confidence={data.get('extraction_confidence')}, "
+            f"page_type={data.get('page_type')}"
+        )
+        if data.get('notes'):
+            logger.info(f"[LLMExtractor] LLM notes: {data.get('notes')}")
 
         # Parse people
         people = self._parse_people_from_response(data, page_url)
@@ -293,8 +313,12 @@ class LLMExtractor:
     ) -> List[ExtractedPerson]:
         """Parse people from LLM response data."""
         people = []
+        raw_people = data.get("people", [])
+        skipped_count = 0
 
-        for p in data.get("people", []):
+        logger.debug(f"[LLMExtractor] Parsing {len(raw_people)} raw people from response")
+
+        for i, p in enumerate(raw_people):
             try:
                 # Normalize and enhance
                 title = p.get("title", "")
@@ -308,6 +332,8 @@ class LLMExtractor:
 
                 # Skip invalid names
                 if not full_name or len(full_name) < 3:
+                    logger.debug(f"[LLMExtractor] Skipping person {i}: invalid name '{full_name}'")
+                    skipped_count += 1
                     continue
 
                 person = ExtractedPerson(
@@ -327,9 +353,15 @@ class LLMExtractor:
                     source_url=page_url,
                 )
                 people.append(person)
+                logger.debug(f"[LLMExtractor] Parsed person: {full_name} - {title}")
             except Exception as e:
-                logger.warning(f"[LLMExtractor] Failed to parse person: {e}")
+                logger.warning(f"[LLMExtractor] Failed to parse person {i}: {e}, data: {p}")
+                skipped_count += 1
 
+        logger.info(
+            f"[LLMExtractor] Parsed {len(people)} valid people, skipped {skipped_count} "
+            f"(from {len(raw_people)} raw)"
+        )
         return people
 
     async def _try_simplified_extraction(
@@ -535,19 +567,41 @@ Text:
         Returns:
             Dict with executives, board_members, and compensation data
         """
-        # Truncate to relevant sections if too long
-        if len(filing_text) > 100000:
-            # Try to find relevant sections
-            sections = []
-            for keyword in ["named executive", "compensation", "board of director", "executive officer"]:
-                idx = filing_text.lower().find(keyword)
-                if idx > 0:
-                    sections.append(filing_text[max(0, idx - 1000):idx + 30000])
+        # Always try to find and extract relevant sections
+        # SEC proxy filings are very long, so we need to find the right sections
+        sections = []
+        filing_text_lower = filing_text.lower()
 
-            if sections:
-                filing_text = "\n\n---\n\n".join(sections)
-            else:
-                filing_text = filing_text[:100000]
+        # Find sections in priority order
+        section_keywords = [
+            ("named executive officers", 25000),
+            ("executive officers", 20000),
+            ("our executive officers", 20000),
+            ("board of directors", 25000),
+            ("election of directors", 20000),
+            ("director nominees", 15000),
+            ("compensation of named", 15000),
+            ("summary compensation table", 10000),
+        ]
+
+        for keyword, section_len in section_keywords:
+            idx = filing_text_lower.find(keyword)
+            if idx >= 0:
+                # Get the section with some context before and after
+                start = max(0, idx - 500)
+                end = min(len(filing_text), idx + section_len)
+                section = filing_text[start:end]
+                sections.append(f"--- Section: {keyword.upper()} ---\n{section}")
+                logger.debug(f"[LLMExtractor] Found section '{keyword}' at position {idx}")
+
+        if sections:
+            # Use the extracted sections
+            filing_text = "\n\n".join(sections[:4])  # Use top 4 sections
+            logger.info(f"[LLMExtractor] Extracted {len(sections)} relevant sections for {company_name}")
+        else:
+            # Fallback: use first portion of text
+            filing_text = filing_text[:50000]
+            logger.warning(f"[LLMExtractor] No sections found for {company_name}, using first 50k chars")
 
         prompt = SEC_PROXY_EXTRACTION_PROMPT.format(
             company_name=company_name,
@@ -555,10 +609,50 @@ Text:
             filing_text=filing_text,
         )
 
+        logger.info(f"[LLMExtractor] Extracting from SEC proxy for {company_name} ({len(filing_text)} chars)")
+
         response = await self._call_llm(prompt)
+
+        # Always log the response for proxy extraction debugging
+        logger.info(
+            f"[LLMExtractor] SEC proxy raw response for {company_name}: "
+            f"{response[:500] if response else 'None'}"
+        )
+
         data = self._parse_json_response(response)
+
+        if not data:
+            # Log the failure and try a simpler extraction
+            logger.warning(
+                f"[LLMExtractor] SEC proxy JSON parse failed for {company_name}. "
+                f"Full response: {response}"
+            )
+
+            # Try simpler fallback prompt
+            data = await self._try_simple_sec_extraction(filing_text, company_name)
 
         if not data:
             return {"executives": [], "board_members": [], "extraction_confidence": "low"}
 
         return data
+
+    async def _try_simple_sec_extraction(
+        self,
+        filing_text: str,
+        company_name: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Try a simpler extraction prompt for SEC filings."""
+        # Use only a small portion of the text
+        text_sample = filing_text[:20000]
+
+        simple_prompt = f"""Extract names and titles of executives from this SEC filing for {company_name}.
+
+Return JSON only:
+{{"executives": [{{"full_name": "Name", "title": "Title"}}], "board_members": [{{"full_name": "Name", "title": "Title"}}]}}
+
+Text:
+{text_sample}"""
+
+        logger.info(f"[LLMExtractor] Trying simple SEC extraction for {company_name}")
+        response = await self._call_llm(simple_prompt)
+        return self._parse_json_response(response)

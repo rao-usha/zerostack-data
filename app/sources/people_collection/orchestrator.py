@@ -221,11 +221,13 @@ class PeopleCollectionOrchestrator:
             session.add(job)
             session.commit()
 
-            # Collect from each source
+            # Collect from each source with detailed tracking
             all_people: List[ExtractedPerson] = []
             all_changes: List[LeadershipChange] = []
+            agent_diagnostics: Dict[str, Any] = {}
 
             if "website" in sources:
+                agent_start = datetime.utcnow()
                 if company.website:
                     logger.info(f"Running WebsiteAgent for {company.name}")
                     website_result = await self._collect_from_website(company, session)
@@ -233,11 +235,22 @@ class PeopleCollectionOrchestrator:
                     all_people.extend(website_result.get("people", []))
                     result.errors.extend(website_result.get("errors", []))
                     logger.info(f"WebsiteAgent found {people_count} people for {company.name}")
+                    agent_diagnostics["website"] = {
+                        "ran": True,
+                        "people_found": people_count,
+                        "errors": website_result.get("errors", []),
+                        "duration_ms": int((datetime.utcnow() - agent_start).total_seconds() * 1000),
+                    }
                 else:
                     logger.warning(f"Skipping WebsiteAgent for {company.name} - no website URL")
                     result.warnings.append("No website URL configured")
+                    agent_diagnostics["website"] = {
+                        "ran": False,
+                        "skip_reason": "No website URL configured",
+                    }
 
             if "sec" in sources:
+                agent_start = datetime.utcnow()
                 if company.cik:
                     logger.info(f"Running SECAgent for {company.name} (CIK: {company.cik})")
                     sec_result = await self._collect_from_sec(company, session)
@@ -247,17 +260,35 @@ class PeopleCollectionOrchestrator:
                     all_changes.extend(sec_result.get("changes", []))
                     result.errors.extend(sec_result.get("errors", []))
                     logger.info(f"SECAgent found {people_count} people, {changes_count} changes for {company.name}")
+                    agent_diagnostics["sec"] = {
+                        "ran": True,
+                        "people_found": people_count,
+                        "changes_found": changes_count,
+                        "errors": sec_result.get("errors", []),
+                        "duration_ms": int((datetime.utcnow() - agent_start).total_seconds() * 1000),
+                    }
                 else:
                     logger.warning(f"Skipping SECAgent for {company.name} - no CIK")
                     result.warnings.append("No SEC CIK configured")
+                    agent_diagnostics["sec"] = {
+                        "ran": False,
+                        "skip_reason": "No SEC CIK configured",
+                    }
 
             if "news" in sources:
+                agent_start = datetime.utcnow()
                 logger.info(f"Running NewsAgent for {company.name}")
                 news_result = await self._collect_from_news(company, session)
                 changes_count = len(news_result.get("changes", []))
                 all_changes.extend(news_result.get("changes", []))
                 result.errors.extend(news_result.get("errors", []))
                 logger.info(f"NewsAgent found {changes_count} changes for {company.name}")
+                agent_diagnostics["news"] = {
+                    "ran": True,
+                    "changes_found": changes_count,
+                    "errors": news_result.get("errors", []),
+                    "duration_ms": int((datetime.utcnow() - agent_start).total_seconds() * 1000),
+                }
 
             # Deduplicate and store people
             result.people_found = len(all_people)
@@ -277,6 +308,22 @@ class PeopleCollectionOrchestrator:
             job.people_updated = result.people_updated
             job.changes_detected = result.changes_detected
             job.errors = result.errors if result.errors else None
+            job.warnings = result.warnings if result.warnings else None
+
+            # Store diagnostic info in config for later analysis
+            job_config = job.config or {}
+            job_config["diagnostics"] = {
+                "company_data": {
+                    "has_website": bool(company.website),
+                    "website_url": company.website,
+                    "has_cik": bool(company.cik),
+                    "cik": company.cik,
+                },
+                "agents_run": sources,
+                "agent_results": agent_diagnostics,
+                "duration_seconds": (datetime.utcnow() - started_at).total_seconds(),
+            }
+            job.config = job_config
 
             # Update company last crawled date
             company.last_crawled_date = date.today()
@@ -588,15 +635,23 @@ class PeopleCollectionOrchestrator:
             if existing.title != extracted.title:
                 existing.title = extracted.title
                 existing.title_normalized = extracted.title_normalized
-                existing.title_level = extracted.title_level.value if extracted.title_level else None
+                # Handle both enum and string values (use_enum_values=True in Pydantic)
+                title_level = extracted.title_level
+                existing.title_level = title_level.value if hasattr(title_level, 'value') else title_level
         else:
+            # Handle both enum and string values (use_enum_values=True in Pydantic)
+            title_level = extracted.title_level
+            title_level_val = title_level.value if hasattr(title_level, 'value') else title_level
+            confidence = extracted.confidence
+            confidence_val = confidence.value if hasattr(confidence, 'value') else (confidence or "medium")
+
             # Create new relationship
             cp = CompanyPerson(
                 company_id=company.id,
                 person_id=person_id,
                 title=extracted.title,
                 title_normalized=extracted.title_normalized,
-                title_level=extracted.title_level.value if extracted.title_level else None,
+                title_level=title_level_val,
                 department=extracted.department,
                 is_board_member=extracted.is_board_member,
                 is_board_chair=extracted.is_board_chair,
@@ -604,7 +659,7 @@ class PeopleCollectionOrchestrator:
                 source="website",
                 source_url=extracted.source_url,
                 extraction_date=date.today(),
-                confidence=extracted.confidence.value if extracted.confidence else "medium",
+                confidence=confidence_val,
             )
             session.add(cp)
 

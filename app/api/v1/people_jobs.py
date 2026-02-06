@@ -77,6 +77,29 @@ class JobStatsResponse(BaseModel):
     success_rate: float
 
 
+class AgentMetrics(BaseModel):
+    """Metrics for a single collection agent."""
+    agent: str
+    total_jobs: int
+    successful_jobs: int
+    failed_jobs: int
+    zero_people_jobs: int
+    success_rate: float
+    avg_people_found: float
+    total_people_found: int
+    common_errors: List[dict]
+
+
+class CollectionMetricsResponse(BaseModel):
+    """Aggregate collection metrics across all agents."""
+    period_days: int
+    generated_at: str
+    summary: dict
+    by_agent: List[AgentMetrics]
+    failure_analysis: dict
+    recommendations: List[str]
+
+
 class ScheduleJobRequest(BaseModel):
     """Request to schedule a collection job."""
     job_type: str = Field(..., description="website_crawl, sec_parse, news_scan")
@@ -187,6 +210,179 @@ async def get_job_stats(
     stats = scheduler.get_job_stats(days=days)
 
     return JobStatsResponse(**stats)
+
+
+@router.get("/metrics", response_model=CollectionMetricsResponse)
+async def get_collection_metrics(
+    days: int = Query(7, ge=1, le=90, description="Days to analyze"),
+    db: Session = Depends(get_db),
+):
+    """
+    Get detailed collection metrics for debugging extraction issues.
+
+    Returns:
+    - Success/failure rates per agent (website, sec, news)
+    - Most common failure reasons
+    - Zero-extraction analysis
+    - Recommendations for improvement
+    """
+    from datetime import datetime, timedelta
+    from sqlalchemy import func, case
+    from collections import Counter
+
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    # Query all jobs in period
+    jobs = db.query(PeopleCollectionJob).filter(
+        PeopleCollectionJob.created_at >= cutoff
+    ).all()
+
+    if not jobs:
+        return CollectionMetricsResponse(
+            period_days=days,
+            generated_at=datetime.utcnow().isoformat(),
+            summary={"total_jobs": 0, "message": "No jobs found in period"},
+            by_agent=[],
+            failure_analysis={},
+            recommendations=["Run some collection jobs to generate metrics"],
+        )
+
+    # Aggregate by job type (agent)
+    agent_stats = {}
+    all_errors = []
+
+    for job in jobs:
+        job_type = job.job_type or "unknown"
+
+        if job_type not in agent_stats:
+            agent_stats[job_type] = {
+                "total": 0,
+                "success": 0,
+                "failed": 0,
+                "zero_people": 0,
+                "people_found": 0,
+                "errors": [],
+            }
+
+        stats = agent_stats[job_type]
+        stats["total"] += 1
+        stats["people_found"] += job.people_found or 0
+
+        if job.status in ("success", "completed_with_errors"):
+            stats["success"] += 1
+        elif job.status == "failed":
+            stats["failed"] += 1
+
+        if (job.people_found or 0) == 0 and job.status != "pending":
+            stats["zero_people"] += 1
+
+        # Collect errors
+        if job.errors:
+            for err in job.errors:
+                stats["errors"].append(err)
+                all_errors.append({"job_type": job_type, "error": err})
+
+        if job.warnings:
+            for warn in job.warnings:
+                stats["errors"].append(warn)
+
+    # Build agent metrics
+    agent_metrics = []
+    for agent, stats in agent_stats.items():
+        # Count common errors
+        error_counts = Counter(stats["errors"])
+        common_errors = [
+            {"error": err[:100], "count": count}
+            for err, count in error_counts.most_common(5)
+        ]
+
+        agent_metrics.append(AgentMetrics(
+            agent=agent,
+            total_jobs=stats["total"],
+            successful_jobs=stats["success"],
+            failed_jobs=stats["failed"],
+            zero_people_jobs=stats["zero_people"],
+            success_rate=round(stats["success"] / stats["total"] * 100, 1) if stats["total"] > 0 else 0,
+            avg_people_found=round(stats["people_found"] / stats["total"], 1) if stats["total"] > 0 else 0,
+            total_people_found=stats["people_found"],
+            common_errors=common_errors,
+        ))
+
+    # Overall failure analysis
+    total_jobs = len(jobs)
+    total_zero_people = sum(1 for j in jobs if (j.people_found or 0) == 0 and j.status != "pending")
+    total_failed = sum(1 for j in jobs if j.status == "failed")
+
+    # Categorize error types
+    error_categories = {
+        "no_leadership_page": 0,
+        "js_rendering": 0,
+        "llm_extraction": 0,
+        "network_error": 0,
+        "no_website": 0,
+        "no_cik": 0,
+        "other": 0,
+    }
+
+    for err_info in all_errors:
+        err = err_info["error"].lower()
+        if "no leadership page" in err or "no pages found" in err:
+            error_categories["no_leadership_page"] += 1
+        elif "javascript" in err or "js-rendered" in err:
+            error_categories["js_rendering"] += 1
+        elif "llm" in err or "extraction" in err:
+            error_categories["llm_extraction"] += 1
+        elif "timeout" in err or "network" in err or "fetch" in err:
+            error_categories["network_error"] += 1
+        elif "no website" in err:
+            error_categories["no_website"] += 1
+        elif "no cik" in err:
+            error_categories["no_cik"] += 1
+        else:
+            error_categories["other"] += 1
+
+    # Generate recommendations
+    recommendations = []
+
+    if error_categories["no_leadership_page"] > 0:
+        recommendations.append(
+            f"Expand URL patterns in PageFinder - {error_categories['no_leadership_page']} jobs couldn't find leadership pages"
+        )
+    if error_categories["js_rendering"] > 0:
+        recommendations.append(
+            f"Add JavaScript rendering support - {error_categories['js_rendering']} pages require JS"
+        )
+    if error_categories["no_website"] > 0:
+        recommendations.append(
+            f"Enrich company data - {error_categories['no_website']} companies missing website URLs"
+        )
+    if error_categories["no_cik"] > 0:
+        recommendations.append(
+            f"Add CIK lookup - {error_categories['no_cik']} companies missing SEC CIK"
+        )
+    if total_zero_people > total_jobs * 0.5:
+        recommendations.append(
+            "High zero-extraction rate (>50%) - review LLM prompts and HTML cleaning"
+        )
+
+    if not recommendations:
+        recommendations.append("Collection metrics look healthy - no urgent issues detected")
+
+    return CollectionMetricsResponse(
+        period_days=days,
+        generated_at=datetime.utcnow().isoformat(),
+        summary={
+            "total_jobs": total_jobs,
+            "total_successful": sum(1 for j in jobs if j.status in ("success", "completed_with_errors")),
+            "total_failed": total_failed,
+            "total_zero_people": total_zero_people,
+            "zero_people_rate": round(total_zero_people / total_jobs * 100, 1) if total_jobs > 0 else 0,
+            "total_people_found": sum(j.people_found or 0 for j in jobs),
+        },
+        by_agent=agent_metrics,
+        failure_analysis=error_categories,
+        recommendations=recommendations,
+    )
 
 
 @router.get("/{job_id}", response_model=JobDetail)

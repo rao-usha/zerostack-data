@@ -130,13 +130,19 @@ class PageFinder(BaseCollector):
                 score += 10
 
         # Medium-value keywords
-        medium_value = ["team", "about", "management", "people", "who-we-are"]
+        medium_value = ["team", "management", "people", "who-we-are"]
         for keyword in medium_value:
             if keyword in url_lower:
                 score += 5
 
+        # Investor relations governance pages (often have leadership)
+        ir_patterns = ["governance", "corporate-governance", "executive-officers", "corporate-officers"]
+        for pattern in ir_patterns:
+            if pattern in url_lower:
+                score += 8
+
         # Link text bonuses
-        text_keywords = ["leadership", "team", "executive", "management", "meet the", "our people"]
+        text_keywords = ["leadership", "team", "executive", "management", "meet the", "our people", "officers"]
         for keyword in text_keywords:
             if keyword in text_lower:
                 score += 8
@@ -146,10 +152,24 @@ class PageFinder(BaseCollector):
             score += 7
 
         # Penalize clearly wrong pages
-        wrong_patterns = ["career", "job", "investor", "news", "press", "blog", "contact", "login", "signup"]
+        wrong_patterns = ["career", "job", "news", "press", "blog", "contact", "login", "signup", "product", "service", "shop", "store", "support"]
         for pattern in wrong_patterns:
             if pattern in url_lower:
                 score -= 10
+
+        # Heavily penalize ESG/sustainability pages (these rarely have leadership)
+        esg_patterns = ["esg", "sustainability", "environmental", "social-responsibility", "csr", "diversity", "inclusion", "empowering"]
+        for pattern in esg_patterns:
+            if pattern in url_lower:
+                score -= 15
+
+        # Penalize generic investor pages (but not governance)
+        if "investor" in url_lower and "governance" not in url_lower and "leadership" not in url_lower:
+            score -= 5
+
+        # About page without specifics should score lower
+        if url_lower.endswith("/about") or url_lower.endswith("/about/"):
+            score += 2  # Still positive, but lower than specific pages
 
         return score
 

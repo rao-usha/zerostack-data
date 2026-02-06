@@ -224,40 +224,33 @@ Bio Text:
 {bio_text}"""
 
 
-SEC_PROXY_EXTRACTION_PROMPT = """You are extracting executive information from an SEC DEF 14A proxy statement.
+SEC_PROXY_EXTRACTION_PROMPT = """Extract executive and board member names from this SEC proxy filing for {company_name}.
 
-Company: {company_name}
-CIK: {cik}
+Look for:
+1. Named Executive Officers (NEOs) - usually listed with titles like CEO, CFO, COO, President, VP
+2. Board of Directors - directors, chairman, independent directors
 
-Extract Named Executive Officers and Board members. Return JSON:
-
+Return ONLY valid JSON:
 {{
   "executives": [
-    {{
-      "full_name": "Name",
-      "title": "Title",
-      "age": 55,
-      "bio": "Brief background",
-      "tenure_years": 5,
-      "base_salary": 500000,
-      "bonus": 200000,
-      "stock_awards": 1000000,
-      "total_compensation": 1700000
-    }}
+    {{"full_name": "John Smith", "title": "Chief Executive Officer", "age": 55}},
+    {{"full_name": "Jane Doe", "title": "Chief Financial Officer", "age": 48}}
   ],
   "board_members": [
-    {{
-      "full_name": "Name",
-      "is_independent": true,
-      "committees": ["Audit", "Compensation"],
-      "since_year": 2018,
-      "bio": "Brief background"
-    }}
+    {{"full_name": "Bob Wilson", "title": "Chairman", "is_independent": false}},
+    {{"full_name": "Mary Johnson", "title": "Independent Director", "is_independent": true}}
   ],
-  "extraction_confidence": "high|medium|low"
+  "extraction_confidence": "high"
 }}
 
-Filing Text:
+IMPORTANT:
+- Extract ALL executives and board members mentioned
+- Names should be in "First Last" format
+- Return valid JSON only, no other text
+- If age is mentioned, include it; otherwise omit
+- Look for patterns like "Name, age X, has served as Title"
+
+SEC Filing Sections:
 {filing_text}"""
 
 
@@ -378,6 +371,49 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     "/site/leadership",
     "/our-company/leadership",
     "/our-company/team",
+
+    # Investor relations patterns (important for public companies)
+    "/investors/governance",
+    "/investors/leadership",
+    "/investors/management",
+    "/investors/corporate-governance",
+    "/investors/corporate-governance/leadership",
+    "/investors/corporate-governance/management",
+    "/investors/corporate-governance/executive-officers",
+    "/investor-relations/governance",
+    "/investor-relations/corporate-governance",
+    "/investor-relations/management",
+    "/investor-relations/executive-team",
+    "/ir/governance",
+    "/ir/leadership",
+    "/ir/management",
+    "/ir/corporate-governance",
+
+    # Industrial/manufacturing company patterns
+    "/about/senior-leadership",
+    "/about/officers",
+    "/about/executive-officers",
+    "/about/corporate-officers",
+    "/corporate/officers",
+    "/corporate/executive-officers",
+    "/corporate/senior-leadership",
+    "/company/officers",
+    "/company/executive-officers",
+
+    # More root-level patterns
+    "/senior-leadership",
+    "/officers",
+    "/executive-officers",
+    "/corporate-officers",
+    "/our-leaders",
+    "/meet-our-leaders",
+    "/meet-leadership",
+
+    # Alternative "about" spellings
+    "/aboutus/leadership",
+    "/aboutus/team",
+    "/about_us/leadership",
+    "/about_us/team",
 ]
 
 LEADERSHIP_LINK_PATTERNS: List[str] = [
