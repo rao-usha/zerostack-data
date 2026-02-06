@@ -572,27 +572,61 @@ Text:
         sections = []
         filing_text_lower = filing_text.lower()
 
-        # Find sections in priority order
-        section_keywords = [
-            ("named executive officers", 25000),
-            ("executive officers", 20000),
-            ("our executive officers", 20000),
-            ("board of directors", 25000),
-            ("election of directors", 20000),
-            ("director nominees", 15000),
-            ("compensation of named", 15000),
-            ("summary compensation table", 10000),
-        ]
+        # Strategy: Find "Director Since" markers which only appear in actual bios
+        # This avoids TOC entries which contain keywords but no actual names
+        director_since_positions = []
+        search_start = 0
+        while True:
+            idx = filing_text_lower.find("director since", search_start)
+            if idx < 0:
+                break
+            director_since_positions.append(idx)
+            search_start = idx + 20
+            if len(director_since_positions) >= 20:  # Limit search
+                break
 
-        for keyword, section_len in section_keywords:
+        if director_since_positions:
+            # Found director bios - extract from first occurrence with large context
+            first_bio = min(director_since_positions)
+            # Go back to find the start of the bio section (look for name before "Director Since")
+            start = max(0, first_bio - 2000)
+            # Extract a large section covering multiple director bios
+            end = min(len(filing_text), first_bio + 50000)
+            section = filing_text[start:end]
+            sections.append(f"--- Section: DIRECTOR BIOGRAPHIES ---\n{section}")
+            logger.info(f"[LLMExtractor] Found {len(director_since_positions)} director bios starting at {first_bio}")
+
+        # Also look for executive officer sections using "Age:" pattern after exec keywords
+        exec_keywords = ["named executive officers", "executive officers", "our executive officers"]
+        for keyword in exec_keywords:
             idx = filing_text_lower.find(keyword)
             if idx >= 0:
-                # Get the section with some context before and after
-                start = max(0, idx - 500)
-                end = min(len(filing_text), idx + section_len)
-                section = filing_text[start:end]
-                sections.append(f"--- Section: {keyword.upper()} ---\n{section}")
-                logger.debug(f"[LLMExtractor] Found section '{keyword}' at position {idx}")
+                # Check if this section has actual content (look for "Age:" within 5000 chars)
+                section_preview = filing_text_lower[idx:idx+5000]
+                if "age:" in section_preview or "age " in section_preview:
+                    start = max(0, idx - 200)
+                    end = min(len(filing_text), idx + 30000)
+                    section = filing_text[start:end]
+                    sections.append(f"--- Section: {keyword.upper()} ---\n{section}")
+                    logger.info(f"[LLMExtractor] Found executive section '{keyword}' at {idx} with bio content")
+                    break  # Only need one exec section
+
+        # Fallback: try original keywords but skip early TOC positions
+        if not sections:
+            section_keywords = [
+                ("board of directors", 25000),
+                ("election of directors", 20000),
+                ("compensation of named", 15000),
+            ]
+            for keyword, section_len in section_keywords:
+                # Find all occurrences and use the one most likely to be content (not TOC)
+                idx = filing_text_lower.find(keyword)
+                if idx >= 0 and idx > 40000:  # Skip TOC which is usually in first 40k
+                    start = max(0, idx - 500)
+                    end = min(len(filing_text), idx + section_len)
+                    section = filing_text[start:end]
+                    sections.append(f"--- Section: {keyword.upper()} ---\n{section}")
+                    logger.debug(f"[LLMExtractor] Found section '{keyword}' at position {idx}")
 
         if sections:
             # Use the extracted sections
