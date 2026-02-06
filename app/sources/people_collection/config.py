@@ -354,8 +354,7 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     # SaaS/tech company patterns
     "/company",  # Many SaaS sites put team on /company
     "/about",    # Sometimes team is on main about page
-    "/careers/team",  # Some show team on careers
-    "/careers/leadership",
+    # NOTE: /careers/team and /careers/leadership removed - they match career pages, not leadership team pages
 
     # Founders/partners patterns (for smaller companies)
     "/founders",
@@ -414,6 +413,34 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     "/aboutus/team",
     "/about_us/leadership",
     "/about_us/team",
+
+    # Governance patterns (common for large corps like ABB)
+    "/about/governance",
+    "/about/governance/executive-committee",
+    "/about/governance/board-of-directors",
+    "/about/our-management",
+    "/about/our-executives",
+    "/company/governance",
+    "/corporate-governance",
+    "/corporate-governance/board-of-directors",
+    "/corporate-governance/leadership",
+    "/corporate-governance/executive-officers",
+    "/executive-committee",
+    "/our-management",
+
+    # .html suffix patterns (many corporate sites use these)
+    "/about/leadership.html",
+    "/about/team.html",
+    "/about/management.html",
+    "/about/board-of-directors.html",
+    "/company/leadership.html",
+    "/leadership.html",
+    "/board-of-directors.html",
+
+    # .aspx patterns (common for investor relations)
+    "/governance/leadership-team/default.aspx",
+    "/governance/board-of-directors/default.aspx",
+    "/corporate-governance/default.aspx",
 ]
 
 LEADERSHIP_LINK_PATTERNS: List[str] = [

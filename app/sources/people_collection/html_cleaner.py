@@ -569,6 +569,34 @@ def _get_itemprop(element: Tag, prop: str, attr: str = None) -> Optional[str]:
     return el.get_text(strip=True)
 
 
+def _strip_name_from_title(title: str, name: Optional[str]) -> str:
+    """
+    Strip person's name from the beginning of a title string.
+
+    Handles cases where HTML extraction concatenates name and title,
+    e.g., "Vicente ReynalChairman, President and CEO" -> "Chairman, President and CEO"
+    """
+    if not name or not title:
+        return title
+
+    # Check if title starts with the person's name (with or without separator)
+    if title.startswith(name):
+        remainder = title[len(name):].lstrip(' ,;:-\t\n')
+        if remainder and _looks_like_title(remainder):
+            return remainder
+
+    # Also check first name + last name without space (concatenation artifact)
+    name_no_space = name.replace(' ', '')
+    if title.replace(' ', '').startswith(name_no_space):
+        # Find where the name part ends in the original title
+        for i in range(len(name), len(title)):
+            remainder = title[i:].lstrip(' ,;:-\t\n')
+            if remainder and _looks_like_title(remainder):
+                return remainder
+
+    return title
+
+
 def _looks_like_name(text: str) -> bool:
     """Check if text looks like a person's name."""
     if not text or len(text) < 3 or len(text) > 60:
@@ -651,6 +679,8 @@ def _extract_person_from_card(card: Tag) -> Optional[Dict[str, Any]]:
             if el and el != card.select_one('.name'):  # Don't pick name as title
                 title = el.get_text(strip=True)
                 if len(title) < 150 and title != person.get('name'):
+                    # Strip person's name from title if concatenated
+                    title = _strip_name_from_title(title, person.get('name'))
                     person['title'] = title
                     break
         except Exception:
@@ -661,6 +691,8 @@ def _extract_person_from_card(card: Tag) -> Optional[Dict[str, Any]]:
         for el in card.find_all(['span', 'p', 'div', 'em']):
             text = el.get_text(strip=True)
             if text != person.get('name') and _looks_like_title(text):
+                # Strip person's name from title if concatenated
+                text = _strip_name_from_title(text, person.get('name'))
                 person['title'] = text
                 break
 

@@ -227,7 +227,23 @@ class WebsiteAgent(BaseCollector):
                 extraction_notes="Structured extraction from HTML cards/patterns",
             )
 
-        # Fall back to LLM extraction
+        # Fall back to LLM extraction - but only if we have meaningful content
+        min_text_length = 200  # Skip LLM if page content is too short (likely JS-rendered)
+        if len(cleaned.text.strip()) < min_text_length:
+            logger.warning(
+                f"[WebsiteAgent] Skipping LLM for {page_url} - content too short "
+                f"({len(cleaned.text.strip())} chars < {min_text_length}). "
+                f"Page likely requires JavaScript rendering."
+            )
+            return LeadershipPageResult(
+                company_name=company_name,
+                page_url=page_url,
+                page_type=page_type,
+                people=structured_people,
+                extraction_confidence=ExtractionConfidence.LOW,
+                extraction_notes=f"Content too short for LLM ({len(cleaned.text.strip())} chars) - likely JS-rendered",
+            )
+
         logger.info(f"[WebsiteAgent] Using LLM extraction for {page_url}")
         result = await self.llm_extractor.extract_leadership_from_html(
             cleaned.text, company_name, page_url
@@ -405,6 +421,16 @@ class WebsiteAgent(BaseCollector):
             lower_name = person.full_name.lower()
             invalid_names = ['contact us', 'our team', 'leadership', 'management', 'learn more']
             if any(inv in lower_name for inv in invalid_names):
+                continue
+
+            # Filter LLM-hallucinated placeholder names
+            placeholder_names = {
+                'jane doe', 'john doe', 'john smith', 'jane smith',
+                'bob smith', 'alice smith', 'joe smith', 'mary smith',
+                'test user', 'sample person', 'example name',
+            }
+            if self._normalize_name(person.full_name) in placeholder_names:
+                logger.warning(f"[WebsiteAgent] Filtering placeholder name: {person.full_name}")
                 continue
 
             valid.append(person)

@@ -15,6 +15,7 @@ import os
 from typing import Optional, List, Set, Tuple
 from urllib.parse import urljoin, urlparse, quote_plus
 
+import aiohttp
 from bs4 import BeautifulSoup
 
 from app.sources.people_collection.base_collector import BaseCollector
@@ -58,8 +59,15 @@ class PageFinder(BaseCollector):
             return path
         return urljoin(base_url, path)
 
-    def _is_same_domain(self, url1: str, url2: str) -> bool:
-        """Check if two URLs are on the same domain."""
+    def _is_same_domain(self, url1: str, url2: str, allow_subdomains: bool = True) -> bool:
+        """
+        Check if two URLs are on the same domain.
+
+        Args:
+            url1: First URL
+            url2: Second URL
+            allow_subdomains: If True, ir.company.com matches www.company.com
+        """
         domain1 = urlparse(url1).netloc.lower()
         domain2 = urlparse(url2).netloc.lower()
 
@@ -67,7 +75,41 @@ class PageFinder(BaseCollector):
         domain1 = domain1.replace("www.", "")
         domain2 = domain2.replace("www.", "")
 
-        return domain1 == domain2
+        # Exact match
+        if domain1 == domain2:
+            return True
+
+        # Allow subdomain matching (e.g., ir.lincolnelectric.com matches lincolnelectric.com)
+        if allow_subdomains:
+            # Extract root domain (last 2 parts)
+            parts1 = domain1.split('.')
+            parts2 = domain2.split('.')
+
+            # Get root domain (e.g., lincolnelectric.com)
+            root1 = '.'.join(parts1[-2:]) if len(parts1) >= 2 else domain1
+            root2 = '.'.join(parts2[-2:]) if len(parts2) >= 2 else domain2
+
+            return root1 == root2
+
+        return False
+
+    def _get_ir_subdomain_urls(self, base_url: str) -> list:
+        """
+        Get investor relations subdomain variations.
+
+        Many public companies host leadership info on ir.company.com or investors.company.com
+        """
+        parsed = urlparse(base_url)
+        domain = parsed.netloc.lower().replace("www.", "")
+
+        # Common IR subdomain patterns
+        ir_subdomains = [
+            f"ir.{domain}",
+            f"investors.{domain}",
+            f"investor.{domain}",
+        ]
+
+        return [f"https://{subdomain}" for subdomain in ir_subdomains]
 
     def _extract_links(self, html: str, base_url: str) -> List[Tuple[str, str]]:
         """
@@ -211,6 +253,36 @@ class PageFinder(BaseCollector):
         found_pages.extend(pattern_pages)
         logger.info(f"[PageFinder] URL patterns found {len(pattern_pages)} pages")
 
+        # Strategy 1b: Try IR subdomain patterns (for public companies)
+        if len(found_pages) < max_pages:
+            ir_urls = self._get_ir_subdomain_urls(base_url)
+            ir_patterns = [
+                "/governance/leadership-team",
+                "/governance/board-of-directors",
+                "/corporate-governance/leadership-team",
+                "/corporate-governance/board-of-directors",
+                "/governance/executive-officers",
+                "/governance/leadership-team/default.aspx",
+                "/governance/board-of-directors/default.aspx",
+            ]
+            for ir_base in ir_urls:
+                for pattern in ir_patterns:
+                    url = ir_base + pattern
+                    if url not in self._visited_urls:
+                        self._visited_urls.add(url)
+                        exists = await self._check_url_exists(url)
+                        if exists:
+                            page_type = self._infer_page_type(url)
+                            score = self._score_leadership_url(url)
+                            found_pages.append({
+                                'url': url,
+                                'page_type': page_type,
+                                'score': score + 5,  # Bonus for IR pages
+                                'source': 'ir_subdomain',
+                            })
+                            logger.info(f"[PageFinder] IR subdomain found: {url}")
+            logger.info(f"[PageFinder] IR subdomain strategy found {len([p for p in found_pages if p.get('source') == 'ir_subdomain'])} pages")
+
         # Strategy 2: Crawl homepage for links
         if len(found_pages) < max_pages:
             logger.debug(f"[PageFinder] Strategy 2: Crawling homepage for links")
@@ -233,8 +305,8 @@ class PageFinder(BaseCollector):
                     new_count += 1
             logger.info(f"[PageFinder] Sitemap found {new_count} additional pages")
 
-        # Strategy 4: Google search fallback (if still no pages and API configured)
-        if len(found_pages) == 0:
+        # Strategy 4: Google/DuckDuckGo search fallback (if few pages found)
+        if len(found_pages) < 2:
             logger.info(f"[PageFinder] Strategy 4: Trying Google search fallback")
             google_pages = await self._google_search_fallback(base_url)
             found_pages.extend(google_pages)
@@ -283,13 +355,15 @@ class PageFinder(BaseCollector):
 
         # Extract domain for site: search
         parsed = urlparse(base_url)
-        domain = parsed.netloc
+        domain = parsed.netloc.replace("www.", "")
 
-        # Search queries to try
+        # Search queries to try - include root domain to catch IR subdomains
         queries = [
             f"site:{domain} leadership team",
             f"site:{domain} about team executives",
             f"site:{domain} management board directors",
+            f"site:ir.{domain} leadership",
+            f"site:ir.{domain} governance board",
         ]
 
         for query in queries:
@@ -349,23 +423,27 @@ class PageFinder(BaseCollector):
         found = []
 
         parsed = urlparse(base_url)
-        domain = parsed.netloc
+        domain = parsed.netloc.replace("www.", "")
 
-        query = f"site:{domain} leadership team executives"
+        # Search entire domain including subdomains like ir.company.com
+        query = f"site:{domain} leadership team executives governance"
         search_url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
 
         try:
             # DuckDuckGo needs different headers
+            logger.info(f"[PageFinder] DuckDuckGo searching: {query}")
             html = await self.fetch_url(search_url)
 
             if not html:
-                logger.debug("[PageFinder] DuckDuckGo returned no results")
+                logger.warning("[PageFinder] DuckDuckGo returned empty response")
                 return found
 
             soup = BeautifulSoup(html, 'html.parser')
+            all_links = soup.select('.result__a')
+            logger.info(f"[PageFinder] DuckDuckGo found {len(all_links)} raw results")
 
             # DuckDuckGo HTML results are in .result__a links
-            for link in soup.select('.result__a'):
+            for link in all_links:
                 href = link.get('href', '')
 
                 # DuckDuckGo wraps URLs, need to extract
@@ -406,13 +484,16 @@ class PageFinder(BaseCollector):
 
         return found
 
-    async def _try_url_patterns(self, base_url: str) -> List[dict]:
+    async def _try_url_patterns(self, base_url: str, max_pages: int = 5) -> List[dict]:
         """Try common leadership URL patterns."""
         found = []
 
         # Try patterns in batches for efficiency
-        batch_size = 5
+        batch_size = 10
         for i in range(0, len(LEADERSHIP_URL_PATTERNS), batch_size):
+            # Stop early if we already have enough pages
+            if len(found) >= max_pages:
+                break
             batch = LEADERSHIP_URL_PATTERNS[i:i + batch_size]
 
             tasks = []
@@ -430,6 +511,9 @@ class PageFinder(BaseCollector):
                         url = base_url + batch[j]
                         page_type = self._infer_page_type(url)
                         score = self._score_leadership_url(url)
+                        if score <= 0:
+                            logger.debug(f"[PageFinder] Skipping low-score URL pattern: {url} (score={score})")
+                            continue
                         found.append({
                             'url': url,
                             'page_type': page_type,
@@ -440,9 +524,14 @@ class PageFinder(BaseCollector):
         return found
 
     async def _check_url_exists(self, url: str) -> bool:
-        """Check if a URL returns 200."""
+        """Check if a URL returns 200 with a fast timeout."""
         try:
-            return await self.check_url_exists(url)
+            await self.rate_limiter.acquire(url, self.source_type)
+            session = await self._get_session()
+            headers = self._get_headers(url)
+            fast_timeout = aiohttp.ClientTimeout(total=10)  # 10s instead of 30s for existence checks
+            async with session.head(url, headers=headers, allow_redirects=True, timeout=fast_timeout) as response:
+                return response.status == 200
         except Exception:
             return False
 

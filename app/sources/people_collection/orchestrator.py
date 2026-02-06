@@ -356,6 +356,9 @@ class PeopleCollectionOrchestrator:
             )
 
         finally:
+            # Close agent sessions to prevent resource leaks
+            await self._close_agents()
+
             if not self._provided_session:
                 session.close()
 
@@ -900,8 +903,32 @@ class PeopleCollectionOrchestrator:
             return diag
 
         finally:
+            # Close agent sessions to prevent resource leaks
+            await self._close_agents()
+
             if not self._provided_session:
                 session.close()
+
+    async def _close_agents(self):
+        """Close all agent HTTP sessions."""
+        if self._website_agent:
+            try:
+                await self._website_agent.close()
+            except Exception:
+                pass
+            self._website_agent = None
+        if hasattr(self, '_sec_agent') and self._sec_agent:
+            try:
+                await self._sec_agent.close()
+            except Exception:
+                pass
+            self._sec_agent = None
+        if hasattr(self, '_news_agent') and self._news_agent:
+            try:
+                await self._news_agent.close()
+            except Exception:
+                pass
+            self._news_agent = None
 
     async def _collect_from_website_with_diag(
         self,
