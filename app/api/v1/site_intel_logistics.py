@@ -12,8 +12,11 @@ Endpoints for:
 - Warehouse listings
 """
 import logging
-from typing import Optional, List
-from fastapi import APIRouter, Depends, Query, HTTPException
+import uuid
+from datetime import datetime
+from typing import Optional, List, Dict, Any
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
@@ -621,6 +624,201 @@ async def get_3pl_coverage(company_id: int, db: Session = Depends(get_db)):
 
 
 # =============================================================================
+# 3PL ENRICHMENT ENDPOINTS
+# =============================================================================
+
+class EnrichRequest(BaseModel):
+    """Request body for 3PL enrichment trigger."""
+    phases: List[str] = ["seed", "sec", "fmcsa"]
+
+
+# In-memory job store for enrichment status tracking
+_enrichment_jobs: Dict[str, Dict[str, Any]] = {}
+
+PHASE_SOURCE_MAP = {
+    "seed": "three_pl_enrichment",
+    "sec": "three_pl_sec",
+    "fmcsa": "three_pl_fmcsa",
+}
+
+
+async def _run_enrichment(job_id: str, phases: List[str], db: Session):
+    """Background task to run enrichment phases sequentially."""
+    from app.sources.site_intel.types import (
+        SiteIntelDomain, SiteIntelSource, CollectionConfig
+    )
+    from app.sources.site_intel.runner import COLLECTOR_REGISTRY
+    # Ensure enrichment collectors are registered
+    import app.sources.site_intel.logistics  # noqa: F401
+
+    job = _enrichment_jobs[job_id]
+    job["status"] = "running"
+    job["started_at"] = datetime.utcnow().isoformat()
+
+    results = {}
+
+    for phase in phases:
+        source_value = PHASE_SOURCE_MAP.get(phase)
+        if not source_value:
+            results[phase] = {"status": "skipped", "reason": f"Unknown phase: {phase}"}
+            continue
+
+        try:
+            source = SiteIntelSource(source_value)
+            collector_cls = COLLECTOR_REGISTRY.get(source)
+
+            if not collector_cls:
+                results[phase] = {"status": "skipped", "reason": "Collector not registered"}
+                continue
+
+            job["current_phase"] = phase
+            collector = collector_cls(db=db)
+
+            config = CollectionConfig(
+                domain=SiteIntelDomain.LOGISTICS,
+                source=source,
+                job_type="enrichment",
+            )
+
+            collector_job = collector.create_job(config)
+            collector.start_job()
+            result = await collector.collect(config)
+            collector.complete_job(result)
+
+            results[phase] = {
+                "status": result.status.value,
+                "inserted": result.inserted_items,
+                "updated": result.updated_items,
+                "failed": result.failed_items,
+                "duration_seconds": result.duration_seconds,
+            }
+
+        except Exception as e:
+            results[phase] = {"status": "failed", "error": str(e)}
+
+    job["status"] = "completed"
+    job["completed_at"] = datetime.utcnow().isoformat()
+    job["results"] = results
+    job["current_phase"] = None
+
+
+@router.post("/3pl-companies/enrich")
+async def trigger_3pl_enrichment(
+    request: EnrichRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    Trigger 3PL company data enrichment.
+
+    Phases:
+    - seed: Load curated seed data (HQ, employees, services, etc.)
+    - sec: Pull authoritative data from SEC EDGAR for public companies
+    - fmcsa: Cross-reference with FMCSA motor carrier records
+    """
+    valid_phases = [p for p in request.phases if p in PHASE_SOURCE_MAP]
+    if not valid_phases:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No valid phases. Choose from: {list(PHASE_SOURCE_MAP.keys())}",
+        )
+
+    job_id = str(uuid.uuid4())[:8]
+    _enrichment_jobs[job_id] = {
+        "job_id": job_id,
+        "phases": valid_phases,
+        "status": "pending",
+        "created_at": datetime.utcnow().isoformat(),
+        "current_phase": None,
+        "results": {},
+    }
+
+    background_tasks.add_task(_run_enrichment, job_id, valid_phases, db)
+
+    return {
+        "job_id": job_id,
+        "phases": valid_phases,
+        "status": "pending",
+        "message": f"Enrichment started with {len(valid_phases)} phases",
+    }
+
+
+@router.get("/3pl-companies/enrich/status/{job_id}")
+async def get_enrichment_status(job_id: str):
+    """Get the status of a 3PL enrichment job."""
+    job = _enrichment_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    return job
+
+
+@router.get("/3pl-companies/data-quality")
+async def get_3pl_data_quality(db: Session = Depends(get_db)):
+    """
+    Get data completeness report for 3PL companies.
+
+    Returns the count and percentage of non-null values for each enrichment field.
+    """
+    total = db.query(func.count(ThreePLCompany.id)).scalar() or 0
+
+    if total == 0:
+        return {"total": 0, "message": "No 3PL companies in database"}
+
+    def field_count(column):
+        return db.query(func.count(column)).filter(column.isnot(None)).scalar() or 0
+
+    def field_pct(count):
+        return round(count / total * 100, 1) if total > 0 else 0
+
+    revenue_count = field_count(ThreePLCompany.annual_revenue_million)
+    employees_count = field_count(ThreePLCompany.employee_count)
+    hq_city_count = field_count(ThreePLCompany.headquarters_city)
+    hq_state_count = field_count(ThreePLCompany.headquarters_state)
+    facility_count = field_count(ThreePLCompany.facility_count)
+    website_count = field_count(ThreePLCompany.website)
+    services_count = field_count(ThreePLCompany.services)
+    industries_count = field_count(ThreePLCompany.industries_served)
+    cold_chain_true = db.query(func.count(ThreePLCompany.id)).filter(
+        ThreePLCompany.has_cold_chain == True
+    ).scalar() or 0
+    hazmat_true = db.query(func.count(ThreePLCompany.id)).filter(
+        ThreePLCompany.has_hazmat == True
+    ).scalar() or 0
+    ecommerce_true = db.query(func.count(ThreePLCompany.id)).filter(
+        ThreePLCompany.has_ecommerce_fulfillment == True
+    ).scalar() or 0
+    cross_dock_true = db.query(func.count(ThreePLCompany.id)).filter(
+        ThreePLCompany.has_cross_dock == True
+    ).scalar() or 0
+    asset_based_count = field_count(ThreePLCompany.is_asset_based)
+    non_asset_count = field_count(ThreePLCompany.is_non_asset)
+    rank_count = field_count(ThreePLCompany.transport_topics_rank)
+
+    return {
+        "total": total,
+        "fields": {
+            "annual_revenue_million": {"count": revenue_count, "pct": field_pct(revenue_count)},
+            "employee_count": {"count": employees_count, "pct": field_pct(employees_count)},
+            "headquarters_city": {"count": hq_city_count, "pct": field_pct(hq_city_count)},
+            "headquarters_state": {"count": hq_state_count, "pct": field_pct(hq_state_count)},
+            "facility_count": {"count": facility_count, "pct": field_pct(facility_count)},
+            "website": {"count": website_count, "pct": field_pct(website_count)},
+            "services": {"count": services_count, "pct": field_pct(services_count)},
+            "industries_served": {"count": industries_count, "pct": field_pct(industries_count)},
+            "transport_topics_rank": {"count": rank_count, "pct": field_pct(rank_count)},
+            "is_asset_based": {"count": asset_based_count, "pct": field_pct(asset_based_count)},
+            "is_non_asset": {"count": non_asset_count, "pct": field_pct(non_asset_count)},
+        },
+        "specializations": {
+            "has_cold_chain": {"true_count": cold_chain_true, "pct": field_pct(cold_chain_true)},
+            "has_hazmat": {"true_count": hazmat_true, "pct": field_pct(hazmat_true)},
+            "has_ecommerce_fulfillment": {"true_count": ecommerce_true, "pct": field_pct(ecommerce_true)},
+            "has_cross_dock": {"true_count": cross_dock_true, "pct": field_pct(cross_dock_true)},
+        },
+    }
+
+
+# =============================================================================
 # WAREHOUSE LISTING ENDPOINTS
 # =============================================================================
 
@@ -899,6 +1097,10 @@ async def get_logistics_summary(db: Session = Depends(get_db)):
             # 3PL companies
             "/site-intel/logistics/3pl-companies",
             "/site-intel/logistics/3pl-companies/{company_id}/coverage",
+            # 3PL enrichment
+            "/site-intel/logistics/3pl-companies/enrich",
+            "/site-intel/logistics/3pl-companies/enrich/status/{job_id}",
+            "/site-intel/logistics/3pl-companies/data-quality",
             # Warehouse listings
             "/site-intel/logistics/warehouse-listings",
             "/site-intel/logistics/warehouse-listings/market-summary",

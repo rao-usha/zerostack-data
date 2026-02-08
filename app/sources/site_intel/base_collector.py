@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any, Type
 
 import httpx
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert
 
@@ -356,6 +357,67 @@ class BaseCollector(ABC):
             self.db.commit()
 
             # PostgreSQL returns rowcount for affected rows
+            batch_affected = result.rowcount
+            inserted += batch_affected
+
+        return inserted, updated
+
+    def null_preserving_upsert(
+        self,
+        model: Type,
+        records: List[Dict[str, Any]],
+        unique_columns: List[str],
+        update_columns: Optional[List[str]] = None,
+        batch_size: int = 1000,
+    ) -> tuple[int, int]:
+        """
+        Bulk upsert that preserves existing non-null values.
+
+        Uses PostgreSQL COALESCE(EXCLUDED.col, existing.col) so that
+        new nulls don't overwrite existing data. This is critical for
+        enrichment pipelines where each source only provides a subset of fields.
+
+        Args:
+            model: SQLAlchemy model class
+            records: List of record dictionaries
+            unique_columns: Columns that form the unique constraint
+            update_columns: Columns to update on conflict (None = all non-unique)
+            batch_size: Records per batch
+
+        Returns:
+            Tuple of (inserted_count, updated_count)
+        """
+        if not records:
+            return 0, 0
+
+        inserted = 0
+        updated = 0
+
+        if update_columns is None:
+            all_columns = set(records[0].keys())
+            update_columns = list(all_columns - set(unique_columns) - {'id'})
+
+        for i in range(0, len(records), batch_size):
+            batch = records[i:i + batch_size]
+
+            stmt = insert(model).values(batch)
+
+            if update_columns:
+                # Use COALESCE: prefer new value, fall back to existing
+                update_dict = {
+                    col: func.coalesce(stmt.excluded[col], getattr(model, col))
+                    for col in update_columns
+                }
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=unique_columns,
+                    set_=update_dict,
+                )
+            else:
+                stmt = stmt.on_conflict_do_nothing(index_elements=unique_columns)
+
+            result = self.db.execute(stmt)
+            self.db.commit()
+
             batch_affected = result.rowcount
             inserted += batch_affected
 
