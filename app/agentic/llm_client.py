@@ -202,6 +202,22 @@ class LLMClient:
                 self._total_tokens_used += response.total_tokens
                 self._total_cost_usd += response.cost_usd
 
+                # Persist to DB via cost tracker
+                try:
+                    from app.core.llm_cost_tracker import get_cost_tracker
+                    tracker = get_cost_tracker()
+                    await tracker.record(
+                        model=response.model,
+                        input_tokens=response.input_tokens,
+                        output_tokens=response.output_tokens,
+                        source="llm_client",
+                        provider=self.provider,
+                        cost_usd=response.cost_usd,
+                        prompt_chars=len(prompt),
+                    )
+                except Exception as track_err:
+                    logger.debug(f"[LLMClient] Cost tracking failed: {track_err}")
+
                 return response
 
             except Exception as e:

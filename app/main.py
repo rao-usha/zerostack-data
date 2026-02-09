@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news, reports, deals, benchmarks, auth, workspaces, form_d, corporate_registry, form_adv, web_traffic, github, scores, entities, glassdoor, app_rankings, predictions, agents, diligence, monitors, competitive, hunter, anomalies, market, reports_gen, lp_collection, fo_collection, pe_firms, pe_companies, pe_people, pe_deals, people, companies_leadership, collection_jobs, people_portfolios, peer_sets, people_watchlists, people_analytics, people_reports, people_data_quality, people_jobs, workflows
+from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news, reports, deals, benchmarks, auth, workspaces, form_d, corporate_registry, form_adv, web_traffic, github, scores, entities, glassdoor, app_rankings, predictions, agents, diligence, monitors, competitive, hunter, anomalies, market, reports_gen, lp_collection, fo_collection, pe_firms, pe_companies, pe_people, pe_deals, people, companies_leadership, collection_jobs, people_portfolios, peer_sets, people_watchlists, people_analytics, people_reports, people_data_quality, people_jobs, workflows, llm_costs
 # Site Intelligence Platform
 from app.api.v1 import site_intel_power, site_intel_telecom, site_intel_transport, site_intel_labor, site_intel_risk, site_intel_incentives, site_intel_logistics, site_intel_water_utilities, site_intel_sites
 from app.graphql import graphql_app
@@ -863,6 +863,10 @@ Browse the endpoint sections below to see what's available:
         {
             "name": "People Watchlists",
             "description": "👁️ **Executive Watchlists** - Track specific executives and get change alerts"
+        },
+        {
+            "name": "LLM Costs",
+            "description": "💰 **LLM Cost Tracking** - Monitor token usage and costs across all LLM-powered features"
         }
     ]
 )
@@ -987,6 +991,9 @@ app.include_router(site_intel_sites.router, prefix="/api/v1")
 
 # Multi-Agent Orchestrator
 app.include_router(workflows.router, prefix="/api/v1")
+
+# LLM Cost Tracking
+app.include_router(llm_costs.router, prefix="/api/v1")
 
 # GraphQL API
 app.include_router(graphql_app, prefix="/graphql", tags=["graphql"])

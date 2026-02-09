@@ -259,6 +259,22 @@ class OrgChartBuilder:
                 )
             )
 
+            # Track LLM cost
+            try:
+                from app.core.llm_cost_tracker import get_cost_tracker
+                tracker = get_cost_tracker()
+                in_tok = response.usage.prompt_tokens if response.usage else 0
+                out_tok = response.usage.completion_tokens if response.usage else 0
+                await tracker.record(
+                    model="gpt-4o",
+                    input_tokens=in_tok,
+                    output_tokens=out_tok,
+                    source="org_chart",
+                    prompt_chars=len(prompt),
+                )
+            except Exception as track_err:
+                logger.debug(f"[OrgChartBuilder] Cost tracking failed: {track_err}")
+
             text = response.choices[0].message.content.strip()
 
             # Parse JSON
@@ -374,6 +390,22 @@ class OrgChartBuilder:
                         temperature=0.1,
                     )
                 )
+
+                # Track LLM cost
+                try:
+                    from app.core.llm_cost_tracker import get_cost_tracker
+                    tracker = get_cost_tracker()
+                    in_tok = response.usage.prompt_tokens if response.usage else 0
+                    out_tok = response.usage.completion_tokens if response.usage else 0
+                    await tracker.record(
+                        model="gpt-4o",
+                        input_tokens=in_tok,
+                        output_tokens=out_tok,
+                        source="org_chart",
+                        prompt_chars=len(prompt),
+                    )
+                except Exception as track_err:
+                    logger.debug(f"[OrgChartBuilder] Cost tracking failed: {track_err}")
 
                 text = response.choices[0].message.content.strip()
 

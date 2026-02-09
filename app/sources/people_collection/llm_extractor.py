@@ -89,6 +89,8 @@ class LLMExtractor:
                         messages=[{"role": "user", "content": prompt}],
                     )
                     result = response.content[0].text
+                    input_tokens = response.usage.input_tokens if response.usage else 0
+                    output_tokens = response.usage.output_tokens if response.usage else 0
                 else:
                     # OpenAI
                     response = await asyncio.to_thread(
@@ -99,6 +101,22 @@ class LLMExtractor:
                         messages=[{"role": "user", "content": prompt}],
                     )
                     result = response.choices[0].message.content
+                    input_tokens = response.usage.prompt_tokens if response.usage else 0
+                    output_tokens = response.usage.completion_tokens if response.usage else 0
+
+                # Track LLM cost
+                try:
+                    from app.core.llm_cost_tracker import get_cost_tracker
+                    tracker = get_cost_tracker()
+                    await tracker.record(
+                        model=self.config.model,
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        source="people_collection",
+                        prompt_chars=len(prompt),
+                    )
+                except Exception as track_err:
+                    logger.debug(f"[LLMExtractor] Cost tracking failed: {track_err}")
 
                 logger.info(f"[LLMExtractor] LLM response received: {len(result) if result else 0} chars")
                 logger.debug(f"[LLMExtractor] Response preview: {result[:500] if result else 'None'}...")

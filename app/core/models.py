@@ -5,7 +5,7 @@ These tables are source-agnostic and used by all data source adapters.
 """
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Column, Integer, String, DateTime, Text, JSON, Enum, UniqueConstraint, Index
+from sqlalchemy import Column, Integer, String, DateTime, Text, JSON, Enum, UniqueConstraint, Index, Numeric
 from sqlalchemy.orm import declarative_base
 import enum
 
@@ -2580,4 +2580,39 @@ class LpCollectionJob(Base):
         return (
             f"<LpCollectionJob(id={self.id}, type='{self.job_type}', "
             f"status='{self.status}', progress={self.completed_lps}/{self.total_lps})>"
+        )
+
+
+class LLMUsage(Base):
+    """
+    Tracks every LLM API call with model, tokens, cost, and source context.
+
+    Persisted to database for cost analysis across collection runs.
+    """
+    __tablename__ = "llm_usage"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    model = Column(String(100), nullable=False)
+    provider = Column(String(20), nullable=True)  # "openai" or "anthropic"
+    input_tokens = Column(Integer, nullable=False, default=0)
+    output_tokens = Column(Integer, nullable=False, default=0)
+    cost_usd = Column(Numeric(10, 6), nullable=False, default=0)
+    source = Column(String(100), nullable=True)  # "people_collection", "org_chart", etc.
+    company_id = Column(Integer, nullable=True)
+    job_id = Column(Integer, nullable=True)
+    prompt_chars = Column(Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        Index('idx_llm_usage_source', 'source'),
+        Index('idx_llm_usage_model', 'model'),
+        Index('idx_llm_usage_created', 'created_at'),
+        Index('idx_llm_usage_job', 'job_id'),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<LLMUsage(id={self.id}, model='{self.model}', "
+            f"tokens={self.input_tokens}+{self.output_tokens}, "
+            f"cost=${self.cost_usd}, source='{self.source}')>"
         )

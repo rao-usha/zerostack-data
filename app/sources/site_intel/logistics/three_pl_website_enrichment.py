@@ -398,6 +398,22 @@ Page text:
                 max_tokens=200,
             )
 
+            # Track LLM cost
+            try:
+                from app.core.llm_cost_tracker import get_cost_tracker
+                tracker = get_cost_tracker()
+                in_tok = response.usage.prompt_tokens if response.usage else 0
+                out_tok = response.usage.completion_tokens if response.usage else 0
+                await tracker.record(
+                    model="gpt-4o-mini",
+                    input_tokens=in_tok,
+                    output_tokens=out_tok,
+                    source="3pl_enrichment",
+                    prompt_chars=len(prompt),
+                )
+            except Exception as track_err:
+                logger.debug(f"[3PL Enrichment] Cost tracking failed: {track_err}")
+
             content = response.choices[0].message.content.strip()
             # Extract JSON from response (handle markdown code blocks)
             if "```" in content:
