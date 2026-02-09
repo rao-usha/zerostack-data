@@ -51,7 +51,7 @@ services:
       - ./data/seeds:/app/data/seeds
       - ./scripts:/app/scripts
       - ./.kaggle:/home/appuser/.kaggle:ro
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   frontend:
     image: nginx:alpine

@@ -397,8 +397,17 @@ class BaseCollector(ABC):
             all_columns = set(records[0].keys())
             update_columns = list(all_columns - set(unique_columns) - {'id'})
 
-        for i in range(0, len(records), batch_size):
-            batch = records[i:i + batch_size]
+        # Normalize records: all dicts must have the same keys for batch insert
+        all_keys = set()
+        for record in records:
+            all_keys.update(record.keys())
+        normalized_records = [
+            {k: record.get(k, None) for k in all_keys}
+            for record in records
+        ]
+
+        for i in range(0, len(normalized_records), batch_size):
+            batch = normalized_records[i:i + batch_size]
 
             stmt = insert(model).values(batch)
 

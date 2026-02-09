@@ -4,11 +4,13 @@ SEC EDGAR API routes.
 Endpoints for ingesting SEC corporate filings.
 """
 import logging
+import asyncio
 from typing import List, Optional
-from datetime import date
+from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.core.database import get_db
 from app.core.models import IngestionJob, JobStatus
@@ -500,6 +502,74 @@ async def ingest_full_company(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/ingest/industrial-companies")
+async def ingest_industrial_companies(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest SEC XBRL financial data for all industrial companies with CIK numbers.
+
+    Reads CIKs from the `industrial_companies` table and ingests income statements,
+    balance sheets, and cash flow statements for each company.
+
+    Returns a master job ID and the list of company CIKs queued for ingestion.
+    """
+    try:
+        # Query all industrial companies with CIK numbers
+        result = db.execute(text(
+            "SELECT id, name, cik FROM industrial_companies WHERE cik IS NOT NULL AND cik != '' ORDER BY name"
+        ))
+        companies = result.fetchall()
+
+        if not companies:
+            raise HTTPException(
+                status_code=404,
+                detail="No industrial companies with CIK numbers found"
+            )
+
+        # Create a master job
+        job_config = {
+            "source": "sec",
+            "type": "industrial_companies_batch",
+            "company_count": len(companies),
+        }
+
+        master_job = IngestionJob(
+            source="sec",
+            status=JobStatus.PENDING,
+            config=job_config
+        )
+        db.add(master_job)
+        db.commit()
+        db.refresh(master_job)
+
+        company_list = [
+            {"id": row[0], "name": row[1], "cik": row[2]}
+            for row in companies
+        ]
+
+        # Run batch ingestion in background
+        background_tasks.add_task(
+            _run_industrial_companies_batch,
+            master_job.id,
+            company_list
+        )
+
+        return {
+            "job_id": master_job.id,
+            "status": "pending",
+            "message": f"Batch ingestion started for {len(companies)} industrial companies",
+            "companies": company_list
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to start industrial companies batch: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # =============================================================================
 # Background Task Functions
 # =============================================================================
@@ -543,14 +613,14 @@ async def _run_financial_data_ingestion(
 ):
     """
     Background task for running XBRL financial data ingestion.
-    
+
     This function is called by FastAPI's background tasks system.
     """
     from app.core.database import get_session_factory
-    
+
     SessionLocal = get_session_factory()
     db = SessionLocal()
-    
+
     try:
         await ingest_xbrl.ingest_company_financial_data(
             db=db,
@@ -559,6 +629,101 @@ async def _run_financial_data_ingestion(
         )
     except Exception as e:
         logger.error(f"Background XBRL ingestion failed for job {job_id}: {e}", exc_info=True)
+    finally:
+        db.close()
+
+
+async def _run_industrial_companies_batch(
+    master_job_id: int,
+    companies: List[dict]
+):
+    """
+    Background task: sequentially ingest financial data for all industrial companies.
+
+    Processes companies one at a time with a small delay between each to respect
+    SEC rate limits (10 req/sec). Each company creates its own sub-job.
+    """
+    from app.core.database import get_session_factory
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+
+    results = []
+    succeeded = 0
+    failed = 0
+
+    try:
+        # Mark master job as running
+        master_job = db.query(IngestionJob).filter(IngestionJob.id == master_job_id).first()
+        if master_job:
+            master_job.status = JobStatus.RUNNING
+            master_job.started_at = datetime.utcnow()
+            db.commit()
+
+        for i, company in enumerate(companies):
+            cik = company["cik"]
+            name = company["name"]
+            cik_normalized = metadata.normalize_cik(cik)
+
+            logger.info(f"[{i+1}/{len(companies)}] Ingesting financials for {name} (CIK {cik_normalized})")
+
+            # Create a sub-job for this company
+            sub_job = IngestionJob(
+                source="sec",
+                status=JobStatus.PENDING,
+                config={
+                    "source": "sec",
+                    "type": "xbrl_financial_data",
+                    "cik": cik_normalized,
+                    "company_name": name,
+                    "parent_job_id": master_job_id,
+                }
+            )
+            db.add(sub_job)
+            db.commit()
+            db.refresh(sub_job)
+
+            try:
+                result = await ingest_xbrl.ingest_company_financial_data(
+                    db=db,
+                    job_id=sub_job.id,
+                    cik=cik_normalized,
+                    skip_facts=True,  # Skip raw facts for batch — much faster
+                )
+                results.append({"company": name, "cik": cik_normalized, "status": "success", **result})
+                succeeded += 1
+                logger.info(f"  -> {name}: {result['total_rows']} rows ingested")
+            except Exception as e:
+                results.append({"company": name, "cik": cik_normalized, "status": "failed", "error": str(e)})
+                failed += 1
+                logger.error(f"  -> {name}: FAILED - {e}")
+
+            # Brief delay between companies to stay well under SEC rate limits
+            if i < len(companies) - 1:
+                await asyncio.sleep(1.0)
+
+        # Update master job
+        master_job = db.query(IngestionJob).filter(IngestionJob.id == master_job_id).first()
+        if master_job:
+            master_job.status = JobStatus.SUCCESS if failed == 0 else JobStatus.FAILED
+            master_job.completed_at = datetime.utcnow()
+            master_job.rows_inserted = sum(r.get("total_rows", 0) for r in results if r["status"] == "success")
+            master_job.error_message = f"{succeeded} succeeded, {failed} failed" if failed > 0 else None
+            db.commit()
+
+        logger.info(f"Industrial companies batch complete: {succeeded} succeeded, {failed} failed")
+
+    except Exception as e:
+        logger.error(f"Industrial companies batch failed: {e}", exc_info=True)
+        try:
+            master_job = db.query(IngestionJob).filter(IngestionJob.id == master_job_id).first()
+            if master_job:
+                master_job.status = JobStatus.FAILED
+                master_job.completed_at = datetime.utcnow()
+                master_job.error_message = str(e)
+                db.commit()
+        except Exception:
+            pass
     finally:
         db.close()
 

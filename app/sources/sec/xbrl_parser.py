@@ -80,6 +80,64 @@ BALANCE_SHEET_MAPPINGS = {
     "StockholdersEquity": ["StockholdersEquity"],
 }
 
+# =============================================================================
+# Column name mapping: _to_snake_case() output → actual DB column names
+# The XBRL PascalCase names produce long snake_case names that don't match
+# the shorter column names in the SQLAlchemy models.
+# =============================================================================
+
+INCOME_COLUMN_MAP = {
+    "operating_income_loss": "operating_income",
+    "net_income_loss": "net_income",
+    "research_and_development_expense": "research_and_development",
+    "selling_general_and_administrative_expense": "selling_general_administrative",
+    "income_loss_from_continuing_operations_before_income_taxes_extraordinary_items_noncontrolling_interest": "income_before_tax",
+    "income_tax_expense_benefit": "income_tax_expense",
+    "interest_income_expense_net": "interest_income",
+    "other_nonoperating_income_expense": "other_income_expense",
+    "weighted_average_number_of_shares_outstanding_basic": "weighted_average_shares_basic",
+    "weighted_average_number_of_diluted_shares_outstanding": "weighted_average_shares_diluted",
+}
+
+BALANCE_SHEET_COLUMN_MAP = {
+    "assets": "total_assets",
+    "assets_current": "current_assets",
+    "cash_and_cash_equivalents_at_carrying_value": "cash_and_equivalents",
+    "accounts_receivable_net_current": "accounts_receivable",
+    "inventory_net": "inventory",
+    "property_plant_and_equipment_net": "property_plant_equipment",
+    "intangible_assets_net_excluding_goodwill": "intangible_assets",
+    "liabilities": "total_liabilities",
+    "liabilities_current": "current_liabilities",
+    "accounts_payable_current": "accounts_payable",
+    "short_term_borrowings": "short_term_debt",
+    "common_stock_value": "common_stock",
+    "retained_earnings_accumulated_deficit": "retained_earnings",
+    "treasury_stock_value": "treasury_stock",
+}
+
+CASH_FLOW_COLUMN_MAP = {
+    "net_income_loss": "net_income",
+    "depreciation_depletion_and_amortization": "depreciation_amortization",
+    "share_based_compensation": "stock_based_compensation",
+    "deferred_income_tax_expense_benefit": "deferred_income_taxes",
+    "increase_decrease_in_operating_capital": "changes_in_working_capital",
+    "net_cash_provided_by_used_in_operating_activities": "cash_from_operations",
+    "payments_to_acquire_property_plant_and_equipment": "capital_expenditures",
+    "payments_to_acquire_businesses_net_of_cash_acquired": "acquisitions",
+    "payments_to_acquire_investments": "purchases_of_investments",
+    "proceeds_from_sale_of_investments": "sales_of_investments",
+    "net_cash_provided_by_used_in_investing_activities": "cash_from_investing",
+    "proceeds_from_issuance_of_debt": "debt_issued",
+    "repayments_of_debt": "debt_repaid",
+    "payments_of_dividends": "dividends_paid",
+    "payments_for_repurchase_of_common_stock": "stock_repurchased",
+    "proceeds_from_issuance_of_common_stock": "stock_issued",
+    "net_cash_provided_by_used_in_financing_activities": "cash_from_financing",
+    "cash_cash_equivalents_restricted_cash_and_restricted_cash_equivalents_period_increase_decrease_including_exchange_rate_effect": "net_change_in_cash",
+    "cash_and_cash_equivalents_at_carrying_value": "cash_end_of_period",
+}
+
 CASH_FLOW_MAPPINGS = {
     # Operating activities
     "NetIncomeLoss": ["NetIncomeLoss"],
@@ -365,10 +423,10 @@ def _build_income_statements(
         # Map each line item
         for std_name, fact_names in INCOME_STATEMENT_MAPPINGS.items():
             value = _find_fact_value(period_facts, fact_names, period_end, fiscal_year, fiscal_period)
-            # Convert to snake_case for database column names
             col_name = _to_snake_case(std_name)
+            col_name = INCOME_COLUMN_MAP.get(col_name, col_name)
             income_stmt[col_name] = value
-        
+
         income_statements.append(income_stmt)
     
     logger.info(f"Built {len(income_statements)} income statement records for CIK {cik}")
@@ -429,8 +487,9 @@ def _build_balance_sheets(
         for std_name, fact_names in BALANCE_SHEET_MAPPINGS.items():
             value = _find_fact_value(period_facts, fact_names, period_end, fiscal_year, fiscal_period)
             col_name = _to_snake_case(std_name)
+            col_name = BALANCE_SHEET_COLUMN_MAP.get(col_name, col_name)
             balance_sheet[col_name] = value
-        
+
         balance_sheets.append(balance_sheet)
     
     logger.info(f"Built {len(balance_sheets)} balance sheet records for CIK {cik}")
@@ -494,16 +553,16 @@ def _build_cash_flow_statements(
         for std_name, fact_names in CASH_FLOW_MAPPINGS.items():
             value = _find_fact_value(period_facts, fact_names, period_end, fiscal_year, fiscal_period)
             col_name = _to_snake_case(std_name)
+            col_name = CASH_FLOW_COLUMN_MAP.get(col_name, col_name)
             cash_flow[col_name] = value
-        
+
         # Calculate free cash flow if we have the components
-        if cash_flow.get("net_cash_provided_by_used_in_operating_activities") and \
-           cash_flow.get("payments_to_acquire_property_plant_and_equipment"):
-            operating_cf = cash_flow["net_cash_provided_by_used_in_operating_activities"]
-            capex = cash_flow["payments_to_acquire_property_plant_and_equipment"]
-            # CapEx is usually negative, so we add it
-            cash_flow["free_cash_flow"] = operating_cf + capex
-        
+        if cash_flow.get("cash_from_operations") and cash_flow.get("capital_expenditures"):
+            operating_cf = cash_flow["cash_from_operations"]
+            capex = cash_flow["capital_expenditures"]
+            # SEC XBRL reports CapEx as positive (PaymentsToAcquire...), so subtract
+            cash_flow["free_cash_flow"] = operating_cf - capex
+
         cash_flows.append(cash_flow)
     
     logger.info(f"Built {len(cash_flows)} cash flow statement records for CIK {cik}")

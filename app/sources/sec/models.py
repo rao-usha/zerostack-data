@@ -3,7 +3,7 @@ SEC EDGAR specific database models for structured financial data.
 
 These tables store parsed XBRL financial data and filing sections.
 """
-from sqlalchemy import Column, Integer, String, Text, Date, DECIMAL, Index, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Date, DECIMAL, Index, ForeignKey, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 
 from app.core.models import Base
@@ -51,6 +51,8 @@ class SECFinancialFact(Base):
     frame = Column(String(50), nullable=True)  # e.g., "CY2023Q4"
     
     __table_args__ = (
+        UniqueConstraint('cik', 'fact_name', 'period_end_date', 'fiscal_year', 'fiscal_period', 'unit',
+                         name='uq_sec_facts_cik_fact_period_unit'),
         Index('idx_sec_facts_cik_fact_period', 'cik', 'fact_name', 'period_end_date'),
         Index('idx_sec_facts_fiscal', 'fiscal_year', 'fiscal_period'),
     )
@@ -109,6 +111,8 @@ class SECIncomeStatement(Base):
     weighted_average_shares_diluted = Column(DECIMAL(20, 0), nullable=True)
     
     __table_args__ = (
+        UniqueConstraint('cik', 'period_end_date', 'fiscal_year', 'fiscal_period',
+                         name='uq_sec_income_cik_period'),
         Index('idx_sec_income_cik_period', 'cik', 'period_end_date'),
         Index('idx_sec_income_fiscal', 'fiscal_year', 'fiscal_period'),
     )
@@ -170,6 +174,8 @@ class SECBalanceSheet(Base):
     stockholders_equity = Column(DECIMAL(20, 2), nullable=True)
     
     __table_args__ = (
+        UniqueConstraint('cik', 'period_end_date', 'fiscal_year', 'fiscal_period',
+                         name='uq_sec_balance_cik_period'),
         Index('idx_sec_balance_cik_period', 'cik', 'period_end_date'),
         Index('idx_sec_balance_fiscal', 'fiscal_year', 'fiscal_period'),
     )
@@ -233,6 +239,8 @@ class SECCashFlowStatement(Base):
     free_cash_flow = Column(DECIMAL(20, 2), nullable=True)  # Operating CF - CapEx
     
     __table_args__ = (
+        UniqueConstraint('cik', 'period_end_date', 'fiscal_year', 'fiscal_period',
+                         name='uq_sec_cashflow_cik_period'),
         Index('idx_sec_cashflow_cik_period', 'cik', 'period_end_date'),
         Index('idx_sec_cashflow_fiscal', 'fiscal_year', 'fiscal_period'),
     )

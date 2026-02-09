@@ -7,8 +7,10 @@ Fetches public water system data from EPA Envirofacts:
 - Water source types
 - Compliance violations
 
-Data source: https://enviro.epa.gov/envirofacts/
+Data source: https://data.epa.gov/efservice/
 No API key required - public access.
+
+Note: EPA migrated from enviro.epa.gov to data.epa.gov in 2025.
 """
 import logging
 from datetime import datetime
@@ -59,14 +61,14 @@ class EPASDWISCollector(BaseCollector):
     default_timeout = 120.0
     rate_limit_delay = 1.0  # Be respectful to EPA servers
 
-    # EPA Envirofacts SDWIS API
-    ENVIROFACTS_URL = "https://enviro.epa.gov/enviro/efservice"
+    # EPA Envirofacts SDWIS API (migrated to data.epa.gov in 2025)
+    ENVIROFACTS_URL = "https://data.epa.gov/efservice"
 
     def __init__(self, db: Session, api_key: Optional[str] = None, **kwargs):
         super().__init__(db, api_key, **kwargs)
 
     def get_default_base_url(self) -> str:
-        return "https://enviro.epa.gov/enviro/efservice"
+        return "https://data.epa.gov/efservice"
 
     def get_default_headers(self) -> Dict[str, str]:
         return {
@@ -128,7 +130,8 @@ class EPASDWISCollector(BaseCollector):
                 await self.apply_rate_limit()
 
                 # EPA Envirofacts URL format: /table/column/value/rows/start:end/format
-                url = f"{self.ENVIROFACTS_URL}/SDWIS_WATER_SYSTEM/PRIMACY_AGENCY_CODE/{state}/JSON"
+                # Note: Table changed from SDWIS_WATER_SYSTEM to WATER_SYSTEM in 2025 migration
+                url = f"{self.ENVIROFACTS_URL}/WATER_SYSTEM/STATE_CODE/{state}/JSON"
 
                 try:
                     response = await client.get(url)
@@ -183,36 +186,40 @@ class EPASDWISCollector(BaseCollector):
 
     def _transform_water_system(self, system: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Transform EPA SDWIS water system to database format."""
-        pwsid = system.get("PWSID")
+        # New API uses lowercase field names
+        pwsid = system.get("pwsid") or system.get("PWSID")
         if not pwsid:
             return None
 
-        # Map PWS type
-        pws_type_code = system.get("PWS_TYPE_CODE", "")
+        # Map PWS type (new API uses lowercase)
+        pws_type_code = system.get("pws_type_code") or system.get("PWS_TYPE_CODE") or ""
         pws_type = PWS_TYPE_MAP.get(pws_type_code, pws_type_code.lower() if pws_type_code else None)
 
         # Map source type
-        source_code = system.get("PRIMARY_SOURCE_CODE", "")
+        source_code = system.get("primary_source_code") or system.get("PRIMARY_SOURCE_CODE") or ""
         source_name = SOURCE_TYPE_MAP.get(source_code, source_code)
 
         # Activity status
-        activity_code = system.get("PWS_ACTIVITY_CODE", "")
+        activity_code = system.get("pws_activity_code") or system.get("PWS_ACTIVITY_CODE") or ""
         is_active = activity_code.upper() == "A"
+
+        # Get state from state_code or primacy_agency_code
+        state = system.get("state_code") or system.get("primacy_agency_code") or system.get("PRIMACY_AGENCY_CODE")
 
         return {
             "pwsid": pwsid,
-            "pws_name": system.get("PWS_NAME"),
+            "pws_name": system.get("pws_name") or system.get("PWS_NAME"),
             "pws_type": pws_type,
-            "state": system.get("PRIMACY_AGENCY_CODE"),
-            "county": system.get("COUNTY_SERVED"),
-            "city": system.get("CITY_SERVED"),
-            "zip_code": system.get("ZIP_CODE"),
-            "population_served": self._parse_int(system.get("POPULATION_SERVED_COUNT")),
-            "service_connections": self._parse_int(system.get("SERVICE_CONNECTIONS_COUNT")),
-            "service_area_type": system.get("SERVICE_AREA_TYPE_CODE"),
+            "state": state,
+            "county": system.get("county_served") or system.get("COUNTY_SERVED"),
+            "city": system.get("city_name") or system.get("city_served") or system.get("CITY_SERVED"),
+            "zip_code": system.get("zip_code") or system.get("ZIP_CODE"),
+            "population_served": self._parse_int(system.get("population_served_count") or system.get("POPULATION_SERVED_COUNT")),
+            "service_connections": self._parse_int(system.get("service_connections_count") or system.get("SERVICE_CONNECTIONS_COUNT")),
+            "service_area_type": system.get("service_area_type_code") or system.get("SERVICE_AREA_TYPE_CODE"),
             "primary_source_code": source_code,
             "primary_source_name": source_name,
-            "source_water_protection": system.get("SOURCE_WATER_PROTECTION_CODE") == "Y",
+            "source_water_protection": (system.get("source_water_protection_code") or system.get("SOURCE_WATER_PROTECTION_CODE")) == "Y",
             "is_active": is_active,
             "compliance_status": "compliant" if is_active else "inactive",
             "source": "epa_sdwis",
@@ -230,7 +237,8 @@ class EPASDWISCollector(BaseCollector):
             for state in states:
                 await self.apply_rate_limit()
 
-                url = f"{self.ENVIROFACTS_URL}/SDWIS_VIOLATION/PRIMACY_AGENCY_CODE/{state}/JSON"
+                # Note: Table changed from SDWIS_VIOLATION to VIOLATION in 2025 migration
+                url = f"{self.ENVIROFACTS_URL}/VIOLATION/STATE_CODE/{state}/JSON"
 
                 try:
                     response = await client.get(url)
@@ -280,14 +288,15 @@ class EPASDWISCollector(BaseCollector):
 
     def _transform_violation(self, violation: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Transform EPA SDWIS violation to database format."""
-        pwsid = violation.get("PWSID")
-        violation_id = violation.get("VIOLATION_ID")
+        # New API uses lowercase field names
+        pwsid = violation.get("pwsid") or violation.get("PWSID")
+        violation_id = violation.get("violation_id") or violation.get("VIOLATION_ID")
 
         if not pwsid or not violation_id:
             return None
 
         # Parse violation date
-        viol_date = violation.get("COMPL_PER_BEGIN_DATE")
+        viol_date = violation.get("compl_per_begin_date") or violation.get("COMPL_PER_BEGIN_DATE")
         violation_date = None
         if viol_date:
             try:
@@ -296,22 +305,22 @@ class EPASDWISCollector(BaseCollector):
                 violation_date = datetime.utcnow().date()
 
         # Determine if health-based
-        is_health_based = violation.get("IS_HEALTH_BASED_IND", "N") == "Y"
+        is_health_based = (violation.get("is_health_based_ind") or violation.get("IS_HEALTH_BASED_IND") or "N") == "Y"
 
         return {
             "pwsid": pwsid,
             "violation_id": f"{pwsid}_{violation_id}",
-            "violation_type": violation.get("VIOLATION_CATEGORY_CODE"),
-            "contaminant_code": violation.get("CONTAMINANT_CODE"),
-            "contaminant_name": violation.get("CONTAMINANT_NAME"),
-            "contaminant_group": violation.get("CONTAMINANT_GROUP_CODE"),
+            "violation_type": violation.get("violation_category_code") or violation.get("VIOLATION_CATEGORY_CODE"),
+            "contaminant_code": violation.get("contaminant_code") or violation.get("CONTAMINANT_CODE"),
+            "contaminant_name": violation.get("contaminant_name") or violation.get("CONTAMINANT_NAME"),
+            "contaminant_group": violation.get("rule_group_code") or violation.get("CONTAMINANT_GROUP_CODE"),
             "violation_date": violation_date,
-            "compliance_period": violation.get("COMPLIANCE_PERIOD"),
+            "compliance_period": violation.get("compliance_period") or violation.get("COMPLIANCE_PERIOD"),
             "is_health_based": is_health_based,
-            "severity_level": violation.get("SEVERITY_IND_CNT"),
-            "enforcement_action": violation.get("ENFORCEMENT_ACTION_TYPE"),
-            "returned_to_compliance": violation.get("RTC_DATE") is not None,
-            "returned_to_compliance_date": self._parse_date(violation.get("RTC_DATE")),
+            "severity_level": violation.get("severity_ind_cnt") or violation.get("SEVERITY_IND_CNT"),
+            "enforcement_action": violation.get("enforcement_action_type") or violation.get("ENFORCEMENT_ACTION_TYPE"),
+            "returned_to_compliance": (violation.get("rtc_date") or violation.get("RTC_DATE")) is not None,
+            "returned_to_compliance_date": self._parse_date(violation.get("rtc_date") or violation.get("RTC_DATE")),
             "source": "epa_sdwis",
             "collected_at": datetime.utcnow(),
         }
