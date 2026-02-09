@@ -93,9 +93,17 @@ def _upsert_financial_statements(
     # Deduplicate by conflict columns to avoid ON CONFLICT batch errors
     filtered_records = _deduplicate_records(filtered_records, conflict_columns)
 
-    # Determine update columns from the first record
-    sample = filtered_records[0]
-    update_col_names = [k for k in sample if k not in conflict_columns and k != "id"]
+    # Collect ALL keys across all records so every record has the same columns
+    all_keys = set()
+    for rec in filtered_records:
+        all_keys.update(rec.keys())
+    # Normalize: ensure every record has every key (default None for missing)
+    for rec in filtered_records:
+        for key in all_keys:
+            rec.setdefault(key, None)
+
+    # Determine update columns from the union of all keys
+    update_col_names = [k for k in all_keys if k not in conflict_columns and k != "id"]
 
     for i in range(0, len(filtered_records), batch_size):
         batch = filtered_records[i:i + batch_size]

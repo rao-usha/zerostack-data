@@ -734,6 +734,145 @@ async def get_change_summary(
 
 
 # =============================================================================
+# Deep Collection Endpoint
+# =============================================================================
+
+class RecursiveCollectRequest(BaseModel):
+    """Request body for recursive collection."""
+    # Structure discovery
+    discover_structure: bool = Field(True, description="Auto-discover subsidiaries and divisions")
+    max_units: int = Field(25, ge=1, le=50, description="Max business units to process")
+
+    # Per-unit collection
+    run_sec_per_unit: bool = Field(True, description="Run SEC EDGAR per public subsidiary")
+    run_website_per_unit: bool = Field(True, description="Run website crawl per unit")
+    run_news_per_unit: bool = Field(False, description="Run news scan per unit (slow)")
+    max_crawl_pages_per_unit: int = Field(20, ge=5, le=100, description="Max pages per unit")
+
+    # LinkedIn discovery
+    run_linkedin: bool = Field(True, description="Run LinkedIn Google search discovery")
+    max_linkedin_searches: int = Field(100, ge=0, le=500, description="Total LinkedIn searches")
+
+    # Functional org mapping
+    map_functions: List[str] = Field(default=["technology"], description="Functions to map (technology, finance, legal)")
+    function_depth: int = Field(3, ge=1, le=5, description="Levels below C-suite to map")
+
+    # Org chart
+    build_master_org_chart: bool = Field(True, description="Build master org chart after collection")
+
+
+class DeepCollectRequest(BaseModel):
+    """Request body for deep collection."""
+    seed_urls: Optional[List[str]] = Field(None, description="Seed URLs for deep crawl")
+    allowed_domains: Optional[List[str]] = Field(None, description="Allowed domains for crawling")
+    subsidiary_names: Optional[List[str]] = Field(None, description="Subsidiary names for news search")
+    newsroom_url: Optional[str] = Field(None, description="Direct newsroom URL")
+    division_context: Optional[str] = Field(None, description="Context about company divisions for org chart")
+    run_sec: bool = Field(True, description="Run SEC EDGAR collection")
+    run_website: bool = Field(True, description="Run deep website crawl")
+    run_news: bool = Field(True, description="Run deep news scan")
+    build_org_chart: bool = Field(True, description="Build org chart after collection")
+    max_crawl_pages: int = Field(50, ge=5, le=200, description="Max pages to crawl")
+    news_days_back: int = Field(1825, ge=30, le=3650, description="News lookback days")
+
+
+@router.post("/recursive-collect/{company_id}")
+async def recursive_collect(
+    company_id: int,
+    request: Optional[RecursiveCollectRequest] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Run recursive corporate structure discovery and deep people collection.
+
+    This is the most comprehensive collection pipeline. It:
+    1. Discovers corporate structure (subsidiaries via SEC Exhibit 21, website, LLM)
+    2. Runs deep collection for each business unit (SEC + website crawl)
+    3. Discovers additional people via LinkedIn Google search
+    4. Builds functional org maps (e.g., technology org 3 levels deep)
+    5. Constructs master cross-subsidiary org chart
+
+    Designed for Fortune 500 companies with complex corporate structures.
+
+    Expected yield: 100-200+ people with organizational hierarchy.
+    Expected LLM cost: ~$12-17.
+    """
+    from app.sources.people_collection.recursive_collector import (
+        RecursiveCollector,
+        RecursiveCollectConfig,
+    )
+
+    # Build config from request
+    config = RecursiveCollectConfig()
+    if request:
+        config.discover_structure = request.discover_structure
+        config.max_units = request.max_units
+        config.run_sec_per_unit = request.run_sec_per_unit
+        config.run_website_per_unit = request.run_website_per_unit
+        config.run_news_per_unit = request.run_news_per_unit
+        config.max_crawl_pages_per_unit = request.max_crawl_pages_per_unit
+        config.run_linkedin = request.run_linkedin
+        config.max_linkedin_searches = request.max_linkedin_searches
+        config.map_functions = request.map_functions
+        config.function_depth = request.function_depth
+        config.build_master_org_chart = request.build_master_org_chart
+
+    collector = RecursiveCollector(db_session=db)
+    result = await collector.collect(company_id, config)
+
+    return result.to_dict()
+
+
+@router.post("/deep-collect/{company_id}")
+async def deep_collect(
+    company_id: int,
+    request: Optional[DeepCollectRequest] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Run deep, multi-phase people collection for a company.
+
+    This is an intensive collection pipeline designed for Fortune 500 companies.
+    It runs:
+    1. SEC EDGAR (proxy + 10-K + Form 4 + 8-K)
+    2. Deep website crawl (BFS across multiple domains)
+    3. Deep news scan (5-year lookback, multi-query)
+    4. LLM-powered org chart construction
+
+    Expected yield: 100-250+ people with organizational hierarchy.
+    Expected duration: 5-15 minutes.
+    Expected LLM cost: ~$5-10.
+
+    The endpoint runs synchronously and returns the full result. For very large
+    companies, consider running as a background task.
+    """
+    from app.sources.people_collection.deep_collection_orchestrator import (
+        DeepCollectionOrchestrator,
+        DeepCollectionConfig,
+    )
+
+    # Build config from request
+    config = DeepCollectionConfig()
+    if request:
+        config.seed_urls = request.seed_urls
+        config.allowed_domains = request.allowed_domains
+        config.subsidiary_names = request.subsidiary_names
+        config.newsroom_url = request.newsroom_url
+        config.division_context = request.division_context
+        config.run_sec = request.run_sec
+        config.run_website = request.run_website
+        config.run_news = request.run_news
+        config.build_org_chart = request.build_org_chart
+        config.max_crawl_pages = request.max_crawl_pages
+        config.news_days_back = request.news_days_back
+
+    orchestrator = DeepCollectionOrchestrator(db_session=db)
+    result = await orchestrator.deep_collect(company_id, config)
+
+    return result.to_dict()
+
+
+# =============================================================================
 # Diagnostic Endpoints
 # =============================================================================
 

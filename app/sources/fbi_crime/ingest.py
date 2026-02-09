@@ -243,6 +243,11 @@ async def ingest_fbi_crime_estimates(
                 try:
                     logger.info(f"Fetching national estimates for {offense}")
                     response = await client.get_national_estimates(offense)
+                    if isinstance(response, dict):
+                        resp_keys = list(response.keys())[:10]
+                        logger.debug(f"Response keys for {offense}: {resp_keys}")
+                    elif isinstance(response, list):
+                        logger.debug(f"Response is list with {len(response)} items for {offense}")
                     parsed = metadata.parse_national_estimates(response, offense)
                     all_rows.extend(parsed)
                     logger.info(f"Parsed {len(parsed)} rows for {offense}")

@@ -448,6 +448,29 @@ class FilingFetcher(BaseCollector):
         # Fall back to DEFA14A if no DEF 14A found
         return filings[0] if filings else None
 
+    async def get_latest_filing(
+        self,
+        cik: str,
+        filing_type: str = "10-K",
+    ) -> Optional[SECFiling]:
+        """
+        Get the most recent filing of any type.
+
+        Args:
+            cik: SEC CIK number
+            filing_type: Filing type (e.g. "10-K", "10-Q", "DEF 14A")
+
+        Returns:
+            Most recent filing of that type, or None
+        """
+        filings = await self.get_company_filings(
+            cik,
+            filing_types=[filing_type],
+            limit=5,
+        )
+
+        return filings[0] if filings else None
+
     async def get_recent_8ks(
         self,
         cik: str,

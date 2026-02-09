@@ -484,6 +484,129 @@ class SECParser:
 
         return compensation
 
+    async def parse_10k_executives(
+        self,
+        content: str,
+        company_name: str,
+    ) -> List[ExtractedPerson]:
+        """
+        Parse executives from 10-K Item 10 (Directors, Executive Officers and Corporate Governance).
+
+        This section typically lists ALL Section 16 officers (15-25 people),
+        more than the 5-7 NEOs in the proxy statement.
+
+        Args:
+            content: Full 10-K filing text/HTML
+            company_name: Company name for context
+
+        Returns:
+            List of extracted executive officers
+        """
+        # Clean HTML if present
+        if '<html' in content.lower() or '<body' in content.lower():
+            text = self._clean_html(content)
+        else:
+            text = content
+
+        # Strategy 1: Look for the executive officers listing section
+        # (often separate from the brief "Item 10" header which may say "incorporated by reference")
+        text_lower = text.lower()
+        item10_section = None
+
+        # First, try to find the actual executive officers listing
+        # This pattern appears when the 10-K includes the exec list directly
+        exec_listing_patterns = [
+            f"the executive officers of {company_name.lower().split()[0]}",
+            "executive officers of the registrant",
+            "executive officers of the company",
+            "the following table sets forth information regarding",
+            "set forth below is certain information concerning",
+        ]
+
+        for pattern in exec_listing_patterns:
+            idx = text_lower.find(pattern)
+            if idx >= 0:
+                # Find the end of this section (next major heading or "Item 11")
+                end_idx = len(text)
+                for end_term in ["item 11", "part iv", "item 12", "signatures"]:
+                    end_pos = text_lower.find(end_term, idx + 200)
+                    if end_pos > 0 and end_pos < end_idx:
+                        end_idx = end_pos
+                item10_section = text[idx:min(idx + 50000, end_idx)]
+                logger.info(f"[SECParser] Found exec listing via pattern '{pattern}' at position {idx}")
+                break
+
+        # Strategy 2: Fall back to standard Item 10 section extraction
+        if not item10_section:
+            item10_section = self._extract_section(
+                text,
+                start_patterns=[
+                    "directors, executive officers and corporate governance",
+                    "directors, executive officers",
+                    "directors and executive officers",
+                    "executive officers and directors",
+                ],
+                end_patterns=[
+                    "item 11",
+                    "executive compensation",
+                    "security ownership",
+                    "certain relationships",
+                ],
+                max_length=50000,
+            )
+
+        if not item10_section:
+            logger.warning(f"[SECParser] No Item 10 section found in 10-K for {company_name}")
+            return []
+
+        logger.info(f"[SECParser] Found Item 10 section: {len(item10_section)} chars")
+
+        # 10-K executive sections are typically tabular (Name | Age | Title)
+        # which is hard for regex but reliable for LLM. Use LLM directly.
+        people: List[ExtractedPerson] = []
+
+        try:
+            prompt = (
+                f"Extract ALL executive officers listed in this 10-K filing section for {company_name}. "
+                f"This is the 'Directors, Executive Officers and Corporate Governance' section. "
+                f"Return a JSON object with an 'executives' array. Each executive should have: "
+                f"'full_name' (the person's full legal name), "
+                f"'title' (their exact corporate title), "
+                f"'age' (integer, if listed), "
+                f"'bio' (1-2 sentence summary if biographical info is available). "
+                f"Include ALL officers listed, not just the top 5. "
+                f"Do NOT include non-person entries like company names.\n\n"
+                f"TEXT:\n{item10_section[:80000]}"
+            )
+
+            response = await self.llm_extractor._call_llm(prompt)
+            if response:
+                parsed = self.llm_extractor._parse_json_response(response)
+                if parsed and isinstance(parsed, dict):
+                    for exec_data in parsed.get("executives", []):
+                        person = self._person_from_dict(exec_data, company_name, is_board=False)
+                        if person:
+                            person.extraction_notes = "From 10-K Item 10 (LLM)"
+                            person.confidence = ExtractionConfidence.HIGH
+                            people.append(person)
+        except Exception as e:
+            logger.warning(f"[SECParser] LLM extraction failed for 10-K: {e}")
+
+        # Fallback to pattern extraction if LLM failed
+        if not people:
+            logger.info("[SECParser] LLM failed, falling back to pattern extraction")
+            people = await self._extract_executives_from_section(
+                item10_section, company_name, is_board=False
+            )
+
+        # Mark all with source info
+        for person in people:
+            if not person.extraction_notes:
+                person.extraction_notes = "From 10-K Item 10"
+
+        logger.info(f"[SECParser] 10-K extraction: {len(people)} executives for {company_name}")
+        return people
+
     async def parse_8k_filing(
         self,
         content: str,

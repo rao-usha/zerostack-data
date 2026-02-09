@@ -88,7 +88,14 @@ class FBICrimeClient(BaseAPIClient):
 
     def _build_headers(self) -> Dict[str, str]:
         """Build request headers with API key."""
-        return {"X-Api-Key": self.api_key}
+        headers = super()._build_headers()
+        headers["X-Api-Key"] = self.api_key
+        return headers
+
+    def _add_auth_to_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Add API key as query parameter (api.data.gov gateway prefers this)."""
+        params["api_key"] = self.api_key
+        return params
 
     # ============================================
     # National Estimates Endpoints
@@ -103,7 +110,7 @@ class FBICrimeClient(BaseAPIClient):
             raise ValueError(f"Invalid offense type: {offense}")
 
         return await self.get(
-            f"api/estimates/national/{offense}/",
+            f"api/estimates/national/{offense}",
             resource_id=f"national_estimates_{offense}"
         )
 
@@ -119,7 +126,7 @@ class FBICrimeClient(BaseAPIClient):
             raise ValueError(f"Invalid state abbreviation: {state_abbr}")
 
         return await self.get(
-            f"api/estimates/states/{state_abbr.upper()}/{offense}/",
+            f"api/estimates/states/{state_abbr.upper()}/{offense}",
             resource_id=f"state_estimates_{state_abbr}_{offense}"
         )
 
@@ -130,7 +137,7 @@ class FBICrimeClient(BaseAPIClient):
     ) -> Dict[str, Any]:
         """Fetch regional crime estimates."""
         return await self.get(
-            f"api/estimates/regions/{region_name}/{offense}/",
+            f"api/estimates/regions/{region_name}/{offense}",
             resource_id=f"regional_estimates_{region_name}_{offense}"
         )
 

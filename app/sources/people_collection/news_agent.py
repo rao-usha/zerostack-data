@@ -1361,6 +1361,276 @@ class NewsAgent(BaseCollector):
         return result
 
 
+    async def deep_collect(
+        self,
+        company_id: int,
+        company_name: str,
+        subsidiary_names: Optional[List[str]] = None,
+        website_url: Optional[str] = None,
+        newsroom_url: Optional[str] = None,
+        days_back: int = 1825,
+        max_results_per_query: int = 20,
+    ) -> CollectionResult:
+        """
+        Deep news collection with multi-query search and expanded time windows.
+
+        Enhanced version of collect() for Fortune 500 companies with multiple
+        subsidiaries and divisions. Runs separate search queries for each
+        subsidiary name, crawls newsroom archives, and increases result limits.
+
+        Args:
+            company_id: Database company ID
+            company_name: Primary company name
+            subsidiary_names: List of subsidiary/division names to search for
+            website_url: Company website URL
+            newsroom_url: Direct newsroom URL (if known)
+            days_back: How far back to search (default 5 years)
+            max_results_per_query: Max results per Google News query
+        """
+        started_at = datetime.utcnow()
+
+        result = CollectionResult(
+            company_id=company_id,
+            company_name=company_name,
+            source="news_deep",
+            started_at=started_at,
+        )
+
+        result.pages_checked = 0
+        result.page_urls = []
+        all_changes: List[LeadershipChange] = []
+
+        logger.info(
+            f"[NewsAgent] Deep collection for {company_name}: "
+            f"days_back={days_back}, subsidiaries={subsidiary_names}"
+        )
+
+        try:
+            # 1. Standard collection first
+            standard_result = await self.collect(
+                company_id, company_name, website_url, days_back=min(days_back, 365),
+                include_google_news=True,
+            )
+            all_changes.extend(standard_result.extracted_changes)
+            result.pages_checked += standard_result.pages_checked
+            result.errors.extend(standard_result.errors)
+
+            # 2. Multi-query search for each subsidiary name
+            all_names = [company_name] + (subsidiary_names or [])
+
+            for name in all_names:
+                search_queries = [
+                    f'"{name}" appoints OR names OR hires executive',
+                    f'"{name}" "promoted to" vice president OR managing director',
+                    f'"{name}" CEO OR CFO OR president appointed OR named',
+                    f'"{name}" board director elected OR appointed',
+                ]
+
+                for query in search_queries:
+                    try:
+                        changes = await self._search_google_news_query(
+                            query, company_name, days_back,
+                            max_results=max_results_per_query, result=result,
+                        )
+                        all_changes.extend(changes)
+                    except Exception as e:
+                        logger.debug(f"[NewsAgent] Query failed for '{query[:40]}': {e}")
+
+            # 3. Crawl newsroom archive if URL provided
+            if newsroom_url:
+                logger.info(f"[NewsAgent] Crawling newsroom archive: {newsroom_url}")
+                archive_changes = await self._crawl_newsroom_archive(
+                    newsroom_url, company_name, days_back, result,
+                )
+                all_changes.extend(archive_changes)
+
+            # Deduplicate
+            unique_changes = self._deduplicate_changes(all_changes)
+
+            result.extracted_changes = unique_changes
+            result.changes_detected = len(unique_changes)
+            result.success = True
+
+            logger.info(
+                f"[NewsAgent] Deep collection complete for {company_name}: "
+                f"{len(unique_changes)} unique changes from {result.pages_checked} pages"
+            )
+
+        except Exception as e:
+            logger.exception(f"[NewsAgent] Deep collection error for {company_name}: {e}")
+            result.errors.append(str(e))
+            result.success = False
+
+        return self._finalize_result(result)
+
+    async def _search_google_news_query(
+        self,
+        query: str,
+        company_name: str,
+        days_back: int,
+        max_results: int,
+        result: CollectionResult,
+    ) -> List[LeadershipChange]:
+        """Run a single Google News query and extract changes."""
+        changes = []
+        cutoff_date = date.today() - timedelta(days=days_back)
+
+        encoded_query = quote_plus(query)
+        rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
+
+        result.pages_checked += 1
+        content = await self.fetch_url(rss_url)
+        if not content:
+            return changes
+
+        soup = BeautifulSoup(content, 'xml')
+        items = soup.find_all('item')
+
+        for item in items[:max_results]:
+            try:
+                title_elem = item.find('title')
+                link_elem = item.find('link')
+                pub_date_elem = item.find('pubDate')
+
+                if not title_elem or not link_elem:
+                    continue
+
+                title_text = title_elem.get_text(strip=True)
+                raw_link = link_elem.get_text(strip=True)
+
+                if not self._is_leadership_related(title_text):
+                    continue
+
+                # Parse date
+                pub_date = None
+                if pub_date_elem:
+                    try:
+                        from dateutil import parser as date_parser
+                        pub_date = date_parser.parse(pub_date_elem.get_text()).date()
+                        if pub_date < cutoff_date:
+                            continue
+                    except Exception:
+                        pass
+
+                # Try to get real URL
+                link_url = self._decode_google_news_url(raw_link)
+                if not link_url or 'news.google.com' in link_url:
+                    link_url = await self._follow_google_redirect(raw_link)
+
+                if not link_url or 'news.google.com' in link_url:
+                    continue
+
+                result.pages_checked += 1
+                article_html = await self.fetch_url(link_url)
+                if not article_html:
+                    continue
+
+                pr = PressRelease(
+                    title=title_text,
+                    content=article_html,
+                    publish_date=pub_date,
+                    source_url=link_url,
+                    company_name=company_name,
+                    source_type="google_news_deep",
+                )
+
+                parse_result = await self.parser.parse(pr)
+                changes.extend(parse_result.changes)
+
+            except Exception as e:
+                logger.debug(f"[NewsAgent] Error processing deep news item: {e}")
+
+        return changes
+
+    async def _crawl_newsroom_archive(
+        self,
+        newsroom_url: str,
+        company_name: str,
+        days_back: int,
+        result: CollectionResult,
+        max_pages: int = 5,
+    ) -> List[LeadershipChange]:
+        """
+        Crawl a company's newsroom archive for leadership press releases.
+
+        Paginates through the newsroom and extracts leadership-related
+        press releases.
+        """
+        changes = []
+        cutoff_date = date.today() - timedelta(days=days_back)
+
+        # Normalize URL
+        if not newsroom_url.startswith('http'):
+            newsroom_url = 'https://' + newsroom_url
+        base_url = newsroom_url.rstrip('/')
+
+        # Try to find pagination pattern
+        page_urls = [base_url]
+
+        # Common pagination patterns
+        pagination_patterns = [
+            "/page/{page}",
+            "?page={page}",
+            "?p={page}",
+            "&page={page}",
+        ]
+
+        # Add paginated URLs
+        for page_num in range(2, max_pages + 1):
+            for pattern in pagination_patterns:
+                page_urls.append(base_url + pattern.format(page=page_num))
+
+        for page_url in page_urls:
+            try:
+                result.pages_checked += 1
+                html = await self.fetch_url(page_url)
+                if not html:
+                    continue
+
+                press_releases = self._extract_press_release_links(
+                    html, page_url, days_back
+                )
+
+                # Filter to leadership-related
+                leadership_releases = [
+                    pr for pr in press_releases
+                    if self._is_leadership_related(pr['title'])
+                ]
+
+                for pr_info in leadership_releases[:10]:
+                    try:
+                        result.pages_checked += 1
+                        pr_html = await self.fetch_url(pr_info['url'])
+                        if not pr_html:
+                            continue
+
+                        pr = PressRelease(
+                            title=pr_info['title'],
+                            content=pr_html,
+                            publish_date=pr_info.get('date'),
+                            source_url=pr_info['url'],
+                            company_name=company_name,
+                            source_type="newsroom_archive",
+                        )
+
+                        parse_result = await self.parser.parse(pr)
+                        changes.extend(parse_result.changes)
+
+                    except Exception as e:
+                        logger.debug(f"[NewsAgent] Archive PR error: {e}")
+
+                # If no press releases found on a page, stop paginating
+                if not press_releases:
+                    break
+
+            except Exception as e:
+                logger.debug(f"[NewsAgent] Archive page error: {e}")
+                break
+
+        logger.info(f"[NewsAgent] Newsroom archive: {len(changes)} changes extracted")
+        return changes
+
+
 async def collect_company_news(
     company_id: int,
     company_name: str,

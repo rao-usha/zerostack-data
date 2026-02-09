@@ -114,15 +114,20 @@ class SECAgent(BaseCollector):
             proxy_people = await self._collect_from_proxy(cik, company_name, result)
             all_people.extend(proxy_people)
 
-            # 2. Get officers/directors from Form 4 filings
+            # 2. Get executives from 10-K Item 10
+            logger.info(f"[SECAgent] Step 2: Checking 10-K filing")
+            tenk_people = await self._collect_from_10k(cik, company_name, result)
+            all_people.extend(tenk_people)
+
+            # 3. Get officers/directors from Form 4 filings
             if include_form4:
-                logger.info(f"[SECAgent] Step 2: Checking Form 4 filings")
+                logger.info(f"[SECAgent] Step 3: Checking Form 4 filings")
                 form4_people = await self._collect_from_form4s(cik, company_name, result)
                 all_people.extend(form4_people)
 
-            # 3. Check recent 8-K filings for leadership changes
+            # 4. Check recent 8-K filings for leadership changes
             if include_8k:
-                logger.info(f"[SECAgent] Step 3: Checking 8-K filings")
+                logger.info(f"[SECAgent] Step 4: Checking 8-K filings")
                 since_date = date.today() - timedelta(days=days_back)
                 changes = await self._collect_from_8ks(cik, company_name, since_date, result)
                 all_changes.extend(changes)
@@ -206,6 +211,59 @@ class SECAgent(BaseCollector):
 
         return people
 
+    async def _collect_from_10k(
+        self,
+        cik: str,
+        company_name: str,
+        result: CollectionResult,
+    ) -> List[ExtractedPerson]:
+        """Collect executives from 10-K Item 10 section."""
+        people = []
+
+        try:
+            tenk = await self.fetcher.get_latest_filing(cik, filing_type="10-K")
+
+            if not tenk:
+                result.warnings.append("No 10-K filing found")
+                logger.warning(f"[SECAgent] No 10-K filing found for CIK {cik}")
+                return people
+
+            logger.info(
+                f"[SECAgent] Found 10-K from {tenk.filing_date}: {tenk.accession_number}"
+            )
+            result.filings_checked += 1
+
+            # 10-K filings are very large (5-10MB for Fortune 500); Item 10 is
+            # often at 40-60% into the document. Request up to 5MB.
+            tenk_content = await self.fetcher.get_filing_content(tenk, max_length=5000000)
+
+            if not tenk_content:
+                result.warnings.append("Failed to fetch 10-K content")
+                return people
+
+            logger.debug(f"[SECAgent] 10-K content length: {len(tenk_content)} chars")
+
+            executives = await self.parser.parse_10k_executives(
+                tenk_content, company_name
+            )
+
+            # Add source info
+            for person in executives:
+                person.source_url = tenk.document_url
+                person.confidence = ExtractionConfidence.HIGH
+
+            people.extend(executives)
+
+            logger.info(
+                f"[SECAgent] 10-K extraction: {len(people)} executives"
+            )
+
+        except Exception as e:
+            logger.warning(f"[SECAgent] 10-K extraction failed: {e}")
+            result.warnings.append(f"10-K extraction failed: {e}")
+
+        return people
+
     async def _collect_from_form4s(
         self,
         cik: str,
@@ -216,8 +274,8 @@ class SECAgent(BaseCollector):
         people = []
 
         try:
-            filers = await self.fetcher.get_form4_filers(cik, limit=30)
-            result.filings_checked += min(30, len(filers))
+            filers = await self.fetcher.get_form4_filers(cik, limit=100)
+            result.filings_checked += min(100, len(filers))
 
             for filer in filers:
                 name = filer.get('name', '')

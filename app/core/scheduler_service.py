@@ -527,7 +527,9 @@ def create_default_schedules(db: Session) -> List[IngestionSchedule]:
 # =============================================================================
 
 # Default timeout for stuck jobs (in hours)
-STUCK_JOB_TIMEOUT_HOURS = 2
+# Increased from 2 to 6 — many government API ingestions (Census, EIA, FCC)
+# make hundreds of rate-limited requests and legitimately run 2-4 hours.
+STUCK_JOB_TIMEOUT_HOURS = 6
 
 
 async def cleanup_stuck_jobs(timeout_hours: int = STUCK_JOB_TIMEOUT_HOURS) -> Dict[str, Any]:

@@ -275,6 +275,29 @@ class PeopleCollectionOrchestrator:
                         "skip_reason": "No SEC CIK configured",
                     }
 
+            if "deep_crawl" in sources:
+                agent_start = datetime.utcnow()
+                if company.website:
+                    logger.info(f"Running DeepCrawler for {company.name}")
+                    deep_result = await self._collect_from_deep_crawl(company, session)
+                    people_count = len(deep_result.get("people", []))
+                    all_people.extend(deep_result.get("people", []))
+                    result.errors.extend(deep_result.get("errors", []))
+                    logger.info(f"DeepCrawler found {people_count} people for {company.name}")
+                    agent_diagnostics["deep_crawl"] = {
+                        "ran": True,
+                        "people_found": people_count,
+                        "errors": deep_result.get("errors", []),
+                        "duration_ms": int((datetime.utcnow() - agent_start).total_seconds() * 1000),
+                    }
+                else:
+                    logger.warning(f"Skipping DeepCrawler for {company.name} - no website URL")
+                    result.warnings.append("No website URL configured for deep crawl")
+                    agent_diagnostics["deep_crawl"] = {
+                        "ran": False,
+                        "skip_reason": "No website URL configured",
+                    }
+
             if "news" in sources:
                 agent_start = datetime.utcnow()
                 logger.info(f"Running NewsAgent for {company.name}")
@@ -481,6 +504,56 @@ class PeopleCollectionOrchestrator:
         except Exception as e:
             logger.error(f"SEC collection error: {e}")
             return {"people": [], "changes": [], "errors": [str(e)]}
+
+    async def _collect_from_deep_crawl(
+        self,
+        company: IndustrialCompany,
+        session: Session,
+    ) -> Dict[str, Any]:
+        """Collect leadership data using deep BFS website crawler."""
+        try:
+            from app.sources.people_collection.deep_crawler import DeepCrawler
+            from urllib.parse import urlparse
+
+            crawler = DeepCrawler()
+
+            # Build seed URLs and allowed domains from company website
+            website = company.website
+            if not website.startswith("http"):
+                website = "https://" + website
+
+            domain = urlparse(website).netloc
+            seed_urls = [
+                website,
+                f"https://{domain}/about/leadership",
+                f"https://{domain}/leadership",
+                f"https://{domain}/about/management",
+            ]
+
+            if company.leadership_page_url:
+                seed_urls.append(company.leadership_page_url)
+
+            allowed_domains = [domain.lstrip("www.")]
+
+            result = await crawler.crawl(
+                company_id=company.id,
+                company_name=company.name,
+                seed_urls=seed_urls,
+                allowed_domains=allowed_domains,
+                max_pages=30,
+                max_depth=2,
+            )
+
+            await crawler.close()
+
+            return {
+                "people": result.extracted_people,
+                "errors": result.errors,
+            }
+
+        except Exception as e:
+            logger.error(f"Deep crawl collection error: {e}")
+            return {"people": [], "errors": [str(e)]}
 
     async def _collect_from_news(
         self,
