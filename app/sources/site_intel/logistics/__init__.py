@@ -25,7 +25,7 @@ from app.sources.site_intel.logistics.air_cargo_collector import AirCargoCollect
 from app.sources.site_intel.logistics.census_trade_collector import CensusTradeCollector
 from app.sources.site_intel.logistics.warehouse_listing_collector import WarehouseListingCollector
 from app.sources.site_intel.logistics.three_pl_collector import ThreePLCollector
-from app.sources.site_intel.logistics.three_pl_enrichment import ThreePLEnrichmentCollector
+from app.sources.site_intel.logistics.three_pl_website_enrichment import ThreePLWebsiteEnrichmentCollector
 from app.sources.site_intel.logistics.three_pl_sec_enrichment import ThreePLSECEnrichmentCollector
 from app.sources.site_intel.logistics.three_pl_fmcsa_enrichment import ThreePLFMCSAEnrichmentCollector
 
@@ -40,7 +40,7 @@ __all__ = [
     "CensusTradeCollector",
     "WarehouseListingCollector",
     "ThreePLCollector",
-    "ThreePLEnrichmentCollector",
+    "ThreePLWebsiteEnrichmentCollector",
     "ThreePLSECEnrichmentCollector",
     "ThreePLFMCSAEnrichmentCollector",
 ]

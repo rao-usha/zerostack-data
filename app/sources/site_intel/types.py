@@ -87,7 +87,7 @@ class SiteIntelSource(str, Enum):
     BTS_CARGO = "bts_cargo"  # BTS T-100 air cargo
     LOOPNET = "loopnet"
     TRANSPORT_TOPICS = "transport_topics"
-    THREE_PL_ENRICHMENT = "three_pl_enrichment"
+    THREE_PL_WEBSITE = "three_pl_website"
     THREE_PL_SEC = "three_pl_sec"
     THREE_PL_FMCSA = "three_pl_fmcsa"
 

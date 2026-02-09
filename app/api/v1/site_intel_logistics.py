@@ -600,6 +600,7 @@ async def search_3pl_companies(
             "services": c.services,
             "has_cold_chain": c.has_cold_chain,
             "is_asset_based": c.is_asset_based,
+            "source": c.source,
         }
         for c in companies
     ]
@@ -629,14 +630,14 @@ async def get_3pl_coverage(company_id: int, db: Session = Depends(get_db)):
 
 class EnrichRequest(BaseModel):
     """Request body for 3PL enrichment trigger."""
-    phases: List[str] = ["seed", "sec", "fmcsa"]
+    phases: List[str] = ["website", "sec", "fmcsa"]
 
 
 # In-memory job store for enrichment status tracking
 _enrichment_jobs: Dict[str, Dict[str, Any]] = {}
 
 PHASE_SOURCE_MAP = {
-    "seed": "three_pl_enrichment",
+    "website": "three_pl_website",
     "sec": "three_pl_sec",
     "fmcsa": "three_pl_fmcsa",
 }
@@ -711,8 +712,8 @@ async def trigger_3pl_enrichment(
     """
     Trigger 3PL company data enrichment.
 
-    Phases:
-    - seed: Load curated seed data (HQ, employees, services, etc.)
+    Phases (run in order — later phases override earlier via COALESCE):
+    - website: Scrape company websites for HQ, employees, facilities
     - sec: Pull authoritative data from SEC EDGAR for public companies
     - fmcsa: Cross-reference with FMCSA motor carrier records
     """
@@ -794,8 +795,17 @@ async def get_3pl_data_quality(db: Session = Depends(get_db)):
     non_asset_count = field_count(ThreePLCompany.is_non_asset)
     rank_count = field_count(ThreePLCompany.transport_topics_rank)
 
+    # Count records by source
+    source_counts = dict(
+        db.query(
+            ThreePLCompany.source,
+            func.count(ThreePLCompany.id),
+        ).group_by(ThreePLCompany.source).all()
+    )
+
     return {
         "total": total,
+        "sources": source_counts,
         "fields": {
             "annual_revenue_million": {"count": revenue_count, "pct": field_pct(revenue_count)},
             "employee_count": {"count": employees_count, "pct": field_pct(employees_count)},

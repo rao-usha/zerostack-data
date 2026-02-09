@@ -265,7 +265,7 @@ class SiteIntelOrchestrator:
                 SiteIntelSource.CENSUS_TRADE,
                 SiteIntelSource.LOOPNET,
                 SiteIntelSource.TRANSPORT_TOPICS,
-                SiteIntelSource.THREE_PL_ENRICHMENT,
+                SiteIntelSource.THREE_PL_WEBSITE,
                 SiteIntelSource.THREE_PL_SEC,
                 SiteIntelSource.THREE_PL_FMCSA,
             ],

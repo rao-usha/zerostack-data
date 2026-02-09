@@ -106,13 +106,25 @@ class ThreePLSECEnrichmentCollector(BaseCollector):
             logger.info(f"Fetched SEC data for {len(records)}/{len(PUBLIC_3PL_CIK_MAP)} companies")
 
             if records:
+                # Ensure all records have consistent keys for batch INSERT
+                all_keys = [
+                    "company_name", "headquarters_city", "headquarters_state",
+                    "employee_count", "annual_revenue_million",
+                    "facility_count", "website",
+                    "source", "collected_at",
+                ]
+                for rec in records:
+                    for key in all_keys:
+                        rec.setdefault(key, None)
+
                 inserted, updated = self.null_preserving_upsert(
                     ThreePLCompany,
                     records,
                     unique_columns=["company_name"],
                     update_columns=[
                         "headquarters_city", "headquarters_state",
-                        "employee_count",
+                        "employee_count", "annual_revenue_million",
+                        "facility_count", "website",
                         "source", "collected_at",
                     ],
                 )
@@ -153,7 +165,7 @@ class ThreePLSECEnrichmentCollector(BaseCollector):
         cik = sec_info["cik"].zfill(10)
         record = {"company_name": company_name}
 
-        # 1. Fetch submissions for HQ address
+        # 1. Fetch submissions for HQ address and website
         try:
             await self.apply_rate_limit()
             submissions = await self.fetch_json(f"/submissions/CIK{cik}.json")
@@ -169,10 +181,26 @@ class ThreePLSECEnrichmentCollector(BaseCollector):
             if state and len(state) == 2:
                 record["headquarters_state"] = state.upper()
 
+            # Extract website from submissions metadata
+            website = submissions.get("website")
+            if website:
+                if not website.startswith("http"):
+                    website = f"https://{website}"
+                record["website"] = website
+
+            # Log most recent 10-K filing date for provenance
+            recent_filings = submissions.get("filings", {}).get("recent", {})
+            forms = recent_filings.get("form", [])
+            filing_dates = recent_filings.get("filingDate", [])
+            for form, date in zip(forms, filing_dates):
+                if form in ("10-K", "10-K/A"):
+                    logger.info(f"SEC data for {company_name} from 10-K filed {date}")
+                    break
+
         except Exception as e:
             logger.debug(f"Submissions fetch failed for {company_name}: {e}")
 
-        # 2. Fetch XBRL facts for employee count
+        # 2. Fetch XBRL facts for employee count, revenue, and facility count
         try:
             await self.apply_rate_limit()
             facts = await self.fetch_json(f"/api/xbrl/companyfacts/CIK{cik}.json")
@@ -180,6 +208,14 @@ class ThreePLSECEnrichmentCollector(BaseCollector):
             employee_count = self._extract_employee_count(facts)
             if employee_count:
                 record["employee_count"] = employee_count
+
+            revenue = self._extract_revenue(facts)
+            if revenue:
+                record["annual_revenue_million"] = revenue
+
+            facility_count = self._extract_facility_count(facts)
+            if facility_count:
+                record["facility_count"] = facility_count
 
         except Exception as e:
             logger.debug(f"XBRL facts fetch failed for {company_name}: {e}")
@@ -227,5 +263,87 @@ class ThreePLSECEnrichmentCollector(BaseCollector):
 
         except Exception as e:
             logger.debug(f"Employee count extraction failed: {e}")
+
+        return None
+
+    def _extract_revenue(self, facts: Dict[str, Any]) -> Optional[float]:
+        """Extract annual revenue in millions from XBRL facts."""
+        try:
+            us_gaap = facts.get("facts", {}).get("us-gaap", {})
+
+            # Try multiple revenue concept names
+            revenue_concepts = [
+                "Revenues",
+                "RevenueFromContractWithCustomerExcludingAssessedTax",
+                "RevenueFromContractWithCustomerIncludingAssessedTax",
+                "SalesRevenueNet",
+            ]
+
+            for concept in revenue_concepts:
+                fact = us_gaap.get(concept, {})
+                usd_values = fact.get("units", {}).get("USD", [])
+                if not usd_values:
+                    continue
+
+                # Get most recent 10-K annual value (full year, not quarterly)
+                annual_values = [
+                    v for v in usd_values
+                    if v.get("form") in ("10-K", "10-K/A")
+                    and v.get("fp") == "FY"
+                ]
+
+                if not annual_values:
+                    # Fallback: 10-K without FY filter
+                    annual_values = [
+                        v for v in usd_values
+                        if v.get("form") in ("10-K", "10-K/A")
+                    ]
+
+                if annual_values:
+                    annual_values.sort(key=lambda v: v.get("end", ""), reverse=True)
+                    val = annual_values[0].get("val")
+                    if val and isinstance(val, (int, float)) and val > 0:
+                        return round(val / 1_000_000, 1)
+
+        except Exception as e:
+            logger.debug(f"Revenue extraction failed: {e}")
+
+        return None
+
+    def _extract_facility_count(self, facts: Dict[str, Any]) -> Optional[int]:
+        """Extract facility/property count from XBRL facts."""
+        try:
+            us_gaap = facts.get("facts", {}).get("us-gaap", {})
+
+            facility_concepts = [
+                "NumberOfStores",
+                "NumberOfRealEstateProperties",
+                "NumberOfOperatingSegments",
+            ]
+
+            for concept in facility_concepts:
+                fact = us_gaap.get(concept, {})
+                # Try pure units first, then number
+                values = fact.get("units", {}).get("pure", []) or \
+                         fact.get("units", {}).get("facility", []) or \
+                         fact.get("units", {}).get("property", []) or \
+                         fact.get("units", {}).get("store", [])
+
+                if not values:
+                    continue
+
+                annual_values = [
+                    v for v in values
+                    if v.get("form") in ("10-K", "10-K/A")
+                ]
+
+                if annual_values:
+                    annual_values.sort(key=lambda v: v.get("end", ""), reverse=True)
+                    val = annual_values[0].get("val")
+                    if val and isinstance(val, (int, float)) and val > 0:
+                        return int(val)
+
+        except Exception as e:
+            logger.debug(f"Facility count extraction failed: {e}")
 
         return None
