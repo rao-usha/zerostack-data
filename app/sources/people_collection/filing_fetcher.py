@@ -360,7 +360,7 @@ class FilingFetcher(BaseCollector):
         primary_documents = recent.get("primaryDocument", [])
         descriptions = recent.get("primaryDocDescription", [])
 
-        for i in range(min(len(accession_numbers), 200)):  # Check up to 200 filings
+        for i in range(len(accession_numbers)):
             form = forms[i] if i < len(forms) else ""
 
             # Filter by filing type
