@@ -3,25 +3,25 @@ News and press release collection agent.
 
 Monitors company news sources for leadership announcements:
 - Company newsroom/press release pages
-- Google News RSS feeds
+- Bing News RSS feeds (direct article URLs)
 - PR distribution services (PR Newswire, Business Wire)
 - RSS/Atom feeds for company news
+- Financial news (Yahoo Finance, MarketWatch)
 
 Enhanced with:
 - 40+ newsroom URL patterns
 - RSS/Atom feed auto-discovery
-- Google News RSS integration
+- Bing News RSS integration (replaced Google News — protobuf URLs broken)
 - Investor relations page parsing
 - Comprehensive diagnostic logging
 """
 
 import asyncio
-import base64
 import logging
 import re
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, date, timedelta
-from urllib.parse import urljoin, urlparse, quote_plus, unquote
+from urllib.parse import urljoin, urlparse, quote_plus
 
 from bs4 import BeautifulSoup
 
@@ -46,8 +46,9 @@ class NewsAgent(BaseCollector):
 
     Sources:
     1. Company newsroom pages
-    2. Google News search
-    3. SEC 8-K (cross-referenced via SEC agent)
+    2. Bing News RSS search
+    3. PR distribution services (PR Newswire, Business Wire, GlobeNewswire)
+    4. Financial news (Yahoo Finance, MarketWatch)
     """
 
     # Expanded newsroom URL patterns (40+ patterns)
@@ -240,12 +241,12 @@ class NewsAgent(BaseCollector):
                 result.page_urls.extend(rss_urls)
                 logger.info(f"[NewsAgent] RSS feeds: Found {len(rss_changes)} changes from {len(rss_urls)} feeds")
 
-            # 3. Search Google News RSS
+            # 3. Search Bing News RSS
             if include_google_news:
-                logger.info(f"[NewsAgent] Step 3: Searching Google News RSS")
-                google_changes = await self._search_google_news(company_name, days_back, result)
-                all_changes.extend(google_changes)
-                logger.info(f"[NewsAgent] Google News: Found {len(google_changes)} changes")
+                logger.info(f"[NewsAgent] Step 3: Searching Bing News RSS")
+                bing_changes = await self._search_bing_news(company_name, days_back, result)
+                all_changes.extend(bing_changes)
+                logger.info(f"[NewsAgent] Bing News: Found {len(bing_changes)} changes")
 
             # 4. Search PR distribution services directly (bypasses company website blocking)
             logger.info(f"[NewsAgent] Step 4: Searching PR distribution services")
@@ -652,17 +653,17 @@ class NewsAgent(BaseCollector):
         title_lower = title.lower()
         return any(kw in title_lower for kw in self.LEADERSHIP_KEYWORDS)
 
-    async def _search_google_news(
+    async def _search_bing_news(
         self,
         company_name: str,
         days_back: int,
         result: CollectionResult,
     ) -> List[LeadershipChange]:
         """
-        Search Google News RSS for leadership announcements.
+        Search Bing News RSS for leadership announcements.
 
-        Uses Google News RSS feeds which don't require an API key.
-        Parses articles when they're from known PR distribution services.
+        Uses Bing News RSS feeds which return direct article URLs
+        (no protobuf encoding or JS redirects like Google News).
         """
         changes = []
         cutoff_date = date.today() - timedelta(days=days_back)
@@ -672,7 +673,6 @@ class NewsAgent(BaseCollector):
             f'"{company_name}" CEO appointed OR named OR announces',
             f'"{company_name}" executive leadership change',
             f'"{company_name}" CFO COO president appointed',
-            f'"{company_name}" board director names',
         ]
 
         articles_found = 0
@@ -680,105 +680,43 @@ class NewsAgent(BaseCollector):
 
         for query in queries[:3]:  # Limit to 3 queries to avoid rate limits
             try:
-                # Use Google News RSS (no API required)
                 encoded_query = quote_plus(query)
-                rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
+                rss_url = f"https://www.bing.com/news/search?q={encoded_query}&format=rss"
 
-                logger.debug(f"[NewsAgent] Google News query: {query[:50]}")
+                logger.debug(f"[NewsAgent] Bing News query: {query[:50]}")
                 result.pages_checked += 1
 
                 content = await self.fetch_url(rss_url)
                 if not content:
-                    logger.debug(f"[NewsAgent] Failed to fetch Google News RSS")
+                    logger.debug(f"[NewsAgent] Failed to fetch Bing News RSS")
                     continue
 
                 # Parse RSS
                 soup = BeautifulSoup(content, 'xml')
                 items = soup.find_all('item')
 
-                logger.debug(f"[NewsAgent] Google News returned {len(items)} items for query")
+                logger.debug(f"[NewsAgent] Bing News returned {len(items)} items for query")
 
                 for item in items[:7]:  # Check first 7 results per query
                     try:
                         title_elem = item.find('title')
                         link_elem = item.find('link')
                         pub_date_elem = item.find('pubDate')
-                        source_elem = item.find('source')
 
                         if not title_elem or not link_elem:
                             continue
 
                         title_text = title_elem.get_text(strip=True)
-                        raw_link = link_elem.get_text(strip=True)
+                        # Bing returns direct article URLs
+                        link_url = link_elem.get_text(strip=True)
 
-                        # Get source info (domain of original article)
-                        source_name = source_elem.get_text(strip=True) if source_elem else None
-                        source_url = source_elem.get('url') if source_elem else None
-                        logger.debug(f"[NewsAgent] Source: {source_name} - {source_url}")
-
-                        # Check relevance first (before URL processing)
+                        # Check relevance first
                         if not self._is_leadership_related(title_text):
                             continue
 
                         articles_found += 1
 
-                        # Try to get the actual article URL
-                        # Strategy 1: If source is a known PR service, search there directly
-                        link_url = None
-                        if source_url:
-                            source_domain = source_url.rstrip('/')
-                            # For Business Wire, PR Newswire, etc. - go directly to their site
-                            if 'businesswire.com' in source_domain:
-                                # Business Wire: search for exact title
-                                search_title = title_text.split(' - ')[0].strip()[:60]
-                                link_url = f"https://www.businesswire.com/news/home/?searchTerm={quote_plus(search_title)}"
-                            elif 'prnewswire.com' in source_domain:
-                                search_title = title_text.split(' - ')[0].strip()[:60]
-                                link_url = f"https://www.prnewswire.com/search/news/?keyword={quote_plus(search_title)}"
-                            elif 'globenewswire.com' in source_domain:
-                                search_title = title_text.split(' - ')[0].strip()[:60]
-                                link_url = f"https://www.globenewswire.com/en/search/tag/{quote_plus(search_title)}"
-
-                        # Strategy 2: Try decoding the Google News URL
-                        if not link_url or 'news.google.com' in (link_url or ''):
-                            decoded_url = self._decode_google_news_url(raw_link)
-                            if decoded_url and 'news.google.com' not in decoded_url:
-                                link_url = decoded_url
-
-                        # Strategy 3: Follow redirect
-                        if not link_url or 'news.google.com' in link_url:
-                            real_url = await self._follow_google_redirect(raw_link)
-                            if real_url and 'news.google.com' not in real_url:
-                                link_url = real_url
-
-                        # Strategy 4: Use Google site search to find the article
-                        if (not link_url or 'news.google.com' in link_url) and source_url:
-                            search_title = title_text.split(' - ')[0].strip()[:50]
-                            site_domain = urlparse(source_url).netloc
-                            google_search_url = f"https://www.google.com/search?q=site:{site_domain}+{quote_plus(search_title)}"
-                            logger.info(f"[NewsAgent] Trying Google site search: {google_search_url[:60]}...")
-
-                            # Fetch Google search results and extract first URL
-                            search_html = await self.fetch_url(google_search_url)
-                            if search_html:
-                                # Look for URLs in search results
-                                url_matches = re.findall(
-                                    rf'href="/url\?q=(https?://[^"&]+{re.escape(site_domain)}[^"&]*)',
-                                    search_html
-                                )
-                                for url in url_matches[:3]:
-                                    decoded_url = unquote(url)
-                                    if site_domain in decoded_url and '/search?' not in decoded_url:
-                                        link_url = decoded_url
-                                        logger.info(f"[NewsAgent] Found via Google search: {link_url[:60]}")
-                                        break
-
-                        # If still no URL, use source_url as base (won't have article but might help)
-                        if not link_url or 'news.google.com' in link_url:
-                            link_url = source_url if source_url else raw_link
-
-                        logger.info(f"[NewsAgent] Google News article: {title_text[:50]}")
-                        logger.info(f"[NewsAgent] Source: {source_name or 'unknown'}")
+                        logger.info(f"[NewsAgent] Bing News article: {title_text[:50]}")
                         logger.info(f"[NewsAgent] Article URL: {link_url[:80] if link_url else 'none'}")
 
                         # Parse date if available
@@ -794,9 +732,8 @@ class NewsAgent(BaseCollector):
                                 pass
 
                         # Check if it's from a trusted PR distribution service
-                        check_url = (link_url or '') + (source_url or '')
                         is_pr_service = any(
-                            domain in check_url.lower()
+                            domain in link_url.lower()
                             for domain in self.PR_DISTRIBUTION_DOMAINS
                         )
 
@@ -820,13 +757,13 @@ class NewsAgent(BaseCollector):
                                     publish_date=pub_date,
                                     source_url=link_url,
                                     company_name=company_name,
-                                    source_type="google_news",
+                                    source_type="bing_news",
                                 )
 
                                 parse_result = await self.parser.parse(pr)
                                 if parse_result.changes:
                                     logger.info(
-                                        f"[NewsAgent] Google News: Extracted {len(parse_result.changes)} "
+                                        f"[NewsAgent] Bing News: Extracted {len(parse_result.changes)} "
                                         f"changes from: {title_text[:50]}"
                                     )
                                 changes.extend(parse_result.changes)
@@ -834,14 +771,14 @@ class NewsAgent(BaseCollector):
                             logger.debug(f"[NewsAgent] Skipping (limit reached): {link_url[:50]}")
 
                     except Exception as e:
-                        logger.debug(f"[NewsAgent] Error processing Google News item: {e}")
+                        logger.debug(f"[NewsAgent] Error processing Bing News item: {e}")
 
             except Exception as e:
-                logger.warning(f"[NewsAgent] Google News search error: {e}")
+                logger.warning(f"[NewsAgent] Bing News search error: {e}")
 
         logger.info(
-            f"[NewsAgent] Google News: Found {articles_found} leadership articles, "
-            f"parsed {articles_parsed} from PR services"
+            f"[NewsAgent] Bing News: Found {articles_found} leadership articles, "
+            f"parsed {articles_parsed}"
         )
 
         return changes
@@ -996,9 +933,12 @@ class NewsAgent(BaseCollector):
                 items = soup.find_all('item')
 
                 leadership_items = 0
+                cutoff_date = date.today() - timedelta(days=days_back)
+
                 for item in items[:10]:
                     title_elem = item.find('title')
                     link_elem = item.find('link')
+                    pub_date_elem = item.find('pubDate')
 
                     if not title_elem:
                         continue
@@ -1006,10 +946,39 @@ class NewsAgent(BaseCollector):
                     title = title_elem.get_text(strip=True)
                     if self._is_leadership_related(title):
                         leadership_items += 1
+                        if leadership_items > 5:
+                            break  # Limit to 5 parsed articles
+
                         if link_elem:
                             link = link_elem.get_text(strip=True)
                             result.page_urls.append(link)
                             logger.debug(f"[NewsAgent] Yahoo Finance match: {title[:50]}")
+
+                            # Parse date
+                            pub_date = None
+                            if pub_date_elem:
+                                try:
+                                    from dateutil import parser as date_parser
+                                    pub_date = date_parser.parse(pub_date_elem.get_text()).date()
+                                    if pub_date < cutoff_date:
+                                        continue
+                                except Exception:
+                                    pass
+
+                            # Fetch and parse the article
+                            result.pages_checked += 1
+                            article_html = await self.fetch_url(link)
+                            if article_html:
+                                pr = PressRelease(
+                                    title=title,
+                                    content=article_html,
+                                    publish_date=pub_date,
+                                    source_url=link,
+                                    company_name=company_name,
+                                    source_type="yahoo_finance",
+                                )
+                                parse_result = await self.parser.parse(pr)
+                                changes.extend(parse_result.changes)
 
                 logger.info(f"[NewsAgent] Yahoo Finance: {leadership_items} leadership items found")
         except Exception as e:
@@ -1031,6 +1000,21 @@ class NewsAgent(BaseCollector):
                     if self._is_leadership_related(article['title']):
                         logger.debug(f"[NewsAgent] MarketWatch match: {article['title'][:50]}")
                         result.page_urls.append(article['url'])
+
+                        # Fetch and parse the article
+                        result.pages_checked += 1
+                        article_html = await self.fetch_url(article['url'])
+                        if article_html:
+                            pr = PressRelease(
+                                title=article['title'],
+                                content=article_html,
+                                publish_date=article.get('date'),
+                                source_url=article['url'],
+                                company_name=company_name,
+                                source_type="marketwatch",
+                            )
+                            parse_result = await self.parser.parse(pr)
+                            changes.extend(parse_result.changes)
         except Exception as e:
             logger.debug(f"[NewsAgent] MarketWatch search error: {e}")
 
@@ -1156,183 +1140,6 @@ class NewsAgent(BaseCollector):
 
         return articles[:10]
 
-    def _decode_google_news_url(self, google_url: str) -> Optional[str]:
-        """
-        Decode a Google News RSS URL to get the actual article URL.
-
-        Google News RSS wraps article URLs in their redirect system using protobuf.
-        The format is: https://news.google.com/rss/articles/[protobuf-encoded-data]
-
-        This method tries multiple decoding strategies.
-        """
-        if not google_url:
-            return None
-
-        # If it's not a Google News URL, return as-is
-        if 'news.google.com' not in google_url:
-            return google_url
-
-        try:
-            if '/articles/' in google_url:
-                encoded_part = google_url.split('/articles/')[-1].split('?')[0]
-
-                # Try multiple decoding strategies
-                for attempt in range(4):
-                    try:
-                        # Strategy 1: Decode full encoded part
-                        if attempt == 0:
-                            to_decode = encoded_part
-                        # Strategy 2: Skip CBMi prefix (4 chars)
-                        elif attempt == 1 and encoded_part.startswith('CBMi'):
-                            to_decode = encoded_part[4:]
-                        # Strategy 3: Skip just CB prefix (2 chars)
-                        elif attempt == 2 and encoded_part.startswith('CB'):
-                            to_decode = encoded_part[2:]
-                        # Strategy 4: Skip first 5 chars (protobuf header varies)
-                        elif attempt == 3:
-                            to_decode = encoded_part[5:]
-                        else:
-                            continue
-
-                        # Try different padding
-                        for extra_padding in range(4):
-                            try:
-                                padded = to_decode + '=' * extra_padding
-                                decoded = base64.urlsafe_b64decode(padded)
-
-                                # Try UTF-8 decode
-                                try:
-                                    decoded_str = decoded.decode('utf-8', errors='ignore')
-                                except:
-                                    decoded_str = decoded.decode('latin-1', errors='ignore')
-
-                                # Look for URL pattern in decoded data
-                                url_match = re.search(r'https?://[^\s<>"\'\x00-\x1f]+', decoded_str)
-                                if url_match:
-                                    url = url_match.group(0).rstrip('.')
-                                    # Verify it's not a Google URL
-                                    if 'google.com' not in url and 'goo.gl' not in url:
-                                        logger.info(f"[NewsAgent] Decoded URL (strategy {attempt+1}): {url[:60]}")
-                                        return url
-                                break  # Padding worked, move to next strategy
-                            except Exception:
-                                continue
-
-                    except Exception as e:
-                        logger.debug(f"[NewsAgent] Decode attempt {attempt+1} failed: {e}")
-                        continue
-
-            # If decoding fails, return original URL - will use _follow_google_redirect
-            logger.debug(f"[NewsAgent] Could not decode, will follow redirect: {google_url[:60]}")
-            return google_url
-
-        except Exception as e:
-            logger.debug(f"[NewsAgent] Error decoding Google News URL: {e}")
-            return google_url
-
-    async def _follow_google_redirect(self, google_url: str) -> Optional[str]:
-        """
-        Follow a Google News redirect to get the actual article URL.
-
-        Google News uses JavaScript redirects, so we need to fetch the page
-        and extract the real URL from the HTML content.
-        """
-        logger.info(f"[NewsAgent] Following redirect for: {google_url[:60]}...")
-        try:
-            import aiohttp
-            from aiohttp import ClientTimeout
-
-            timeout = ClientTimeout(total=15)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                # First try HEAD to see if there's an HTTP redirect
-                try:
-                    async with session.head(
-                        google_url,
-                        headers=self.DEFAULT_HEADERS,
-                        allow_redirects=True,
-                        max_redirects=5,
-                    ) as response:
-                        final_url = str(response.url)
-                        logger.info(f"[NewsAgent] HEAD redirect result: {final_url[:60]}")
-                        if 'news.google.com' not in final_url:
-                            return final_url
-                except Exception as e:
-                    logger.info(f"[NewsAgent] HEAD request failed: {e}")
-
-                # HEAD didn't work, fetch the page and look for JS/meta redirect
-                logger.info(f"[NewsAgent] Trying GET request...")
-                async with session.get(
-                    google_url,
-                    headers=self.DEFAULT_HEADERS,
-                    allow_redirects=True,
-                ) as response:
-                    html = await response.text()
-                    logger.info(f"[NewsAgent] Got page content, length: {len(html)}")
-
-                    # Method 1: Look for data-n-au attribute (article URL)
-                    match = re.search(r'data-n-au="([^"]+)"', html)
-                    if match:
-                        url = match.group(1)
-                        if url.startswith('http'):
-                            logger.info(f"[NewsAgent] Extracted URL from data-n-au: {url[:60]}")
-                            return url
-
-                    # Method 2: Look for "url" in JSON data
-                    match = re.search(r'"url"\s*:\s*"(https?://[^"]+)"', html)
-                    if match:
-                        url = match.group(1).replace('\\u002F', '/').replace('\\/', '/')
-                        if 'news.google.com' not in url:
-                            logger.info(f"[NewsAgent] Extracted URL from JSON: {url[:60]}")
-                            return url
-
-                    # Method 3: Look for canonical URL
-                    match = re.search(r'<link[^>]+rel="canonical"[^>]+href="([^"]+)"', html)
-                    if match:
-                        url = match.group(1)
-                        if 'news.google.com' not in url:
-                            logger.info(f"[NewsAgent] Extracted canonical URL: {url[:60]}")
-                            return url
-
-                    # Method 4: Look for og:url meta tag
-                    match = re.search(r'<meta[^>]+property="og:url"[^>]+content="([^"]+)"', html)
-                    if match:
-                        url = match.group(1)
-                        if 'news.google.com' not in url:
-                            logger.info(f"[NewsAgent] Extracted og:url: {url[:60]}")
-                            return url
-
-                    # Method 5: Look for window.location redirect
-                    match = re.search(r'window\.location\s*=\s*["\']([^"\']+)["\']', html)
-                    if match:
-                        url = match.group(1)
-                        if url.startswith('http') and 'news.google.com' not in url:
-                            logger.info(f"[NewsAgent] Extracted JS redirect: {url[:60]}")
-                            return url
-
-                    # Method 6: Look for meta refresh
-                    match = re.search(r'<meta[^>]+http-equiv="refresh"[^>]+content="[^"]*url=([^"]+)"', html, re.I)
-                    if match:
-                        url = match.group(1)
-                        if url.startswith('http') and 'news.google.com' not in url:
-                            logger.info(f"[NewsAgent] Extracted meta refresh: {url[:60]}")
-                            return url
-
-                    # Method 7: Look for any href that's not Google
-                    urls_found = re.findall(r'href="(https?://[^"]+)"', html)
-                    for url in urls_found:
-                        if 'google' not in url.lower() and 'gstatic' not in url.lower():
-                            logger.info(f"[NewsAgent] Found href URL: {url[:60]}")
-                            return url
-
-                    # Log sample of content for debugging
-                    logger.info(f"[NewsAgent] Page sample: {html[:500]}")
-                    logger.info(f"[NewsAgent] Could not extract URL from Google News page")
-
-        except Exception as e:
-            logger.debug(f"[NewsAgent] Redirect follow failed: {e}")
-
-        return None
-
     def _deduplicate_changes(
         self,
         changes: List[LeadershipChange],
@@ -1428,13 +1235,21 @@ class NewsAgent(BaseCollector):
 
                 for query in search_queries:
                     try:
-                        changes = await self._search_google_news_query(
+                        changes = await self._search_bing_news_query(
                             query, company_name, days_back,
                             max_results=max_results_per_query, result=result,
                         )
                         all_changes.extend(changes)
                     except Exception as e:
                         logger.debug(f"[NewsAgent] Query failed for '{query[:40]}': {e}")
+
+            # 2b. Search PR services for each subsidiary name
+            for name in all_names[1:]:  # Skip main name (already searched in standard collect)
+                try:
+                    pr_changes = await self._search_pr_services(name, days_back, result)
+                    all_changes.extend(pr_changes)
+                except Exception as e:
+                    logger.debug(f"[NewsAgent] PR services failed for '{name}': {e}")
 
             # 3. Crawl newsroom archive if URL provided
             if newsroom_url:
@@ -1463,7 +1278,7 @@ class NewsAgent(BaseCollector):
 
         return self._finalize_result(result)
 
-    async def _search_google_news_query(
+    async def _search_bing_news_query(
         self,
         query: str,
         company_name: str,
@@ -1471,12 +1286,12 @@ class NewsAgent(BaseCollector):
         max_results: int,
         result: CollectionResult,
     ) -> List[LeadershipChange]:
-        """Run a single Google News query and extract changes."""
+        """Run a single Bing News query and extract changes."""
         changes = []
         cutoff_date = date.today() - timedelta(days=days_back)
 
         encoded_query = quote_plus(query)
-        rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
+        rss_url = f"https://www.bing.com/news/search?q={encoded_query}&format=rss"
 
         result.pages_checked += 1
         content = await self.fetch_url(rss_url)
@@ -1496,7 +1311,8 @@ class NewsAgent(BaseCollector):
                     continue
 
                 title_text = title_elem.get_text(strip=True)
-                raw_link = link_elem.get_text(strip=True)
+                # Bing returns direct article URLs
+                link_url = link_elem.get_text(strip=True)
 
                 if not self._is_leadership_related(title_text):
                     continue
@@ -1512,12 +1328,7 @@ class NewsAgent(BaseCollector):
                     except Exception:
                         pass
 
-                # Try to get real URL
-                link_url = self._decode_google_news_url(raw_link)
-                if not link_url or 'news.google.com' in link_url:
-                    link_url = await self._follow_google_redirect(raw_link)
-
-                if not link_url or 'news.google.com' in link_url:
+                if not link_url:
                     continue
 
                 result.pages_checked += 1
@@ -1531,7 +1342,7 @@ class NewsAgent(BaseCollector):
                     publish_date=pub_date,
                     source_url=link_url,
                     company_name=company_name,
-                    source_type="google_news_deep",
+                    source_type="bing_news_deep",
                 )
 
                 parse_result = await self.parser.parse(pr)
