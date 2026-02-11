@@ -283,6 +283,16 @@ class PageFinder(BaseCollector):
                             logger.info(f"[PageFinder] IR subdomain found: {url}")
             logger.info(f"[PageFinder] IR subdomain strategy found {len([p for p in found_pages if p.get('source') == 'ir_subdomain'])} pages")
 
+        # Early exit: if we already have enough high-quality pages, skip fallback strategies
+        high_quality_pages = [p for p in found_pages if p.get('score', 0) >= 8]
+        if len(high_quality_pages) >= 3:
+            logger.info(
+                f"[PageFinder] Found {len(high_quality_pages)} high-quality pages (score>=8), "
+                f"skipping fallback strategies (homepage crawl, sitemap, search)"
+            )
+            found_pages.sort(key=lambda x: x['score'], reverse=True)
+            return found_pages[:max_pages]
+
         # Strategy 2: Crawl homepage for links
         if len(found_pages) < max_pages:
             logger.debug(f"[PageFinder] Strategy 2: Crawling homepage for links")
@@ -305,12 +315,15 @@ class PageFinder(BaseCollector):
                     new_count += 1
             logger.info(f"[PageFinder] Sitemap found {new_count} additional pages")
 
-        # Strategy 4: Google/DuckDuckGo search fallback (if few pages found)
-        if len(found_pages) < 2:
-            logger.info(f"[PageFinder] Strategy 4: Trying Google search fallback")
-            google_pages = await self._google_search_fallback(base_url)
+        # Strategy 4: Google search fallback (only if Google API is configured)
+        # DuckDuckGo is blocked from Docker containers — skip unless Google API available
+        if len(found_pages) < 2 and GOOGLE_API_KEY and GOOGLE_CSE_ID:
+            logger.info(f"[PageFinder] Strategy 4: Trying Google API search fallback")
+            google_pages = await self._google_api_search(base_url)
             found_pages.extend(google_pages)
             logger.info(f"[PageFinder] Google search found {len(google_pages)} pages")
+        elif len(found_pages) < 2:
+            logger.info(f"[PageFinder] Strategy 4: Skipping search fallback (no Google API key, DuckDuckGo blocked in Docker)")
 
         # Sort by score and limit
         found_pages.sort(key=lambda x: x['score'], reverse=True)

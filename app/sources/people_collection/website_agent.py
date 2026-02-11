@@ -204,16 +204,27 @@ class WebsiteAgent(BaseCollector):
             f"has_leadership_content={cleaned.has_leadership_content}"
         )
 
-        if not cleaned.has_leadership_content:
-            logger.debug(f"[WebsiteAgent] No leadership keywords detected at {page_url}")
-            # Still try extraction in case detection missed something
-
         # Try structured extraction first (faster, no LLM cost)
         structured_people = self._extract_structured(html, page_url, company_name)
         logger.debug(f"[WebsiteAgent] Structured extraction found {len(structured_people)} people")
 
-        # If structured extraction found people, use those
-        if len(structured_people) >= 3:
+        # Pre-filter: skip LLM if no leadership keywords AND no structured people found
+        if not cleaned.has_leadership_content and len(structured_people) == 0:
+            logger.info(
+                f"[WebsiteAgent] Skipping LLM for {page_url} - no leadership content "
+                f"detected and no structured people found"
+            )
+            return LeadershipPageResult(
+                company_name=company_name,
+                page_url=page_url,
+                page_type=page_type,
+                people=[],
+                extraction_confidence=ExtractionConfidence.LOW,
+                extraction_notes="No leadership content detected, skipping LLM",
+            )
+
+        # If structured extraction found people, use those (even 1 means page has markup)
+        if len(structured_people) >= 1:
             logger.info(
                 f"[WebsiteAgent] Using structured extraction for {page_url}: "
                 f"{len(structured_people)} people (skipping LLM)"
@@ -228,7 +239,7 @@ class WebsiteAgent(BaseCollector):
             )
 
         # Fall back to LLM extraction - but only if we have meaningful content
-        min_text_length = 200  # Skip LLM if page content is too short (likely JS-rendered)
+        min_text_length = 1000  # Skip LLM if page content is too short (likely JS-rendered or error page)
         if len(cleaned.text.strip()) < min_text_length:
             logger.warning(
                 f"[WebsiteAgent] Skipping LLM for {page_url} - content too short "
@@ -244,9 +255,14 @@ class WebsiteAgent(BaseCollector):
                 extraction_notes=f"Content too short for LLM ({len(cleaned.text.strip())} chars) - likely JS-rendered",
             )
 
-        logger.info(f"[WebsiteAgent] Using LLM extraction for {page_url}")
+        # Cap text sent to LLM — leadership info is always near the top of the page
+        llm_text = cleaned.text[:30000]  # ~7500 tokens, was up to 500K chars
+        logger.info(
+            f"[WebsiteAgent] Using LLM extraction for {page_url} "
+            f"(text: {len(cleaned.text)} chars, sending: {len(llm_text)} chars)"
+        )
         result = await self.llm_extractor.extract_leadership_from_html(
-            cleaned.text, company_name, page_url
+            llm_text, company_name, page_url
         )
 
         logger.info(

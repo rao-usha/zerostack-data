@@ -308,10 +308,9 @@ class LLMExtractor:
         # Parse people
         people = self._parse_people_from_response(data, page_url)
 
-        # If no people found, try with simplified prompt
-        if len(people) == 0 and text_length > 100:
-            logger.info(f"[LLMExtractor] No people found, trying simplified extraction for {page_url}")
-            people = await self._try_simplified_extraction(cleaned_text, company_name, page_url)
+        # No automatic retry — if LLM found 0 people with a good prompt,
+        # a second call with a simpler prompt won't find them either.
+        # (Testing showed all retries returned 0 people, doubling cost for no gain)
 
         logger.info(f"[LLMExtractor] Extracted {len(people)} people from {page_url}")
 

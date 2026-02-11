@@ -74,7 +74,7 @@ def get_llm_config() -> LLMConfig:
     if provider == "anthropic":
         model = "claude-3-5-sonnet-20241022"
     else:
-        model = "gpt-4-turbo-preview"
+        model = "gpt-4o"
 
     return LLMConfig(provider=provider, model=model)
 
