@@ -512,6 +512,53 @@ class PeopleCollectionJob(Base):
 
 
 # =============================================================================
+# DEDUPLICATION TABLES
+# =============================================================================
+
+class PeopleMergeCandidate(Base):
+    """
+    Tracks potential duplicate person records for review and merge.
+
+    Pairs are stored with person_id_a < person_id_b to prevent duplicate pairs.
+    Auto-merged pairs go straight to 'auto_merged' status; ambiguous matches
+    land in 'pending' for manual review.
+    """
+    __tablename__ = "people_merge_candidates"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # The two people being compared (a < b to prevent duplicate pairs)
+    person_id_a = Column(Integer, ForeignKey("people.id"), nullable=False, index=True)
+    person_id_b = Column(Integer, ForeignKey("people.id"), nullable=False, index=True)
+
+    # Match details
+    match_type = Column(String(50), nullable=False)
+    # Values: linkedin_url, name_exact, name_fuzzy, name_fuzzy_company
+    similarity_score = Column(Numeric(4, 3))  # 0.000 to 1.000
+    shared_company_ids = Column(JSON)  # List of company IDs they share
+    evidence_notes = Column(Text)  # Explanation of why they matched
+
+    # Review workflow
+    status = Column(String(20), nullable=False, default="pending", index=True)
+    # Values: pending, auto_merged, approved, rejected
+    canonical_person_id = Column(Integer, ForeignKey("people.id"))  # Person kept after merge
+
+    # Timestamps
+    reviewed_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("person_id_a", "person_id_b", name="uq_merge_candidate_pair"),
+        CheckConstraint("person_id_a < person_id_b", name="ck_merge_candidate_order"),
+        Index("ix_merge_candidates_status", "status"),
+        Index("ix_merge_candidates_persons", "person_id_a", "person_id_b"),
+    )
+
+    def __repr__(self):
+        return f"<PeopleMergeCandidate {self.person_id_a} <-> {self.person_id_b} ({self.status})>"
+
+
+# =============================================================================
 # PE FEATURE TABLES
 # =============================================================================
 

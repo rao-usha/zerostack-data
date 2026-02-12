@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from app.core.database import get_db
 from app.services.data_quality_service import DataQualityService
 from app.sources.people_collection.email_inferrer import EmailInferrer, CompanyEmailPatternLearner
+from app.sources.people_collection.mx_verifier import MXVerifier
 
 
 router = APIRouter(prefix="/people-data-quality", tags=["People Data Quality"])
@@ -169,6 +170,12 @@ class BulkEmailInferenceRequest(BaseModel):
         None,
         description="Known emails to learn pattern: [{email, first_name, last_name}]"
     )
+
+
+class BackfillEmailsRequest(BaseModel):
+    """Request to backfill inferred emails."""
+    company_id: Optional[int] = Field(None, description="Specific company ID, or null for all")
+    dry_run: bool = Field(True, description="If true, report what would be done without saving")
 
 
 # =============================================================================
@@ -405,6 +412,124 @@ async def infer_emails_bulk(
         "company_domain": request.company_domain,
         "learned_pattern": learner.learn_from_known_emails(known).value if known else None,
         "results": results,
+    }
+
+
+@router.post("/backfill-emails")
+async def backfill_emails(
+    request: BackfillEmailsRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Backfill inferred email addresses for people missing work emails.
+
+    For each company: extracts domain, checks MX records, learns email pattern
+    from existing known emails, and infers emails for people missing them.
+    Only stores high-confidence inferences.
+    """
+    from app.core.people_models import IndustrialCompany, CompanyPerson, Person
+
+    email_inferrer = EmailInferrer()
+    pattern_learner = CompanyEmailPatternLearner()
+    mx_verifier = MXVerifier()
+
+    stats = {
+        "companies_processed": 0,
+        "people_checked": 0,
+        "emails_inferred": 0,
+        "emails_skipped_no_mx": 0,
+        "dry_run": request.dry_run,
+    }
+
+    # Get companies to process
+    company_query = db.query(IndustrialCompany).filter(
+        IndustrialCompany.website.isnot(None),
+    )
+    if request.company_id:
+        company_query = company_query.filter(
+            IndustrialCompany.id == request.company_id,
+        )
+
+    companies = company_query.all()
+
+    for company in companies:
+        domain = email_inferrer.extract_domain_from_website(company.website)
+        if not domain:
+            continue
+
+        # Check MX
+        mx_result = mx_verifier.verify_domain(domain)
+        if not mx_result.has_mx:
+            stats["emails_skipped_no_mx"] += 1
+            continue
+
+        stats["companies_processed"] += 1
+
+        # Learn pattern from existing emails at this company
+        learned_pattern = pattern_learner.learn_pattern_from_db(company.id, db)
+
+        # Find people at this company missing work_email
+        people_cps = (
+            db.query(Person, CompanyPerson)
+            .join(CompanyPerson, CompanyPerson.person_id == Person.id)
+            .filter(
+                CompanyPerson.company_id == company.id,
+                CompanyPerson.is_current == True,
+                CompanyPerson.work_email.is_(None),
+                Person.first_name.isnot(None),
+                Person.last_name.isnot(None),
+            )
+            .all()
+        )
+
+        for person, cp in people_cps:
+            stats["people_checked"] += 1
+
+            if person.email:
+                continue
+
+            candidates = email_inferrer.infer_email(
+                first_name=person.first_name,
+                last_name=person.last_name,
+                company_domain=domain,
+                known_pattern=learned_pattern,
+            )
+
+            if not candidates:
+                continue
+
+            top = candidates[0]
+            if top.confidence != "high":
+                continue
+
+            stats["emails_inferred"] += 1
+
+            if not request.dry_run:
+                person.email = top.email
+                person.email_confidence = "inferred"
+                cp.work_email = top.email
+
+    if not request.dry_run:
+        db.commit()
+
+    return stats
+
+
+@router.get("/mx-check/{domain}")
+async def check_mx_records(domain: str):
+    """
+    Check MX records for a domain.
+
+    Useful for debugging whether a domain can receive email.
+    """
+    mx_verifier = MXVerifier()
+    result = mx_verifier.verify_domain(domain)
+
+    return {
+        "domain": domain,
+        "has_mx": result.has_mx,
+        "mx_records": result.mx_records,
+        "error": result.error,
     }
 
 

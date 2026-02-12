@@ -231,6 +231,9 @@ class CollectionResult(BaseModel):
     people_updated: int = 0
     changes_detected: int = 0
 
+    # Email inference
+    emails_inferred: int = 0
+
     # Extracted data (before DB insertion)
     extracted_people: List[ExtractedPerson] = Field(default_factory=list)
     extracted_changes: List[LeadershipChange] = Field(default_factory=list)

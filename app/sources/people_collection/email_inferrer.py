@@ -237,6 +237,61 @@ class CompanyEmailPatternLearner:
     def __init__(self):
         self.email_inferrer = EmailInferrer()
 
+    def learn_pattern_from_db(
+        self,
+        company_id: int,
+        session,
+    ) -> Optional[EmailPattern]:
+        """
+        Learn the email pattern for a company from existing database records.
+
+        Queries company_people JOIN people where work_email or email is populated,
+        then learns the most common pattern from those known emails.
+
+        Args:
+            company_id: The company to learn patterns for.
+            session: SQLAlchemy session.
+
+        Returns:
+            The most common EmailPattern found, or None.
+        """
+        try:
+            from app.core.people_models import Person, CompanyPerson
+
+            # Find people at this company who have known emails
+            rows = (
+                session.query(
+                    Person.first_name,
+                    Person.last_name,
+                    Person.email,
+                    CompanyPerson.work_email,
+                )
+                .join(CompanyPerson, CompanyPerson.person_id == Person.id)
+                .filter(
+                    CompanyPerson.company_id == company_id,
+                    CompanyPerson.is_current == True,
+                )
+                .all()
+            )
+
+            emails = []
+            for first_name, last_name, person_email, work_email in rows:
+                email = work_email or person_email
+                if email and first_name and last_name:
+                    emails.append((email, first_name, last_name))
+
+            if not emails:
+                return None
+
+            return self.learn_from_known_emails(emails)
+
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Failed to learn email pattern from DB for company {company_id}: {e}"
+            )
+            return None
+
     def learn_from_known_emails(
         self,
         emails: List[Tuple[str, str, str]],  # (email, first_name, last_name)

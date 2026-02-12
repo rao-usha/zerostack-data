@@ -318,10 +318,19 @@ class PeopleCollectionOrchestrator:
             stored = await self._store_people(all_people, company, session)
             result.people_created = stored["created"]
             result.people_updated = stored["updated"]
+            result.emails_inferred = stored.get("emails_inferred", 0)
 
             # Store changes
             result.changes_detected = len(all_changes)
             await self._store_changes(all_changes, company, session)
+
+            # Run lightweight company-scoped dedup scan
+            try:
+                from app.services.dedup_service import DedupService
+                dedup_svc = DedupService(session)
+                dedup_svc.scan_for_duplicates(company_id=company.id, limit=200)
+            except Exception as e:
+                logger.debug(f"Post-storage dedup scan skipped: {e}")
 
             # Update job status
             job.status = "success" if not result.errors else "completed_with_errors"
@@ -593,9 +602,36 @@ class PeopleCollectionOrchestrator:
         Store extracted people in the database.
 
         Handles deduplication by matching on LinkedIn URL or name+company.
+        After storage, attempts email inference for people missing emails.
         """
         created = 0
         updated = 0
+        emails_inferred = 0
+
+        # Initialize email inference (once per batch)
+        company_domain = None
+        learned_pattern = None
+        domain_has_mx = True
+        try:
+            from app.sources.people_collection.email_inferrer import (
+                EmailInferrer, CompanyEmailPatternLearner,
+            )
+            from app.sources.people_collection.mx_verifier import MXVerifier
+
+            email_inferrer = EmailInferrer()
+            pattern_learner = CompanyEmailPatternLearner()
+            mx_verifier = MXVerifier()
+
+            if company.website:
+                company_domain = email_inferrer.extract_domain_from_website(company.website)
+
+            if company_domain:
+                mx_result = mx_verifier.verify_domain(company_domain)
+                domain_has_mx = mx_result.has_mx
+                if domain_has_mx:
+                    learned_pattern = pattern_learner.learn_pattern_from_db(company.id, session)
+        except Exception as e:
+            logger.debug(f"Email inference setup skipped: {e}")
 
         for extracted in people:
             try:
@@ -637,10 +673,84 @@ class PeopleCollectionOrchestrator:
                     person_id, extracted, company, session
                 )
 
+                # Attempt email inference
+                if company_domain and domain_has_mx:
+                    inferred = self._maybe_infer_email(
+                        person_id, extracted, company_domain,
+                        learned_pattern, email_inferrer, session,
+                    )
+                    if inferred:
+                        emails_inferred += 1
+
             except Exception as e:
                 logger.warning(f"Failed to store person {extracted.full_name}: {e}")
 
-        return {"created": created, "updated": updated}
+        return {"created": created, "updated": updated, "emails_inferred": emails_inferred}
+
+    def _maybe_infer_email(
+        self,
+        person_id: int,
+        extracted: ExtractedPerson,
+        company_domain: str,
+        learned_pattern,
+        email_inferrer,
+        session: Session,
+    ) -> bool:
+        """
+        Attempt to infer and store an email for a person.
+
+        Only stores when confidence is "high" (known or DB-learned pattern).
+        Returns True if an email was inferred and stored.
+        """
+        try:
+            # Skip if person already has email
+            person = session.query(Person).get(person_id)
+            if not person:
+                return False
+
+            # Check if CompanyPerson already has work_email
+            cp = session.query(CompanyPerson).filter(
+                CompanyPerson.person_id == person_id,
+                CompanyPerson.is_current == True,
+            ).first()
+
+            if person.email or (cp and cp.work_email):
+                return False
+
+            # Need first and last name for inference
+            first_name = extracted.first_name or person.first_name
+            last_name = extracted.last_name or person.last_name
+            if not first_name or not last_name:
+                return False
+
+            # Infer email
+            candidates = email_inferrer.infer_email(
+                first_name=first_name,
+                last_name=last_name,
+                company_domain=company_domain,
+                known_pattern=learned_pattern,
+            )
+
+            if not candidates:
+                return False
+
+            # Only use high-confidence results
+            top = candidates[0]
+            if top.confidence != "high":
+                return False
+
+            # Store inferred email
+            person.email = top.email
+            person.email_confidence = "inferred"
+
+            if cp:
+                cp.work_email = top.email
+
+            return True
+
+        except Exception as e:
+            logger.debug(f"Email inference failed for person {person_id}: {e}")
+            return False
 
     def _create_person(self, extracted: ExtractedPerson) -> Person:
         """Create a new Person record from extracted data."""
@@ -933,12 +1043,22 @@ class PeopleCollectionOrchestrator:
                 stored = await self._store_people(all_people, company, session)
                 diag.people_stored_created = stored["created"]
                 diag.people_stored_updated = stored["updated"]
+                emails_inferred = stored.get("emails_inferred", 0)
                 session.commit()
 
                 logger.info(
                     f"[DIAG] Stored: {diag.people_stored_created} created, "
-                    f"{diag.people_stored_updated} updated"
+                    f"{diag.people_stored_updated} updated, "
+                    f"{emails_inferred} emails inferred"
                 )
+
+                # Run lightweight company-scoped dedup scan
+                try:
+                    from app.services.dedup_service import DedupService
+                    dedup_svc = DedupService(session)
+                    dedup_svc.scan_for_duplicates(company_id=company.id, limit=200)
+                except Exception as e:
+                    logger.debug(f"[DIAG] Post-storage dedup scan skipped: {e}")
 
             except Exception as e:
                 error_msg = f"Storage exception: {str(e)}\n{traceback.format_exc()}"
