@@ -1,219 +1,215 @@
-# Claude Code Project Instructions
+# CLAUDE.md
 
-> This file is read by Claude Code on startup. Follow these guidelines.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project: Nexdata External Data Ingestion API
+## Project Overview
 
-FastAPI service for ingesting data from 25+ public APIs into PostgreSQL.
+Nexdata is a FastAPI service that ingests data from 28+ public APIs (Census, FRED, SEC, EIA, BLS, etc.) into PostgreSQL. It includes agentic AI research (portfolio discovery, people/org chart collection, site intelligence), job scheduling, data quality validation, and a GraphQL layer.
 
----
-
-## Standard Workflow
-
-**Always follow this sequence:**
-
-```
-1. PLAN      → Write plan, get user approval BEFORE coding
-2. EXECUTE   → Write code, use TodoWrite to track progress
-3. TEST      → docker-compose up --build -d, curl endpoints
-4. FIX       → If tests fail, check logs, fix, re-test
-5. COMMIT    → git add <files>, git commit with good message
-6. PUSH      → git push origin main
-7. CI CHECK  → Verify GitHub Actions passes
-```
-
-**Do NOT skip steps.** Always test before committing.
-
-### Planning Phase (Step 1)
-- **Record the plan** in `docs/plans/PLAN_XXX_<name>.md`
-- Include: goal, endpoints, features, models, files to create, example usage
-- Update status in `PARALLEL_WORK.md` plan table
-- **Wait for user to mark [x] Approved** before writing any code
-- Never assume approval - explicit confirmation required
-
-**Plan file template:** See existing plans in `docs/plans/`
+**Stack:** Python 3.11, FastAPI, SQLAlchemy 2.0, PostgreSQL 14, httpx, APScheduler, OpenAI/Anthropic LLMs, Docker
 
 ---
 
-## Parallel Work
-
-If working with another Claude instance:
-
-1. **Read `PARALLEL_WORK.md`** before doing anything
-2. **Only touch files assigned to your tab**
-3. **Update your status** in PARALLEL_WORK.md
-4. **Tab 1 handles:** main.py integration, commits, pushes
-5. **Use Communication Log** for async coordination
-
-See `.claude/WORKFLOW.md` for full parallel workflow details.
-
----
-
-## Key Commands
+## Build & Run Commands
 
 ```bash
-# Rebuild Docker (port 8001)
+# Start all services (API on :8001, Postgres on :5434)
 docker-compose up --build -d
 
-# Check logs for errors
-docker-compose logs api --tail 50
+# Restart API after code changes (volume-mounted but needs process restart)
+docker-compose restart api
+# Wait ~20-30s for startup — the app has many imports
 
-# Test endpoint
+# Clean rebuild when Docker cache is stale
+docker-compose down && docker-compose build --no-cache api && docker-compose up -d
+
+# View logs
+docker-compose logs api --tail 50
+docker-compose logs api -f  # follow
+
+# Test an endpoint
 curl -s http://localhost:8001/api/v1/<endpoint> | python -m json.tool
 
-# Check CI
-curl -s "https://api.github.com/repos/rao-usha/zerostack-data/actions/runs?per_page=3"
+# Swagger UI
+# http://localhost:8001/docs
 ```
+
+### Testing
+
+```bash
+# Run all unit tests (excludes integration tests)
+pytest tests/ -v --ignore=tests/integration/
+
+# Run a single test file
+pytest tests/test_llm_client.py -v
+
+# Run with coverage
+pytest tests/ --cov=app --cov-report=xml --ignore=tests/integration/
+
+# Integration tests (require API keys + network)
+RUN_INTEGRATION_TESTS=true pytest tests/integration/ -v
+```
+
+Tests use markers: `@pytest.mark.unit` (offline) and `@pytest.mark.integration` (requires API keys).
+
+### Linting
+
+```bash
+ruff check app/
+```
+
+CI runs ruff as non-blocking (`continue-on-error: true`).
 
 ---
 
-## File Structure
+## Port Mappings (Critical)
 
-```
-app/
-├── api/v1/          # FastAPI routers (one per source)
-├── core/            # Shared services (models, database, config)
-├── sources/         # Source-specific clients and ingestors
-└── main.py          # App entry point, router registration
-```
+| Service    | Container Port | Host Port | Notes                        |
+|------------|---------------|-----------|------------------------------|
+| API        | 8000          | **8001**  | All curl/docs use 8001       |
+| PostgreSQL | 5432          | **5434**  | Code inside containers: 5432 |
 
----
-
-## Adding New Features
-
-1. **New data source:**
-   - Create `app/sources/<name>/` with client.py, ingest.py
-   - Create `app/api/v1/<name>.py` with endpoints
-   - Add router to `app/main.py`
-   - Add OpenAPI tag to main.py
-
-2. **New core feature:**
-   - Add models to `app/core/models.py`
-   - Create service in `app/core/<feature>_service.py`
-   - Create API in `app/api/v1/<feature>.py`
-   - Register router in main.py
+Code in containers uses internal ports. External access (curl, psql from host) uses host ports.
 
 ---
 
-## Commit Format
+## Architecture
+
+### Core Abstractions
+
+Every data source follows the same plugin pattern:
+
+1. **`BaseAPIClient`** (`app/core/http_client.py`) — All HTTP clients inherit this. Provides bounded concurrency (`asyncio.Semaphore`), exponential backoff with jitter, rate limiting, retry logic, and connection pooling via `httpx.AsyncClient`.
+
+2. **`BaseSourceIngestor`** (`app/core/ingest_base.py`) — All ingestors inherit this. Handles table creation, dataset registry updates, and job tracking.
+
+3. **API Router** (`app/api/v1/<source>.py`) — Creates an ingestion job, kicks off background work via `BackgroundTasks`, returns `job_id` immediately.
+
+4. **Router Registration** — All routers are registered in `app/main.py` under `/api/v1` prefix. New routers also need an OpenAPI tag in main.py.
+
+### Adding a New Data Source
 
 ```
-<type>: <short description>
-
-- Detail 1
-- Detail 2
-
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+app/sources/<name>/
+├── client.py      # Inherits BaseAPIClient
+├── ingest.py      # Inherits BaseSourceIngestor
+└── metadata.py    # Dataset schemas, field definitions
+app/api/v1/<name>.py  # Endpoints
+app/main.py            # Register router + OpenAPI tag
 ```
 
-Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
+### Site Intelligence Collector Pattern
 
----
-
-## Rules
-
-- **Always test before committing**
-- **Don't modify files you don't own in parallel mode**
-- **Use TodoWrite for multi-step tasks**
-- **Check CI after every push**
-- **Ask user before making architectural decisions**
-
----
-
-## Long-Running Task Protocol
-
-For complex multi-step tasks that may take extended time or could be interrupted:
-
-### 1. CREATE TASK LIST
-Use TaskCreate to break down work into trackable tasks:
-```
-- Create task for each major phase
-- Include clear descriptions and success criteria
-- Mark dependencies between tasks
-```
-
-### 2. EXECUTE WITH CHECKPOINTS
-For each task:
-```
-1. Mark task as "in_progress" before starting
-2. Complete the work
-3. Mark task as "completed" when done
-4. If blocked, note the blocker and move on
-```
-
-### 3. CHECKPOINT FORMAT
-After completing significant work, update task with:
-```
-Last completed: [specific action]
-Next action: [what to do next]
-Blockers: [any issues]
-Resume: [how to continue if interrupted]
-```
-
-### 4. ON RESUME
-If session was interrupted:
-```
-1. Use TaskList to see current state
-2. Use TaskGet on in_progress tasks
-3. Continue from last checkpoint
-4. Don't repeat completed work
-```
-
-### 5. TASK LIST EXAMPLE
-
-```markdown
-## Comprehensive Investor Data Expansion
-
-### Phase 1: Database Setup
-- [x] Create lp_aum_history table
-- [x] Create lp_allocation_history table
-- [ ] Create lp_13f_holding table (IN PROGRESS)
-- [ ] Create lp_manager_commitment table
-
-### Phase 2: Collectors
-- [ ] SEC 13F collector
-- [ ] Form 990 collector
-- [ ] CAFR parser with LLM
-
-### Checkpoint
-Last: Created allocation history table
-Next: Create 13F holding table
-Resume: Run remaining CREATE TABLE statements
-```
-
-### 6. COMPLETION
-When all tasks done:
-```
-1. Mark all tasks as completed
-2. Summarize what was accomplished
-3. Note any remaining issues or follow-ups
-4. Commit changes with comprehensive message
-```
-
----
-
-## Querying the Nexdata API
-
-The API runs at `http://localhost:8001`. Use the Python client for data queries:
+Site intel collectors use a decorator-based registry:
 
 ```python
-from scripts.nexdata_client import NexdataClient
-client = NexdataClient()
+from app.sources.site_intel.runner import register_collector
 
-# Search investors
-investors = client.search_investors("Sequoia")
-
-# Get portfolio
-portfolio = client.get_portfolio(investor_id)
-
-# Get company health score
-score = client.get_company_score("Stripe")
-
-# Get deal predictions
-prediction = client.get_deal_prediction(deal_id)
-
-# Get pipeline insights
-insights = client.get_pipeline_insights()
+@register_collector(SiteIntelSource.POWER_PLANTS)
+class PowerCollector(BaseCollector):
+    domain = SiteIntelDomain.POWER
+    source = SiteIntelSource.POWER_PLANTS
 ```
 
-For full API documentation, see `.claude/skills/nexdata.md`.
+The decorator populates `COLLECTOR_REGISTRY` at import time. For collectors to be available, their module **must be imported** — each domain's `__init__.py` imports all collector modules. When calling collectors from API endpoints, ensure the import chain reaches the domain `__init__.py`:
+```python
+import app.sources.site_intel.logistics  # noqa: F401
+```
+
+### People Collection Pipeline
+
+**Flow:** PageFinder → WebsiteAgent (structured HTML + LLM fallback) → Orchestrator → Storage
+
+- **DB tables:** `people`, `company_people`, `industrial_companies`, `org_chart_snapshots`
+- **Deep collection** (4 phases): SEC EDGAR 10-K → Website deep crawl → News scan → Org chart build
+- **Test endpoint:** `POST /api/v1/people-jobs/test/{company_id}?sources=website`
+- **Deep collect:** `POST /api/v1/people-jobs/deep-collect/{company_id}`
+
+### Key Models Files
+
+- `app/core/models.py` (102KB) — Core tables: IngestionJob, IngestionSchedule, DatasetRegistry, etc.
+- `app/core/models_site_intel.py` (65KB) — Site Intelligence domain tables
+- `app/core/people_models.py` (23KB) — People and org chart tables
+- `app/core/pe_models.py` (31KB) — PE Intelligence tables
+
+### Database Patterns
+
+- **`bulk_upsert()`** overwrites ALL columns including nulls — dangerous for incremental enrichment
+- **`null_preserving_upsert()`** uses `COALESCE(EXCLUDED.col, existing.col)` — safe for enrichment workflows
+- Tables are created at startup via `Base.metadata.create_all()` (no migration tool)
+- All batch INSERT records must have identical keys — use `rec.setdefault(key, None)` before upsert
+
+### Error Hierarchy (`app/core/api_errors.py`)
+
+```
+APIError
+├── RetryableError    (500s, timeouts — auto-retry)
+├── RateLimitError    (429 — backoff)
+├── FatalError        (400, 404 — don't retry)
+├── AuthenticationError (401, 403)
+└── NotFoundError     (404)
+```
+
+### Job Lifecycle
+
+Every ingestion creates an `ingestion_jobs` record: `pending → running → success | failed`. Jobs support retry logic, parent-child chaining, and scheduling via APScheduler (configured in lifespan).
+
+---
+
+## Critical Rules
+
+### Data Safety
+- **Only** use publicly available data — never access paywalled/login-required content
+- **Never** collect PII beyond what sources explicitly provide; never de-anonymize datasets
+- **Always** parameterize SQL queries (`:param` style) — never string-concatenate untrusted input
+- **Always** use `asyncio.Semaphore` for bounded concurrency (default `MAX_CONCURRENCY=4`)
+
+### Web Scraping Safeguards
+- Respect `robots.txt` strictly
+- Rate limit: 1-2 req/sec per domain (0.5 req/sec for sensitive targets like family offices)
+- User-Agent: `"NexdataResearch/1.0 (research@nexdata.com; respectful research bot)"`
+- Exponential backoff with jitter on errors; respect `Retry-After` headers
+- Abort immediately if login required or paywall detected
+
+### LLM Usage
+- Track all LLM costs via `llm_cost_tracker.py`
+- LLM-extracted data gets `confidence='llm_extracted'` until human-verified
+- Confidence priority: SEC filings > Official websites > Annual reports > News
+
+---
+
+## Workflow
+
+1. **Plan** — Record in `docs/plans/PLAN_XXX_<name>.md`, wait for explicit user approval
+2. **Execute** — Use TaskCreate/TaskUpdate for multi-step work
+3. **Test** — `docker-compose up --build -d`, curl endpoints, check logs
+4. **Commit** — Conventional Commits format: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`
+
+### Parallel Work
+
+If working alongside another Claude instance, read `PARALLEL_WORK.md` first. Only touch assigned files. Tab 1 handles main.py integration and commits.
+
+### Long-Running Tasks
+
+Use TaskCreate to break work into phases. Mark tasks `in_progress` before starting, `completed` when done. Include checkpoint info (last completed, next action, blockers, resume instructions) so work can continue if interrupted.
+
+---
+
+## Environment Variables
+
+**Required:** `DATABASE_URL`
+
+**Source-specific (required only when using that source):** `FRED_API_KEY`, `EIA_API_KEY`, `BEA_API_KEY`, `BLS_API_KEY`, `CENSUS_SURVEY_API_KEY`, `NOAA_API_TOKEN`, `YELP_API_KEY`, `DATA_GOV_API`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `KAGGLE_USERNAME`, `KAGGLE_KEY`
+
+**System:** `MAX_CONCURRENCY` (default 4), `MAX_REQUESTS_PER_SECOND` (default 5.0), `LOG_LEVEL` (default INFO), `ENABLE_PLAYWRIGHT` (default 0)
+
+App startup does NOT require data source API keys — keys are validated at ingestion time.
+
+---
+
+## Known Issues
+
+- DuckDuckGo search returns 0 results from Docker (likely IP-blocked)
+- JS-rendered pages not supported unless `ENABLE_PLAYWRIGHT=1` (adds ~500MB to image)
+- Docker build cache can be stale — use `--no-cache` when changes aren't picked up
+- Container logs may appear empty initially; app takes time to initialize
