@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news, reports, deals, benchmarks, auth, workspaces, form_d, corporate_registry, form_adv, web_traffic, github, scores, entities, glassdoor, app_rankings, predictions, agents, diligence, monitors, competitive, hunter, anomalies, market, reports_gen, lp_collection, fo_collection, pe_firms, pe_companies, pe_people, pe_deals, people, companies_leadership, collection_jobs, people_portfolios, peer_sets, people_watchlists, people_analytics, people_reports, people_data_quality, people_dedup, people_jobs, workflows, llm_costs
+from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news, reports, deals, benchmarks, auth, workspaces, form_d, corporate_registry, form_adv, web_traffic, github, scores, entities, glassdoor, app_rankings, predictions, agents, diligence, monitors, competitive, hunter, anomalies, market, reports_gen, lp_collection, fo_collection, pe_firms, pe_companies, pe_people, pe_deals, pe_collection, app_stores, opencorporates, people, companies_leadership, collection_jobs, people_portfolios, peer_sets, people_watchlists, people_analytics, people_reports, people_data_quality, people_dedup, people_jobs, workflows, llm_costs
 # Site Intelligence Platform
 from app.api.v1 import site_intel_power, site_intel_telecom, site_intel_transport, site_intel_labor, site_intel_risk, site_intel_incentives, site_intel_logistics, site_intel_water_utilities, site_intel_sites
 from app.graphql import graphql_app
@@ -951,6 +951,8 @@ app.include_router(github.router, prefix="/api/v1")
 app.include_router(scores.router, prefix="/api/v1")
 app.include_router(entities.router, prefix="/api/v1")
 app.include_router(glassdoor.router, prefix="/api/v1")
+app.include_router(app_stores.router, prefix="/api/v1")
+app.include_router(opencorporates.router, prefix="/api/v1")
 app.include_router(app_rankings.router, prefix="/api/v1")
 app.include_router(predictions.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
@@ -969,6 +971,7 @@ app.include_router(pe_firms.router, prefix="/api/v1")
 app.include_router(pe_companies.router, prefix="/api/v1")
 app.include_router(pe_people.router, prefix="/api/v1")
 app.include_router(pe_deals.router, prefix="/api/v1")
+app.include_router(pe_collection.router, prefix="/api/v1")
 
 # People & Org Chart Intelligence
 app.include_router(people.router, prefix="/api/v1")

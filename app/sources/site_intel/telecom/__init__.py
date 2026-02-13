@@ -8,5 +8,6 @@ Data sources:
 """
 
 from app.sources.site_intel.telecom.peeringdb_collector import PeeringDBCollector
+from app.sources.site_intel.telecom.fcc_broadband_collector import FCCBroadbandCollector
 
-__all__ = ["PeeringDBCollector"]
+__all__ = ["PeeringDBCollector", "FCCBroadbandCollector"]

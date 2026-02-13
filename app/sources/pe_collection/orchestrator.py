@@ -20,6 +20,7 @@ from app.sources.pe_collection.types import (
     PECollectionSource,
 )
 from app.sources.pe_collection.base_collector import BasePECollector
+from app.core.pe_models import PEFirm, PEPortfolioCompany, PEPerson, PEDeal
 
 logger = logging.getLogger(__name__)
 
@@ -215,34 +216,65 @@ class PECollectionOrchestrator:
             logger.warning("No database session, cannot fetch entities")
             return []
 
-        # TODO: Implement database queries based on entity_type and filters
-        # For now, return empty list - entities should be passed explicitly
+        db = self.db_session
+
+        def _to_entity(row, extra: dict = None) -> Dict[str, Any]:
+            """Convert a model instance to an entity dict."""
+            d = {"id": row.id, "name": getattr(row, "name", None) or getattr(row, "full_name", None)}
+            if hasattr(row, "website"):
+                d["website"] = row.website
+            if hasattr(row, "cik"):
+                d["cik"] = row.cik
+            if hasattr(row, "crd_number"):
+                d["crd_number"] = row.crd_number
+            if extra:
+                d.update(extra)
+            return d
+
         entities = []
 
         if config.entity_type == EntityType.FIRM:
-            # Query pe_firms table
+            query = db.query(PEFirm)
             if config.firm_id:
-                # Single firm
-                pass
+                query = query.filter(PEFirm.id == config.firm_id)
             elif config.firm_ids:
-                # Multiple firms
-                pass
+                query = query.filter(PEFirm.id.in_(config.firm_ids))
             else:
-                # All firms matching filters
-                pass
+                query = query.filter(PEFirm.status == "Active")
+                if config.firm_types:
+                    query = query.filter(PEFirm.firm_type.in_(config.firm_types))
+            entities = [_to_entity(r) for r in query.all()]
 
         elif config.entity_type == EntityType.COMPANY:
-            # Query pe_portfolio_companies table
-            pass
+            query = db.query(PEPortfolioCompany)
+            if config.company_id:
+                query = query.filter(PEPortfolioCompany.id == config.company_id)
+            elif config.company_ids:
+                query = query.filter(PEPortfolioCompany.id.in_(config.company_ids))
+            else:
+                query = query.filter(PEPortfolioCompany.status == "Active")
+                if config.sectors:
+                    query = query.filter(PEPortfolioCompany.industry.in_(config.sectors))
+            entities = [_to_entity(r) for r in query.all()]
 
         elif config.entity_type == EntityType.PERSON:
-            # Query pe_people table
-            pass
+            query = db.query(PEPerson)
+            if config.person_id:
+                query = query.filter(PEPerson.id == config.person_id)
+            elif config.person_ids:
+                query = query.filter(PEPerson.id.in_(config.person_ids))
+            else:
+                query = query.filter(PEPerson.is_active.is_(True))
+            entities = [_to_entity(r) for r in query.all()]
 
         elif config.entity_type == EntityType.DEAL:
-            # Query pe_deals table
-            pass
+            query = db.query(PEDeal)
+            entities = [
+                {"id": r.id, "name": r.deal_name or f"Deal {r.id}"}
+                for r in query.all()
+            ]
 
+        logger.info(f"Fetched {len(entities)} {config.entity_type.value} entities from DB")
         return entities
 
     @property

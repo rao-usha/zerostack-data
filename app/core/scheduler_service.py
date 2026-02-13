@@ -7,11 +7,13 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy.orm import Session
 
 from app.core.models import IngestionSchedule, IngestionJob, JobStatus, ScheduleFrequency
+from app.core.config import get_settings
 from app.core.database import get_session_factory
 
 logger = logging.getLogger(__name__)
@@ -21,10 +23,14 @@ _scheduler: Optional[AsyncIOScheduler] = None
 
 
 def get_scheduler() -> AsyncIOScheduler:
-    """Get or create the global scheduler instance."""
+    """Get or create the global scheduler instance with persistent job store."""
     global _scheduler
     if _scheduler is None:
-        _scheduler = AsyncIOScheduler()
+        settings = get_settings()
+        jobstores = {
+            "default": SQLAlchemyJobStore(url=settings.database_url),
+        }
+        _scheduler = AsyncIOScheduler(jobstores=jobstores)
     return _scheduler
 
 

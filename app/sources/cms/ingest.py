@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 import csv
 import io
+import zipfile
 
 from app.core.config import get_settings
 from app.core.models import DatasetRegistry, IngestionJob, JobStatus
@@ -199,26 +200,87 @@ async def ingest_hospital_cost_reports(
     # 3. Register dataset
     _register_dataset(db, dataset_type, meta)
     
-    # 4. For demonstration, we'll use a known HCRIS CSV file URL
-    # In production, this would be configurable or fetched from CMS
-    # Example: Hospital 2022 Alpha file
-    hcris_url = "https://www.cms.gov/files/zip/hosp2022alphav26.zip"
-    
-    logger.warning(
-        "Hospital Cost Reports ingestion requires downloading and parsing large ZIP files. "
-        "This is a placeholder implementation. Full HCRIS ingestion requires additional "
-        "CSV parsing logic for the specific report format."
-    )
-    
-    # For now, return a placeholder result
-    # TODO: Implement full HCRIS ZIP download and CSV parsing
-    
-    return {
-        "table_name": table_name,
-        "rows_inserted": 0,
-        "duration_seconds": (datetime.utcnow() - start_time).total_seconds(),
-        "note": "HCRIS ingestion requires additional implementation for ZIP/CSV parsing"
-    }
+    # Update job to RUNNING
+    job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+    if job:
+        job.status = JobStatus.RUNNING
+        job.started_at = start_time
+        db.commit()
+
+    try:
+        # 4. Build HCRIS URL for requested year
+        hcris_year = year or 2022
+        hcris_url = f"https://www.cms.gov/files/zip/hosp{hcris_year}alphav26.zip"
+
+        # 5. Download the ZIP file
+        client = CMSClient(
+            max_concurrency=settings.max_concurrency,
+            max_retries=settings.max_retries,
+            backoff_factor=settings.retry_backoff_factor,
+        )
+
+        try:
+            logger.info(f"Downloading HCRIS ZIP from {hcris_url}")
+            zip_bytes = await client.fetch_bulk_file(hcris_url)
+            logger.info(f"Downloaded {len(zip_bytes)} bytes")
+        finally:
+            await client.close()
+
+        # 6. Extract and parse CSV from ZIP
+        records = []
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            csv_names = [n for n in zf.namelist() if n.lower().endswith(".csv")]
+            if not csv_names:
+                raise ValueError(f"No CSV files found in HCRIS ZIP archive: {zf.namelist()}")
+
+            for csv_name in csv_names:
+                logger.info(f"Parsing {csv_name}")
+                raw = zf.read(csv_name)
+                # HCRIS files use CP1252 encoding
+                text_data = raw.decode("cp1252", errors="replace")
+                reader = csv.DictReader(io.StringIO(text_data))
+
+                for row in reader:
+                    records.append(row)
+                    if limit and len(records) >= limit:
+                        break
+                if limit and len(records) >= limit:
+                    break
+
+        logger.info(f"Parsed {len(records)} records from HCRIS ZIP")
+
+        # 7. Insert data
+        if records:
+            await _batch_insert_data(db, table_name, records, meta["columns"])
+
+        rows_inserted = len(records)
+        duration = (datetime.utcnow() - start_time).total_seconds()
+
+        # 8. Update job status
+        if job:
+            job.status = JobStatus.SUCCESS if rows_inserted > 0 else JobStatus.FAILED
+            if rows_inserted == 0:
+                job.error_message = "No rows parsed from HCRIS ZIP"
+            job.completed_at = datetime.utcnow()
+            job.rows_inserted = rows_inserted
+            db.commit()
+
+        logger.info(f"Ingested {rows_inserted} HCRIS rows into {table_name} in {duration:.2f}s")
+
+        return {
+            "table_name": table_name,
+            "rows_inserted": rows_inserted,
+            "duration_seconds": duration,
+        }
+
+    except Exception as e:
+        logger.error(f"CMS HCRIS ingestion failed: {e}", exc_info=True)
+        if job:
+            job.status = JobStatus.FAILED
+            job.error_message = str(e)
+            job.completed_at = datetime.utcnow()
+            db.commit()
+        raise
 
 
 async def ingest_drug_pricing(

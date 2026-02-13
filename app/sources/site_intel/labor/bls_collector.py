@@ -250,7 +250,7 @@ class BLSLaborCollector(BaseCollector):
             ]
 
             # Determine which states to collect
-            states = config.states if config.states else list(STATE_FIPS.keys())[:10]  # Limit for rate limits
+            states = config.states if config.states else list(STATE_FIPS.keys())
 
             all_records = []
 

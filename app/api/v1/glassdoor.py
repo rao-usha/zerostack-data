@@ -4,13 +4,14 @@ Glassdoor API endpoints.
 Provides access to company reviews, ratings, and salary data.
 """
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from typing import Optional, List
 
 from app.core.database import get_db
 from app.sources.glassdoor.client import GlassdoorClient
+from app.sources.glassdoor.ingest import GlassdoorCSVImporter
 
 router = APIRouter(prefix="/glassdoor", tags=["Glassdoor"])
 
@@ -245,6 +246,38 @@ def get_rankings(
     """
     client = GlassdoorClient(db)
     result = client.get_rankings(metric=metric, industry=industry, limit=limit)
+
+    return result
+
+
+@router.post("/import-csv")
+async def import_csv(
+    file: UploadFile = File(..., description="CSV file with Glassdoor data"),
+    data_type: str = Query(
+        "companies",
+        description="Type of data: 'companies' or 'salaries'",
+    ),
+    db: Session = Depends(get_db),
+):
+    """
+    Import Glassdoor data from a CSV file.
+
+    Supports two data types:
+    - **companies**: Company ratings and metadata (requires company_name column)
+    - **salaries**: Salary data by job title (requires company_name and job_title columns)
+    """
+    if data_type not in ("companies", "salaries"):
+        raise HTTPException(status_code=400, detail="data_type must be 'companies' or 'salaries'")
+
+    content = await file.read()
+    csv_content = content.decode("utf-8-sig")
+
+    importer = GlassdoorCSVImporter(db)
+
+    if data_type == "companies":
+        result = importer.import_companies_csv(csv_content)
+    else:
+        result = importer.import_salaries_csv(csv_content)
 
     return result
 

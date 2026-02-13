@@ -20,13 +20,34 @@ class GeoJSONFetcher:
     
     # TIGERweb base URLs for different vintages
     BASE_URL = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb"
-    
+
     # Map geo levels to TIGERweb service names
     GEO_SERVICES = {
         "state": "State_2020",
         "county": "County_2020",
         "tract": "Census_Tracts_2020",
         "zip code tabulation area": "ZCTA_2020"
+    }
+
+    # Map geo levels to TIGERweb MapServer layer IDs
+    LAYER_IDS = {
+        "state": 80,
+        "county": 82,
+        "tract": 8,
+        "zip code tabulation area": 2,
+    }
+
+    # FIPS code field names per layer
+    FIPS_FIELDS = {
+        "state": "STATE",
+        "county": "STATE",
+        "tract": "STATE",
+        "zip code tabulation area": None,
+    }
+
+    COUNTY_FIPS_FIELDS = {
+        "county": "COUNTY",
+        "tract": "COUNTY",
     }
     
     def __init__(self, year: int = 2020):
@@ -58,14 +79,32 @@ class GeoJSONFetcher:
         Returns:
             Full URL for GeoJSON fetch
         """
-        # For now, return empty URL - GeoJSON fetch will be skipped
-        # TODO: Implement proper TIGERweb integration or use alternative source
-        # Alternative: Use Census Cartographic Boundary Files
-        # https://www2.census.gov/geo/tiger/GENZ2020/shp/
-        raise NotImplementedError(
-            "GeoJSON fetching temporarily disabled. "
-            "Will implement using Census Cartographic Boundary files."
+        layer_id = self.LAYER_IDS.get(geo_level)
+        if layer_id is None:
+            raise ValueError(
+                f"Unsupported geo_level '{geo_level}'. "
+                f"Supported: {list(self.LAYER_IDS.keys())}"
+            )
+
+        # Build WHERE clause for FIPS filtering
+        where_parts = []
+        fips_field = self.FIPS_FIELDS.get(geo_level)
+        if state_fips and fips_field:
+            where_parts.append(f"{fips_field}='{state_fips}'")
+        county_field = self.COUNTY_FIPS_FIELDS.get(geo_level)
+        if county_fips and county_field:
+            where_parts.append(f"{county_field}='{county_fips}'")
+
+        where_clause = " AND ".join(where_parts) if where_parts else "1=1"
+
+        url = (
+            f"{self.BASE_URL}/tigerWMS_Current/MapServer/{layer_id}/query"
+            f"?where={where_clause}"
+            f"&outFields=*"
+            f"&f=geojson"
+            f"&resultRecordCount=1000"
         )
+        return url
     
     async def fetch_geojson(
         self,
@@ -89,36 +128,50 @@ class GeoJSONFetcher:
         Raises:
             httpx.HTTPError: On fetch errors
         """
-        url = self._build_geojson_url(geo_level, state_fips, county_fips)
-        
+        base_url = self._build_geojson_url(geo_level, state_fips, county_fips)
+
         logger.info(f"Fetching GeoJSON for {geo_level} level")
-        
-        for attempt in range(max_retries):
-            try:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.get(url)
-                    response.raise_for_status()
-                    geojson = response.json()
-                    
-                    # Validate it's a FeatureCollection
-                    if geojson.get("type") != "FeatureCollection":
-                        logger.warning(f"Response is not a FeatureCollection: {geojson}")
-                    
-                    feature_count = len(geojson.get("features", []))
-                    logger.info(f"Fetched GeoJSON with {feature_count} features")
-                    
-                    return geojson
-            
-            except (httpx.HTTPError, httpx.TimeoutException) as e:
-                if attempt < max_retries - 1:
-                    wait_time = 2 ** attempt
-                    logger.warning(f"GeoJSON fetch failed, retrying in {wait_time}s: {e}")
-                    await asyncio.sleep(wait_time)
+
+        all_features = []
+        offset = 0
+        page_size = 1000
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            while True:
+                url = f"{base_url}&resultOffset={offset}"
+
+                for attempt in range(max_retries):
+                    try:
+                        response = await client.get(url)
+                        response.raise_for_status()
+                        page = response.json()
+                        break
+                    except (httpx.HTTPError, httpx.TimeoutException) as e:
+                        if attempt < max_retries - 1:
+                            wait_time = 2 ** attempt
+                            logger.warning(f"GeoJSON fetch failed, retrying in {wait_time}s: {e}")
+                            await asyncio.sleep(wait_time)
+                        else:
+                            logger.error(f"Failed to fetch GeoJSON after {max_retries} attempts: {e}")
+                            raise
                 else:
-                    logger.error(f"Failed to fetch GeoJSON after {max_retries} attempts: {e}")
-                    raise
-        
-        raise Exception("Failed to fetch GeoJSON")
+                    raise Exception("Failed to fetch GeoJSON")
+
+                features = page.get("features", [])
+                all_features.extend(features)
+                logger.info(f"Fetched {len(features)} features (offset={offset}, total={len(all_features)})")
+
+                if len(features) < page_size:
+                    break
+                offset += page_size
+                await asyncio.sleep(0.5)
+
+        geojson = {
+            "type": "FeatureCollection",
+            "features": all_features,
+        }
+        logger.info(f"Fetched GeoJSON with {len(all_features)} total features")
+        return geojson
     
     async def fetch_simplified_geojson(
         self,

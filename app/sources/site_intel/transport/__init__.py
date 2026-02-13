@@ -10,5 +10,6 @@ Data sources:
 """
 
 from app.sources.site_intel.transport.bts_collector import BTSTransportCollector
+from app.sources.site_intel.transport.fra_rail_collector import FRARailCollector
 
-__all__ = ["BTSTransportCollector"]
+__all__ = ["BTSTransportCollector", "FRARailCollector"]

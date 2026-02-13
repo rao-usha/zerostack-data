@@ -473,7 +473,7 @@ class NewsAgent(BaseCollector):
         feed_url = None
         for pattern in self.RSS_FEED_PATTERNS:
             url = base_url + pattern
-            exists = await self.check_url_exists(url)
+            exists = await self.check_url_exists(url, timeout=10)
             if exists:
                 feed_url = url
                 logger.debug(f"[NewsAgent] Found RSS feed via pattern: {pattern}")
