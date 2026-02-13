@@ -359,8 +359,10 @@ class BioExtractor(BasePECollector):
         self, llm_client, text: str, firm_name: str
     ) -> List[Dict[str, Any]]:
         """Use LLM to extract structured bio data from team page text."""
-        # Truncate to avoid token limits
-        text = text[:12000]
+        import json as json_mod
+
+        # Truncate to keep input small so model has room for output tokens
+        text = text[:6000]
         prompt = BIO_EXTRACTION_PROMPT.format(firm_name=firm_name, text=text)
 
         try:
@@ -372,7 +374,12 @@ class BioExtractor(BasePECollector):
                 ),
                 json_mode=True,
             )
+
+            # Try standard parse first; falls back to JSON repair on None
             result = response.parse_json()
+            if result is None:
+                raw = response.content if hasattr(response, "content") else str(response)
+                result = self._repair_json_array(raw)
 
             # Handle both list and dict with a "people" key
             if isinstance(result, list):
@@ -383,4 +390,69 @@ class BioExtractor(BasePECollector):
 
         except Exception as e:
             logger.warning(f"LLM bio extraction failed: {e}")
+            return []
+
+    @staticmethod
+    def _repair_json_array(raw: str) -> Any:
+        """Attempt to repair and parse a JSON array from raw LLM output."""
+        import json as json_mod
+
+        # Find the outermost [ ... ] bracket pair
+        start = raw.find("[")
+        if start == -1:
+            return []
+
+        # Find matching closing bracket
+        depth = 0
+        end = -1
+        for i in range(start, len(raw)):
+            if raw[i] == "[":
+                depth += 1
+            elif raw[i] == "]":
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+
+        if end == -1:
+            # Truncated output — find last complete object and close array
+            candidate = raw[start:]
+            # Find the last complete "}" that closes a top-level object
+            last_complete = -1
+            obj_depth = 0
+            in_string = False
+            escape_next = False
+            for i, ch in enumerate(candidate):
+                if escape_next:
+                    escape_next = False
+                    continue
+                if ch == "\\":
+                    escape_next = True
+                    continue
+                if ch == '"' and not escape_next:
+                    in_string = not in_string
+                    continue
+                if in_string:
+                    continue
+                if ch == "{":
+                    obj_depth += 1
+                elif ch == "}":
+                    obj_depth -= 1
+                    if obj_depth == 0:
+                        last_complete = i
+
+            if last_complete > 0:
+                candidate = candidate[:last_complete + 1] + "]"
+            else:
+                candidate = "[]"
+        else:
+            candidate = raw[start:end + 1]
+
+        # Fix common JSON issues: trailing commas before ] or }
+        candidate = re.sub(r",\s*([}\]])", r"\1", candidate)
+
+        try:
+            return json_mod.loads(candidate)
+        except json_mod.JSONDecodeError:
+            logger.debug("JSON repair failed, returning empty list")
             return []
