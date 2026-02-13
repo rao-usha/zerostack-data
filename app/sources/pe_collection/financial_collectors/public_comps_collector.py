@@ -2,9 +2,10 @@
 Public Comps Collector for PE portfolio company financials.
 
 Pulls financial data (revenue, EBITDA, market cap, valuation multiples)
-for public portfolio companies via Yahoo Finance.
+for public portfolio companies via the yfinance package.
 """
 
+import asyncio
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -20,20 +21,13 @@ from app.sources.pe_collection.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Yahoo Finance endpoints
+# Yahoo Finance search endpoint (still works without auth)
 YAHOO_SEARCH_URL = "https://query2.finance.yahoo.com/v1/finance/search"
-YAHOO_QUOTE_SUMMARY_URL = (
-    "https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}"
-)
-YAHOO_SUMMARY_MODULES = (
-    "financialData,defaultKeyStatistics,incomeStatementHistory,"
-    "balanceSheetHistory,cashflowStatementHistory,price,summaryProfile"
-)
 
 
 class PublicCompsCollector(BasePECollector):
     """
-    Collects financial data for public portfolio companies via Yahoo Finance.
+    Collects financial data for public portfolio companies via yfinance.
 
     Extracts: revenue, EBITDA, net income, balance sheet, valuation multiples,
     company profile data.
@@ -65,7 +59,7 @@ class PublicCompsCollector(BasePECollector):
         Args:
             entity_id: Portfolio company ID
             entity_name: Company name
-            website_url: Company website (used for ticker search fallback)
+            website_url: Company website
             ticker: Stock ticker symbol (if known)
         """
         started_at = datetime.utcnow()
@@ -90,9 +84,9 @@ class PublicCompsCollector(BasePECollector):
             warnings.append(f"Resolved ticker to '{ticker}' via search")
 
         try:
-            # Fetch quote summary (bundles all financial modules)
-            summary = await self._fetch_quote_summary(ticker)
-            if not summary:
+            # Fetch data via yfinance (runs sync IO in thread pool)
+            info = await self._fetch_yfinance_info(ticker)
+            if not info:
                 return self._create_result(
                     entity_id=entity_id,
                     entity_name=entity_name,
@@ -101,25 +95,26 @@ class PublicCompsCollector(BasePECollector):
                     started_at=started_at,
                 )
 
+            self._requests_made += 1
             source_url = f"https://finance.yahoo.com/quote/{ticker}"
 
             # Extract financial data
             financial_item = self._extract_financials(
-                summary, entity_id, entity_name, ticker, source_url
+                info, entity_id, entity_name, ticker, source_url
             )
             if financial_item:
                 items.append(financial_item)
 
             # Extract valuation data
             valuation_item = self._extract_valuation(
-                summary, entity_id, entity_name, ticker, source_url
+                info, entity_id, entity_name, ticker, source_url
             )
             if valuation_item:
                 items.append(valuation_item)
 
             # Extract company profile update
             profile_item = self._extract_profile(
-                summary, entity_id, entity_name, ticker, source_url
+                info, entity_id, entity_name, ticker, source_url
             )
             if profile_item:
                 items.append(profile_item)
@@ -155,102 +150,76 @@ class PublicCompsCollector(BasePECollector):
 
         quotes = data.get("quotes", [])
         for quote in quotes:
-            # Prefer equity quotes
-            quote_type = quote.get("quoteType", "")
-            if quote_type == "EQUITY":
+            if quote.get("quoteType") == "EQUITY":
                 return quote.get("symbol")
 
-        # Fallback: return first result if any
         if quotes:
             return quotes[0].get("symbol")
 
         return None
 
-    async def _fetch_quote_summary(
-        self, ticker: str
-    ) -> Optional[Dict[str, Any]]:
-        """Fetch Yahoo Finance quote summary with all financial modules."""
-        url = YAHOO_QUOTE_SUMMARY_URL.format(ticker=ticker)
-        data = await self._fetch_json(url, params={"modules": YAHOO_SUMMARY_MODULES})
-
-        if not data:
+    async def _fetch_yfinance_info(self, ticker: str) -> Optional[Dict[str, Any]]:
+        """Fetch ticker info via yfinance (runs in thread pool)."""
+        try:
+            import yfinance as yf
+        except ImportError:
+            logger.error("yfinance package not installed")
             return None
 
-        result = data.get("quoteSummary", {}).get("result", [])
-        if not result:
+        def _fetch():
+            t = yf.Ticker(ticker)
+            return t.info
+
+        loop = asyncio.get_event_loop()
+        info = await loop.run_in_executor(None, _fetch)
+
+        if not info or not info.get("symbol"):
             return None
 
-        return result[0]
+        return info
 
     def _extract_financials(
         self,
-        summary: Dict[str, Any],
+        info: Dict[str, Any],
         entity_id: int,
         entity_name: str,
         ticker: str,
         source_url: str,
     ) -> Optional[PECollectedItem]:
         """Extract income statement, balance sheet, and cash flow data."""
-        fin = summary.get("financialData", {})
-        stats = summary.get("defaultKeyStatistics", {})
-
-        # Get most recent annual income statement
-        income_history = (
-            summary.get("incomeStatementHistory", {})
-            .get("incomeStatementHistory", [])
-        )
-        latest_income = income_history[0] if income_history else {}
-
-        # Get most recent balance sheet
-        bs_history = (
-            summary.get("balanceSheetHistory", {})
-            .get("balanceSheetStatements", [])
-        )
-        latest_bs = bs_history[0] if bs_history else {}
-
-        # Get most recent cash flow
-        cf_history = (
-            summary.get("cashflowStatementHistory", {})
-            .get("cashflowStatements", [])
-        )
-        latest_cf = cf_history[0] if cf_history else {}
-
-        fiscal_end = latest_income.get("endDate", {}).get("fmt")
-
         data = {
             "company_id": entity_id,
             "company_name": entity_name,
             "ticker": ticker,
-            "fiscal_year_end": fiscal_end,
             # Income statement
-            "revenue": _raw(fin.get("totalRevenue")),
-            "ebitda": _raw(fin.get("ebitda")),
-            "gross_profit": _raw(latest_income.get("grossProfit")),
-            "operating_income": _raw(latest_income.get("operatingIncome")),
-            "net_income": _raw(latest_income.get("netIncome")),
+            "revenue": info.get("totalRevenue"),
+            "ebitda": info.get("ebitda"),
+            "gross_profit": info.get("grossProfits"),
+            "operating_income": info.get("operatingIncome"),
+            "net_income": info.get("netIncomeToCommon"),
             # Balance sheet
-            "total_assets": _raw(latest_bs.get("totalAssets")),
-            "total_debt": _raw(fin.get("totalDebt")),
-            "total_cash": _raw(fin.get("totalCash")),
-            "total_stockholder_equity": _raw(
-                latest_bs.get("totalStockholderEquity")
-            ),
+            "total_assets": info.get("totalAssets"),
+            "total_debt": info.get("totalDebt"),
+            "total_cash": info.get("totalCash"),
+            "total_stockholder_equity": info.get("bookValue"),
             # Cash flow
-            "free_cash_flow": _raw(fin.get("freeCashflow")),
-            "operating_cash_flow": _raw(fin.get("operatingCashflow")),
+            "free_cash_flow": info.get("freeCashflow"),
+            "operating_cash_flow": info.get("operatingCashflow"),
             # Margins
-            "gross_margin": _raw(fin.get("grossMargins")),
-            "operating_margin": _raw(fin.get("operatingMargins")),
-            "profit_margin": _raw(fin.get("profitMargins")),
+            "gross_margin": info.get("grossMargins"),
+            "operating_margin": info.get("operatingMargins"),
+            "profit_margin": info.get("profitMargins"),
             # Growth
-            "revenue_growth": _raw(fin.get("revenueGrowth")),
-            "earnings_growth": _raw(fin.get("earningsGrowth")),
+            "revenue_growth": info.get("revenueGrowth"),
+            "earnings_growth": info.get("earningsGrowth"),
         }
 
-        # Only return if we have some meaningful data
-        if not any(v for k, v in data.items() if k not in (
-            "company_id", "company_name", "ticker", "fiscal_year_end"
-        )):
+        has_data = any(
+            v is not None
+            for k, v in data.items()
+            if k not in ("company_id", "company_name", "ticker")
+        )
+        if not has_data:
             return None
 
         return self._create_item(
@@ -262,19 +231,15 @@ class PublicCompsCollector(BasePECollector):
 
     def _extract_valuation(
         self,
-        summary: Dict[str, Any],
+        info: Dict[str, Any],
         entity_id: int,
         entity_name: str,
         ticker: str,
         source_url: str,
     ) -> Optional[PECollectedItem]:
         """Extract valuation metrics (EV, multiples)."""
-        stats = summary.get("defaultKeyStatistics", {})
-        fin = summary.get("financialData", {})
-        price = summary.get("price", {})
-
-        market_cap = _raw(price.get("marketCap"))
-        enterprise_value = _raw(stats.get("enterpriseValue"))
+        market_cap = info.get("marketCap")
+        enterprise_value = info.get("enterpriseValue")
 
         data = {
             "company_id": entity_id,
@@ -282,16 +247,16 @@ class PublicCompsCollector(BasePECollector):
             "ticker": ticker,
             "market_cap": market_cap,
             "enterprise_value": enterprise_value,
-            "ev_to_revenue": _raw(stats.get("enterpriseToRevenue")),
-            "ev_to_ebitda": _raw(stats.get("enterpriseToEbitda")),
-            "trailing_pe": _raw(stats.get("trailingPE") or stats.get("trailingPe")),
-            "forward_pe": _raw(stats.get("forwardPE") or stats.get("forwardPe")),
-            "price_to_book": _raw(stats.get("priceToBook")),
-            "price_to_sales": _raw(stats.get("priceToSalesTrailing12Months")),
-            "beta": _raw(stats.get("beta")),
-            "fifty_two_week_high": _raw(stats.get("fiftyTwoWeekHigh")),
-            "fifty_two_week_low": _raw(stats.get("fiftyTwoWeekLow")),
-            "current_price": _raw(fin.get("currentPrice")),
+            "ev_to_revenue": info.get("enterpriseToRevenue"),
+            "ev_to_ebitda": info.get("enterpriseToEbitda"),
+            "trailing_pe": info.get("trailingPE"),
+            "forward_pe": info.get("forwardPE"),
+            "price_to_book": info.get("priceToBook"),
+            "price_to_sales": info.get("priceToSalesTrailing12Months"),
+            "beta": info.get("beta"),
+            "fifty_two_week_high": info.get("fiftyTwoWeekHigh"),
+            "fifty_two_week_low": info.get("fiftyTwoWeekLow"),
+            "current_price": info.get("currentPrice"),
         }
 
         if not enterprise_value and not market_cap:
@@ -306,32 +271,32 @@ class PublicCompsCollector(BasePECollector):
 
     def _extract_profile(
         self,
-        summary: Dict[str, Any],
+        info: Dict[str, Any],
         entity_id: int,
         entity_name: str,
         ticker: str,
         source_url: str,
     ) -> Optional[PECollectedItem]:
         """Extract company profile fields for portfolio company update."""
-        profile = summary.get("summaryProfile", {})
-        price = summary.get("price", {})
+        industry = info.get("industry")
+        sector = info.get("sector")
 
-        if not profile:
+        if not industry and not sector:
             return None
 
         data = {
             "company_id": entity_id,
             "company_name": entity_name,
             "ticker": ticker,
-            "industry": profile.get("industry"),
-            "sector": profile.get("sector"),
-            "description": profile.get("longBusinessSummary"),
-            "employee_count": profile.get("fullTimeEmployees"),
-            "headquarters_city": profile.get("city"),
-            "headquarters_state": profile.get("state"),
-            "headquarters_country": profile.get("country"),
-            "website": profile.get("website"),
-            "exchange": price.get("exchangeName"),
+            "industry": industry,
+            "sector": sector,
+            "description": info.get("longBusinessSummary"),
+            "employee_count": info.get("fullTimeEmployees"),
+            "headquarters_city": info.get("city"),
+            "headquarters_state": info.get("state"),
+            "headquarters_country": info.get("country"),
+            "website": info.get("website"),
+            "exchange": info.get("exchange"),
         }
 
         return self._create_item(
@@ -341,10 +306,3 @@ class PublicCompsCollector(BasePECollector):
             confidence="high",
             is_new=False,
         )
-
-
-def _raw(val: Any) -> Any:
-    """Extract raw value from Yahoo Finance nested dict format."""
-    if isinstance(val, dict):
-        return val.get("raw")
-    return val
