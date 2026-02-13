@@ -4,6 +4,7 @@ Job retry service.
 Provides functionality to retry failed ingestion jobs with exponential backoff.
 """
 import logging
+import random
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
@@ -17,11 +18,15 @@ logger = logging.getLogger(__name__)
 BASE_DELAY_MINUTES = 5  # First retry after 5 minutes
 MAX_DELAY_MINUTES = 60 * 24  # Max 24 hours between retries
 BACKOFF_MULTIPLIER = 2  # Double the delay each retry
+JITTER_FACTOR = 0.25  # ±25% random jitter to prevent thundering herd
 
 
 def calculate_retry_delay(retry_count: int) -> timedelta:
     """
-    Calculate delay before next retry using exponential backoff.
+    Calculate delay before next retry using exponential backoff with jitter.
+
+    Adds ±25% random jitter to prevent thundering herd when multiple
+    jobs fail and retry at the same time.
 
     Args:
         retry_count: Number of retries already attempted
@@ -33,6 +38,9 @@ def calculate_retry_delay(retry_count: int) -> timedelta:
         BASE_DELAY_MINUTES * (BACKOFF_MULTIPLIER ** retry_count),
         MAX_DELAY_MINUTES
     )
+    # Apply jitter: ±25% randomization
+    jitter = delay_minutes * JITTER_FACTOR * (2 * random.random() - 1)
+    delay_minutes = max(1, delay_minutes + jitter)
     return timedelta(minutes=delay_minutes)
 
 

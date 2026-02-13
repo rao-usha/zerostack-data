@@ -229,6 +229,7 @@ class SiteIntelOrchestrator:
                 SiteIntelSource.TELEGEOGRAPHY,
             ],
             SiteIntelDomain.TRANSPORT: [
+                SiteIntelSource.BTS,
                 SiteIntelSource.BTS_NTAD,
                 SiteIntelSource.FRA,
                 SiteIntelSource.USACE,
@@ -236,12 +237,14 @@ class SiteIntelOrchestrator:
                 SiteIntelSource.FHWA,
             ],
             SiteIntelDomain.LABOR: [
+                SiteIntelSource.BLS,
                 SiteIntelSource.BLS_OES,
                 SiteIntelSource.BLS_QCEW,
                 SiteIntelSource.CENSUS_LEHD,
                 SiteIntelSource.CENSUS_ACS,
             ],
             SiteIntelDomain.RISK: [
+                SiteIntelSource.FEMA,
                 SiteIntelSource.FEMA_NFHL,
                 SiteIntelSource.USGS_EARTHQUAKE,
                 SiteIntelSource.NOAA_CLIMATE,
