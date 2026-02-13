@@ -141,40 +141,33 @@ class PressReleaseCollector(BasePECollector):
                     started_at=started_at,
                 )
 
-            # Fetch and process press releases with LLM
-            llm_client = self._get_llm_client()
-            if not llm_client:
-                # Fall back to keyword-only extraction without LLM
-                warnings.append(
-                    "LLM not available — returning PR metadata only (no structured extraction)"
-                )
-                for pr in press_releases[:MAX_PR_TO_PROCESS]:
-                    items.append(
-                        self._create_item(
-                            item_type="deal_press_release",
-                            data={
-                                "firm_id": entity_id,
-                                "firm_name": entity_name,
-                                "title": pr.get("title"),
-                                "url": pr.get("url"),
-                                "source": pr.get("source"),
-                            },
-                            source_url=pr.get("url"),
-                            confidence="low",
-                        )
+            # Separate SEC 8-K metadata items from fetchable press releases
+            sec_items = [pr for pr in press_releases if pr.get("source") == "sec_8k"]
+            pr_items = [pr for pr in press_releases if pr.get("source") != "sec_8k"]
+
+            # SEC 8-K filings: create deal items from metadata directly
+            # (filing documents are blocked from Docker, but metadata is sufficient)
+            for sec in sec_items[:15]:
+                items.append(
+                    self._create_item(
+                        item_type="deal_8k_filing",
+                        data={
+                            "firm_id": entity_id,
+                            "firm_name": entity_name,
+                            "title": sec.get("title"),
+                            "filing_date": sec.get("date"),
+                            "company_name": sec.get("company_name"),
+                            "filing_items": sec.get("items", []),
+                        },
+                        source_url=sec.get("url"),
+                        confidence="high",
                     )
-                return self._create_result(
-                    entity_id=entity_id,
-                    entity_name=entity_name,
-                    success=True,
-                    items=items,
-                    warnings=warnings,
-                    started_at=started_at,
                 )
 
-            # Process each PR with LLM extraction
+            # Process fetchable press releases with LLM extraction
+            llm_client = self._get_llm_client()
             processed = 0
-            for pr in press_releases:
+            for pr in pr_items:
                 if processed >= MAX_PR_TO_PROCESS:
                     break
 
@@ -184,12 +177,30 @@ class PressReleaseCollector(BasePECollector):
 
                 # Fetch full text
                 text = await self._fetch_pr_text(pr_url)
-                if not text:
+                if not text or len(text) < 100:
                     continue
 
                 # Truncate to avoid exceeding token limits
                 text = text[:8000]
                 processed += 1
+
+                if not llm_client:
+                    # No LLM — store as metadata-only item
+                    items.append(
+                        self._create_item(
+                            item_type="deal_press_release",
+                            data={
+                                "firm_id": entity_id,
+                                "firm_name": entity_name,
+                                "title": pr.get("title"),
+                                "url": pr_url,
+                                "source": pr.get("source"),
+                            },
+                            source_url=pr_url,
+                            confidence="low",
+                        )
+                    )
+                    continue
 
                 # Extract deal data via LLM
                 deal_data = await self._extract_deal_with_llm(
@@ -332,11 +343,17 @@ class PressReleaseCollector(BasePECollector):
                     f"https://www.sec.gov/Archives/edgar/data/"
                     f"{cik}/{accession_clean}/"
                 )
+                # Extract 8-K item numbers (e.g., 1.01 = Material Agreement)
+                filing_items = source.get("items", [])
+                # Clean company name from display format
+                company_name = title.split("(")[0].strip() if title else ""
                 releases.append({
                     "url": sec_url,
-                    "title": f"8-K: {title}" if title else f"8-K filing {filing_date}",
+                    "title": f"8-K: {company_name}" if company_name else f"8-K filing {filing_date}",
                     "source": "sec_8k",
                     "date": filing_date,
+                    "company_name": company_name,
+                    "items": filing_items,
                 })
 
         return releases
