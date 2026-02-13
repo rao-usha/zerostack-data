@@ -6,8 +6,16 @@ import pytest
 from datetime import date, datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.ext.compiler import compiles
 from app.core.models import Base
 from app.core.config import reset_settings
+
+
+# Teach SQLite how to compile PostgreSQL ARRAY columns (renders as TEXT)
+@compiles(ARRAY, "sqlite")
+def _compile_array_for_sqlite(type_, compiler, **kw):
+    return "TEXT"
 from app.core.people_models import (
     Person, IndustrialCompany, CompanyPerson, PersonExperience,
     PersonEducation, OrgChartSnapshot, LeadershipChange, PeopleCollectionJob,
