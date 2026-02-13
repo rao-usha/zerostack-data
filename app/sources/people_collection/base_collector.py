@@ -220,15 +220,24 @@ class BaseCollector:
                 logger.error(f"JSON decode error for {url}: {e}")
         return None
 
-    async def check_url_exists(self, url: str) -> bool:
-        """Check if a URL exists (returns 200)."""
+    async def check_url_exists(self, url: str, timeout: Optional[float] = None) -> bool:
+        """Check if a URL exists (returns 200).
+
+        Args:
+            url: URL to check
+            timeout: Optional per-request timeout in seconds (overrides session default)
+        """
         await self.rate_limiter.acquire(url, self.source_type)
 
         try:
             session = await self._get_session()
             headers = self._get_headers(url)
 
-            async with session.head(url, headers=headers, allow_redirects=True) as response:
+            kwargs = {"headers": headers, "allow_redirects": True}
+            if timeout:
+                kwargs["timeout"] = ClientTimeout(total=timeout)
+
+            async with session.head(url, **kwargs) as response:
                 return response.status == 200
         except Exception as e:
             logger.debug(f"URL check failed for {url}: {e}")

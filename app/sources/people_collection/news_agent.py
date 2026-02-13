@@ -185,6 +185,7 @@ class NewsAgent(BaseCollector):
         website_url: Optional[str] = None,
         days_back: int = 90,
         include_google_news: bool = True,
+        newsroom_url: Optional[str] = None,
     ) -> CollectionResult:
         """
         Collect leadership changes from news sources.
@@ -195,6 +196,7 @@ class NewsAgent(BaseCollector):
             website_url: Company website URL (for newsroom)
             days_back: How far back to look for news
             include_google_news: Whether to search Google News RSS
+            newsroom_url: Direct newsroom URL (skips pattern search if provided)
 
         Returns:
             CollectionResult with extracted changes
@@ -220,10 +222,11 @@ class NewsAgent(BaseCollector):
 
         try:
             # 1. Check company newsroom
-            if website_url:
+            if website_url or newsroom_url:
                 logger.info(f"[NewsAgent] Step 1: Searching for company newsroom")
                 newsroom_changes, newsroom_urls = await self._collect_from_newsroom(
-                    website_url, company_name, days_back, result
+                    website_url or newsroom_url, company_name, days_back, result,
+                    newsroom_url=newsroom_url,
                 )
                 all_changes.extend(newsroom_changes)
                 result.page_urls.extend(newsroom_urls)
@@ -286,6 +289,7 @@ class NewsAgent(BaseCollector):
         company_name: str,
         days_back: int,
         result: CollectionResult,
+        newsroom_url: Optional[str] = None,
     ) -> Tuple[List[LeadershipChange], List[str]]:
         """Collect from company newsroom page."""
         changes = []
@@ -296,10 +300,12 @@ class NewsAgent(BaseCollector):
             website_url = 'https://' + website_url
         base_url = website_url.rstrip('/')
 
-        logger.debug(f"[NewsAgent] Looking for newsroom on {base_url}")
-
-        # Try to find newsroom page
-        newsroom_url = await self._find_newsroom_url(base_url, result)
+        # Use provided newsroom_url directly, or discover it
+        if newsroom_url:
+            logger.info(f"[NewsAgent] Using provided newsroom URL: {newsroom_url}")
+        else:
+            logger.debug(f"[NewsAgent] Looking for newsroom on {base_url}")
+            newsroom_url = await self._find_newsroom_url(base_url, result)
 
         if not newsroom_url:
             logger.info(f"[NewsAgent] No newsroom found for {base_url}")
@@ -376,11 +382,21 @@ class NewsAgent(BaseCollector):
         """Find the newsroom URL for a company website."""
         logger.debug(f"[NewsAgent] Trying {len(self.NEWSROOM_PATTERNS)} newsroom URL patterns")
 
+        # Strategy 0: Try common newsroom subdomains (news.example.com, etc.)
+        parsed = urlparse(base_url)
+        root_domain = parsed.netloc.lstrip("www.")
+        for prefix in ["news", "newsroom", "press", "media"]:
+            sub_url = f"{parsed.scheme}://{prefix}.{root_domain}"
+            exists = await self.check_url_exists(sub_url, timeout=10)
+            if exists:
+                logger.debug(f"[NewsAgent] Found newsroom via subdomain: {sub_url}")
+                return sub_url
+
         # Strategy 1: Try common patterns (check first 15 quickly)
         checked_count = 0
         for pattern in self.NEWSROOM_PATTERNS[:15]:
             url = base_url + pattern
-            exists = await self.check_url_exists(url)
+            exists = await self.check_url_exists(url, timeout=10)
             checked_count += 1
             if exists:
                 logger.debug(f"[NewsAgent] Found newsroom via pattern: {pattern}")
@@ -407,8 +423,9 @@ class NewsAgent(BaseCollector):
 
                 if any(kw in href or kw in text for kw in newsroom_keywords):
                     full_url = urljoin(base_url, a['href'])
-                    # Verify it's on the same domain
-                    if urlparse(full_url).netloc == urlparse(base_url).netloc:
+                    # Allow same domain or subdomains (e.g. news.prudential.com)
+                    link_netloc = urlparse(full_url).netloc.lstrip("www.")
+                    if link_netloc == root_domain or link_netloc.endswith("." + root_domain):
                         logger.debug(f"[NewsAgent] Found newsroom via homepage link: {a.get_text()[:30]}")
                         return full_url
 
@@ -416,7 +433,7 @@ class NewsAgent(BaseCollector):
         logger.debug(f"[NewsAgent] Trying remaining {len(self.NEWSROOM_PATTERNS) - 15} patterns")
         for pattern in self.NEWSROOM_PATTERNS[15:]:
             url = base_url + pattern
-            exists = await self.check_url_exists(url)
+            exists = await self.check_url_exists(url, timeout=10)
             if exists:
                 logger.debug(f"[NewsAgent] Found newsroom via extended pattern: {pattern}")
                 return url
@@ -425,7 +442,7 @@ class NewsAgent(BaseCollector):
         ir_patterns = ["/investors", "/investor-relations", "/ir"]
         for pattern in ir_patterns:
             url = base_url + pattern
-            exists = await self.check_url_exists(url)
+            exists = await self.check_url_exists(url, timeout=10)
             if exists:
                 # Check if IR page has news section
                 ir_html = await self.fetch_url(url)
@@ -1217,6 +1234,7 @@ class NewsAgent(BaseCollector):
             standard_result = await self.collect(
                 company_id, company_name, website_url, days_back=min(days_back, 365),
                 include_google_news=True,
+                newsroom_url=newsroom_url,
             )
             all_changes.extend(standard_result.extracted_changes)
             result.pages_checked += standard_result.pages_checked
