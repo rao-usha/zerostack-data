@@ -17,8 +17,9 @@ from app.core.config import (
 def test_config_requires_database_url(clean_env, monkeypatch):
     """Database URL is required for app startup."""
     # Should raise validation error without DATABASE_URL
+    # Use _env_file=None to prevent reading DATABASE_URL from .env on disk
     with pytest.raises(Exception):  # Pydantic validation error
-        Settings()
+        Settings(_env_file=None)
 
 
 @pytest.mark.unit

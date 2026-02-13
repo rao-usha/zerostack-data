@@ -34,8 +34,19 @@ sys.modules["app.sources.people_collection.person_matcher"] = _pm_mod
 _pm_spec.loader.exec_module(_pm_mod)
 
 # Mock out people_models to avoid SQLAlchemy/database dependency
+# Save real module first so we can restore it after dedup_service loads
+_real_people_models = sys.modules.get("app.core.people_models")
 mock_models = MagicMock()
 sys.modules["app.core.people_models"] = mock_models
+
+# Eagerly import dedup_service while mock is active
+from app.services.dedup_service import DedupService as _DedupService  # noqa: E402
+
+# Restore real people_models so other test files aren't polluted
+if _real_people_models is not None:
+    sys.modules["app.core.people_models"] = _real_people_models
+else:
+    del sys.modules["app.core.people_models"]
 
 
 def _make_mock_person(id, full_name, first_name, last_name, **kwargs):
