@@ -469,14 +469,17 @@ class NewsAgent(BaseCollector):
             website_url = 'https://' + website_url
         base_url = website_url.rstrip('/')
 
-        # Strategy 1: Try common RSS feed patterns
+        # Strategy 1: Try common RSS feed patterns (parallel probes)
         feed_url = None
-        for pattern in self.RSS_FEED_PATTERNS:
-            url = base_url + pattern
-            exists = await self.check_url_exists(url, timeout=10)
-            if exists:
+        candidate_urls = [base_url + pattern for pattern in self.RSS_FEED_PATTERNS]
+        results = await asyncio.gather(
+            *(self.check_url_exists(url, timeout=10) for url in candidate_urls),
+            return_exceptions=True,
+        )
+        for url, exists in zip(candidate_urls, results):
+            if exists is True:
                 feed_url = url
-                logger.debug(f"[NewsAgent] Found RSS feed via pattern: {pattern}")
+                logger.debug(f"[NewsAgent] Found RSS feed via pattern: {url}")
                 break
 
         # Strategy 2: Check HTML for feed autodiscovery links
