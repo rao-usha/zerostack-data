@@ -170,10 +170,16 @@ class PECollectionOrchestrator:
                     max_retries=config.max_retries,
                 )
 
+                # Forward entity fields (cik, crd_number, ticker, etc.) to collectors
+                extra_kwargs = {
+                    k: v for k, v in entity.items()
+                    if k not in ("id", "name", "website") and v is not None
+                }
                 result = await collector.collect(
                     entity_id=entity_id,
                     entity_name=entity_name,
                     website_url=website,
+                    **extra_kwargs,
                 )
 
                 self._results.append(result)
@@ -227,6 +233,8 @@ class PECollectionOrchestrator:
                 d["cik"] = row.cik
             if hasattr(row, "crd_number"):
                 d["crd_number"] = row.crd_number
+            if hasattr(row, "ticker"):
+                d["ticker"] = row.ticker
             if extra:
                 d.update(extra)
             return d

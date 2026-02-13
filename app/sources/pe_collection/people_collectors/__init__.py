@@ -7,8 +7,11 @@ Collectors for gathering data about executives and investors:
 - Education and experience parsing
 """
 
-# Collectors will be implemented in future phases
-# from app.sources.pe_collection.people_collectors.linkedin_people_collector import LinkedInPeopleCollector
-# from app.sources.pe_collection.people_collectors.bio_extractor import BioExtractor
+from app.sources.pe_collection.people_collectors.bio_extractor import BioExtractor
 
-__all__ = []
+# LinkedIn requires paid API / ToS compliance
+# from app.sources.pe_collection.people_collectors.linkedin_people_collector import LinkedInPeopleCollector
+
+__all__ = [
+    "BioExtractor",
+]
