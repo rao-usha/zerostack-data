@@ -14,15 +14,20 @@ Features:
 - Provides summary of what was ingested
 
 Usage:
-    python scripts/populate_demo_data.py [--sources census,fred,eia] [--quick]
+    python scripts/populate_demo_data.py [--sources census,fred,bls,treasury] [--quick]
 """
 
-import asyncio
 import sys
 import time
 import argparse
-from datetime import datetime, date
-from typing import List, Dict, Any, Optional
+import io
+from datetime import date
+from typing import Dict, Any
+
+# Fix Windows console encoding for Unicode characters
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 import requests
 from pathlib import Path
 
@@ -131,288 +136,453 @@ def wait_for_job(job_id: int, job_name: str, timeout: int = MAX_WAIT_TIME) -> bo
 
 def ingest_census_data(quick: bool = False) -> Dict[str, Any]:
     """Ingest sample Census data."""
-    print_header("📊 U.S. Census Bureau Data")
-    
-    results = {"attempted": 0, "succeeded": 0, "failed": 0}
-    
     datasets = [
         {
             "name": "ACS 5-Year 2023 - Population by State",
+            "endpoint": "/api/v1/census/state",
             "payload": {
-                "source": "census",
-                "config": {
-                    "survey": "acs5",
-                    "year": 2023,
-                    "table_id": "B01001",  # Sex by Age
-                    "geo_level": "state"
-                }
-            }
+                "survey": "acs5",
+                "year": 2023,
+                "table_id": "B01001",
+                "include_geojson": False,
+            },
         },
         {
-            "name": "ACS 5-Year 2023 - Median Income by County",
+            "name": "ACS 5-Year 2023 - Median Income (CA Counties)",
+            "endpoint": "/api/v1/census/county",
             "payload": {
-                "source": "census",
-                "config": {
-                    "survey": "acs5",
-                    "year": 2023,
-                    "table_id": "B19013",  # Median Household Income
-                    "geo_level": "county",
-                    "state": "06"  # California
-                }
-            }
-        }
+                "survey": "acs5",
+                "year": 2023,
+                "table_id": "B19013",
+                "state_fips": "06",
+                "include_geojson": False,
+            },
+        },
     ]
-    
-    if quick:
-        datasets = datasets[:1]  # Only first dataset in quick mode
-    
-    for dataset in datasets:
-        results["attempted"] += 1
-        print_info(f"Ingesting: {dataset['name']}")
-        
-        try:
-            response = requests.post(
-                f"{API_BASE_URL}/api/v1/jobs",
-                json=dataset["payload"],
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                job_data = response.json()
-                job_id = job_data.get("job_id")
-                
-                if wait_for_job(job_id, dataset["name"]):
-                    results["succeeded"] += 1
-                else:
-                    results["failed"] += 1
-            else:
-                print_error(f"Failed to start job: {response.text}")
-                results["failed"] += 1
-                
-        except Exception as e:
-            print_error(f"Error: {e}")
-            results["failed"] += 1
-    
-    return results
+    return _run_datasets("U.S. Census Bureau Data", datasets, quick, timeout=600)
 
 
 def ingest_fred_data(quick: bool = False) -> Dict[str, Any]:
     """Ingest sample FRED economic data."""
-    print_header("💰 Federal Reserve Economic Data (FRED)")
-    
-    results = {"attempted": 0, "succeeded": 0, "failed": 0}
-    
-    # Key economic indicators
-    series_ids = [
-        ("GDP", "Gross Domestic Product"),
-        ("UNRATE", "Unemployment Rate"),
-        ("CPIAUCSL", "Consumer Price Index"),
-        ("DFF", "Federal Funds Rate"),
-        ("T10Y2Y", "10-Year Treasury Minus 2-Year (Yield Curve)"),
-        ("DCOILWTICO", "Crude Oil Prices (WTI)"),
-        ("M2SL", "M2 Money Supply"),
-        ("INDPRO", "Industrial Production Index")
+    datasets = [
+        {
+            "name": "FRED Interest Rates",
+            "endpoint": "/api/v1/fred/ingest",
+            "payload": {
+                "category": "interest_rates",
+                "observation_start": "2020-01-01",
+                "observation_end": str(date.today()),
+            },
+        },
+        {
+            "name": "FRED Economic Indicators",
+            "endpoint": "/api/v1/fred/ingest",
+            "payload": {
+                "category": "economic_indicators",
+                "observation_start": "2020-01-01",
+                "observation_end": str(date.today()),
+            },
+        },
+        {
+            "name": "FRED Monetary Aggregates",
+            "endpoint": "/api/v1/fred/ingest",
+            "payload": {
+                "category": "monetary_aggregates",
+                "observation_start": "2020-01-01",
+                "observation_end": str(date.today()),
+            },
+        },
+        {
+            "name": "FRED Industrial Production",
+            "endpoint": "/api/v1/fred/ingest",
+            "payload": {
+                "category": "industrial_production",
+                "observation_start": "2020-01-01",
+                "observation_end": str(date.today()),
+            },
+        },
     ]
-    
+    return _run_datasets("Federal Reserve Economic Data (FRED)", datasets, quick)
+
+
+def ingest_eia_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest sample EIA energy data."""
+    datasets = [
+        {
+            "name": "EIA Petroleum Consumption (Annual)",
+            "endpoint": "/api/v1/eia/petroleum/ingest",
+            "payload": {
+                "subcategory": "consumption",
+                "frequency": "annual",
+            },
+        },
+        {
+            "name": "EIA Natural Gas Prices",
+            "endpoint": "/api/v1/eia/natural-gas/ingest",
+            "payload": {
+                "subcategory": "prices",
+                "frequency": "annual",
+            },
+        },
+        {
+            "name": "EIA Electricity Retail Sales",
+            "endpoint": "/api/v1/eia/electricity/ingest",
+            "payload": {
+                "subcategory": "retail_sales",
+                "frequency": "annual",
+            },
+        },
+    ]
+    return _run_datasets("Energy Information Administration (EIA)", datasets, quick, timeout=600)
+
+
+def ingest_sec_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest SEC corporate filing data."""
+    datasets = [
+        {
+            "name": "SEC Apple Inc. (10-K/10-Q)",
+            "endpoint": "/api/v1/sec/ingest/company",
+            "payload": {
+                "cik": "0000320193",
+                "filing_types": ["10-K", "10-Q"],
+                "start_date": "2022-01-01",
+            },
+            "timeout": 120,
+        },
+        {
+            "name": "SEC Microsoft Corp. (10-K/10-Q)",
+            "endpoint": "/api/v1/sec/ingest/company",
+            "payload": {
+                "cik": "0000789019",
+                "filing_types": ["10-K", "10-Q"],
+                "start_date": "2022-01-01",
+            },
+            "timeout": 120,
+        },
+        {
+            "name": "SEC Apple Financial Data (XBRL)",
+            "endpoint": "/api/v1/sec/ingest/financial-data",
+            "payload": {"cik": "0000320193"},
+            "timeout": 120,
+        },
+    ]
+    return _run_datasets("SEC Corporate Filings", datasets, quick, timeout=600)
+
+
+def ingest_realestate_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest sample real estate data."""
+    datasets = [
+        {
+            "name": "FHFA House Price Index (State)",
+            "endpoint": "/api/v1/realestate/fhfa/ingest",
+            "payload": {"geography_type": "State"},
+        },
+        {
+            "name": "HUD Building Permits (National)",
+            "endpoint": "/api/v1/realestate/hud/ingest",
+            "payload": {"geography_type": "National"},
+        },
+    ]
+    return _run_datasets("Real Estate & Housing Data", datasets, quick)
+
+
+def _run_datasets(header: str, datasets: list, quick: bool = False,
+                   timeout: int = MAX_WAIT_TIME) -> Dict[str, Any]:
+    """Generic runner for sources that use endpoint+payload datasets."""
+    print_header(header)
+    results = {"attempted": 0, "succeeded": 0, "failed": 0}
+
     if quick:
-        series_ids = series_ids[:3]  # Only first 3 in quick mode
-    
-    for series_id, description in series_ids:
+        datasets = datasets[:1]
+
+    for dataset in datasets:
         results["attempted"] += 1
-        print_info(f"Ingesting: {description} ({series_id})")
-        
+        name = dataset["name"]
+        endpoint = dataset["endpoint"]
+        payload = dataset.get("payload", {})
+        job_timeout = dataset.get("timeout", timeout)
+        print_info(f"Ingesting: {name}")
+
         try:
             response = requests.post(
-                f"{API_BASE_URL}/api/v1/fred/ingest",
-                json={
-                    "series_ids": [series_id],
-                    "observation_start": "2020-01-01",
-                    "observation_end": str(date.today())
-                },
-                timeout=10
+                f"{API_BASE_URL}{endpoint}",
+                json=payload,
+                timeout=10,
             )
-            
-            if response.status_code in [200, 201]:
+
+            if response.status_code in [200, 201, 202]:
                 job_data = response.json()
                 job_id = job_data.get("job_id")
-                
-                if wait_for_job(job_id, f"FRED: {series_id}"):
+                if wait_for_job(job_id, name, timeout=job_timeout):
                     results["succeeded"] += 1
                 else:
                     results["failed"] += 1
             else:
                 print_warning(f"API returned {response.status_code}: {response.text[:200]}")
                 results["failed"] += 1
-                
+
         except Exception as e:
             print_error(f"Error: {e}")
             results["failed"] += 1
-    
+
     return results
 
 
-def ingest_eia_data(quick: bool = False) -> Dict[str, Any]:
-    """Ingest sample EIA energy data."""
-    print_header("⚡ Energy Information Administration (EIA)")
-    
-    results = {"attempted": 0, "succeeded": 0, "failed": 0}
-    
+# ── New source functions (15) ──────────────────────────────────────────
+
+
+def ingest_bls_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest BLS employment, inflation, and unemployment data."""
     datasets = [
         {
-            "name": "Retail Gasoline Prices (National)",
-            "series_id": "PET.EMM_EPMR_PTE_NUS_DPG.W"  # Weekly retail gas prices
+            "name": "BLS CES Employment (Nonfarm Payrolls)",
+            "endpoint": "/api/v1/bls/ces/ingest",
+            "payload": {"start_year": 2020, "end_year": 2025},
+            "timeout": 600,
         },
         {
-            "name": "Natural Gas Prices",
-            "series_id": "NG.N3035US3.M"  # Monthly natural gas prices
+            "name": "BLS CPI Inflation",
+            "endpoint": "/api/v1/bls/cpi/ingest",
+            "payload": {"start_year": 2020, "end_year": 2025},
+            "timeout": 600,
         },
         {
-            "name": "Electricity Generation (Total US)",
-            "series_id": "ELEC.GEN.ALL-US-99.M"  # Monthly electricity generation
-        }
+            "name": "BLS CPS Unemployment",
+            "endpoint": "/api/v1/bls/cps/ingest",
+            "payload": {"start_year": 2020, "end_year": 2025},
+            "timeout": 600,
+        },
     ]
-    
-    if quick:
-        datasets = datasets[:1]
-    
-    for dataset in datasets:
-        results["attempted"] += 1
-        print_info(f"Ingesting: {dataset['name']}")
-        
-        try:
-            response = requests.post(
-                f"{API_BASE_URL}/api/v1/eia/ingest",
-                json={
-                    "series_id": dataset["series_id"],
-                    "start_date": "2020-01-01"
-                },
-                timeout=10
-            )
-            
-            if response.status_code in [200, 201]:
-                job_data = response.json()
-                job_id = job_data.get("job_id")
-                
-                if wait_for_job(job_id, dataset["name"]):
-                    results["succeeded"] += 1
-                else:
-                    results["failed"] += 1
-            else:
-                print_warning(f"API returned {response.status_code}")
-                results["failed"] += 1
-                
-        except Exception as e:
-            print_error(f"Error: {e}")
-            results["failed"] += 1
-    
-    return results
+    return _run_datasets("Bureau of Labor Statistics (BLS)", datasets, quick, timeout=600)
 
 
-def ingest_sec_data(quick: bool = False) -> Dict[str, Any]:
-    """Ingest sample SEC company data."""
-    print_header("📈 SEC Corporate Filings")
-    
-    results = {"attempted": 0, "succeeded": 0, "failed": 0}
-    
-    # Sample major companies
-    companies = [
-        ("0000320193", "Apple Inc."),
-        ("0001018724", "Amazon.com Inc."),
-        ("0001652044", "Alphabet Inc. (Google)"),
-        ("0001326801", "Meta Platforms Inc. (Facebook)"),
-        ("0000789019", "Microsoft Corporation")
-    ]
-    
-    if quick:
-        companies = companies[:2]
-    
-    for cik, name in companies:
-        results["attempted"] += 1
-        print_info(f"Ingesting: {name} (CIK: {cik})")
-        
-        try:
-            response = requests.post(
-                f"{API_BASE_URL}/api/v1/sec/ingest/financial",
-                json={
-                    "cik": cik,
-                    "include_xbrl": False  # Skip XBRL for speed
-                },
-                timeout=10
-            )
-            
-            if response.status_code in [200, 201, 202]:
-                job_data = response.json()
-                job_id = job_data.get("job_id")
-                
-                if wait_for_job(job_id, f"SEC: {name}", timeout=120):
-                    results["succeeded"] += 1
-                else:
-                    results["failed"] += 1
-            else:
-                print_warning(f"API returned {response.status_code}")
-                results["failed"] += 1
-                
-        except Exception as e:
-            print_error(f"Error: {e}")
-            results["failed"] += 1
-    
-    return results
-
-
-def ingest_realestate_data(quick: bool = False) -> Dict[str, Any]:
-    """Ingest sample real estate data."""
-    print_header("🏠 Real Estate & Housing Data")
-    
-    results = {"attempted": 0, "succeeded": 0, "failed": 0}
-    
+def ingest_bea_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest BEA GDP and regional income data."""
     datasets = [
         {
-            "name": "FHFA House Price Index (National)",
-            "endpoint": "/api/v1/realestate/fhfa/ingest",
+            "name": "BEA NIPA GDP (Quarterly)",
+            "endpoint": "/api/v1/bea/nipa/ingest",
             "payload": {
-                "geography_type": "National"
-            }
+                "table_name": "T10101",
+                "frequency": "Q",
+                "year": "2020,2021,2022,2023,2024",
+            },
         },
         {
-            "name": "HUD Building Permits (National)",
-            "endpoint": "/api/v1/realestate/hud/ingest",
+            "name": "BEA Regional Income by State",
+            "endpoint": "/api/v1/bea/regional/ingest",
             "payload": {
-                "geography_level": "National"
-            }
-        }
+                "table_name": "SAGDP2N",
+                "line_code": "1",
+                "geo_fips": "STATE",
+                "year": "2023",
+            },
+        },
     ]
-    
-    if quick:
-        datasets = datasets[:1]
-    
-    for dataset in datasets:
-        results["attempted"] += 1
-        print_info(f"Ingesting: {dataset['name']}")
-        
-        try:
-            response = requests.post(
-                f"{API_BASE_URL}{dataset['endpoint']}",
-                json=dataset["payload"],
-                timeout=10
-            )
-            
-            if response.status_code in [200, 201]:
-                job_data = response.json()
-                job_id = job_data.get("job_id")
-                
-                if wait_for_job(job_id, dataset["name"]):
-                    results["succeeded"] += 1
-                else:
-                    results["failed"] += 1
-            else:
-                print_warning(f"API returned {response.status_code}")
-                results["failed"] += 1
-                
-        except Exception as e:
-            print_error(f"Error: {e}")
-            results["failed"] += 1
-    
-    return results
+    return _run_datasets("Bureau of Economic Analysis (BEA)", datasets, quick)
+
+
+def ingest_treasury_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest Treasury debt and interest rate data."""
+    datasets = [
+        {
+            "name": "Treasury National Debt",
+            "endpoint": "/api/v1/treasury/debt/ingest",
+            "payload": {
+                "start_date": "2020-01-01",
+                "end_date": "2025-12-31",
+            },
+        },
+        {
+            "name": "Treasury Interest Rates",
+            "endpoint": "/api/v1/treasury/interest-rates/ingest",
+            "payload": {
+                "start_date": "2020-01-01",
+                "end_date": "2025-12-31",
+            },
+        },
+    ]
+    return _run_datasets("U.S. Treasury", datasets, quick)
+
+
+def ingest_fdic_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest FDIC bank institutions and failed banks data."""
+    datasets = [
+        {
+            "name": "FDIC Active Institutions",
+            "endpoint": "/api/v1/fdic/institutions/ingest",
+            "payload": {"active_only": True, "limit": 10000},
+            "timeout": 600,
+        },
+        {
+            "name": "FDIC Failed Banks (2000-2025)",
+            "endpoint": "/api/v1/fdic/failed-banks/ingest",
+            "payload": {"year_start": 2000, "year_end": 2025},
+        },
+    ]
+    return _run_datasets("FDIC Banking Data", datasets, quick, timeout=600)
+
+
+def ingest_fema_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest FEMA disaster declarations."""
+    datasets = [
+        {
+            "name": "FEMA Disaster Declarations (All)",
+            "endpoint": "/api/v1/fema/disasters/ingest",
+            "payload": {"max_records": 50000},
+            "timeout": 600,
+        },
+    ]
+    return _run_datasets("FEMA Disaster Data", datasets, quick, timeout=600)
+
+
+def ingest_usda_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest USDA crop production data."""
+    datasets = [
+        {
+            "name": "USDA All Major Crops 2024",
+            "endpoint": "/api/v1/usda/all-major-crops/ingest",
+            "payload": {"year": 2024},
+        },
+    ]
+    return _run_datasets("USDA Agriculture Data", datasets, quick)
+
+
+def ingest_cftc_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest CFTC Commitments of Traders data."""
+    datasets = [
+        {
+            "name": "CFTC COT Legacy 2024",
+            "endpoint": "/api/v1/cftc-cot/ingest",
+            "payload": {
+                "year": 2024,
+                "report_type": "legacy",
+                "combined": True,
+            },
+        },
+        {
+            "name": "CFTC COT Disaggregated 2024",
+            "endpoint": "/api/v1/cftc-cot/ingest",
+            "payload": {
+                "year": 2024,
+                "report_type": "disaggregated",
+                "combined": True,
+            },
+        },
+    ]
+    return _run_datasets("CFTC Commitments of Traders", datasets, quick)
+
+
+def ingest_irs_soi_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest IRS Statistics of Income data."""
+    datasets = [
+        {
+            "name": "IRS SOI County Income 2021",
+            "endpoint": "/api/v1/irs-soi/county-income/ingest",
+            "payload": {"year": 2021, "use_cache": True},
+        },
+    ]
+    return _run_datasets("IRS Statistics of Income", datasets, quick)
+
+
+def ingest_us_trade_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest US international trade summary data."""
+    datasets = [
+        {
+            "name": "US Trade Summary Dec 2024",
+            "endpoint": "/api/v1/us-trade/summary/ingest",
+            "payload": {"year": 2024, "month": 12},
+            "timeout": 600,
+        },
+    ]
+    return _run_datasets("U.S. International Trade", datasets, quick, timeout=600)
+
+
+def ingest_data_commons_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest Data Commons US state statistics."""
+    datasets = [
+        {
+            "name": "Data Commons US States (Population + Income)",
+            "endpoint": "/api/v1/data-commons/us-states/ingest",
+            "payload": {
+                "variables": ["Count_Person", "Median_Income_Household"],
+            },
+        },
+    ]
+    return _run_datasets("Google Data Commons", datasets, quick)
+
+
+def ingest_cms_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest CMS Medicare utilization data."""
+    datasets = [
+        {
+            "name": "CMS Medicare Utilization 2023",
+            "endpoint": "/api/v1/cms/ingest/medicare-utilization",
+            "payload": {"year": 2023, "limit": 5000},
+        },
+    ]
+    return _run_datasets("CMS Healthcare Data", datasets, quick)
+
+
+def ingest_uspto_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest USPTO patent data for AI technology."""
+    datasets = [
+        {
+            "name": "USPTO AI Patents (CPC G06N)",
+            "endpoint": "/api/v1/uspto/ingest/cpc",
+            "payload": {
+                "cpc_code": "G06N",
+                "date_from": "2023-01-01",
+                "max_patents": 500,
+            },
+        },
+    ]
+    return _run_datasets("USPTO Patent Data", datasets, quick)
+
+
+def ingest_fbi_crime_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest FBI crime estimates data."""
+    datasets = [
+        {
+            "name": "FBI National Violent Crime Estimates",
+            "endpoint": "/api/v1/fbi-crime/estimates/ingest",
+            "payload": {
+                "scope": "national",
+                "offenses": ["violent-crime"],
+            },
+        },
+    ]
+    return _run_datasets("FBI Crime Data", datasets, quick)
+
+
+def ingest_bts_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest BTS border crossing transportation data."""
+    datasets = [
+        {
+            "name": "BTS US-Mexico Border Crossings (Trucks)",
+            "endpoint": "/api/v1/bts/border-crossing/ingest",
+            "payload": {
+                "start_date": "2020-01",
+                "end_date": "2024-12",
+                "border": "US-Mexico Border",
+                "measure": "Trucks",
+            },
+        },
+    ]
+    return _run_datasets("BTS Transportation Data", datasets, quick)
+
+
+def ingest_fcc_data(quick: bool = False) -> Dict[str, Any]:
+    """Ingest FCC broadband availability data."""
+    datasets = [
+        {
+            "name": "FCC Broadband by State (CA, NY, TX)",
+            "endpoint": "/api/v1/fcc-broadband/state/ingest",
+            "payload": {"state_codes": ["CA", "NY", "TX"]},
+            "timeout": 600,
+        },
+    ]
+    return _run_datasets("FCC Broadband Data", datasets, quick, timeout=600)
 
 
 def print_summary(all_results: Dict[str, Dict[str, int]]):
@@ -464,13 +634,15 @@ def print_summary(all_results: Dict[str, Dict[str, int]]):
 
 def main():
     """Main execution function."""
+    global API_BASE_URL
+
     parser = argparse.ArgumentParser(
         description="Populate database with demo data from all sources"
     )
     parser.add_argument(
         "--sources",
         type=str,
-        help="Comma-separated list of sources (census,fred,eia,sec,realestate). Default: all"
+        help="Comma-separated list of sources (e.g. census,fred,bls,treasury). Default: all 20"
     )
     parser.add_argument(
         "--quick",
@@ -483,10 +655,8 @@ def main():
         default=API_BASE_URL,
         help=f"API base URL (default: {API_BASE_URL})"
     )
-    
+
     args = parser.parse_args()
-    
-    global API_BASE_URL
     API_BASE_URL = args.api_url
     
     # Print welcome banner
@@ -506,33 +676,59 @@ def main():
     
     print_success("Service is healthy and ready!")
     
+    # All available sources (order: existing 5 + 15 new)
+    ALL_SOURCES = [
+        "census", "fred", "eia", "sec", "realestate",
+        "bls", "bea", "treasury", "fdic", "fema",
+        "usda", "cftc", "irs_soi", "us_trade", "data_commons",
+        "cms", "uspto", "fbi_crime", "bts", "fcc",
+    ]
+
+    # Map source key -> (display name, function)
+    SOURCE_MAP = {
+        "census":       ("Census",          ingest_census_data),
+        "fred":         ("FRED",            ingest_fred_data),
+        "eia":          ("EIA",             ingest_eia_data),
+        "sec":          ("SEC",             ingest_sec_data),
+        "realestate":   ("Real Estate",     ingest_realestate_data),
+        "bls":          ("BLS",             ingest_bls_data),
+        "bea":          ("BEA",             ingest_bea_data),
+        "treasury":     ("Treasury",        ingest_treasury_data),
+        "fdic":         ("FDIC",            ingest_fdic_data),
+        "fema":         ("FEMA",            ingest_fema_data),
+        "usda":         ("USDA",            ingest_usda_data),
+        "cftc":         ("CFTC",            ingest_cftc_data),
+        "irs_soi":      ("IRS SOI",         ingest_irs_soi_data),
+        "us_trade":     ("US Trade",        ingest_us_trade_data),
+        "data_commons": ("Data Commons",    ingest_data_commons_data),
+        "cms":          ("CMS",             ingest_cms_data),
+        "uspto":        ("USPTO",           ingest_uspto_data),
+        "fbi_crime":    ("FBI Crime",       ingest_fbi_crime_data),
+        "bts":          ("BTS",             ingest_bts_data),
+        "fcc":          ("FCC",             ingest_fcc_data),
+    }
+
     # Determine which sources to ingest
     if args.sources:
         sources_to_ingest = [s.strip() for s in args.sources.split(",")]
+        unknown = [s for s in sources_to_ingest if s not in SOURCE_MAP]
+        if unknown:
+            print_error(f"Unknown source(s): {', '.join(unknown)}")
+            print_info(f"Available: {', '.join(ALL_SOURCES)}")
+            return 1
     else:
-        sources_to_ingest = ["census", "fred", "eia", "sec", "realestate"]
-    
-    print_info(f"Will ingest from: {', '.join(sources_to_ingest)}")
-    print_warning(f"This may take several minutes...")
-    
+        sources_to_ingest = ALL_SOURCES
+
+    print_info(f"Will ingest from {len(sources_to_ingest)} sources: {', '.join(sources_to_ingest)}")
+    print_warning("This may take several minutes...")
+
     # Ingest from each source
     all_results = {}
     start_time = time.time()
-    
-    if "census" in sources_to_ingest:
-        all_results["Census"] = ingest_census_data(args.quick)
-    
-    if "fred" in sources_to_ingest:
-        all_results["FRED"] = ingest_fred_data(args.quick)
-    
-    if "eia" in sources_to_ingest:
-        all_results["EIA"] = ingest_eia_data(args.quick)
-    
-    if "sec" in sources_to_ingest:
-        all_results["SEC"] = ingest_sec_data(args.quick)
-    
-    if "realestate" in sources_to_ingest:
-        all_results["Real Estate"] = ingest_realestate_data(args.quick)
+
+    for source_key in sources_to_ingest:
+        display_name, ingest_fn = SOURCE_MAP[source_key]
+        all_results[display_name] = ingest_fn(args.quick)
     
     elapsed_time = time.time() - start_time
     
