@@ -382,10 +382,10 @@ class SEC13FCollector(BasePECollector):
                     holding[field] = elem.text.strip()
                     break
 
-        # Value is in thousands in 13F filings
+        # Ensure value is a clean integer string (SEC XML reports whole dollars)
         if "value" in holding:
             try:
-                holding["value"] = str(int(holding["value"]) * 1000)
+                holding["value"] = str(int(holding["value"]))
             except ValueError:
                 pass
 

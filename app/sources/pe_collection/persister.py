@@ -175,6 +175,10 @@ class PEPersister:
                 f"Failed to persist {item.item_type} for entity {entity_id}: {e}"
             )
             self.db.rollback()
+            # Clear caches — rollback may have removed objects they reference
+            self._fund_cache.clear()
+            self._company_cache.clear()
+            self._person_cache.clear()
             self.stats["failed"] += 1
             self.stats["errors"].append(
                 f"{item.item_type}(entity={entity_id}): {str(e)[:200]}"
