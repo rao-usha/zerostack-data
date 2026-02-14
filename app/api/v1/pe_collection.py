@@ -45,15 +45,22 @@ async def _run_collection(config_dict: dict, db: Session):
     # Import here to ensure collectors are registered
     import app.sources.pe_collection  # noqa: F401
     from app.sources.pe_collection.orchestrator import PECollectionOrchestrator
+    from app.sources.pe_collection.persister import PEPersister
     from app.sources.pe_collection.types import PECollectionConfig
 
     config = PECollectionConfig.from_dict(config_dict)
     orchestrator = PECollectionOrchestrator(db_session=db)
     results = await orchestrator.run_collection(config)
 
+    # Persist collected items to DB
+    persister = PEPersister(db)
+    persist_stats = persister.persist_results(results)
+
+    total_items = sum(r.items_found for r in results)
     logger.info(
-        f"PE collection complete: {len(results)} results, "
-        f"{sum(r.items_found for r in results)} items found"
+        f"PE collection complete: {len(results)} results, {total_items} items found, "
+        f"persisted={persist_stats['persisted']}, updated={persist_stats['updated']}, "
+        f"failed={persist_stats['failed']}"
     )
 
 

@@ -22,6 +22,7 @@ from app.core.people_models import (
     PeoplePortfolio, PeoplePortfolioCompany, PeoplePeerSet, PeoplePeerSetMember,
     PeopleWatchlist, PeopleWatchlistPerson,
 )
+import app.core.pe_models  # noqa: F401 — registers PE tables with Base.metadata
 
 
 @pytest.fixture(scope="function")
