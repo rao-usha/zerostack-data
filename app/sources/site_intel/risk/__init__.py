@@ -11,5 +11,6 @@ Data sources:
 
 from app.sources.site_intel.risk.fema_collector import FEMARiskCollector
 from app.sources.site_intel.risk.usgs_earthquake_collector import USGSEarthquakeCollector
+from app.sources.site_intel.risk.epa_envirofacts_collector import EPAEnvirofactsCollector
 
-__all__ = ["FEMARiskCollector", "USGSEarthquakeCollector"]
+__all__ = ["FEMARiskCollector", "USGSEarthquakeCollector", "EPAEnvirofactsCollector"]

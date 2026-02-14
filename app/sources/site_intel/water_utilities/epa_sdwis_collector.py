@@ -11,9 +11,11 @@ Data source: https://data.epa.gov/efservice/
 No API key required - public access.
 
 Note: EPA migrated from enviro.epa.gov to data.epa.gov in 2025.
+Field names are returned in lowercase by the API.
+Pagination uses /rows/{start}:{end}/ URL segment.
 """
 import logging
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List, Dict, Any
 
 from sqlalchemy.orm import Session
@@ -63,6 +65,7 @@ class EPASDWISCollector(BaseCollector):
 
     # EPA Envirofacts SDWIS API (migrated to data.epa.gov in 2025)
     ENVIROFACTS_URL = "https://data.epa.gov/efservice"
+    PAGE_SIZE = 5000  # Max rows per request for Envirofacts pagination
 
     def __init__(self, db: Session, api_key: Optional[str] = None, **kwargs):
         super().__init__(db, api_key, **kwargs)
@@ -118,46 +121,61 @@ class EPASDWISCollector(BaseCollector):
             )
 
     async def _collect_water_systems(self, config: CollectionConfig) -> Dict[str, Any]:
-        """Collect public water systems from EPA SDWIS."""
+        """Collect public water systems from EPA SDWIS with pagination."""
         try:
             client = await self.get_client()
             all_systems = []
 
-            # Determine states to query
             states = config.states if config.states else ["TX", "CA", "OH", "PA", "IL"]
 
-            for state in states:
-                await self.apply_rate_limit()
+            for state_idx, state in enumerate(states):
+                offset = 0
+                state_count = 0
 
-                # EPA Envirofacts URL format: /table/column/value/rows/start:end/format
-                # Note: Table changed from SDWIS_WATER_SYSTEM to WATER_SYSTEM in 2025 migration
-                url = f"{self.ENVIROFACTS_URL}/WATER_SYSTEM/STATE_CODE/{state}/JSON"
+                while True:
+                    await self.apply_rate_limit()
 
-                try:
-                    response = await client.get(url)
+                    url = (
+                        f"{self.ENVIROFACTS_URL}/WATER_SYSTEM/STATE_CODE/{state}"
+                        f"/rows/{offset}:{offset + self.PAGE_SIZE}/JSON"
+                    )
 
-                    if response.status_code != 200:
-                        logger.warning(f"EPA API returned {response.status_code} for {state}")
-                        continue
+                    try:
+                        response = await client.get(url)
 
-                    data = response.json()
-                    if data:
+                        if response.status_code != 200:
+                            logger.warning(f"EPA API returned {response.status_code} for {state}")
+                            break
+
+                        data = response.json()
+                        if not data:
+                            break
+
                         all_systems.extend(data)
-                        logger.info(f"Retrieved {len(data)} water systems for {state}")
+                        state_count += len(data)
 
-                except Exception as e:
-                    logger.warning(f"Failed to fetch water systems for {state}: {e}")
-                    continue
+                        if len(data) < self.PAGE_SIZE:
+                            break
+                        offset += self.PAGE_SIZE
+
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch water systems for {state} at offset {offset}: {e}")
+                        break
+
+                logger.info(f"Retrieved {state_count} water systems for {state}")
+                self.update_progress(
+                    processed=state_idx + 1,
+                    total=len(states),
+                    current_step=f"Fetched water systems for {state} ({state_count} records)",
+                )
 
             if not all_systems:
                 return {"processed": 0, "inserted": 0}
 
-            # Transform records
             records = []
             for system in all_systems:
                 transformed = self._transform_water_system(system)
                 if transformed:
-                    # Filter by minimum population if specified
                     if config.options and config.options.get("min_population"):
                         if (transformed.get("population_served") or 0) < config.options["min_population"]:
                             continue
@@ -227,33 +245,53 @@ class EPASDWISCollector(BaseCollector):
         }
 
     async def _collect_violations(self, config: CollectionConfig) -> Dict[str, Any]:
-        """Collect water system violations from EPA SDWIS."""
+        """Collect water system violations from EPA SDWIS with pagination."""
         try:
             client = await self.get_client()
             all_violations = []
+            max_per_state = 10000
 
             states = config.states if config.states else ["TX", "CA", "OH", "PA", "IL"]
 
-            for state in states:
-                await self.apply_rate_limit()
+            for state_idx, state in enumerate(states):
+                offset = 0
+                state_count = 0
 
-                # Note: Table changed from SDWIS_VIOLATION to VIOLATION in 2025 migration
-                url = f"{self.ENVIROFACTS_URL}/VIOLATION/STATE_CODE/{state}/JSON"
+                while state_count < max_per_state:
+                    await self.apply_rate_limit()
 
-                try:
-                    response = await client.get(url)
+                    url = (
+                        f"{self.ENVIROFACTS_URL}/VIOLATION/STATE_CODE/{state}"
+                        f"/rows/{offset}:{offset + self.PAGE_SIZE}/JSON"
+                    )
 
-                    if response.status_code != 200:
-                        continue
+                    try:
+                        response = await client.get(url)
 
-                    data = response.json()
-                    if data:
-                        all_violations.extend(data[:1000])  # Limit per state
-                        logger.info(f"Retrieved {min(len(data), 1000)} violations for {state}")
+                        if response.status_code != 200:
+                            break
 
-                except Exception as e:
-                    logger.warning(f"Failed to fetch violations for {state}: {e}")
-                    continue
+                        data = response.json()
+                        if not data:
+                            break
+
+                        all_violations.extend(data)
+                        state_count += len(data)
+
+                        if len(data) < self.PAGE_SIZE:
+                            break
+                        offset += self.PAGE_SIZE
+
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch violations for {state} at offset {offset}: {e}")
+                        break
+
+                logger.info(f"Retrieved {state_count} violations for {state}")
+                self.update_progress(
+                    processed=state_idx + 1,
+                    total=len(states),
+                    current_step=f"Fetched violations for {state} ({state_count} records)",
+                )
 
             if not all_violations:
                 return {"processed": 0, "inserted": 0}
@@ -297,12 +335,7 @@ class EPASDWISCollector(BaseCollector):
 
         # Parse violation date
         viol_date = violation.get("compl_per_begin_date") or violation.get("COMPL_PER_BEGIN_DATE")
-        violation_date = None
-        if viol_date:
-            try:
-                violation_date = datetime.strptime(str(viol_date)[:10], "%Y-%m-%d").date()
-            except (ValueError, TypeError):
-                violation_date = datetime.utcnow().date()
+        violation_date = self._parse_date(viol_date)
 
         # Determine if health-based
         is_health_based = (violation.get("is_health_based_ind") or violation.get("IS_HEALTH_BASED_IND") or "N") == "Y"
@@ -334,11 +367,14 @@ class EPASDWISCollector(BaseCollector):
         except (ValueError, TypeError):
             return None
 
-    def _parse_date(self, value: Any) -> Optional[datetime]:
-        """Parse date value."""
+    def _parse_date(self, value: Any) -> Optional[date]:
+        """Parse date value. Handles ISO format and EPA's DD-MON-YY format."""
         if value is None or value == "":
             return None
-        try:
-            return datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
-        except (ValueError, TypeError):
-            return None
+        val = str(value).strip()
+        for fmt in ("%Y-%m-%d", "%d-%b-%y", "%d-%b-%Y"):
+            try:
+                return datetime.strptime(val[:11], fmt).date()
+            except (ValueError, TypeError):
+                continue
+        return None
