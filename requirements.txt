@@ -50,6 +50,9 @@ playwright>=1.40.0  # Browser automation for JS-heavy pages
 # GraphQL API
 strawberry-graphql[fastapi]>=0.220.0
 
+# Encryption (for API key storage)
+cryptography>=41.0.0
+
 # Authentication
 PyJWT>=2.8.0
 bcrypt>=4.1.0

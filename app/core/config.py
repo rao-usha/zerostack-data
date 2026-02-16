@@ -665,6 +665,8 @@ class Settings(BaseSettings):
         """
         Unified method to get API key for any source.
 
+        Checks DB (source_api_keys table) first, falls back to env var.
+
         Args:
             source: Source name (e.g., 'fred', 'eia', 'census')
             required: If True, raises ValueError when key is missing
@@ -690,6 +692,12 @@ class Settings(BaseSettings):
                 f"Available sources: {available}"
             )
 
+        # Check DB first
+        db_key = self._get_api_key_from_db(source_lower)
+        if db_key:
+            return db_key
+
+        # Fall back to env var
         field_name, signup_url = self._API_KEY_MAP[source_lower]
         key_value = getattr(self, field_name, None)
 
@@ -701,6 +709,24 @@ class Settings(BaseSettings):
             )
 
         return key_value
+
+    def _get_api_key_from_db(self, source: str) -> Optional[str]:
+        """
+        Try to load an API key from the source_api_keys table.
+        Uses the settings module's cache to avoid repeated DB hits.
+        Returns None on any failure (missing table, decryption error, etc.).
+        """
+        try:
+            from app.api.v1.settings import get_cached_db_key
+            from app.core.database import get_session_factory
+            SessionLocal = get_session_factory()
+            db = SessionLocal()
+            try:
+                return get_cached_db_key(source, db)
+            finally:
+                db.close()
+        except Exception:
+            return None
 
     def has_api_key(self, source: str) -> bool:
         """

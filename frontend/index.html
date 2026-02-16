@@ -217,6 +217,95 @@
         @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
         #results { margin-top: 1rem; }
         .hidden { display: none; }
+        /* Settings Tab Styles */
+        .key-category { margin-bottom: 1.5rem; }
+        .key-category-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent);
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .key-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-input);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+        .key-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .key-status-dot.configured { background: var(--success); }
+        .key-status-dot.missing { background: var(--border); }
+        .key-info { flex: 1; min-width: 0; }
+        .key-name { font-weight: 600; font-size: 0.875rem; }
+        .key-desc { font-size: 0.75rem; color: var(--text-muted); }
+        .key-masked {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            background: var(--bg);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+        .key-source-badge {
+            font-size: 0.625rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .key-source-badge.db { background: rgba(99, 102, 241, 0.2); color: var(--primary); }
+        .key-source-badge.env { background: rgba(249, 115, 22, 0.2); color: #f97316; }
+        .key-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+        .btn-sm {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.75rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+        .btn-sm:hover { background: var(--bg-card); color: var(--text); }
+        .btn-sm.primary { background: var(--primary); border-color: var(--primary); color: white; }
+        .btn-sm.primary:hover { opacity: 0.9; }
+        .btn-sm.danger { color: var(--error); }
+        .btn-sm.danger:hover { background: rgba(239, 68, 68, 0.1); }
+        .key-edit-row {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            margin-top: 0.5rem;
+        }
+        .key-edit-input {
+            flex: 1;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.8rem;
+        }
+        .key-edit-input:focus { outline: none; border-color: var(--primary); }
+        .test-result {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            margin-top: 0.25rem;
+        }
+        .test-result.success { background: rgba(34, 197, 94, 0.1); color: var(--success); }
+        .test-result.failure { background: rgba(239, 68, 68, 0.1); color: var(--error); }
     </style>
 </head>
 <body>
@@ -237,6 +326,7 @@
         <button class="tab" onclick="showTab('scores')">📊 Scores</button>
         <button class="tab" onclick="showTab('market')">📈 Market</button>
         <button class="tab" onclick="showTab('network')">🕸️ Network</button>
+        <button class="tab" onclick="showTab('settings')">⚙️ Settings</button>
     </nav>
 
     <main class="content">
@@ -299,6 +389,20 @@
                 <div id="network-results" style="margin-top: 1rem;"></div>
             </div>
         </div>
+
+        <!-- Settings Tab -->
+        <div id="tab-settings" class="hidden">
+            <div class="card">
+                <h2 class="card-title">⚙️ API Key Management</h2>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                    Configure API keys for external data sources. Keys are encrypted and stored in the database.
+                    Existing <code>.env</code> keys continue to work — DB keys take priority.
+                </p>
+                <div id="api-keys-container">
+                    <div class="loading">Loading API keys...</div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <footer class="footer">
@@ -328,6 +432,7 @@
             document.querySelectorAll('.content > div').forEach(t => t.classList.add('hidden'));
             event.target.classList.add('active');
             document.getElementById('tab-' + tab).classList.remove('hidden');
+            if (tab === 'settings') loadApiKeys();
         }
 
         // Source display names
@@ -1031,6 +1136,203 @@
             } catch (err) {
                 results.innerHTML = `<p style="color: var(--error);">Error: ${err.message}</p>`;
             }
+        }
+
+        // ===== Settings Tab =====
+        let apiKeysData = [];
+        let editingSource = null;
+
+        async function loadApiKeys() {
+            const container = document.getElementById('api-keys-container');
+            if (!container) return;
+            container.innerHTML = '<div class="loading">Loading API keys...</div>';
+
+            try {
+                const res = await fetch(`${API}/settings/api-keys`);
+                apiKeysData = await res.json();
+                renderApiKeys();
+            } catch (err) {
+                container.innerHTML = `<p style="color: var(--error);">Failed to load API keys: ${err.message}</p>`;
+            }
+        }
+
+        function renderApiKeys() {
+            const container = document.getElementById('api-keys-container');
+            if (!container) return;
+
+            // Group by category
+            const groups = {};
+            apiKeysData.forEach(k => {
+                if (!groups[k.category]) groups[k.category] = [];
+                groups[k.category].push(k);
+            });
+
+            // Preferred order
+            const categoryOrder = ['Government Data', 'LLM / AI', 'Location & Foot Traffic', 'Other'];
+            const sortedCategories = categoryOrder.filter(c => groups[c]);
+
+            let html = '';
+            // Summary stats
+            const configured = apiKeysData.filter(k => k.configured).length;
+            const total = apiKeysData.length;
+            html += `
+                <div class="stats-grid" style="margin-bottom: 1.5rem;">
+                    <div class="stat-card">
+                        <div class="stat-value" style="color: var(--success);">${configured}</div>
+                        <div class="stat-label">Configured</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" style="color: var(--text-muted);">${total - configured}</div>
+                        <div class="stat-label">Missing</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${total}</div>
+                        <div class="stat-label">Total Sources</div>
+                    </div>
+                </div>
+            `;
+
+            sortedCategories.forEach(cat => {
+                html += `<div class="key-category">`;
+                html += `<div class="key-category-title">${cat}</div>`;
+                groups[cat].forEach(k => {
+                    html += renderKeyRow(k);
+                });
+                html += `</div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderKeyRow(k) {
+            const isEditing = editingSource === k.source;
+            const statusClass = k.configured ? 'configured' : 'missing';
+            const sourceLabel = k.configured ? k.source_type.toUpperCase() : '';
+            const sourceBadge = k.configured
+                ? `<span class="key-source-badge ${k.source_type}">${sourceLabel}</span>`
+                : '';
+
+            let html = `<div class="key-row" id="key-row-${k.source}">`;
+            html += `<span class="key-status-dot ${statusClass}"></span>`;
+            html += `<div class="key-info">`;
+            html += `<div class="key-name">${k.source} ${sourceBadge}</div>`;
+            html += `<div class="key-desc">${k.description} &mdash; <a href="${k.signup_url}" target="_blank" style="color: var(--accent);">Get key</a></div>`;
+
+            if (k.configured && !isEditing) {
+                html += `<span class="key-masked">${k.masked_key}</span>`;
+            }
+
+            if (isEditing) {
+                html += `
+                    <div class="key-edit-row">
+                        <input type="password" class="key-edit-input" id="key-input-${k.source}"
+                               placeholder="Paste your API key here..." autofocus
+                               onkeydown="if(event.key==='Enter')saveKey('${k.source}');if(event.key==='Escape')cancelEdit();">
+                        <button class="btn-sm primary" onclick="saveKey('${k.source}')">Save</button>
+                        <button class="btn-sm" onclick="cancelEdit()">Cancel</button>
+                    </div>
+                `;
+            }
+
+            html += `<div id="test-result-${k.source}"></div>`;
+            html += `</div>`; // key-info
+
+            if (!isEditing) {
+                html += `<div class="key-actions">`;
+                html += `<button class="btn-sm" onclick="editKey('${k.source}')">Edit</button>`;
+                if (k.configured) {
+                    html += `<button class="btn-sm" onclick="testKey('${k.source}')">Test</button>`;
+                    if (k.source_type === 'db') {
+                        html += `<button class="btn-sm danger" onclick="deleteKey('${k.source}')">Remove</button>`;
+                    }
+                }
+                html += `</div>`;
+            }
+
+            html += `</div>`; // key-row
+            return html;
+        }
+
+        function editKey(source) {
+            editingSource = source;
+            renderApiKeys();
+            // Focus the input after render
+            setTimeout(() => {
+                const input = document.getElementById(`key-input-${source}`);
+                if (input) input.focus();
+            }, 50);
+        }
+
+        function cancelEdit() {
+            editingSource = null;
+            renderApiKeys();
+        }
+
+        async function saveKey(source) {
+            const input = document.getElementById(`key-input-${source}`);
+            if (!input || !input.value.trim()) return;
+
+            const key = input.value.trim();
+            input.disabled = true;
+
+            try {
+                const res = await fetch(`${API}/settings/api-keys`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({source, key})
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    editingSource = null;
+                    await loadApiKeys();
+                } else {
+                    showTestResult(source, false, data.detail || 'Failed to save');
+                    input.disabled = false;
+                }
+            } catch (err) {
+                showTestResult(source, false, err.message);
+                input.disabled = false;
+            }
+        }
+
+        async function deleteKey(source) {
+            if (!confirm(`Remove the stored key for "${source}"? It will fall back to .env if available.`)) return;
+
+            try {
+                const res = await fetch(`${API}/settings/api-keys/${source}`, {method: 'DELETE'});
+                if (res.ok) {
+                    await loadApiKeys();
+                }
+            } catch (err) {
+                showTestResult(source, false, err.message);
+            }
+        }
+
+        async function testKey(source) {
+            showTestResult(source, null, 'Testing...');
+
+            try {
+                const res = await fetch(`${API}/settings/api-keys/${source}/test`, {method: 'POST'});
+                const data = await res.json();
+                showTestResult(source, data.success, data.message);
+            } catch (err) {
+                showTestResult(source, false, err.message);
+            }
+        }
+
+        function showTestResult(source, success, message) {
+            const el = document.getElementById(`test-result-${source}`);
+            if (!el) return;
+
+            if (success === null) {
+                el.innerHTML = `<div class="test-result" style="color: var(--text-muted);">${message}</div>`;
+            } else {
+                const cls = success ? 'success' : 'failure';
+                el.innerHTML = `<div class="test-result ${cls}">${success ? '✓' : '✗'} ${message}</div>`;
+            }
+            // Auto-clear after 5 seconds
+            setTimeout(() => { if (el) el.innerHTML = ''; }, 5000);
         }
 
         async function getNetwork() {
