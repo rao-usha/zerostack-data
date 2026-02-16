@@ -54,8 +54,8 @@ class FRARailCollector(BaseCollector):
     rate_limit_delay = 0.5
 
     RAIL_NETWORK_URL = (
-        "https://geo.dot.gov/server/rest/services/NTAD/"
-        "Rail_Network/MapServer/0/query"
+        "https://geo.dot.gov/server/rest/services/Hosted/"
+        "North_American_Class_1_Rail/FeatureServer/0/query"
     )
 
     def __init__(self, db: Session, api_key: Optional[str] = None, **kwargs):
@@ -109,9 +109,9 @@ class FRARailCollector(BaseCollector):
 
         result = self.create_result(
             status=CollectionStatus.SUCCESS if inserted > 0 else CollectionStatus.PARTIAL,
-            records_collected=len(all_records),
-            records_inserted=inserted,
-            errors=errors,
+            total=len(all_records),
+            processed=len(all_records),
+            inserted=inserted,
         )
         self.complete_job(result)
         return result
@@ -126,9 +126,10 @@ class FRARailCollector(BaseCollector):
 
         while True:
             params = {
-                "where": f"STFIPS='{fips}'",
+                "where": f"stfips='{fips}'",
                 "outFields": "*",
                 "returnGeometry": "true",
+                "outSR": "4326",
                 "f": "json",
                 "resultOffset": offset,
                 "resultRecordCount": page_size,
@@ -146,20 +147,22 @@ class FRARailCollector(BaseCollector):
                 attrs = feature.get("attributes", {})
                 geom = feature.get("geometry")
 
-                # Build unique ID from railroad + segment
-                rrowner = attrs.get("RROWNER1", attrs.get("RROWNER", ""))
-                objectid = attrs.get("OBJECTID", attrs.get("FID", ""))
+                # Build unique ID from railroad + segment (lowercase field names in new API)
+                rrowner = attrs.get("rrowner1") or attrs.get("RROWNER1") or attrs.get("RROWNER") or ""
+                objectid = attrs.get("objectid") or attrs.get("OBJECTID") or attrs.get("FID") or ""
                 fra_id = f"{rrowner}_{state}_{objectid}" if rrowner else f"NTAD_{state}_{objectid}"
 
                 record = {
                     "fra_line_id": fra_id[:50],
                     "railroad": (rrowner or "")[:100],
                     "track_type": self._classify_track(attrs),
-                    "track_class": self._safe_int(attrs.get("TRACKS", attrs.get("TRKCLASS"))),
-                    "max_speed_mph": self._safe_int(attrs.get("MAXSPD")),
-                    "annual_tonnage_million": self._safe_float(attrs.get("AMTK_NODE")),
+                    "track_class": self._safe_int(
+                        attrs.get("tracks") or attrs.get("TRACKS") or attrs.get("TRKCLASS")
+                    ),
+                    "max_speed_mph": None,
+                    "annual_tonnage_million": None,
                     "state": state,
-                    "county": (attrs.get("CNTYNAME", "") or "")[:100],
+                    "county": "",
                     "geometry_geojson": self._arcgis_to_geojson(geom) if geom else None,
                     "source": "fra",
                     "collected_at": datetime.utcnow(),
@@ -175,7 +178,7 @@ class FRARailCollector(BaseCollector):
     @staticmethod
     def _classify_track(attrs: Dict) -> str:
         """Classify track type from attributes."""
-        net = (attrs.get("NET", "") or "").upper()
+        net = (attrs.get("net") or attrs.get("NET") or "").upper()
         if "MAIN" in net:
             return "mainline"
         elif "BRANCH" in net or "SPUR" in net:

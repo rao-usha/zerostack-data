@@ -467,3 +467,318 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================
+   Data Sources Dashboard (ds-)
+   ============================ */
+
+.ds-container {
+  max-width: 100%;
+}
+
+/* Hero stats row */
+.ds-hero {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.ds-hero-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.ds-hero-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.ds-hero-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-top: 0.25rem;
+}
+
+/* Alert bar */
+.ds-alerts {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--error);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ds-alert-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.ds-alert-severity {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.ds-alert-severity.critical {
+  background: var(--error);
+  color: white;
+}
+
+.ds-alert-severity.warning {
+  background: var(--warning);
+  color: white;
+}
+
+.ds-alert-severity.info {
+  background: var(--accent);
+  color: white;
+}
+
+/* Toolbar */
+.ds-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Category accordion */
+.ds-category {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+.ds-category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  user-select: none;
+}
+
+.ds-category-header:hover {
+  background: var(--bg-input);
+}
+
+.ds-category-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ds-chevron {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  width: 1rem;
+}
+
+.ds-category-title {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.ds-category-count {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.ds-category-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ds-badge-active {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.625rem;
+  border-radius: 10px;
+}
+
+.ds-category-body {
+  padding: 0 1.25rem 1.25rem;
+}
+
+/* Source table */
+.ds-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ds-table th {
+  text-align: left;
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  font-weight: 500;
+}
+
+.ds-table td {
+  padding: 0.625rem 0.5rem;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+  font-size: 0.875rem;
+}
+
+.ds-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ds-table tbody tr:hover {
+  background: rgba(99, 102, 241, 0.04);
+}
+
+/* Status dots */
+.ds-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+
+.ds-status.ok { background: var(--success); }
+.ds-status.stale { background: var(--warning); }
+.ds-status.error { background: var(--error); }
+.ds-status.idle { background: var(--text-muted); }
+
+.ds-status-text {
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+.ds-status-text.ok { color: var(--success); }
+.ds-status-text.stale { color: var(--warning); }
+.ds-status-text.error { color: var(--error); }
+.ds-status-text.idle { color: var(--text-muted); }
+
+/* Site intel domain groups */
+.ds-site-intel-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ds-domain-group {
+  background: var(--bg-input);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.ds-domain-header {
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-transform: capitalize;
+}
+
+.ds-domain-count {
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.125rem 0.5rem;
+  border-radius: 8px;
+}
+
+/* Activity feed */
+.ds-activity {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.ds-activity-header {
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.ds-activity-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.ds-activity-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+  align-items: baseline;
+}
+
+.ds-activity-item:last-child {
+  border-bottom: none;
+}
+
+.ds-activity-time {
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-width: 60px;
+  font-size: 0.8rem;
+}
+
+.ds-activity-trigger {
+  background: var(--bg-input);
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.ds-activity-job {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+/* Empty state within ds */
+.ds-empty {
+  text-align: center;
+  padding: 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .ds-hero {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ds-table th:nth-child(3),
+  .ds-table td:nth-child(3),
+  .ds-table th:nth-child(4),
+  .ds-table td:nth-child(4) {
+    display: none;
+  }
+}

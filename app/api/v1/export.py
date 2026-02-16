@@ -4,10 +4,13 @@ Data Export API endpoints.
 Provides REST API for exporting table data to files.
 """
 import logging
+from datetime import date, datetime
+from decimal import Decimal
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -150,6 +153,76 @@ def get_table_columns(table_name: str, db: Session = Depends(get_db)):
         return {"table_name": table_name, "columns": columns}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+def _serialize_value(val):
+    """Convert non-JSON-serializable values to strings."""
+    if val is None:
+        return None
+    if isinstance(val, (datetime, date)):
+        return val.isoformat()
+    if isinstance(val, Decimal):
+        return float(val)
+    if isinstance(val, bytes):
+        return val.hex()
+    return val
+
+
+@router.get("/tables/{table_name}/preview")
+def preview_table(
+    table_name: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    sort: Optional[str] = Query(default=None, description="Column to sort by"),
+    order: str = Query(default="asc", regex="^(asc|desc)$"),
+    db: Session = Depends(get_db),
+):
+    """
+    Preview table data with pagination.
+
+    Returns rows as JSON objects — useful for inline data browsing.
+    """
+    inspector = inspect(db.get_bind())
+    valid_tables = inspector.get_table_names()
+    if table_name not in valid_tables:
+        raise HTTPException(status_code=404, detail=f"Table not found: {table_name}")
+
+    col_meta = inspector.get_columns(table_name)
+    column_names = [c["name"] for c in col_meta]
+    column_types = {c["name"]: str(c["type"]) for c in col_meta}
+
+    # Validate sort column
+    sort_col = None
+    if sort and sort in column_names:
+        sort_col = sort
+    elif "id" in column_names:
+        sort_col = "id"
+
+    # Build query — table/column names validated against inspector
+    order_clause = f' ORDER BY "{sort_col}" {order.upper()}' if sort_col else ""
+    query = f'SELECT * FROM "{table_name}"{order_clause} LIMIT :lim OFFSET :off'
+    count_query = f'SELECT COUNT(*) FROM "{table_name}"'
+
+    try:
+        total = db.execute(text(count_query)).scalar()
+        result = db.execute(text(query), {"lim": limit, "off": offset})
+        rows = [
+            {col: _serialize_value(val) for col, val in zip(column_names, row)}
+            for row in result.fetchall()
+        ]
+    except Exception as e:
+        logger.error(f"Preview query failed for {table_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
+
+    return {
+        "table_name": table_name,
+        "total_rows": total,
+        "columns": column_names,
+        "column_types": column_types,
+        "rows": rows,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.post("/jobs", response_model=ExportJobResponse, status_code=201)

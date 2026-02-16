@@ -65,12 +65,17 @@ def _mask_key(key: str) -> str:
 
 # Category groupings for UI display
 SOURCE_CATEGORIES = {
-    "Government Data": ["census", "fred", "eia", "bls", "noaa", "bea", "bts", "fbi_crime", "data_commons", "uspto"],
-    "LLM / AI": ["openai", "anthropic"],
-    "Location & Foot Traffic": ["safegraph", "placer", "foursquare", "yelp"],
+    "Government Data": ["census", "fred", "eia", "bls", "noaa", "bea", "bts", "fbi_crime", "data_commons", "usda", "uspto"],
+    "LLM / AI": ["openai", "anthropic", "gemini", "xai", "deepseek", "groq", "mistral", "cohere", "perplexity"],
+    "Financial & Market Data": ["fmp", "alpha_vantage", "polygon", "finnhub", "tiingo", "quandl"],
+    "Location & Foot Traffic": ["safegraph", "placer", "foursquare", "yelp", "peeringdb"],
+    "Search & Web Data": ["google_search", "google_cse", "similarweb", "github"],
+    "Business Intelligence": ["crunchbase", "newsapi", "linkedin", "opencorporates", "kaggle_username", "kaggle_key"],
+    "Enrichment": ["hunter", "clearbit", "zoominfo", "pitchbook"],
 }
 
 SOURCE_DESCRIPTIONS = {
+    # Government Data
     "census": "U.S. Census Bureau demographics and housing data",
     "fred": "Federal Reserve Economic Data - 800K+ time series",
     "eia": "Energy Information Administration - energy prices and production",
@@ -80,13 +85,48 @@ SOURCE_DESCRIPTIONS = {
     "bts": "Bureau of Transportation Statistics - freight and border data",
     "fbi_crime": "FBI Crime Data Explorer (via data.gov key)",
     "data_commons": "Google Data Commons - unified public data",
-    "yelp": "Yelp Fusion - business listings and reviews",
+    "usda": "USDA agricultural data and statistics",
+    "uspto": "USPTO PatentsView patent data",
+    # LLM / AI
+    "openai": "OpenAI GPT models for LLM extraction",
+    "anthropic": "Anthropic Claude models",
+    "gemini": "Google Gemini models",
+    "xai": "xAI Grok models",
+    "deepseek": "DeepSeek low-cost reasoning models",
+    "groq": "Groq ultra-fast LLM inference",
+    "mistral": "Mistral European LLM provider",
+    "cohere": "Cohere enterprise LLM and embeddings",
+    "perplexity": "Perplexity search-augmented LLM",
+    # Financial & Market Data
+    "fmp": "Financial Modeling Prep - company financials and ratios",
+    "alpha_vantage": "Alpha Vantage - stock prices, forex, crypto",
+    "polygon": "Polygon.io - real-time and historical market data",
+    "finnhub": "Finnhub - stock API, news, fundamentals",
+    "tiingo": "Tiingo - EOD prices, IEX data, news",
+    "quandl": "Quandl / Nasdaq Data Link datasets",
+    # Location & Foot Traffic
     "safegraph": "SafeGraph foot traffic patterns",
     "placer": "Placer.ai retail analytics",
     "foursquare": "Foursquare Places POI data",
-    "openai": "OpenAI GPT models for LLM extraction",
-    "anthropic": "Anthropic Claude models",
-    "uspto": "USPTO PatentsView patent data",
+    "yelp": "Yelp Fusion - business listings and reviews",
+    "peeringdb": "PeeringDB network/peering exchange data",
+    # Search & Web Data
+    "google_search": "Google Custom Search API key",
+    "google_cse": "Google Custom Search Engine ID",
+    "similarweb": "SimilarWeb web traffic analytics",
+    "github": "GitHub personal access token for API",
+    # Business Intelligence
+    "crunchbase": "Crunchbase startup and VC data",
+    "newsapi": "NewsAPI news article search",
+    "linkedin": "LinkedIn professional network API",
+    "opencorporates": "OpenCorporates company registry data",
+    "kaggle_username": "Kaggle username for dataset downloads",
+    "kaggle_key": "Kaggle API key for dataset downloads",
+    # Enrichment
+    "hunter": "Hunter.io email finding and verification",
+    "clearbit": "Clearbit company and person enrichment",
+    "zoominfo": "ZoomInfo B2B contact data",
+    "pitchbook": "Pitchbook PE/VC deal data",
 }
 
 
@@ -281,42 +321,35 @@ async def test_api_key(source: str, db: Session = Depends(get_db)):
 async def _test_source_key(client, source: str, key: str) -> APIKeyTestResult:
     """Run a lightweight test request for a specific source."""
     tests = {
-        "fred": (
-            "https://api.stlouisfed.org/fred/series?series_id=GNPCA&api_key={key}&file_type=json",
-            200
-        ),
-        "eia": (
-            "https://api.eia.gov/v2/?api_key={key}",
-            200
-        ),
-        "census": (
-            "https://api.census.gov/data/2023/acs/acs5?get=NAME&for=state:01&key={key}",
-            200
-        ),
-        "bls": (
-            "https://api.bls.gov/publicAPI/v2/timeseries/data/LNS14000000?registrationkey={key}&latest=true",
-            200
-        ),
-        "noaa": (
-            "https://www.ncdc.noaa.gov/cdo-web/api/v2/datasets?limit=1",
-            200
-        ),
-        "bea": (
-            "https://apps.bea.gov/api/data/?method=GETDATASETLIST&UserID={key}&ResultFormat=JSON",
-            200
-        ),
-        "data_commons": (
-            "https://api.datacommons.org/v2/node?key={key}&nodes=country/USA&property=name",
-            200
-        ),
-        "openai": (
-            "https://api.openai.com/v1/models",
-            200
-        ),
-        "anthropic": (
-            "https://api.anthropic.com/v1/models",
-            200
-        ),
+        # Government Data
+        "fred": ("https://api.stlouisfed.org/fred/series?series_id=GNPCA&api_key={key}&file_type=json", 200),
+        "eia": ("https://api.eia.gov/v2/?api_key={key}", 200),
+        "census": ("https://api.census.gov/data/2023/acs/acs5?get=NAME&for=state:01&key={key}", 200),
+        "bls": ("https://api.bls.gov/publicAPI/v2/timeseries/data/LNS14000000?registrationkey={key}&latest=true", 200),
+        "noaa": ("https://www.ncdc.noaa.gov/cdo-web/api/v2/datasets?limit=1", 200),
+        "bea": ("https://apps.bea.gov/api/data/?method=GETDATASETLIST&UserID={key}&ResultFormat=JSON", 200),
+        "data_commons": ("https://api.datacommons.org/v2/node?key={key}&nodes=country/USA&property=name", 200),
+        "usda": ("https://api.nal.usda.gov/fdc/v1/foods/search?api_key={key}&query=apple&pageSize=1", 200),
+        # LLM / AI
+        "openai": ("https://api.openai.com/v1/models", 200),
+        "anthropic": ("https://api.anthropic.com/v1/models", 200),
+        "gemini": ("https://generativelanguage.googleapis.com/v1/models?key={key}", 200),
+        "groq": ("https://api.groq.com/openai/v1/models", 200),
+        "mistral": ("https://api.mistral.ai/v1/models", 200),
+        "deepseek": ("https://api.deepseek.com/models", 200),
+        "cohere": ("https://api.cohere.com/v1/models", 200),
+        "perplexity": ("https://api.perplexity.ai/chat/completions", 200),
+        # Financial & Market Data
+        "fmp": ("https://financialmodelingprep.com/api/v3/profile/AAPL?apikey={key}", 200),
+        "alpha_vantage": ("https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=IBM&interval=5min&apikey={key}", 200),
+        "polygon": ("https://api.polygon.io/v2/aggs/ticker/AAPL/prev?apiKey={key}", 200),
+        "finnhub": ("https://finnhub.io/api/v1/stock/profile2?symbol=AAPL&token={key}", 200),
+        "tiingo": ("https://api.tiingo.com/api/test?token={key}", 200),
+        "quandl": ("https://data.nasdaq.com/api/v3/datasets/WIKI/AAPL/metadata.json?api_key={key}", 200),
+        # Search & Web Data
+        "github": ("https://api.github.com/user", 200),
+        # Business Intelligence
+        "newsapi": ("https://newsapi.org/v2/top-headlines?country=us&pageSize=1&apiKey={key}", 200),
     }
 
     if source in tests:
@@ -333,6 +366,14 @@ async def _test_source_key(client, source: str, key: str) -> APIKeyTestResult:
             headers["x-api-key"] = key
             headers["anthropic-version"] = "2023-06-01"
             url = "https://api.anthropic.com/v1/models"
+        elif source in ("groq", "mistral", "deepseek", "perplexity"):
+            headers["Authorization"] = f"Bearer {key}"
+        elif source == "cohere":
+            headers["Authorization"] = f"Bearer {key}"
+        elif source == "github":
+            headers["Authorization"] = f"token {key}"
+        elif source == "tiingo":
+            headers["Authorization"] = f"Token {key}"
 
         resp = await client.get(url, headers=headers)
         if resp.status_code == expected:

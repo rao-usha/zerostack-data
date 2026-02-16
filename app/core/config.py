@@ -455,6 +455,134 @@ class Settings(BaseSettings):
         description="USPTO PatentsView API key for patent data"
     )
 
+    # ==========================================================================
+    # KEYS ALREADY USED IN CODEBASE (not previously in _API_KEY_MAP)
+    # ==========================================================================
+
+    usda_api_key: Optional[str] = Field(
+        default=None,
+        description="USDA API key for agricultural data"
+    )
+    github_token: Optional[str] = Field(
+        default=None,
+        description="GitHub personal access token for higher rate limits"
+    )
+    google_api_key: Optional[str] = Field(
+        default=None,
+        description="Google API key for Custom Search"
+    )
+    google_cse_id: Optional[str] = Field(
+        default=None,
+        description="Google Custom Search Engine ID"
+    )
+    similarweb_api_key: Optional[str] = Field(
+        default=None,
+        description="SimilarWeb API key for web traffic analytics"
+    )
+    opencorporates_api_key: Optional[str] = Field(
+        default=None,
+        description="OpenCorporates API key for company registry data"
+    )
+    peeringdb_api_key: Optional[str] = Field(
+        default=None,
+        description="PeeringDB API key for network/peering data"
+    )
+    crunchbase_api_key: Optional[str] = Field(
+        default=None,
+        description="Crunchbase API key for startup/VC data"
+    )
+    newsapi_key: Optional[str] = Field(
+        default=None,
+        description="NewsAPI key for news article search"
+    )
+    linkedin_api_key: Optional[str] = Field(
+        default=None,
+        description="LinkedIn API key for professional network data"
+    )
+
+    # ==========================================================================
+    # AI / LLM PROVIDER KEYS
+    # ==========================================================================
+
+    gemini_api_key: Optional[str] = Field(
+        default=None,
+        description="Google Gemini API key"
+    )
+    xai_api_key: Optional[str] = Field(
+        default=None,
+        description="xAI / Grok API key"
+    )
+    deepseek_api_key: Optional[str] = Field(
+        default=None,
+        description="DeepSeek API key for reasoning models"
+    )
+    groq_api_key: Optional[str] = Field(
+        default=None,
+        description="Groq API key for ultra-fast inference"
+    )
+    mistral_api_key: Optional[str] = Field(
+        default=None,
+        description="Mistral API key"
+    )
+    cohere_api_key: Optional[str] = Field(
+        default=None,
+        description="Cohere API key for LLM and embeddings"
+    )
+    perplexity_api_key: Optional[str] = Field(
+        default=None,
+        description="Perplexity API key for search-augmented LLM"
+    )
+
+    # ==========================================================================
+    # FINANCIAL / MARKET DATA KEYS
+    # ==========================================================================
+
+    fmp_api_key: Optional[str] = Field(
+        default=None,
+        description="Financial Modeling Prep API key"
+    )
+    alpha_vantage_api_key: Optional[str] = Field(
+        default=None,
+        description="Alpha Vantage API key for stock/forex/crypto data"
+    )
+    polygon_api_key: Optional[str] = Field(
+        default=None,
+        description="Polygon.io API key for market data"
+    )
+    finnhub_api_key: Optional[str] = Field(
+        default=None,
+        description="Finnhub API key for stock data and news"
+    )
+    tiingo_api_key: Optional[str] = Field(
+        default=None,
+        description="Tiingo API key for EOD prices and news"
+    )
+    quandl_api_key: Optional[str] = Field(
+        default=None,
+        description="Quandl/Nasdaq Data Link API key"
+    )
+
+    # ==========================================================================
+    # BUSINESS / ENRICHMENT KEYS
+    # ==========================================================================
+
+    hunter_api_key: Optional[str] = Field(
+        default=None,
+        description="Hunter.io API key for email finding"
+    )
+    clearbit_api_key: Optional[str] = Field(
+        default=None,
+        description="Clearbit API key for company/person enrichment"
+    )
+    zoominfo_api_key: Optional[str] = Field(
+        default=None,
+        description="ZoomInfo API key for B2B contact data"
+    )
+    pitchbook_api_key: Optional[str] = Field(
+        default=None,
+        description="Pitchbook API key for PE/VC deal data"
+    )
+
     # Google Popular Times scraping (Free but ToS risk)
     foot_traffic_enable_google_scraping: bool = Field(
         default=False,
@@ -643,6 +771,7 @@ class Settings(BaseSettings):
 
     # Mapping of source names to (field_name, signup_url)
     _API_KEY_MAP = {
+        # Government Data (11)
         "census": ("census_survey_api_key", "https://api.census.gov/data/key_signup.html"),
         "fred": ("fred_api_key", "https://fred.stlouisfed.org/docs/api/api_key.html"),
         "eia": ("eia_api_key", "https://www.eia.gov/opendata/register.php"),
@@ -652,13 +781,48 @@ class Settings(BaseSettings):
         "bts": ("bts_app_token", "https://data.transportation.gov/profile/edit/developer_settings"),
         "fbi_crime": ("data_gov_api", "https://api.data.gov/signup/"),
         "data_commons": ("data_commons_api_key", "https://console.cloud.google.com/apis/credentials"),
-        "yelp": ("yelp_api_key", "https://www.yelp.com/developers/v3/manage_app"),
+        "usda": ("usda_api_key", "https://api.data.gov/signup/"),
+        "uspto": ("uspto_patentsview_api_key", "https://patentsview-support.atlassian.net/servicedesk/customer/portal/1"),
+        # LLM / AI (9)
+        "openai": ("openai_api_key", "https://platform.openai.com/api-keys"),
+        "anthropic": ("anthropic_api_key", "https://console.anthropic.com/"),
+        "gemini": ("gemini_api_key", "https://aistudio.google.com/app/apikey"),
+        "xai": ("xai_api_key", "https://console.x.ai/"),
+        "deepseek": ("deepseek_api_key", "https://platform.deepseek.com/api_keys"),
+        "groq": ("groq_api_key", "https://console.groq.com/keys"),
+        "mistral": ("mistral_api_key", "https://console.mistral.ai/api-keys"),
+        "cohere": ("cohere_api_key", "https://dashboard.cohere.com/api-keys"),
+        "perplexity": ("perplexity_api_key", "https://www.perplexity.ai/settings/api"),
+        # Financial & Market Data (6)
+        "fmp": ("fmp_api_key", "https://site.financialmodelingprep.com/developer/docs"),
+        "alpha_vantage": ("alpha_vantage_api_key", "https://www.alphavantage.co/support/#api-key"),
+        "polygon": ("polygon_api_key", "https://polygon.io/dashboard/signup"),
+        "finnhub": ("finnhub_api_key", "https://finnhub.io/register"),
+        "tiingo": ("tiingo_api_key", "https://www.tiingo.com/account/api/token"),
+        "quandl": ("quandl_api_key", "https://data.nasdaq.com/sign-up"),
+        # Location & Foot Traffic (5)
         "safegraph": ("safegraph_api_key", "https://www.safegraph.com/"),
         "placer": ("placer_api_key", "https://www.placer.ai/"),
         "foursquare": ("foursquare_api_key", "https://developer.foursquare.com/"),
-        "openai": ("openai_api_key", "https://platform.openai.com/api-keys"),
-        "anthropic": ("anthropic_api_key", "https://console.anthropic.com/"),
-        "uspto": ("uspto_patentsview_api_key", "https://patentsview-support.atlassian.net/servicedesk/customer/portal/1"),
+        "yelp": ("yelp_api_key", "https://www.yelp.com/developers/v3/manage_app"),
+        "peeringdb": ("peeringdb_api_key", "https://www.peeringdb.com/register"),
+        # Search & Web Data (4)
+        "google_search": ("google_api_key", "https://console.cloud.google.com/apis/credentials"),
+        "google_cse": ("google_cse_id", "https://programmablesearchengine.google.com/"),
+        "similarweb": ("similarweb_api_key", "https://www.similarweb.com/corp/developer/"),
+        "github": ("github_token", "https://github.com/settings/tokens"),
+        # Business Intelligence (6)
+        "crunchbase": ("crunchbase_api_key", "https://www.crunchbase.com/home"),
+        "newsapi": ("newsapi_key", "https://newsapi.org/register"),
+        "linkedin": ("linkedin_api_key", "https://www.linkedin.com/developers/"),
+        "opencorporates": ("opencorporates_api_key", "https://opencorporates.com/api_accounts/new"),
+        "kaggle_username": ("kaggle_username", "https://www.kaggle.com/account"),
+        "kaggle_key": ("kaggle_key", "https://www.kaggle.com/account"),
+        # Enrichment (4)
+        "hunter": ("hunter_api_key", "https://hunter.io/users/sign_up"),
+        "clearbit": ("clearbit_api_key", "https://clearbit.com/"),
+        "zoominfo": ("zoominfo_api_key", "https://www.zoominfo.com/"),
+        "pitchbook": ("pitchbook_api_key", "https://pitchbook.com/"),
     }
 
     def get_api_key(self, source: str, required: bool = False) -> Optional[str]:

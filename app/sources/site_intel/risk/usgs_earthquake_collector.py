@@ -104,6 +104,7 @@ class USGSEarthquakeCollector(BaseCollector):
             total_inserted += hazard_result.get("inserted", 0)
         except Exception as e:
             logger.error(f"Seismic hazard collection failed: {e}")
+            self.db.rollback()
             errors += 1
 
         # Phase 2: Collect recent significant earthquakes as hazard indicators
@@ -113,6 +114,7 @@ class USGSEarthquakeCollector(BaseCollector):
             total_inserted += quake_result.get("inserted", 0)
         except Exception as e:
             logger.error(f"Earthquake collection failed: {e}")
+            self.db.rollback()
             errors += 1
 
         # Phase 3: Collect fault data
@@ -122,13 +124,14 @@ class USGSEarthquakeCollector(BaseCollector):
             total_inserted += fault_result.get("inserted", 0)
         except Exception as e:
             logger.error(f"Fault line collection failed: {e}")
+            self.db.rollback()
             errors += 1
 
         result = self.create_result(
             status=CollectionStatus.SUCCESS if total_inserted > 0 else CollectionStatus.PARTIAL,
-            records_collected=total_inserted,
-            records_inserted=total_inserted,
-            errors=errors,
+            total=total_inserted,
+            processed=total_inserted,
+            inserted=total_inserted,
         )
         self.complete_job(result)
         return result
@@ -203,8 +206,8 @@ class USGSEarthquakeCollector(BaseCollector):
             return {"processed": 0, "inserted": 0}
 
         features = data.get("features", [])
-        records = []
-
+        # Deduplicate by (lat, lng) — keep highest magnitude
+        seen = {}
         for feature in features:
             props = feature.get("properties", {})
             geom = feature.get("geometry", {})
@@ -213,14 +216,18 @@ class USGSEarthquakeCollector(BaseCollector):
                 continue
 
             lng, lat = coords[0], coords[1]
-            mag = props.get("mag", 0)
+            mag = props.get("mag", 0) or 0
+            key = (round(lat, 4), round(lng, 4))
 
-            # Approximate PGA from magnitude and distance (simplified)
-            pga_estimate = min(mag * 0.1, 2.0)
+            if key not in seen or mag > seen[key]["mag"]:
+                seen[key] = {"lat": key[0], "lng": key[1], "mag": mag}
 
+        records = []
+        for key, info in seen.items():
+            pga_estimate = min(info["mag"] * 0.1, 2.0)
             records.append({
-                "latitude": round(lat, 4),
-                "longitude": round(lng, 4),
+                "latitude": info["lat"],
+                "longitude": info["lng"],
                 "pga_2pct_50yr": pga_estimate,
                 "source": "usgs_earthquake_event",
                 "collected_at": datetime.utcnow(),
@@ -247,22 +254,23 @@ class USGSEarthquakeCollector(BaseCollector):
             return {"processed": 0, "inserted": 0}
 
         features = data.get("features", [])
-        records = []
-
+        # Deduplicate by fault_name (place) — last wins
+        seen_names = {}
         for feature in features:
             props = feature.get("properties", {})
             geom = feature.get("geometry", {})
 
-            fault_name = props.get("place", "Unknown")
-            records.append({
-                "fault_name": fault_name[:255],
+            fault_name = (props.get("place", "Unknown") or "Unknown")[:255]
+            seen_names[fault_name] = {
+                "fault_name": fault_name,
                 "fault_type": props.get("type", "earthquake_source"),
                 "slip_rate_mm_yr": None,
                 "age": "recent",
                 "geometry_geojson": geom,
                 "source": "usgs",
                 "collected_at": datetime.utcnow(),
-            })
+            }
+        records = list(seen_names.values())
 
         inserted = 0
         if records:

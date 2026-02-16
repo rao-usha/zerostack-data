@@ -62,7 +62,7 @@
         }
         .tab:hover { background: var(--bg-input); color: var(--text); }
         .tab.active { background: var(--primary); border-color: var(--primary); color: white; }
-        .content { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+        .content { padding: 2rem; max-width: 1400px; margin: 0 auto; padding-bottom: 5rem; }
         .card {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -71,7 +71,6 @@
             margin-bottom: 1.5rem;
         }
         .card-title { font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; }
-        .search-box { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
         .search-input {
             flex: 1;
             padding: 0.75rem 1rem;
@@ -82,6 +81,7 @@
             font-size: 1rem;
         }
         .search-input:focus { outline: none; border-color: var(--primary); }
+        .search-input::placeholder { color: var(--text-muted); }
         .btn {
             padding: 0.75rem 1.5rem;
             background: var(--primary);
@@ -89,115 +89,19 @@
             border-radius: 8px;
             color: white;
             cursor: pointer;
+            font-size: 0.875rem;
         }
-        .btn:disabled { opacity: 0.5; }
+        .btn:hover { background: #4f46e5; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { background: var(--bg-input); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: var(--border); }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; }
         .stat-card { background: var(--bg-input); padding: 1rem; border-radius: 8px; text-align: center; }
         .stat-value { font-size: 2rem; font-weight: 700; color: var(--primary); }
         .stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
-        .result-item {
-            padding: 1rem;
-            background: var(--bg-input);
-            border-radius: 8px;
-            margin-bottom: 0.5rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .score-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.875rem;
-            background: var(--success);
-            color: white;
-        }
         .loading { text-align: center; padding: 2rem; color: var(--text-muted); }
-        .empty { text-align: center; padding: 3rem; color: var(--text-muted); }
-        .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
-        /* Agent Progress Styles */
-        .agent-log {
-            background: #0d1117;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
-            font-family: 'Monaco', 'Menlo', monospace;
-            font-size: 0.8rem;
-            max-height: 400px;
-            overflow-y: auto;
-            margin-top: 1rem;
-        }
-        .log-entry {
-            padding: 0.25rem 0;
-            border-bottom: 1px solid #1e293b;
-            display: flex;
-            align-items: flex-start;
-            gap: 0.5rem;
-        }
-        .log-entry:last-child { border-bottom: none; }
-        .log-time { color: #6b7280; min-width: 80px; }
-        .log-icon { min-width: 20px; text-align: center; }
-        .log-msg { flex: 1; }
-        .log-pending { color: #94a3b8; }
-        .log-running { color: #fbbf24; }
-        .log-success { color: #22c55e; }
-        .log-error { color: #ef4444; }
-        .log-info { color: #60a5fa; }
-        .source-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.5rem;
-            margin: 1rem 0;
-        }
-        .source-chip {
-            padding: 0.5rem 0.75rem;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            text-align: center;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-        }
-        .source-chip.pending { border-color: #6b7280; color: #6b7280; }
-        .source-chip.running { border-color: #fbbf24; color: #fbbf24; background: rgba(251, 191, 36, 0.1); }
-        .source-chip.success { border-color: #22c55e; color: #22c55e; background: rgba(34, 197, 94, 0.1); }
-        .source-chip.failed { border-color: #ef4444; color: #ef4444; background: rgba(239, 68, 68, 0.1); }
-        .progress-bar {
-            height: 4px;
-            background: var(--bg-input);
-            border-radius: 2px;
-            overflow: hidden;
-            margin: 1rem 0;
-        }
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--primary), var(--accent));
-            transition: width 0.3s ease;
-        }
-        .profile-section {
-            background: var(--bg-input);
-            border-radius: 8px;
-            padding: 1rem;
-            margin-top: 0.5rem;
-        }
-        .profile-section h4 {
-            color: var(--accent);
-            font-size: 0.875rem;
-            margin-bottom: 0.5rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-        .profile-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.5rem;
-        }
-        .profile-item {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.875rem;
-        }
-        .profile-label { color: var(--text-muted); }
-        .profile-value { color: var(--text); font-weight: 500; }
+        .empty { text-align: center; padding: 2rem; color: var(--text-muted); }
+        .hidden { display: none; }
         .footer {
             display: flex;
             justify-content: center;
@@ -213,99 +117,152 @@
             right: 0;
         }
         .footer a { color: var(--accent); text-decoration: none; }
-        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
-        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
-        #results { margin-top: 1rem; }
-        .hidden { display: none; }
-        /* Settings Tab Styles */
-        .key-category { margin-bottom: 1.5rem; }
-        .key-category-title {
-            font-size: 0.875rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--accent);
-            margin-bottom: 0.75rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border);
+
+        /* ===== Data Sources Styles ===== */
+        .ds-hero { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .ds-hero-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; text-align: center; }
+        .ds-hero-value { font-size: 2rem; font-weight: 700; color: var(--primary); }
+        .ds-hero-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.25rem; }
+
+        .ds-legend { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 1.5rem; padding: 1rem 1.25rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; }
+        .ds-legend-section { display: flex; flex-direction: column; gap: 0.375rem; }
+        .ds-legend-title { font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); font-weight: 600; }
+        .ds-legend-items { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+        .ds-legend-item { display: flex; align-items: center; gap: 0.375rem; font-size: 0.75rem; color: var(--text-muted); }
+        .ds-legend-item .ds-dot { margin-right: 0; }
+        .ds-date-sub { font-size: 0.7rem; color: var(--text-muted); display: block; margin-top: 0.125rem; }
+
+        .ds-alerts { background: rgba(239,68,68,0.1); border: 1px solid var(--error); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.5rem; }
+        .ds-alert-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; padding: 0.25rem 0; }
+        .ds-alert-sev { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; }
+        .ds-alert-sev.critical { background: var(--error); color: white; }
+        .ds-alert-sev.warning { background: var(--warning); color: white; }
+        .ds-alert-sev.info { background: var(--accent); color: white; }
+
+        .ds-toolbar { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; }
+
+        .ds-category { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 1rem; overflow: hidden; }
+        .ds-cat-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; cursor: pointer; user-select: none; transition: background 0.15s; }
+        .ds-cat-header:hover { background: var(--bg-input); }
+        .ds-cat-left { display: flex; align-items: center; gap: 0.75rem; }
+        .ds-chevron { font-size: 0.75rem; color: var(--text-muted); width: 1rem; transition: transform 0.2s; }
+        .ds-cat-title { font-weight: 600; font-size: 1rem; }
+        .ds-cat-count { color: var(--text-muted); font-size: 0.875rem; }
+        .ds-badge-active { background: rgba(34,197,94,0.15); color: var(--success); font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.625rem; border-radius: 10px; }
+        .ds-cat-body { padding: 0 1.25rem 1.25rem; }
+
+        .ds-table { width: 100%; border-collapse: collapse; }
+        .ds-table th { text-align: left; padding: 0.5rem; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); font-weight: 500; }
+        .ds-table td { padding: 0.625rem 0.5rem; border-bottom: 1px solid rgba(51,65,85,0.5); font-size: 0.875rem; }
+        .ds-table tbody tr:last-child td { border-bottom: none; }
+        .ds-table tbody tr:hover { background: rgba(99,102,241,0.04); }
+
+        .ds-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 0.5rem; vertical-align: middle; }
+        .ds-dot.ok { background: var(--success); }
+        .ds-dot.stale { background: var(--warning); }
+        .ds-dot.error { background: var(--error); }
+        .ds-dot.idle { background: var(--text-muted); }
+
+        .ds-status-text { font-size: 0.75rem; text-transform: capitalize; }
+        .ds-status-text.ok { color: var(--success); }
+        .ds-status-text.stale { color: var(--warning); }
+        .ds-status-text.error { color: var(--error); }
+        .ds-status-text.idle { color: var(--text-muted); }
+
+        .ds-domain-group { background: var(--bg-input); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem; }
+        .ds-domain-header { font-weight: 600; font-size: 0.875rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; text-transform: capitalize; }
+        .ds-domain-count { background: var(--bg-card); color: var(--text-muted); font-size: 0.7rem; font-weight: 500; padding: 0.125rem 0.5rem; border-radius: 8px; }
+
+        .ds-activity { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-top: 1.5rem; }
+        .ds-activity-header { font-weight: 600; font-size: 1rem; margin-bottom: 1rem; }
+        .ds-act-item { display: flex; gap: 0.75rem; padding: 0.5rem 0; font-size: 0.875rem; border-bottom: 1px solid rgba(51,65,85,0.3); align-items: baseline; }
+        .ds-act-item:last-child { border-bottom: none; }
+        .ds-act-time { color: var(--text-muted); white-space: nowrap; min-width: 60px; font-size: 0.8rem; }
+        .ds-act-trigger { background: var(--bg-input); padding: 0.125rem 0.375rem; border-radius: 4px; font-size: 0.75rem; }
+        .ds-act-job { color: var(--text-muted); font-size: 0.8rem; }
+
+        .ds-table tbody tr { cursor: pointer; }
+        .ds-table tbody tr:hover { background: rgba(99,102,241,0.08); }
+
+        /* Detail view */
+        .ds-detail-back { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--accent); cursor: pointer; font-size: 0.875rem; margin-bottom: 1rem; background: none; border: none; padding: 0.5rem 0; }
+        .ds-detail-back:hover { text-decoration: underline; }
+        .ds-detail-header { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .ds-detail-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.75rem; }
+        .ds-detail-meta { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.75rem; }
+        .ds-detail-chip { background: var(--bg-input); padding: 0.375rem 0.75rem; border-radius: 6px; font-size: 0.8rem; color: var(--text-muted); }
+        .ds-detail-tables { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .ds-detail-tables h3 { font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; }
+        .ds-detail-table-row { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: var(--bg-input); border-radius: 8px; margin-bottom: 0.5rem; cursor: pointer; transition: background 0.15s; }
+        .ds-detail-table-row:hover { background: var(--border); }
+        .ds-detail-table-row.active { background: rgba(99,102,241,0.15); border: 1px solid var(--primary); }
+        .ds-detail-table-name { font-weight: 600; font-size: 0.9rem; }
+        .ds-detail-table-stats { display: flex; gap: 1.5rem; font-size: 0.8rem; color: var(--text-muted); }
+        .ds-detail-schema { background: var(--bg-input); border-radius: 8px; padding: 1rem; margin-top: 0.75rem; font-family: 'Monaco','Menlo','Consolas',monospace; font-size: 0.8rem; color: var(--text-muted); line-height: 1.6; }
+        .ds-detail-schema span { color: var(--accent); }
+        .ds-detail-preview { margin-top: 1rem; overflow-x: auto; }
+        .ds-detail-preview table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 600px; }
+        .ds-detail-preview th { text-align: left; padding: 0.5rem 0.75rem; background: var(--bg-card); color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; white-space: nowrap; }
+        .ds-detail-preview td { padding: 0.5rem 0.75rem; border-bottom: 1px solid rgba(51,65,85,0.3); white-space: nowrap; max-width: 250px; overflow: hidden; text-overflow: ellipsis; }
+        .ds-detail-preview tr:hover td { background: rgba(99,102,241,0.04); }
+        .ds-detail-pagination { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0; margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted); }
+        .ds-detail-pagination button { padding: 0.375rem 0.75rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; font-size: 0.8rem; }
+        .ds-detail-pagination button:hover:not(:disabled) { background: var(--border); }
+        .ds-detail-pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .ds-detail-actions { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; display: flex; gap: 0.75rem; flex-wrap: wrap; }
+        .ds-detail-actions h3 { width: 100%; font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .ds-preview-loading { text-align: center; padding: 2rem; color: var(--text-muted); }
+
+        @media (max-width: 768px) {
+            .ds-hero { grid-template-columns: repeat(2, 1fr); }
+            .ds-table th:nth-child(3), .ds-table td:nth-child(3),
+            .ds-table th:nth-child(4), .ds-table td:nth-child(4) { display: none; }
         }
-        .key-row {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 0.75rem 1rem;
-            background: var(--bg-input);
-            border-radius: 8px;
-            margin-bottom: 0.5rem;
+
+        /* ===== Settings Styles ===== */
+        .key-filter-box { position: relative; margin-bottom: 1.25rem; }
+        .key-filter-input {
+            width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem;
+            background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+            color: var(--text); font-size: 0.9rem;
         }
-        .key-status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
+        .key-filter-input:focus { outline: none; border-color: var(--primary); }
+        .key-filter-input::placeholder { color: var(--text-muted); }
+        .key-filter-icon { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem; pointer-events: none; }
+        .key-category { margin-bottom: 1rem; }
+        .key-category-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 0.6rem 0.75rem; border-radius: 8px; margin-bottom: 0.5rem; transition: background 0.15s; user-select: none; }
+        .key-category-header:hover { background: var(--bg-input); }
+        .key-category-title { font-size: 0.875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); display: flex; align-items: center; gap: 0.5rem; }
+        .key-category-title .chevron { transition: transform 0.2s; font-size: 0.7rem; }
+        .key-category-title .chevron.collapsed { transform: rotate(-90deg); }
+        .key-category-count { font-size: 0.75rem; color: var(--text-muted); font-weight: 400; }
+        .key-category-count .configured-num { color: var(--success); font-weight: 600; }
+        .key-category-body { overflow: hidden; transition: max-height 0.3s ease; }
+        .key-category-body.collapsed { max-height: 0 !important; }
+        .key-row { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1rem; background: var(--bg-input); border-radius: 8px; margin-bottom: 0.5rem; }
+        .key-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
         .key-status-dot.configured { background: var(--success); }
         .key-status-dot.missing { background: var(--border); }
         .key-info { flex: 1; min-width: 0; }
         .key-name { font-weight: 600; font-size: 0.875rem; }
         .key-desc { font-size: 0.75rem; color: var(--text-muted); }
-        .key-masked {
-            font-family: 'Monaco', 'Menlo', monospace;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            background: var(--bg);
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-        }
-        .key-source-badge {
-            font-size: 0.625rem;
-            padding: 0.125rem 0.375rem;
-            border-radius: 3px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-        .key-source-badge.db { background: rgba(99, 102, 241, 0.2); color: var(--primary); }
-        .key-source-badge.env { background: rgba(249, 115, 22, 0.2); color: #f97316; }
+        .key-masked { font-family: 'Monaco','Menlo',monospace; font-size: 0.75rem; color: var(--text-muted); background: var(--bg); padding: 0.25rem 0.5rem; border-radius: 4px; }
+        .key-source-badge { font-size: 0.625rem; padding: 0.125rem 0.375rem; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .key-source-badge.db { background: rgba(99,102,241,0.2); color: var(--primary); }
+        .key-source-badge.env { background: rgba(249,115,22,0.2); color: #f97316; }
         .key-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
-        .btn-sm {
-            padding: 0.375rem 0.75rem;
-            font-size: 0.75rem;
-            border-radius: 6px;
-            border: 1px solid var(--border);
-            background: transparent;
-            color: var(--text-muted);
-            cursor: pointer;
-        }
+        .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; }
         .btn-sm:hover { background: var(--bg-card); color: var(--text); }
         .btn-sm.primary { background: var(--primary); border-color: var(--primary); color: white; }
         .btn-sm.primary:hover { opacity: 0.9; }
         .btn-sm.danger { color: var(--error); }
-        .btn-sm.danger:hover { background: rgba(239, 68, 68, 0.1); }
-        .key-edit-row {
-            display: flex;
-            gap: 0.5rem;
-            align-items: center;
-            margin-top: 0.5rem;
-        }
-        .key-edit-input {
-            flex: 1;
-            padding: 0.5rem 0.75rem;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text);
-            font-family: 'Monaco', 'Menlo', monospace;
-            font-size: 0.8rem;
-        }
+        .btn-sm.danger:hover { background: rgba(239,68,68,0.1); }
+        .key-edit-row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem; }
+        .key-edit-input { flex: 1; padding: 0.5rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: 'Monaco','Menlo',monospace; font-size: 0.8rem; }
         .key-edit-input:focus { outline: none; border-color: var(--primary); }
-        .test-result {
-            font-size: 0.75rem;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            margin-top: 0.25rem;
-        }
-        .test-result.success { background: rgba(34, 197, 94, 0.1); color: var(--success); }
-        .test-result.failure { background: rgba(239, 68, 68, 0.1); color: var(--error); }
+        .test-result { font-size: 0.75rem; padding: 0.25rem 0.5rem; border-radius: 4px; margin-top: 0.25rem; }
+        .test-result.success { background: rgba(34,197,94,0.1); color: var(--success); }
+        .test-result.failure { background: rgba(239,68,68,0.1); color: var(--error); }
     </style>
 </head>
 <body>
@@ -322,72 +279,15 @@
     </header>
 
     <nav class="tabs">
-        <button class="tab active" onclick="showTab('research')">🔬 Research</button>
-        <button class="tab" onclick="showTab('scores')">📊 Scores</button>
-        <button class="tab" onclick="showTab('market')">📈 Market</button>
-        <button class="tab" onclick="showTab('network')">🕸️ Network</button>
+        <button class="tab active" onclick="showTab('sources')">📡 Sources</button>
         <button class="tab" onclick="showTab('settings')">⚙️ Settings</button>
     </nav>
 
     <main class="content">
-        <!-- Research Tab -->
-        <div id="tab-research">
-            <div class="card">
-                <h2 class="card-title">🔬 Company Research</h2>
-                <p style="color: var(--text-muted); margin-bottom: 1rem;">AI-powered research across 9+ data sources</p>
-                <div class="search-box">
-                    <input type="text" class="search-input" id="company-input" placeholder="Enter company name (e.g., Stripe, OpenAI)" onkeydown="if(event.key==='Enter')runSelectedResearch()">
-                    <button class="btn" onclick="runSelectedResearch()" id="research-btn">Research</button>
-                </div>
-                <div style="margin-bottom: 1rem; display: flex; gap: 1rem; align-items: center;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="radio" name="research-mode" value="quick" checked style="accent-color: var(--primary);">
-                        <span>⚡ Quick Scan</span>
-                        <span style="color: var(--text-muted); font-size: 0.75rem;">(data collection only)</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                        <input type="radio" name="research-mode" value="deep" style="accent-color: var(--primary);">
-                        <span>🧠 Deep Research</span>
-                        <span style="color: var(--text-muted); font-size: 0.75rem;">(multi-turn LLM analysis)</span>
-                    </label>
-                </div>
-                <div id="research-results"></div>
-            </div>
-        </div>
-
-        <!-- Scores Tab -->
-        <div id="tab-scores" class="hidden">
-            <div class="card">
-                <h2 class="card-title">📊 Company Scores</h2>
-                <div class="search-box">
-                    <input type="text" class="search-input" id="score-input" placeholder="Enter company name" onkeydown="if(event.key==='Enter')getScore()">
-                    <button class="btn" onclick="getScore()">Get Score</button>
-                </div>
-                <div id="score-results"></div>
-            </div>
-        </div>
-
-        <!-- Market Tab -->
-        <div id="tab-market" class="hidden">
-            <div class="card">
-                <h2 class="card-title">📈 Weekly Market Brief</h2>
-                <button class="btn" onclick="getMarketBrief()" style="margin-bottom: 1rem;">Load Brief</button>
-                <div id="market-results"></div>
-            </div>
-            <div class="card">
-                <h2 class="card-title">📡 Market Signals</h2>
-                <button class="btn" onclick="triggerScan()">Run Scan</button>
-                <div id="signal-results" style="margin-top: 1rem;"></div>
-            </div>
-        </div>
-
-        <!-- Network Tab -->
-        <div id="tab-network" class="hidden">
-            <div class="card">
-                <h2 class="card-title">🕸️ Most Connected Investors</h2>
-                <button class="btn" onclick="getNetwork()">Load Network</button>
-                <div id="network-results" style="margin-top: 1rem;"></div>
-            </div>
+        <!-- Sources Tab (default) -->
+        <div id="tab-sources">
+            <div id="sources-loading" class="loading">Loading data sources...</div>
+            <div id="sources-content" class="hidden"></div>
         </div>
 
         <!-- Settings Tab -->
@@ -398,6 +298,12 @@
                     Configure API keys for external data sources. Keys are encrypted and stored in the database.
                     Existing <code>.env</code> keys continue to work — DB keys take priority.
                 </p>
+                <div class="key-filter-box">
+                    <span class="key-filter-icon">🔍</span>
+                    <input type="text" class="key-filter-input" id="key-filter"
+                           placeholder="Filter keys (e.g. openai, fred, market...)"
+                           oninput="filterApiKeys(this.value)">
+                </div>
                 <div id="api-keys-container">
                     <div class="loading">Loading API keys...</div>
                 </div>
@@ -410,23 +316,13 @@
         <span>•</span>
         <a href="http://localhost:8001/graphql" target="_blank">GraphQL</a>
         <span>•</span>
-        <span>600+ Endpoints • 25+ Data Sources</span>
+        <span>100+ Endpoints • 25+ Data Sources</span>
     </footer>
 
     <script>
         const API = '/api/v1';
 
-        // Check health
-        fetch('/api/v1/deals')
-            .then(r => r.json())
-            .then(d => {
-                document.getElementById('health-dot').classList.add('healthy');
-                document.getElementById('health-status').textContent = 'API Connected';
-            })
-            .catch(() => {
-                document.getElementById('health-status').textContent = 'API Offline';
-            });
-
+        // ===== Tab Navigation =====
         function showTab(tab) {
             document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.content > div').forEach(t => t.classList.add('hidden'));
@@ -435,718 +331,1214 @@
             if (tab === 'settings') loadApiKeys();
         }
 
-        // Source display names
-        const SOURCE_NAMES = {
-            'enrichment': '📊 Enrichment',
-            'github': '🐙 GitHub API',
-            'glassdoor': '💼 Glassdoor',
-            'app_store': '📱 App Store',
-            'web_traffic': '🌐 Web Traffic',
-            'news': '📰 Google News',
-            'sec_filings': '📄 SEC Filings',
-            'corporate_registry': '🏢 Corp Registry',
-            'scoring': '📈 Scoring',
-            'web_scrape': '🔍 Website Scrape'
+        // ===== Health Check =====
+        fetch('/api/v1/deals')
+            .then(r => r.json())
+            .then(() => {
+                document.getElementById('health-dot').classList.add('healthy');
+                document.getElementById('health-status').textContent = 'API Connected';
+            })
+            .catch(() => {
+                document.getElementById('health-status').textContent = 'API Offline';
+            });
+
+        // ===================================================================
+        //  DATA SOURCES DASHBOARD
+        // ===================================================================
+
+        // Source registry: maps to actual DB tables and ingestion sources
+        // key = must match backend source_health / ingestion_jobs key for status to work
+        // healthKey = override key for health lookup (when key differs from health system)
+        // siCollector = site intel collector key (for site intel status lookup)
+        // endpoints = [{method, path, label}] available API endpoints
+        // triggers = [{method, path, label, body?}] endpoints that start collection
+        // scheduleOptions = available schedule frequencies
+        const SOURCE_REGISTRY = {
+            macro_econ: {
+                label: 'Macro Economic',
+                sources: [
+                    { key: 'fred', label: 'FRED (Federal Reserve)', tables: ['fred_series', 'fred_series_observations'],
+                      triggers: [{method:'POST', path:'/api/v1/fred/ingest', label:'Ingest category'}, {method:'POST', path:'/api/v1/fred/ingest/batch', label:'Batch ingest'}],
+                      endpoints: [{method:'GET', path:'/api/v1/fred/categories', label:'List categories'}, {method:'GET', path:'/api/v1/fred/series/{category}', label:'Series by category'}],
+                      scheduleOptions: ['daily','weekly','monthly'] },
+                    { key: 'bea', label: 'BEA (Bureau of Economic Analysis)', tables: ['bea_datasets', 'bea_nipa_data', 'bea_regional_data', 'bea_industry_data'],
+                      triggers: [{method:'POST', path:'/api/v1/bea/nipa/ingest', label:'Ingest NIPA/GDP'}, {method:'POST', path:'/api/v1/bea/regional/ingest', label:'Ingest Regional'}, {method:'POST', path:'/api/v1/bea/gdp-industry/ingest', label:'Ingest GDP by Industry'}, {method:'POST', path:'/api/v1/bea/international/ingest', label:'Ingest Intl Trade'}],
+                      endpoints: [{method:'GET', path:'/api/v1/bea/datasets', label:'List datasets'}],
+                      scheduleOptions: ['weekly','monthly','quarterly'] },
+                    { key: 'bls', label: 'BLS (Bureau of Labor Statistics)', tables: ['bls_series', 'bls_series_data'],
+                      triggers: [{method:'POST', path:'/api/v1/bls/{dataset}/ingest', label:'Ingest dataset'}, {method:'POST', path:'/api/v1/bls/all/ingest', label:'Ingest all datasets'}],
+                      endpoints: [{method:'GET', path:'/api/v1/bls/reference/datasets', label:'List datasets'}, {method:'GET', path:'/api/v1/bls/reference/series', label:'Search series'}, {method:'GET', path:'/api/v1/bls/reference/quick', label:'Quick lookup'}],
+                      scheduleOptions: ['daily','weekly','monthly'] },
+                    { key: 'treasury', label: 'US Treasury', tables: ['treasury_yield_curves', 'treasury_securities', 'treasury_debt_to_penny', 'treasury_statements', 'treasury_exchange_rates'],
+                      triggers: [{method:'POST', path:'/api/v1/treasury/fiscal-data/ingest', label:'Ingest fiscal data'}, {method:'POST', path:'/api/v1/treasury/daily-balance/ingest', label:'Ingest daily balance'}],
+                      scheduleOptions: ['daily','weekly'] },
+                    { key: 'data_commons', label: 'Google Data Commons', tables: ['data_commons_observations'],
+                      scheduleOptions: ['weekly','monthly'] },
+                    { key: 'prediction_markets', label: 'Prediction Markets', tables: ['prediction_market_contracts'],
+                      scheduleOptions: ['daily','weekly'] },
+                    { key: 'international_econ_worldbank', label: 'World Bank', tablePrefix: 'international_',
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'international_econ_imf', label: 'IMF Data', tablePrefix: 'international_',
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'international_econ_oecd', label: 'OECD Data', tablePrefix: 'international_',
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'international_econ_bis', label: 'BIS Data', tablePrefix: 'international_',
+                      scheduleOptions: ['monthly','quarterly'] },
+                ],
+            },
+            trade_commerce: {
+                label: 'Trade & Commerce',
+                sources: [
+                    { key: 'us_trade', label: 'US Trade (Census)', tables: ['us_trade_data', 'us_trade_partners', 'us_trade_commodities'],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'census', label: 'Census Bureau', tablePrefix: 'census_',
+                      triggers: [{method:'POST', path:'/api/v1/census/state', label:'Ingest state-level'}, {method:'POST', path:'/api/v1/census/county', label:'Ingest county-level'}, {method:'POST', path:'/api/v1/census/zip', label:'Ingest ZIP-level'}, {method:'POST', path:'/api/v1/census/batch/state', label:'Batch ingest states'}],
+                      scheduleOptions: ['monthly','quarterly','yearly'] },
+                    { key: 'cftc_cot', label: 'CFTC Commitments of Traders', tables: ['cftc_cot_reports'],
+                      scheduleOptions: ['weekly'] },
+                    { key: 'irs_soi', label: 'IRS Statistics of Income', tables: ['irs_soi_data'],
+                      scheduleOptions: ['yearly'] },
+                ],
+            },
+            financial_reg: {
+                label: 'Financial & Regulatory',
+                sources: [
+                    { key: 'sec', label: 'SEC (EDGAR Filings)', tablePrefix: 'sec_',
+                      triggers: [{method:'POST', path:'/api/v1/sec/ingest/company', label:'Ingest company'}, {method:'POST', path:'/api/v1/sec/ingest/multiple', label:'Batch ingest'}, {method:'POST', path:'/api/v1/sec/ingest/industrial-companies', label:'Ingest industrial cos'}],
+                      endpoints: [{method:'GET', path:'/api/v1/sec/supported-filing-types', label:'Filing types'}, {method:'GET', path:'/api/v1/sec/common-companies', label:'Common companies'}, {method:'POST', path:'/api/v1/sec/form-adv/ingest/family-offices', label:'Ingest Form ADV FOs'}, {method:'GET', path:'/api/v1/sec/form-adv/firms', label:'Query Form ADV firms'}, {method:'GET', path:'/api/v1/sec/form-adv/stats', label:'Form ADV stats'}],
+                      scheduleOptions: ['daily','weekly','monthly'] },
+                    { key: 'fdic', label: 'FDIC (Banking)', tables: ['fdic_institutions', 'fdic_financials'],
+                      triggers: [{method:'POST', path:'/api/v1/fdic/bank-financials/ingest', label:'Ingest bank data'}],
+                      endpoints: [{method:'GET', path:'/api/v1/fdic/banks', label:'Search banks'}, {method:'GET', path:'/api/v1/fdic/banks/{cert_number}', label:'Bank details'}, {method:'GET', path:'/api/v1/fdic/datasets', label:'List datasets'}],
+                      scheduleOptions: ['weekly','monthly','quarterly'] },
+                    { key: 'form_d', label: 'SEC Form D', tables: ['form_d_filings', 'form_d_related_persons'],
+                      scheduleOptions: ['weekly','monthly'] },
+                    { key: 'form_adv', label: 'SEC Form ADV', tables: ['form_adv_firms', 'form_adv_personnel'], healthKey: 'sec',
+                      endpoints: [{method:'GET', path:'/api/v1/sec/form-adv/firms', label:'Query firms'}, {method:'GET', path:'/api/v1/sec/form-adv/firms/{crd}', label:'Firm by CRD'}, {method:'GET', path:'/api/v1/sec/form-adv/stats', label:'Statistics'}],
+                      triggers: [{method:'POST', path:'/api/v1/sec/form-adv/ingest/family-offices', label:'Ingest family offices'}, {method:'POST', path:'/api/v1/sec/form-adv/ingest/crd', label:'Ingest by CRD'}],
+                      scheduleOptions: ['weekly','monthly'] },
+                    { key: 'corporate_registry', label: 'Corporate Registry', tables: ['corporate_registry_entities'],
+                      scheduleOptions: ['monthly','quarterly'] },
+                ],
+            },
+            energy_ag: {
+                label: 'Energy & Agriculture',
+                sources: [
+                    { key: 'eia', label: 'EIA (Energy)', tablePrefix: 'eia_',
+                      triggers: [{method:'POST', path:'/api/v1/eia/petroleum/ingest', label:'Ingest petroleum'}, {method:'POST', path:'/api/v1/eia/electricity/ingest', label:'Ingest electricity'}, {method:'POST', path:'/api/v1/eia/natural-gas/ingest', label:'Ingest natural gas'}, {method:'POST', path:'/api/v1/eia/steo/ingest', label:'Ingest STEO'}],
+                      scheduleOptions: ['daily','weekly','monthly'] },
+                    { key: 'usda', label: 'USDA', tablePrefix: 'usda_',
+                      scheduleOptions: ['weekly','monthly'] },
+                    { key: 'noaa', label: 'NOAA (Climate)', tablePrefix: 'noaa_',
+                      scheduleOptions: ['daily','weekly'] },
+                ],
+            },
+            realestate_health: {
+                label: 'Real Estate & Healthcare',
+                sources: [
+                    { key: 'realestate', label: 'Real Estate Data', tablePrefix: 'realestate_',
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'cms', label: 'CMS (Healthcare/Medicare)', tablePrefix: 'cms_',
+                      triggers: [{method:'POST', path:'/api/v1/cms/medicare-utilization/ingest', label:'Ingest Medicare'}, {method:'POST', path:'/api/v1/cms/hospital-costs/ingest', label:'Ingest hospital costs'}, {method:'POST', path:'/api/v1/cms/drug-pricing/ingest', label:'Ingest drug pricing'}],
+                      endpoints: [{method:'GET', path:'/api/v1/cms/datasets', label:'List datasets'}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                ],
+            },
+            site_intel: {
+                label: 'Site Intelligence',
+                sources: [
+                    // Power
+                    { key: 'si_eia', label: 'EIA Power Plants', domain: 'power', siCollector: 'eia',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/power/plants', label:'List plants'}, {method:'GET', path:'/api/v1/site-intel/power/plants/nearby', label:'Nearby plants'}, {method:'GET', path:'/api/v1/site-intel/power/prices', label:'Electricity prices'}],
+                      triggers: [{method:'POST', path:'/api/v1/site-intel/sites/collect', label:'Collect', body:{domains:['power'],sources:['eia']}}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_hifld', label: 'HIFLD Infrastructure', domain: 'power', siCollector: 'hifld',
+                      triggers: [{method:'POST', path:'/api/v1/site-intel/sites/collect', label:'Collect', body:{domains:['power'],sources:['hifld']}}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_nrel', label: 'NREL Solar/Wind', domain: 'power', siCollector: 'nrel', scheduleOptions: ['quarterly'] },
+                    { key: 'si_iso_pjm', label: 'ISO PJM', domain: 'power', siCollector: 'iso_pjm', scheduleOptions: ['daily','weekly'] },
+                    { key: 'si_iso_caiso', label: 'ISO CAISO', domain: 'power', siCollector: 'iso_caiso', scheduleOptions: ['daily','weekly'] },
+                    { key: 'si_iso_ercot', label: 'ISO ERCOT', domain: 'power', siCollector: 'iso_ercot', scheduleOptions: ['daily','weekly'] },
+                    { key: 'si_iso_miso', label: 'ISO MISO', domain: 'power', siCollector: 'iso_miso', scheduleOptions: ['daily','weekly'] },
+                    { key: 'si_iso_spp', label: 'ISO SPP', domain: 'power', siCollector: 'iso_spp', scheduleOptions: ['daily','weekly'] },
+                    { key: 'si_iso_nyiso', label: 'ISO NYISO', domain: 'power', siCollector: 'iso_nyiso', scheduleOptions: ['daily','weekly'] },
+                    { key: 'si_iso_isone', label: 'ISO ISO-NE', domain: 'power', siCollector: 'iso_isone', scheduleOptions: ['daily','weekly'] },
+                    // Telecom
+                    { key: 'si_fcc', label: 'FCC Broadband', domain: 'telecom', siCollector: 'fcc',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/telecom/broadband', label:'Broadband coverage'}, {method:'GET', path:'/api/v1/site-intel/telecom/broadband/at-location', label:'Coverage at location'}, {method:'GET', path:'/api/v1/site-intel/telecom/connectivity-score', label:'Connectivity score'}],
+                      triggers: [{method:'POST', path:'/api/v1/site-intel/sites/collect', label:'Collect', body:{domains:['telecom'],sources:['fcc']}}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_peeringdb', label: 'PeeringDB', domain: 'telecom', siCollector: 'peeringdb',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/telecom/ix', label:'Internet exchanges'}, {method:'GET', path:'/api/v1/site-intel/telecom/ix/nearby', label:'Nearby IXs'}, {method:'GET', path:'/api/v1/site-intel/telecom/data-centers', label:'Data centers'}],
+                      scheduleOptions: ['weekly','monthly'] },
+                    { key: 'si_telegeography', label: 'TeleGeography', domain: 'telecom', siCollector: 'telegeography', scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_ripe_atlas', label: 'RIPE Atlas', domain: 'telecom', siCollector: 'ripe_atlas', scheduleOptions: ['monthly'] },
+                    // Transport
+                    { key: 'si_bts', label: 'BTS Transport', domain: 'transport', siCollector: 'bts',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/transport/intermodal', label:'Intermodal terminals'}, {method:'GET', path:'/api/v1/site-intel/transport/intermodal/nearby', label:'Nearby terminals'}],
+                      triggers: [{method:'POST', path:'/api/v1/site-intel/sites/collect', label:'Collect', body:{domains:['transport'],sources:['bts']}}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_bts_ntad', label: 'BTS NTAD', domain: 'transport', siCollector: 'bts_ntad', scheduleOptions: ['quarterly'] },
+                    { key: 'si_fra', label: 'FRA Rail', domain: 'transport', siCollector: 'fra',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/transport/rail/access', label:'Rail access'}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_usace', label: 'USACE Waterways', domain: 'transport', siCollector: 'usace',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/transport/ports', label:'Port terminals'}, {method:'GET', path:'/api/v1/site-intel/transport/ports/nearby', label:'Nearby ports'}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_faa', label: 'FAA Airports', domain: 'transport', siCollector: 'faa',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/transport/airports', label:'Airports'}, {method:'GET', path:'/api/v1/site-intel/transport/airports/nearby', label:'Nearby airports'}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_fhwa', label: 'FHWA Highways', domain: 'transport', siCollector: 'fhwa', scheduleOptions: ['quarterly'] },
+                    // Labor
+                    { key: 'si_bls', label: 'BLS Employment', domain: 'labor', siCollector: 'bls',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/labor/wages', label:'Wage data'}, {method:'GET', path:'/api/v1/site-intel/labor/employment', label:'Employment'}, {method:'GET', path:'/api/v1/site-intel/labor/workforce-score', label:'Workforce score'}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_bls_oes', label: 'BLS OES', domain: 'labor', siCollector: 'bls_oes', scheduleOptions: ['quarterly','yearly'] },
+                    { key: 'si_bls_qcew', label: 'BLS QCEW', domain: 'labor', siCollector: 'bls_qcew', scheduleOptions: ['quarterly'] },
+                    { key: 'si_census_lehd', label: 'Census LEHD', domain: 'labor', siCollector: 'census_lehd', scheduleOptions: ['quarterly','yearly'] },
+                    { key: 'si_census_acs', label: 'Census ACS', domain: 'labor', siCollector: 'census_acs', scheduleOptions: ['yearly'] },
+                    // Risk
+                    { key: 'si_fema', label: 'FEMA Disasters', domain: 'risk', siCollector: 'fema',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/risk/flood', label:'Flood risk'}, {method:'GET', path:'/api/v1/site-intel/risk/flood/at-location', label:'Flood at location'}],
+                      scheduleOptions: ['daily','weekly'] },
+                    { key: 'si_fema_nfhl', label: 'FEMA Flood', domain: 'risk', siCollector: 'fema_nfhl', scheduleOptions: ['quarterly'] },
+                    { key: 'si_fema_nri', label: 'FEMA NRI', domain: 'risk', siCollector: 'fema_nri',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/risk/nri', label:'NRI data'}, {method:'GET', path:'/api/v1/site-intel/risk/nri/county/{fips}', label:'County NRI'}],
+                      scheduleOptions: ['quarterly','yearly'] },
+                    { key: 'si_usgs_eq', label: 'USGS Earthquake', domain: 'risk', siCollector: 'usgs_earthquake',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/risk/seismic/at-location', label:'Seismic risk'}, {method:'GET', path:'/api/v1/site-intel/risk/faults/nearby', label:'Nearby faults'}],
+                      scheduleOptions: ['daily','weekly'] },
+                    { key: 'si_noaa_climate', label: 'NOAA Climate', domain: 'risk', siCollector: 'noaa_climate',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/risk/climate/at-location', label:'Climate risk'}],
+                      scheduleOptions: ['weekly','monthly'] },
+                    { key: 'si_epa_enviro', label: 'EPA Envirofacts', domain: 'risk', siCollector: 'epa_envirofacts', scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_usfws_nwi', label: 'USFWS NWI', domain: 'risk', siCollector: 'usfws_nwi', scheduleOptions: ['quarterly','yearly'] },
+                    // Incentives
+                    { key: 'si_cdfi_oz', label: 'CDFI Opportunity Zones', domain: 'incentives', siCollector: 'cdfi_oz',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/incentives/opportunity-zones', label:'List OZs'}, {method:'GET', path:'/api/v1/site-intel/incentives/opportunity-zones/at-location', label:'OZs at location'}],
+                      scheduleOptions: ['quarterly','yearly'] },
+                    { key: 'si_ftz', label: 'FTZ Board', domain: 'incentives', siCollector: 'ftz_board',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/incentives/ftz', label:'List FTZs'}, {method:'GET', path:'/api/v1/site-intel/incentives/ftz/nearby', label:'Nearby FTZs'}],
+                      scheduleOptions: ['quarterly'] },
+                    { key: 'si_good_jobs', label: 'Good Jobs First', domain: 'incentives', siCollector: 'good_jobs_first',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/incentives/deals', label:'Incentive deals'}, {method:'GET', path:'/api/v1/site-intel/incentives/deals/benchmark', label:'Benchmarking'}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_state_edo', label: 'State EDO', domain: 'incentives', siCollector: 'state_edo',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/incentives/programs', label:'Programs'}, {method:'GET', path:'/api/v1/site-intel/incentives/programs/by-state/{state}', label:'By state'}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    // Logistics
+                    { key: 'si_freightos', label: 'Freightos', domain: 'logistics', siCollector: 'freightos',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/logistics/container-rates', label:'Container rates'}, {method:'GET', path:'/api/v1/site-intel/logistics/container-rates/routes', label:'Route rates'}],
+                      scheduleOptions: ['daily','weekly'] },
+                    { key: 'si_usda_ams', label: 'USDA AMS', domain: 'logistics', siCollector: 'usda_ams',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/logistics/truck-rates/agricultural', label:'Ag truck rates'}],
+                      scheduleOptions: ['weekly','monthly'] },
+                    { key: 'si_fmcsa', label: 'FMCSA', domain: 'logistics', siCollector: 'fmcsa',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/logistics/carriers', label:'Carriers'}, {method:'GET', path:'/api/v1/site-intel/logistics/carriers/{dot}/safety', label:'Safety records'}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_drewry', label: 'Drewry', domain: 'logistics', siCollector: 'drewry', scheduleOptions: ['weekly','monthly'] },
+                    { key: 'si_scfi', label: 'SCFI', domain: 'logistics', siCollector: 'scfi', scheduleOptions: ['weekly'] },
+                    { key: 'si_ccfi', label: 'CCFI', domain: 'logistics', siCollector: 'ccfi', scheduleOptions: ['weekly'] },
+                    { key: 'si_census_trade', label: 'Census Trade', domain: 'logistics', siCollector: 'census_trade', scheduleOptions: ['monthly'] },
+                    { key: 'si_bts_cargo', label: 'BTS Cargo', domain: 'logistics', siCollector: 'bts_cargo', scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_loopnet', label: 'LoopNet', domain: 'logistics', siCollector: 'loopnet', scheduleOptions: ['weekly','monthly'] },
+                    { key: 'si_transport_topics', label: 'Transport Topics', domain: 'logistics', siCollector: 'transport_topics', scheduleOptions: ['weekly'] },
+                    { key: 'si_3pl_website', label: '3PL Website', domain: 'logistics', siCollector: 'three_pl_website', scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_3pl_sec', label: '3PL SEC', domain: 'logistics', siCollector: 'three_pl_sec', scheduleOptions: ['quarterly'] },
+                    { key: 'si_3pl_fmcsa', label: '3PL FMCSA', domain: 'logistics', siCollector: 'three_pl_fmcsa', scheduleOptions: ['monthly','quarterly'] },
+                    // Water & Utilities
+                    { key: 'si_usgs_water', label: 'USGS Water', domain: 'water_utilities', siCollector: 'usgs_water',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/water/monitoring-sites', label:'Monitoring sites'}, {method:'GET', path:'/api/v1/site-intel/water/monitoring-sites/near', label:'Nearby sites'}],
+                      scheduleOptions: ['weekly','monthly'] },
+                    { key: 'si_epa_sdwis', label: 'EPA SDWIS', domain: 'water_utilities', siCollector: 'epa_sdwis',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/water/water-systems', label:'Water systems'}, {method:'GET', path:'/api/v1/site-intel/water/water-systems/{pwsid}/violations', label:'Violations'}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_eia_gas', label: 'EIA Gas', domain: 'water_utilities', siCollector: 'eia_gas',
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/water/gas-pipelines', label:'Gas pipelines'}, {method:'GET', path:'/api/v1/site-intel/water/gas-storage', label:'Gas storage'}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'si_openei_urdb', label: 'OpenEI URDB', domain: 'water_utilities', siCollector: 'openei_urdb', scheduleOptions: ['quarterly'] },
+                    { key: 'si_eia_electricity', label: 'EIA Electricity', domain: 'water_utilities', siCollector: 'eia_electricity', scheduleOptions: ['monthly','quarterly'] },
+                ],
+            },
+            people: {
+                label: 'People & Org Charts',
+                sources: [
+                    { key: 'people_website', label: 'Website Scraping', tables: ['people', 'company_people'],
+                      triggers: [{method:'POST', path:'/api/v1/people-jobs/test/{company_id}?sources=website', label:'Test collect'}, {method:'POST', path:'/api/v1/people-jobs/schedule', label:'Schedule job'}],
+                      endpoints: [{method:'GET', path:'/api/v1/people/', label:'Search people'}, {method:'GET', path:'/api/v1/people/search', label:'Advanced search'}, {method:'GET', path:'/api/v1/people-jobs/', label:'List jobs'}, {method:'GET', path:'/api/v1/people-jobs/stats', label:'Job stats'}],
+                      scheduleOptions: ['weekly','monthly'] },
+                    { key: 'people_sec', label: 'SEC 10-K Officers', tables: ['people', 'company_people'],
+                      triggers: [{method:'POST', path:'/api/v1/people-jobs/deep-collect/{company_id}', label:'Deep collect (SEC phase)'}],
+                      endpoints: [{method:'GET', path:'/api/v1/people/', label:'Search people'}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'people_news', label: 'News Deep Scan', tables: ['people', 'company_people'],
+                      triggers: [{method:'POST', path:'/api/v1/people-jobs/deep-collect/{company_id}', label:'Deep collect (News phase)'}],
+                      scheduleOptions: ['daily','weekly'] },
+                    { key: 'people_deep_crawl', label: 'Deep Crawl', tables: ['people', 'company_people'],
+                      triggers: [{method:'POST', path:'/api/v1/people-jobs/deep-collect/{company_id}', label:'Deep collect (Crawl phase)'}, {method:'POST', path:'/api/v1/people-jobs/recursive-collect/{company_id}', label:'Recursive collect'}],
+                      scheduleOptions: ['weekly','monthly'] },
+                    { key: 'org_chart', label: 'Org Chart Builder', tables: ['org_chart_snapshots'],
+                      triggers: [{method:'POST', path:'/api/v1/people-jobs/deep-collect/{company_id}', label:'Deep collect (Org chart phase)'}],
+                      endpoints: [{method:'GET', path:'/api/v1/companies/{company_id}/leadership', label:'Leadership team'}, {method:'GET', path:'/api/v1/companies/{company_id}/leadership/history', label:'Leadership history'}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                ],
+            },
+            pe: {
+                label: 'PE Intelligence',
+                sources: [
+                    { key: 'pe_firms', label: 'PE/VC Firms', tables: ['pe_firms', 'pe_firm_contacts'],
+                      triggers: [{method:'POST', path:'/api/v1/pe/collection/collect', label:'Collect PE data', body:{modules:['firms']}}],
+                      endpoints: [{method:'GET', path:'/api/v1/pe/firms/', label:'List firms'}, {method:'GET', path:'/api/v1/pe/firms/search', label:'Search firms'}, {method:'GET', path:'/api/v1/pe/firms/{id}/portfolio', label:'Portfolio'}, {method:'GET', path:'/api/v1/pe/firms/{id}/exits', label:'Exits'}],
+                      scheduleOptions: ['weekly','monthly'] },
+                    { key: 'pe_funds', label: 'Fund Performance', tables: ['pe_funds'],
+                      triggers: [{method:'POST', path:'/api/v1/pe/collection/collect', label:'Collect PE data', body:{modules:['funds']}}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'pe_deals', label: 'Deal Flow', tables: ['pe_deals', 'pe_deal_participants', 'pe_deal_advisors'],
+                      triggers: [{method:'POST', path:'/api/v1/pe/collection/collect', label:'Collect PE data', body:{modules:['deals']}}],
+                      endpoints: [{method:'GET', path:'/api/v1/pe/deals/', label:'List deals'}, {method:'GET', path:'/api/v1/pe/deals/search', label:'Search deals'}],
+                      scheduleOptions: ['daily','weekly'] },
+                    { key: 'pe_portfolio', label: 'Portfolio Companies', tables: ['pe_portfolio_companies', 'pe_portfolio_financials'],
+                      triggers: [{method:'POST', path:'/api/v1/pe/collection/collect', label:'Collect PE data', body:{modules:['portfolio']}}],
+                      endpoints: [{method:'GET', path:'/api/v1/pe/companies/', label:'List companies'}, {method:'GET', path:'/api/v1/pe/companies/search', label:'Search'}, {method:'GET', path:'/api/v1/pe/companies/{id}/financials', label:'Financials'}],
+                      scheduleOptions: ['weekly','monthly'] },
+                    { key: 'pe_people', label: 'Fund Professionals', tables: ['pe_people', 'pe_person_experience'],
+                      triggers: [{method:'POST', path:'/api/v1/pe/collection/collect', label:'Collect PE data', body:{modules:['people']}}],
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'pe_13f', label: '13F Filings', tables: ['pe_13f_filings', 'pe_13f_holdings'],
+                      triggers: [{method:'POST', path:'/api/v1/pe/collection/collect', label:'Collect PE data', body:{modules:['13f']}}],
+                      scheduleOptions: ['quarterly'] },
+                ],
+            },
+            fo: {
+                label: 'Family Office & LP',
+                sources: [
+                    { key: 'family_offices', label: 'Family Offices', tables: ['family_offices', 'family_office_contacts'],
+                      triggers: [{method:'POST', path:'/api/v1/sec/form-adv/ingest/family-offices', label:'Ingest from Form ADV'}],
+                      endpoints: [{method:'GET', path:'/api/v1/family-offices/', label:'List offices'}, {method:'GET', path:'/api/v1/family-offices/{id}', label:'Office details'}, {method:'GET', path:'/api/v1/family-offices/stats/overview', label:'Overview stats'}],
+                      scheduleOptions: ['weekly','monthly','quarterly'] },
+                    { key: 'lp_commitments', label: 'LP Commitments', tables: ['lp_commitments'],
+                      scheduleOptions: ['monthly','quarterly'] },
+                ],
+            },
+            alt_data: {
+                label: 'Alternative Data',
+                sources: [
+                    { key: 'fbi_crime', label: 'FBI Crime Stats', tables: ['fbi_crime_data'],
+                      scheduleOptions: ['monthly','quarterly','yearly'] },
+                    { key: 'kaggle', label: 'Kaggle Datasets', tablePrefix: 'kaggle_',
+                      scheduleOptions: ['monthly'] },
+                    { key: 'fcc_broadband', label: 'FCC Broadband (National)', tablePrefix: 'fcc_',
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'uspto', label: 'USPTO Patents', tablePrefix: 'uspto_',
+                      scheduleOptions: ['monthly','quarterly'] },
+                    { key: 'yelp', label: 'Yelp Business Data', tablePrefix: 'yelp_',
+                      scheduleOptions: ['weekly','monthly'] },
+                ],
+            },
         };
 
-        let logEntries = [];
-        let pollInterval = null;
+        const TOTAL_SOURCES = Object.values(SOURCE_REGISTRY).reduce((s, c) => s + c.sources.length, 0);
 
-        function addLog(msg, type = 'info') {
-            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-            const icons = { pending: '⏳', running: '🔄', success: '✅', error: '❌', info: '💡' };
-            logEntries.push({ time, msg, type, icon: icons[type] || '•' });
-            updateLogDisplay();
+        // State
+        let dashboardData = null;
+        let siteIntelData = null;
+        let schedulesData = null;
+        let watermarksData = null;
+        let auditData = null;
+        let activityData = null;
+        let sourceConfigsData = null;
+        let expandedCategories = {};
+        let detailLoaded = false;
+        let currentFilter = '';
+        let currentFilterMode = 'all'; // 'all', 'with_data', 'empty'
+
+        // Detail view state
+        let currentView = 'list';       // 'list' or 'detail'
+        let selectedSource = null;       // source object when in detail view
+        let selectedCatKey = null;       // category key of selected source
+        let allTablesCache = null;       // cached /export/tables response
+        let expandedTable = null;        // table name showing preview
+        let tablePreview = null;         // { rows, columns, column_types, total_rows }
+        let previewPage = 0;
+        let previewLoading = false;
+        const PREVIEW_PAGE_SIZE = 50;
+
+        // Helpers
+        function timeAgo(dateStr) {
+            if (!dateStr) return 'Never';
+            const now = new Date(), date = new Date(dateStr);
+            const ms = now - date;
+            if (ms < 0) return 'Just now';
+            const mins = Math.floor(ms / 60000);
+            if (mins < 1) return 'Just now';
+            if (mins < 60) return mins + 'm ago';
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24) return hrs + 'h ago';
+            const days = Math.floor(hrs / 24);
+            if (days < 30) return days + 'd ago';
+            return Math.floor(days / 30) + 'mo ago';
         }
 
-        function updateLogDisplay() {
-            const logEl = document.getElementById('agent-log');
-            if (!logEl) return;
-            logEl.innerHTML = logEntries.map(e => `
-                <div class="log-entry">
-                    <span class="log-time">${e.time}</span>
-                    <span class="log-icon">${e.icon}</span>
-                    <span class="log-msg log-${e.type}">${e.msg}</span>
+        function fmtDate(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            const mon = d.toLocaleString('en-US', { month: 'short' });
+            const day = d.getDate();
+            const hr = d.getHours().toString().padStart(2, '0');
+            const min = d.getMinutes().toString().padStart(2, '0');
+            return `${mon} ${day}, ${hr}:${min}`;
+        }
+
+        function fmtFullDate(dateStr) {
+            if (!dateStr) return 'Never';
+            return new Date(dateStr).toLocaleString('en-US', {
+                year: 'numeric', month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', hour12: false
+            });
+        }
+
+        function fmtNum(n) {
+            if (n == null) return '-';
+            if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+            if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+            return n.toLocaleString();
+        }
+
+        // Build lookup maps
+        function getSourceHealthMap() { return dashboardData?.source_health?.sources || {}; }
+        function getScheduleMap() {
+            const m = {};
+            if (Array.isArray(schedulesData)) schedulesData.forEach(s => m[s.source] = s);
+            return m;
+        }
+        function getLatestJobsMap() { return siteIntelData?.latest_jobs || {}; }
+        function getWatermarkMap() {
+            const m = {};
+            if (watermarksData?.watermarks) watermarksData.watermarks.forEach(w => m[w.source] = w);
+            return m;
+        }
+
+        // Resolve the health system key for a source
+        function resolveHealthKey(key) {
+            const found = findSourceByKey(key);
+            if (!found) return key;
+            const src = found.source;
+            if (src.healthKey) return src.healthKey;
+            return key;
+        }
+
+        // Get site intel collector status from siteIntelData
+        function getSiCollectorStatus(src) {
+            if (!src.siCollector || !siteIntelData) return null;
+            const jobs = siteIntelData.latest_jobs || {};
+            return jobs[src.siCollector] || null;
+        }
+
+        // Check if source has data in tables (fallback for sources not in health system)
+        function getTableRowCount(src) {
+            if (!allTablesCache) return 0;
+            const tables = getTablesForSourceObj(src);
+            return tables.reduce((sum, t) => sum + (t.row_count || 0), 0);
+        }
+
+        // Like getTablesForSource but takes source object directly
+        function getTablesForSourceObj(source) {
+            if (!allTablesCache) return [];
+            if (source.tables && source.tables.length > 0) {
+                return allTablesCache.filter(t => source.tables.includes(t.table_name));
+            }
+            if (source.tablePrefix) {
+                return allTablesCache.filter(t => t.table_name.startsWith(source.tablePrefix));
+            }
+            return allTablesCache.filter(t => t.table_name.startsWith(source.key + '_'));
+        }
+
+        function getSourceStatus(key) {
+            // 1. Check main health system (with resolved key)
+            const hKey = resolveHealthKey(key);
+            const h = getSourceHealthMap()[hKey];
+            if (h) {
+                if (h.status === 'healthy') return 'ok';
+                if (h.status === 'degraded' || h.status === 'warning') return 'stale';
+                if (h.status === 'critical') return 'error';
+                if (h.last_success_at) return 'stale';
+                return 'idle';
+            }
+            // 2. Check site intel collector status
+            const found = findSourceByKey(key);
+            if (found?.source.siCollector) {
+                const siJob = getSiCollectorStatus(found.source);
+                if (siJob) {
+                    if (siJob.status === 'success' || siJob.status === 'completed') return 'ok';
+                    if (siJob.status === 'partial') return 'stale';
+                    if (siJob.status === 'failed') return 'error';
+                    if (siJob.status === 'running') return 'ok';
+                }
+            }
+            // 3. Check site intel latest_jobs directly
+            const j = getLatestJobsMap()[key];
+            if (j) {
+                if (j.status === 'completed' && j.rows_collected > 0) return 'ok';
+                if (j.status === 'failed') return 'error';
+                if (j.status === 'running') return 'ok';
+                return 'idle';
+            }
+            // 4. Fallback: check if tables have data
+            if (found && allTablesCache) {
+                const rows = getTableRowCount(found.source);
+                if (rows > 0) return 'stale'; // has data but we don't know when it ran
+            }
+            return 'idle';
+        }
+
+        function getLastRunRaw(key) {
+            const hKey = resolveHealthKey(key);
+            const h = getSourceHealthMap()[hKey];
+            if (h?.last_success_at) return h.last_success_at;
+            // Site intel collector
+            const found = findSourceByKey(key);
+            if (found?.source.siCollector) {
+                const siJob = getSiCollectorStatus(found.source);
+                if (siJob?.completed_at) return siJob.completed_at;
+            }
+            const j = getLatestJobsMap()[key];
+            if (j?.completed_at) return j.completed_at;
+            const w = getWatermarkMap()[key];
+            if (w?.last_collected_at) return w.last_collected_at;
+            const s = getScheduleMap()[key];
+            if (s?.last_run_at) return s.last_run_at;
+            return null;
+        }
+
+        function getLastRun(key) {
+            const raw = getLastRunRaw(key);
+            if (raw) return `<span title="${fmtFullDate(raw)}">${timeAgo(raw)}<span class="ds-date-sub">${fmtDate(raw)}</span></span>`;
+            // Fallback: if tables have data, show "Has data" instead of "Never"
+            const found = findSourceByKey(key);
+            if (found && allTablesCache) {
+                const rows = getTableRowCount(found.source);
+                if (rows > 0) return `<span style="color:var(--text-muted)">Has data (${fmtNum(rows)} rows)</span>`;
+            }
+            return 'Never';
+        }
+
+        function getRecords(key) {
+            const j = getLatestJobsMap()[key];
+            if (j?.rows_collected != null) return fmtNum(j.rows_collected);
+            const hKey = resolveHealthKey(key);
+            const h = getSourceHealthMap()[hKey];
+            if (h?.success_24h > 0) return h.success_24h + ' jobs';
+            // Site intel collector
+            const found = findSourceByKey(key);
+            if (found?.source.siCollector) {
+                const siJob = getSiCollectorStatus(found.source);
+                if (siJob?.rows_inserted != null) return fmtNum(siJob.rows_inserted);
+            }
+            // Table fallback
+            if (found && allTablesCache) {
+                const rows = getTableRowCount(found.source);
+                if (rows > 0) return fmtNum(rows);
+            }
+            return '-';
+        }
+
+        function getFrequency(key) {
+            const s = getScheduleMap()[key];
+            if (!s) return 'Manual';
+            if (!s.is_active) return 'Paused';
+            return s.frequency ? s.frequency.charAt(0).toUpperCase() + s.frequency.slice(1) : 'Manual';
+        }
+
+        function countActive(sources) {
+            return sources.filter(s => { const st = getSourceStatus(s.key); return st === 'ok' || st === 'stale'; }).length;
+        }
+
+        function filterSources(sources) {
+            if (!currentFilter.trim()) return sources;
+            const q = currentFilter.toLowerCase();
+            return sources.filter(s =>
+                s.label.toLowerCase().includes(q) ||
+                s.key.toLowerCase().includes(q) ||
+                (s.domain && s.domain.toLowerCase().includes(q))
+            );
+        }
+
+        // Render the entire sources dashboard
+        function renderSources() {
+            if (currentView === 'detail') {
+                renderDetailView();
+                return;
+            }
+            renderListView();
+        }
+
+        // Get the DB table names for a source as a display string
+        function getSourceTableNames(src) {
+            if (src.tables && src.tables.length > 0) return src.tables;
+            if (src.tablePrefix) {
+                if (!allTablesCache) return [src.tablePrefix + '*'];
+                const matched = allTablesCache.filter(t => t.table_name.startsWith(src.tablePrefix));
+                return matched.length > 0 ? matched.map(t => t.table_name) : [src.tablePrefix + '*'];
+            }
+            if (!allTablesCache) return [src.key + '_*'];
+            const matched = allTablesCache.filter(t => t.table_name.startsWith(src.key + '_'));
+            return matched.length > 0 ? matched.map(t => t.table_name) : [];
+        }
+
+        // Get total DB records for a source from actual tables
+        function getDbRecords(src) {
+            if (!allTablesCache) return 0;
+            const tables = getTablesForSourceObj(src);
+            return tables.reduce((sum, t) => sum + (t.row_count || 0), 0);
+        }
+
+        // Compute inventory stats
+        function getInventoryStats() {
+            const allTables = allTablesCache || [];
+            const totalTables = allTables.length;
+            const tablesWithData = allTables.filter(t => t.row_count > 0).length;
+            const totalRecords = allTables.reduce((s, t) => s + t.row_count, 0);
+            // Count sources with data
+            let sourcesWithData = 0;
+            let sourcesTotal = 0;
+            for (const cat of Object.values(SOURCE_REGISTRY)) {
+                for (const src of cat.sources) {
+                    sourcesTotal++;
+                    if (getDbRecords(src) > 0) sourcesWithData++;
+                }
+            }
+            // Top tables
+            const topTables = [...allTables].sort((a, b) => b.row_count - a.row_count).filter(t => t.row_count > 0).slice(0, 10);
+            // Records per category
+            const catRecords = {};
+            for (const [catKey, cat] of Object.entries(SOURCE_REGISTRY)) {
+                catRecords[catKey] = { label: cat.label, records: 0, sources: cat.sources.length, withData: 0 };
+                for (const src of cat.sources) {
+                    const r = getDbRecords(src);
+                    catRecords[catKey].records += r;
+                    if (r > 0) catRecords[catKey].withData++;
+                }
+            }
+            return { totalTables, tablesWithData, totalRecords, sourcesWithData, sourcesTotal, topTables, catRecords };
+        }
+
+        function renderListView() {
+            const inv = getInventoryStats();
+            const alerts = dashboardData?.alerts || [];
+
+            let html = '';
+
+            // ---- Hero stats (data inventory focused) ----
+            html += `<div class="ds-hero">
+                <div class="ds-hero-card">
+                    <div class="ds-hero-value">${fmtNum(inv.totalRecords)}</div>
+                    <div class="ds-hero-label">Total Records</div>
                 </div>
-            `).join('');
-            logEl.scrollTop = logEl.scrollHeight;
-        }
+                <div class="ds-hero-card">
+                    <div class="ds-hero-value">${inv.tablesWithData}<span style="font-size:1rem;color:var(--text-muted)">/${inv.totalTables}</span></div>
+                    <div class="ds-hero-label">Tables with Data</div>
+                </div>
+                <div class="ds-hero-card">
+                    <div class="ds-hero-value">${inv.sourcesWithData}<span style="font-size:1rem;color:var(--text-muted)">/${inv.sourcesTotal}</span></div>
+                    <div class="ds-hero-label">Sources with Data</div>
+                </div>
+                <div class="ds-hero-card">
+                    <div class="ds-hero-value">${Object.keys(SOURCE_REGISTRY).length}</div>
+                    <div class="ds-hero-label">Categories</div>
+                </div>
+            </div>`;
 
-        function updateSourceChips(requested, completed, failed) {
-            const chipContainer = document.getElementById('source-chips');
-            if (!chipContainer) return;
-
-            const failedSources = failed.map(f => f.source);
-            chipContainer.innerHTML = requested.map(src => {
-                let status = 'pending';
-                if (completed.includes(src)) status = 'success';
-                else if (failedSources.includes(src)) status = 'failed';
-                return `<div class="source-chip ${status}">${SOURCE_NAMES[src] || src}</div>`;
-            }).join('');
-        }
-
-        async function runResearch() {
-            const name = document.getElementById('company-input').value;
-            if (!name) return;
-
-            const btn = document.getElementById('research-btn');
-            const results = document.getElementById('research-results');
-            btn.disabled = true;
-            btn.textContent = 'Researching...';
-            logEntries = [];
-
-            // Initial UI with progress tracking
-            results.innerHTML = `
-                <div class="card" style="margin-top: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h3>🔬 Researching: ${name}</h3>
-                        <span id="status-badge" class="score-badge" style="background: var(--warning);">Starting...</span>
+            // ---- Data coverage by category (horizontal bars) ----
+            const maxCatRecords = Math.max(...Object.values(inv.catRecords).map(c => c.records), 1);
+            html += `<div class="card" style="margin-bottom:1.5rem;">
+                <div class="card-title">Data Coverage by Category</div>`;
+            for (const [catKey, cat] of Object.entries(inv.catRecords)) {
+                const pct = Math.max(1, Math.round((cat.records / maxCatRecords) * 100));
+                const barColor = cat.records > 0 ? 'var(--primary)' : 'var(--border)';
+                html += `<div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.625rem;cursor:pointer;" onclick="expandedCategories['${catKey}']=true;renderSources();document.querySelector('[data-cat=\\'${catKey}\\']')?.scrollIntoView({behavior:'smooth'});">
+                    <div style="width:160px;font-size:0.8rem;color:var(--text-muted);text-align:right;flex-shrink:0;">${cat.label}</div>
+                    <div style="flex:1;background:var(--bg-input);border-radius:4px;height:20px;overflow:hidden;">
+                        <div style="width:${pct}%;height:100%;background:${barColor};border-radius:4px;transition:width 0.3s;"></div>
                     </div>
-                    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: 0%"></div></div>
-                    <div id="source-chips" class="source-grid"></div>
-                    <div class="agent-log" id="agent-log"></div>
-                    <div id="profile-results" style="margin-top: 1rem;"></div>
-                </div>
-            `;
+                    <div style="width:90px;font-size:0.8rem;color:var(--text);font-weight:500;">${fmtNum(cat.records)}</div>
+                    <div style="width:60px;font-size:0.75rem;color:var(--text-muted);">${cat.withData}/${cat.sources} src</div>
+                </div>`;
+            }
+            html += `</div>`;
 
-            addLog(`Starting research for "${name}"`, 'info');
-            addLog('Initializing data collection agent...', 'pending');
-
-            try {
-                // Start research with force_refresh to see all actions
-                addLog('Sending research request to API...', 'running');
-                const res = await fetch(`${API}/agents/research/company`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({company_name: name, force_refresh: true})
+            // ---- Largest Tables ----
+            if (inv.topTables.length > 0) {
+                html += `<div class="card" style="margin-bottom:1.5rem;">
+                    <div class="card-title">Largest Tables</div>
+                    <table class="ds-table"><thead><tr>
+                        <th>Table</th><th>Records</th><th>Columns</th>
+                    </tr></thead><tbody>`;
+                inv.topTables.forEach(t => {
+                    html += `<tr style="cursor:pointer;" onclick="jumpToTablePreview('${t.table_name}')">
+                        <td style="font-family:monospace;font-size:0.8rem;">${t.table_name}</td>
+                        <td style="font-weight:600;">${fmtNum(t.row_count)}</td>
+                        <td>${t.columns.length}</td>
+                    </tr>`;
                 });
-                const data = await res.json();
+                html += `</tbody></table></div>`;
+            }
 
-                if (data.status === 'cached') {
-                    addLog('Found cached research (less than 7 days old)', 'success');
-                    displayProfile(data.result?.profile || data.result, name);
-                    btn.disabled = false;
-                    btn.textContent = 'Research';
-                    document.getElementById('status-badge').textContent = 'Cached';
-                    document.getElementById('status-badge').style.background = 'var(--accent)';
-                    document.getElementById('progress-fill').style.width = '100%';
-                    return;
-                }
+            // ---- Alerts ----
+            const importantAlerts = (alerts || []).filter(a => a.severity === 'critical' || a.severity === 'warning');
+            if (importantAlerts.length > 0) {
+                html += '<div class="ds-alerts">';
+                importantAlerts.forEach(a => {
+                    const icon = a.severity === 'critical' ? '!!' : '!';
+                    html += `<div class="ds-alert-item"><span class="ds-alert-sev ${a.severity}">${icon}</span> ${a.message}</div>`;
+                });
+                html += '</div>';
+            }
 
-                if (!data.job_id) {
-                    addLog('Error: No job ID returned', 'error');
-                    btn.disabled = false;
-                    btn.textContent = 'Research';
-                    return;
-                }
+            // ---- Toolbar ----
+            html += `<div class="ds-toolbar">
+                <input class="search-input" type="text" placeholder="Filter sources..." value="${currentFilter}" oninput="currentFilter=this.value;renderSources()">
+                <select class="search-input" style="flex:none;width:auto;" onchange="currentFilterMode=this.value;renderSources()">
+                    <option value="all"${currentFilterMode==='all'?' selected':''}>All sources</option>
+                    <option value="with_data"${currentFilterMode==='with_data'?' selected':''}>With data only</option>
+                    <option value="empty"${currentFilterMode==='empty'?' selected':''}>Empty only</option>
+                </select>
+                <button class="btn btn-secondary" onclick="refreshSources()">Refresh</button>
+            </div>`;
 
-                addLog(`Job created: ${data.job_id}`, 'success');
-                addLog(`Querying ${data.estimated_sources || 9} data sources in parallel...`, 'info');
+            // ---- Category accordions ----
+            for (const [catKey, category] of Object.entries(SOURCE_REGISTRY)) {
+                let filtered = filterSources(category.sources);
+                // Apply data filter
+                if (currentFilterMode === 'with_data') filtered = filtered.filter(s => getDbRecords(s) > 0);
+                else if (currentFilterMode === 'empty') filtered = filtered.filter(s => getDbRecords(s) === 0);
+                if ((currentFilter || currentFilterMode !== 'all') && filtered.length === 0) continue;
 
-                // Initialize source chips
-                const allSources = ['enrichment', 'github', 'glassdoor', 'app_store', 'web_traffic', 'news', 'sec_filings', 'corporate_registry', 'scoring', 'web_scrape'];
-                updateSourceChips(allSources, [], []);
+                const isExpanded = expandedCategories[catKey];
+                const catRows = inv.catRecords[catKey];
+                const chevron = isExpanded ? '&#9660;' : '&#9654;';
 
-                // Poll for status
-                let lastCompleted = [];
-                let lastFailed = [];
+                html += `<div class="ds-category" data-cat="${catKey}">
+                    <div class="ds-cat-header" onclick="toggleSourceCategory('${catKey}')">
+                        <div class="ds-cat-left">
+                            <span class="ds-chevron">${chevron}</span>
+                            <span class="ds-cat-title">${category.label}</span>
+                            <span class="ds-cat-count">(${filtered.length} sources)</span>
+                        </div>
+                        <div style="display:flex;gap:1rem;align-items:center;">
+                            ${catRows.records > 0 ? `<span style="font-size:0.8rem;color:var(--text-muted);">${fmtNum(catRows.records)} records</span>` : ''}
+                            ${catRows.withData > 0 ? `<span class="ds-badge-active">${catRows.withData} with data</span>` : ''}
+                        </div>
+                    </div>`;
 
-                pollInterval = setInterval(async () => {
-                    try {
-                        const statusRes = await fetch(`${API}/agents/research/${data.job_id}`);
-                        const status = await statusRes.json();
-
-                        // Update progress bar
-                        const progress = (status.progress || 0) * 100;
-                        document.getElementById('progress-fill').style.width = `${progress}%`;
-
-                        // Log new completions
-                        const newCompleted = (status.sources_completed || []).filter(s => !lastCompleted.includes(s));
-                        newCompleted.forEach(src => {
-                            addLog(`${SOURCE_NAMES[src] || src}: Data collected successfully`, 'success');
-                            // Add special log for news with AI summary
-                            if (src === 'news') {
-                                addLog('🤖 AI generating news summary...', 'info');
-                            }
-                        });
-                        lastCompleted = status.sources_completed || [];
-
-                        // Log new failures
-                        const newFailed = (status.sources_failed || []).filter(f => !lastFailed.some(lf => lf.source === f.source));
-                        newFailed.forEach(f => {
-                            addLog(`${SOURCE_NAMES[f.source] || f.source}: ${f.error || 'No data found'}`, 'error');
-                        });
-                        lastFailed = status.sources_failed || [];
-
-                        // Update source chips
-                        updateSourceChips(status.sources_requested || allSources, lastCompleted, lastFailed);
-
-                        // Check if done
-                        if (['completed', 'partial', 'failed'].includes(status.status)) {
-                            clearInterval(pollInterval);
-
-                            const badge = document.getElementById('status-badge');
-                            if (status.status === 'completed') {
-                                badge.textContent = 'Complete';
-                                badge.style.background = 'var(--success)';
-                                addLog('All sources queried successfully!', 'success');
-                            } else if (status.status === 'partial') {
-                                badge.textContent = 'Partial';
-                                badge.style.background = 'var(--warning)';
-                                addLog(`Research complete with ${lastCompleted.length}/${allSources.length} sources`, 'info');
-                            } else {
-                                badge.textContent = 'Failed';
-                                badge.style.background = 'var(--error)';
-                                addLog('Research failed - no data sources returned data', 'error');
-                            }
-
-                            // Display profile
-                            if (status.results?.profile) {
-                                addLog('Synthesizing company profile...', 'info');
-                                addLog(`Confidence score: ${((status.results.confidence || 0) * 100).toFixed(0)}%`, 'info');
-                                displayProfile(status.results.profile, name, status.results.confidence);
-                            }
-
-                            btn.disabled = false;
-                            btn.textContent = 'Research';
-                        }
-                    } catch (pollErr) {
-                        console.error('Poll error:', pollErr);
+                if (isExpanded) {
+                    html += '<div class="ds-cat-body">';
+                    if (catKey === 'site_intel') {
+                        html += renderSiteIntelTable(filtered, catKey);
+                    } else {
+                        html += renderSourceTable(filtered, catKey);
                     }
-                }, 1000); // Poll every second
-
-            } catch (err) {
-                addLog(`Error: ${err.message}`, 'error');
-                btn.disabled = false;
-                btn.textContent = 'Research';
-                if (pollInterval) clearInterval(pollInterval);
-            }
-        }
-
-        function displayProfile(profile, name, confidence) {
-            const container = document.getElementById('profile-results');
-            if (!container || !profile) return;
-
-            let html = '<h3 style="margin-bottom: 1rem;">📋 Company Profile</h3>';
-
-            // Tech Presence
-            if (profile.tech_presence) {
-                const tp = profile.tech_presence;
-                html += `
-                    <div class="profile-section">
-                        <h4>🐙 Tech Presence (GitHub)</h4>
-                        <div class="profile-grid">
-                            <div class="profile-item"><span class="profile-label">Organization</span><span class="profile-value">${tp.github_org || 'N/A'}</span></div>
-                            <div class="profile-item"><span class="profile-label">Repos</span><span class="profile-value">${tp.public_repos?.toLocaleString() || 'N/A'}</span></div>
-                            <div class="profile-item"><span class="profile-label">Stars</span><span class="profile-value">${tp.total_stars?.toLocaleString() || 'N/A'}</span></div>
-                            <div class="profile-item"><span class="profile-label">Forks</span><span class="profile-value">${tp.total_forks?.toLocaleString() || 'N/A'}</span></div>
-                            <div class="profile-item"><span class="profile-label">Velocity Score</span><span class="profile-value">${tp.velocity_score || 'N/A'}</span></div>
-                            <div class="profile-item"><span class="profile-label">Primary Lang</span><span class="profile-value">${tp.primary_language || 'N/A'}</span></div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            // Web Traffic
-            if (profile.web_traffic) {
-                const wt = profile.web_traffic;
-                html += `
-                    <div class="profile-section">
-                        <h4>🌐 Web Traffic</h4>
-                        <div class="profile-grid">
-                            <div class="profile-item"><span class="profile-label">Domain</span><span class="profile-value">${wt.domain || 'N/A'}</span></div>
-                            <div class="profile-item"><span class="profile-label">Tranco Rank</span><span class="profile-value">#${wt.tranco_rank?.toLocaleString() || 'N/A'}</span></div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            // Employer Brand
-            if (profile.employer_brand) {
-                const eb = profile.employer_brand;
-                html += `
-                    <div class="profile-section">
-                        <h4>💼 Employer Brand (Glassdoor)</h4>
-                        <div class="profile-grid">
-                            <div class="profile-item"><span class="profile-label">Overall Rating</span><span class="profile-value">${eb.overall_rating?.toFixed(1) || 'N/A'}/5.0</span></div>
-                            <div class="profile-item"><span class="profile-label">CEO Approval</span><span class="profile-value">${eb.ceo_approval ? (eb.ceo_approval * 100).toFixed(0) + '%' : 'N/A'}</span></div>
-                            <div class="profile-item"><span class="profile-label">Work-Life Balance</span><span class="profile-value">${eb.work_life_balance?.toFixed(1) || 'N/A'}</span></div>
-                            <div class="profile-item"><span class="profile-label">Compensation</span><span class="profile-value">${eb.compensation_rating?.toFixed(1) || 'N/A'}</span></div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            // Mobile Presence
-            if (profile.mobile_presence && profile.mobile_presence.app_count > 0) {
-                const mp = profile.mobile_presence;
-                html += `
-                    <div class="profile-section">
-                        <h4>📱 Mobile Presence</h4>
-                        <div class="profile-grid">
-                            <div class="profile-item"><span class="profile-label">Apps</span><span class="profile-value">${mp.app_count || 0}</span></div>
-                            <div class="profile-item"><span class="profile-label">Avg Rating</span><span class="profile-value">${mp.avg_rating?.toFixed(1) || 'N/A'}</span></div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            // Health Score
-            if (profile.health_score) {
-                const hs = profile.health_score;
-                html += `
-                    <div class="profile-section">
-                        <h4>📈 Health Score</h4>
-                        <div class="profile-grid">
-                            <div class="profile-item"><span class="profile-label">Composite</span><span class="profile-value" style="color: var(--primary); font-size: 1.25rem;">${hs.composite?.toFixed(0) || 'N/A'}</span></div>
-                            <div class="profile-item"><span class="profile-label">Tier</span><span class="profile-value">${hs.tier || 'N/A'}</span></div>
-                            <div class="profile-item"><span class="profile-label">Growth</span><span class="profile-value">${hs.growth?.toFixed(0) || 'N/A'}</span></div>
-                            <div class="profile-item"><span class="profile-label">Stability</span><span class="profile-value">${hs.stability?.toFixed(0) || 'N/A'}</span></div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            // News with AI Summary
-            if (profile.news && profile.news.article_count > 0) {
-                html += `
-                    <div class="profile-section">
-                        <h4>📰 Recent News</h4>
-                        ${profile.news.content_summary ? `
-                            <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(6, 182, 212, 0.1)); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 3px solid var(--primary);">
-                                <div style="font-size: 0.75rem; color: var(--primary); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">🤖 AI Summary</div>
-                                <div style="font-size: 0.9rem; line-height: 1.5;">${profile.news.content_summary}</div>
-                            </div>
-                        ` : ''}
-                        <div style="font-size: 0.875rem;">
-                            ${profile.news.recent_articles.slice(0, 3).map(a => `
-                                <div style="margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);">
-                                    <a href="${a.url || '#'}" target="_blank" style="color: var(--accent); text-decoration: none;">
-                                        ${a.title || 'Untitled'}
-                                    </a>
-                                    <div style="color: var(--text-muted); font-size: 0.75rem;">
-                                        ${a.source || 'Unknown'} • ${a.date ? new Date(a.date).toLocaleDateString() : 'No date'}
-                                        ${a.event_type ? `• <span style="color: var(--primary);">${a.event_type}</span>` : ''}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            }
-
-            // SEC Filings
-            if (profile.sec_filings && (profile.sec_filings.cik || profile.sec_filings.issuer_name)) {
-                const sec = profile.sec_filings;
-                html += `
-                    <div class="profile-section">
-                        <h4>📄 SEC Filings</h4>
-                        <div class="profile-grid">
-                            ${sec.issuer_name ? `<div class="profile-item"><span class="profile-label">Issuer</span><span class="profile-value">${sec.issuer_name}</span></div>` : ''}
-                            ${sec.cik ? `<div class="profile-item"><span class="profile-label">CIK</span><span class="profile-value">${sec.cik}</span></div>` : ''}
-                            ${sec.filing_type ? `<div class="profile-item"><span class="profile-label">Filing Type</span><span class="profile-value">${sec.filing_type}</span></div>` : ''}
-                            ${sec.form_d_total_raised ? `<div class="profile-item"><span class="profile-label">Total Raised</span><span class="profile-value">$${(sec.form_d_total_raised/1000000).toFixed(1)}M</span></div>` : ''}
-                            ${sec.sec_url ? `<div class="profile-item"><span class="profile-label">SEC Link</span><a href="${sec.sec_url}" target="_blank" style="color: var(--accent);">View Filing</a></div>` : ''}
-                        </div>
-                    </div>
-                `;
-            }
-
-            // Corporate Registry
-            if (profile.corporate_registry) {
-                const cr = profile.corporate_registry;
-                html += `
-                    <div class="profile-section">
-                        <h4>🏢 Corporate Registry</h4>
-                        <div class="profile-grid">
-                            ${cr.registered_name ? `<div class="profile-item"><span class="profile-label">Registered Name</span><span class="profile-value">${cr.registered_name}</span></div>` : ''}
-                            ${cr.jurisdiction ? `<div class="profile-item"><span class="profile-label">Jurisdiction</span><span class="profile-value">${cr.jurisdiction.toUpperCase()}</span></div>` : ''}
-                            ${cr.incorporation_date ? `<div class="profile-item"><span class="profile-label">Incorporated</span><span class="profile-value">${cr.incorporation_date}</span></div>` : ''}
-                            ${cr.company_type ? `<div class="profile-item"><span class="profile-label">Type</span><span class="profile-value">${cr.company_type}</span></div>` : ''}
-                            ${cr.status ? `<div class="profile-item"><span class="profile-label">Status</span><span class="profile-value" style="color: ${cr.status === 'Active' ? 'var(--success)' : 'var(--warning)'};">${cr.status}</span></div>` : ''}
-                            ${cr.opencorporates_url ? `<div class="profile-item"><span class="profile-label">Registry</span><a href="${cr.opencorporates_url}" target="_blank" style="color: var(--accent);">OpenCorporates</a></div>` : ''}
-                        </div>
-                    </div>
-                `;
-            }
-
-            // Web Scraped Info
-            if (profile.web_scraped) {
-                const ws = profile.web_scraped;
-                html += `
-                    <div class="profile-section">
-                        <h4>🔍 From Company Website</h4>
-                        <div class="profile-grid">
-                            ${ws.description ? `<div class="profile-item" style="grid-column: span 2;"><span class="profile-label">Description</span><span class="profile-value" style="font-size: 0.8rem;">${ws.description.substring(0, 150)}...</span></div>` : ''}
-                            ${ws.founded_year ? `<div class="profile-item"><span class="profile-label">Founded</span><span class="profile-value">${ws.founded_year}</span></div>` : ''}
-                            ${ws.source_url ? `<div class="profile-item"><span class="profile-label">Source</span><a href="${ws.source_url}" target="_blank" style="color: var(--accent);">Visit</a></div>` : ''}
-                        </div>
-                    </div>
-                `;
-            }
-
-            // Data Gaps
-            if (profile.data_gaps && profile.data_gaps.length > 0) {
-                html += `
-                    <div class="profile-section" style="border: 1px solid var(--warning);">
-                        <h4 style="color: var(--warning);">⚠️ Data Gaps</h4>
-                        <p style="font-size: 0.875rem; color: var(--text-muted);">
-                            Missing: ${profile.data_gaps.map(g => g.replace('_', ' ')).join(', ')}
-                        </p>
-                    </div>
-                `;
-            }
-
-            // Confidence
-            if (confidence !== undefined) {
-                html += `
-                    <div style="margin-top: 1rem; text-align: center;">
-                        <span class="score-badge" style="background: var(--primary); padding: 0.5rem 1.5rem; font-size: 1rem;">
-                            Research Confidence: ${(confidence * 100).toFixed(0)}%
-                        </span>
-                    </div>
-                `;
-            }
-
-            container.innerHTML = html;
-        }
-
-        function runSelectedResearch() {
-            const mode = document.querySelector('input[name="research-mode"]:checked').value;
-            if (mode === 'deep') {
-                runDeepResearch();
-            } else {
-                runResearch();
-            }
-        }
-
-        async function runDeepResearch() {
-            const name = document.getElementById('company-input').value;
-            if (!name) return;
-
-            const btn = document.getElementById('research-btn');
-            const results = document.getElementById('research-results');
-            btn.disabled = true;
-            btn.textContent = 'Analyzing...';
-            logEntries = [];
-
-            // Initial UI
-            results.innerHTML = `
-                <div class="card" style="margin-top: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h3>🧠 Deep Research: ${name}</h3>
-                        <span id="deep-status" class="score-badge" style="background: var(--warning);">Initializing...</span>
-                    </div>
-                    <div class="progress-bar"><div class="progress-fill" id="deep-progress" style="width: 0%"></div></div>
-                    <div id="phase-display" style="margin: 1rem 0; padding: 0.5rem 1rem; background: var(--bg-input); border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
-                        <span id="phase-icon">📊</span>
-                        <span id="phase-text">Starting data collection...</span>
-                    </div>
-                    <div class="agent-log" id="agent-log"></div>
-                    <div id="analysis-results" style="margin-top: 1rem;"></div>
-                </div>
-            `;
-
-            const phases = {
-                'collecting': { icon: '📊', text: 'Collecting data from 10 sources...' },
-                'analyzing': { icon: '🧠', text: 'Running LLM investment analysis...' },
-                'synthesizing': { icon: '📝', text: 'Synthesizing final report...' },
-                'complete': { icon: '✅', text: 'Research complete!' },
-                'failed': { icon: '❌', text: 'Research failed' }
-            };
-
-            addLog(`Starting deep research for "${name}"`, 'info');
-            addLog('🧠 Multi-turn LLM analysis enabled', 'info');
-
-            try {
-                // Start deep research
-                addLog('Sending request to Deep Research API...', 'running');
-                const res = await fetch(`${API}/agents/deep-research`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({company_name: name, include_follow_ups: true})
-                });
-                const data = await res.json();
-
-                if (!data.job_id) {
-                    addLog('Error: ' + (data.detail || 'No job ID returned'), 'error');
-                    btn.disabled = false;
-                    btn.textContent = 'Research';
-                    return;
+                    html += '</div>';
                 }
-
-                addLog(`Deep research job started: ${data.job_id}`, 'success');
-                addLog('Phase 1: Collecting data from all sources...', 'info');
-
-                // Poll for status
-                let lastStep = 0;
-                pollInterval = setInterval(async () => {
-                    try {
-                        const statusRes = await fetch(`${API}/agents/deep-research/${data.job_id}`);
-                        const status = await statusRes.json();
-
-                        // Update progress
-                        const progress = (status.progress || 0) * 100;
-                        document.getElementById('deep-progress').style.width = `${progress}%`;
-
-                        // Update phase
-                        const phase = phases[status.phase] || phases['collecting'];
-                        document.getElementById('phase-icon').textContent = phase.icon;
-                        document.getElementById('phase-text').textContent = phase.text;
-
-                        // Log new analysis steps
-                        const steps = status.analysis_steps || [];
-                        for (let i = lastStep; i < steps.length; i++) {
-                            const step = steps[i];
-                            const typeMap = {
-                                'collecting': 'info',
-                                'analyzing': 'running',
-                                'complete': 'success'
-                            };
-                            addLog(`[${step.phase}] ${step.action}`, typeMap[step.phase] || 'info');
-                            if (step.tokens_used > 0) {
-                                addLog(`   └─ ${step.tokens_used.toLocaleString()} tokens, $${step.cost_usd?.toFixed(4) || '0'}`, 'info');
-                            }
-                        }
-                        lastStep = steps.length;
-
-                        // Check if complete
-                        if (status.status === 'complete' || status.status === 'failed') {
-                            clearInterval(pollInterval);
-
-                            const badge = document.getElementById('deep-status');
-                            if (status.status === 'complete') {
-                                badge.textContent = 'Complete';
-                                badge.style.background = 'var(--success)';
-                                addLog('Deep research completed successfully!', 'success');
-                                addLog(`Total cost: $${status.total_cost_usd?.toFixed(4) || '0'}`, 'info');
-
-                                // Display the analysis
-                                if (status.final_report) {
-                                    displayDeepAnalysis(status.final_report);
-                                }
-                            } else {
-                                badge.textContent = 'Failed';
-                                badge.style.background = 'var(--error)';
-                                addLog('Error: ' + (status.error_message || 'Unknown error'), 'error');
-                            }
-
-                            btn.disabled = false;
-                            btn.textContent = 'Research';
-                        }
-                    } catch (pollErr) {
-                        console.error('Poll error:', pollErr);
-                    }
-                }, 2000); // Poll every 2 seconds (LLM takes time)
-
-            } catch (err) {
-                addLog(`Error: ${err.message}`, 'error');
-                btn.disabled = false;
-                btn.textContent = 'Research';
-                if (pollInterval) clearInterval(pollInterval);
+                html += '</div>';
             }
+
+            document.getElementById('sources-content').innerHTML = html;
         }
 
-        function displayDeepAnalysis(report) {
-            const container = document.getElementById('analysis-results');
-            if (!container || !report) return;
+        function renderSourceTable(sources, catKey) {
+            if (sources.length === 0) return '<div class="empty">No matching sources</div>';
+            let html = `<table class="ds-table"><thead><tr>
+                <th>Source</th><th>DB Tables</th><th>Records</th><th>Frequency</th><th>Last Run</th>
+            </tr></thead><tbody>`;
+            sources.forEach(s => {
+                const st = getSourceStatus(s.key);
+                const tableNames = getSourceTableNames(s);
+                const dbRecords = getDbRecords(s);
+                const tableDisplay = tableNames.length <= 2
+                    ? tableNames.map(t => `<span style="font-family:monospace;font-size:0.75rem;">${t}</span>`).join(', ')
+                    : `<span style="font-family:monospace;font-size:0.75rem;">${tableNames[0]}</span> <span style="color:var(--text-muted);font-size:0.7rem;">+${tableNames.length - 1} more</span>`;
 
-            let html = '<h3 style="margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">📊 Investment Analysis Report</h3>';
+                html += `<tr onclick="openSourceDetail('${s.key}','${catKey}')" title="Click to view details">
+                    <td><span class="ds-dot ${st}"></span>${s.label}</td>
+                    <td>${tableDisplay}</td>
+                    <td style="font-weight:${dbRecords > 0 ? '600' : '400'};${dbRecords === 0 ? 'color:var(--text-muted);' : ''}">${dbRecords > 0 ? fmtNum(dbRecords) : '-'}</td>
+                    <td>${getFrequency(s.key)}</td>
+                    <td>${getLastRun(s.key)}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            return html;
+        }
 
-            // Metadata
-            html += `
-                <div style="display: flex; gap: 1rem; margin-bottom: 1rem; font-size: 0.75rem; color: var(--text-muted);">
-                    <span>Company: <strong style="color: var(--text);">${report.company_name}</strong></span>
-                    <span>•</span>
-                    <span>Generated: ${new Date(report.generated_at).toLocaleString()}</span>
-                    <span>•</span>
-                    <span>Tokens: ${report.metadata?.total_tokens?.toLocaleString() || 'N/A'}</span>
-                    <span>•</span>
-                    <span>Cost: $${report.metadata?.total_cost_usd?.toFixed(4) || '0'}</span>
-                </div>
-            `;
-
-            // Main Analysis
-            if (report.analysis?.initial_analysis) {
-                html += `
-                    <div class="profile-section" style="margin-bottom: 1rem;">
-                        <h4 style="color: var(--primary); font-size: 1rem;">📋 Comprehensive Analysis</h4>
-                        <div style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.6; max-height: 400px; overflow-y: auto;">
-                            ${formatMarkdown(report.analysis.initial_analysis)}
-                        </div>
-                    </div>
-                `;
-            }
-
-            // Follow-up Analyses
-            if (report.analysis?.follow_ups?.length > 0) {
-                const followUpIcons = {
-                    'competitive_analysis': '⚔️',
-                    'risk_deep_dive': '⚠️',
-                    'investment_recommendation': '💰'
-                };
-                const followUpTitles = {
-                    'competitive_analysis': 'Competitive Analysis',
-                    'risk_deep_dive': 'Risk Deep Dive',
-                    'investment_recommendation': 'Investment Recommendation'
-                };
-
-                report.analysis.follow_ups.forEach(fu => {
-                    const icon = followUpIcons[fu.name] || '📌';
-                    const title = followUpTitles[fu.name] || fu.name;
-                    html += `
-                        <div class="profile-section" style="margin-bottom: 1rem; border-left: 3px solid var(--accent);">
-                            <h4 style="color: var(--accent); font-size: 1rem;">${icon} ${title}</h4>
-                            <div style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.6; max-height: 300px; overflow-y: auto;">
-                                ${formatMarkdown(fu.analysis || 'No analysis available')}
-                            </div>
-                        </div>
-                    `;
+        function renderSiteIntelTable(sources, catKey) {
+            const grouped = {};
+            sources.forEach(s => {
+                const d = s.domain || 'other';
+                if (!grouped[d]) grouped[d] = [];
+                grouped[d].push(s);
+            });
+            const domainLabels = { power: 'Power', telecom: 'Telecom', transport: 'Transport', labor: 'Labor', risk: 'Risk', incentives: 'Incentives', logistics: 'Logistics', water_utilities: 'Water & Utilities' };
+            let html = '';
+            for (const [domain, list] of Object.entries(grouped)) {
+                const domainRecords = list.reduce((s, src) => s + getDbRecords(src), 0);
+                html += `<div class="ds-domain-group">
+                    <div class="ds-domain-header">${domainLabels[domain] || domain} <span class="ds-domain-count">${list.length}</span>${domainRecords > 0 ? ` <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;">&middot; ${fmtNum(domainRecords)} records</span>` : ''}</div>`;
+                html += `<table class="ds-table"><thead><tr>
+                    <th>Collector</th><th>Records</th><th>Frequency</th><th>Last Run</th>
+                </tr></thead><tbody>`;
+                list.forEach(s => {
+                    const st = getSourceStatus(s.key);
+                    const dbRecords = getDbRecords(s);
+                    html += `<tr onclick="openSourceDetail('${s.key}','${catKey}')" title="Click to view details">
+                        <td><span class="ds-dot ${st}"></span>${s.label}</td>
+                        <td style="font-weight:${dbRecords > 0 ? '600' : '400'};${dbRecords === 0 ? 'color:var(--text-muted);' : ''}">${dbRecords > 0 ? fmtNum(dbRecords) : '-'}</td>
+                        <td>${getFrequency(s.key)}</td>
+                        <td>${getLastRun(s.key)}</td>
+                    </tr>`;
                 });
+                html += '</tbody></table></div>';
             }
+            return html;
+        }
 
-            // Final Recommendation Highlight
-            if (report.analysis?.final_recommendation) {
-                // Try to extract the recommendation
-                const recMatch = report.analysis.final_recommendation.match(/\*\*Recommendation\*\*:\s*\[?([^\]\n]+)\]?/i);
-                const recommendation = recMatch ? recMatch[1].trim() : null;
+        // Jump directly to a table's preview from the "Largest Tables" section
+        async function jumpToTablePreview(tableName) {
+            // Find which source owns this table
+            for (const [catKey, cat] of Object.entries(SOURCE_REGISTRY)) {
+                for (const src of cat.sources) {
+                    const tables = getSourceTableNames(src);
+                    if (tables.includes(tableName)) {
+                        await openSourceDetail(src.key, catKey);
+                        toggleTablePreview(tableName);
+                        return;
+                    }
+                }
+            }
+            // If no source found, open a standalone preview
+            expandedTable = tableName;
+            previewPage = 0;
+            previewLoading = true;
+            // Show a minimal detail view
+            selectedSource = { key: tableName, label: tableName, tables: [tableName] };
+            selectedCatKey = '';
+            currentView = 'detail';
+            renderSources();
+            await loadPreview(tableName, 0);
+        }
 
-                const recColors = {
-                    'STRONG BUY': 'var(--success)',
-                    'BUY': 'var(--success)',
-                    'HOLD': 'var(--warning)',
-                    'PASS': 'var(--error)',
-                    'STRONG PASS': 'var(--error)'
-                };
-                const recColor = recommendation ? (recColors[recommendation.toUpperCase()] || 'var(--primary)') : 'var(--primary)';
+        // =================================================================
+        //  DETAIL VIEW — Click-into-source data browser
+        // =================================================================
 
-                html += `
-                    <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(6, 182, 212, 0.1)); padding: 1.5rem; border-radius: 12px; text-align: center; margin-top: 1rem;">
-                        <div style="font-size: 0.875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem;">Final Verdict</div>
-                        ${recommendation ? `
-                            <div style="font-size: 2rem; font-weight: 700; color: ${recColor}; margin-bottom: 0.5rem;">
-                                ${recommendation}
+        function findSourceByKey(key) {
+            for (const [catKey, cat] of Object.entries(SOURCE_REGISTRY)) {
+                const src = cat.sources.find(s => s.key === key);
+                if (src) return { source: src, catKey };
+            }
+            return null;
+        }
+
+        function getTablesForSource(source) {
+            if (!allTablesCache) return [];
+            // Explicit table list
+            if (source.tables && source.tables.length > 0) {
+                return allTablesCache.filter(t => source.tables.includes(t.table_name));
+            }
+            // Prefix-based matching
+            if (source.tablePrefix) {
+                return allTablesCache.filter(t => t.table_name.startsWith(source.tablePrefix));
+            }
+            // Fallback: try key as prefix
+            return allTablesCache.filter(t => t.table_name.startsWith(source.key + '_'));
+        }
+
+        async function ensureTablesLoaded() {
+            if (allTablesCache) return;
+            try {
+                const res = await fetch(`${API}/export/tables`);
+                if (res.ok) allTablesCache = await res.json();
+            } catch (e) {
+                console.error('Failed to load tables:', e);
+                allTablesCache = [];
+            }
+        }
+
+        async function openSourceDetail(sourceKey, catKey) {
+            selectedCatKey = catKey;
+            const found = findSourceByKey(sourceKey);
+            if (!found) return;
+            selectedSource = found.source;
+            currentView = 'detail';
+            expandedTable = null;
+            tablePreview = null;
+            previewPage = 0;
+
+            // Show loading state immediately
+            document.getElementById('sources-content').innerHTML = '<div class="loading">Loading source details...</div>';
+
+            await ensureTablesLoaded();
+            renderSources();
+        }
+
+        function backToList() {
+            currentView = 'list';
+            selectedSource = null;
+            expandedTable = null;
+            tablePreview = null;
+            previewPage = 0;
+            renderSources();
+        }
+
+        function renderDetailView() {
+            const src = selectedSource;
+            if (!src) { backToList(); return; }
+
+            const st = getSourceStatus(src.key);
+            const catLabel = SOURCE_REGISTRY[selectedCatKey]?.label || '';
+            const sourceTables = getTablesForSource(src);
+            const totalRows = sourceTables.reduce((sum, t) => sum + (t.row_count || 0), 0);
+
+            let html = '';
+
+            // Back button
+            html += `<button class="ds-detail-back" onclick="backToList()">&larr; Back to Sources</button>`;
+
+            // Header card
+            html += `<div class="ds-detail-header">
+                <div class="ds-detail-title">
+                    <span class="ds-dot ${st}" style="width:12px;height:12px;"></span>
+                    ${src.label}
+                    <span class="ds-status-text ${st}" style="font-size:0.9rem;">${st}</span>
+                </div>
+                <div style="color:var(--text-muted);font-size:0.85rem;margin-top:0.25rem;">${catLabel}${src.domain ? ' &mdash; ' + src.domain.replace(/_/g,' ') : ''}</div>
+                <div class="ds-detail-meta">
+                    <span class="ds-detail-chip">Last run: ${getLastRun(src.key)}</span>
+                    <span class="ds-detail-chip">Records: ${getRecords(src.key)}</span>
+                    <span class="ds-detail-chip">Frequency: ${getFrequency(src.key)}</span>
+                    <span class="ds-detail-chip">${sourceTables.length} table${sourceTables.length !== 1 ? 's' : ''} &middot; ${fmtNum(totalRows)} total rows</span>
+                </div>
+            </div>`;
+
+            // ---- Run Collection section ----
+            const triggers = src.triggers || [];
+            const schedOpts = src.scheduleOptions || [];
+            if (triggers.length > 0 || schedOpts.length > 0) {
+                html += `<div class="ds-detail-tables" style="padding-bottom:1.25rem;">
+                    <h3>Run Collection</h3>`;
+                if (triggers.length > 0) {
+                    html += `<div style="margin-bottom:1rem;">`;
+                    triggers.forEach((t, i) => {
+                        html += `<div class="ds-detail-table-row" style="cursor:default;margin-bottom:0.375rem;">
+                            <div style="flex:1;">
+                                <div class="ds-detail-table-name" style="font-size:0.85rem;">${t.label}</div>
+                                <div style="font-family:monospace;font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">${t.method} ${t.path}</div>
+                                ${t.body ? `<div style="font-family:monospace;font-size:0.7rem;color:var(--text-muted);margin-top:0.125rem;">Body: ${JSON.stringify(t.body)}</div>` : ''}
                             </div>
-                        ` : ''}
-                        <div style="font-size: 0.875rem; color: var(--text-muted);">
-                            Based on analysis of ${Object.keys(report.collected_data || {}).length} data dimensions
+                            <button class="btn" style="padding:0.375rem 1rem;font-size:0.8rem;" onclick="triggerCollection(${i})">Run</button>
+                        </div>`;
+                    });
+                    html += `</div>`;
+                }
+                if (schedOpts.length > 0) {
+                    html += `<div style="margin-top:0.5rem;">
+                        <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;">Schedule Options</div>
+                        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">`;
+                    schedOpts.forEach(freq => {
+                        const label = freq.charAt(0).toUpperCase() + freq.slice(1);
+                        html += `<span class="ds-detail-chip" style="background:rgba(99,102,241,0.1);color:var(--primary);font-weight:500;">${label}</span>`;
+                    });
+                    html += `</div>
+                        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">
+                            Configure schedules via <a href="/docs#/schedules" target="_blank" style="color:var(--accent);">POST /api/v1/schedules</a>
+                            with source="${src.key}" and desired frequency.
                         </div>
-                    </div>
-                `;
+                    </div>`;
+                }
+                html += `</div>`;
             }
 
-            container.innerHTML = html;
-        }
-
-        function formatMarkdown(text) {
-            if (!text) return '';
-            // Basic markdown formatting
-            return text
-                .replace(/### (.+)/g, '<h5 style="color: var(--accent); margin: 1rem 0 0.5rem;">$1</h5>')
-                .replace(/## (.+)/g, '<h4 style="color: var(--primary); margin: 1rem 0 0.5rem;">$1</h4>')
-                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                .replace(/- (.+)/g, '<li style="margin-left: 1rem;">$1</li>')
-                .replace(/\n\n/g, '<br><br>');
-        }
-
-        async function getScore() {
-            const name = document.getElementById('score-input').value;
-            if (!name) return;
-
-            const results = document.getElementById('score-results');
-            results.innerHTML = '<div class="loading">Loading...</div>';
-
-            try {
-                const res = await fetch(`${API}/scores/company/${encodeURIComponent(name)}`);
-                const score = await res.json();
-
-                results.innerHTML = `
-                    <div style="margin-top: 1rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <h3>${score.company_name || name}</h3>
-                            <span class="score-badge">${score.composite_score?.toFixed(0) || 'N/A'} (${score.tier || 'N/A'})</span>
-                        </div>
-                        <div class="stats-grid" style="margin-top: 1rem;">
-                            ${Object.entries(score.category_scores || {}).map(([k,v]) => `
-                                <div class="stat-card">
-                                    <div class="stat-value">${v}</div>
-                                    <div class="stat-label">${k}</div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            } catch (err) {
-                results.innerHTML = `<p style="color: var(--error);">Error: ${err.message}</p>`;
-            }
-        }
-
-        async function getMarketBrief() {
-            const results = document.getElementById('market-results');
-            results.innerHTML = '<div class="loading">Loading...</div>';
-
-            try {
-                const res = await fetch(`${API}/market/brief?period_type=weekly`);
-                const brief = await res.json();
-
-                results.innerHTML = `
-                    <p style="margin-bottom: 1rem;">${brief.summary}</p>
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-value">${brief.stats?.total_signals || 0}</div>
-                            <div class="stat-label">Signals</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" style="color: var(--success);">${brief.stats?.accelerating || 0}</div>
-                            <div class="stat-label">Accelerating</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value" style="color: var(--error);">${brief.stats?.decelerating || 0}</div>
-                            <div class="stat-label">Decelerating</div>
-                        </div>
-                    </div>
-                `;
-            } catch (err) {
-                results.innerHTML = `<p style="color: var(--error);">Error: ${err.message}</p>`;
-            }
-        }
-
-        async function triggerScan() {
-            const results = document.getElementById('signal-results');
-            results.innerHTML = '<div class="loading">Scanning...</div>';
-
-            try {
-                const res = await fetch(`${API}/market/scan/trigger`, { method: 'POST' });
-                const data = await res.json();
-
-                if (data.signals?.length) {
-                    results.innerHTML = data.signals.map(s => `
-                        <div class="result-item">
+            // ---- Available Endpoints section ----
+            const endpoints = src.endpoints || [];
+            const allEndpoints = [...triggers, ...endpoints];
+            if (allEndpoints.length > 0) {
+                html += `<div class="ds-detail-tables">
+                    <h3>Available API Endpoints</h3>`;
+                allEndpoints.forEach(ep => {
+                    const methodColor = ep.method === 'POST' ? 'var(--success)' : ep.method === 'GET' ? 'var(--accent)' : 'var(--warning)';
+                    html += `<div class="ds-detail-table-row" style="cursor:default;margin-bottom:0.375rem;">
+                        <div style="display:flex;align-items:center;gap:0.75rem;flex:1;">
+                            <span style="background:${methodColor};color:white;padding:0.125rem 0.5rem;border-radius:4px;font-size:0.7rem;font-weight:700;font-family:monospace;min-width:40px;text-align:center;">${ep.method}</span>
                             <div>
-                                <strong>${s.signal_type?.replace('_', ' ')}</strong>
-                                <p style="color: var(--text-muted); font-size: 0.875rem;">${s.description}</p>
+                                <div style="font-size:0.85rem;font-weight:500;">${ep.label}</div>
+                                <div style="font-family:monospace;font-size:0.75rem;color:var(--text-muted);">${ep.path}</div>
                             </div>
-                            <span class="score-badge">${((s.strength || 0) * 100).toFixed(0)}%</span>
                         </div>
-                    `).join('');
+                        <a class="btn-sm" href="/docs" target="_blank" style="text-decoration:none;">Docs</a>
+                    </div>`;
+                });
+                html += `</div>`;
+            }
+
+            // ---- Tables section ----
+            html += `<div class="ds-detail-tables">
+                <h3>Database Tables</h3>`;
+
+            if (sourceTables.length === 0) {
+                html += `<div class="empty">No tables found for this source. Tables may use a different naming convention or haven't been created yet.</div>`;
+            } else {
+                sourceTables.forEach(t => {
+                    const isActive = expandedTable === t.table_name;
+                    html += `<div class="ds-detail-table-row${isActive ? ' active' : ''}" onclick="toggleTablePreview('${t.table_name}')">
+                        <div>
+                            <div class="ds-detail-table-name">${isActive ? '&#9660;' : '&#9654;'} ${t.table_name}</div>
+                        </div>
+                        <div class="ds-detail-table-stats">
+                            <span>${t.columns.length} columns</span>
+                            <span>${fmtNum(t.row_count)} rows</span>
+                        </div>
+                    </div>`;
+
+                    // Expanded table: schema + preview
+                    if (isActive) {
+                        // Schema
+                        html += `<div class="ds-detail-schema">`;
+                        if (tablePreview?.column_types) {
+                            html += t.columns.map(c =>
+                                `<span>${c}</span> <span style="color:var(--text-muted)">(${tablePreview.column_types[c] || 'unknown'})</span>`
+                            ).join(', ');
+                        } else {
+                            html += t.columns.map(c => `<span>${c}</span>`).join(', ');
+                        }
+                        html += `</div>`;
+
+                        // Preview data
+                        if (previewLoading) {
+                            html += `<div class="ds-preview-loading">Loading preview...</div>`;
+                        } else if (tablePreview && tablePreview.rows) {
+                            html += renderPreviewTable(tablePreview, t);
+                        }
+                    }
+                });
+            }
+            html += `</div>`;
+
+            // ---- Quick Actions footer ----
+            html += `<div class="ds-detail-actions">
+                <h3>Quick Actions</h3>`;
+            html += `<a class="btn btn-secondary" href="/docs" target="_blank" style="text-decoration:none;">API Docs</a>`;
+            if (sourceTables.length > 0) {
+                html += `<button class="btn btn-secondary" onclick="exportSourceTable()">Export CSV</button>`;
+            }
+            html += `</div>`;
+
+            document.getElementById('sources-content').innerHTML = html;
+        }
+
+        function renderPreviewTable(preview, tableInfo) {
+            const cols = preview.columns || [];
+            const rows = preview.rows || [];
+            const total = preview.total_rows || 0;
+            const currentPage = Math.floor(previewPage / PREVIEW_PAGE_SIZE) + 1;
+            const totalPages = Math.max(1, Math.ceil(total / PREVIEW_PAGE_SIZE));
+
+            let html = `<div class="ds-detail-preview">
+                <table><thead><tr>`;
+            cols.forEach(c => { html += `<th>${c}</th>`; });
+            html += `</tr></thead><tbody>`;
+
+            if (rows.length === 0) {
+                html += `<tr><td colspan="${cols.length}" style="text-align:center;color:var(--text-muted);">No data</td></tr>`;
+            } else {
+                rows.forEach(row => {
+                    html += '<tr>';
+                    cols.forEach(c => {
+                        const val = row[c];
+                        const display = val === null ? '<span style="color:var(--text-muted)">null</span>' : String(val);
+                        html += `<td title="${String(val ?? '')}">${display}</td>`;
+                    });
+                    html += '</tr>';
+                });
+            }
+
+            html += `</tbody></table></div>`;
+
+            // Pagination
+            html += `<div class="ds-detail-pagination">
+                <div>
+                    <button onclick="prevPreviewPage()" ${previewPage === 0 ? 'disabled' : ''}>&#8592; Prev</button>
+                    <button onclick="nextPreviewPage()" ${previewPage + PREVIEW_PAGE_SIZE >= total ? 'disabled' : ''}>Next &#8594;</button>
+                </div>
+                <span>Page ${currentPage} of ${fmtNum(totalPages)} &middot; ${fmtNum(total)} rows</span>
+                <button class="btn btn-secondary" style="padding:0.375rem 0.75rem;font-size:0.8rem;" onclick="exportSourceTable()">Export CSV</button>
+            </div>`;
+
+            return html;
+        }
+
+        async function toggleTablePreview(tableName) {
+            if (expandedTable === tableName) {
+                // Collapse
+                expandedTable = null;
+                tablePreview = null;
+                previewPage = 0;
+                renderSources();
+                return;
+            }
+            expandedTable = tableName;
+            previewPage = 0;
+            tablePreview = null;
+            previewLoading = true;
+            renderSources();
+            await loadPreview(tableName, 0);
+        }
+
+        async function loadPreview(tableName, offset) {
+            previewLoading = true;
+            try {
+                const res = await fetch(`${API}/export/tables/${encodeURIComponent(tableName)}/preview?limit=${PREVIEW_PAGE_SIZE}&offset=${offset}`);
+                if (res.ok) {
+                    tablePreview = await res.json();
                 } else {
-                    results.innerHTML = '<p style="color: var(--text-muted);">No signals detected. Try ingesting some data first.</p>';
+                    tablePreview = { columns: [], rows: [], total_rows: 0, column_types: {} };
                 }
-            } catch (err) {
-                results.innerHTML = `<p style="color: var(--error);">Error: ${err.message}</p>`;
+            } catch (e) {
+                console.error('Preview load failed:', e);
+                tablePreview = { columns: [], rows: [], total_rows: 0, column_types: {} };
+            }
+            previewLoading = false;
+            renderSources();
+        }
+
+        async function nextPreviewPage() {
+            if (!expandedTable || !tablePreview) return;
+            previewPage += PREVIEW_PAGE_SIZE;
+            await loadPreview(expandedTable, previewPage);
+        }
+
+        async function prevPreviewPage() {
+            if (!expandedTable || previewPage <= 0) return;
+            previewPage = Math.max(0, previewPage - PREVIEW_PAGE_SIZE);
+            await loadPreview(expandedTable, previewPage);
+        }
+
+        async function exportSourceTable() {
+            const tableName = expandedTable || (getTablesForSource(selectedSource)?.[0]?.table_name);
+            if (!tableName) return;
+            try {
+                const res = await fetch(`${API}/export/jobs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ table_name: tableName, format: 'csv' })
+                });
+                if (res.ok) {
+                    const job = await res.json();
+                    alert(`Export job #${job.id} created for ${tableName}. Check API docs to download when complete.`);
+                } else {
+                    const err = await res.json();
+                    alert(`Export failed: ${err.detail || 'Unknown error'}`);
+                }
+            } catch (e) {
+                alert(`Export failed: ${e.message}`);
             }
         }
 
-        // ===== Settings Tab =====
+        async function triggerCollection(triggerIndex) {
+            if (!selectedSource?.triggers?.[triggerIndex]) return;
+            const trigger = selectedSource.triggers[triggerIndex];
+            const pathHasParam = trigger.path.includes('{');
+            if (pathHasParam) {
+                alert(`This endpoint requires parameters.\n\n${trigger.method} ${trigger.path}\n\nUse the API docs (Swagger UI) to fill in the required values and run it.`);
+                window.open('/docs', '_blank');
+                return;
+            }
+            if (!confirm(`Run "${trigger.label}"?\n\n${trigger.method} ${trigger.path}`)) return;
+            try {
+                const opts = { method: trigger.method, headers: { 'Content-Type': 'application/json' } };
+                if (trigger.body) opts.body = JSON.stringify(trigger.body);
+                const res = await fetch(trigger.path, opts);
+                const data = await res.json();
+                if (res.ok) {
+                    const jobId = data.job_id || data.id || '';
+                    alert(`Collection started successfully!${jobId ? ` Job ID: ${jobId}` : ''}`);
+                } else {
+                    alert(`Failed: ${data.detail || JSON.stringify(data)}`);
+                }
+            } catch (e) {
+                alert(`Request failed: ${e.message}`);
+            }
+        }
+
+        function toggleSourceCategory(catKey) {
+            expandedCategories[catKey] = !expandedCategories[catKey];
+            if (expandedCategories[catKey] && !detailLoaded) {
+                loadPhase2().then(() => renderSources());
+            }
+            renderSources();
+        }
+
+        // Phase 1: core data on page load
+        async function loadPhase1() {
+            try {
+                const [dashRes, siteRes, schedRes, tablesRes] = await Promise.all([
+                    fetch(`${API}/jobs/monitoring/dashboard`).then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch(`${API}/site-intel/sites/collect/status`).then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch(`${API}/schedules`).then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch(`${API}/export/tables`).then(r => r.ok ? r.json() : null).catch(() => null),
+                ]);
+                dashboardData = dashRes;
+                siteIntelData = siteRes;
+                schedulesData = schedRes;
+                allTablesCache = tablesRes;
+            } catch (e) { console.error('Phase 1 load error:', e); }
+
+            document.getElementById('sources-loading').classList.add('hidden');
+            document.getElementById('sources-content').classList.remove('hidden');
+            renderSources();
+        }
+
+        // Phase 2: detail data (lazy)
+        async function loadPhase2() {
+            if (detailLoaded) return;
+            try {
+                const [auditRes, wmRes, cfgRes, actRes] = await Promise.all([
+                    fetch(`${API}/audit-trail/summary`).then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch(`${API}/site-intel/sites/watermarks`).then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch(`${API}/source-configs`).then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch(`${API}/audit-trail?limit=15`).then(r => r.ok ? r.json() : null).catch(() => null),
+                ]);
+                auditData = auditRes;
+                watermarksData = wmRes;
+                sourceConfigsData = cfgRes;
+                activityData = actRes;
+                detailLoaded = true;
+            } catch (e) { console.error('Phase 2 load error:', e); }
+        }
+
+        function refreshSources() {
+            detailLoaded = false;
+            watermarksData = null;
+            auditData = null;
+            activityData = null;
+            sourceConfigsData = null;
+            document.getElementById('sources-loading').classList.remove('hidden');
+            document.getElementById('sources-content').classList.add('hidden');
+            loadPhase1();
+        }
+
+        // Start loading sources immediately
+        loadPhase1();
+
+        // ===================================================================
+        //  SETTINGS TAB (API Key Management)
+        // ===================================================================
         let apiKeysData = [];
         let editingSource = null;
+        const collapsedCategories = {};
 
         async function loadApiKeys() {
             const container = document.getElementById('api-keys-container');
             if (!container) return;
             container.innerHTML = '<div class="loading">Loading API keys...</div>';
-
             try {
                 const res = await fetch(`${API}/settings/api-keys`);
                 apiKeysData = await res.json();
@@ -1156,213 +1548,146 @@
             }
         }
 
-        function renderApiKeys() {
+        function renderApiKeys(filterText) {
             const container = document.getElementById('api-keys-container');
             if (!container) return;
+            const filter = (filterText || '').toLowerCase().trim();
+            const visibleKeys = filter
+                ? apiKeysData.filter(k => k.source.toLowerCase().includes(filter) || k.description.toLowerCase().includes(filter) || k.category.toLowerCase().includes(filter))
+                : apiKeysData;
 
-            // Group by category
             const groups = {};
-            apiKeysData.forEach(k => {
-                if (!groups[k.category]) groups[k.category] = [];
-                groups[k.category].push(k);
-            });
+            visibleKeys.forEach(k => { if (!groups[k.category]) groups[k.category] = []; groups[k.category].push(k); });
 
-            // Preferred order
-            const categoryOrder = ['Government Data', 'LLM / AI', 'Location & Foot Traffic', 'Other'];
+            const allGroups = {};
+            apiKeysData.forEach(k => { if (!allGroups[k.category]) allGroups[k.category] = []; allGroups[k.category].push(k); });
+
+            const categoryOrder = ['Government Data','LLM / AI','Financial & Market Data','Location & Foot Traffic','Search & Web Data','Business Intelligence','Enrichment','Other'];
             const sortedCategories = categoryOrder.filter(c => groups[c]);
 
             let html = '';
-            // Summary stats
             const configured = apiKeysData.filter(k => k.configured).length;
             const total = apiKeysData.length;
-            html += `
-                <div class="stats-grid" style="margin-bottom: 1.5rem;">
-                    <div class="stat-card">
-                        <div class="stat-value" style="color: var(--success);">${configured}</div>
-                        <div class="stat-label">Configured</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" style="color: var(--text-muted);">${total - configured}</div>
-                        <div class="stat-label">Missing</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${total}</div>
-                        <div class="stat-label">Total Sources</div>
-                    </div>
-                </div>
-            `;
+            html += `<div class="stats-grid" style="margin-bottom:1.5rem;">
+                <div class="stat-card"><div class="stat-value" style="color:var(--success);">${configured}</div><div class="stat-label">Configured</div></div>
+                <div class="stat-card"><div class="stat-value" style="color:var(--text-muted);">${total - configured}</div><div class="stat-label">Missing</div></div>
+                <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Sources</div></div>
+            </div>`;
+
+            if (visibleKeys.length === 0) {
+                html += '<div class="empty">No keys match your filter.</div>';
+                container.innerHTML = html;
+                return;
+            }
 
             sortedCategories.forEach(cat => {
-                html += `<div class="key-category">`;
-                html += `<div class="key-category-title">${cat}</div>`;
-                groups[cat].forEach(k => {
-                    html += renderKeyRow(k);
-                });
+                const catKeys = groups[cat];
+                const allCatKeys = allGroups[cat] || catKeys;
+                const catConfigured = allCatKeys.filter(k => k.configured).length;
+                const catTotal = allCatKeys.length;
+                const isCollapsed = (collapsedCategories[cat] !== false) && !filter;
+                const chevronClass = isCollapsed ? 'chevron collapsed' : 'chevron';
+
+                html += `<div class="key-category" data-category="${cat}">`;
+                html += `<div class="key-category-header" onclick="toggleSettingsCategory('${cat}')">`;
+                html += `<span class="key-category-title"><span class="${chevronClass}">▼</span> ${cat}</span>`;
+                html += `<span class="key-category-count"><span class="configured-num">${catConfigured}</span> / ${catTotal} configured</span>`;
                 html += `</div>`;
+                html += `<div class="key-category-body${isCollapsed ? ' collapsed' : ''}" id="cat-body-${cat.replace(/[^a-zA-Z]/g, '')}">`;
+                catKeys.forEach(k => { html += renderKeyRow(k); });
+                html += `</div></div>`;
             });
 
             container.innerHTML = html;
         }
 
+        function toggleSettingsCategory(cat) {
+            collapsedCategories[cat] = collapsedCategories[cat] === false ? true : false;
+            renderApiKeys(document.getElementById('key-filter')?.value || '');
+        }
+
+        function filterApiKeys(text) { renderApiKeys(text); }
+
         function renderKeyRow(k) {
             const isEditing = editingSource === k.source;
             const statusClass = k.configured ? 'configured' : 'missing';
             const sourceLabel = k.configured ? k.source_type.toUpperCase() : '';
-            const sourceBadge = k.configured
-                ? `<span class="key-source-badge ${k.source_type}">${sourceLabel}</span>`
-                : '';
+            const sourceBadge = k.configured ? `<span class="key-source-badge ${k.source_type}">${sourceLabel}</span>` : '';
 
             let html = `<div class="key-row" id="key-row-${k.source}">`;
             html += `<span class="key-status-dot ${statusClass}"></span>`;
             html += `<div class="key-info">`;
             html += `<div class="key-name">${k.source} ${sourceBadge}</div>`;
-            html += `<div class="key-desc">${k.description} &mdash; <a href="${k.signup_url}" target="_blank" style="color: var(--accent);">Get key</a></div>`;
+            html += `<div class="key-desc">${k.description} &mdash; <a href="${k.signup_url}" target="_blank" style="color:var(--accent);">Get key</a></div>`;
 
-            if (k.configured && !isEditing) {
-                html += `<span class="key-masked">${k.masked_key}</span>`;
-            }
+            if (k.configured && !isEditing) html += `<span class="key-masked">${k.masked_key}</span>`;
 
             if (isEditing) {
-                html += `
-                    <div class="key-edit-row">
-                        <input type="password" class="key-edit-input" id="key-input-${k.source}"
-                               placeholder="Paste your API key here..." autofocus
-                               onkeydown="if(event.key==='Enter')saveKey('${k.source}');if(event.key==='Escape')cancelEdit();">
-                        <button class="btn-sm primary" onclick="saveKey('${k.source}')">Save</button>
-                        <button class="btn-sm" onclick="cancelEdit()">Cancel</button>
-                    </div>
-                `;
+                html += `<div class="key-edit-row">
+                    <input type="password" class="key-edit-input" id="key-input-${k.source}" placeholder="Paste your API key here..." autofocus onkeydown="if(event.key==='Enter')saveKey('${k.source}');if(event.key==='Escape')cancelEdit();">
+                    <button class="btn-sm primary" onclick="saveKey('${k.source}')">Save</button>
+                    <button class="btn-sm" onclick="cancelEdit()">Cancel</button>
+                </div>`;
             }
 
             html += `<div id="test-result-${k.source}"></div>`;
-            html += `</div>`; // key-info
+            html += `</div>`;
 
             if (!isEditing) {
                 html += `<div class="key-actions">`;
                 html += `<button class="btn-sm" onclick="editKey('${k.source}')">Edit</button>`;
                 if (k.configured) {
                     html += `<button class="btn-sm" onclick="testKey('${k.source}')">Test</button>`;
-                    if (k.source_type === 'db') {
-                        html += `<button class="btn-sm danger" onclick="deleteKey('${k.source}')">Remove</button>`;
-                    }
+                    if (k.source_type === 'db') html += `<button class="btn-sm danger" onclick="deleteKey('${k.source}')">Remove</button>`;
                 }
                 html += `</div>`;
             }
 
-            html += `</div>`; // key-row
+            html += `</div>`;
             return html;
         }
 
         function editKey(source) {
             editingSource = source;
             renderApiKeys();
-            // Focus the input after render
-            setTimeout(() => {
-                const input = document.getElementById(`key-input-${source}`);
-                if (input) input.focus();
-            }, 50);
+            setTimeout(() => { const i = document.getElementById(`key-input-${source}`); if (i) i.focus(); }, 50);
         }
 
-        function cancelEdit() {
-            editingSource = null;
-            renderApiKeys();
-        }
+        function cancelEdit() { editingSource = null; renderApiKeys(); }
 
         async function saveKey(source) {
             const input = document.getElementById(`key-input-${source}`);
             if (!input || !input.value.trim()) return;
-
-            const key = input.value.trim();
             input.disabled = true;
-
             try {
                 const res = await fetch(`${API}/settings/api-keys`, {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({source, key})
+                    body: JSON.stringify({source, key: input.value.trim()})
                 });
-                const data = await res.json();
-
-                if (res.ok) {
-                    editingSource = null;
-                    await loadApiKeys();
-                } else {
-                    showTestResult(source, false, data.detail || 'Failed to save');
-                    input.disabled = false;
-                }
-            } catch (err) {
-                showTestResult(source, false, err.message);
-                input.disabled = false;
-            }
+                if (res.ok) { editingSource = null; await loadApiKeys(); }
+                else { const d = await res.json(); showTestResult(source, false, d.detail || 'Failed to save'); input.disabled = false; }
+            } catch (err) { showTestResult(source, false, err.message); input.disabled = false; }
         }
 
         async function deleteKey(source) {
-            if (!confirm(`Remove the stored key for "${source}"? It will fall back to .env if available.`)) return;
-
-            try {
-                const res = await fetch(`${API}/settings/api-keys/${source}`, {method: 'DELETE'});
-                if (res.ok) {
-                    await loadApiKeys();
-                }
-            } catch (err) {
-                showTestResult(source, false, err.message);
-            }
+            if (!confirm(`Remove the stored key for "${source}"?`)) return;
+            try { const res = await fetch(`${API}/settings/api-keys/${source}`, {method:'DELETE'}); if (res.ok) await loadApiKeys(); }
+            catch (err) { showTestResult(source, false, err.message); }
         }
 
         async function testKey(source) {
             showTestResult(source, null, 'Testing...');
-
-            try {
-                const res = await fetch(`${API}/settings/api-keys/${source}/test`, {method: 'POST'});
-                const data = await res.json();
-                showTestResult(source, data.success, data.message);
-            } catch (err) {
-                showTestResult(source, false, err.message);
-            }
+            try { const res = await fetch(`${API}/settings/api-keys/${source}/test`, {method:'POST'}); const d = await res.json(); showTestResult(source, d.success, d.message); }
+            catch (err) { showTestResult(source, false, err.message); }
         }
 
         function showTestResult(source, success, message) {
             const el = document.getElementById(`test-result-${source}`);
             if (!el) return;
-
-            if (success === null) {
-                el.innerHTML = `<div class="test-result" style="color: var(--text-muted);">${message}</div>`;
-            } else {
-                const cls = success ? 'success' : 'failure';
-                el.innerHTML = `<div class="test-result ${cls}">${success ? '✓' : '✗'} ${message}</div>`;
-            }
-            // Auto-clear after 5 seconds
+            if (success === null) el.innerHTML = `<div class="test-result" style="color:var(--text-muted);">${message}</div>`;
+            else el.innerHTML = `<div class="test-result ${success ? 'success' : 'failure'}">${success ? '✓' : '✗'} ${message}</div>`;
             setTimeout(() => { if (el) el.innerHTML = ''; }, 5000);
-        }
-
-        async function getNetwork() {
-            const results = document.getElementById('network-results');
-            results.innerHTML = '<div class="loading">Loading...</div>';
-
-            try {
-                const res = await fetch(`${API}/network/central?limit=15`);
-                const investors = await res.json();
-
-                if (investors?.length) {
-                    results.innerHTML = investors.map((inv, i) => `
-                        <div class="result-item">
-                            <div>
-                                <span style="color: var(--text-muted);">#${i+1}</span>
-                                <strong style="margin-left: 0.5rem;">${inv.name}</strong>
-                                <span style="color: var(--text-muted); margin-left: 0.5rem;">${inv.location || ''}</span>
-                            </div>
-                            <div>
-                                <span style="color: var(--text-muted); margin-right: 0.5rem;">${inv.degree} connections</span>
-                                <span class="score-badge" style="background: var(--accent);">${inv.type?.replace('_', ' ')}</span>
-                            </div>
-                        </div>
-                    `).join('');
-                } else {
-                    results.innerHTML = '<p style="color: var(--text-muted);">No network data available.</p>';
-                }
-            } catch (err) {
-                results.innerHTML = `<p style="color: var(--error);">Error: ${err.message}</p>`;
-            }
         }
     </script>
 </body>

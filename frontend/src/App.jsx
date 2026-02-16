@@ -3,6 +3,7 @@ import CompanyResearch from './components/CompanyResearch'
 import DealPipeline from './components/DealPipeline'
 import MarketIntel from './components/MarketIntel'
 import NetworkGraph from './components/NetworkGraph'
+import DataSources from './components/DataSources'
 
 const API_BASE = '/api/v1'
 
@@ -30,6 +31,7 @@ function App() {
     { id: 'deals', label: '💼 Deals', icon: '💼' },
     { id: 'market', label: '📊 Market', icon: '📊' },
     { id: 'network', label: '🕸️ Network', icon: '🕸️' },
+    { id: 'sources', label: '📡 Sources', icon: '📡' },
   ]
 
   return (
@@ -66,6 +68,7 @@ function App() {
         {activeTab === 'deals' && <DealPipeline />}
         {activeTab === 'market' && <MarketIntel />}
         {activeTab === 'network' && <NetworkGraph />}
+        {activeTab === 'sources' && <DataSources />}
       </main>
 
       <footer className="footer">

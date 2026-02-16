@@ -2,12 +2,11 @@
 BTS Transportation Collector.
 
 Fetches transportation infrastructure data from Bureau of Transportation Statistics:
-- Intermodal terminals (rail/truck)
-- Ports and waterways
+- Major ports (tonnage data)
 - Airports with cargo facilities
 
 Data sources:
-- National Transportation Atlas Database (NTAD)
+- National Transportation Atlas Database (NTAD) via geo.dot.gov Hosted FeatureServer
 - BTS Open Data Portal
 
 No API key required - public data via ArcGIS REST services.
@@ -34,9 +33,8 @@ class BTSTransportCollector(BaseCollector):
     Collector for BTS/NTAD transportation infrastructure data.
 
     Fetches:
-    - Intermodal terminals (rail-truck transfer facilities)
-    - Major ports
-    - Airports with cargo facilities
+    - Major ports (tonnage, import/export data)
+    - Airports (FAA facilities database)
     """
 
     domain = SiteIntelDomain.TRANSPORT
@@ -46,16 +44,15 @@ class BTSTransportCollector(BaseCollector):
     default_timeout = 120.0
     rate_limit_delay = 0.3
 
-    # NTAD ArcGIS REST endpoints
-    INTERMODAL_URL = "https://geo.dot.gov/server/rest/services/NTAD/Intermodal_Freight_Facilities/MapServer/0/query"
-    PORTS_URL = "https://geo.dot.gov/server/rest/services/NTAD/Principal_Ports/MapServer/0/query"
-    AIRPORTS_URL = "https://geo.dot.gov/server/rest/services/NTAD/Aviation_Facilities/MapServer/0/query"
+    # Updated NTAD ArcGIS REST endpoints (Hosted FeatureServer)
+    PORTS_URL = "https://geo.dot.gov/server/rest/services/Hosted/Major_Ports/FeatureServer/0/query"
+    AIRPORTS_URL = "https://geo.dot.gov/server/rest/services/Hosted/Airports_/FeatureServer/0/query"
 
     def __init__(self, db: Session, api_key: Optional[str] = None, **kwargs):
         super().__init__(db, api_key, **kwargs)
 
     def get_default_base_url(self) -> str:
-        return "https://geo.dot.gov/server/rest/services/NTAD"
+        return "https://geo.dot.gov/server/rest/services/Hosted"
 
     def get_default_headers(self) -> Dict[str, str]:
         return {
@@ -67,21 +64,13 @@ class BTSTransportCollector(BaseCollector):
         """
         Execute BTS data collection.
 
-        Collects intermodal terminals, ports, and airports.
+        Collects ports and airports.
         """
         total_inserted = 0
         total_processed = 0
         errors = []
 
         try:
-            # Collect intermodal terminals
-            logger.info("Collecting BTS intermodal terminal data...")
-            intermodal_result = await self._collect_intermodal_terminals(config)
-            total_inserted += intermodal_result.get("inserted", 0)
-            total_processed += intermodal_result.get("processed", 0)
-            if intermodal_result.get("error"):
-                errors.append({"source": "intermodal", "error": intermodal_result["error"]})
-
             # Collect ports
             logger.info("Collecting BTS port data...")
             ports_result = await self._collect_ports(config)
@@ -115,137 +104,21 @@ class BTSTransportCollector(BaseCollector):
                 error_message=str(e),
             )
 
-    async def _collect_intermodal_terminals(self, config: CollectionConfig) -> Dict[str, Any]:
-        """
-        Collect intermodal freight facilities from NTAD.
-        """
-        try:
-            all_terminals = []
-            offset = 0
-            page_size = 1000
-
-            # Build state filter
-            state_filter = ""
-            if config.states:
-                state_list = ", ".join(f"'{s}'" for s in config.states)
-                state_filter = f"STATE IN ({state_list})"
-
-            while True:
-                params = {
-                    "where": state_filter if state_filter else "1=1",
-                    "outFields": "*",
-                    "returnGeometry": "true",
-                    "f": "json",
-                    "resultOffset": offset,
-                    "resultRecordCount": page_size,
-                }
-
-                response = await self._fetch_arcgis(self.INTERMODAL_URL, params)
-                features = response.get("features", [])
-
-                if not features:
-                    break
-
-                all_terminals.extend(features)
-                logger.info(f"Fetched {len(features)} intermodal records (total: {len(all_terminals)})")
-
-                if len(features) < page_size:
-                    break
-
-                offset += page_size
-
-            # Transform records
-            records = []
-            for feature in all_terminals:
-                transformed = self._transform_intermodal(feature)
-                if transformed:
-                    records.append(transformed)
-
-            # Insert into database
-            if records:
-                inserted, _ = self.bulk_upsert(
-                    IntermodalTerminal,
-                    records,
-                    unique_columns=["ntad_id"],
-                    update_columns=[
-                        "name", "city", "state", "county", "latitude", "longitude",
-                        "railroad", "terminal_type", "has_container", "has_trailer",
-                        "collected_at"
-                    ],
-                )
-                return {"processed": len(all_terminals), "inserted": inserted}
-
-            return {"processed": 0, "inserted": 0}
-
-        except Exception as e:
-            logger.error(f"Failed to collect intermodal terminals: {e}", exc_info=True)
-            return {"processed": 0, "inserted": 0, "error": str(e)}
-
-    def _transform_intermodal(self, feature: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Transform NTAD intermodal feature to database format."""
-        attrs = feature.get("attributes", {})
-        geometry = feature.get("geometry", {})
-
-        ntad_id = attrs.get("OBJECTID") or attrs.get("ID")
-        if not ntad_id:
-            return None
-
-        lat, lng = None, None
-        if geometry:
-            lng = geometry.get("x")
-            lat = geometry.get("y")
-
-        return {
-            "ntad_id": str(ntad_id),
-            "name": attrs.get("NAME") or attrs.get("FACILITY"),
-            "city": attrs.get("CITY"),
-            "state": attrs.get("STATE") or attrs.get("STATEABBR"),
-            "county": attrs.get("COUNTY"),
-            "latitude": lat,
-            "longitude": lng,
-            "railroad": attrs.get("RAILROAD") or attrs.get("RR"),
-            "terminal_type": self._determine_terminal_type(attrs),
-            "has_container": attrs.get("CONTAINER") == "Y" or attrs.get("CONTAINER") == 1,
-            "has_trailer": attrs.get("TRAILER") == "Y" or attrs.get("TRAILER") == 1,
-            "source": "bts_ntad",
-            "collected_at": datetime.utcnow(),
-        }
-
-    def _determine_terminal_type(self, attrs: Dict[str, Any]) -> str:
-        """Determine terminal type from attributes."""
-        facility_type = attrs.get("FACTYPE") or attrs.get("TYPE") or ""
-        facility_type = facility_type.lower()
-
-        if "rail" in facility_type and "truck" in facility_type:
-            return "rail_truck"
-        elif "rail" in facility_type:
-            return "rail"
-        elif "truck" in facility_type:
-            return "truck"
-        elif "port" in facility_type or "marine" in facility_type:
-            return "port"
-        else:
-            return "intermodal"
-
     async def _collect_ports(self, config: CollectionConfig) -> Dict[str, Any]:
         """
-        Collect principal ports from NTAD.
+        Collect major ports from NTAD Hosted FeatureServer.
         """
         try:
             all_ports = []
             offset = 0
             page_size = 1000
 
-            state_filter = ""
-            if config.states:
-                state_list = ", ".join(f"'{s}'" for s in config.states)
-                state_filter = f"STATE_POST IN ({state_list})"
-
             while True:
                 params = {
-                    "where": state_filter if state_filter else "1=1",
+                    "where": "1=1",
                     "outFields": "*",
                     "returnGeometry": "true",
+                    "outSR": "4326",
                     "f": "json",
                     "resultOffset": offset,
                     "resultRecordCount": page_size,
@@ -265,23 +138,24 @@ class BTSTransportCollector(BaseCollector):
 
                 offset += page_size
 
-            # Transform records
-            records = []
+            # Transform and dedup records
+            seen_codes = {}
             for feature in all_ports:
                 transformed = self._transform_port(feature)
                 if transformed:
-                    records.append(transformed)
+                    seen_codes[transformed["port_code"]] = transformed
+            records = list(seen_codes.values())
 
             # Insert into database
             if records:
                 inserted, _ = self.bulk_upsert(
                     Port,
                     records,
-                    unique_columns=["ntad_port_id"],
+                    unique_columns=["port_code"],
                     update_columns=[
                         "name", "city", "state", "latitude", "longitude",
-                        "port_type", "total_tons", "domestic_tons", "foreign_tons",
-                        "imports_tons", "exports_tons", "collected_at"
+                        "port_type", "has_container_terminal", "has_bulk_terminal",
+                        "channel_depth_ft", "collected_at"
                     ],
                 )
                 return {"processed": len(all_ports), "inserted": inserted}
@@ -290,6 +164,10 @@ class BTSTransportCollector(BaseCollector):
 
         except Exception as e:
             logger.error(f"Failed to collect ports: {e}", exc_info=True)
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
             return {"processed": 0, "inserted": 0, "error": str(e)}
 
     def _transform_port(self, feature: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -297,7 +175,8 @@ class BTSTransportCollector(BaseCollector):
         attrs = feature.get("attributes", {})
         geometry = feature.get("geometry", {})
 
-        port_id = attrs.get("PORT_ID") or attrs.get("OBJECTID")
+        # New hosted service uses lowercase field names
+        port_id = attrs.get("port") or attrs.get("PORT") or attrs.get("objectid")
         if not port_id:
             return None
 
@@ -306,28 +185,35 @@ class BTSTransportCollector(BaseCollector):
             lng = geometry.get("x")
             lat = geometry.get("y")
 
+        total = self._safe_int(attrs.get("total") or attrs.get("TOTAL")) or 0
+        foreign = self._safe_int(attrs.get("foreign_") or attrs.get("FOREIGN")) or 0
+
+        # Parse state from port_name (e.g. "Unalaska Island, AK")
+        port_name = attrs.get("port_name") or attrs.get("PORT_NAME") or f"Port {port_id}"
+        state = None
+        city = None
+        if ", " in port_name:
+            parts = port_name.rsplit(", ", 1)
+            city = parts[0]
+            state = parts[1].strip()[:2] if len(parts) > 1 else None
+
         return {
-            "ntad_port_id": str(port_id),
-            "name": attrs.get("PORT_NAME") or attrs.get("NAME"),
-            "city": attrs.get("CITY"),
-            "state": attrs.get("STATE_POST") or attrs.get("STATE"),
+            "port_code": str(port_id),
+            "name": port_name,
+            "city": city,
+            "state": state,
             "latitude": lat,
             "longitude": lng,
-            "port_type": self._determine_port_type(attrs),
-            "total_tons": self._safe_int(attrs.get("TOTAL")),
-            "domestic_tons": self._safe_int(attrs.get("DOMESTIC")),
-            "foreign_tons": self._safe_int(attrs.get("FOREIGN")),
-            "imports_tons": self._safe_int(attrs.get("IMPORTS")),
-            "exports_tons": self._safe_int(attrs.get("EXPORTS")),
+            "port_type": self._determine_port_type(total, foreign),
+            "has_container_terminal": foreign > total * 0.3 if total > 0 else None,
+            "has_bulk_terminal": total > 1000000,
+            "channel_depth_ft": None,
             "source": "bts_ntad",
             "collected_at": datetime.utcnow(),
         }
 
-    def _determine_port_type(self, attrs: Dict[str, Any]) -> str:
-        """Determine port type from attributes."""
-        total = self._safe_int(attrs.get("TOTAL")) or 0
-        foreign = self._safe_int(attrs.get("FOREIGN")) or 0
-
+    def _determine_port_type(self, total: int, foreign: int) -> str:
+        """Determine port type from tonnage data."""
         if foreign > total * 0.5:
             return "international"
         elif total > 10000000:  # > 10M tons
@@ -337,24 +223,25 @@ class BTSTransportCollector(BaseCollector):
 
     async def _collect_airports(self, config: CollectionConfig) -> Dict[str, Any]:
         """
-        Collect airports from NTAD, focusing on those with cargo facilities.
+        Collect airports from NTAD Hosted FeatureServer.
         """
         try:
             all_airports = []
             offset = 0
             page_size = 2000
 
-            # Focus on larger airports that likely have cargo
-            state_filter = "FAC_TYPE = 'AIRPORT'"
+            # Filter for airports only (new service uses lowercase field names)
+            state_filter = "fac_type = 'AIRPORT'"
             if config.states:
                 state_list = ", ".join(f"'{s}'" for s in config.states)
-                state_filter += f" AND STATE IN ({state_list})"
+                state_filter += f" AND state IN ({state_list})"
 
             while True:
                 params = {
                     "where": state_filter,
                     "outFields": "*",
                     "returnGeometry": "true",
+                    "outSR": "4326",
                     "f": "json",
                     "resultOffset": offset,
                     "resultRecordCount": page_size,
@@ -374,23 +261,24 @@ class BTSTransportCollector(BaseCollector):
 
                 offset += page_size
 
-            # Transform records
-            records = []
+            # Transform and dedup by FAA code
+            seen_codes = {}
             for feature in all_airports:
                 transformed = self._transform_airport(feature)
                 if transformed:
-                    records.append(transformed)
+                    seen_codes[transformed["faa_code"]] = transformed
+            records = list(seen_codes.values())
 
             # Insert into database
             if records:
                 inserted, _ = self.bulk_upsert(
                     Airport,
                     records,
-                    unique_columns=["faa_id"],
+                    unique_columns=["faa_code"],
                     update_columns=[
-                        "icao_id", "name", "city", "state", "county",
-                        "latitude", "longitude", "airport_type", "ownership",
-                        "has_cargo_facility", "runway_length_ft", "collected_at"
+                        "icao_code", "name", "city", "state",
+                        "latitude", "longitude", "airport_type",
+                        "has_cargo_facility", "longest_runway_ft", "collected_at"
                     ],
                 )
                 return {"processed": len(all_airports), "inserted": inserted}
@@ -399,6 +287,10 @@ class BTSTransportCollector(BaseCollector):
 
         except Exception as e:
             logger.error(f"Failed to collect airports: {e}", exc_info=True)
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
             return {"processed": 0, "inserted": 0, "error": str(e)}
 
     def _transform_airport(self, feature: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -406,7 +298,11 @@ class BTSTransportCollector(BaseCollector):
         attrs = feature.get("attributes", {})
         geometry = feature.get("geometry", {})
 
-        faa_id = attrs.get("LOCID") or attrs.get("FAA_ID") or attrs.get("IDENT")
+        # New hosted service uses lowercase field names
+        faa_id = (
+            attrs.get("locid") or attrs.get("loc_id") or
+            attrs.get("LOCID") or attrs.get("FAA_ID")
+        )
         if not faa_id:
             return None
 
@@ -415,47 +311,44 @@ class BTSTransportCollector(BaseCollector):
             lng = geometry.get("x")
             lat = geometry.get("y")
 
-        # Determine if airport has cargo - based on airport class/type
-        airport_use = (attrs.get("USE") or "").upper()
-        airport_class = (attrs.get("CLASS") or "").upper()
-        has_cargo = (
-            "CARGO" in airport_use or
-            "COMMERCIAL" in airport_class or
-            attrs.get("COMMERCIAL") == "Y" or
-            (attrs.get("ENPLANEMENTS") or 0) > 10000
-        )
+        # Determine if airport has cargo based on hub classification
+        hub = (attrs.get("hub") or attrs.get("HUB") or "").upper()
+        has_cargo = hub in ("L", "M", "S")  # Large, Medium, Small hub
 
         return {
-            "faa_id": faa_id,
-            "icao_id": attrs.get("ICAO_ID") or attrs.get("ICAO"),
-            "name": attrs.get("FULLNAME") or attrs.get("NAME") or attrs.get("ARPT_NAME"),
-            "city": attrs.get("CITY"),
-            "state": attrs.get("STATE") or attrs.get("STATE_CODE"),
-            "county": attrs.get("COUNTY"),
+            "faa_code": faa_id,
+            "icao_code": attrs.get("icao_identifier") or attrs.get("ICAO_ID"),
+            "name": (
+                attrs.get("fac_name") or attrs.get("FULLNAME") or
+                attrs.get("airport") or f"Airport {faa_id}"
+            ),
+            "city": attrs.get("city") or attrs.get("CITY"),
+            "state": attrs.get("state") or attrs.get("STATE"),
             "latitude": lat,
             "longitude": lng,
             "airport_type": self._determine_airport_type(attrs),
-            "ownership": attrs.get("OWNERSHIP") or attrs.get("OWNER_TYPE"),
             "has_cargo_facility": has_cargo,
-            "runway_length_ft": self._safe_int(attrs.get("MAX_RUNWAY_LENGTH") or attrs.get("RUNWAY_LENGTH")),
+            "longest_runway_ft": None,
             "source": "bts_ntad",
             "collected_at": datetime.utcnow(),
         }
 
     def _determine_airport_type(self, attrs: Dict[str, Any]) -> str:
-        """Determine airport type from attributes."""
-        fac_type = (attrs.get("FAC_TYPE") or "").lower()
-        airport_class = (attrs.get("CLASS") or "").lower()
+        """Determine airport type from hub classification."""
+        hub = (attrs.get("hub") or attrs.get("HUB") or "").upper()
+        role = (attrs.get("role") or attrs.get("ROLE") or "").lower()
 
-        if "large" in airport_class or "hub" in airport_class:
+        if hub == "L":
             return "large_hub"
-        elif "medium" in airport_class:
+        elif hub == "M":
             return "medium_hub"
-        elif "small" in airport_class:
+        elif hub == "S":
             return "small_hub"
-        elif "reliever" in airport_class:
+        elif hub == "N":
+            return "non_hub"
+        elif "reliever" in role:
             return "reliever"
-        elif "general" in fac_type:
+        elif "general" in role:
             return "general_aviation"
         else:
             return "other"
@@ -468,10 +361,14 @@ class BTSTransportCollector(BaseCollector):
         try:
             response = await client.get(url, params=params)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            if "error" in data:
+                logger.error(f"ArcGIS error: {data['error']}")
+                return {"features": []}
+            return data
         except Exception as e:
             logger.error(f"ArcGIS request failed: {url} - {e}")
-            raise
+            return {"features": []}
 
     def _safe_int(self, value: Any) -> Optional[int]:
         """Safely convert value to int."""

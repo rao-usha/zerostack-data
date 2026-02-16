@@ -64,7 +64,7 @@ class FEMARiskCollector(BaseCollector):
     rate_limit_delay = 0.5
 
     # NRI ArcGIS REST endpoint
-    NRI_URL = "https://services.arcgis.com/XG15cJAlne2vxtgt/arcgis/rest/services/NRI_counties/FeatureServer/0/query"
+    NRI_URL = "https://services.arcgis.com/XG15cJAlne2vxtgt/arcgis/rest/services/National_Risk_Index_Counties/FeatureServer/0/query"
 
     def __init__(self, db: Session, api_key: Optional[str] = None, **kwargs):
         super().__init__(db, api_key, **kwargs)
@@ -160,12 +160,14 @@ class FEMARiskCollector(BaseCollector):
 
                 offset += page_size
 
-            # Transform records
-            records = []
+            # Transform records, dedup by county_fips (API may return duplicates)
+            seen_fips = {}
             for feature in all_counties:
                 transformed = self._transform_nri_record(feature)
                 if transformed:
-                    records.append(transformed)
+                    fips = transformed["county_fips"]
+                    seen_fips[fips] = transformed  # last wins
+            records = list(seen_fips.values())
 
             # Insert into database
             if records:
@@ -187,13 +189,17 @@ class FEMARiskCollector(BaseCollector):
 
         except Exception as e:
             logger.error(f"Failed to collect NRI data: {e}", exc_info=True)
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
             return {"processed": 0, "inserted": 0, "error": str(e)}
 
     def _transform_nri_record(self, feature: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Transform FEMA NRI feature to database format."""
         attrs = feature.get("attributes", {})
 
-        county_fips = attrs.get("COUNTYFIPS") or attrs.get("STCOFIPS")
+        county_fips = attrs.get("STCOFIPS") or attrs.get("COUNTYFIPS")
         if not county_fips:
             return None
 

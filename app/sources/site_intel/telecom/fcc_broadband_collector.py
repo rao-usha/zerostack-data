@@ -107,9 +107,9 @@ class FCCBroadbandCollector(BaseCollector):
 
         result = self.create_result(
             status=CollectionStatus.SUCCESS if inserted > 0 else CollectionStatus.PARTIAL,
-            records_collected=len(all_records),
-            records_inserted=inserted,
-            errors=errors,
+            total=len(all_records),
+            processed=len(all_records),
+            inserted=inserted,
         )
         self.complete_job(result)
         return result
