@@ -158,12 +158,14 @@ class EPAEnvirofactsCollector(BaseCollector):
             if not all_facilities:
                 return {"processed": 0, "inserted": 0}
 
-            # Transform and filter
-            records = []
+            # Transform, filter, and dedup by epa_id (API may return duplicates across pages)
+            seen_ids = {}
             for facility in all_facilities:
                 transformed = self._transform_tri_facility(facility)
                 if transformed:
-                    records.append(transformed)
+                    epa_id = transformed["epa_id"]
+                    seen_ids[epa_id] = transformed  # last wins
+            records = list(seen_ids.values())
 
             if records:
                 inserted, _ = self.bulk_upsert(
@@ -182,7 +184,11 @@ class EPAEnvirofactsCollector(BaseCollector):
             return {"processed": len(all_facilities), "inserted": 0}
 
         except Exception as e:
-            logger.error(f"Failed to collect TRI facilities: {e}")
+            logger.error(f"Failed to collect TRI facilities: {e}", exc_info=True)
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
             return {"processed": 0, "inserted": 0, "error": str(e)}
 
     def _transform_tri_facility(self, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -204,7 +210,7 @@ class EPAEnvirofactsCollector(BaseCollector):
         lng = self._parse_float(record.get("longitude"))
 
         return {
-            "epa_id": str(facility_id),
+            "epa_id": str(facility_id).strip(),
             "facility_name": facility_name,
             "facility_type": record.get("industry_sector_code"),
             "address": record.get("street_address"),

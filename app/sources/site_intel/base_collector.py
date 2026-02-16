@@ -342,23 +342,55 @@ class BaseCollector(ABC):
         for i in range(0, len(records), batch_size):
             batch = records[i:i + batch_size]
 
-            stmt = insert(model).values(batch)
+            # Deduplicate batch by unique columns to prevent CardinalityViolation
+            seen = {}
+            deduped_batch = []
+            for rec in batch:
+                key = tuple(rec.get(col) for col in unique_columns)
+                if key not in seen:
+                    seen[key] = True
+                    deduped_batch.append(rec)
+            batch = deduped_batch
 
-            if update_columns:
-                update_dict = {col: stmt.excluded[col] for col in update_columns}
-                stmt = stmt.on_conflict_do_update(
-                    index_elements=unique_columns,
-                    set_=update_dict,
-                )
-            else:
-                stmt = stmt.on_conflict_do_nothing(index_elements=unique_columns)
+            try:
+                stmt = insert(model).values(batch)
 
-            result = self.db.execute(stmt)
-            self.db.commit()
+                if update_columns:
+                    update_dict = {col: stmt.excluded[col] for col in update_columns}
+                    stmt = stmt.on_conflict_do_update(
+                        index_elements=unique_columns,
+                        set_=update_dict,
+                    )
+                else:
+                    stmt = stmt.on_conflict_do_nothing(index_elements=unique_columns)
 
-            # PostgreSQL returns rowcount for affected rows
-            batch_affected = result.rowcount
-            inserted += batch_affected
+                result = self.db.execute(stmt)
+                self.db.commit()
+
+                # PostgreSQL returns rowcount for affected rows
+                batch_affected = result.rowcount
+                inserted += batch_affected
+            except Exception as e:
+                logger.warning(f"Batch upsert failed ({len(batch)} records), retrying individually: {e}")
+                self.db.rollback()
+                # Fall back to individual record inserts
+                for rec in batch:
+                    try:
+                        stmt = insert(model).values([rec])
+                        if update_columns:
+                            update_dict = {col: stmt.excluded[col] for col in update_columns}
+                            stmt = stmt.on_conflict_do_update(
+                                index_elements=unique_columns,
+                                set_=update_dict,
+                            )
+                        else:
+                            stmt = stmt.on_conflict_do_nothing(index_elements=unique_columns)
+                        result = self.db.execute(stmt)
+                        self.db.commit()
+                        inserted += result.rowcount
+                    except Exception as rec_err:
+                        logger.debug(f"Skipping record: {rec_err}")
+                        self.db.rollback()
 
         return inserted, updated
 
