@@ -356,6 +356,106 @@ async def check_and_notify_alerts(
     }
 
 
+async def check_consecutive_failures(
+    db: Session,
+    threshold: int = 3,
+) -> List[Dict[str, Any]]:
+    """
+    Check for site intel sources with N consecutive failures.
+
+    Queries SiteIntelCollectionJob for sources where the last N jobs all failed.
+
+    Args:
+        db: Database session
+        threshold: Number of consecutive failures to trigger alert
+
+    Returns:
+        List of sources with consecutive failures
+    """
+    from app.core.models_site_intel import SiteIntelCollectionJob
+
+    # Get distinct domain/source pairs
+    pairs = db.query(
+        SiteIntelCollectionJob.domain,
+        SiteIntelCollectionJob.source,
+    ).distinct().all()
+
+    alerts = []
+    for domain_val, source_val in pairs:
+        # Get last N jobs for this source
+        recent_jobs = (
+            db.query(SiteIntelCollectionJob)
+            .filter(
+                SiteIntelCollectionJob.domain == domain_val,
+                SiteIntelCollectionJob.source == source_val,
+            )
+            .order_by(SiteIntelCollectionJob.created_at.desc())
+            .limit(threshold)
+            .all()
+        )
+
+        if len(recent_jobs) < threshold:
+            continue
+
+        # Check if all are failed
+        if all(j.status == "failed" for j in recent_jobs):
+            alerts.append({
+                "domain": domain_val,
+                "source": source_val,
+                "consecutive_failures": len(recent_jobs),
+                "last_error": recent_jobs[0].error_message[:200] if recent_jobs[0].error_message else None,
+                "last_failure_at": recent_jobs[0].created_at.isoformat() if recent_jobs[0].created_at else None,
+            })
+
+    return alerts
+
+
+async def check_and_notify_consecutive_failures(
+    threshold: int = 3,
+) -> Dict[str, Any]:
+    """
+    Check for consecutive failures and send webhook notifications.
+
+    Args:
+        threshold: Number of consecutive failures to trigger alert
+
+    Returns:
+        Summary of alerts found and notifications sent
+    """
+    from app.core.database import get_session_factory
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+
+    try:
+        alerts = await check_consecutive_failures(db, threshold=threshold)
+
+        if not alerts:
+            return {"alerts_found": 0, "notifications_sent": 0}
+
+        notifications_sent = 0
+        for alert in alerts:
+            try:
+                result = await webhook_service.notify_consecutive_failures(
+                    source=alert["source"],
+                    count=alert["consecutive_failures"],
+                    domain=alert["domain"],
+                )
+                if result.get("successful", 0) > 0:
+                    notifications_sent += 1
+            except Exception as e:
+                logger.error(f"Failed to send consecutive failure alert: {e}")
+
+        return {
+            "alerts_found": len(alerts),
+            "notifications_sent": notifications_sent,
+            "alerts": alerts,
+        }
+
+    finally:
+        db.close()
+
+
 async def notify_job_completion(
     job_id: int,
     source: str,

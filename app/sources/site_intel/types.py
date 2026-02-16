@@ -136,6 +136,7 @@ class CollectionConfig(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     year: Optional[int] = None
+    since: Optional[datetime] = None  # Watermark: only collect data after this timestamp
 
     # Pagination
     limit: Optional[int] = None

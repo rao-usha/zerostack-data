@@ -27,6 +27,7 @@ class ScheduleFrequency(str, enum.Enum):
     DAILY = "daily"
     WEEKLY = "weekly"
     MONTHLY = "monthly"
+    QUARTERLY = "quarterly"
     CUSTOM = "custom"  # For cron expressions
 
 
@@ -121,10 +122,68 @@ class IngestionSchedule(Base):
         )
 
 
+class SourceConfig(Base):
+    """
+    Per-source configuration for timeouts, retries, and rate limiting.
+
+    Missing rows fall back to global defaults. Allows sources like Census
+    (long-running) to have different timeouts than Treasury (fast).
+    """
+    __tablename__ = "source_configs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source = Column(String(50), unique=True, nullable=False, index=True)
+    timeout_seconds = Column(Integer, default=21600)  # 6 hours
+    max_retries = Column(Integer, default=3)
+    retry_backoff_base_min = Column(Integer, default=5)
+    retry_backoff_max_min = Column(Integer, default=1440)  # 24 hours
+    retry_backoff_multiplier = Column(Integer, default=2)
+    rate_limit_rps = Column(Numeric(6, 2), default=5.0)
+    max_concurrent = Column(Integer, default=4)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return (
+            f"<SourceConfig(source={self.source}, timeout={self.timeout_seconds}s, "
+            f"retries={self.max_retries})>"
+        )
+
+
+class CollectionAuditLog(Base):
+    """
+    Audit trail for all collection triggers (API, schedule, retry).
+
+    Records who/what triggered a collection, when, and with what config.
+    """
+    __tablename__ = "collection_audit_log"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    trigger_type = Column(String(20), nullable=False, index=True)  # api, schedule, retry
+    trigger_source = Column(String(255), nullable=True)  # endpoint path or schedule_id
+    domain = Column(String(50), nullable=True, index=True)
+    source = Column(String(50), nullable=False, index=True)
+    job_id = Column(Integer, nullable=True, index=True)
+    job_type = Column(String(20), nullable=True)  # ingestion, site_intel
+    config_snapshot = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    __table_args__ = (
+        Index('idx_audit_source_created', 'source', 'created_at'),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<CollectionAuditLog(id={self.id}, trigger={self.trigger_type}, "
+            f"source={self.source}, job_id={self.job_id})>"
+        )
+
+
 class DatasetRegistry(Base):
     """
     Metadata registry for all ingested datasets.
-    
+
     Each unique dataset (source + identifier) gets one entry.
     """
     __tablename__ = "dataset_registry"
@@ -1477,6 +1536,9 @@ class WebhookEventType(str, enum.Enum):
     ALERT_DATA_STALENESS = "alert_data_staleness"
     SCHEDULE_TRIGGERED = "schedule_triggered"
     CLEANUP_COMPLETED = "cleanup_completed"
+    SITE_INTEL_FAILED = "site_intel_failed"
+    SITE_INTEL_SUCCESS = "site_intel_success"
+    ALERT_CONSECUTIVE_FAILURES = "alert_consecutive_failures"
 
 
 class Webhook(Base):
@@ -2616,3 +2678,22 @@ class LLMUsage(Base):
             f"tokens={self.input_tokens}+{self.output_tokens}, "
             f"cost=${self.cost_usd}, source='{self.source}')>"
         )
+
+
+class SourceAPIKey(Base):
+    """
+    Stores encrypted API keys for external data sources.
+
+    Keys are Fernet-encrypted at rest and decrypted only when read.
+    DB keys take priority over .env keys.
+    """
+    __tablename__ = "source_api_keys"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source = Column(String(50), unique=True, nullable=False)  # "fred", "eia", "census", etc.
+    encrypted_key = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<SourceAPIKey(source='{self.source}', updated_at={self.updated_at})>"

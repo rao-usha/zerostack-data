@@ -105,6 +105,9 @@ def format_slack_payload(
         WebhookEventType.ALERT_DATA_STALENESS: ":calendar:",
         WebhookEventType.SCHEDULE_TRIGGERED: ":clock3:",
         WebhookEventType.CLEANUP_COMPLETED: ":broom:",
+        WebhookEventType.SITE_INTEL_FAILED: ":rotating_light:",
+        WebhookEventType.SITE_INTEL_SUCCESS: ":satellite:",
+        WebhookEventType.ALERT_CONSECUTIVE_FAILURES: ":fire:",
     }
 
     color_map = {
@@ -115,6 +118,9 @@ def format_slack_payload(
         WebhookEventType.ALERT_DATA_STALENESS: "warning",
         WebhookEventType.SCHEDULE_TRIGGERED: "#439FE0",
         WebhookEventType.CLEANUP_COMPLETED: "good",
+        WebhookEventType.SITE_INTEL_FAILED: "danger",
+        WebhookEventType.SITE_INTEL_SUCCESS: "good",
+        WebhookEventType.ALERT_CONSECUTIVE_FAILURES: "danger",
     }
 
     emoji = emoji_map.get(event_type, ":bell:")
@@ -160,6 +166,9 @@ def format_discord_payload(
         WebhookEventType.ALERT_DATA_STALENESS: 0xFFA500,
         WebhookEventType.SCHEDULE_TRIGGERED: 0x0099FF,  # Blue
         WebhookEventType.CLEANUP_COMPLETED: 0x00FF00,
+        WebhookEventType.SITE_INTEL_FAILED: 0xFF0000,
+        WebhookEventType.SITE_INTEL_SUCCESS: 0x00FF00,
+        WebhookEventType.ALERT_CONSECUTIVE_FAILURES: 0xFF4500,  # OrangeRed
     }
 
     color = color_map.get(event_type, 0x808080)
@@ -534,6 +543,52 @@ def get_webhook_deliveries(
     ).order_by(
         WebhookDelivery.created_at.desc()
     ).limit(limit).all()
+
+
+async def notify_site_intel_result(
+    domain: str,
+    source: str,
+    job_id: int,
+    status: str,
+    inserted: int = 0,
+    error_msg: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Send notification for a site intel collection result."""
+    event_type = (
+        WebhookEventType.SITE_INTEL_SUCCESS
+        if status == "success"
+        else WebhookEventType.SITE_INTEL_FAILED
+    )
+    return await trigger_webhooks(
+        event_type=event_type,
+        event_data={
+            "domain": domain,
+            "source": source,
+            "job_id": job_id,
+            "status": status,
+            "inserted_items": inserted,
+            "error_message": error_msg[:500] if error_msg else None,
+        },
+        source=source,
+    )
+
+
+async def notify_consecutive_failures(
+    source: str,
+    count: int,
+    domain: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Send alert for consecutive collection failures."""
+    return await trigger_webhooks(
+        event_type=WebhookEventType.ALERT_CONSECUTIVE_FAILURES,
+        event_data={
+            "source": source,
+            "domain": domain,
+            "consecutive_failures": count,
+            "message": f"Source '{source}' has {count} consecutive failures",
+        },
+        source=source,
+    )
 
 
 async def test_webhook(webhook: Webhook) -> Dict[str, Any]:

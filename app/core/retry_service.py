@@ -21,7 +21,10 @@ BACKOFF_MULTIPLIER = 2  # Double the delay each retry
 JITTER_FACTOR = 0.25  # ±25% random jitter to prevent thundering herd
 
 
-def calculate_retry_delay(retry_count: int) -> timedelta:
+def calculate_retry_delay(
+    retry_count: int,
+    config: Optional[Dict[str, Any]] = None,
+) -> timedelta:
     """
     Calculate delay before next retry using exponential backoff with jitter.
 
@@ -30,13 +33,19 @@ def calculate_retry_delay(retry_count: int) -> timedelta:
 
     Args:
         retry_count: Number of retries already attempted
+        config: Optional per-source retry config dict with keys:
+            backoff_base_min, backoff_max_min, backoff_multiplier
 
     Returns:
         Timedelta for delay before next retry
     """
+    base = config.get("backoff_base_min", BASE_DELAY_MINUTES) if config else BASE_DELAY_MINUTES
+    max_delay = config.get("backoff_max_min", MAX_DELAY_MINUTES) if config else MAX_DELAY_MINUTES
+    multiplier = config.get("backoff_multiplier", BACKOFF_MULTIPLIER) if config else BACKOFF_MULTIPLIER
+
     delay_minutes = min(
-        BASE_DELAY_MINUTES * (BACKOFF_MULTIPLIER ** retry_count),
-        MAX_DELAY_MINUTES
+        base * (multiplier ** retry_count),
+        max_delay
     )
     # Apply jitter: ±25% randomization
     jitter = delay_minutes * JITTER_FACTOR * (2 * random.random() - 1)
@@ -242,6 +251,21 @@ def mark_job_for_immediate_retry(
     db.commit()
     logger.info(f"Job {job_id} marked for immediate retry (attempt {job.retry_count}/{job.max_retries})")
 
+    # Audit trail
+    try:
+        from app.core import audit_service
+        audit_service.log_collection(
+            db,
+            trigger_type="retry",
+            source=job.source,
+            job_id=job.id,
+            job_type="ingestion",
+            trigger_source="immediate_retry",
+            config_snapshot=job.config,
+        )
+    except Exception:
+        pass
+
     return job
 
 
@@ -313,7 +337,8 @@ def auto_schedule_retry(db: Session, job: IngestionJob) -> bool:
     Automatically schedule a failed job for retry.
 
     Called when a job fails. If retries remain, schedules the job
-    for retry with exponential backoff.
+    for retry with exponential backoff. Uses per-source retry config
+    from SourceConfig when available.
 
     Args:
         db: Database session
@@ -330,8 +355,16 @@ def auto_schedule_retry(db: Session, job: IngestionJob) -> bool:
         logger.info(f"Job {job.id} has exhausted all retries ({job.retry_count}/{job.max_retries})")
         return False
 
+    # Load per-source retry config
+    retry_config = None
+    try:
+        from app.core import source_config_service
+        retry_config = source_config_service.get_retry_config(db, job.source)
+    except Exception:
+        pass  # Fall back to global defaults
+
     # Calculate delay with exponential backoff
-    delay = calculate_retry_delay(job.retry_count)
+    delay = calculate_retry_delay(job.retry_count, config=retry_config)
     next_retry = datetime.utcnow() + delay
 
     job.next_retry_at = next_retry
@@ -341,6 +374,21 @@ def auto_schedule_retry(db: Session, job: IngestionJob) -> bool:
         f"Job {job.id} scheduled for auto-retry at {next_retry} "
         f"(attempt {job.retry_count + 1}/{job.max_retries}, delay={delay})"
     )
+
+    # Audit trail
+    try:
+        from app.core import audit_service
+        audit_service.log_collection(
+            db,
+            trigger_type="retry",
+            source=job.source,
+            job_id=job.id,
+            job_type="ingestion",
+            trigger_source="auto_schedule",
+            config_snapshot={"retry_at": next_retry.isoformat(), "attempt": job.retry_count + 1},
+        )
+    except Exception:
+        pass
 
     return True
 

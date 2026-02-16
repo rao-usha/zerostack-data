@@ -1,12 +1,13 @@
 """
-Site Intelligence Platform - Site Scoring API.
+Site Intelligence Platform - Site Scoring & Collection API.
 
-Endpoints for scoring, comparing, and searching potential sites.
+Endpoints for scoring, comparing, searching, and triggering data collection.
 """
 import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel, Field
@@ -46,6 +47,376 @@ class SiteSearchRequest(BaseModel):
     requirements: Optional[Dict[str, Any]] = None
     sort_by: str = "overall_score"
     limit: int = Field(default=20, gt=0, le=100)
+
+
+class CollectionRequest(BaseModel):
+    """Request to trigger site intel data collection."""
+    domains: Optional[List[str]] = Field(
+        default=None,
+        description="Domains to collect (e.g. ['power', 'telecom']). None = all domains.",
+    )
+    sources: Optional[List[str]] = Field(
+        default=None,
+        description="Specific sources to collect (e.g. ['eia', 'fcc']). None = all sources in selected domains.",
+    )
+    states: Optional[List[str]] = Field(
+        default=None,
+        description="US state codes to filter (e.g. ['TX', 'CA']). None = all states.",
+    )
+
+
+# =============================================================================
+# COLLECTION ENDPOINTS
+# =============================================================================
+
+def _import_all_collectors():
+    """Import all domain modules to trigger collector registration."""
+    import app.sources.site_intel.power           # noqa: F401
+    import app.sources.site_intel.telecom         # noqa: F401
+    import app.sources.site_intel.transport       # noqa: F401
+    import app.sources.site_intel.labor           # noqa: F401
+    import app.sources.site_intel.risk            # noqa: F401
+    import app.sources.site_intel.incentives      # noqa: F401
+    import app.sources.site_intel.logistics       # noqa: F401
+    import app.sources.site_intel.water_utilities # noqa: F401
+
+
+async def _run_collection(
+    domains: Optional[List[str]],
+    sources: Optional[List[str]],
+    states: Optional[List[str]],
+):
+    """Background task: run site intel collection."""
+    from app.core.database import get_session_factory
+    from app.core.config import get_settings
+    from app.sources.site_intel.runner import SiteIntelOrchestrator, COLLECTOR_REGISTRY
+    from app.sources.site_intel.types import SiteIntelDomain, SiteIntelSource
+
+    _import_all_collectors()
+
+    settings = get_settings()
+
+    # Build API keys dict from available env vars
+    api_keys = {}
+    key_mapping = {
+        "eia": "eia_api_key",
+        "eia_electricity": "eia_api_key",
+        "eia_gas": "eia_api_key",
+        "bls": "bls_api_key",
+        "bls_oes": "bls_api_key",
+        "bls_qcew": "bls_api_key",
+    }
+    for source_val, field_name in key_mapping.items():
+        key_val = getattr(settings, field_name, None)
+        if key_val:
+            api_keys[source_val] = key_val
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+
+    try:
+        # Log audit trail entry
+        try:
+            from app.core import audit_service
+            audit_service.log_collection(
+                db,
+                trigger_type="api",
+                source=",".join(sources) if sources else "all",
+                domain=",".join(domains) if domains else "all",
+                job_type="site_intel",
+                trigger_source="/site-intel/sites/collect",
+                config_snapshot={"domains": domains, "sources": sources, "states": states},
+            )
+        except Exception as e:
+            logger.debug(f"Audit log failed: {e}")
+
+        orchestrator = SiteIntelOrchestrator(db, api_keys=api_keys)
+
+        # Resolve target domains
+        target_domains = None
+        if domains:
+            target_domains = []
+            for d in domains:
+                try:
+                    target_domains.append(SiteIntelDomain(d))
+                except ValueError:
+                    logger.warning(f"Unknown domain: {d}, skipping")
+
+        # Resolve target sources
+        target_sources = None
+        if sources:
+            target_sources = []
+            for s in sources:
+                try:
+                    target_sources.append(SiteIntelSource(s))
+                except ValueError:
+                    logger.warning(f"Unknown source: {s}, skipping")
+
+        # Build collection kwargs
+        kwargs = {}
+        if states:
+            kwargs["states"] = states
+
+        if target_sources:
+            # Collect specific sources — determine domain for each
+            for source in target_sources:
+                # Find which domain this source belongs to
+                domain = None
+                for d in SiteIntelDomain:
+                    if source in orchestrator.get_sources_for_domain(d):
+                        domain = d
+                        break
+                if domain:
+                    logger.info(f"Collecting {domain.value}/{source.value}")
+                    await orchestrator.collect(domain, source, **kwargs)
+                else:
+                    logger.warning(f"Could not determine domain for source: {source.value}")
+        elif target_domains:
+            # Collect all sources for specified domains
+            for domain in target_domains:
+                logger.info(f"Collecting domain: {domain.value}")
+                await orchestrator.collect_domain(domain, **kwargs)
+        else:
+            # Full sync across all domains
+            logger.info("Starting full sync across all domains")
+            await orchestrator.full_sync(**kwargs)
+
+        logger.info("Site intel collection completed")
+
+    except Exception as e:
+        logger.error(f"Site intel collection failed: {e}", exc_info=True)
+    finally:
+        db.close()
+
+
+@router.post("/collect")
+async def trigger_collection(
+    request: CollectionRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    Trigger site intelligence data collection.
+
+    Runs collection in the background across specified domains/sources.
+    Use GET /collect/status to check progress.
+    """
+    from app.sources.site_intel.runner import SiteIntelOrchestrator, COLLECTOR_REGISTRY
+    from app.sources.site_intel.types import SiteIntelDomain
+
+    _import_all_collectors()
+
+    # Build summary of what will be collected
+    orchestrator = SiteIntelOrchestrator(db)
+    available = orchestrator.get_available_collectors()
+
+    # Filter to requested domains
+    targeted = {}
+    if request.domains:
+        for d in request.domains:
+            if d in available:
+                targeted[d] = available[d]
+            else:
+                targeted[d] = []
+    else:
+        targeted = available
+
+    # Further filter by requested sources
+    if request.sources:
+        for domain_name in targeted:
+            targeted[domain_name] = [
+                s for s in targeted[domain_name] if s in request.sources
+            ]
+
+    total_collectors = sum(len(v) for v in targeted.values())
+
+    background_tasks.add_task(
+        _run_collection,
+        request.domains,
+        request.sources,
+        request.states,
+    )
+
+    return {
+        "status": "started",
+        "domains": list(targeted.keys()),
+        "collectors_targeted": total_collectors,
+        "breakdown": targeted,
+        "states_filter": request.states,
+        "message": f"Collection started for {total_collectors} collectors across {len(targeted)} domains. Check /collect/status for progress.",
+    }
+
+
+@router.get("/collect/status")
+async def get_collection_status(db: Session = Depends(get_db)):
+    """
+    Get current site intelligence collection status.
+
+    Shows available collectors, today's job counts, and latest job per domain.
+    """
+    from app.sources.site_intel.runner import SiteIntelOrchestrator
+
+    _import_all_collectors()
+
+    orchestrator = SiteIntelOrchestrator(db)
+    return orchestrator.get_collection_status()
+
+
+# =============================================================================
+# WATERMARK ENDPOINTS (Incremental Collection Tracking)
+# =============================================================================
+
+@router.get("/watermarks")
+async def list_watermarks(
+    domain: Optional[str] = Query(None, description="Filter by domain"),
+    db: Session = Depends(get_db),
+):
+    """List all collection watermarks (last-collected timestamps)."""
+    from app.core import watermark_service
+    watermarks = watermark_service.get_all_watermarks(db, domain=domain)
+    return {"watermarks": watermarks, "total": len(watermarks)}
+
+
+@router.get("/watermarks/{domain}/{source}")
+async def get_watermark(
+    domain: str,
+    source: str,
+    state: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Get watermark for a specific domain/source."""
+    from app.core import watermark_service
+    ts = watermark_service.get_watermark(db, domain, source, state=state)
+    return {
+        "domain": domain,
+        "source": source,
+        "state": state,
+        "last_collected_at": ts.isoformat() if ts else None,
+        "has_watermark": ts is not None,
+    }
+
+
+@router.delete("/watermarks/{domain}/{source}")
+async def clear_watermark(
+    domain: str,
+    source: str,
+    state: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Clear a watermark to force full re-sync on next collection."""
+    from app.core import watermark_service
+    cleared = watermark_service.clear_watermark(db, domain, source, state=state)
+    if not cleared:
+        raise HTTPException(status_code=404, detail="Watermark not found")
+    return {"cleared": True, "domain": domain, "source": source, "state": state}
+
+
+# =============================================================================
+# REAL-TIME PROGRESS (SSE)
+# =============================================================================
+
+@router.get("/collect/stream")
+async def stream_all_progress():
+    """
+    SSE stream for all active collections.
+
+    Usage: const es = new EventSource('/api/v1/site-intel/sites/collect/stream')
+    Events: started, progress, completed, failed, domain_started, domain_completed
+    """
+    from app.core.event_bus import EventBus
+    return StreamingResponse(
+        EventBus.subscribe_stream("collection_all"),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/collect/stream/{job_id}")
+async def stream_job_progress(job_id: int):
+    """SSE stream for a specific collection job."""
+    from app.core.event_bus import EventBus
+    return StreamingResponse(
+        EventBus.subscribe_stream(f"collection_{job_id}"),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+# =============================================================================
+# JOB DEPENDENCIES
+# =============================================================================
+
+class DependencyPlanItem(BaseModel):
+    domain: str
+    depends_on: List[str] = Field(default_factory=list)
+
+
+@router.post("/collect-with-deps")
+async def collect_with_dependencies(
+    plan: List[DependencyPlanItem],
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    Trigger collection with dependency ordering.
+
+    Domains without dependencies run first; dependents wait until
+    their prerequisites complete.
+
+    Example body:
+    [
+        {"domain": "power", "depends_on": []},
+        {"domain": "risk", "depends_on": []},
+        {"domain": "scoring", "depends_on": ["power", "risk"]}
+    ]
+    """
+    plan_dicts = [item.model_dump() for item in plan]
+
+    async def _run_plan():
+        from app.core.database import get_session_factory
+        from app.core.config import get_settings
+        from app.sources.site_intel.runner import SiteIntelOrchestrator
+
+        _import_all_collectors()
+        settings = get_settings()
+
+        api_keys = {}
+        key_mapping = {
+            "eia": "eia_api_key",
+            "eia_electricity": "eia_api_key",
+            "eia_gas": "eia_api_key",
+            "bls": "bls_api_key",
+            "bls_oes": "bls_api_key",
+            "bls_qcew": "bls_api_key",
+        }
+        for source_val, field_name in key_mapping.items():
+            key_val = getattr(settings, field_name, None)
+            if key_val:
+                api_keys[source_val] = key_val
+
+        SessionLocal = get_session_factory()
+        db_session = SessionLocal()
+        try:
+            orchestrator = SiteIntelOrchestrator(db_session, api_keys=api_keys)
+            await orchestrator.collect_with_plan(plan_dicts)
+        except Exception as e:
+            logger.error(f"Dependency plan failed: {e}", exc_info=True)
+        finally:
+            db_session.close()
+
+    background_tasks.add_task(_run_plan)
+
+    return {
+        "status": "started",
+        "plan": plan_dicts,
+        "message": f"Collection plan with {len(plan)} phases started. Check /collect/stream for progress.",
+    }
 
 
 # =============================================================================
@@ -364,6 +735,8 @@ async def get_sites_summary(db: Session = Depends(get_db)):
         ],
         "cached_scores": db.query(func.count(SiteScore.id)).scalar(),
         "available_endpoints": [
+            "/site-intel/sites/collect",
+            "/site-intel/sites/collect/status",
             "/site-intel/sites/score",
             "/site-intel/sites/compare",
             "/site-intel/sites/search",

@@ -336,7 +336,7 @@ class IntermodalTerminal(Base):
     __tablename__ = "intermodal_terminal"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    ntad_id = Column(String(50), index=True)
+    ntad_id = Column(String(50), unique=True, index=True)
     name = Column(String(255), nullable=False)
     operator = Column(String(255))
     terminal_type = Column(String(50))  # ramp, port, warehouse
@@ -364,7 +364,7 @@ class RailLine(Base):
     __tablename__ = "rail_line"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    fra_line_id = Column(String(50), index=True)
+    fra_line_id = Column(String(50), unique=True, index=True)
     railroad = Column(String(100))
     track_type = Column(String(50))  # mainline, branch, yard
     track_class = Column(Integer)  # FRA class 1-9
@@ -432,7 +432,7 @@ class Airport(Base):
     __tablename__ = "airport"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    faa_code = Column(String(10), index=True)
+    faa_code = Column(String(10), unique=True, index=True)
     icao_code = Column(String(10))
     name = Column(String(255), nullable=False)
     city = Column(String(100))
@@ -642,6 +642,7 @@ class SeismicHazard(Base):
     collected_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
+        UniqueConstraint('latitude', 'longitude', name='uq_seismic_location'),
         Index('idx_seismic_location', 'latitude', 'longitude'),
     )
 
@@ -651,7 +652,7 @@ class FaultLine(Base):
     __tablename__ = "fault_line"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    fault_name = Column(String(255))
+    fault_name = Column(String(255), unique=True)
     fault_type = Column(String(50))  # strike_slip, normal, reverse
     slip_rate_mm_yr = Column(Numeric(8, 2))
     age = Column(String(50))  # historic, holocene, quaternary
@@ -734,7 +735,7 @@ class EnvironmentalFacility(Base):
     __tablename__ = "environmental_facility"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    epa_id = Column(String(50), index=True)
+    epa_id = Column(String(50), unique=True, index=True)
     facility_name = Column(String(255))
     facility_type = Column(String(100))
     address = Column(String(500))
@@ -1647,4 +1648,29 @@ class SiteIntelCollectionJob(Base):
         Index('idx_site_intel_job_domain', 'domain'),
         Index('idx_site_intel_job_status', 'status'),
         Index('idx_site_intel_job_created', 'created_at'),
+    )
+
+
+class CollectionWatermark(Base):
+    """
+    Tracks last-collected timestamp per domain/source/state for incremental collection.
+
+    NULL watermark = full sync (existing behavior). When a watermark exists,
+    collectors can use it as a date filter for incremental updates.
+    """
+    __tablename__ = "collection_watermarks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    domain = Column(String(50), nullable=False, index=True)
+    source = Column(String(50), nullable=False, index=True)
+    state = Column(String(10), nullable=True)  # NULL = national
+    last_collected_at = Column(DateTime, nullable=False)
+    last_job_id = Column(Integer, nullable=True)
+    records_collected = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('domain', 'source', 'state', name='uq_watermark_domain_source_state'),
+        Index('idx_watermark_domain_source', 'domain', 'source'),
     )

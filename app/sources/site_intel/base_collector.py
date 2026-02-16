@@ -239,8 +239,14 @@ class BaseCollector(ABC):
     # JOB MANAGEMENT
     # =========================================================================
 
-    def create_job(self, config: CollectionConfig) -> SiteIntelCollectionJob:
-        """Create a collection job record."""
+    def create_job(self, config: CollectionConfig, bridge_to_ingestion: bool = False) -> SiteIntelCollectionJob:
+        """
+        Create a collection job record.
+
+        Args:
+            config: Collection configuration
+            bridge_to_ingestion: If True, also create a shadow IngestionJob for dependency tracking
+        """
         job = SiteIntelCollectionJob(
             domain=self.domain.value,
             source=self.source.value,
@@ -253,6 +259,24 @@ class BaseCollector(ABC):
         self.db.commit()
         self.db.refresh(job)
         self._job = job
+        self._bridge_job_id = None
+
+        # Optional shadow IngestionJob for dependency service
+        if bridge_to_ingestion:
+            try:
+                from app.core.models import IngestionJob, JobStatus
+                bridge_job = IngestionJob(
+                    source=f"site_intel_{self.source.value}",
+                    status=JobStatus.PENDING,
+                    config={"site_intel_job_id": job.id, "domain": self.domain.value},
+                )
+                self.db.add(bridge_job)
+                self.db.commit()
+                self.db.refresh(bridge_job)
+                self._bridge_job_id = bridge_job.id
+            except Exception as e:
+                logger.warning(f"Failed to create bridge job: {e}")
+
         return job
 
     def start_job(self):
@@ -261,6 +285,13 @@ class BaseCollector(ABC):
             self._job.status = "running"
             self._job.started_at = datetime.utcnow()
             self.db.commit()
+
+        # Publish SSE event
+        self._publish_event("started", {
+            "domain": self.domain.value,
+            "source": self.source.value,
+            "job_id": self._job.id if self._job else None,
+        })
 
     def complete_job(self, result: CollectionResult):
         """Mark job as completed with results."""
@@ -278,6 +309,79 @@ class BaseCollector(ABC):
                 self._job.error_details = {"errors": result.errors}
             self.db.commit()
 
+        # Update bridge job if it exists
+        if getattr(self, '_bridge_job_id', None):
+            try:
+                from app.core.models import IngestionJob, JobStatus
+                from app.core import dependency_service
+                bridge = self.db.query(IngestionJob).filter(IngestionJob.id == self._bridge_job_id).first()
+                if bridge:
+                    bridge.status = JobStatus.SUCCESS if result.status == CollectionStatus.SUCCESS else JobStatus.FAILED
+                    bridge.completed_at = datetime.utcnow()
+                    bridge.rows_inserted = result.inserted_items
+                    if result.error_message:
+                        bridge.error_message = result.error_message
+                    self.db.commit()
+                    dependency_service.check_and_unblock_dependent_jobs(self.db, self._bridge_job_id)
+            except Exception as e:
+                logger.warning(f"Failed to update bridge job: {e}")
+
+        # Publish SSE event
+        event_type = "completed" if result.status == CollectionStatus.SUCCESS else "failed"
+        self._publish_event(event_type, {
+            "domain": self.domain.value,
+            "source": self.source.value,
+            "job_id": self._job.id if self._job else None,
+            "status": result.status.value,
+            "inserted": result.inserted_items,
+            "failed": result.failed_items,
+            "error": result.error_message,
+        })
+
+        # Fire webhook notification (non-blocking)
+        self._fire_webhook(result)
+
+    def _fire_webhook(self, result: CollectionResult):
+        """Fire webhook notification for collection result (non-blocking)."""
+        import asyncio
+        try:
+            from app.core import webhook_service
+            from app.core.models import WebhookEventType
+
+            event_type = (
+                WebhookEventType.SITE_INTEL_SUCCESS
+                if result.status == CollectionStatus.SUCCESS
+                else WebhookEventType.SITE_INTEL_FAILED
+            )
+            event_data = {
+                "domain": self.domain.value,
+                "source": self.source.value,
+                "job_id": self._job.id if self._job else None,
+                "status": result.status.value,
+                "inserted": result.inserted_items,
+                "error_message": result.error_message[:500] if result.error_message else None,
+            }
+
+            try:
+                loop = asyncio.get_running_loop()
+                asyncio.ensure_future(
+                    webhook_service.trigger_webhooks(event_type, event_data, source=self.source.value)
+                )
+            except RuntimeError:
+                pass  # No event loop running
+        except Exception as e:
+            logger.debug(f"Webhook notification skipped: {e}")
+
+    def _publish_event(self, event_type: str, data: dict):
+        """Publish an SSE event to the event bus (best-effort)."""
+        try:
+            from app.core.event_bus import EventBus
+            EventBus.publish("collection_all", event_type, data)
+            if self._job:
+                EventBus.publish(f"collection_{self._job.id}", event_type, data)
+        except Exception:
+            pass  # SSE is best-effort
+
     def update_progress(
         self,
         processed: int,
@@ -293,6 +397,19 @@ class BaseCollector(ABC):
             self.db.commit()
 
         progress_pct = (processed / total * 100) if total > 0 else 0
+
+        # Publish SSE event
+        self._publish_event("progress", {
+            "domain": self.domain.value,
+            "source": self.source.value,
+            "job_id": self._job.id if self._job else 0,
+            "processed": processed,
+            "total": total,
+            "progress_pct": round(progress_pct, 1),
+            "current_step": current_step,
+            "errors": errors,
+        })
+
         return CollectionProgress(
             job_id=self._job.id if self._job else 0,
             status=CollectionStatus.RUNNING,
@@ -302,6 +419,41 @@ class BaseCollector(ABC):
             current_step=current_step,
             errors_so_far=errors,
         )
+
+    # =========================================================================
+    # WATERMARK METHODS (for incremental collection)
+    # =========================================================================
+
+    def get_watermark(self, state: Optional[str] = None) -> Optional[datetime]:
+        """Get the last-collected timestamp for this collector's domain/source."""
+        try:
+            from app.core import watermark_service
+            return watermark_service.get_watermark(
+                self.db, self.domain.value, self.source.value, state=state
+            )
+        except Exception:
+            return None
+
+    def update_watermark(
+        self,
+        timestamp: datetime,
+        state: Optional[str] = None,
+        records: Optional[int] = None,
+    ):
+        """Update the watermark after successful collection."""
+        try:
+            from app.core import watermark_service
+            watermark_service.update_watermark(
+                self.db,
+                self.domain.value,
+                self.source.value,
+                last_collected_at=timestamp,
+                job_id=self._job.id if self._job else None,
+                records=records,
+                state=state,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to update watermark: {e}")
 
     # =========================================================================
     # DATABASE OPERATIONS

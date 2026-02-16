@@ -13,6 +13,10 @@ from app.core.database import create_tables
 from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news, reports, deals, benchmarks, auth, workspaces, form_d, corporate_registry, form_adv, web_traffic, github, scores, entities, glassdoor, app_rankings, predictions, agents, diligence, monitors, competitive, hunter, anomalies, market, reports_gen, lp_collection, fo_collection, pe_firms, pe_companies, pe_people, pe_deals, pe_collection, app_stores, opencorporates, people, companies_leadership, collection_jobs, people_portfolios, peer_sets, people_watchlists, people_analytics, people_reports, people_data_quality, people_dedup, people_jobs, workflows, llm_costs
 # Site Intelligence Platform
 from app.api.v1 import site_intel_power, site_intel_telecom, site_intel_transport, site_intel_labor, site_intel_risk, site_intel_incentives, site_intel_logistics, site_intel_water_utilities, site_intel_sites
+# Collection Management
+from app.api.v1 import source_configs, audit
+# Settings
+from app.api.v1 import settings as settings_router
 from app.graphql import graphql_app
 
 # Configure logging
@@ -68,6 +72,10 @@ async def lifespan(app: FastAPI):
         scheduler_service.register_retry_processor(interval_minutes=5)
         logger.info("Automatic retry processor registered")
 
+        # Register consecutive failure checker (runs every 30 minutes)
+        scheduler_service.register_consecutive_failure_checker(interval_minutes=30)
+        logger.info("Consecutive failure checker registered")
+
         # Register people collection schedules
         try:
             from app.jobs.people_collection_scheduler import register_people_collection_schedules
@@ -76,6 +84,15 @@ async def lifespan(app: FastAPI):
             logger.info(f"People collection schedules registered: {registered_count}/{len(people_results)}")
         except Exception as e:
             logger.warning(f"Failed to register people collection schedules: {e}")
+
+        # Register site intel collection schedules
+        try:
+            from app.jobs.site_intel_scheduler import register_site_intel_schedules
+            site_intel_results = register_site_intel_schedules()
+            registered_count = sum(1 for v in site_intel_results.values() if v)
+            logger.info(f"Site intel schedules registered: {registered_count}/{len(site_intel_results)}")
+        except Exception as e:
+            logger.warning(f"Failed to register site intel schedules: {e}")
     except Exception as e:
         logger.warning(f"Failed to start scheduler: {e}")
 
@@ -871,6 +888,18 @@ Browse the endpoint sections below to see what's available:
         {
             "name": "LLM Costs",
             "description": "💰 **LLM Cost Tracking** - Monitor token usage and costs across all LLM-powered features"
+        },
+        {
+            "name": "Source Configuration",
+            "description": "Per-source timeouts, retry policies, and rate limits"
+        },
+        {
+            "name": "Audit Trail",
+            "description": "Collection audit trail - who triggered what, when, and how"
+        },
+        {
+            "name": "Settings",
+            "description": "Application settings - manage external source API keys"
         }
     ]
 )
@@ -996,6 +1025,13 @@ app.include_router(site_intel_incentives.router, prefix="/api/v1")
 app.include_router(site_intel_logistics.router, prefix="/api/v1")
 app.include_router(site_intel_water_utilities.router, prefix="/api/v1")
 app.include_router(site_intel_sites.router, prefix="/api/v1")
+
+# Collection Management
+app.include_router(source_configs.router, prefix="/api/v1")
+app.include_router(audit.router, prefix="/api/v1")
+
+# Settings
+app.include_router(settings_router.router, prefix="/api/v1")
 
 # Multi-Agent Orchestrator
 app.include_router(workflows.router, prefix="/api/v1")

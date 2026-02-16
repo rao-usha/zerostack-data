@@ -125,12 +125,21 @@ class SiteIntelOrchestrator:
 
         try:
             logger.info(f"Starting collection: {domain.value}/{source.value}")
-            job = collector.create_job(config)
+            bridge = kwargs.pop("bridge_to_ingestion", False)
+            job = collector.create_job(config, bridge_to_ingestion=bridge)
             collector.start_job()
 
             result = await collector.collect(config)
 
             collector.complete_job(result)
+
+            # Auto-update watermark on success
+            if result.status == CollectionStatus.SUCCESS:
+                collector.update_watermark(
+                    datetime.utcnow(),
+                    records=result.inserted_items,
+                )
+
             logger.info(
                 f"Completed {domain.value}/{source.value}: "
                 f"{result.inserted_items} inserted, {result.updated_items} updated"
@@ -146,7 +155,16 @@ class SiteIntelOrchestrator:
                 source=source,
                 error_message=str(e),
             )
-            collector.complete_job(error_result)
+            # Rollback any failed transaction before recording the error
+            try:
+                self.db.rollback()
+                collector.complete_job(error_result)
+            except Exception as job_err:
+                logger.error(f"Could not record job failure for {source.value}: {job_err}")
+                try:
+                    self.db.rollback()
+                except Exception:
+                    pass
             return error_result
 
         finally:
@@ -171,14 +189,35 @@ class SiteIntelOrchestrator:
         """
         results = {}
 
-        # Get sources for domain
+        # Get sources for domain, filtered to only registered collectors
         domain_sources = self.get_sources_for_domain(domain)
+        registered_sources = [s for s in domain_sources if s in COLLECTOR_REGISTRY]
         if sources:
-            domain_sources = [s for s in domain_sources if s in sources]
+            registered_sources = [s for s in registered_sources if s in sources]
 
-        for source in domain_sources:
+        skipped = [s.value for s in domain_sources if s not in COLLECTOR_REGISTRY]
+        if skipped:
+            logger.info(f"Skipping unregistered collectors for {domain.value}: {skipped}")
+
+        # Publish domain_started SSE event
+        self._publish_event("domain_started", {
+            "domain": domain.value,
+            "sources": [s.value for s in registered_sources],
+            "total_sources": len(registered_sources),
+        })
+
+        for source in registered_sources:
             result = await self.collect(domain, source, **kwargs)
             results[source] = result
+
+        # Publish domain_completed SSE event
+        success_count = sum(1 for r in results.values() if r.status == CollectionStatus.SUCCESS)
+        self._publish_event("domain_completed", {
+            "domain": domain.value,
+            "total_sources": len(registered_sources),
+            "success": success_count,
+            "failed": len(registered_sources) - success_count,
+        })
 
         return results
 
@@ -209,6 +248,64 @@ class SiteIntelOrchestrator:
             logger.info(f"Starting full sync for domain: {domain.value}")
             domain_results = await self.collect_domain(domain, **kwargs)
             results[domain] = domain_results
+
+        return results
+
+    def _publish_event(self, event_type: str, data: dict):
+        """Publish an SSE event to the event bus (best-effort)."""
+        try:
+            from app.core.event_bus import EventBus
+            EventBus.publish("collection_all", event_type, data)
+        except Exception:
+            pass
+
+    async def collect_with_plan(
+        self,
+        plan: List[Dict[str, Any]],
+    ) -> Dict[str, CollectionResult]:
+        """
+        Execute collection with dependency ordering.
+
+        Each item in the plan is {"domain": str, "depends_on": [str]}.
+        Domains with no dependencies run first; dependents wait.
+
+        Args:
+            plan: List of {"domain": "...", "depends_on": ["..."]}
+
+        Returns:
+            Dict of domain -> CollectionResult
+        """
+        results = {}
+        completed_domains = set()
+
+        # Build adjacency: domain -> set of dependencies
+        dep_map = {
+            item["domain"]: set(item.get("depends_on", []))
+            for item in plan
+        }
+
+        while len(completed_domains) < len(plan):
+            # Find domains whose dependencies are all completed
+            ready = [
+                d for d, deps in dep_map.items()
+                if d not in completed_domains and deps.issubset(completed_domains)
+            ]
+
+            if not ready:
+                # Deadlock or circular dependency
+                remaining = set(dep_map.keys()) - completed_domains
+                logger.error(f"Dependency deadlock: {remaining}")
+                break
+
+            for domain_name in ready:
+                try:
+                    domain = SiteIntelDomain(domain_name)
+                    domain_results = await self.collect_domain(domain, bridge_to_ingestion=True)
+                    for source, result in domain_results.items():
+                        results[f"{domain_name}/{source.value}"] = result
+                except Exception as e:
+                    logger.error(f"Failed to collect domain {domain_name}: {e}")
+                completed_domains.add(domain_name)
 
         return results
 

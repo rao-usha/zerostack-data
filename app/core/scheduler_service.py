@@ -90,6 +90,21 @@ async def run_scheduled_job(schedule_id: int):
 
         logger.info(f"Created job {job.id} for schedule {schedule.name}")
 
+        # Audit trail
+        try:
+            from app.core import audit_service
+            audit_service.log_collection(
+                db,
+                trigger_type="schedule",
+                source=schedule.source,
+                job_id=job.id,
+                job_type="ingestion",
+                trigger_source=f"schedule_{schedule_id}",
+                config_snapshot=schedule.config,
+            )
+        except Exception:
+            pass
+
         # Execute the job asynchronously
         await _execute_ingestion_job(db, job)
 
@@ -158,6 +173,32 @@ def _calculate_next_run(schedule: IngestionSchedule) -> datetime:
                 next_run = next_run.replace(month=now.month + 1)
         return next_run
 
+    elif schedule.frequency == ScheduleFrequency.QUARTERLY:
+        day = schedule.day_of_month or 2
+        quarter_months = [1, 4, 7, 10]
+        # Find the next quarter month
+        for qm in quarter_months:
+            next_run = now.replace(
+                month=qm,
+                day=min(day, 28),
+                hour=schedule.hour or 6,
+                minute=0,
+                second=0,
+                microsecond=0
+            )
+            if next_run > now:
+                return next_run
+        # Wrap to next year Q1
+        return now.replace(
+            year=now.year + 1,
+            month=1,
+            day=min(day, 28),
+            hour=schedule.hour or 6,
+            minute=0,
+            second=0,
+            microsecond=0
+        )
+
     else:
         # Default to next hour
         return now + timedelta(hours=1)
@@ -184,6 +225,14 @@ def _get_trigger_for_schedule(schedule: IngestionSchedule):
     elif schedule.frequency == ScheduleFrequency.MONTHLY:
         return CronTrigger(
             day=schedule.day_of_month or 1,
+            hour=schedule.hour or 6,
+            minute=0
+        )
+
+    elif schedule.frequency == ScheduleFrequency.QUARTERLY:
+        return CronTrigger(
+            month='1,4,7,10',
+            day=schedule.day_of_month or 2,
             hour=schedule.hour or 6,
             minute=0
         )
@@ -460,53 +509,397 @@ def get_schedule_history(
 # =============================================================================
 
 DEFAULT_SCHEDULES = [
-    {
-        "name": "FEMA Disasters - Daily",
-        "source": "fema",
-        "config": {"dataset": "disasters", "year_start": 2020},
-        "frequency": ScheduleFrequency.DAILY,
-        "hour": 6,
-        "description": "Daily update of FEMA disaster declarations",
-        "priority": 3
-    },
+    # =========================================================================
+    # TIER 1 — Daily (10:00-13:00 UTC / 5-8 AM ET)
+    # =========================================================================
     {
         "name": "Treasury Daily Balance",
         "source": "treasury",
         "config": {"dataset": "daily_balance"},
         "frequency": ScheduleFrequency.DAILY,
-        "hour": 18,
-        "description": "Daily Treasury statement (updates late afternoon)",
-        "priority": 2
+        "hour": 10,
+        "description": "Daily Treasury statement",
+        "priority": 2,
     },
     {
-        "name": "FRED Economic Indicators - Weekly",
+        "name": "FRED Daily Series - Interest Rates",
         "source": "fred",
-        "config": {"category": "gdp"},
-        "frequency": ScheduleFrequency.WEEKLY,
-        "hour": 7,
-        "day_of_week": 0,  # Monday
-        "description": "Weekly update of FRED GDP data",
-        "priority": 4
+        "config": {"category": "interest_rates"},
+        "frequency": ScheduleFrequency.DAILY,
+        "hour": 10,
+        "description": "Daily FRED interest rate series",
+        "priority": 3,
     },
     {
-        "name": "BLS Employment - Monthly",
+        "name": "Prediction Markets Snapshot",
+        "source": "prediction_markets",
+        "config": {"sources": ["kalshi", "polymarket"]},
+        "frequency": ScheduleFrequency.DAILY,
+        "hour": 11,
+        "description": "Daily prediction market odds snapshot",
+        "priority": 4,
+    },
+
+    # =========================================================================
+    # TIER 2 — Weekly (Mon-Wed early AM)
+    # =========================================================================
+    {
+        "name": "FRED All Categories - Weekly",
+        "source": "fred",
+        "config": {"category": "all"},
+        "frequency": ScheduleFrequency.WEEKLY,
+        "hour": 10,
+        "day_of_week": 0,  # Monday
+        "description": "Weekly full refresh of FRED modified series",
+        "priority": 3,
+    },
+    {
+        "name": "EIA Petroleum Weekly",
+        "source": "eia",
+        "config": {"dataset": "petroleum_weekly", "subcategory": "consumption", "frequency": "weekly"},
+        "frequency": ScheduleFrequency.WEEKLY,
+        "hour": 11,
+        "day_of_week": 0,  # Monday
+        "description": "Weekly petroleum status report",
+        "priority": 3,
+    },
+    {
+        "name": "CFTC COT Weekly",
+        "source": "cftc_cot",
+        "config": {"report_type": "all"},
+        "frequency": ScheduleFrequency.WEEKLY,
+        "hour": 12,
+        "day_of_week": 0,  # Monday
+        "description": "Weekly Commitments of Traders positions",
+        "priority": 4,
+    },
+    {
+        "name": "Web Traffic Tranco - Weekly",
+        "source": "web_traffic",
+        "config": {"list": "tranco_top1m"},
+        "frequency": ScheduleFrequency.WEEKLY,
+        "hour": 12,
+        "day_of_week": 1,  # Tuesday
+        "description": "Weekly Tranco ranking changes",
+        "priority": 6,
+    },
+    {
+        "name": "GitHub Analytics - Weekly",
+        "source": "github",
+        "config": {},
+        "frequency": ScheduleFrequency.WEEKLY,
+        "hour": 10,
+        "day_of_week": 2,  # Wednesday
+        "description": "Weekly GitHub repository metrics",
+        "priority": 6,
+    },
+    {
+        "name": "NOAA Weather - Weekly",
+        "source": "noaa",
+        "config": {"dataset": "daily_summaries"},
+        "frequency": ScheduleFrequency.WEEKLY,
+        "hour": 11,
+        "day_of_week": 2,  # Wednesday
+        "description": "Weekly weather observations refresh",
+        "priority": 5,
+    },
+
+    # =========================================================================
+    # TIER 3 — Monthly (spread across days 1-15)
+    # =========================================================================
+    {
+        "name": "FEMA Disasters - Monthly",
+        "source": "fema",
+        "config": {"dataset": "disasters"},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 11,
+        "day_of_month": 1,
+        "description": "Monthly FEMA disaster declarations update",
+        "priority": 3,
+    },
+    {
+        "name": "BEA GDP/Income - Monthly",
+        "source": "bea",
+        "config": {"dataset": "gdp", "table_name": "T10101"},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 11,
+        "day_of_month": 3,
+        "description": "Monthly BEA national accounts data",
+        "priority": 2,
+    },
+    {
+        "name": "EIA Electricity - Monthly",
+        "source": "eia",
+        "config": {"dataset": "electricity", "subcategory": "retail_sales"},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 11,
+        "day_of_month": 4,
+        "description": "Monthly EIA electricity utility rates",
+        "priority": 4,
+    },
+    {
+        "name": "EIA Natural Gas - Monthly",
+        "source": "eia",
+        "config": {"dataset": "natural_gas", "subcategory": "consumption"},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 12,
+        "day_of_month": 4,
+        "description": "Monthly EIA natural gas prices",
+        "priority": 4,
+    },
+    {
+        "name": "BLS Employment (CES) - Monthly",
         "source": "bls",
         "config": {"dataset": "ces"},
         "frequency": ScheduleFrequency.MONTHLY,
-        "hour": 8,
+        "hour": 13,
         "day_of_month": 5,
         "description": "Monthly employment data (BLS releases ~first Friday)",
-        "priority": 2
+        "priority": 2,
     },
     {
-        "name": "Census ACS Population - Monthly",
-        "source": "census",
-        "config": {"survey": "acs5", "table_id": "B01001", "geo_level": "state"},
+        "name": "Data Commons - Monthly",
+        "source": "data_commons",
+        "config": {},
         "frequency": ScheduleFrequency.MONTHLY,
-        "hour": 3,
+        "hour": 12,
+        "day_of_month": 5,
+        "description": "Monthly unified public data refresh",
+        "priority": 6,
+    },
+    {
+        "name": "BLS CPI - Monthly",
+        "source": "bls",
+        "config": {"dataset": "cpi"},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 13,
+        "day_of_month": 6,
+        "description": "Monthly consumer price index data",
+        "priority": 2,
+    },
+    {
+        "name": "BLS PPI - Monthly",
+        "source": "bls",
+        "config": {"dataset": "ppi"},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 13,
+        "day_of_month": 7,
+        "description": "Monthly producer price index data",
+        "priority": 3,
+    },
+    {
+        "name": "FDIC Bank Financials - Monthly",
+        "source": "fdic",
+        "config": {"dataset": "financials"},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 11,
+        "day_of_month": 8,
+        "description": "Monthly FDIC bank call reports",
+        "priority": 4,
+    },
+    {
+        "name": "SEC Form ADV - Monthly",
+        "source": "form_adv",
+        "config": {},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 11,
+        "day_of_month": 9,
+        "description": "Monthly SEC investment adviser registrations",
+        "priority": 5,
+    },
+    {
+        "name": "SEC Form D - Monthly",
+        "source": "form_d",
+        "config": {},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 12,
+        "day_of_month": 9,
+        "description": "Monthly SEC private placement filings",
+        "priority": 5,
+    },
+    {
+        "name": "CMS Medicare Utilization - Monthly",
+        "source": "cms",
+        "config": {"dataset": "utilization"},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 11,
+        "day_of_month": 10,
+        "description": "Monthly Medicare healthcare utilization data",
+        "priority": 5,
+    },
+    {
+        "name": "App Store Rankings - Monthly",
+        "source": "app_rankings",
+        "config": {},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 11,
+        "day_of_month": 11,
+        "description": "Monthly app metrics and rankings",
+        "priority": 7,
+    },
+    {
+        "name": "FBI Crime Statistics - Monthly",
+        "source": "fbi_crime",
+        "config": {"dataset": "ucr"},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 11,
+        "day_of_month": 12,
+        "description": "Monthly FBI UCR crime statistics",
+        "priority": 5,
+    },
+    {
+        "name": "IRS SOI ZIP Income - Monthly",
+        "source": "irs_soi",
+        "config": {"dataset": "zip_income"},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 11,
+        "day_of_month": 13,
+        "description": "Monthly IRS income-by-ZIP update",
+        "priority": 6,
+    },
+    {
+        "name": "Glassdoor Reviews - Monthly",
+        "source": "glassdoor",
+        "config": {},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 11,
+        "day_of_month": 14,
+        "description": "Monthly Glassdoor company reviews/ratings",
+        "priority": 7,
+    },
+    {
+        "name": "Yelp Business Listings - Monthly",
+        "source": "yelp",
+        "config": {},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 11,
         "day_of_month": 15,
-        "description": "Monthly refresh of ACS population estimates",
-        "priority": 5
+        "description": "Monthly Yelp business listing refresh",
+        "priority": 7,
+    },
+    {
+        "name": "FCC Broadband Coverage - Monthly",
+        "source": "fcc_broadband",
+        "config": {},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 12,
+        "day_of_month": 15,
+        "description": "Monthly FCC broadband coverage data",
+        "priority": 5,
+    },
+
+    # =========================================================================
+    # TIER 4 — Quarterly (Jan/Apr/Jul/Oct, staggered across first 2 weeks)
+    # =========================================================================
+    {
+        "name": "Census ACS 5-Year - Quarterly",
+        "source": "census",
+        "config": {"survey": "acs5", "geo_level": "county"},
+        "frequency": ScheduleFrequency.QUARTERLY,
+        "hour": 8,
+        "day_of_month": 2,
+        "description": "Quarterly Census ACS 5-year estimates refresh",
+        "priority": 3,
+    },
+    {
+        "name": "BEA Regional Data - Quarterly",
+        "source": "bea",
+        "config": {"dataset": "regional", "table_name": "SAGDP2N"},
+        "frequency": ScheduleFrequency.QUARTERLY,
+        "hour": 9,
+        "day_of_month": 2,
+        "description": "Quarterly BEA regional economic data",
+        "priority": 4,
+    },
+    {
+        "name": "SEC 10-K/10-Q Filings - Quarterly",
+        "source": "sec",
+        "config": {"filing_type": "10-K,10-Q"},
+        "frequency": ScheduleFrequency.QUARTERLY,
+        "hour": 10,
+        "day_of_month": 3,
+        "description": "Quarterly SEC 10-K/10-Q filing refresh",
+        "priority": 3,
+    },
+    {
+        "name": "SEC 13F Holdings - Quarterly",
+        "source": "sec",
+        "config": {"filing_type": "13F"},
+        "frequency": ScheduleFrequency.QUARTERLY,
+        "hour": 11,
+        "day_of_month": 3,
+        "description": "Quarterly SEC 13F institutional holdings",
+        "priority": 3,
+    },
+    {
+        "name": "USPTO Patents - Quarterly",
+        "source": "uspto",
+        "config": {},
+        "frequency": ScheduleFrequency.QUARTERLY,
+        "hour": 10,
+        "day_of_month": 4,
+        "description": "Quarterly USPTO patent filings refresh",
+        "priority": 5,
+    },
+    {
+        "name": "US Trade Imports/Exports - Quarterly",
+        "source": "us_trade",
+        "config": {},
+        "frequency": ScheduleFrequency.QUARTERLY,
+        "hour": 11,
+        "day_of_month": 4,
+        "description": "Quarterly US international trade data",
+        "priority": 4,
+    },
+    {
+        "name": "BTS Transportation - Quarterly",
+        "source": "bts",
+        "config": {},
+        "frequency": ScheduleFrequency.QUARTERLY,
+        "hour": 10,
+        "day_of_month": 5,
+        "description": "Quarterly BTS transportation statistics",
+        "priority": 5,
+    },
+    {
+        "name": "International Econ (World Bank/IMF/OECD) - Quarterly",
+        "source": "international_econ",
+        "config": {},
+        "frequency": ScheduleFrequency.QUARTERLY,
+        "hour": 11,
+        "day_of_month": 5,
+        "description": "Quarterly international economic indicators",
+        "priority": 4,
+    },
+    {
+        "name": "Real Estate FHFA HPI - Quarterly",
+        "source": "realestate",
+        "config": {},
+        "frequency": ScheduleFrequency.QUARTERLY,
+        "hour": 10,
+        "day_of_month": 6,
+        "description": "Quarterly FHFA House Price Index",
+        "priority": 5,
+    },
+    {
+        "name": "OpenCorporates Registry - Quarterly",
+        "source": "opencorporates",
+        "config": {},
+        "frequency": ScheduleFrequency.QUARTERLY,
+        "hour": 11,
+        "day_of_month": 6,
+        "description": "Quarterly global company registry refresh",
+        "priority": 6,
+    },
+    {
+        "name": "USDA Agriculture - Quarterly",
+        "source": "usda",
+        "config": {},
+        "frequency": ScheduleFrequency.QUARTERLY,
+        "hour": 10,
+        "day_of_month": 7,
+        "description": "Quarterly USDA crop and livestock data",
+        "priority": 5,
     },
 ]
 
@@ -556,56 +949,73 @@ async def cleanup_stuck_jobs(timeout_hours: int = STUCK_JOB_TIMEOUT_HOURS) -> Di
     Find and mark stuck jobs as failed.
 
     Jobs are considered stuck if they have been in RUNNING status
-    for longer than the timeout threshold.
+    for longer than the timeout threshold. Uses per-source timeout
+    from SourceConfig when available, falling back to the global default.
 
     Args:
-        timeout_hours: Hours after which a running job is considered stuck
+        timeout_hours: Fallback hours (used only if no per-source config)
 
     Returns:
         Dictionary with cleanup results
     """
     from app.core import webhook_service
+    from app.core import source_config_service
 
     SessionLocal = get_session_factory()
     db = SessionLocal()
 
     try:
-        # Find stuck jobs
-        cutoff = datetime.utcnow() - timedelta(hours=timeout_hours)
-
-        stuck_jobs = db.query(IngestionJob).filter(
+        # Get ALL running jobs (we check per-source timeout individually)
+        running_jobs = db.query(IngestionJob).filter(
             IngestionJob.status == JobStatus.RUNNING,
-            IngestionJob.started_at < cutoff
+            IngestionJob.started_at.isnot(None),
         ).all()
 
-        if not stuck_jobs:
-            logger.info("No stuck jobs found during cleanup")
+        if not running_jobs:
+            logger.info("No running jobs found during cleanup")
             return {
                 "cleaned_up": 0,
                 "jobs": [],
                 "timeout_hours": timeout_hours
             }
 
-        # Mark stuck jobs as failed
+        # Mark stuck jobs as failed (check per-source timeout)
         cleaned_jobs = []
-        for job in stuck_jobs:
-            running_hours = (datetime.utcnow() - job.started_at).total_seconds() / 3600
+        for job in running_jobs:
+            # Get per-source timeout, fall back to global
+            source_timeout_secs = source_config_service.get_timeout_seconds(db, job.source)
+            running_seconds = (datetime.utcnow() - job.started_at).total_seconds()
+
+            if running_seconds < source_timeout_secs:
+                continue  # Not stuck yet for this source
+
+            running_hours = running_seconds / 3600
+            threshold_hours = source_timeout_secs / 3600
 
             job.status = JobStatus.FAILED
-            job.error_message = f"Job timed out after {running_hours:.1f} hours (threshold: {timeout_hours}h) - automatically marked as failed"
+            job.error_message = f"Job timed out after {running_hours:.1f} hours (threshold: {threshold_hours:.1f}h) - automatically marked as failed"
             job.completed_at = datetime.utcnow()
 
             cleaned_jobs.append({
                 "job_id": job.id,
                 "source": job.source,
                 "running_hours": round(running_hours, 2),
-                "started_at": job.started_at.isoformat()
+                "started_at": job.started_at.isoformat(),
+                "timeout_hours": round(threshold_hours, 2),
             })
 
             logger.warning(
                 f"Marked stuck job {job.id} ({job.source}) as failed - "
-                f"was running for {running_hours:.1f} hours"
+                f"was running for {running_hours:.1f} hours (threshold: {threshold_hours:.1f}h)"
             )
+
+        if not cleaned_jobs:
+            logger.info("No stuck jobs found during cleanup")
+            return {
+                "cleaned_up": 0,
+                "jobs": [],
+                "timeout_hours": timeout_hours
+            }
 
         db.commit()
 
@@ -750,4 +1160,42 @@ def unregister_retry_processor() -> bool:
         return True
     except Exception as e:
         logger.error(f"Failed to unregister retry processor: {e}")
+        return False
+
+
+def register_consecutive_failure_checker(interval_minutes: int = 30) -> bool:
+    """
+    Register periodic check for site intel sources with consecutive failures.
+
+    Fires ALERT_CONSECUTIVE_FAILURES webhook when a source has 3+ consecutive failures.
+
+    Args:
+        interval_minutes: How often to run the check (default 30 min)
+
+    Returns:
+        True if registered successfully
+    """
+    from app.core.monitoring import check_and_notify_consecutive_failures
+
+    scheduler = get_scheduler()
+    job_id = "system_consecutive_failure_checker"
+
+    try:
+        existing_job = scheduler.get_job(job_id)
+        if existing_job:
+            scheduler.remove_job(job_id)
+
+        scheduler.add_job(
+            check_and_notify_consecutive_failures,
+            trigger=IntervalTrigger(minutes=interval_minutes),
+            id=job_id,
+            name="Consecutive Failure Checker",
+            replace_existing=True,
+        )
+
+        logger.info(f"Registered consecutive failure checker to run every {interval_minutes} minutes")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to register consecutive failure checker: {e}")
         return False
