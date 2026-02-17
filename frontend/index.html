@@ -535,7 +535,7 @@
             macro_econ: {
                 label: 'Macro Economic',
                 sources: [
-                    { key: 'fred', label: 'FRED (Federal Reserve)', tables: ['fred_series', 'fred_series_observations'],
+                    { key: 'fred', label: 'FRED (Federal Reserve)', tablePrefix: 'fred_',
                       triggers: [{method:'POST', path:'/api/v1/fred/ingest', label:'Ingest category'}, {method:'POST', path:'/api/v1/fred/ingest/batch', label:'Batch ingest'}],
                       endpoints: [{method:'GET', path:'/api/v1/fred/categories', label:'List categories'}, {method:'GET', path:'/api/v1/fred/series/{category}', label:'Series by category'}],
                       scheduleOptions: ['daily','weekly','monthly'] },
