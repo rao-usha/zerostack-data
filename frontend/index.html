@@ -263,6 +263,174 @@
         .test-result { font-size: 0.75rem; padding: 0.25rem 0.5rem; border-radius: 4px; margin-top: 0.25rem; }
         .test-result.success { background: rgba(34,197,94,0.1); color: var(--success); }
         .test-result.failure { background: rgba(239,68,68,0.1); color: var(--error); }
+
+        /* Inline endpoint docs panel */
+        .ep-docs-panel {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin: 0.25rem 0 0.75rem 0;
+            animation: epSlideDown 0.2s ease-out;
+        }
+        @keyframes epSlideDown {
+            from { opacity: 0; max-height: 0; padding: 0 1.25rem; }
+            to { opacity: 1; max-height: 2000px; padding: 1.25rem; }
+        }
+        .ep-docs-section { margin-bottom: 1rem; }
+        .ep-docs-section:last-child { margin-bottom: 0; }
+        .ep-docs-section-title {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+        .ep-docs-desc { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; }
+        .ep-docs-desc p { margin-bottom: 0.5rem; }
+        .ep-docs-desc strong { color: var(--text); }
+        .ep-docs-desc code { background: var(--bg-input); padding: 0.125rem 0.375rem; border-radius: 3px; font-size: 0.8rem; }
+        .ep-docs-desc ul { margin: 0.25rem 0 0.5rem 1.25rem; }
+        .ep-docs-desc li { margin-bottom: 0.25rem; }
+        .ep-params-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .ep-params-table th {
+            text-align: left;
+            padding: 0.375rem 0.5rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+        }
+        .ep-params-table td {
+            padding: 0.375rem 0.5rem;
+            border-bottom: 1px solid rgba(51,65,85,0.5);
+            vertical-align: top;
+        }
+        .ep-params-table .param-name { font-family: monospace; color: var(--accent); font-weight: 500; }
+        .ep-params-table .param-required { color: var(--error); font-weight: 700; }
+        .ep-params-table .param-type { color: var(--warning); font-family: monospace; font-size: 0.75rem; }
+        .ep-schema-block, .ep-curl-block {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            font-family: 'Monaco','Menlo','Consolas',monospace;
+            font-size: 0.78rem;
+            line-height: 1.6;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .ep-schema-block .key { color: var(--accent); }
+        .ep-schema-block .type { color: var(--warning); }
+        .ep-schema-block .required-marker { color: var(--error); font-weight: 700; }
+        .ep-schema-block .comment { color: var(--text-muted); font-style: italic; }
+        .ep-schema-block .nested-toggle { color: var(--primary); cursor: pointer; text-decoration: underline; font-style: normal; }
+        .ep-schema-block .nested-toggle:hover { color: var(--accent); }
+        .ep-model-name { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.375rem; font-family: monospace; }
+        .ep-model-name span { color: var(--primary); font-weight: 600; }
+        .ep-response-code { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 700; font-family: monospace; margin-right: 0.5rem; }
+        .ep-response-code.c2xx { background: rgba(34,197,94,0.15); color: var(--success); }
+        .ep-response-code.c4xx { background: rgba(245,158,11,0.15); color: var(--warning); }
+        .ep-response-code.c5xx { background: rgba(239,68,68,0.15); color: var(--error); }
+        .ep-response-block { margin-bottom: 0.75rem; }
+        .ep-response-block:last-child { margin-bottom: 0; }
+        .ep-response-desc { font-size: 0.8rem; color: var(--text-muted); margin: 0.25rem 0 0.375rem 0; }
+        .ep-enum-values { font-size: 0.7rem; color: var(--warning); font-family: monospace; }
+        .ep-curl-block { color: var(--success); }
+        .ep-loading { text-align: center; padding: 1rem; color: var(--text-muted); font-size: 0.85rem; }
+        .ep-fallback { padding: 0.75rem; color: var(--text-muted); font-size: 0.85rem; }
+        .ep-fallback a { color: var(--accent); }
+        .ep-docs-toggle { cursor: pointer; user-select: none; }
+        .ep-docs-toggle:hover { color: var(--text) !important; }
+
+        /* ===== Active Jobs Panel ===== */
+        .active-jobs-panel {
+            background: var(--card-bg, #1e1e2e);
+            border: 1px solid var(--border, #333);
+            border-radius: 8px;
+            margin: 0.5rem 1rem;
+            padding: 0.75rem 1rem;
+            display: none; /* shown via JS when jobs exist */
+        }
+        .active-jobs-panel.visible { display: block; }
+        .active-jobs-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text, #e0e0e0);
+        }
+        .pulse-dot {
+            width: 8px; height: 8px;
+            background: #4ade80;
+            border-radius: 50%;
+            animation: pulse-glow 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(74,222,128,0.5); }
+            50% { box-shadow: 0 0 0 6px rgba(74,222,128,0); }
+        }
+        .active-job-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.4rem 0;
+            font-size: 0.8rem;
+            color: var(--text-muted, #aaa);
+        }
+        .active-job-item + .active-job-item {
+            border-top: 1px solid var(--border, #333);
+        }
+        .job-type-badge {
+            background: var(--accent, #6366f1);
+            color: #fff;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .job-progress-bar {
+            flex: 1;
+            height: 6px;
+            background: var(--border, #333);
+            border-radius: 3px;
+            overflow: hidden;
+            min-width: 80px;
+        }
+        .job-progress-fill {
+            height: 100%;
+            background: #4ade80;
+            border-radius: 3px;
+            transition: width 0.4s ease;
+        }
+        .job-message {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .job-worker-badge {
+            font-size: 0.65rem;
+            color: var(--text-muted, #888);
+            background: rgba(255,255,255,0.05);
+            padding: 0.1rem 0.4rem;
+            border-radius: 3px;
+            white-space: nowrap;
+        }
+        .job-fade-out {
+            animation: job-fade 0.6s ease forwards;
+        }
+        @keyframes job-fade {
+            to { opacity: 0; height: 0; padding: 0; margin: 0; overflow: hidden; }
+        }
     </style>
 </head>
 <body>
@@ -282,6 +450,16 @@
         <button class="tab active" onclick="showTab('sources')">📡 Sources</button>
         <button class="tab" onclick="showTab('settings')">⚙️ Settings</button>
     </nav>
+
+    <!-- Active Jobs Panel (auto-shows when jobs are running) -->
+    <div id="active-jobs-panel" class="active-jobs-panel">
+        <div class="active-jobs-header">
+            <span class="pulse-dot"></span>
+            <span>Active Jobs</span>
+            <span id="active-jobs-count" style="color: var(--text-muted); font-weight: 400;"></span>
+        </div>
+        <div id="active-jobs-list"></div>
+    </div>
 
     <main class="content">
         <!-- Sources Tab (default) -->
@@ -370,7 +548,8 @@
                       endpoints: [{method:'GET', path:'/api/v1/bls/reference/datasets', label:'List datasets'}, {method:'GET', path:'/api/v1/bls/reference/series', label:'Search series'}, {method:'GET', path:'/api/v1/bls/reference/quick', label:'Quick lookup'}],
                       scheduleOptions: ['daily','weekly','monthly'] },
                     { key: 'treasury', label: 'US Treasury', tables: ['treasury_yield_curves', 'treasury_securities', 'treasury_debt_to_penny', 'treasury_statements', 'treasury_exchange_rates'],
-                      triggers: [{method:'POST', path:'/api/v1/treasury/fiscal-data/ingest', label:'Ingest fiscal data'}, {method:'POST', path:'/api/v1/treasury/daily-balance/ingest', label:'Ingest daily balance'}],
+                      triggers: [{method:'POST', path:'/api/v1/treasury/interest-rates/ingest', label:'Ingest interest rates'}, {method:'POST', path:'/api/v1/treasury/debt/ingest', label:'Ingest debt data'}, {method:'POST', path:'/api/v1/treasury/auctions/ingest', label:'Ingest auctions'}, {method:'POST', path:'/api/v1/treasury/all/ingest', label:'Ingest all'}],
+                      endpoints: [{method:'GET', path:'/api/v1/treasury/reference/datasets', label:'List datasets'}, {method:'GET', path:'/api/v1/treasury/reference/security-types', label:'Security types'}],
                       scheduleOptions: ['daily','weekly'] },
                     { key: 'data_commons', label: 'Google Data Commons', tables: ['data_commons_observations'],
                       scheduleOptions: ['weekly','monthly'] },
@@ -408,8 +587,8 @@
                       endpoints: [{method:'GET', path:'/api/v1/sec/supported-filing-types', label:'Filing types'}, {method:'GET', path:'/api/v1/sec/common-companies', label:'Common companies'}, {method:'POST', path:'/api/v1/sec/form-adv/ingest/family-offices', label:'Ingest Form ADV FOs'}, {method:'GET', path:'/api/v1/sec/form-adv/firms', label:'Query Form ADV firms'}, {method:'GET', path:'/api/v1/sec/form-adv/stats', label:'Form ADV stats'}],
                       scheduleOptions: ['daily','weekly','monthly'] },
                     { key: 'fdic', label: 'FDIC (Banking)', tables: ['fdic_institutions', 'fdic_financials'],
-                      triggers: [{method:'POST', path:'/api/v1/fdic/bank-financials/ingest', label:'Ingest bank data'}],
-                      endpoints: [{method:'GET', path:'/api/v1/fdic/banks', label:'Search banks'}, {method:'GET', path:'/api/v1/fdic/banks/{cert_number}', label:'Bank details'}, {method:'GET', path:'/api/v1/fdic/datasets', label:'List datasets'}],
+                      triggers: [{method:'POST', path:'/api/v1/fdic/financials/ingest', label:'Ingest financials'}, {method:'POST', path:'/api/v1/fdic/institutions/ingest', label:'Ingest institutions'}, {method:'POST', path:'/api/v1/fdic/all/ingest', label:'Ingest all'}],
+                      endpoints: [{method:'GET', path:'/api/v1/fdic/search', label:'Search banks'}, {method:'GET', path:'/api/v1/fdic/reference/datasets', label:'List datasets'}, {method:'GET', path:'/api/v1/fdic/reference/major-banks', label:'Major banks'}],
                       scheduleOptions: ['weekly','monthly','quarterly'] },
                     { key: 'form_d', label: 'SEC Form D', tables: ['form_d_filings', 'form_d_related_persons'],
                       scheduleOptions: ['weekly','monthly'] },
@@ -439,7 +618,7 @@
                     { key: 'realestate', label: 'Real Estate Data', tablePrefix: 'realestate_',
                       scheduleOptions: ['monthly','quarterly'] },
                     { key: 'cms', label: 'CMS (Healthcare/Medicare)', tablePrefix: 'cms_',
-                      triggers: [{method:'POST', path:'/api/v1/cms/medicare-utilization/ingest', label:'Ingest Medicare'}, {method:'POST', path:'/api/v1/cms/hospital-costs/ingest', label:'Ingest hospital costs'}, {method:'POST', path:'/api/v1/cms/drug-pricing/ingest', label:'Ingest drug pricing'}],
+                      triggers: [{method:'POST', path:'/api/v1/cms/ingest/medicare-utilization', label:'Ingest Medicare'}, {method:'POST', path:'/api/v1/cms/ingest/hospital-cost-reports', label:'Ingest hospital costs'}, {method:'POST', path:'/api/v1/cms/ingest/drug-pricing', label:'Ingest drug pricing'}],
                       endpoints: [{method:'GET', path:'/api/v1/cms/datasets', label:'List datasets'}],
                       scheduleOptions: ['monthly','quarterly'] },
                 ],
@@ -548,13 +727,13 @@
                     { key: 'si_3pl_fmcsa', label: '3PL FMCSA', domain: 'logistics', siCollector: 'three_pl_fmcsa', scheduleOptions: ['monthly','quarterly'] },
                     // Water & Utilities
                     { key: 'si_usgs_water', label: 'USGS Water', domain: 'water_utilities', siCollector: 'usgs_water',
-                      endpoints: [{method:'GET', path:'/api/v1/site-intel/water/monitoring-sites', label:'Monitoring sites'}, {method:'GET', path:'/api/v1/site-intel/water/monitoring-sites/near', label:'Nearby sites'}],
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/water-utilities/monitoring-sites', label:'Monitoring sites'}, {method:'GET', path:'/api/v1/site-intel/water-utilities/monitoring-sites/near', label:'Nearby sites'}],
                       scheduleOptions: ['weekly','monthly'] },
                     { key: 'si_epa_sdwis', label: 'EPA SDWIS', domain: 'water_utilities', siCollector: 'epa_sdwis',
-                      endpoints: [{method:'GET', path:'/api/v1/site-intel/water/water-systems', label:'Water systems'}, {method:'GET', path:'/api/v1/site-intel/water/water-systems/{pwsid}/violations', label:'Violations'}],
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/water-utilities/water-systems', label:'Water systems'}, {method:'GET', path:'/api/v1/site-intel/water-utilities/water-systems/{pwsid}/violations', label:'Violations'}],
                       scheduleOptions: ['monthly','quarterly'] },
                     { key: 'si_eia_gas', label: 'EIA Gas', domain: 'water_utilities', siCollector: 'eia_gas',
-                      endpoints: [{method:'GET', path:'/api/v1/site-intel/water/gas-pipelines', label:'Gas pipelines'}, {method:'GET', path:'/api/v1/site-intel/water/gas-storage', label:'Gas storage'}],
+                      endpoints: [{method:'GET', path:'/api/v1/site-intel/water-utilities/gas-pipelines', label:'Gas pipelines'}, {method:'GET', path:'/api/v1/site-intel/water-utilities/gas-storage', label:'Gas storage'}],
                       scheduleOptions: ['monthly','quarterly'] },
                     { key: 'si_openei_urdb', label: 'OpenEI URDB', domain: 'water_utilities', siCollector: 'openei_urdb', scheduleOptions: ['quarterly'] },
                     { key: 'si_eia_electricity', label: 'EIA Electricity', domain: 'water_utilities', siCollector: 'eia_electricity', scheduleOptions: ['monthly','quarterly'] },
@@ -565,11 +744,11 @@
                 sources: [
                     { key: 'people_website', label: 'Website Scraping', tables: ['people', 'company_people'],
                       triggers: [{method:'POST', path:'/api/v1/people-jobs/test/{company_id}?sources=website', label:'Test collect'}, {method:'POST', path:'/api/v1/people-jobs/schedule', label:'Schedule job'}],
-                      endpoints: [{method:'GET', path:'/api/v1/people/', label:'Search people'}, {method:'GET', path:'/api/v1/people/search', label:'Advanced search'}, {method:'GET', path:'/api/v1/people-jobs/', label:'List jobs'}, {method:'GET', path:'/api/v1/people-jobs/stats', label:'Job stats'}],
+                      endpoints: [{method:'GET', path:'/api/v1/people', label:'Search people'}, {method:'GET', path:'/api/v1/people/search/executives', label:'Search executives'}, {method:'GET', path:'/api/v1/people-jobs/', label:'List jobs'}, {method:'GET', path:'/api/v1/people-jobs/stats', label:'Job stats'}],
                       scheduleOptions: ['weekly','monthly'] },
                     { key: 'people_sec', label: 'SEC 10-K Officers', tables: ['people', 'company_people'],
                       triggers: [{method:'POST', path:'/api/v1/people-jobs/deep-collect/{company_id}', label:'Deep collect (SEC phase)'}],
-                      endpoints: [{method:'GET', path:'/api/v1/people/', label:'Search people'}],
+                      endpoints: [{method:'GET', path:'/api/v1/people', label:'Search people'}],
                       scheduleOptions: ['monthly','quarterly'] },
                     { key: 'people_news', label: 'News Deep Scan', tables: ['people', 'company_people'],
                       triggers: [{method:'POST', path:'/api/v1/people-jobs/deep-collect/{company_id}', label:'Deep collect (News phase)'}],
@@ -588,7 +767,7 @@
                 sources: [
                     { key: 'pe_firms', label: 'PE/VC Firms', tables: ['pe_firms', 'pe_firm_contacts'],
                       triggers: [{method:'POST', path:'/api/v1/pe/collection/collect', label:'Collect PE data', body:{modules:['firms']}}],
-                      endpoints: [{method:'GET', path:'/api/v1/pe/firms/', label:'List firms'}, {method:'GET', path:'/api/v1/pe/firms/search', label:'Search firms'}, {method:'GET', path:'/api/v1/pe/firms/{id}/portfolio', label:'Portfolio'}, {method:'GET', path:'/api/v1/pe/firms/{id}/exits', label:'Exits'}],
+                      endpoints: [{method:'GET', path:'/api/v1/pe/firms/', label:'List firms'}, {method:'GET', path:'/api/v1/pe/firms/search', label:'Search firms'}, {method:'GET', path:'/api/v1/pe/firms/{firm_id}/portfolio', label:'Portfolio'}, {method:'GET', path:'/api/v1/pe/firms/{firm_id}/team', label:'Team'}],
                       scheduleOptions: ['weekly','monthly'] },
                     { key: 'pe_funds', label: 'Fund Performance', tables: ['pe_funds'],
                       triggers: [{method:'POST', path:'/api/v1/pe/collection/collect', label:'Collect PE data', body:{modules:['funds']}}],
@@ -599,7 +778,7 @@
                       scheduleOptions: ['daily','weekly'] },
                     { key: 'pe_portfolio', label: 'Portfolio Companies', tables: ['pe_portfolio_companies', 'pe_portfolio_financials'],
                       triggers: [{method:'POST', path:'/api/v1/pe/collection/collect', label:'Collect PE data', body:{modules:['portfolio']}}],
-                      endpoints: [{method:'GET', path:'/api/v1/pe/companies/', label:'List companies'}, {method:'GET', path:'/api/v1/pe/companies/search', label:'Search'}, {method:'GET', path:'/api/v1/pe/companies/{id}/financials', label:'Financials'}],
+                      endpoints: [{method:'GET', path:'/api/v1/pe/companies/', label:'List companies'}, {method:'GET', path:'/api/v1/pe/companies/search', label:'Search'}, {method:'GET', path:'/api/v1/pe/companies/{company_id}/financials', label:'Financials'}],
                       scheduleOptions: ['weekly','monthly'] },
                     { key: 'pe_people', label: 'Fund Professionals', tables: ['pe_people', 'pe_person_experience'],
                       triggers: [{method:'POST', path:'/api/v1/pe/collection/collect', label:'Collect PE data', body:{modules:['people']}}],
@@ -614,7 +793,7 @@
                 sources: [
                     { key: 'family_offices', label: 'Family Offices', tables: ['family_offices', 'family_office_contacts'],
                       triggers: [{method:'POST', path:'/api/v1/sec/form-adv/ingest/family-offices', label:'Ingest from Form ADV'}],
-                      endpoints: [{method:'GET', path:'/api/v1/family-offices/', label:'List offices'}, {method:'GET', path:'/api/v1/family-offices/{id}', label:'Office details'}, {method:'GET', path:'/api/v1/family-offices/stats/overview', label:'Overview stats'}],
+                      endpoints: [{method:'GET', path:'/api/v1/family-offices/', label:'List offices'}, {method:'GET', path:'/api/v1/family-offices/{office_id}', label:'Office details'}, {method:'GET', path:'/api/v1/family-offices/stats/overview', label:'Overview stats'}],
                       scheduleOptions: ['weekly','monthly','quarterly'] },
                     { key: 'lp_commitments', label: 'LP Commitments', tables: ['lp_commitments'],
                       scheduleOptions: ['monthly','quarterly'] },
@@ -662,6 +841,12 @@
         let previewPage = 0;
         let previewLoading = false;
         const PREVIEW_PAGE_SIZE = 50;
+
+        // Inline endpoint docs state
+        let expandedEndpointKey = null;
+        let openApiSpec = null;
+        let openApiFetchPromise = null;
+        let endpointDocsLoading = false;
 
         // Helpers
         function timeAgo(dateStr) {
@@ -948,30 +1133,33 @@
                 </div>
             </div>`;
 
-            // ---- Data coverage by category (horizontal bars) ----
+            // ---- Data Coverage + Largest Tables (side by side) ----
             const maxCatRecords = Math.max(...Object.values(inv.catRecords).map(c => c.records), 1);
-            html += `<div class="card" style="margin-bottom:1.5rem;">
+            html += `<div style="display:flex;gap:1.5rem;margin-bottom:1.5rem;flex-wrap:wrap;">`;
+
+            // Left: Data Coverage by Category
+            html += `<div class="card" style="flex:1;min-width:340px;margin-bottom:0;">
                 <div class="card-title">Data Coverage by Category</div>`;
             for (const [catKey, cat] of Object.entries(inv.catRecords)) {
                 const pct = Math.max(1, Math.round((cat.records / maxCatRecords) * 100));
                 const barColor = cat.records > 0 ? 'var(--primary)' : 'var(--border)';
                 html += `<div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.625rem;cursor:pointer;" onclick="expandedCategories['${catKey}']=true;renderSources();document.querySelector('[data-cat=\\'${catKey}\\']')?.scrollIntoView({behavior:'smooth'});">
-                    <div style="width:160px;font-size:0.8rem;color:var(--text-muted);text-align:right;flex-shrink:0;">${cat.label}</div>
+                    <div style="width:130px;font-size:0.8rem;color:var(--text-muted);text-align:right;flex-shrink:0;">${cat.label}</div>
                     <div style="flex:1;background:var(--bg-input);border-radius:4px;height:20px;overflow:hidden;">
                         <div style="width:${pct}%;height:100%;background:${barColor};border-radius:4px;transition:width 0.3s;"></div>
                     </div>
-                    <div style="width:90px;font-size:0.8rem;color:var(--text);font-weight:500;">${fmtNum(cat.records)}</div>
-                    <div style="width:60px;font-size:0.75rem;color:var(--text-muted);">${cat.withData}/${cat.sources} src</div>
+                    <div style="width:80px;font-size:0.8rem;color:var(--text);font-weight:500;">${fmtNum(cat.records)}</div>
+                    <div style="width:55px;font-size:0.75rem;color:var(--text-muted);">${cat.withData}/${cat.sources}</div>
                 </div>`;
             }
             html += `</div>`;
 
-            // ---- Largest Tables ----
+            // Right: Largest Tables
             if (inv.topTables.length > 0) {
-                html += `<div class="card" style="margin-bottom:1.5rem;">
+                html += `<div class="card" style="flex:0 0 380px;min-width:300px;margin-bottom:0;">
                     <div class="card-title">Largest Tables</div>
                     <table class="ds-table"><thead><tr>
-                        <th>Table</th><th>Records</th><th>Columns</th>
+                        <th>Table</th><th>Records</th><th>Cols</th>
                     </tr></thead><tbody>`;
                 inv.topTables.forEach(t => {
                     html += `<tr style="cursor:pointer;" onclick="jumpToTablePreview('${t.table_name}')">
@@ -982,6 +1170,7 @@
                 });
                 html += `</tbody></table></div>`;
             }
+            html += `</div>`;
 
             // ---- Alerts ----
             const importantAlerts = (alerts || []).filter(a => a.severity === 'critical' || a.severity === 'warning');
@@ -1189,6 +1378,400 @@
             renderSources();
         }
 
+        // ---- Inline Endpoint Docs ----
+
+        async function getOpenApiSpec() {
+            if (openApiSpec) return openApiSpec;
+            if (openApiFetchPromise) return openApiFetchPromise;
+            openApiFetchPromise = (async () => {
+                const urls = ['/openapi.json', 'http://localhost:8001/openapi.json'];
+                for (const url of urls) {
+                    try {
+                        const r = await fetch(url);
+                        if (!r.ok) continue;
+                        const ct = r.headers.get('content-type') || '';
+                        if (!ct.includes('json')) continue; // proxy returned HTML fallback
+                        const spec = await r.json();
+                        if (spec?.paths) { openApiSpec = spec; return spec; }
+                    } catch (e) { console.warn(`OpenAPI fetch failed (${url}):`, e); }
+                }
+                console.warn('Could not load OpenAPI spec from any URL');
+                return null;
+            })();
+            openApiFetchPromise.finally(() => { openApiFetchPromise = null; });
+            return openApiFetchPromise;
+        }
+
+        function resolveRef(ref, spec) {
+            if (!ref || !ref.startsWith('#/')) return null;
+            const parts = ref.replace('#/', '').split('/');
+            let obj = spec;
+            for (const p of parts) { obj = obj?.[p]; if (!obj) return null; }
+            return obj;
+        }
+
+        function getRefName(schema) {
+            if (schema?.$ref) return schema.$ref.split('/').pop();
+            if (schema?.allOf) {
+                const refItem = schema.allOf.find(s => s.$ref);
+                if (refItem) return refItem.$ref.split('/').pop();
+            }
+            return null;
+        }
+
+        function resolveSchema(schema, spec, depth = 0, seen = new Set()) {
+            if (!schema || depth > 8) return schema;
+            if (schema.$ref) {
+                if (seen.has(schema.$ref)) return { type: 'object', title: schema.$ref.split('/').pop(), _circular: true };
+                seen.add(schema.$ref);
+                const resolved = resolveRef(schema.$ref, spec);
+                return resolved ? resolveSchema({ ...resolved, title: resolved.title || schema.$ref.split('/').pop() }, spec, depth + 1, seen) : schema;
+            }
+            if (schema.allOf) {
+                let merged = { type: 'object', properties: {}, required: [] };
+                for (const sub of schema.allOf) {
+                    const resolved = resolveSchema(sub, spec, depth + 1, seen);
+                    if (resolved?.properties) Object.assign(merged.properties, resolved.properties);
+                    if (resolved?.required) merged.required.push(...resolved.required);
+                    if (resolved?.title) merged.title = resolved.title;
+                }
+                return merged;
+            }
+            if (schema.anyOf) {
+                const nonNull = schema.anyOf.filter(s => s.type !== 'null');
+                if (nonNull.length === 1) {
+                    const inner = resolveSchema(nonNull[0], spec, depth + 1, seen);
+                    return { ...inner, _nullable: true, description: schema.description || inner?.description };
+                }
+                return schema;
+            }
+            if (schema.properties) {
+                const props = {};
+                for (const [k, v] of Object.entries(schema.properties)) {
+                    props[k] = resolveSchema(v, spec, depth + 1, seen);
+                }
+                return { ...schema, properties: props };
+            }
+            if (schema.items) return { ...schema, items: resolveSchema(schema.items, spec, depth + 1, seen) };
+            return schema;
+        }
+
+        function getTypeString(prop) {
+            if (!prop) return 'any';
+            if (prop._circular) return prop.title || 'object (circular)';
+            if (prop.enum) return prop.enum.map(v => `"${v}"`).join(' | ');
+            let t = prop.type || 'any';
+            if (prop.format) t += ` (${prop.format})`;
+            if (t === 'array' && prop.items) {
+                const itemType = prop.items?.title || prop.items?.type || 'any';
+                t = itemType + '[]';
+            }
+            if (prop.anyOf) {
+                t = prop.anyOf.map(s => s.type === 'null' ? 'null' : (s.title || s.type || 'any')).join(' | ');
+            }
+            if (prop._nullable) t += ' | null';
+            return t;
+        }
+
+        function renderSchemaLines(schema, spec, indent = 0, seen = new Set()) {
+            const resolved = resolveSchema(schema, spec, 0, new Set(seen));
+            const pad = '  '.repeat(indent);
+            const lines = [];
+
+            if (resolved?._circular) {
+                lines.push(`${pad}<span class="comment">// circular ref: ${escHtml(resolved.title)}</span>`);
+                return lines;
+            }
+
+            // Array of objects
+            if (resolved?.type === 'array' && resolved.items) {
+                const itemResolved = resolveSchema(resolved.items, spec, 0, new Set(seen));
+                if (itemResolved?.properties) {
+                    const modelName = itemResolved.title || getRefName(resolved.items) || '';
+                    lines.push(`${pad}[  <span class="comment">// ${escHtml(modelName)}[]</span>`);
+                    lines.push(...renderObjectLines(itemResolved, spec, indent + 1, seen));
+                    lines.push(`${pad}]`);
+                } else {
+                    const itemType = getTypeString(itemResolved);
+                    lines.push(`${pad}<span class="type">${escHtml(itemType)}[]</span>`);
+                }
+                return lines;
+            }
+
+            // Object with properties
+            if (resolved?.properties) {
+                lines.push(...renderObjectLines(resolved, spec, indent, seen));
+                return lines;
+            }
+
+            // Primitive
+            lines.push(`${pad}<span class="type">${escHtml(getTypeString(resolved))}</span>`);
+            return lines;
+        }
+
+        function renderObjectLines(resolved, spec, indent, seen) {
+            const pad = '  '.repeat(indent);
+            const required = new Set(resolved.required || []);
+            const lines = [`${pad}{`];
+            const entries = Object.entries(resolved.properties || {});
+            entries.forEach(([key, prop], i) => {
+                const innerPad = '  '.repeat(indent + 1);
+                const reqMark = required.has(key) ? '<span class="required-marker">*</span>' : '';
+                const comma = i < entries.length - 1 ? ',' : '';
+
+                // Check if prop is a nested object or array of objects
+                const propResolved = resolveSchema(prop, spec, 0, new Set(seen));
+                const isNestedObj = propResolved?.properties && !propResolved._circular;
+                const isNestedArr = propResolved?.type === 'array' && resolveSchema(propResolved?.items, spec, 0, new Set(seen))?.properties;
+
+                if (isNestedObj && Object.keys(propResolved.properties).length > 0) {
+                    const modelName = propResolved.title || getRefName(prop) || '';
+                    const desc = prop?.description || propResolved?.description || '';
+                    const descComment = desc ? `  <span class="comment">// ${escHtml(desc)}</span>` : '';
+                    lines.push(`${innerPad}<span class="key">"${escHtml(key)}"</span>${reqMark}: {${descComment}${modelName ? `  <span class="comment">(${escHtml(modelName)})</span>` : ''}`);
+                    const nestedEntries = Object.entries(propResolved.properties);
+                    const nestedRequired = new Set(propResolved.required || []);
+                    nestedEntries.forEach(([nk, nv], ni) => {
+                        const deepPad = '  '.repeat(indent + 2);
+                        const nReqMark = nestedRequired.has(nk) ? '<span class="required-marker">*</span>' : '';
+                        const nResolved = resolveSchema(nv, spec, 0, new Set(seen));
+                        const nType = getTypeString(nResolved);
+                        const nDesc = nv?.description || nResolved?.description || '';
+                        const nDescComment = nDesc ? `  <span class="comment">// ${escHtml(nDesc)}</span>` : '';
+                        const nDefault = nResolved?.default !== undefined ? ` = ${escHtml(JSON.stringify(nResolved.default))}` : '';
+                        const nEnum = nResolved?.enum ? `  <span class="comment">enum: [${nResolved.enum.map(v => `"${v}"`).join(', ')}]</span>` : '';
+                        const nComma = ni < nestedEntries.length - 1 ? ',' : '';
+
+                        // If this nested prop is ALSO an object, show its type name but don't go infinitely deep
+                        const deepResolved = resolveSchema(nv, spec, 0, new Set(seen));
+                        if (deepResolved?.properties && !deepResolved._circular && Object.keys(deepResolved.properties).length > 0) {
+                            const deepModel = deepResolved.title || getRefName(nv) || 'object';
+                            lines.push(`${deepPad}<span class="key">"${escHtml(nk)}"</span>${nReqMark}: <span class="type">${escHtml(deepModel)}</span>${nDefault}${nComma}${nDescComment}`);
+                        } else {
+                            lines.push(`${deepPad}<span class="key">"${escHtml(nk)}"</span>${nReqMark}: <span class="type">${escHtml(nType)}</span>${nDefault}${nComma}${nDescComment}${nEnum}`);
+                        }
+                    });
+                    lines.push(`${innerPad}}${comma}`);
+                } else if (isNestedArr) {
+                    const itemResolved = resolveSchema(propResolved.items, spec, 0, new Set(seen));
+                    const modelName = itemResolved?.title || getRefName(propResolved.items) || 'object';
+                    const desc = prop?.description || propResolved?.description || '';
+                    const descComment = desc ? `  <span class="comment">// ${escHtml(desc)}</span>` : '';
+                    lines.push(`${innerPad}<span class="key">"${escHtml(key)}"</span>${reqMark}: <span class="type">${escHtml(modelName)}[]</span>${comma}${descComment}`);
+                } else {
+                    const typeStr = getTypeString(propResolved);
+                    const desc = prop?.description || propResolved?.description || '';
+                    const descComment = desc ? `  <span class="comment">// ${escHtml(desc)}</span>` : '';
+                    const defVal = propResolved?.default !== undefined ? ` = ${escHtml(JSON.stringify(propResolved.default))}` : '';
+                    const enumVals = propResolved?.enum ? `  <span class="comment">enum: [${propResolved.enum.map(v => `"${v}"`).join(', ')}]</span>` : '';
+                    lines.push(`${innerPad}<span class="key">"${escHtml(key)}"</span>${reqMark}: <span class="type">${escHtml(typeStr)}</span>${defVal}${comma}${descComment}${enumVals}`);
+                }
+            });
+            lines.push(`${pad}}`);
+            return lines;
+        }
+
+        function renderSchemaAsBlock(schema, spec) {
+            const modelName = getRefName(schema);
+            const lines = renderSchemaLines(schema, spec);
+            if (lines.length === 0) return '<span class="comment">// No schema available</span>';
+            let header = '';
+            if (modelName) header = `<div class="ep-model-name">Model: <span>${escHtml(modelName)}</span></div>`;
+            return header + lines.join('\n');
+        }
+
+        function escHtml(s) {
+            if (!s) return '';
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        function simpleMarkdown(text) {
+            if (!text) return '';
+            let html = escHtml(text);
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+            html = html.replace(/\n\n/g, '</p><p>');
+            return '<p>' + html + '</p>';
+        }
+
+        function buildCurlExample(method, path, operation, spec) {
+            let url = `http://localhost:8001${path}`;
+            const params = operation.parameters || [];
+            const queryParams = params.filter(p => p.in === 'query' && p.required);
+            if (queryParams.length > 0) {
+                url += '?' + queryParams.map(p => `${p.name}={${p.name}}`).join('&');
+            }
+            let curl = `curl -X ${method} "${url}"`;
+            if (['POST', 'PUT', 'PATCH'].includes(method)) {
+                curl += ` \\\n  -H "Content-Type: application/json"`;
+                const bodySchema = operation.requestBody?.content?.['application/json']?.schema;
+                if (bodySchema) {
+                    const resolved = resolveSchema(bodySchema, spec);
+                    if (resolved?.properties) {
+                        const example = {};
+                        const required = new Set(resolved.required || []);
+                        for (const [k, v] of Object.entries(resolved.properties)) {
+                            if (k === '_required') continue;
+                            if (required.has(k) || Object.keys(example).length < 3) {
+                                example[k] = v?.example ?? v?.default ?? (v?.type === 'integer' ? 0 : v?.type === 'boolean' ? false : v?.type === 'array' ? [] : '...');
+                            }
+                        }
+                        curl += ` \\\n  -d '${JSON.stringify(example)}'`;
+                    }
+                }
+            }
+            return curl;
+        }
+
+        function findSpecPath(rawPath, spec) {
+            const paths = spec.paths || {};
+            // Strip query string and trailing slash for matching
+            const clean = rawPath.split('?')[0].replace(/\/+$/, '');
+            // 1. Exact match (with and without trailing slash)
+            if (paths[clean]) return clean;
+            if (paths[clean + '/']) return clean + '/';
+            if (paths[rawPath]) return rawPath;
+            // 2. Normalize param names: {id} matches {firm_id} etc.
+            const norm = p => p.replace(/\{[^}]+\}/g, '{}');
+            const cleanNorm = norm(clean);
+            for (const sp of Object.keys(paths)) {
+                if (norm(sp) === cleanNorm || norm(sp) === cleanNorm + '/') return sp;
+            }
+            return null;
+        }
+
+        function renderEndpointDocs(method, path) {
+            const spec = openApiSpec;
+            if (!spec) {
+                return `<div class="ep-fallback">Could not load API documentation. <a href="http://localhost:8001/docs" target="_blank">Open Swagger UI</a></div>`;
+            }
+            const matched = findSpecPath(path, spec);
+            if (!matched) {
+                const clean = path.split('?')[0].replace(/\/+$/, '');
+                return `<div class="ep-fallback">Endpoint <code>${escHtml(clean)}</code> not found in API spec. It may not be implemented yet or the path may have changed.</div>`;
+            }
+            return renderEndpointDocsInner(method, matched, spec.paths[matched], spec);
+        }
+
+        function renderEndpointDocsInner(method, path, pathObj, spec) {
+            const op = pathObj[method.toLowerCase()];
+            if (!op) {
+                return `<div class="ep-fallback">Method ${method} not found for this path. <a href="http://localhost:8001/docs" target="_blank">Open Swagger UI</a></div>`;
+            }
+
+            let html = '';
+
+            // Summary header (operation ID + summary)
+            if (op.summary) {
+                html += `<div style="font-size:0.95rem;font-weight:600;margin-bottom:0.5rem;">${escHtml(op.summary)}</div>`;
+            }
+            if (op.operationId) {
+                html += `<div style="font-family:monospace;font-size:0.75rem;color:var(--text-muted);margin-bottom:0.75rem;">operationId: <span style="color:var(--primary);">${escHtml(op.operationId)}</span></div>`;
+            }
+
+            // Description
+            const desc = op.description || '';
+            if (desc) {
+                html += `<div class="ep-docs-section">
+                    <div class="ep-docs-section-title">Description</div>
+                    <div class="ep-docs-desc">${simpleMarkdown(desc)}</div>
+                </div>`;
+            }
+
+            // Parameters
+            const params = [...(pathObj.parameters || []), ...(op.parameters || [])];
+            if (params.length > 0) {
+                html += `<div class="ep-docs-section">
+                    <div class="ep-docs-section-title">Parameters</div>
+                    <table class="ep-params-table">
+                        <thead><tr><th>Name</th><th>In</th><th>Type</th><th>Req</th><th>Default</th><th>Description</th></tr></thead>
+                        <tbody>`;
+                params.forEach(p => {
+                    const pSchema = resolveSchema(p.schema, spec);
+                    const typeStr = getTypeString(pSchema);
+                    const req = p.required ? '<span class="param-required">Yes</span>' : 'No';
+                    const def = pSchema?.default !== undefined ? escHtml(JSON.stringify(pSchema.default)) : '-';
+                    let descHtml = escHtml(p.description || pSchema?.description || '');
+                    if (pSchema?.enum) {
+                        descHtml += `<br><span class="ep-enum-values">enum: [${pSchema.enum.map(v => `"${v}"`).join(', ')}]</span>`;
+                    }
+                    if (pSchema?.minimum !== undefined || pSchema?.maximum !== undefined) {
+                        const range = [];
+                        if (pSchema.minimum !== undefined) range.push(`min: ${pSchema.minimum}`);
+                        if (pSchema.maximum !== undefined) range.push(`max: ${pSchema.maximum}`);
+                        descHtml += `<br><span class="ep-enum-values">${range.join(', ')}</span>`;
+                    }
+                    html += `<tr>
+                        <td class="param-name">${escHtml(p.name)}</td>
+                        <td>${p.in}</td>
+                        <td class="param-type">${escHtml(typeStr)}</td>
+                        <td>${req}</td>
+                        <td>${def}</td>
+                        <td>${descHtml}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table></div>`;
+            }
+
+            // Request Body
+            const bodyContent = op.requestBody?.content?.['application/json'];
+            if (bodyContent?.schema) {
+                const reqLabel = op.requestBody?.required === false ? 'Request Body (optional, application/json)' : 'Request Body (application/json)';
+                html += `<div class="ep-docs-section">
+                    <div class="ep-docs-section-title">${reqLabel}</div>
+                    <div class="ep-schema-block">${renderSchemaAsBlock(bodyContent.schema, spec)}</div>
+                </div>`;
+            }
+
+            // All Responses
+            const responseCodes = Object.keys(op.responses || {}).sort();
+            if (responseCodes.length > 0) {
+                html += `<div class="ep-docs-section">
+                    <div class="ep-docs-section-title">Responses</div>`;
+                responseCodes.forEach(code => {
+                    const resp = op.responses[code];
+                    const codeClass = code.startsWith('2') ? 'c2xx' : code.startsWith('4') ? 'c4xx' : code.startsWith('5') ? 'c5xx' : 'c4xx';
+                    const respSchema = resp.content?.['application/json']?.schema;
+                    html += `<div class="ep-response-block">
+                        <span class="ep-response-code ${codeClass}">${code}</span>
+                        <span style="font-size:0.8rem;color:var(--text-muted);">${escHtml(resp.description || '')}</span>`;
+                    if (respSchema) {
+                        html += `<div class="ep-schema-block" style="margin-top:0.375rem;">${renderSchemaAsBlock(respSchema, spec)}</div>`;
+                    }
+                    html += `</div>`;
+                });
+                html += `</div>`;
+            }
+
+            // Curl example
+            html += `<div class="ep-docs-section">
+                <div class="ep-docs-section-title">Example</div>
+                <div class="ep-curl-block">${escHtml(buildCurlExample(method, path, op, spec))}</div>
+            </div>`;
+
+            return html;
+        }
+
+        async function toggleEndpointDocs(method, path) {
+            const key = `${method} ${path}`;
+            if (expandedEndpointKey === key) {
+                expandedEndpointKey = null;
+                renderDetailView();
+                return;
+            }
+            expandedEndpointKey = key;
+            if (!openApiSpec) {
+                endpointDocsLoading = true;
+                renderDetailView();
+                const spec = await getOpenApiSpec();
+                endpointDocsLoading = false;
+                if (expandedEndpointKey !== key) return; // user clicked something else
+            }
+            renderDetailView();
+        }
+
         function renderDetailView() {
             const src = selectedSource;
             if (!src) { backToList(); return; }
@@ -1249,7 +1832,7 @@
                     });
                     html += `</div>
                         <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">
-                            Configure schedules via <a href="/docs#/schedules" target="_blank" style="color:var(--accent);">POST /api/v1/schedules</a>
+                            Configure schedules via <a href="http://localhost:8001/docs#/schedules" target="_blank" style="color:var(--accent);">POST /api/v1/schedules</a>
                             with source="${src.key}" and desired frequency.
                         </div>
                     </div>`;
@@ -1265,7 +1848,9 @@
                     <h3>Available API Endpoints</h3>`;
                 allEndpoints.forEach(ep => {
                     const methodColor = ep.method === 'POST' ? 'var(--success)' : ep.method === 'GET' ? 'var(--accent)' : 'var(--warning)';
-                    html += `<div class="ds-detail-table-row" style="cursor:default;margin-bottom:0.375rem;">
+                    const epKey = `${ep.method} ${ep.path}`;
+                    const isExpanded = expandedEndpointKey === epKey;
+                    html += `<div class="ds-detail-table-row" style="cursor:default;margin-bottom:${isExpanded ? '0' : '0.375rem'};">
                         <div style="display:flex;align-items:center;gap:0.75rem;flex:1;">
                             <span style="background:${methodColor};color:white;padding:0.125rem 0.5rem;border-radius:4px;font-size:0.7rem;font-weight:700;font-family:monospace;min-width:40px;text-align:center;">${ep.method}</span>
                             <div>
@@ -1273,8 +1858,17 @@
                                 <div style="font-family:monospace;font-size:0.75rem;color:var(--text-muted);">${ep.path}</div>
                             </div>
                         </div>
-                        <a class="btn-sm" href="/docs" target="_blank" style="text-decoration:none;">Docs</a>
+                        <span class="btn-sm ep-docs-toggle" onclick="toggleEndpointDocs('${ep.method}','${ep.path}')" style="text-decoration:none;">${isExpanded ? '&#9660; Docs' : '&#9654; Docs'}</span>
                     </div>`;
+                    if (isExpanded) {
+                        html += `<div class="ep-docs-panel">`;
+                        if (endpointDocsLoading) {
+                            html += `<div class="ep-loading">Loading documentation...</div>`;
+                        } else {
+                            html += renderEndpointDocs(ep.method, ep.path);
+                        }
+                        html += `</div>`;
+                    }
                 });
                 html += `</div>`;
             }
@@ -1325,7 +1919,7 @@
             // ---- Quick Actions footer ----
             html += `<div class="ds-detail-actions">
                 <h3>Quick Actions</h3>`;
-            html += `<a class="btn btn-secondary" href="/docs" target="_blank" style="text-decoration:none;">API Docs</a>`;
+            html += `<a class="btn btn-secondary" href="http://localhost:8001/docs" target="_blank" style="text-decoration:none;">API Docs</a>`;
             if (sourceTables.length > 0) {
                 html += `<button class="btn btn-secondary" onclick="exportSourceTable()">Export CSV</button>`;
             }
@@ -1448,7 +2042,7 @@
             const pathHasParam = trigger.path.includes('{');
             if (pathHasParam) {
                 alert(`This endpoint requires parameters.\n\n${trigger.method} ${trigger.path}\n\nUse the API docs (Swagger UI) to fill in the required values and run it.`);
-                window.open('/docs', '_blank');
+                window.open('http://localhost:8001/docs', '_blank');
                 return;
             }
             if (!confirm(`Run "${trigger.label}"?\n\n${trigger.method} ${trigger.path}`)) return;
@@ -1689,6 +2283,131 @@
             else el.innerHTML = `<div class="test-result ${success ? 'success' : 'failure'}">${success ? '✓' : '✗'} ${message}</div>`;
             setTimeout(() => { if (el) el.innerHTML = ''; }, 5000);
         }
+
+        // ==================================================================
+        // Active Jobs Panel — SSE live updates
+        // ==================================================================
+        const _activeJobs = new Map(); // job_id -> job data
+
+        function _renderActiveJobs() {
+            const panel = document.getElementById('active-jobs-panel');
+            const list = document.getElementById('active-jobs-list');
+            const countEl = document.getElementById('active-jobs-count');
+            if (!panel || !list) return;
+
+            if (_activeJobs.size === 0) {
+                panel.classList.remove('visible');
+                return;
+            }
+            panel.classList.add('visible');
+            countEl.textContent = `(${_activeJobs.size})`;
+
+            list.innerHTML = '';
+            for (const [id, job] of _activeJobs) {
+                const pct = job.progress_pct || 0;
+                const row = document.createElement('div');
+                row.className = 'active-job-item';
+                row.id = `active-job-${id}`;
+                row.innerHTML = `
+                    <span class="job-type-badge">${job.job_type || '?'}</span>
+                    <div class="job-progress-bar">
+                        <div class="job-progress-fill" style="width:${pct}%"></div>
+                    </div>
+                    <span class="job-message">${job.progress_message || job.status || ''}</span>
+                    ${job.worker_id ? `<span class="job-worker-badge">${job.worker_id}</span>` : ''}
+                `;
+                list.appendChild(row);
+            }
+        }
+
+        function _removeJobWithFade(jobId) {
+            const el = document.getElementById(`active-job-${jobId}`);
+            if (el) {
+                el.classList.add('job-fade-out');
+                setTimeout(() => {
+                    _activeJobs.delete(jobId);
+                    _renderActiveJobs();
+                }, 600);
+            } else {
+                _activeJobs.delete(jobId);
+                _renderActiveJobs();
+            }
+        }
+
+        // Fetch currently active jobs on page load
+        function _loadActiveJobs() {
+            fetch('/api/v1/jobs/active')
+                .then(r => r.ok ? r.json() : [])
+                .then(jobs => {
+                    jobs.forEach(j => _activeJobs.set(j.id, j));
+                    _renderActiveJobs();
+                })
+                .catch(() => {}); // silent fail
+        }
+
+        // Connect SSE for live updates
+        function _connectJobStream() {
+            const es = new EventSource('/api/v1/jobs/stream');
+
+            es.addEventListener('job_started', e => {
+                const d = JSON.parse(e.data);
+                _activeJobs.set(d.job_id, {
+                    job_type: d.job_type,
+                    worker_id: d.worker_id,
+                    status: 'running',
+                    progress_pct: 0,
+                    progress_message: 'Started',
+                });
+                _renderActiveJobs();
+            });
+
+            es.addEventListener('job_progress', e => {
+                const d = JSON.parse(e.data);
+                const existing = _activeJobs.get(d.job_id) || {};
+                _activeJobs.set(d.job_id, {
+                    ...existing,
+                    progress_pct: d.progress_pct,
+                    progress_message: d.progress_message,
+                    status: 'running',
+                });
+                _renderActiveJobs();
+            });
+
+            es.addEventListener('job_completed', e => {
+                const d = JSON.parse(e.data);
+                const existing = _activeJobs.get(d.job_id) || {};
+                _activeJobs.set(d.job_id, {
+                    ...existing,
+                    progress_pct: 100,
+                    progress_message: 'Completed',
+                    status: 'success',
+                });
+                _renderActiveJobs();
+                setTimeout(() => _removeJobWithFade(d.job_id), 2000);
+            });
+
+            es.addEventListener('job_failed', e => {
+                const d = JSON.parse(e.data);
+                const existing = _activeJobs.get(d.job_id) || {};
+                _activeJobs.set(d.job_id, {
+                    ...existing,
+                    progress_message: d.error_message || 'Failed',
+                    status: 'failed',
+                });
+                _renderActiveJobs();
+                setTimeout(() => _removeJobWithFade(d.job_id), 5000);
+            });
+
+            es.onerror = () => {
+                // Reconnect after a delay
+                es.close();
+                setTimeout(_connectJobStream, 5000);
+            };
+        }
+
+        // Initialize active jobs on page load
+        _loadActiveJobs();
+        _connectJobStream();
     </script>
 </body>
 </html>
