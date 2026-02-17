@@ -99,7 +99,9 @@ async def lifespan(app: FastAPI):
         # Register stale job recovery (resets jobs with stale heartbeats back to pending)
         try:
             from app.core.job_queue_service import reset_stale_jobs
-            scheduler_service.scheduler.add_job(
+            from app.core.scheduler_service import get_scheduler
+            sched = get_scheduler()
+            sched.add_job(
                 reset_stale_jobs,
                 "interval",
                 minutes=5,

@@ -18,7 +18,7 @@ from app.core.models_queue import JobQueue, QueueJobStatus
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/jobs", tags=["Job Queue"])
+router = APIRouter(prefix="/job-queue", tags=["Job Queue"])
 
 
 @router.get("/stream")

@@ -2336,7 +2336,7 @@
 
         // Fetch currently active jobs on page load
         function _loadActiveJobs() {
-            fetch('/api/v1/jobs/active')
+            fetch('/api/v1/job-queue/active')
                 .then(r => r.ok ? r.json() : [])
                 .then(jobs => {
                     jobs.forEach(j => _activeJobs.set(j.id, j));
@@ -2347,7 +2347,7 @@
 
         // Connect SSE for live updates
         function _connectJobStream() {
-            const es = new EventSource('/api/v1/jobs/stream');
+            const es = new EventSource('/api/v1/job-queue/stream');
 
             es.addEventListener('job_started', e => {
                 const d = JSON.parse(e.data);
