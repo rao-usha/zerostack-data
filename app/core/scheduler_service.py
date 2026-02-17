@@ -27,6 +27,57 @@ from app.core.database import get_session_factory
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# Incremental Loading — Source-specific date parameter mapping
+# =============================================================================
+# Maps source name -> (param_name, formatter_fn)
+# When a schedule has "incremental": true and a non-null last_run_at,
+# the formatter converts last_run_at into the source-specific start param.
+
+INCREMENTAL_PARAM_MAP = {
+    "fred":     ("observation_start", lambda dt: dt.strftime("%Y-%m-%d")),
+    "bls":      ("start_year",        lambda dt: dt.year),
+    "eia":      ("start",             lambda dt: dt.strftime("%Y-%m-%d")),
+    "sec":      ("start_date",        lambda dt: dt.strftime("%Y-%m-%d")),
+    "treasury": ("start_date",        lambda dt: dt.strftime("%Y-%m-%d")),
+    "bts":      ("start_date",        lambda dt: dt.strftime("%Y-%m-%d")),
+    "census":   ("year",              lambda dt: dt.year),
+    "bea":      ("year",              lambda dt: str(dt.year)),
+}
+
+
+def _inject_incremental_params(
+    config: Dict[str, Any],
+    source: str,
+    last_run_at: Optional[datetime],
+) -> Dict[str, Any]:
+    """
+    If config has incremental=true and we have a previous run timestamp,
+    inject the source-specific start-date parameter so the ingestor only
+    fetches data newer than the last successful run.
+
+    First run (last_run_at is None) or unknown source → full load unchanged.
+    """
+    if not config or not config.get("incremental"):
+        return config or {}
+
+    if last_run_at is None:
+        logger.info(f"Incremental enabled for {source} but no last_run_at — full load")
+        return config
+
+    mapping = INCREMENTAL_PARAM_MAP.get(source)
+    if mapping is None:
+        logger.warning(f"Incremental enabled for {source} but no param mapping — full load")
+        return config
+
+    param_name, formatter = mapping
+    effective = dict(config)  # shallow copy
+    effective[param_name] = formatter(last_run_at)
+    logger.info(
+        f"Incremental injection for {source}: {param_name}={effective[param_name]}"
+    )
+    return effective
+
 # Global scheduler instance
 _scheduler: Optional["AsyncIOScheduler"] = None
 
@@ -72,11 +123,18 @@ async def run_scheduled_job(schedule_id: int):
 
         logger.info(f"Running scheduled job: {schedule.name} (source={schedule.source})")
 
+        # Inject incremental start params if configured
+        effective_config = _inject_incremental_params(
+            config=schedule.config or {},
+            source=schedule.source,
+            last_run_at=schedule.last_run_at,
+        )
+
         # Create a new ingestion job
         job = IngestionJob(
             source=schedule.source,
             status=JobStatus.PENDING,
-            config=schedule.config
+            config=effective_config,
         )
         db.add(job)
         db.commit()
@@ -1198,4 +1256,147 @@ def register_consecutive_failure_checker(interval_minutes: int = 30) -> bool:
 
     except Exception as e:
         logger.error(f"Failed to register consecutive failure checker: {e}")
+        return False
+
+
+# =============================================================================
+# Auto-Refresh Stale Datasets
+# =============================================================================
+
+async def check_and_refresh_stale_datasets():
+    """
+    Background job: evaluate FRESHNESS quality rules and re-ingest
+    any source whose data is stale — but only if an active schedule
+    exists for it and no job is already PENDING/RUNNING.
+    """
+    from app.core.models import DataQualityRule, RuleType
+    from app.core.data_quality_service import evaluate_freshness_rule
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+
+    try:
+        # 1. Get all enabled FRESHNESS rules
+        rules = (
+            db.query(DataQualityRule)
+            .filter(
+                DataQualityRule.rule_type == RuleType.FRESHNESS,
+                DataQualityRule.is_enabled == 1,
+            )
+            .all()
+        )
+
+        if not rules:
+            logger.debug("Auto-refresh: no freshness rules configured")
+            return
+
+        refreshed = 0
+
+        for rule in rules:
+            # Evaluate the rule
+            try:
+                result = evaluate_freshness_rule(
+                    db, rule, rule.dataset_pattern or "", rule.column_name or ""
+                )
+            except Exception as e:
+                logger.debug(f"Auto-refresh: could not evaluate rule {rule.name}: {e}")
+                continue
+
+            if result.passed:
+                continue  # data is fresh
+
+            source = rule.source
+            if not source:
+                continue
+
+            logger.info(f"Auto-refresh: {source} is stale ({result.message})")
+
+            # Check for active schedule
+            schedule = (
+                db.query(IngestionSchedule)
+                .filter(
+                    IngestionSchedule.source == source,
+                    IngestionSchedule.is_active == 1,
+                )
+                .first()
+            )
+            if not schedule:
+                logger.debug(f"Auto-refresh: no active schedule for {source}, skipping")
+                continue
+
+            # Skip if a job is already pending or running
+            active_job = (
+                db.query(IngestionJob)
+                .filter(
+                    IngestionJob.source == source,
+                    IngestionJob.status.in_([JobStatus.PENDING, JobStatus.RUNNING]),
+                )
+                .first()
+            )
+            if active_job:
+                logger.debug(f"Auto-refresh: {source} already has active job {active_job.id}, skipping")
+                continue
+
+            # Create a new job with incremental params
+            effective_config = _inject_incremental_params(
+                config=schedule.config or {},
+                source=source,
+                last_run_at=schedule.last_run_at,
+            )
+
+            job = IngestionJob(
+                source=source,
+                status=JobStatus.PENDING,
+                config=effective_config,
+            )
+            db.add(job)
+            db.commit()
+            db.refresh(job)
+
+            logger.info(f"Auto-refresh: created job {job.id} for stale source {source}")
+
+            # Execute
+            await _execute_ingestion_job(db, job)
+            refreshed += 1
+
+        if refreshed:
+            logger.info(f"Auto-refresh: triggered {refreshed} re-ingestion(s)")
+
+    except Exception as e:
+        logger.error(f"Auto-refresh error: {e}", exc_info=True)
+    finally:
+        db.close()
+
+
+def register_freshness_checker(interval_minutes: int = 60) -> bool:
+    """
+    Register the auto-refresh checker as an APScheduler interval job.
+
+    Args:
+        interval_minutes: How often to check (default 60 min)
+
+    Returns:
+        True if registered successfully
+    """
+    scheduler = get_scheduler()
+    job_id = "system_freshness_checker"
+
+    try:
+        existing_job = scheduler.get_job(job_id)
+        if existing_job:
+            scheduler.remove_job(job_id)
+
+        scheduler.add_job(
+            check_and_refresh_stale_datasets,
+            trigger=IntervalTrigger(minutes=interval_minutes),
+            id=job_id,
+            name="Freshness Auto-Refresh Checker",
+            replace_existing=True,
+        )
+
+        logger.info(f"Registered freshness checker to run every {interval_minutes} minutes")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to register freshness checker: {e}")
         return False

@@ -137,6 +137,41 @@ SOURCE_DISPATCH: Dict[str, Tuple[str, str, List[str]]] = {
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
+async def _run_quality_gate(db, job: IngestionJob):
+    """
+    Run data quality rules against a successfully completed job.
+
+    Advisory only — logs results but never changes job status.
+    Errors in the quality gate itself are swallowed so they never
+    cause the ingestion job to appear failed.
+    """
+    try:
+        from app.core.data_quality_service import evaluate_rules_for_job
+        from app.core.models import DatasetRegistry
+
+        # Find the most recent dataset registry entry for this source
+        registry = (
+            db.query(DatasetRegistry)
+            .filter(DatasetRegistry.source == job.source)
+            .order_by(DatasetRegistry.last_updated_at.desc())
+            .first()
+        )
+        if not registry:
+            logger.debug(f"Quality gate: no dataset registry entry for {job.source}, skipping")
+            return
+
+        report = evaluate_rules_for_job(db, job, registry.table_name)
+        if report.overall_status == "passed":
+            logger.info(f"Quality gate passed for job {job.id} ({job.source})")
+        else:
+            logger.warning(
+                f"Quality gate {report.overall_status} for job {job.id} ({job.source}): "
+                f"{report.errors_count} errors, {report.warnings_count} warnings"
+            )
+    except Exception as e:
+        logger.warning(f"Quality gate error for job {job.id}: {e}")
+
+
 async def _handle_job_completion(db, job: IngestionJob):
     """
     Handle job completion: unblock dependent jobs, update chain status.
@@ -251,6 +286,9 @@ async def _run_dispatched_job(db, job, job_id, source, config, monitoring):
 
         logger.info(f"Job {job_id} ({source}) completed successfully: {result}")
 
+        # Run advisory quality gate
+        await _run_quality_gate(db, job)
+
         # Send success notification
         try:
             await monitoring.notify_job_completion(
@@ -312,6 +350,9 @@ async def _run_census_job(db, job, job_id, config, monitoring):
         db.commit()
 
         logger.info(f"Job {job_id} completed successfully: {result}")
+
+        # Run advisory quality gate
+        await _run_quality_gate(db, job)
 
         try:
             await monitoring.notify_job_completion(
@@ -381,6 +422,9 @@ async def _run_public_lp_strategies_job(db, job, job_id, config, monitoring):
         db.commit()
 
         logger.info(f"Job {job_id} completed successfully: {result}")
+
+        # Run advisory quality gate
+        await _run_quality_gate(db, job)
 
         try:
             await monitoring.notify_job_completion(
