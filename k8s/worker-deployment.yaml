@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexdata-worker
+  labels:
+    app: nexdata
+    component: worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nexdata
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: nexdata
+        component: worker
+    spec:
+      terminationGracePeriodSeconds: 300  # Allow current job to finish
+      containers:
+        - name: worker
+          image: nexdata:latest
+          command: ["python", "-m", "app.worker.main"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: nexdata-secrets
+                  key: database-url
+            - name: WORKER_MODE
+              value: "1"
+            - name: WORKER_POLL_INTERVAL
+              value: "2.0"
+            - name: MAX_CONCURRENCY
+              value: "4"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nexdata-secrets
+                  key: openai-api-key
+                  optional: true
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nexdata-secrets
+                  key: anthropic-api-key
+                  optional: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          livenessProbe:
+            exec:
+              command: ["python", "-c", "import sys; sys.exit(0)"]
+            initialDelaySeconds: 30
+            periodSeconds: 60
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexdata-api
+  labels:
+    app: nexdata
+    component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nexdata
+      component: api
+  template:
+    metadata:
+      labels:
+        app: nexdata
+        component: api
+    spec:
+      containers:
+        - name: api
+          image: nexdata:latest
+          command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: nexdata-secrets
+                  key: database-url
+            - name: WORKER_MODE
+              value: "1"
+            - name: LOG_LEVEL
+              value: "INFO"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nexdata-api
+  labels:
+    app: nexdata
+    component: api
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app: nexdata
+    component: api

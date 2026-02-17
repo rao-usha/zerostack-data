@@ -310,17 +310,31 @@ async def trigger_portfolio_collection(
         # Get database URL for background task
         from app.core.config import get_settings
         settings = get_settings()
-        
-        # Queue background task
-        background_tasks.add_task(
-            run_portfolio_collection,
-            request.investor_id,
-            request.investor_type,
-            request.strategies,
-            job_id,
-            settings.database_url
+
+        # Queue background task (or submit to worker queue)
+        from app.core.job_queue_service import submit_job
+        submit_result = submit_job(
+            db=db,
+            job_type="agentic",
+            payload={
+                "investor_id": request.investor_id,
+                "investor_type": request.investor_type,
+                "strategies": request.strategies,
+                "job_id": job_id,
+                "db_url": settings.database_url,
+            },
+            job_table_id=job_id,
+            background_tasks=background_tasks,
+            background_func=run_portfolio_collection,
+            background_args=(
+                request.investor_id,
+                request.investor_type,
+                request.strategies,
+                job_id,
+                settings.database_url,
+            ),
         )
-        
+
         return {
             "job_id": job_id,
             "status": "pending",
@@ -424,21 +438,35 @@ async def batch_portfolio_collection(
             )
             job_id = result.fetchone()[0]
             job_ids.append(job_id)
-            
+
             # Get database URL
             from app.core.config import get_settings
             settings = get_settings()
-            
-            # Queue background task
-            background_tasks.add_task(
-                run_portfolio_collection,
-                investor_id,
-                request.investor_type,
-                None,  # Let agent decide strategies
-                job_id,
-                settings.database_url
+
+            # Queue background task (or submit to worker queue)
+            from app.core.job_queue_service import submit_job
+            submit_job(
+                db=db,
+                job_type="agentic",
+                payload={
+                    "investor_id": investor_id,
+                    "investor_type": request.investor_type,
+                    "strategies": None,
+                    "job_id": job_id,
+                    "db_url": settings.database_url,
+                },
+                job_table_id=job_id,
+                background_tasks=background_tasks,
+                background_func=run_portfolio_collection,
+                background_args=(
+                    investor_id,
+                    request.investor_type,
+                    None,
+                    job_id,
+                    settings.database_url,
+                ),
             )
-        
+
         db.commit()
         
         return {

@@ -211,7 +211,7 @@ async def create_collection_job(
     db.commit()
     db.refresh(job)
 
-    # Run collection in background
+    # Run collection in background (or queue for worker)
     def run_job_sync():
         """Run the async collection job in a new event loop."""
         try:
@@ -219,7 +219,16 @@ async def create_collection_job(
         except Exception as e:
             logger.error(f"Error in collection job {job.id}: {e}")
 
-    background_tasks.add_task(run_job_sync)
+    from app.core.job_queue_service import submit_job
+    submit_result = submit_job(
+        db=db,
+        job_type="lp",
+        payload=config.to_dict(),
+        job_table_id=job.id,
+        background_tasks=background_tasks,
+        background_func=run_job_sync,
+        background_args=(),
+    )
 
     return CollectionJobResponse(
         job_id=job.id,

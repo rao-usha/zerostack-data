@@ -103,13 +103,21 @@ async def trigger_collection(
         "company_ids": request.company_ids,
     }
 
-    background_tasks.add_task(_run_collection, config_dict, db)
+    from app.core.job_queue_service import submit_job
+    result = submit_job(
+        db=db,
+        job_type="pe",
+        payload=config_dict,
+        background_tasks=background_tasks,
+        background_func=_run_collection,
+        background_args=(config_dict, db),
+    )
 
     return CollectResponse(
         status="started",
         message=(
             f"Collection started for entity_type={request.entity_type}, "
-            f"sources={request.sources}"
+            f"sources={request.sources} (mode={result['mode']})"
         ),
     )
 

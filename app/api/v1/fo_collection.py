@@ -12,7 +12,7 @@ import logging
 from typing import Optional, List
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -177,6 +177,7 @@ async def seed_fos_from_registry(
 @router.post("/jobs", response_model=FoCollectionJobResponse)
 async def create_collection_job(
     request: FoCollectionJobRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     """
@@ -203,7 +204,27 @@ async def create_collection_job(
         rate_limit_delay=request.rate_limit_delay,
     )
 
-    # Run collection with database session for persistence
+    from app.core.job_queue_service import submit_job, WORKER_MODE
+    if WORKER_MODE:
+        submit_result = submit_job(
+            db=db,
+            job_type="fo",
+            payload={
+                "fo_types": request.fo_types,
+                "regions": request.regions,
+                "sources": request.sources,
+                "max_concurrent_fos": request.max_concurrent_fos,
+                "rate_limit_delay": request.rate_limit_delay,
+            },
+        )
+        return FoCollectionJobResponse(
+            status="queued",
+            total_fos=0,
+            completed_fos=0,
+            message=f"Job queued (id={submit_result['job_queue_id']})",
+        )
+
+    # Legacy: run collection synchronously with database session
     orchestrator = FoCollectionOrchestrator(config=config, db=db)
     result = await orchestrator.run_collection()
 

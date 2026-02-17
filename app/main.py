@@ -11,6 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.database import create_tables
 from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news, reports, deals, benchmarks, auth, workspaces, form_d, corporate_registry, form_adv, web_traffic, github, scores, entities, glassdoor, app_rankings, predictions, agents, diligence, monitors, competitive, hunter, anomalies, market, reports_gen, lp_collection, fo_collection, pe_firms, pe_companies, pe_people, pe_deals, pe_collection, app_stores, opencorporates, people, companies_leadership, collection_jobs, people_portfolios, peer_sets, people_watchlists, people_analytics, people_reports, people_data_quality, people_dedup, people_jobs, workflows, llm_costs
+# Job Queue Streaming
+from app.api.v1 import job_stream
 # Site Intelligence Platform
 from app.api.v1 import site_intel_power, site_intel_telecom, site_intel_transport, site_intel_labor, site_intel_risk, site_intel_incentives, site_intel_logistics, site_intel_water_utilities, site_intel_sites
 # Collection Management
@@ -93,13 +95,45 @@ async def lifespan(app: FastAPI):
             logger.info(f"Site intel schedules registered: {registered_count}/{len(site_intel_results)}")
         except Exception as e:
             logger.warning(f"Failed to register site intel schedules: {e}")
+
+        # Register stale job recovery (resets jobs with stale heartbeats back to pending)
+        try:
+            from app.core.job_queue_service import reset_stale_jobs
+            scheduler_service.scheduler.add_job(
+                reset_stale_jobs,
+                "interval",
+                minutes=5,
+                id="reset_stale_queue_jobs",
+                replace_existing=True,
+            )
+            logger.info("Stale queue job recovery registered (every 5 min)")
+        except Exception as e:
+            logger.warning(f"Failed to register stale job recovery: {e}")
+
     except Exception as e:
         logger.warning(f"Failed to start scheduler: {e}")
+
+    # Start PG LISTEN → EventBus bridge for live job progress
+    pg_listener_task = None
+    try:
+        from app.core.pg_listener import start_pg_listener
+        pg_listener_task = await start_pg_listener()
+        logger.info("PG listener started for job event streaming")
+    except Exception as e:
+        logger.warning(f"Failed to start PG listener: {e}")
 
     yield
 
     # Shutdown
     logger.info("Shutting down")
+
+    # Stop PG listener
+    try:
+        from app.core.pg_listener import stop_pg_listener
+        await stop_pg_listener()
+        logger.info("PG listener stopped")
+    except Exception as e:
+        logger.warning(f"Error stopping PG listener: {e}")
 
     # Stop scheduler
     try:
@@ -900,6 +934,10 @@ Browse the endpoint sections below to see what's available:
         {
             "name": "Settings",
             "description": "Application settings - manage external source API keys"
+        },
+        {
+            "name": "Job Queue",
+            "description": "Distributed job queue - live streaming, active jobs, and queue status"
         }
     ]
 )
@@ -1038,6 +1076,9 @@ app.include_router(workflows.router, prefix="/api/v1")
 
 # LLM Cost Tracking
 app.include_router(llm_costs.router, prefix="/api/v1")
+
+# Job Queue Streaming
+app.include_router(job_stream.router, prefix="/api/v1")
 
 # GraphQL API
 app.include_router(graphql_app, prefix="/graphql", tags=["graphql"])

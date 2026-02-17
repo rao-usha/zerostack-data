@@ -230,11 +230,18 @@ async def trigger_collection(
 
     total_collectors = sum(len(v) for v in targeted.values())
 
-    background_tasks.add_task(
-        _run_collection,
-        request.domains,
-        request.sources,
-        request.states,
+    from app.core.job_queue_service import submit_job
+    result = submit_job(
+        db=db,
+        job_type="site_intel",
+        payload={
+            "domains": request.domains,
+            "sources": request.sources,
+            "states": request.states,
+        },
+        background_tasks=background_tasks,
+        background_func=_run_collection,
+        background_args=(request.domains, request.sources, request.states),
     )
 
     return {
@@ -243,6 +250,7 @@ async def trigger_collection(
         "collectors_targeted": total_collectors,
         "breakdown": targeted,
         "states_filter": request.states,
+        "job_queue_id": result.get("job_queue_id"),
         "message": f"Collection started for {total_collectors} collectors across {len(targeted)} domains. Check /collect/status for progress.",
     }
 
@@ -410,7 +418,15 @@ async def collect_with_dependencies(
         finally:
             db_session.close()
 
-    background_tasks.add_task(_run_plan)
+    from app.core.job_queue_service import submit_job
+    submit_job(
+        db=db,
+        job_type="site_intel",
+        payload={"plan": plan_dicts},
+        background_tasks=background_tasks,
+        background_func=_run_plan,
+        background_args=(),
+    )
 
     return {
         "status": "started",

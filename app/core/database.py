@@ -15,6 +15,8 @@ from app.core import pe_models
 from app.core import people_models
 # Import Site Intelligence Platform models
 from app.core import models_site_intel
+# Import Job Queue model for distributed workers
+from app.core import models_queue
 import logging
 
 logger = logging.getLogger(__name__)
