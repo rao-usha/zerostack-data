@@ -18,8 +18,18 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 # Configuration
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "nexdata-secret-key-change-in-production")
 ALGORITHM = "HS256"
+
+
+def _get_secret_key() -> str:
+    """Get JWT secret key, failing loudly if not configured."""
+    key = os.getenv("JWT_SECRET_KEY")
+    if not key:
+        raise RuntimeError(
+            "JWT_SECRET_KEY environment variable is required. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+        )
+    return key
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 PASSWORD_RESET_EXPIRE_HOURS = 24
@@ -102,7 +112,7 @@ class AuthService:
             "exp": expire,
             "iat": datetime.utcnow()
         }
-        return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+        return jwt.encode(payload, _get_secret_key(), algorithm=ALGORITHM)
 
     def _create_refresh_token(self, user_id: int) -> str:
         """Create and store refresh token."""
@@ -215,7 +225,7 @@ class AuthService:
     def verify_token(self, token: str) -> Dict[str, Any]:
         """Verify JWT and return user info."""
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            payload = jwt.decode(token, _get_secret_key(), algorithms=[ALGORITHM])
 
             if payload.get("type") != "access":
                 raise ValueError("Invalid token type")

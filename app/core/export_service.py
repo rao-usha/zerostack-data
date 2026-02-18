@@ -7,6 +7,7 @@ import os
 import gzip
 import json
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from pathlib import Path
@@ -20,6 +21,13 @@ logger = logging.getLogger(__name__)
 # Export directory - can be configured via environment
 EXPORT_DIR = os.environ.get("EXPORT_DIR", "/tmp/exports")
 EXPORT_EXPIRY_HOURS = int(os.environ.get("EXPORT_EXPIRY_HOURS", "24"))
+
+# ---------------------------------------------------------------------------
+# Table list cache — avoids ~400 queries per request
+# ---------------------------------------------------------------------------
+_table_cache: List[Dict[str, Any]] = []
+_table_cache_time: float = 0
+_TABLE_CACHE_TTL = 300  # 5 minutes
 
 
 # =============================================================================
@@ -38,32 +46,49 @@ class ExportService:
         Path(EXPORT_DIR).mkdir(parents=True, exist_ok=True)
 
     def list_tables(self) -> List[Dict[str, Any]]:
-        """List all tables available for export."""
+        """List all tables available for export. Uses a 5-minute TTL cache."""
+        global _table_cache, _table_cache_time
+
+        now = time.monotonic()
+        if _table_cache and (now - _table_cache_time) < _TABLE_CACHE_TTL:
+            return _table_cache
+
         inspector = inspect(self.db.get_bind())
         tables = []
 
+        # Single query for all row counts via pg_stat — avoids N COUNT(*) queries
+        row_counts: Dict[str, int] = {}
+        try:
+            rows = self.db.execute(text(
+                "SELECT relname, n_live_tup "
+                "FROM pg_stat_user_tables "
+                "ORDER BY relname"
+            ))
+            for r in rows:
+                row_counts[r[0]] = int(r[1])
+        except Exception:
+            pass  # fall back to 0 if pg_stat not available
+
         for table_name in inspector.get_table_names():
-            # Skip internal/system tables
             if table_name.startswith("_") or table_name in ("alembic_version",):
                 continue
 
             try:
-                # Get row count
-                result = self.db.execute(text(f'SELECT COUNT(*) FROM "{table_name}"'))
-                row_count = result.scalar()
-
-                # Get columns
                 columns = [col["name"] for col in inspector.get_columns(table_name)]
-
                 tables.append({
                     "table_name": table_name,
-                    "row_count": row_count,
+                    "row_count": row_counts.get(table_name, 0),
                     "columns": columns
                 })
             except Exception as e:
                 logger.warning(f"Could not inspect table {table_name}: {e}")
 
-        return sorted(tables, key=lambda x: x["table_name"])
+        tables.sort(key=lambda x: x["table_name"])
+
+        _table_cache = tables
+        _table_cache_time = now
+
+        return tables
 
     def get_table_columns(self, table_name: str) -> List[str]:
         """Get column names for a table."""
@@ -132,23 +157,27 @@ class ExportService:
 
             query = f'SELECT {columns_str} FROM "{job.table_name}"'
 
-            # Apply filters
+            # Apply filters (parameterized to prevent SQL injection)
             where_clauses = []
+            params = {}
             if job.filters:
                 if job.filters.get("date_from"):
-                    where_clauses.append(f"created_at >= '{job.filters['date_from']}'")
+                    where_clauses.append("created_at >= :date_from")
+                    params["date_from"] = job.filters["date_from"]
                 if job.filters.get("date_to"):
-                    where_clauses.append(f"created_at <= '{job.filters['date_to']}'")
+                    where_clauses.append("created_at <= :date_to")
+                    params["date_to"] = job.filters["date_to"]
 
             if where_clauses:
                 query += " WHERE " + " AND ".join(where_clauses)
 
             # Apply limit
             if job.row_limit:
-                query += f" LIMIT {job.row_limit}"
+                query += " LIMIT :row_limit"
+                params["row_limit"] = job.row_limit
 
             # Execute query
-            result = self.db.execute(text(query))
+            result = self.db.execute(text(query), params)
             rows = result.fetchall()
             column_names = result.keys()
 

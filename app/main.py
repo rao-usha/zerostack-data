@@ -5,8 +5,9 @@ Source-agnostic entry point that routes to appropriate adapters.
 """
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
 from app.core.database import create_tables
@@ -952,14 +953,39 @@ Browse the endpoint sections below to see what's available:
     ]
 )
 
-# CORS middleware (configure as needed)
+# CORS middleware — restrict to known frontend origins
+_cors_origins = [
+    "http://localhost:3001",   # frontend dev (nginx)
+    "http://localhost:5173",   # frontend dev (vite)
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:5173",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# Global exception handlers — prevent leaking internal details to callers
+# ---------------------------------------------------------------------------
+_main_logger = logging.getLogger("app.main")
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception):
+    """Catch-all: log the real error, return a generic message."""
+    _main_logger.error(
+        "Unhandled exception on %s %s: %s",
+        request.method, request.url.path, exc, exc_info=True
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
 
 # Include routers
 app.include_router(jobs.router, prefix="/api/v1")

@@ -1,5 +1,5 @@
 x-api-keys: &api-keys
-  CENSUS_SURVEY_API_KEY: 3661f0d2a5cf57c77df27749037845eabd0949ed
+  CENSUS_SURVEY_API_KEY: ${CENSUS_SURVEY_API_KEY:-}
   FRED_API_KEY: ${FRED_API_KEY:-}
   BLS_API_KEY: ${BLS_API_KEY:-}
   KAGGLE_USERNAME: ${KAGGLE_USERNAME:-}
@@ -74,6 +74,7 @@ services:
     environment:
       DATABASE_URL: postgresql://nexdata:nexdata_dev_password@postgres:5432/nexdata
       <<: *api-keys
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
       MAX_CONCURRENCY: 4
       LOG_LEVEL: INFO
       # Set to "1" to route jobs through the queue instead of BackgroundTasks

@@ -194,11 +194,9 @@ def request_password_reset(request: PasswordResetRequest):
         token = auth_service.request_password_reset(request.email)
 
         # Always return success to not reveal if email exists
+        # Token is logged server-side only; in production, send via email
         return {
-            "message": "If the email exists, a reset link has been sent",
-            # In production, don't return the token - send via email
-            # For testing purposes, we include it here
-            "token": token
+            "message": "If the email exists, a reset link has been sent"
         }
     finally:
         db.close()
