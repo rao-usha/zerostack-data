@@ -1300,6 +1300,204 @@
             // ── Site Intel & PE (body pre-defined in trigger) ──
             '/api/v1/site-intel/sites/collect': { fields: [] },
             '/api/v1/pe/collection/collect': { fields: [] },
+
+            // ── USDA ──
+            '/api/v1/usda/{dataset}/ingest': {
+                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
+                    { value: 'crop', label: 'Crop Production' }, { value: 'livestock', label: 'Livestock' },
+                    { value: 'annual-summary', label: 'Annual Summary' }, { value: 'all-major-crops', label: 'All Major Crops' },
+                ]}],
+                fields: [
+                    { name: 'commodity', label: 'Commodity', type: 'text', placeholder: 'e.g. CORN' },
+                    { name: 'year', label: 'Year', type: 'number', placeholder: '2025' },
+                    { name: 'state', label: 'State', type: 'text', placeholder: 'e.g. IOWA' },
+                ],
+            },
+            '/api/v1/noaa/ingest': {
+                fields: [
+                    { name: 'dataset_key', label: 'Dataset', type: 'select', required: true, options: [
+                        { value: 'GHCND', label: 'Daily Summaries' }, { value: 'GSOM', label: 'Monthly Summaries' },
+                        { value: 'GSOY', label: 'Yearly Summaries' }, { value: 'NORMAL_DLY', label: 'Climate Normals' },
+                    ]},
+                    { name: 'start_date', label: 'Start Date', type: 'date' },
+                    { name: 'end_date', label: 'End Date', type: 'date' },
+                    { name: 'location_id', label: 'Location ID', type: 'text', placeholder: 'e.g. FIPS:06' },
+                    { name: 'max_results', label: 'Max Results', type: 'number', placeholder: '1000' },
+                ],
+            },
+            '/api/v1/fbi-crime/{dataset}/ingest': {
+                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
+                    { value: 'estimates', label: 'Crime Estimates' }, { value: 'summarized', label: 'Summarized (SRS)' },
+                    { value: 'nibrs', label: 'NIBRS' }, { value: 'hate-crime', label: 'Hate Crime' }, { value: 'leoka', label: 'LEOKA' },
+                ]}],
+                fields: [
+                    { name: 'states', label: 'States (comma-sep)', type: 'text', placeholder: 'CA,TX,NY' },
+                    { name: 'offenses', label: 'Offenses', type: 'text', placeholder: 'e.g. burglary' },
+                ],
+            },
+            '/api/v1/kaggle/m5/ingest': {
+                fields: [
+                    { name: 'force_download', label: 'Force Download', type: 'select', options: [{ value: '', label: 'No' }, { value: 'true', label: 'Yes' }]},
+                    { name: 'limit_items', label: 'Limit Items', type: 'number', placeholder: '1000' },
+                ],
+            },
+            '/api/v1/yelp/businesses/ingest': {
+                fields: [
+                    { name: 'location', label: 'Location', type: 'text', required: true, placeholder: 'e.g. San Francisco, CA' },
+                    { name: 'term', label: 'Search Term', type: 'text', placeholder: 'e.g. restaurants' },
+                    { name: 'categories', label: 'Categories', type: 'text', placeholder: 'e.g. bars,nightlife' },
+                    { name: 'limit', label: 'Limit', type: 'number', placeholder: '50' },
+                ],
+            },
+            '/api/v1/uspto/ingest/{method}': {
+                pathParams: [{ name: 'method', label: 'Method', type: 'select', required: true, options: [
+                    { value: 'assignee', label: 'By Assignee' }, { value: 'cpc', label: 'By CPC Code' }, { value: 'search', label: 'By Search Query' },
+                ]}],
+                fields: [
+                    { name: 'assignee_name', label: 'Assignee Name', type: 'text', placeholder: 'e.g. Google LLC' },
+                    { name: 'cpc_code', label: 'CPC Code', type: 'text', placeholder: 'e.g. G06F' },
+                    { name: 'search_query', label: 'Search Query', type: 'text', placeholder: 'e.g. machine learning' },
+                    { name: 'date_from', label: 'Date From', type: 'date' }, { name: 'date_to', label: 'Date To', type: 'date' },
+                    { name: 'max_patents', label: 'Max Patents', type: 'number', placeholder: '100' },
+                ],
+            },
+            '/api/v1/fema/{dataset}/ingest': {
+                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
+                    { value: 'disasters', label: 'Disaster Declarations' }, { value: 'public-assistance', label: 'Public Assistance' },
+                    { value: 'hazard-mitigation', label: 'Hazard Mitigation' },
+                ]}],
+                fields: [
+                    { name: 'state', label: 'State', type: 'text', placeholder: 'e.g. CA' },
+                    { name: 'year', label: 'Year', type: 'number', placeholder: '2025' },
+                    { name: 'max_records', label: 'Max Records', type: 'number', placeholder: '1000' },
+                ],
+            },
+            '/api/v1/bts/{dataset}/ingest': {
+                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
+                    { value: 'border-crossing', label: 'Border Crossing' }, { value: 'vmt', label: 'Vehicle Miles Traveled' },
+                    { value: 'faf', label: 'Freight Analysis (FAF)' },
+                ]}],
+                fields: [
+                    { name: 'start_date', label: 'Start Date', type: 'date' }, { name: 'end_date', label: 'End Date', type: 'date' },
+                    { name: 'state', label: 'State', type: 'text', placeholder: 'e.g. TX' },
+                ],
+            },
+            '/api/v1/data-commons/{dataset}/ingest': {
+                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
+                    { value: 'stat-var', label: 'Statistical Variable' }, { value: 'place-stats', label: 'Place Statistics' },
+                    { value: 'us-states', label: 'US States' },
+                ]}],
+                fields: [
+                    { name: 'variable_dcid', label: 'Variable DCID', type: 'text', placeholder: 'e.g. Count_Person' },
+                    { name: 'place_dcid', label: 'Place DCID', type: 'text', placeholder: 'e.g. geoId/06' },
+                    { name: 'variables', label: 'Variables (comma-sep)', type: 'text', placeholder: 'Count_Person,Median_Income_Person' },
+                ],
+            },
+            '/api/v1/prediction-markets/monitor/all': {
+                fields: [
+                    { name: 'kalshi_categories', label: 'Kalshi Categories', type: 'text', placeholder: 'e.g. politics,economics' },
+                    { name: 'limit_per_platform', label: 'Limit per Platform', type: 'number', placeholder: '50' },
+                ],
+            },
+            '/api/v1/international/{dataset}/ingest': {
+                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
+                    { value: 'worldbank/wdi', label: 'World Bank WDI' }, { value: 'worldbank/countries', label: 'WB Countries' },
+                    { value: 'imf/ifs', label: 'IMF IFS' }, { value: 'oecd/mei', label: 'OECD MEI' },
+                    { value: 'oecd/kei', label: 'OECD KEI' }, { value: 'oecd/labor', label: 'OECD Labor' },
+                    { value: 'oecd/trade', label: 'OECD Trade' }, { value: 'bis/eer', label: 'BIS Exchange Rates' },
+                    { value: 'bis/property', label: 'BIS Property' },
+                ]}],
+                fields: [
+                    { name: 'indicators', label: 'Indicators (comma-sep)', type: 'text', placeholder: 'NY.GDP.MKTP.CD' },
+                    { name: 'countries', label: 'Countries (comma-sep)', type: 'text', placeholder: 'USA,GBR,DEU' },
+                    { name: 'start_year', label: 'Start Year', type: 'number', placeholder: '2020' },
+                    { name: 'end_year', label: 'End Year', type: 'number', placeholder: '2025' },
+                ],
+            },
+            '/api/v1/us-trade/{dataset}/ingest': {
+                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
+                    { value: 'exports/hs', label: 'Exports by HS' }, { value: 'imports/hs', label: 'Imports by HS' },
+                    { value: 'exports/state', label: 'Exports by State' }, { value: 'port', label: 'Port Trade' },
+                    { value: 'summary', label: 'Trade Summary' },
+                ]}],
+                fields: [
+                    { name: 'year', label: 'Year', type: 'number', placeholder: '2025' },
+                    { name: 'month', label: 'Month', type: 'number', placeholder: '1-12' },
+                    { name: 'hs_code', label: 'HS Code', type: 'text', placeholder: 'e.g. 8471' },
+                    { name: 'country', label: 'Country', type: 'text', placeholder: 'e.g. China' },
+                ],
+            },
+            '/api/v1/cftc-cot/ingest': {
+                fields: [
+                    { name: 'year', label: 'Year', type: 'number', placeholder: '2025' },
+                    { name: 'report_type', label: 'Report Type', type: 'select', options: [
+                        { value: '', label: 'Default' }, { value: 'futures_only', label: 'Futures Only' }, { value: 'combined', label: 'Combined' },
+                    ]},
+                ],
+            },
+            '/api/v1/irs-soi/{dataset}/ingest': {
+                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
+                    { value: 'zip-income', label: 'ZIP Income' }, { value: 'county-income', label: 'County Income' },
+                    { value: 'migration', label: 'Migration' }, { value: 'business-income', label: 'Business Income' },
+                    { value: 'all', label: 'All SOI Data' },
+                ]}],
+                fields: [{ name: 'year', label: 'Year', type: 'number', placeholder: '2021' }],
+            },
+            '/api/v1/fcc-broadband/{dataset}/ingest': {
+                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
+                    { value: 'state', label: 'State Coverage' }, { value: 'all-states', label: 'All States' }, { value: 'county', label: 'County Coverage' },
+                ]}],
+                fields: [
+                    { name: 'state_codes', label: 'State Codes (comma-sep)', type: 'text', placeholder: 'CA,TX,NY' },
+                    { name: 'county_fips_codes', label: 'County FIPS', type: 'text', placeholder: '06037,48201' },
+                ],
+            },
+            '/api/v1/realestate/{dataset}/ingest': {
+                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
+                    { value: 'fhfa', label: 'FHFA House Price Index' }, { value: 'hud', label: 'HUD Permits' },
+                    { value: 'redfin', label: 'Redfin Market Data' }, { value: 'osm', label: 'OSM Buildings' },
+                ]}],
+                fields: [
+                    { name: 'geography_type', label: 'Geography', type: 'select', options: [
+                        { value: '', label: 'Default' }, { value: 'state', label: 'State' }, { value: 'msa', label: 'MSA' }, { value: 'county', label: 'County' },
+                    ]},
+                    { name: 'start_date', label: 'Start Date', type: 'date' }, { name: 'end_date', label: 'End Date', type: 'date' },
+                ],
+            },
+            '/api/v1/foot-traffic/collect': {
+                fields: [
+                    { name: 'brand_name', label: 'Brand Name', type: 'text', required: true, placeholder: 'e.g. Starbucks' },
+                    { name: 'city', label: 'City', type: 'text', placeholder: 'e.g. New York' },
+                    { name: 'state', label: 'State', type: 'text', placeholder: 'e.g. NY' },
+                    { name: 'start_date', label: 'Start Date', type: 'date' }, { name: 'end_date', label: 'End Date', type: 'date' },
+                ],
+            },
+            '/api/v1/form-d/ingest': { fields: [{ name: 'ciks', label: 'CIKs (comma-sep)', type: 'text', placeholder: '0001234567,0009876543' }] },
+            '/api/v1/form-adv/ingest': { fields: [] },
+            '/api/v1/opencorporates/ingest': {
+                fields: [
+                    { name: 'company_names', label: 'Company Names (comma-sep)', type: 'text', required: true, placeholder: 'Acme Inc,Widget Corp' },
+                    { name: 'jurisdiction', label: 'Jurisdiction', type: 'text', placeholder: 'e.g. us_de' },
+                    { name: 'limit', label: 'Limit', type: 'number', placeholder: '10' },
+                ],
+            },
+            '/api/v1/app-stores/ingest': {
+                fields: [
+                    { name: 'company_name', label: 'Company Name', type: 'text', required: true, placeholder: 'e.g. Uber' },
+                    { name: 'search_query', label: 'Search Query', type: 'text', placeholder: 'e.g. ride sharing' },
+                    { name: 'limit', label: 'Limit', type: 'number', placeholder: '10' },
+                ],
+            },
+            '/api/v1/github/org/{org}/fetch': {
+                pathParams: [{ name: 'org', label: 'GitHub Org', type: 'text', required: true, placeholder: 'e.g. facebook' }],
+                fields: [],
+            },
+            '/api/v1/glassdoor/company': {
+                fields: [
+                    { name: 'company_name', label: 'Company Name', type: 'text', required: true, placeholder: 'e.g. Google' },
+                    { name: 'website', label: 'Website', type: 'text', placeholder: 'e.g. google.com' },
+                ],
+            },
         };
 
         // ===================================================================
@@ -2654,7 +2852,10 @@
 
         function collectFormValues(formDef, triggerPath, triggerBody, triggerId) {
             const prefix = `tf-${triggerId}`;
-            let resolvedPath = triggerPath;
+            // Separate query string so path param replacement doesn't break it
+            const qIdx = triggerPath.indexOf('?');
+            let resolvedPath = qIdx >= 0 ? triggerPath.substring(0, qIdx) : triggerPath;
+            const queryString = qIdx >= 0 ? triggerPath.substring(qIdx) : '';
             let body = triggerBody ? { ...triggerBody } : {};
 
             if (formDef) {
@@ -2677,7 +2878,7 @@
                             if (f.required && !val) return { error: `${f.label} is required` };
                             if (val) {
                                 // comma-separated text => array for known array fields
-                                if (f.type === 'text' && val.includes(',') && ['filing_types','ciks','categories','years','family_office_names','series_ids'].includes(f.name)) {
+                                if (f.type === 'text' && val.includes(',') && ['filing_types','ciks','categories','years','family_office_names','series_ids','company_names','indicators','countries','state_codes','county_fips_codes','states','variables','locations','offenses','subjects'].includes(f.name)) {
                                     body[f.name] = val.split(',').map(s => s.trim()).filter(Boolean);
                                 } else if (f.type === 'number') {
                                     body[f.name] = parseInt(val) || val;
@@ -2696,7 +2897,7 @@
                     catch { return { error: 'Invalid JSON' }; }
                 }
             }
-            return { resolvedPath, body };
+            return { resolvedPath: resolvedPath + queryString, body };
         }
 
         function renderScheduleToggle(triggerId, sourceKey) {
@@ -3665,8 +3866,8 @@
                             <label>Source</label>
                             <select id="jobs-ingest-source" onchange="jobsIngestSourceChanged()">
                                 <option value="">Select source...</option>
-                                ${['fred','bea','bls','census','treasury','eia','sec','fdic','cms','noaa','epa','usda','dot','fema','hud','osha','fcc','sba','patent','trade','yelp','data_gov','kaggle'].map(s =>
-                                    `<option value="${s}">${s.toUpperCase()}</option>`
+                                ${Object.keys(INGEST_SOURCE_TRIGGERS).sort().map(s =>
+                                    `<option value="${s}">${s.replace(/_/g,' ').toUpperCase()}</option>`
                                 ).join('')}
                             </select>
                         </div>
@@ -3692,6 +3893,29 @@
             sec: '/api/v1/sec/ingest/company',
             fdic: '/api/v1/fdic/{type}/ingest',
             cms: '/api/v1/cms/ingest/{dataset}',
+            usda: '/api/v1/usda/{dataset}/ingest',
+            noaa: '/api/v1/noaa/ingest',
+            fbi_crime: '/api/v1/fbi-crime/{dataset}/ingest',
+            kaggle: '/api/v1/kaggle/m5/ingest',
+            yelp: '/api/v1/yelp/businesses/ingest',
+            uspto: '/api/v1/uspto/ingest/{method}',
+            fema: '/api/v1/fema/{dataset}/ingest',
+            bts: '/api/v1/bts/{dataset}/ingest',
+            data_commons: '/api/v1/data-commons/{dataset}/ingest',
+            prediction_markets: '/api/v1/prediction-markets/monitor/all',
+            international_econ: '/api/v1/international/{dataset}/ingest',
+            us_trade: '/api/v1/us-trade/{dataset}/ingest',
+            cftc_cot: '/api/v1/cftc-cot/ingest',
+            irs_soi: '/api/v1/irs-soi/{dataset}/ingest',
+            fcc_broadband: '/api/v1/fcc-broadband/{dataset}/ingest',
+            realestate: '/api/v1/realestate/{dataset}/ingest',
+            foot_traffic: '/api/v1/foot-traffic/collect',
+            form_d: '/api/v1/form-d/ingest',
+            form_adv: '/api/v1/form-adv/ingest',
+            opencorporates: '/api/v1/opencorporates/ingest',
+            app_stores: '/api/v1/app-stores/ingest',
+            github: '/api/v1/github/org/{org}/fetch',
+            glassdoor: '/api/v1/glassdoor/company',
         };
 
         function jobsIngestSourceChanged() {
@@ -3733,7 +3957,7 @@
                 switch (type) {
                     case 'site_intel': {
                         const domains = getCheckedValues('si-domain');
-                        url = '/api/v1/site-intel/collect';
+                        url = '/api/v1/site-intel/sites/collect';
                         body = { domains };
                         break;
                     }
@@ -3749,16 +3973,16 @@
                     }
                     case 'pe': {
                         const modules = getCheckedValues('pe-module');
-                        url = '/api/v1/pe/collect';
+                        url = '/api/v1/pe/collection/collect';
                         body = { modules };
                         break;
                     }
-                    case 'lp': { url = '/api/v1/lp/collect'; body = {}; break; }
-                    case 'fo': { url = '/api/v1/family-offices/collect'; body = {}; break; }
+                    case 'lp': { url = '/api/v1/lp-collection/jobs'; body = {}; break; }
+                    case 'fo': { url = '/api/v1/fo-collection/jobs'; body = {}; break; }
                     case 'agentic': {
                         const investorId = document.getElementById('jobs-agentic-investor')?.value;
                         const resType = document.getElementById('jobs-agentic-type')?.value || 'portfolio';
-                        url = '/api/v1/agentic/research';
+                        url = '/api/v1/agentic/portfolio/collect';
                         body = { investor_id: parseInt(investorId) || 0, research_type: resType };
                         break;
                     }
