@@ -8,20 +8,14 @@ Requires USDA_API_KEY environment variable.
 import logging
 from datetime import datetime
 from typing import Optional
-from enum import Enum
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db, get_session_factory
-from app.core.models import IngestionJob, JobStatus
+from app.core.database import get_db
+from app.core.job_helpers import create_and_dispatch_job
 from app.sources.usda import (
-    ingest_crop_production,
-    ingest_crop_all_stats,
-    ingest_livestock_inventory,
-    ingest_annual_crops,
-    ingest_all_major_crops,
     MAJOR_CROP_STATES,
     COMMODITY_CATEGORIES,
     STATE_FIPS,
@@ -76,25 +70,6 @@ class AllMajorCropsIngestRequest(BaseModel):
 # ========== Ingestion Endpoints ==========
 
 
-def _create_usda_job(db, background_tasks, config, run_func, run_args, message):
-    """Helper to create a USDA ingestion job with custom background task."""
-    try:
-        job = IngestionJob(source="usda", status=JobStatus.PENDING, config=config)
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        background_tasks.add_task(run_func, job.id, *run_args)
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": message,
-            "check_status": f"/api/v1/jobs/{job.id}",
-        }
-    except Exception as e:
-        logger.error("Failed to create USDA job: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.post("/crop/ingest")
 async def ingest_crop_data(
     request: CropIngestRequest,
@@ -108,9 +83,10 @@ async def ingest_crop_data(
 
     **Requires USDA_API_KEY environment variable.**
     """
-    return _create_usda_job(
-        db,
-        background_tasks,
+    return create_and_dispatch_job(
+        db=db,
+        background_tasks=background_tasks,
+        source="usda",
         config={
             "dataset": "crop",
             "commodity": request.commodity.upper(),
@@ -118,13 +94,6 @@ async def ingest_crop_data(
             "state": request.state,
             "all_stats": request.all_stats,
         },
-        run_func=_run_crop_ingestion,
-        run_args=(
-            request.commodity.upper(),
-            request.year,
-            request.state,
-            request.all_stats,
-        ),
         message=f"USDA {request.commodity.upper()} ingestion job created for {request.year}",
     )
 
@@ -142,17 +111,16 @@ async def ingest_livestock_data(
 
     **Requires USDA_API_KEY environment variable.**
     """
-    return _create_usda_job(
-        db,
-        background_tasks,
+    return create_and_dispatch_job(
+        db=db,
+        background_tasks=background_tasks,
+        source="usda",
         config={
             "dataset": "livestock",
             "commodity": request.commodity.upper(),
             "year": request.year,
             "state": request.state,
         },
-        run_func=_run_livestock_ingestion,
-        run_args=(request.commodity.upper(), request.year, request.state),
         message=f"USDA {request.commodity.upper()} livestock ingestion job created",
     )
 
@@ -168,12 +136,14 @@ async def ingest_annual_summary(
 
     **Requires USDA_API_KEY environment variable.**
     """
-    return _create_usda_job(
-        db,
-        background_tasks,
-        config={"dataset": "annual_summary", "year": request.year},
-        run_func=_run_annual_ingestion,
-        run_args=(request.year,),
+    return create_and_dispatch_job(
+        db=db,
+        background_tasks=background_tasks,
+        source="usda",
+        config={
+            "dataset": "annual_summary",
+            "year": request.year,
+        },
         message=f"USDA annual summary ingestion job created for {request.year}",
     )
 
@@ -189,153 +159,16 @@ async def ingest_all_major_crops_endpoint(
 
     **Requires USDA_API_KEY environment variable.**
     """
-    return _create_usda_job(
-        db,
-        background_tasks,
-        config={"dataset": "all_major_crops", "year": request.year},
-        run_func=_run_all_crops_ingestion,
-        run_args=(request.year,),
+    return create_and_dispatch_job(
+        db=db,
+        background_tasks=background_tasks,
+        source="usda",
+        config={
+            "dataset": "all_major_crops",
+            "year": request.year,
+        },
         message=f"USDA all major crops ingestion job created for {request.year}",
     )
-
-
-# ========== Background Tasks ==========
-
-
-async def _run_crop_ingestion(job_id, commodity, year, state, all_stats):
-    """Background task for crop ingestion."""
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        job = db.get(IngestionJob, job_id)
-        if job:
-            job.status = JobStatus.RUNNING
-            job.started_at = datetime.utcnow()
-            db.commit()
-
-        conn = db.connection().connection
-        if all_stats:
-            total_rows = await ingest_crop_all_stats(conn, commodity, year, state)
-        else:
-            total_rows = await ingest_crop_production(conn, commodity, year, state)
-
-        job = db.get(IngestionJob, job_id)
-        if job:
-            job.status = JobStatus.SUCCESS
-            job.rows_inserted = total_rows
-            job.completed_at = datetime.utcnow()
-            db.commit()
-        logger.info("USDA crop job %d completed: %d rows", job_id, total_rows)
-    except Exception as e:
-        logger.error("USDA crop job %d failed: %s", job_id, e, exc_info=True)
-        job = db.get(IngestionJob, job_id)
-        if job:
-            job.status = JobStatus.FAILED
-            job.error_message = str(e)
-            job.completed_at = datetime.utcnow()
-            db.commit()
-    finally:
-        db.close()
-
-
-async def _run_livestock_ingestion(job_id, commodity, year, state):
-    """Background task for livestock ingestion."""
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        job = db.get(IngestionJob, job_id)
-        if job:
-            job.status = JobStatus.RUNNING
-            job.started_at = datetime.utcnow()
-            db.commit()
-
-        conn = db.connection().connection
-        total_rows = await ingest_livestock_inventory(conn, commodity, year, state)
-
-        job = db.get(IngestionJob, job_id)
-        if job:
-            job.status = JobStatus.SUCCESS
-            job.rows_inserted = total_rows
-            job.completed_at = datetime.utcnow()
-            db.commit()
-        logger.info("USDA livestock job %d completed: %d rows", job_id, total_rows)
-    except Exception as e:
-        logger.error("USDA livestock job %d failed: %s", job_id, e, exc_info=True)
-        job = db.get(IngestionJob, job_id)
-        if job:
-            job.status = JobStatus.FAILED
-            job.error_message = str(e)
-            job.completed_at = datetime.utcnow()
-            db.commit()
-    finally:
-        db.close()
-
-
-async def _run_annual_ingestion(job_id, year):
-    """Background task for annual summary ingestion."""
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        job = db.get(IngestionJob, job_id)
-        if job:
-            job.status = JobStatus.RUNNING
-            job.started_at = datetime.utcnow()
-            db.commit()
-
-        conn = db.connection().connection
-        total_rows = await ingest_annual_crops(conn, year)
-
-        job = db.get(IngestionJob, job_id)
-        if job:
-            job.status = JobStatus.SUCCESS
-            job.rows_inserted = total_rows
-            job.completed_at = datetime.utcnow()
-            db.commit()
-        logger.info("USDA annual job %d completed: %d rows", job_id, total_rows)
-    except Exception as e:
-        logger.error("USDA annual job %d failed: %s", job_id, e, exc_info=True)
-        job = db.get(IngestionJob, job_id)
-        if job:
-            job.status = JobStatus.FAILED
-            job.error_message = str(e)
-            job.completed_at = datetime.utcnow()
-            db.commit()
-    finally:
-        db.close()
-
-
-async def _run_all_crops_ingestion(job_id, year):
-    """Background task for all major crops ingestion."""
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        job = db.get(IngestionJob, job_id)
-        if job:
-            job.status = JobStatus.RUNNING
-            job.started_at = datetime.utcnow()
-            db.commit()
-
-        conn = db.connection().connection
-        results = await ingest_all_major_crops(conn, year)
-        total_rows = sum(results.values())
-
-        job = db.get(IngestionJob, job_id)
-        if job:
-            job.status = JobStatus.SUCCESS
-            job.rows_inserted = total_rows
-            job.completed_at = datetime.utcnow()
-            db.commit()
-        logger.info("USDA all crops job %d completed: %d rows", job_id, total_rows)
-    except Exception as e:
-        logger.error("USDA all crops job %d failed: %s", job_id, e, exc_info=True)
-        job = db.get(IngestionJob, job_id)
-        if job:
-            job.status = JobStatus.FAILED
-            job.error_message = str(e)
-            job.completed_at = datetime.utcnow()
-            db.commit()
-    finally:
-        db.close()
 
 
 # ========== Reference Endpoints ==========

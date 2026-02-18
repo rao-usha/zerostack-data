@@ -4,7 +4,7 @@ Job management endpoints.
 
 import importlib
 import logging
-from typing import List, Dict, Tuple, Any, Optional
+from typing import List, Dict, Tuple
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 
@@ -457,6 +457,33 @@ SOURCE_DISPATCH: Dict[str, Tuple[str, str, List[str]]] = {
         "discover_brand_locations",
         ["brand_name", "city", "state", "latitude", "longitude", "limit"],
     ),
+    # -- CFTC COT ----------------------------------------------------------
+    "cftc_cot": (
+        "app.sources.cftc_cot.ingest",
+        "dispatch_cot_ingest",
+        ["report_type", "year", "combined"],
+    ),
+    # -- USDA --------------------------------------------------------------
+    "usda:crop": (
+        "app.sources.usda.ingest",
+        "dispatch_usda_crop",
+        ["commodity", "year", "state", "all_stats", "api_key"],
+    ),
+    "usda:livestock": (
+        "app.sources.usda.ingest",
+        "dispatch_usda_livestock",
+        ["commodity", "year", "state", "api_key"],
+    ),
+    "usda:annual_summary": (
+        "app.sources.usda.ingest",
+        "dispatch_usda_annual_summary",
+        ["year", "api_key"],
+    ),
+    "usda:all_major_crops": (
+        "app.sources.usda.ingest",
+        "dispatch_usda_all_major_crops",
+        ["year", "api_key"],
+    ),
 }
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -823,7 +850,6 @@ async def run_ingestion_job(job_id: int, source: str, config: dict):
     """
     from datetime import datetime
     from app.core.database import get_session_factory
-    from app.core.retry_service import auto_schedule_retry
     from app.core import monitoring
 
     SessionLocal = get_session_factory()
