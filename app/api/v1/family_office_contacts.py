@@ -2,13 +2,12 @@
 API endpoints for family office contact research and enrichment.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import date, datetime
-import asyncio
 import logging
 import csv
 import io

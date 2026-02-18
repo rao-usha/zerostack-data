@@ -12,7 +12,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.people_models import (
@@ -20,7 +20,6 @@ from app.core.people_models import (
     CompanyPerson,
     IndustrialCompany,
     LeadershipChange,
-    OrgChartSnapshot,
     PeopleCollectionJob,
 )
 

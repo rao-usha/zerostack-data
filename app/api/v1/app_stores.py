@@ -5,7 +5,7 @@ Provides access to iOS and Android app data, rankings, and portfolios.
 """
 
 import logging
-from typing import Optional, List
+from typing import Optional
 from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session

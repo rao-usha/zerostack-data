@@ -12,7 +12,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
-from datetime import datetime
 
 from app.core.database import get_db
 from app.agents.anomaly_detector import AnomalyDetectorAgent

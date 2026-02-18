@@ -10,14 +10,13 @@ Collects executive and board data from SEC EDGAR filings:
 Includes CIK auto-discovery to find CIK by company name.
 """
 
-import asyncio
 import logging
-from typing import Optional, List, Dict, Any
+from typing import List
 from datetime import datetime, date, timedelta
 
 from app.sources.people_collection.base_collector import BaseCollector
-from app.sources.people_collection.filing_fetcher import FilingFetcher, SECFiling
-from app.sources.people_collection.sec_parser import SECParser, ProxyParseResult
+from app.sources.people_collection.filing_fetcher import FilingFetcher
+from app.sources.people_collection.sec_parser import SECParser
 from app.sources.people_collection.types import (
     ExtractedPerson,
     LeadershipChange,

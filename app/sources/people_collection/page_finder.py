@@ -12,7 +12,7 @@ import asyncio
 import logging
 import re
 import os
-from typing import Optional, List, Set, Tuple
+from typing import List, Set, Tuple
 from urllib.parse import urljoin, urlparse, quote_plus
 
 import aiohttp

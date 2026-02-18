@@ -6,7 +6,7 @@ Provides workspace management, member invitations, and role-based access.
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, List
+from typing import Optional
 
 from app.core.database import get_db
 from app.users.workspaces import WorkspaceService

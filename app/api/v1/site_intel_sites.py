@@ -17,7 +17,6 @@ from app.core.database import get_db
 from app.core.models_site_intel import (
     SiteScoreConfig,
     SiteScore,
-    PowerPlant,
     Substation,
     InternetExchange,
     DataCenterFacility,
@@ -102,7 +101,7 @@ async def _run_collection(
     """Background task: run site intel collection."""
     from app.core.database import get_session_factory
     from app.core.config import get_settings
-    from app.sources.site_intel.runner import SiteIntelOrchestrator, COLLECTOR_REGISTRY
+    from app.sources.site_intel.runner import SiteIntelOrchestrator
     from app.sources.site_intel.types import SiteIntelDomain, SiteIntelSource
 
     _import_all_collectors()
@@ -221,8 +220,7 @@ async def trigger_collection(
     Runs collection in the background across specified domains/sources.
     Use GET /collect/status to check progress.
     """
-    from app.sources.site_intel.runner import SiteIntelOrchestrator, COLLECTOR_REGISTRY
-    from app.sources.site_intel.types import SiteIntelDomain
+    from app.sources.site_intel.runner import SiteIntelOrchestrator
 
     _import_all_collectors()
 

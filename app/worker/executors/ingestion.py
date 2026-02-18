@@ -18,7 +18,6 @@ async def execute(job: JobQueue, db: Session):
     The payload should contain 'source' and 'config' matching the /api/v1/jobs
     ingestion pattern.
     """
-    from app.core.database import get_session_factory
 
     payload = job.payload or {}
     source = payload.get("source", "unknown")

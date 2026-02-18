@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.event_bus import EventBus
-from app.core.models import IngestionJob, JobStatus
+from app.core.models import IngestionJob
 from app.core.models_queue import JobQueue, QueueJobStatus
 
 logger = logging.getLogger(__name__)

@@ -11,15 +11,12 @@ Provides HTTP API for:
 import logging
 from datetime import date
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_async_session
 from app.sources.noaa.ingest import ingest_noaa_data, ingest_noaa_by_chunks
-from app.sources.noaa.metadata import NOAA_DATASETS, NOAADataset
+from app.sources.noaa.metadata import NOAA_DATASETS
 from app.sources.noaa.client import NOAAClient
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/noaa", tags=["noaa"])

@@ -11,7 +11,6 @@ import logging
 from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from app.core.people_models import (
     LeadershipChange,
@@ -20,7 +19,6 @@ from app.core.people_models import (
     PeoplePortfolio,
     PeoplePortfolioCompany,
     IndustrialCompany,
-    Person,
 )
 
 logger = logging.getLogger(__name__)

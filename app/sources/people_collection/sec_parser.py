@@ -10,7 +10,7 @@ Parses DEF 14A proxy statements and 8-K filings to extract:
 
 import re
 import logging
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any
 from datetime import date
 from dataclasses import dataclass, field
 

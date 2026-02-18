@@ -5,7 +5,7 @@ Handles downloading, parsing, and inserting COT data into PostgreSQL.
 """
 
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from datetime import datetime
 
 from .client import CFTCCOTClient
@@ -304,3 +304,34 @@ async def ingest_cot_all_reports(
     logger.info(f"Total COT records ingested for {year}: {total}")
 
     return results
+
+
+# =============================================================================
+# Dispatch-compatible wrappers
+# =============================================================================
+# These wrappers accept (db, job_id, **kwargs) to match the SOURCE_DISPATCH
+# interface used by run_ingestion_job(). They extract the raw psycopg2
+# connection from the SQLAlchemy session and delegate to the original
+# conn-based ingest functions.
+
+
+async def dispatch_cot_ingest(db, job_id: int, report_type: str = "legacy", year: int = None, combined: bool = True):
+    """Dispatch wrapper for COT ingestion via SOURCE_DISPATCH."""
+    conn = db.connection().connection
+    if year is None:
+        year = datetime.now().year
+
+    if report_type == "all":
+        results = await ingest_cot_all_reports(conn, year, combined)
+        return {"rows_inserted": sum(results.values())}
+    elif report_type == "legacy":
+        rows = await ingest_cot_legacy(conn, year, combined)
+        return {"rows_inserted": rows}
+    elif report_type == "disaggregated":
+        rows = await ingest_cot_disaggregated(conn, year, combined)
+        return {"rows_inserted": rows}
+    elif report_type == "tff":
+        rows = await ingest_cot_tff(conn, year, combined)
+        return {"rows_inserted": rows}
+    else:
+        raise ValueError(f"Unknown COT report type: {report_type}")

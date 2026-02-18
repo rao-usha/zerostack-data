@@ -7,8 +7,7 @@ COST: $100-500/month depending on tier
 """
 
 import logging
-from datetime import datetime, date, timedelta
-from typing import Any, Dict, List
+from datetime import date, timedelta
 
 from app.agentic.traffic_strategies.base import (
     BaseTrafficStrategy,

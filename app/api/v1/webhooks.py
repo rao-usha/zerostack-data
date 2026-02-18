@@ -7,12 +7,12 @@ Provides API for creating, updating, and managing webhook notifications.
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.core.database import get_db
-from app.core.models import Webhook, WebhookDelivery, WebhookEventType
+from app.core.models import Webhook, WebhookEventType
 from app.core import webhook_service
 from app.core import monitoring
 

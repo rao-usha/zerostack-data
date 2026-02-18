@@ -14,7 +14,7 @@ Follows project rules:
 
 import asyncio
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import text

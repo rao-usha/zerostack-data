@@ -9,7 +9,6 @@ Provides access to data lineage tracking, including:
 """
 
 import logging
-from datetime import datetime
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -21,7 +20,6 @@ from app.core.models import (
     LineageEdge,
     LineageEvent,
     DatasetVersion,
-    ImpactAnalysis,
     LineageNodeType,
     LineageEdgeType,
 )

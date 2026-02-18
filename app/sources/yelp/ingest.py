@@ -16,7 +16,7 @@ from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.core.models import DatasetRegistry, IngestionJob, JobStatus
-from app.sources.yelp.client import YelpClient, YELP_CATEGORIES
+from app.sources.yelp.client import YelpClient
 from app.sources.yelp import metadata
 
 logger = logging.getLogger(__name__)

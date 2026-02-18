@@ -11,7 +11,6 @@ Provides:
 
 import logging
 import time
-from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from threading import Lock

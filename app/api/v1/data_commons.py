@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from app.core.database import get_db
 from app.core.job_helpers import create_and_dispatch_job
-from app.sources.data_commons.client import STATISTICAL_VARIABLES, PLACE_DCIDS
+from app.sources.data_commons.client import STATISTICAL_VARIABLES
 
 logger = logging.getLogger(__name__)
 

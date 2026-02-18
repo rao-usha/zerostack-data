@@ -9,8 +9,8 @@ Parses press releases from various sources to extract leadership changes:
 
 import re
 import logging
-from typing import Optional, List, Dict, Any
-from datetime import date, datetime
+from typing import Optional, List
+from datetime import date
 from dataclasses import dataclass, field
 
 from bs4 import BeautifulSoup

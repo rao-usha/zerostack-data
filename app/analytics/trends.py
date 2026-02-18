@@ -7,7 +7,7 @@ sector rotation, emerging themes, and geographic shifts.
 
 import logging
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 from collections import defaultdict
 
 from sqlalchemy import text

@@ -10,7 +10,7 @@ __all__ = []
 
 # T13: Dashboard Analytics (Tab 1)
 try:
-    from app.analytics.dashboard import DashboardAnalytics, get_dashboard_analytics
+    from app.analytics.dashboard import DashboardAnalytics, get_dashboard_analytics  # noqa: F401
 
     __all__.extend(["DashboardAnalytics", "get_dashboard_analytics"])
 except ImportError:
@@ -18,7 +18,7 @@ except ImportError:
 
 # T17: Portfolio Comparison (Tab 2)
 try:
-    from app.analytics.comparison import PortfolioComparisonService
+    from app.analytics.comparison import PortfolioComparisonService  # noqa: F401
 
     __all__.append("PortfolioComparisonService")
 except ImportError:
@@ -26,7 +26,7 @@ except ImportError:
 
 # T18: Recommendations (Tab 2)
 try:
-    from app.analytics.recommendations import RecommendationEngine
+    from app.analytics.recommendations import RecommendationEngine  # noqa: F401
 
     __all__.append("RecommendationEngine")
 except ImportError:

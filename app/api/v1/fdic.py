@@ -11,7 +11,7 @@ Datasets:
 """
 
 import logging
-from typing import List, Optional
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field

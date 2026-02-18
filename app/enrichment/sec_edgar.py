@@ -7,7 +7,6 @@ Fetches public company filings (10-K, 10-Q) from SEC EDGAR.
 import logging
 import httpx
 from typing import Dict, Optional
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 

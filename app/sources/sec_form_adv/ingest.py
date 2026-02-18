@@ -5,9 +5,7 @@ Stores investment adviser data in PostgreSQL.
 """
 
 import logging
-import json
-from typing import Dict, List, Optional, Any
-from datetime import datetime
+from typing import Dict, Optional, Any
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session

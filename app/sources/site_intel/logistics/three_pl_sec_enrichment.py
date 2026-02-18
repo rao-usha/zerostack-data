@@ -8,12 +8,10 @@ Rate limit: 10 req/sec per SEC fair access policy.
 User-Agent must include company/contact info per SEC guidelines.
 """
 
-import asyncio
 import logging
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 
-from sqlalchemy.orm import Session
 
 from app.core.models_site_intel import ThreePLCompany
 from app.sources.site_intel.base_collector import BaseCollector

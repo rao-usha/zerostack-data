@@ -5,7 +5,6 @@ T24: Aggregates news from SEC EDGAR, Google News, and other sources
 to provide a unified news feed for investors and portfolio companies.
 """
 
-import asyncio
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, BackgroundTasks
 from sqlalchemy.orm import Session

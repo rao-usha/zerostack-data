@@ -5,7 +5,7 @@ Contains field mappings, CPC code descriptions, and validation utilities.
 """
 
 import re
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 from datetime import datetime
 
 # Default fields to request from PatentsView API

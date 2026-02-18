@@ -8,12 +8,11 @@ Downloads CAFR PDFs and uses LLM to extract structured data:
 - Governance information
 """
 
-import asyncio
 import io
 import logging
 import re
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Tuple
 
 from app.sources.lp_collection.base_collector import BaseCollector
 from app.sources.lp_collection.types import (

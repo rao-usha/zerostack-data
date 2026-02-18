@@ -10,7 +10,7 @@ Provides endpoints for:
 
 import json
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -19,19 +19,10 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.models import (
-    Location,
-    FootTrafficObservation,
-    LocationMetadata,
-    FootTrafficCollectionJob,
-)
 from app.agentic.foot_traffic_agent import (
     FootTrafficAgent,
-    quick_location_discovery,
-    quick_traffic_collection,
 )
 from app.sources.foot_traffic.ingest import (
-    discover_brand_locations,
     collect_traffic_for_location,
     enrich_location_metadata,
     get_brand_traffic_summary,

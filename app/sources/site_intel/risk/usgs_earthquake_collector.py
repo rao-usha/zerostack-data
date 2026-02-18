@@ -11,7 +11,7 @@ Faults: https://earthquake.usgs.gov/cfusion/qfault/
 
 import logging
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 
 from sqlalchemy.orm import Session
 

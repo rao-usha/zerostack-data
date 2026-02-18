@@ -10,13 +10,11 @@ Matches 3PL companies to FMCSA motor carrier records to enrich:
 First checks local motor_carrier table, then falls back to FMCSA web API.
 """
 
-import asyncio
 import logging
 import re
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
-from sqlalchemy.orm import Session
 
 from app.core.models_site_intel import ThreePLCompany, MotorCarrier
 from app.sources.site_intel.base_collector import BaseCollector

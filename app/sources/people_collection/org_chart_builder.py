@@ -24,7 +24,6 @@ from app.core.people_models import (
     OrgChartSnapshot,
 )
 from app.sources.people_collection.types import (
-    ExtractedPerson,
     TitleLevel,
 )
 

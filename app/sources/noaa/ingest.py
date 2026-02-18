@@ -5,15 +5,13 @@ This module orchestrates the ingestion of NOAA climate and weather data
 following the service's plugin pattern and safety rules.
 """
 
-import asyncio
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Dict, List, Optional, Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_async_session
-from app.core.models import IngestionJob, DatasetRegistry
 from app.sources.noaa.client import NOAAClient
 from app.sources.noaa.metadata import NOAA_DATASETS, get_table_schema, get_primary_key
 

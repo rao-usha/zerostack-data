@@ -5,7 +5,6 @@ Defines market categories, classification logic, and alert thresholds.
 """
 
 from typing import Optional, Dict, List
-import re
 
 # =============================================================================
 # MARKET CATEGORIES

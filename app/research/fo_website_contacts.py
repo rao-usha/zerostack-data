@@ -7,9 +7,9 @@ import asyncio
 import httpx
 import re
 from bs4 import BeautifulSoup
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 from urllib.parse import urljoin, urlparse
-from datetime import date, datetime
+from datetime import date
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
@@ -19,7 +19,6 @@ from app.research.contact_validation import (
     validate_email,
     validate_phone,
     standardize_phone,
-    extract_executive_title,
     is_likely_executive_title,
     determine_role_from_title,
     should_skip_page,

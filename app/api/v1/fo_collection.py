@@ -452,7 +452,6 @@ async def get_fos_by_sector(
 
     Searches sectors_of_interest field for matches.
     """
-    from sqlalchemy import any_
 
     # Search for FOs with matching sector in their sectors_of_interest array
     fos = (

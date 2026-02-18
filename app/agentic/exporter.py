@@ -166,8 +166,8 @@ class PortfolioExporter:
         """
         try:
             from openpyxl import Workbook
-            from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
-            from openpyxl.utils import get_column_letter
+            from openpyxl.styles import Alignment, Font, PatternFill, Border, Side  # noqa: F401
+            from openpyxl.utils import get_column_letter  # noqa: F401
         except ImportError:
             logger.warning("openpyxl not installed, falling back to CSV export")
             return self.to_csv()
@@ -266,8 +266,7 @@ class PortfolioExporter:
 
     def _write_summary_sheet(self, ws) -> None:
         """Write the summary statistics sheet."""
-        from openpyxl.styles import Alignment, Font, PatternFill
-        from openpyxl.utils import get_column_letter
+        from openpyxl.styles import Font, PatternFill
 
         title_font = Font(bold=True, size=14)
         header_font = Font(bold=True)
@@ -344,7 +343,7 @@ class PortfolioExporter:
 
     def _write_source_breakdown_sheet(self, ws) -> None:
         """Write the source breakdown sheet."""
-        from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
+        from openpyxl.styles import Font, PatternFill, Border, Side
         from openpyxl.utils import get_column_letter
 
         header_font = Font(bold=True, color="FFFFFF")

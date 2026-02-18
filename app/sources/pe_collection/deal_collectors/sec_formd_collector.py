@@ -7,7 +7,7 @@ filings (Reg D) as PE deal data via the PE collection orchestrator.
 
 import logging
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 
 from app.sources.pe_collection.base_collector import BasePECollector
 from app.sources.pe_collection.types import (

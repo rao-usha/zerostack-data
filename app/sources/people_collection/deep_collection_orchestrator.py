@@ -8,7 +8,6 @@ Designed for companies like Prudential Financial with 40,000+ employees
 spread across multiple web domains and subsidiaries.
 """
 
-import asyncio
 import logging
 from datetime import datetime, date
 from typing import List, Optional, Dict, Any
@@ -19,15 +18,11 @@ from sqlalchemy.orm import Session
 from app.core.database import get_session_factory
 from app.core.people_models import (
     IndustrialCompany,
-    Person,
-    CompanyPerson,
     PeopleCollectionJob,
 )
 from app.sources.people_collection.types import (
     ExtractedPerson,
     LeadershipChange,
-    CollectionResult,
-    ExtractionConfidence,
 )
 
 logger = logging.getLogger(__name__)

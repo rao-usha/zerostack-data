@@ -5,13 +5,12 @@ High-level functions that coordinate data fetching, table creation, and data loa
 """
 
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.core.config import get_settings
-from app.core.models import IngestionJob, JobStatus
 from app.core.ingest_base import BaseSourceIngestor
 from app.core.batch_operations import batch_insert
 from app.sources.uspto.client import USPTOClient

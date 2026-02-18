@@ -6,7 +6,7 @@ for all real estate data sources.
 """
 
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import text

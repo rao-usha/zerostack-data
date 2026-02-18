@@ -7,9 +7,8 @@ Crawls company websites to extract leadership team information:
 3. Deduplicates and validates results
 """
 
-import asyncio
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 from datetime import datetime
 
 from app.sources.people_collection.base_collector import BaseCollector

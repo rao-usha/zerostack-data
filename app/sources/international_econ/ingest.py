@@ -17,8 +17,6 @@ from app.sources.international_econ.client import (
     IMFClient,
     OECDClient,
     BISClient,
-    COMMON_WDI_INDICATORS,
-    MAJOR_ECONOMIES,
 )
 from app.sources.international_econ import metadata
 

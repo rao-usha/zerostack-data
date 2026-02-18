@@ -14,7 +14,6 @@ Implementation:
 """
 
 import asyncio
-import hashlib
 import io
 import logging
 import re

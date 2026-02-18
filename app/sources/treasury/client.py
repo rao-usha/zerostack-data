@@ -18,7 +18,7 @@ Rate limits:
 """
 
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 
 from app.core.http_client import BaseAPIClient
 from app.core.api_registry import get_api_config

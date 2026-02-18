@@ -4,7 +4,7 @@ CFTC COT metadata and schema definitions.
 Defines table schemas and parsing functions for COT data.
 """
 
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any, Optional
 
 
 # Database schema for COT tables

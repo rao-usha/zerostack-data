@@ -16,7 +16,6 @@ from app.core.models import DatasetRegistry, IngestionJob, JobStatus
 from app.sources.data_commons.client import (
     DataCommonsClient,
     STATISTICAL_VARIABLES,
-    PLACE_DCIDS,
 )
 from app.sources.data_commons import metadata
 

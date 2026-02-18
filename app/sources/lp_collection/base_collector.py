@@ -21,7 +21,6 @@ from app.sources.lp_collection.types import (
     CollectionResult,
     CollectedItem,
     LpCollectionSource,
-    CollectionConfig,
 )
 
 logger = logging.getLogger(__name__)

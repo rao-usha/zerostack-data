@@ -14,7 +14,7 @@ Data Source:
 import logging
 import re
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, List, Dict, Any, Tuple
 
 from app.sources.lp_collection.base_collector import BaseCollector

@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 async def execute(job: JobQueue, db: Session):
     """Execute a foot traffic discovery/collection job."""
     from app.core.database import get_session_factory
-    from app.agentic.foot_traffic_agent import FootTrafficAgent
     from app.sources.foot_traffic.ingest import (
         discover_brand_locations,
         collect_traffic_for_location,

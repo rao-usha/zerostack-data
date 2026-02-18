@@ -5,7 +5,7 @@ Uses the Census Bureau's TIGERweb REST API for geographic boundaries.
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 import httpx
 import asyncio
 

@@ -13,7 +13,7 @@ Uses free news APIs and web scraping.
 import logging
 import re
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 
 from app.sources.family_office_collection.base_collector import FoBaseCollector
 from app.sources.family_office_collection.types import (

@@ -12,10 +12,8 @@ from sqlalchemy import (
     Date,
     DECIMAL,
     Index,
-    ForeignKey,
     UniqueConstraint,
 )
-from sqlalchemy.ext.declarative import declarative_base
 
 from app.core.models import Base
 

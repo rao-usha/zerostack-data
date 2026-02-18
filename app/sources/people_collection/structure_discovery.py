@@ -12,11 +12,10 @@ Discovered business units are inserted into industrial_companies with
 parent_company_id linking back to the parent.
 """
 
-import json
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session

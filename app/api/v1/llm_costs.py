@@ -13,7 +13,7 @@ from datetime import date, datetime
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, cast, Date
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.models import LLMUsage

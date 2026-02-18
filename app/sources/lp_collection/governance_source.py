@@ -12,7 +12,7 @@ IMPORTANT: Only collects publicly available information.
 import logging
 import re
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 
 from app.sources.lp_collection.base_collector import BaseCollector
 from app.sources.lp_collection.types import (

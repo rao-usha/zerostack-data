@@ -9,8 +9,7 @@ Supported cities: Seattle, NYC, San Francisco, Chicago
 """
 
 import logging
-from datetime import datetime, date, timedelta
-from typing import Any, Dict, List
+from datetime import date, timedelta
 
 from app.agentic.traffic_strategies.base import (
     BaseTrafficStrategy,

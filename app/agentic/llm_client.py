@@ -12,13 +12,12 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 # Try to import LLM libraries
 try:
-    import openai
     from openai import AsyncOpenAI
 
     OPENAI_AVAILABLE = True
@@ -27,7 +26,6 @@ except ImportError:
     AsyncOpenAI = None
 
 try:
-    import anthropic
     from anthropic import AsyncAnthropic
 
     ANTHROPIC_AVAILABLE = True

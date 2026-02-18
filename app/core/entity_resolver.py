@@ -13,11 +13,9 @@ Features:
 """
 
 import logging
-import re
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
@@ -33,8 +31,6 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     UniqueConstraint,
-    and_,
-    or_,
     func,
 )
 from sqlalchemy.orm import Session

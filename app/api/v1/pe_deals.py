@@ -9,7 +9,7 @@ Endpoints for managing M&A deal data including:
 """
 
 import logging
-from typing import List, Optional
+from typing import Optional
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field

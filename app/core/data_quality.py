@@ -10,7 +10,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from app.core.models import IngestionJob, JobStatus
+from app.core.models import IngestionJob
 
 logger = logging.getLogger(__name__)
 

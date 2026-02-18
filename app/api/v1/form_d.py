@@ -5,13 +5,12 @@ T31: Access and search private placement filings.
 """
 
 from typing import Optional, List
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.sources.sec_form_d import FormDIngestionService, FormDClient
+from app.sources.sec_form_d import FormDIngestionService
 
 router = APIRouter(prefix="/form-d", tags=["form-d"])
 

@@ -14,11 +14,11 @@ No API key required - public data via ArcGIS REST services.
 
 import logging
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 
 from sqlalchemy.orm import Session
 
-from app.core.models_site_intel import IntermodalTerminal, Port, Airport
+from app.core.models_site_intel import Port, Airport
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
     SiteIntelDomain,

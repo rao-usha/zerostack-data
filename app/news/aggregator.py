@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 
-from sqlalchemy import text, Column, Integer, String, Text, Float, DateTime, ARRAY
+from sqlalchemy import text, Column, Integer, String, Text, Float, DateTime
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.declarative import declarative_base
 

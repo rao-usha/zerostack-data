@@ -4,7 +4,6 @@ Metadata and configuration for foot traffic data collection.
 Defines location categories, source confidence levels, and data mappings.
 """
 
-from typing import Dict, List, Any
 
 # =============================================================================
 # LOCATION CATEGORIES

@@ -7,7 +7,6 @@ Parses Form D XML filings into structured data.
 import logging
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional, Any
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 

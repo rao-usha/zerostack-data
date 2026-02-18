@@ -6,7 +6,6 @@ for LPs and Family Offices.
 """
 
 import logging
-from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -428,7 +427,6 @@ async def batch_portfolio_collection(
 
         # Create jobs for each investor
         job_ids = []
-        import json
 
         for investor_id, investor_name in investors:
             result = db.execute(

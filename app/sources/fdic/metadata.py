@@ -11,7 +11,7 @@ FDIC BankFind API: https://banks.data.fdic.gov/docs/
 """
 
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any, Optional
 from datetime import datetime
 
 logger = logging.getLogger(__name__)

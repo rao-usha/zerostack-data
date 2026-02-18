@@ -14,13 +14,6 @@ from app.core.config import get_settings
 from app.core.models import DatasetRegistry, IngestionJob, JobStatus
 from app.sources.sec.client import SECClient
 from app.sources.sec import metadata
-from app.sources.sec import xbrl_parser
-from app.sources.sec.models import (
-    SECFinancialFact,
-    SECIncomeStatement,
-    SECBalanceSheet,
-    SECCashFlowStatement,
-)
 
 logger = logging.getLogger(__name__)
 

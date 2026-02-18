@@ -14,7 +14,6 @@ Tables for industrial and data center site selection across 9 domains:
 """
 
 from datetime import datetime
-from typing import Optional
 from sqlalchemy import (
     Column,
     Integer,
@@ -29,11 +28,8 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     UniqueConstraint,
-    Enum,
 )
 from sqlalchemy.dialects.postgresql import ARRAY
-from sqlalchemy.orm import relationship
-import enum
 
 # Import Base from main models to share the same declarative base
 from app.core.models import Base

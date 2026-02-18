@@ -5,11 +5,10 @@ Endpoints for Opportunity Zones, FTZ, incentive programs, and industrial sites.
 """
 
 import logging
-from typing import Optional, List
+from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.models_site_intel import (

@@ -10,7 +10,6 @@ Main entry point for running FO data collection jobs:
 
 import asyncio
 import logging
-from datetime import datetime
 from typing import List, Optional, Dict, Any, Type
 
 from sqlalchemy.orm import Session

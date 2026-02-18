@@ -10,7 +10,6 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 
 from app.core.models import (
     PredictionMarket,
@@ -19,14 +18,11 @@ from app.core.models import (
     PredictionMarketJob,
 )
 from app.sources.prediction_markets.client import (
-    KalshiClient,
-    PolymarketClient,
     MarketData,
     get_kalshi_client,
     get_polymarket_client,
 )
 from app.sources.prediction_markets.metadata import (
-    categorize_market,
     get_alert_threshold,
     KALSHI_SERIES,
 )

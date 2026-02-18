@@ -16,7 +16,6 @@ from app.sources.pe_collection.types import (
     PECollectionSource,
     EntityType,
 )
-from app.sources.pe_collection.config import settings
 
 logger = logging.getLogger(__name__)
 

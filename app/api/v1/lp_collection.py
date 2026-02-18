@@ -31,7 +31,6 @@ from app.core.models import (
     LpStrategySnapshot,
     LpAssetClassTargetAllocation,
     LpManagerOrVehicleExposure,
-    LpKeyContact,
     PortfolioCompany,
 )
 from app.sources.lp_collection.types import (

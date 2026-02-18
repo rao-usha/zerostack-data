@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
+from sqlalchemy import or_
 
 from app.core.people_models import (
     Person,

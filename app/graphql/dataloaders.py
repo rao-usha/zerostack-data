@@ -5,8 +5,7 @@ Prevents N+1 query problems by batching database requests.
 Uses synchronous database access to match existing codebase patterns.
 """
 
-from typing import List, Dict, Tuple, Any, Callable
-from collections import defaultdict
+from typing import List, Dict, Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 

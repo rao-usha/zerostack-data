@@ -14,16 +14,14 @@ Key capabilities:
 Rate limited: 1 req / 30 seconds via linkedin_google config.
 """
 
-import asyncio
 import logging
 import re
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from urllib.parse import quote_plus
 
 import httpx
 
-from app.sources.people_collection.base_collector import BaseCollector, RateLimiter
-from app.sources.people_collection.config import RATE_LIMITS
+from app.sources.people_collection.base_collector import BaseCollector
 from app.sources.people_collection.types import (
     ExtractedPerson,
     ExtractionConfidence,

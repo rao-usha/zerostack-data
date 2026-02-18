@@ -7,7 +7,6 @@ with fuzzy matching, faceted filtering, and autocomplete.
 
 import logging
 from typing import List, Optional, Dict, Any
-from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field

@@ -16,7 +16,6 @@ from sqlalchemy.orm import Session
 from app.core.people_models import (
     IndustrialCompany,
     PeopleCollectionJob,
-    PeoplePortfolio,
     PeoplePortfolioCompany,
 )
 

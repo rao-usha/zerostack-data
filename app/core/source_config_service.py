@@ -6,7 +6,7 @@ Missing config rows fall back to global defaults.
 """
 
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 
 from sqlalchemy.orm import Session
 

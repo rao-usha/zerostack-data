@@ -18,7 +18,6 @@ from app.sources.pe_collection.types import (
     PECollectionSource,
     EntityType,
 )
-from app.sources.pe_collection.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -378,7 +377,6 @@ class BioExtractor(BasePECollector):
         self, llm_client, text: str, firm_name: str
     ) -> List[Dict[str, Any]]:
         """Use LLM to extract structured bio data from team page text."""
-        import json as json_mod
 
         # Truncate to keep input small so model has room for output tokens
         text = text[:6000]

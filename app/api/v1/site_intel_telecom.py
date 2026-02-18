@@ -6,7 +6,7 @@ Endpoints for broadband availability, internet exchanges, and data centers.
 
 import logging
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
@@ -17,7 +17,6 @@ from app.core.models_site_intel import (
     InternetExchange,
     DataCenterFacility,
     SubmarineCableLanding,
-    NetworkLatency,
 )
 
 logger = logging.getLogger(__name__)

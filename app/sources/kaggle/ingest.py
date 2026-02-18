@@ -13,12 +13,11 @@ IMPORTANT:
 - Parameterized queries only (no SQL string concatenation)
 """
 
-import asyncio
 import csv
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 from sqlalchemy.orm import Session
 from sqlalchemy import text

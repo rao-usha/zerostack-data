@@ -4,9 +4,8 @@ GitHub Repository Analytics API Endpoints.
 T34: Track developer activity as a proxy for tech company health.
 """
 
-import asyncio
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 

@@ -5,7 +5,6 @@ These tables are source-agnostic and used by all data source adapters.
 """
 
 from datetime import datetime
-from typing import Optional
 from sqlalchemy import (
     Column,
     Integer,

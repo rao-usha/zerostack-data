@@ -8,10 +8,9 @@ from typing import Optional, List, Dict, Any
 from datetime import date, timedelta
 from collections import defaultdict
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_, case, distinct
+from sqlalchemy import or_
 
 from app.core.people_models import (
-    Person,
     CompanyPerson,
     IndustrialCompany,
     LeadershipChange,

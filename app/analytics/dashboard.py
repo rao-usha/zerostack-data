@@ -7,8 +7,8 @@ trends, data quality metrics, and system health statistics.
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
+from datetime import datetime
+from typing import List, Optional
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session

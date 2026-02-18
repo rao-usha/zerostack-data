@@ -8,7 +8,7 @@ These types define the structure of data extracted from various sources
 from datetime import date, datetime
 from enum import Enum
 from typing import Optional, List
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 
 class ExtractionConfidence(str, Enum):

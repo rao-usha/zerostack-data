@@ -7,7 +7,7 @@ and merges records to create high-quality, validated data.
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 from app.agentic.fuzzy_matcher import CompanyNameMatcher, similarity_ratio
 

@@ -11,7 +11,6 @@ Form ADV contains detailed information about:
 """
 
 import logging
-import re
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 

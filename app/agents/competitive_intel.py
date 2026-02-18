@@ -8,7 +8,7 @@ tracks competitive movements, and generates moat assessments.
 import logging
 import math
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from enum import Enum
 
 from sqlalchemy import text

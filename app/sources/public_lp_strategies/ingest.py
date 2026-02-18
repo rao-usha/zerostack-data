@@ -12,10 +12,9 @@ They do NOT fetch or parse documents; they assume structured inputs are provided
 """
 
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 
 from app.core.models import (
     LpFund,
@@ -24,10 +23,8 @@ from app.core.models import (
     LpStrategySnapshot,
     LpAssetClassTargetAllocation,
     LpAssetClassProjection,
-    LpManagerOrVehicleExposure,
     LpStrategyThematicTag,
     LpKeyContact,
-    DatasetRegistry,
 )
 from app.sources.public_lp_strategies.types import (
     LpFundInput,
@@ -636,7 +633,6 @@ def register_lp_contact(db: Session, contact_input: LpKeyContactInput) -> LpKeyC
     Returns:
         LpKeyContact instance
     """
-    from app.sources.public_lp_strategies.contact_validation import is_likely_duplicate
 
     # Check for existing contact
     existing = (

@@ -12,7 +12,6 @@ from app.graphql.types import (
     LPFundType,
     FamilyOfficeType,
     PortfolioCompanyType,
-    CoInvestorType,
     SearchResultType,
     AnalyticsOverviewType,
     IndustryBreakdownType,

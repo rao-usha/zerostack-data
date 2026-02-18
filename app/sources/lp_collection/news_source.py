@@ -11,7 +11,7 @@ Monitors news and press releases for:
 import logging
 import re
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 
 from app.sources.lp_collection.base_collector import BaseCollector
 from app.sources.lp_collection.types import (

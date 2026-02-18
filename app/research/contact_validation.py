@@ -5,7 +5,6 @@ Enforces strict quality and privacy standards.
 
 import re
 from typing import Optional, Tuple
-from datetime import date
 
 
 # Personal email providers that should be rejected for business contacts

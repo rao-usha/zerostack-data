@@ -15,7 +15,7 @@ import logging
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session

@@ -10,7 +10,6 @@ Handles:
 
 import logging
 from typing import List, Dict, Any, Optional, Set, Tuple
-from datetime import datetime
 
 from app.sources.lp_collection.types import CollectedItem, CollectionResult
 

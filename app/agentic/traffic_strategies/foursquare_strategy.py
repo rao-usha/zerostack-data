@@ -7,8 +7,6 @@ COST: Free tier + $0.01-0.05/call for premium
 """
 
 import logging
-from datetime import datetime
-from typing import Any, Dict, List
 
 from app.agentic.traffic_strategies.base import (
     BaseTrafficStrategy,

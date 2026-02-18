@@ -11,7 +11,6 @@ from typing import Optional, List
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from pydantic import BaseModel, Field
 
 from app.core.database import get_db

@@ -8,20 +8,13 @@ Handles the full workflow of:
 4. Storing results in the database
 """
 
-import asyncio
 import logging
 from datetime import datetime, date, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.core.models import (
-    Location,
-    FootTrafficObservation,
-    LocationMetadata,
-    FootTrafficCollectionJob,
-)
 from app.sources.foot_traffic.client import (
     FootTrafficClient,
     FoursquareClient,
@@ -31,8 +24,6 @@ from app.sources.foot_traffic.client import (
     TrafficObservation,
 )
 from app.sources.foot_traffic.metadata import (
-    MAJOR_RETAIL_CHAINS,
-    SOURCE_CONFIDENCE_LEVELS,
     CITY_PEDESTRIAN_DATA_SOURCES,
 )
 

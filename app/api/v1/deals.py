@@ -10,7 +10,7 @@ from typing import Optional, List
 from datetime import datetime
 
 from app.core.database import get_db
-from app.deals.tracker import DealTracker, PIPELINE_STAGES
+from app.deals.tracker import DealTracker
 
 router = APIRouter(prefix="/deals", tags=["deals"])
 

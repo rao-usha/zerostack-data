@@ -9,7 +9,7 @@ Provides endpoints for generating and exporting reports:
 
 from typing import Optional, List
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field

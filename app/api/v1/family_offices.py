@@ -7,7 +7,6 @@ Use this to track all family offices regardless of registration status.
 
 import logging
 from typing import List, Optional
-from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session

@@ -444,7 +444,6 @@ class FMCSACollector(BaseCollector):
         """
         try:
             # Get DOT numbers from recently collected carriers
-            from sqlalchemy import func
 
             dot_numbers = (
                 self.db.query(MotorCarrier.dot_number)

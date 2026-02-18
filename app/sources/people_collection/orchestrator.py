@@ -20,8 +20,6 @@ from app.core.people_models import (
     IndustrialCompany,
     Person,
     CompanyPerson,
-    PersonExperience,
-    PersonEducation,
     LeadershipChange as LeadershipChangeModel,
     PeopleCollectionJob,
 )

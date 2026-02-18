@@ -9,7 +9,6 @@ This agent:
 5. Logs full reasoning trail for debugging
 """
 
-import asyncio
 import logging
 from datetime import datetime, date, timedelta
 from typing import Any, Dict, List, Optional, Type
@@ -28,12 +27,6 @@ from app.agentic.traffic_strategies import (
     PlacerStrategy,
     GooglePopularTimesStrategy,
     CityDataStrategy,
-)
-from app.core.models import (
-    Location,
-    FootTrafficObservation,
-    LocationMetadata,
-    FootTrafficCollectionJob,
 )
 
 logger = logging.getLogger(__name__)

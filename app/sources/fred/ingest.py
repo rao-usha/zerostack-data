@@ -6,11 +6,9 @@ High-level functions that coordinate data fetching, table creation, and data loa
 
 import logging
 from typing import Dict, Any, Optional, List
-from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.models import IngestionJob, JobStatus
 from app.core.ingest_base import BaseSourceIngestor, create_ingestion_job
 from app.core.batch_operations import batch_insert
 from app.sources.fred.client import FREDClient

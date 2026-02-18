@@ -7,7 +7,7 @@ top holdings, and sector allocation.
 
 import logging
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from io import BytesIO
 
 from sqlalchemy import text
@@ -318,7 +318,7 @@ class InvestorProfileTemplate:
     def render_excel(self, data: Dict[str, Any]) -> bytes:
         """Render report as Excel workbook."""
         from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.styles import Font, PatternFill
 
         wb = Workbook()
 

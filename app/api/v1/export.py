@@ -158,7 +158,6 @@ def list_tables(
 ):
     """List tables available for export. Cached for 5 minutes; pass ?refresh=true to bust."""
     if refresh:
-        from app.core.export_service import _table_cache
         import app.core.export_service as _es
 
         _es._table_cache = []

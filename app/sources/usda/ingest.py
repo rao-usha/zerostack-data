@@ -14,7 +14,6 @@ from .metadata import (
     generate_create_table_sql,
     parse_usda_record,
     CROP_PRODUCTION_COLUMNS,
-    COMMODITY_CATEGORIES,
 )
 
 logger = logging.getLogger(__name__)
@@ -358,3 +357,43 @@ async def _insert_usda_records(
 
     conn.commit()
     return rows_inserted
+
+
+# =============================================================================
+# Dispatch-compatible wrappers
+# =============================================================================
+# These wrappers accept (db, job_id, **kwargs) to match the SOURCE_DISPATCH
+# interface used by run_ingestion_job(). They extract the raw psycopg2
+# connection from the SQLAlchemy session and delegate to the original
+# conn-based ingest functions.
+
+
+async def dispatch_usda_crop(db, job_id: int, commodity: str = "CORN", year: int = None, state: Optional[str] = None, all_stats: bool = True, api_key: Optional[str] = None):
+    """Dispatch wrapper for USDA crop ingestion via SOURCE_DISPATCH."""
+    conn = db.connection().connection
+    if all_stats:
+        rows = await ingest_crop_all_stats(conn, commodity, year, state, api_key)
+    else:
+        rows = await ingest_crop_production(conn, commodity, year, state, api_key)
+    return {"rows_inserted": rows}
+
+
+async def dispatch_usda_livestock(db, job_id: int, commodity: str = "CATTLE", year: int = None, state: Optional[str] = None, api_key: Optional[str] = None):
+    """Dispatch wrapper for USDA livestock ingestion via SOURCE_DISPATCH."""
+    conn = db.connection().connection
+    rows = await ingest_livestock_inventory(conn, commodity, year, state, api_key)
+    return {"rows_inserted": rows}
+
+
+async def dispatch_usda_annual_summary(db, job_id: int, year: int = None, api_key: Optional[str] = None):
+    """Dispatch wrapper for USDA annual summary ingestion via SOURCE_DISPATCH."""
+    conn = db.connection().connection
+    rows = await ingest_annual_crops(conn, year, api_key)
+    return {"rows_inserted": rows}
+
+
+async def dispatch_usda_all_major_crops(db, job_id: int, year: int = None, api_key: Optional[str] = None):
+    """Dispatch wrapper for USDA all major crops ingestion via SOURCE_DISPATCH."""
+    conn = db.connection().connection
+    results = await ingest_all_major_crops(conn, year, api_key)
+    return {"rows_inserted": sum(results.values())}

@@ -9,7 +9,7 @@ Endpoints for managing people data including:
 """
 
 import logging
-from typing import List, Optional
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 
 from app.core.database import get_db
-from app.agents.company_researcher import CompanyResearchAgent, ResearchStatus
+from app.agents.company_researcher import CompanyResearchAgent
 from app.agents.deep_researcher import DeepResearchAgent
 
 router = APIRouter(prefix="/agents", tags=["Agentic Intelligence"])

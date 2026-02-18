@@ -15,7 +15,7 @@ Data includes:
 import logging
 import re
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Tuple
 
 from app.sources.lp_collection.base_collector import BaseCollector
 from app.sources.lp_collection.types import (

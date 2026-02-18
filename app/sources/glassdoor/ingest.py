@@ -7,7 +7,7 @@ Reads Glassdoor CSV exports and bulk-inserts into existing tables.
 import csv
 import io
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 from sqlalchemy.orm import Session
 from sqlalchemy import text

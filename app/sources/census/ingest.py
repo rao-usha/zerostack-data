@@ -13,8 +13,6 @@ from sqlalchemy import text
 from app.core.config import get_settings
 from app.core.models import (
     DatasetRegistry,
-    IngestionJob,
-    JobStatus,
     GeoJSONBoundaries,
     CensusVariableMetadata,
 )
@@ -179,7 +177,6 @@ async def ingest_acs_table(
     Raises:
         Exception: On data fetch or insertion errors
     """
-    import asyncio
 
     start_time = datetime.utcnow()
 

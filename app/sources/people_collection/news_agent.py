@@ -34,7 +34,6 @@ from app.sources.people_collection.change_detector import ChangeDetector
 from app.sources.people_collection.types import (
     LeadershipChange,
     CollectionResult,
-    ExtractionConfidence,
 )
 
 logger = logging.getLogger(__name__)

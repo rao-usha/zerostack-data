@@ -24,7 +24,6 @@ from typing import Dict, List, Optional, Any
 from app.core.http_client import BaseAPIClient
 from app.core.api_errors import (
     FatalError,
-    RetryableError,
     ValidationError,
     RateLimitError,
 )

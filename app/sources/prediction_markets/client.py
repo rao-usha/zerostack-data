@@ -10,10 +10,10 @@ import asyncio
 import json
 import logging
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 from dataclasses import dataclass
 
-from app.sources.prediction_markets.metadata import categorize_market, KALSHI_SERIES
+from app.sources.prediction_markets.metadata import categorize_market
 
 logger = logging.getLogger(__name__)
 

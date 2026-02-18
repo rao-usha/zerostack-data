@@ -14,14 +14,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, date
 from typing import Any, Dict, List, Optional
-from urllib.parse import quote
 
 import httpx
 
 from app.core.config import get_settings
 from app.sources.foot_traffic.metadata import (
     API_RATE_LIMITS,
-    SOURCE_CONFIDENCE_LEVELS,
     CITY_PEDESTRIAN_DATA_SOURCES,
 )
 

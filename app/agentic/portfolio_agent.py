@@ -9,7 +9,6 @@ This agent:
 5. Logs full reasoning trail for debugging
 """
 
-import asyncio
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Type
@@ -23,12 +22,6 @@ from app.agentic.strategies.annual_report_strategy import AnnualReportStrategy
 from app.agentic.strategies.news_strategy import NewsStrategy
 from app.agentic.strategies.reverse_search_strategy import ReverseSearchStrategy
 from app.agentic.synthesizer import DataSynthesizer
-from app.core.models import (
-    AgenticCollectionJob,
-    CoInvestment,
-    InvestorTheme,
-    PortfolioCompany,
-)
 
 logger = logging.getLogger(__name__)
 

@@ -10,7 +10,6 @@ Endpoints for managing PE/VC firm data including:
 
 import logging
 from typing import List, Optional
-from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session

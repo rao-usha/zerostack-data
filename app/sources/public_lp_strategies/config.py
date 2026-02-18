@@ -8,7 +8,7 @@ This file contains:
 - Projection horizon constants
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 
 # =============================================================================

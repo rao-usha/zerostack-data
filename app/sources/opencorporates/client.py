@@ -7,7 +7,6 @@ Provides access to global company registry data from 140+ jurisdictions.
 import os
 import httpx
 from typing import Optional
-from datetime import datetime
 
 
 class OpenCorporatesClient:

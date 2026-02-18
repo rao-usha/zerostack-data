@@ -9,11 +9,10 @@ Provides reusable logic for:
 """
 
 import logging
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List, Type
+from abc import ABC
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 
 from app.core.models import DatasetRegistry, IngestionJob, JobStatus
 from app.core.batch_operations import (

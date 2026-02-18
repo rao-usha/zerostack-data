@@ -9,7 +9,7 @@ Detects changes by comparing:
 
 import logging
 from typing import Optional, List, Dict, Set, Tuple
-from datetime import date, datetime
+from datetime import date
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 

@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.core.models_queue import JobQueue, QueueJobStatus, QueueJobType
+from app.core.models_queue import JobQueue, QueueJobStatus
 
 logger = logging.getLogger(__name__)
 

@@ -17,10 +17,9 @@ import json
 import logging
 import re
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 
 import httpx
-from sqlalchemy.orm import Session
 
 from app.core.models_site_intel import ThreePLCompany
 from app.sources.site_intel.base_collector import BaseCollector

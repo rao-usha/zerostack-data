@@ -12,7 +12,7 @@ Provides comprehensive data lineage tracking including:
 import hashlib
 import logging
 from datetime import datetime
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 

@@ -6,9 +6,9 @@ and industry allocation analysis.
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional, Dict, Any, Set
+from typing import List, Optional, Dict
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session

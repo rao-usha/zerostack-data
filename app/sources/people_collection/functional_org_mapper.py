@@ -12,11 +12,9 @@ Key capabilities:
 - 3-level deep mapping: C-suite -> VPs -> Directors
 """
 
-import asyncio
-import json
 import logging
 import re
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -24,12 +22,9 @@ from app.core.people_models import (
     CompanyPerson,
     Person,
     IndustrialCompany,
-    OrgChartSnapshot,
 )
 from app.sources.people_collection.types import (
     ExtractedPerson,
-    TitleLevel,
-    ExtractionConfidence,
 )
 from app.sources.people_collection.llm_extractor import LLMExtractor
 

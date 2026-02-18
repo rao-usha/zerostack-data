@@ -45,7 +45,6 @@ from app.sources.lp_collection.news_source import NewsCollector
 from app.sources.lp_collection.governance_source import GovernanceCollector
 from app.sources.lp_collection.performance_source import PerformanceCollector
 from app.sources.lp_collection.normalizer import DataNormalizer
-from app.sources.lp_collection.config import get_lp_registry
 
 logger = logging.getLogger(__name__)
 

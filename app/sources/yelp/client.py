@@ -21,7 +21,7 @@ Required. Get at: https://www.yelp.com/developers/v3/manage_app
 """
 
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 
 from app.core.http_client import BaseAPIClient
 from app.core.api_registry import get_api_config

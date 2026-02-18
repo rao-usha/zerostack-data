@@ -25,7 +25,7 @@ import json
 from typing import Dict, List, Optional, Any
 
 from app.core.http_client import BaseAPIClient
-from app.core.api_errors import FatalError, RetryableError, RateLimitError
+from app.core.api_errors import FatalError
 from app.core.api_registry import get_api_config
 
 logger = logging.getLogger(__name__)

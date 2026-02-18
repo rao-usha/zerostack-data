@@ -243,7 +243,6 @@ async def get_collection_metrics(
     - Recommendations for improvement
     """
     from datetime import datetime, timedelta
-    from sqlalchemy import func, case
     from collections import Counter
 
     cutoff = datetime.utcnow() - timedelta(days=days)

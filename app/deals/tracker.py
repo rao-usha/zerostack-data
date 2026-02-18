@@ -5,7 +5,6 @@ Manages investment deal pipeline from sourcing to close.
 """
 
 import logging
-from datetime import datetime
 from typing import Dict, Any, List, Optional
 
 from sqlalchemy import text

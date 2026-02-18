@@ -26,15 +26,14 @@ import logging
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from heapq import heappush, heappop
 
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import text
-from sqlalchemy.orm import Session
 
-from app.core.scheduler_service import get_scheduler, start_scheduler
+from app.core.scheduler_service import get_scheduler
 from app.core.database import get_session_factory
 from app.agentic.metrics import get_metrics_collector
 

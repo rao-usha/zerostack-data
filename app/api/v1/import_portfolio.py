@@ -7,7 +7,7 @@ portfolio data from CSV/Excel files.
 
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db

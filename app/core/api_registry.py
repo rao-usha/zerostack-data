@@ -11,7 +11,7 @@ This eliminates magic strings scattered across client files.
 """
 
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 from enum import Enum
 
 

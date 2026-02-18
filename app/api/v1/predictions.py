@@ -4,7 +4,7 @@ Predictive Deal Scoring API Endpoints (T40)
 Provides win probability predictions and pipeline insights for deals.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field

@@ -5,7 +5,6 @@ Processes and stores GitHub organization and repository metrics.
 """
 
 import logging
-import asyncio
 from typing import Dict, List, Optional, Any
 from datetime import datetime, date, timedelta
 

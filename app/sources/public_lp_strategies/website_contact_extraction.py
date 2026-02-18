@@ -18,9 +18,8 @@ RULES:
 import asyncio
 import re
 import logging
-from typing import Optional, List, Dict, Any, Set
+from typing import Optional, List, Dict, Any
 from urllib.parse import urljoin, urlparse
-from datetime import datetime
 
 import httpx
 from bs4 import BeautifulSoup

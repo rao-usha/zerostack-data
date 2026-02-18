@@ -18,10 +18,10 @@ API v2 is the current version as of 2025.
 """
 
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 
 from app.core.http_client import BaseAPIClient
-from app.core.api_errors import FatalError, RetryableError
+from app.core.api_errors import RetryableError
 from app.core.api_registry import get_api_config
 
 logger = logging.getLogger(__name__)

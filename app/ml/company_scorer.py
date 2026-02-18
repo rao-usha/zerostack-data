@@ -6,7 +6,7 @@ using weighted signals from multiple data sources.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional, Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session

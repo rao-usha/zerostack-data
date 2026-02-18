@@ -6,7 +6,6 @@ Note: Uses Google site: search only - no LinkedIn API or scraping.
 """
 
 import re
-import asyncio
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from urllib.parse import quote_plus

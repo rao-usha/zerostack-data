@@ -11,12 +11,11 @@ Implementation:
 """
 
 import asyncio
-import json
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import quote_plus, urljoin, urlparse
+from urllib.parse import quote_plus
 
 import httpx
 from bs4 import BeautifulSoup

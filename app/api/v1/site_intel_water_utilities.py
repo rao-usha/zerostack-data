@@ -9,10 +9,10 @@ Endpoints for:
 """
 
 import logging
-from typing import Optional, List
+from typing import Optional
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc, and_
+from sqlalchemy import desc, and_
 from math import radians, sin, cos, sqrt, atan2
 
 from app.core.database import get_db

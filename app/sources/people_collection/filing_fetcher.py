@@ -7,12 +7,11 @@ and caching. Supports DEF 14A, 8-K, 10-K, and Form 4 filings.
 Includes CIK auto-discovery to find CIK by company name.
 """
 
-import asyncio
 import logging
 import re
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any
 from datetime import date, datetime
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from difflib import SequenceMatcher
 
 from app.sources.people_collection.base_collector import BaseCollector

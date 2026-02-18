@@ -9,13 +9,12 @@ High-level functions that coordinate:
 """
 
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import json
 
-from app.core.config import get_settings
 from app.core.models import DatasetRegistry, IngestionJob, JobStatus
 from app.sources.sec.formadv_client import FormADVClient, search_family_offices
 from app.sources.sec import formadv_metadata

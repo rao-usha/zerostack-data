@@ -11,11 +11,9 @@ Approach:
 - Graceful degradation: returns partial results if LLM is unavailable
 """
 
-import asyncio
 import logging
 import re
 from typing import List, Dict, Any, Optional
-from datetime import date
 
 from app.sources.public_lp_strategies.types import (
     StrategyExtractionResult,

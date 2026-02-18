@@ -15,9 +15,6 @@ from app.core.entity_resolver import (
     EntityResolver,
     CanonicalEntity,
     EntityAlias,
-    EntityMergeHistory,
-    EntityType,
-    MergeAction,
 )
 
 router = APIRouter(prefix="/entities", tags=["Entity Resolution"])

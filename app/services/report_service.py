@@ -4,12 +4,10 @@ Report Service for People Intelligence Platform.
 Generates management assessment reports, peer comparisons, and exports.
 """
 
-import io
 import json
 from typing import Optional, List, Dict, Any
 from datetime import date, datetime, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from app.core.people_models import (
     Person,
@@ -18,7 +16,6 @@ from app.core.people_models import (
     LeadershipChange,
     PersonExperience,
     PersonEducation,
-    PeoplePeerSet,
     PeoplePeerSetMember,
 )
 

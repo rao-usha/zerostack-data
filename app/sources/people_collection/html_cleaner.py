@@ -10,7 +10,7 @@ import logging
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 
-from bs4 import BeautifulSoup, Tag, NavigableString
+from bs4 import BeautifulSoup, Tag
 
 logger = logging.getLogger(__name__)
 

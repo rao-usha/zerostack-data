@@ -8,7 +8,7 @@ Provides endpoints for managing people collection jobs:
 """
 
 from typing import Optional, List
-from datetime import datetime, date
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import func

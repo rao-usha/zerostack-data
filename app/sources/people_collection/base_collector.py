@@ -19,7 +19,7 @@ from tenacity import (
     retry_if_exception_type,
 )
 
-from app.sources.people_collection.config import RATE_LIMITS, RateLimitConfig
+from app.sources.people_collection.config import RATE_LIMITS
 
 logger = logging.getLogger(__name__)
 

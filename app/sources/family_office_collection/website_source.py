@@ -11,7 +11,7 @@ Collects publicly available information from family office websites:
 import logging
 import re
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 
 from app.sources.family_office_collection.base_collector import FoBaseCollector
 from app.sources.family_office_collection.types import (

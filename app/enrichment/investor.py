@@ -7,7 +7,7 @@ AUM history, and investment preferences.
 
 import json
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
 

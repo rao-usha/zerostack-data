@@ -9,7 +9,6 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from datetime import datetime
 
 from app.core.database import get_db
 from app.core.models import (

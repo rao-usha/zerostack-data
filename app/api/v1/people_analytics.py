@@ -10,10 +10,9 @@ Provides endpoints for leadership analytics, trends, and aggregations:
 """
 
 from typing import Optional, List
-from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.services.analytics_service import AnalyticsService

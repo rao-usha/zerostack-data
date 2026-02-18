@@ -15,7 +15,6 @@ from app.core.database import get_db
 from app.core.models import (
     JobChain,
     JobChainExecution,
-    JobDependency,
     IngestionJob,
     JobStatus,
     DependencyCondition,

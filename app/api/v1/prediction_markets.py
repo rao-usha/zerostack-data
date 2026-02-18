@@ -8,9 +8,8 @@ Provides REST API for:
 - Dashboard data and analytics
 """
 
-import asyncio
 import logging
-from datetime import datetime, date, timedelta
+from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session

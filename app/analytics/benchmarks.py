@@ -6,10 +6,9 @@ enabling peer comparison and diversification analysis.
 """
 
 import logging
-import math
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from collections import defaultdict
-from statistics import median, stdev
+from statistics import stdev
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session

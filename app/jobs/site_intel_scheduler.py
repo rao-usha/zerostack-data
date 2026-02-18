@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 
 from app.sources.site_intel.types import (
     SiteIntelDomain,
-    CollectionConfig,
 )
 
 logger = logging.getLogger(__name__)

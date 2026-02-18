@@ -4,12 +4,12 @@ Data Quality Service for People Intelligence Platform.
 Provides data quality scoring, deduplication, and enrichment tracking.
 """
 
-from typing import Optional, List, Dict, Any, Tuple
+from typing import List, Dict, Any
 from datetime import date, timedelta
 from collections import defaultdict
 import re
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, or_
 
 from app.core.people_models import (
     Person,

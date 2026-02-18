@@ -15,7 +15,6 @@ from typing import Dict, List, Optional, Any
 from datetime import date
 
 from app.core.http_client import BaseAPIClient
-from app.core.api_errors import RetryableError
 from app.core.api_registry import get_api_config
 
 logger = logging.getLogger(__name__)

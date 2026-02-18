@@ -11,11 +11,10 @@ Designed for large companies with multiple domains (e.g., Prudential Financial
 with prudential.com, pgim.com, news.prudential.com).
 """
 
-import asyncio
 import logging
 import re
 from collections import deque
-from typing import List, Optional, Set, Dict, Any, Tuple
+from typing import List, Set, Dict, Tuple
 from urllib.parse import urljoin, urlparse
 from datetime import datetime
 
@@ -28,7 +27,6 @@ from app.sources.people_collection.types import (
     ExtractedPerson,
     CollectionResult,
     ExtractionConfidence,
-    TitleLevel,
 )
 
 logger = logging.getLogger(__name__)
