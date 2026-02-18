@@ -4,6 +4,7 @@ Main FastAPI application.
 Source-agnostic entry point that routes to appropriate adapters.
 """
 import logging
+import os
 from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -989,7 +990,9 @@ async def _unhandled_exception_handler(request: Request, exc: Exception):
 
 
 # Auth dependency for protected routers
-_auth = [Depends(get_current_user)]
+# Set REQUIRE_AUTH=true to enforce JWT on all protected routes (default: off for dev)
+_require_auth = os.getenv("REQUIRE_AUTH", "false").lower() == "true"
+_auth = [Depends(get_current_user)] if _require_auth else []
 
 # Public routers (no auth required)
 app.include_router(auth.router, prefix="/api/v1")  # login/register must be public
