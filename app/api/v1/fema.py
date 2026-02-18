@@ -8,14 +8,13 @@ Provides HTTP endpoints for ingesting FEMA disaster and emergency data:
 """
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from enum import Enum
 
 from app.core.database import get_db
-from app.core.models import IngestionJob, JobStatus
-from app.sources.fema import ingest
+from app.core.job_helpers import create_and_dispatch_job
 
 logger = logging.getLogger(__name__)
 
@@ -134,43 +133,17 @@ async def ingest_disaster_declarations(
     - Get 2023 disasters only: `year=2023`
     - Get major disasters only: `disaster_type="DR"`
     """
-    try:
-        job_config = {
+    return create_and_dispatch_job(
+        db, background_tasks, source="fema",
+        config={
             "dataset": "disaster_declarations",
             "state": request.state,
             "year": request.year,
             "disaster_type": request.disaster_type.value if request.disaster_type else None,
-            "max_records": request.max_records
-        }
-        
-        job = IngestionJob(
-            source="fema",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_disaster_declarations_ingestion,
-            job.id,
-            request.state,
-            request.year,
-            request.disaster_type.value if request.disaster_type else None,
-            request.max_records
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "FEMA disaster declarations ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create FEMA disasters job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "max_records": request.max_records,
+        },
+        message="FEMA disaster declarations ingestion job created",
+    )
 
 
 @router.post("/fema/public-assistance/ingest")
@@ -192,41 +165,16 @@ async def ingest_pa_projects(
     
     **Note:** This is a large dataset. Use filters for faster ingestion.
     """
-    try:
-        job_config = {
+    return create_and_dispatch_job(
+        db, background_tasks, source="fema",
+        config={
             "dataset": "pa_projects",
             "state": request.state,
             "disaster_number": request.disaster_number,
-            "max_records": request.max_records
-        }
-        
-        job = IngestionJob(
-            source="fema",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_pa_projects_ingestion,
-            job.id,
-            request.state,
-            request.disaster_number,
-            request.max_records
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "FEMA Public Assistance projects ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create FEMA PA projects job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "max_records": request.max_records,
+        },
+        message="FEMA Public Assistance projects ingestion job created",
+    )
 
 
 @router.post("/fema/hazard-mitigation/ingest")
@@ -252,41 +200,16 @@ async def ingest_hma_projects(
     
     **No API key required** - free public OpenFEMA API
     """
-    try:
-        job_config = {
+    return create_and_dispatch_job(
+        db, background_tasks, source="fema",
+        config={
             "dataset": "hma_projects",
             "state": request.state,
             "program_area": request.program_area.value if request.program_area else None,
-            "max_records": request.max_records
-        }
-        
-        job = IngestionJob(
-            source="fema",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_hma_projects_ingestion,
-            job.id,
-            request.state,
-            request.program_area.value if request.program_area else None,
-            request.max_records
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "FEMA Hazard Mitigation projects ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create FEMA HMA projects job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "max_records": request.max_records,
+        },
+        message="FEMA Hazard Mitigation projects ingestion job created",
+    )
 
 
 @router.get("/fema/datasets")
@@ -340,80 +263,3 @@ async def list_fema_datasets():
     }
 
 
-# ========== Background Task Functions ==========
-
-async def _run_disaster_declarations_ingestion(
-    job_id: int,
-    state: Optional[str],
-    year: Optional[int],
-    disaster_type: Optional[str],
-    max_records: int
-):
-    """Run FEMA disaster declarations ingestion in background."""
-    from app.core.database import get_session_factory
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        await ingest.ingest_disaster_declarations(
-            db=db,
-            job_id=job_id,
-            state=state,
-            year=year,
-            disaster_type=disaster_type,
-            max_records=max_records
-        )
-    except Exception as e:
-        logger.error(f"Background FEMA disaster ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_pa_projects_ingestion(
-    job_id: int,
-    state: Optional[str],
-    disaster_number: Optional[int],
-    max_records: int
-):
-    """Run FEMA PA projects ingestion in background."""
-    from app.core.database import get_session_factory
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        await ingest.ingest_public_assistance_projects(
-            db=db,
-            job_id=job_id,
-            state=state,
-            disaster_number=disaster_number,
-            max_records=max_records
-        )
-    except Exception as e:
-        logger.error(f"Background FEMA PA projects ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_hma_projects_ingestion(
-    job_id: int,
-    state: Optional[str],
-    program_area: Optional[str],
-    max_records: int
-):
-    """Run FEMA HMA projects ingestion in background."""
-    from app.core.database import get_session_factory
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        await ingest.ingest_hazard_mitigation_projects(
-            db=db,
-            job_id=job_id,
-            state=state,
-            program_area=program_area,
-            max_records=max_records
-        )
-    except Exception as e:
-        logger.error(f"Background FEMA HMA projects ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()

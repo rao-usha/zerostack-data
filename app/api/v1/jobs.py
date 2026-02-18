@@ -17,116 +17,440 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Universal Source Dispatch Table
 # =============================================================================
-# Maps source name -> (module_path, function_name, [config_keys])
+# Maps dispatch key -> (module_path, function_name, [config_keys])
 # Config keys are extracted from the job config dict and passed as kwargs.
+#
+# Dispatch key resolution order:
+#   1. "{source}:{dataset}" — for multi-dataset sources (e.g. "fema:pa_projects")
+#   2. "{source}"           — fallback for single-dataset sources
+#
 # Sources with complex config parsing (census, public_lp_strategies) are
 # handled as special cases below.
 
 SOURCE_DISPATCH: Dict[str, Tuple[str, str, List[str]]] = {
-    # --- Daily ---
+    # ── Treasury ──────────────────────────────────────────────────────────
     "treasury": (
         "app.sources.treasury.ingest",
         "ingest_treasury_daily_balance",
         ["start_date", "end_date"],
     ),
+    "treasury:debt_outstanding": (
+        "app.sources.treasury.ingest",
+        "ingest_treasury_debt_outstanding",
+        ["start_date", "end_date"],
+    ),
+    "treasury:interest_rates": (
+        "app.sources.treasury.ingest",
+        "ingest_treasury_interest_rates",
+        ["start_date", "end_date", "security_type"],
+    ),
+    "treasury:monthly_statement": (
+        "app.sources.treasury.ingest",
+        "ingest_treasury_monthly_statement",
+        ["start_date", "end_date", "classification"],
+    ),
+    "treasury:auctions": (
+        "app.sources.treasury.ingest",
+        "ingest_treasury_auctions",
+        ["start_date", "end_date", "security_type"],
+    ),
+    # ── FRED ──────────────────────────────────────────────────────────────
     "fred": (
         "app.sources.fred.ingest",
         "ingest_fred_category",
         ["category", "series_ids", "observation_start", "observation_end", "api_key"],
     ),
+    # ── Prediction Markets ────────────────────────────────────────────────
     "prediction_markets": (
         "app.sources.prediction_markets.ingest",
         "create_job",
         ["job_type", "target_platforms", "target_categories"],
     ),
-    # --- Weekly ---
+    # ── EIA ───────────────────────────────────────────────────────────────
     "eia": (
         "app.sources.eia.ingest",
         "ingest_eia_petroleum_data",
         ["subcategory", "route", "frequency", "start", "end", "facets", "api_key"],
     ),
+    "eia:natural_gas": (
+        "app.sources.eia.ingest",
+        "ingest_eia_natural_gas_data",
+        ["subcategory", "route", "frequency", "start", "end", "facets", "api_key"],
+    ),
+    "eia:electricity": (
+        "app.sources.eia.ingest",
+        "ingest_eia_electricity_data",
+        ["subcategory", "route", "frequency", "start", "end", "facets", "api_key"],
+    ),
+    "eia:retail_gas_prices": (
+        "app.sources.eia.ingest",
+        "ingest_eia_retail_gas_prices",
+        ["frequency", "start", "end", "facets", "api_key"],
+    ),
+    "eia:steo": (
+        "app.sources.eia.ingest",
+        "ingest_eia_steo_projections",
+        ["frequency", "start", "end", "facets", "api_key"],
+    ),
+    # ── NOAA ──────────────────────────────────────────────────────────────
     "noaa": (
         "app.sources.noaa.ingest",
         "create_noaa_table",
         ["dataset_key"],
     ),
-    # --- Monthly ---
+    # ── BLS ───────────────────────────────────────────────────────────────
     "bls": (
         "app.sources.bls.ingest",
         "ingest_bls_dataset",
         ["dataset", "start_year", "end_year", "series_ids"],
     ),
+    "bls:series": (
+        "app.sources.bls.ingest",
+        "ingest_bls_series",
+        ["series_ids", "start_year", "end_year", "dataset"],
+    ),
+    # ── BEA ───────────────────────────────────────────────────────────────
     "bea": (
         "app.sources.bea.ingest",
         "ingest_nipa_data",
         ["table_name", "frequency", "year", "api_key"],
     ),
+    "bea:regional": (
+        "app.sources.bea.ingest",
+        "ingest_regional_data",
+        ["table_name", "line_code", "geo_fips", "year", "api_key"],
+    ),
+    "bea:gdp_industry": (
+        "app.sources.bea.ingest",
+        "ingest_gdp_by_industry_data",
+        ["table_id", "frequency", "year", "industry", "api_key"],
+    ),
+    "bea:international": (
+        "app.sources.bea.ingest",
+        "ingest_international_data",
+        ["indicator", "area_or_country", "frequency", "year", "api_key"],
+    ),
+    # ── FEMA ──────────────────────────────────────────────────────────────
     "fema": (
         "app.sources.fema.ingest",
         "ingest_disaster_declarations",
         ["state", "year", "disaster_type", "max_records"],
     ),
+    "fema:pa_projects": (
+        "app.sources.fema.ingest",
+        "ingest_public_assistance_projects",
+        ["state", "disaster_number", "max_records"],
+    ),
+    "fema:hma_projects": (
+        "app.sources.fema.ingest",
+        "ingest_hazard_mitigation_projects",
+        ["state", "program_area", "max_records"],
+    ),
+    # ── FDIC ──────────────────────────────────────────────────────────────
     "fdic": (
         "app.sources.fdic.ingest",
         "ingest_bank_financials",
         ["cert", "report_date", "year", "limit"],
     ),
+    "fdic:institutions": (
+        "app.sources.fdic.ingest",
+        "ingest_institutions",
+        ["active_only", "state", "limit"],
+    ),
+    "fdic:failed_banks": (
+        "app.sources.fdic.ingest",
+        "ingest_failed_banks",
+        ["year_start", "year_end", "limit"],
+    ),
+    "fdic:deposits": (
+        "app.sources.fdic.ingest",
+        "ingest_summary_of_deposits",
+        ["year", "cert", "state", "limit"],
+    ),
+    # ── CMS ───────────────────────────────────────────────────────────────
     "cms": (
         "app.sources.cms.ingest",
         "ingest_medicare_utilization",
         ["year", "state", "limit"],
     ),
+    "cms:hospital_cost_reports": (
+        "app.sources.cms.ingest",
+        "ingest_hospital_cost_reports",
+        ["year", "limit"],
+    ),
+    "cms:drug_pricing": (
+        "app.sources.cms.ingest",
+        "ingest_drug_pricing",
+        ["year", "brand_name", "limit"],
+    ),
+    # ── FBI Crime ─────────────────────────────────────────────────────────
     "fbi_crime": (
         "app.sources.fbi_crime.ingest",
         "ingest_fbi_crime_estimates",
         ["scope", "offenses", "states", "api_key"],
     ),
+    "fbi_crime:summarized": (
+        "app.sources.fbi_crime.ingest",
+        "ingest_fbi_crime_summarized",
+        ["states", "offenses", "since", "until", "api_key"],
+    ),
+    "fbi_crime:nibrs": (
+        "app.sources.fbi_crime.ingest",
+        "ingest_fbi_crime_nibrs",
+        ["states", "variables", "api_key"],
+    ),
+    "fbi_crime:hate_crime": (
+        "app.sources.fbi_crime.ingest",
+        "ingest_fbi_hate_crime",
+        ["states", "api_key"],
+    ),
+    "fbi_crime:leoka": (
+        "app.sources.fbi_crime.ingest",
+        "ingest_fbi_leoka",
+        ["states", "api_key"],
+    ),
+    # ── IRS SOI ───────────────────────────────────────────────────────────
     "irs_soi": (
         "app.sources.irs_soi.ingest",
         "ingest_zip_income_data",
         ["year", "use_cache"],
     ),
+    "irs_soi:county_income": (
+        "app.sources.irs_soi.ingest",
+        "ingest_county_income_data",
+        ["year", "use_cache"],
+    ),
+    "irs_soi:migration": (
+        "app.sources.irs_soi.ingest",
+        "ingest_migration_data",
+        ["year", "flow_type", "use_cache"],
+    ),
+    "irs_soi:business_income": (
+        "app.sources.irs_soi.ingest",
+        "ingest_business_income_data",
+        ["year", "use_cache"],
+    ),
+    "irs_soi:all": (
+        "app.sources.irs_soi.ingest",
+        "ingest_all_soi_data",
+        ["year", "use_cache"],
+    ),
+    # ── Data Commons ──────────────────────────────────────────────────────
     "data_commons": (
         "app.sources.data_commons.ingest",
         "ingest_statistical_variable",
         ["variable_dcid", "places", "api_key"],
     ),
+    "data_commons:place_stats": (
+        "app.sources.data_commons.ingest",
+        "ingest_place_statistics",
+        ["place_dcid", "variables", "api_key"],
+    ),
+    "data_commons:us_states": (
+        "app.sources.data_commons.ingest",
+        "ingest_us_state_data",
+        ["variables", "api_key"],
+    ),
+    # ── FCC Broadband ─────────────────────────────────────────────────────
     "fcc_broadband": (
         "app.sources.fcc_broadband.ingest",
         "ingest_state_coverage",
         ["state_code", "include_summary"],
     ),
+    "fcc_broadband:multiple_states": (
+        "app.sources.fcc_broadband.ingest",
+        "ingest_multiple_states",
+        ["state_codes", "include_summary"],
+    ),
+    "fcc_broadband:all_states": (
+        "app.sources.fcc_broadband.ingest",
+        "ingest_all_states",
+        ["include_summary"],
+    ),
+    # ── Yelp ──────────────────────────────────────────────────────────────
     "yelp": (
         "app.sources.yelp.ingest",
         "ingest_businesses_by_location",
         ["location", "term", "categories", "limit", "api_key"],
     ),
-    # --- Quarterly ---
+    "yelp:multi_location": (
+        "app.sources.yelp.ingest",
+        "ingest_multiple_locations",
+        ["locations", "term", "categories", "limit_per_location", "api_key"],
+    ),
+    "yelp:categories": (
+        "app.sources.yelp.ingest",
+        "ingest_business_categories",
+        ["api_key"],
+    ),
+    # ── US Trade ──────────────────────────────────────────────────────────
     "us_trade": (
         "app.sources.us_trade.ingest",
         "ingest_exports_by_hs",
         ["year", "month", "hs_code", "country", "api_key"],
     ),
+    "us_trade:imports_hs": (
+        "app.sources.us_trade.ingest",
+        "ingest_imports_by_hs",
+        ["year", "month", "hs_code", "country", "api_key"],
+    ),
+    "us_trade:state_exports": (
+        "app.sources.us_trade.ingest",
+        "ingest_exports_by_state",
+        ["year", "month", "state", "hs_code", "country", "api_key"],
+    ),
+    "us_trade:port_trade": (
+        "app.sources.us_trade.ingest",
+        "ingest_port_trade",
+        ["year", "trade_type", "month", "district", "hs_code", "country", "api_key"],
+    ),
+    "us_trade:summary": (
+        "app.sources.us_trade.ingest",
+        "ingest_trade_summary",
+        ["year", "month", "api_key"],
+    ),
+    # ── BTS ───────────────────────────────────────────────────────────────
     "bts": (
         "app.sources.bts.ingest",
         "ingest_border_crossing_data",
         ["start_date", "end_date", "state", "border", "measure", "app_token"],
     ),
+    "bts:vmt": (
+        "app.sources.bts.ingest",
+        "ingest_vmt_data",
+        ["start_date", "end_date", "state", "app_token"],
+    ),
+    "bts:faf": (
+        "app.sources.bts.ingest",
+        "ingest_faf_regional_data",
+        ["version", "app_token"],
+    ),
+    # ── International Economics ────────────────────────────────────────────
     "international_econ": (
         "app.sources.international_econ.ingest",
         "ingest_worldbank_wdi",
+        ["indicators", "countries", "start_year", "end_year"],
+    ),
+    "international_econ:worldbank_countries": (
+        "app.sources.international_econ.ingest",
+        "ingest_worldbank_countries",
+        [],
+    ),
+    "international_econ:worldbank_indicators": (
+        "app.sources.international_econ.ingest",
+        "ingest_worldbank_indicators",
+        ["search", "max_results"],
+    ),
+    "international_econ:imf_ifs": (
+        "app.sources.international_econ.ingest",
+        "ingest_imf_ifs",
         ["indicator", "countries", "start_year", "end_year"],
     ),
+    "international_econ:oecd_mei": (
+        "app.sources.international_econ.ingest",
+        "ingest_oecd_mei",
+        ["countries", "subjects", "start_period", "end_period"],
+    ),
+    "international_econ:oecd_kei": (
+        "app.sources.international_econ.ingest",
+        "ingest_oecd_kei",
+        ["countries", "start_period", "end_period"],
+    ),
+    "international_econ:oecd_labor": (
+        "app.sources.international_econ.ingest",
+        "ingest_oecd_labor",
+        ["countries", "start_period", "end_period"],
+    ),
+    "international_econ:oecd_trade": (
+        "app.sources.international_econ.ingest",
+        "ingest_oecd_trade",
+        ["countries", "start_period", "end_period"],
+    ),
+    "international_econ:oecd_tax": (
+        "app.sources.international_econ.ingest",
+        "ingest_oecd_tax",
+        ["countries", "start_period", "end_period"],
+    ),
+    "international_econ:bis_eer": (
+        "app.sources.international_econ.ingest",
+        "ingest_bis_eer",
+        ["countries", "eer_type", "start_period", "end_period"],
+    ),
+    "international_econ:bis_property": (
+        "app.sources.international_econ.ingest",
+        "ingest_bis_property_prices",
+        ["countries", "start_period", "end_period"],
+    ),
+    # ── Real Estate ───────────────────────────────────────────────────────
     "realestate": (
         "app.sources.realestate.ingest",
         "ingest_fhfa_hpi",
         ["geography_type", "start_date", "end_date"],
     ),
+    "realestate:hud_permits": (
+        "app.sources.realestate.ingest",
+        "ingest_hud_permits",
+        ["geography_type", "geography_id", "start_date", "end_date"],
+    ),
+    "realestate:redfin": (
+        "app.sources.realestate.ingest",
+        "ingest_redfin",
+        ["region_type", "property_type"],
+    ),
+    "realestate:osm_buildings": (
+        "app.sources.realestate.ingest",
+        "ingest_osm_buildings",
+        ["bounding_box", "building_type", "limit"],
+    ),
+    # ── USPTO ─────────────────────────────────────────────────────────────
     "uspto": (
         "app.sources.uspto.ingest",
         "ingest_patents",
         ["query", "start_date", "end_date", "limit"],
     ),
+    "uspto:assignee": (
+        "app.sources.uspto.ingest",
+        "ingest_patents_by_assignee",
+        ["assignee_name", "date_from", "date_to", "max_patents", "api_key"],
+    ),
+    "uspto:cpc": (
+        "app.sources.uspto.ingest",
+        "ingest_patents_by_cpc",
+        ["cpc_code", "date_from", "date_to", "max_patents", "api_key"],
+    ),
+    "uspto:search": (
+        "app.sources.uspto.ingest",
+        "ingest_patents_by_search",
+        ["search_query", "date_from", "date_to", "max_patents", "api_key"],
+    ),
+    # ── SEC ───────────────────────────────────────────────────────────────
+    "sec": (
+        "app.sources.sec.ingest",
+        "ingest_company_filings",
+        ["cik", "filing_types", "start_date", "end_date"],
+    ),
+    "sec:financial_data": (
+        "app.sources.sec.ingest_xbrl",
+        "ingest_company_financial_data",
+        ["cik"],
+    ),
+    "sec:formadv": (
+        "app.sources.sec.formadv_ingest",
+        "ingest_family_offices",
+        ["family_office_names", "max_concurrency", "max_requests_per_second"],
+    ),
+    "sec:formadv_crd": (
+        "app.sources.sec.formadv_ingest",
+        "ingest_firm_by_crd",
+        ["crd_number"],
+    ),
+    # ── Kaggle ────────────────────────────────────────────────────────────
+    "kaggle": (
+        "app.sources.kaggle.ingest",
+        "ingest_m5_dataset",
+        ["force_download", "limit_items", "kaggle_username", "kaggle_key"],
+    ),
+    # ── Foot Traffic ──────────────────────────────────────────────────────
     "foot_traffic": (
         "app.sources.foot_traffic.ingest",
         "discover_brand_locations",
@@ -252,7 +576,10 @@ async def _run_dispatched_job(db, job, job_id, source, config, monitoring):
     """Run a job via the SOURCE_DISPATCH registry."""
     from datetime import datetime
 
-    module_path, func_name, config_keys = SOURCE_DISPATCH[source]
+    # Resolve dispatch key: try "source:dataset" first, then "source"
+    dataset = config.get("dataset") if config else None
+    dispatch_key = f"{source}:{dataset}" if dataset and f"{source}:{dataset}" in SOURCE_DISPATCH else source
+    module_path, func_name, config_keys = SOURCE_DISPATCH[dispatch_key]
 
     try:
         module = importlib.import_module(module_path)
@@ -475,7 +802,7 @@ async def run_ingestion_job(job_id: int, source: str, config: dict):
         elif source == "public_lp_strategies":
             await _run_public_lp_strategies_job(db, job, job_id, config, monitoring)
 
-        elif source in SOURCE_DISPATCH:
+        elif source in SOURCE_DISPATCH or any(k.startswith(f"{source}:") for k in SOURCE_DISPATCH):
             await _run_dispatched_job(db, job, job_id, source, config, monitoring)
 
         else:
@@ -503,7 +830,9 @@ async def create_job(
     The job will run asynchronously in the background.
     """
     # Validate source
-    valid_sources = ["census", "public_lp_strategies"] + list(SOURCE_DISPATCH.keys())
+    # Valid sources include base names (before ":") from composite keys
+    _base_sources = {k.split(":")[0] for k in SOURCE_DISPATCH}
+    valid_sources = sorted({"census", "public_lp_strategies"} | _base_sources)
     if job_request.source not in valid_sources:
         raise HTTPException(
             status_code=400,
