@@ -137,8 +137,16 @@ def list_formats():
 
 
 @router.get("/tables", response_model=List[TableInfo])
-def list_tables(db: Session = Depends(get_db)):
-    """List tables available for export."""
+def list_tables(
+    refresh: bool = Query(default=False, description="Force cache refresh"),
+    db: Session = Depends(get_db),
+):
+    """List tables available for export. Cached for 5 minutes; pass ?refresh=true to bust."""
+    if refresh:
+        from app.core.export_service import _table_cache
+        import app.core.export_service as _es
+        _es._table_cache = []
+        _es._table_cache_time = 0
     service = ExportService(db)
     tables = service.list_tables()
     return [TableInfo(**t) for t in tables]
@@ -174,7 +182,7 @@ def preview_table(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     sort: Optional[str] = Query(default=None, description="Column to sort by"),
-    order: str = Query(default="asc", regex="^(asc|desc)$"),
+    order: str = Query(default="asc", pattern="^(asc|desc)$"),
     db: Session = Depends(get_db),
 ):
     """

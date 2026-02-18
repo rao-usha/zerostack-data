@@ -43,7 +43,7 @@ class ZipIncomeIngestRequest(BaseModel):
     year: Optional[int] = Field(
         None,
         description=f"Tax year (defaults to {DEFAULT_YEAR})",
-        example=2021
+        examples=[2021]
     )
     use_cache: bool = Field(
         True,
@@ -56,7 +56,7 @@ class CountyIncomeIngestRequest(BaseModel):
     year: Optional[int] = Field(
         None,
         description=f"Tax year (defaults to {DEFAULT_YEAR})",
-        example=2021
+        examples=[2021]
     )
     use_cache: bool = Field(
         True,
@@ -69,7 +69,7 @@ class MigrationIngestRequest(BaseModel):
     year: Optional[int] = Field(
         None,
         description=f"Tax year (defaults to {DEFAULT_YEAR})",
-        example=2021
+        examples=[2021]
     )
     flow_type: FlowType = Field(
         FlowType.BOTH,
@@ -86,7 +86,7 @@ class BusinessIncomeIngestRequest(BaseModel):
     year: Optional[int] = Field(
         None,
         description=f"Tax year (defaults to {DEFAULT_YEAR})",
-        example=2021
+        examples=[2021]
     )
     use_cache: bool = Field(
         True,
@@ -99,7 +99,7 @@ class AllDatasetsIngestRequest(BaseModel):
     year: Optional[int] = Field(
         None,
         description=f"Tax year (defaults to {DEFAULT_YEAR})",
-        example=2021
+        examples=[2021]
     )
     use_cache: bool = Field(
         True,

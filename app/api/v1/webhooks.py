@@ -28,7 +28,7 @@ class WebhookCreate(BaseModel):
     """Request schema for creating a webhook."""
     name: str = Field(..., min_length=1, max_length=255)
     url: str = Field(..., min_length=1, max_length=2048)
-    event_types: List[str] = Field(..., min_items=1)
+    event_types: List[str] = Field(..., min_length=1)
     source_filter: Optional[str] = Field(None, max_length=50)
     secret: Optional[str] = Field(None, max_length=255)
     headers: Optional[dict] = None

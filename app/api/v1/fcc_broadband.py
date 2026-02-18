@@ -52,7 +52,7 @@ class StateIngestRequest(BaseModel):
     state_codes: List[str] = Field(
         ...,
         description="List of 2-letter state codes (e.g., ['CA', 'NY', 'TX'])",
-        example=["CA", "NY", "TX"],
+        examples=[["CA", "NY", "TX"]],
         min_length=1,
         max_length=52
     )
@@ -75,7 +75,7 @@ class CountyIngestRequest(BaseModel):
     county_fips_codes: List[str] = Field(
         ...,
         description="List of 5-digit county FIPS codes (e.g., ['06001', '36061'])",
-        example=["06001", "36061"],
+        examples=[["06001", "36061"]],
         min_length=1
     )
     include_summary: bool = Field(

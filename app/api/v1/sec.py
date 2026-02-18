@@ -39,22 +39,22 @@ class IngestCompanyRequest(BaseModel):
     cik: str = Field(
         ...,
         description="Company CIK (Central Index Key), e.g., '0000320193' for Apple",
-        example="0000320193"
+        examples=["0000320193"]
     )
     filing_types: Optional[List[str]] = Field(
         default=None,
         description="Filing types to ingest (defaults to 10-K and 10-Q)",
-        example=["10-K", "10-Q", "8-K"]
+        examples=[["10-K", "10-Q", "8-K"]]
     )
     start_date: Optional[date] = Field(
         default=None,
         description="Start date for filings (ISO format)",
-        example="2020-01-01"
+        examples=["2020-01-01"]
     )
     end_date: Optional[date] = Field(
         default=None,
         description="End date for filings (ISO format)",
-        example="2024-12-31"
+        examples=["2024-12-31"]
     )
 
 
@@ -64,22 +64,22 @@ class IngestMultipleCompaniesRequest(BaseModel):
     ciks: List[str] = Field(
         ...,
         description="List of company CIKs",
-        example=["0000320193", "0000789019", "0001652044"]
+        examples=[["0000320193", "0000789019", "0001652044"]]
     )
     filing_types: Optional[List[str]] = Field(
         default=None,
         description="Filing types to ingest (defaults to 10-K and 10-Q)",
-        example=["10-K", "10-Q"]
+        examples=[["10-K", "10-Q"]]
     )
     start_date: Optional[date] = Field(
         default=None,
         description="Start date for filings (ISO format)",
-        example="2020-01-01"
+        examples=["2020-01-01"]
     )
     end_date: Optional[date] = Field(
         default=None,
         description="End date for filings (ISO format)",
-        example="2024-12-31"
+        examples=["2024-12-31"]
     )
 
 
@@ -99,7 +99,7 @@ class IngestFormADVRequest(BaseModel):
     family_office_names: List[str] = Field(
         ...,
         description="List of family office names to search and ingest",
-        example=["Soros Fund Management", "Pritzker Group", "Cascade Investment"]
+        examples=[["Soros Fund Management", "Pritzker Group", "Cascade Investment"]]
     )
     max_concurrency: Optional[int] = Field(
         default=1,
@@ -121,7 +121,7 @@ class IngestFormADVByCRDRequest(BaseModel):
     crd_number: str = Field(
         ...,
         description="Investment adviser CRD (Central Registration Depository) number",
-        example="158626"
+        examples=["158626"]
     )
 
 

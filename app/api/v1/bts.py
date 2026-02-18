@@ -57,17 +57,17 @@ class BorderCrossingIngestRequest(BaseModel):
     start_date: Optional[str] = Field(
         None,
         description="Start date (YYYY-MM format). Defaults to 5 years ago.",
-        example="2020-01"
+        examples=["2020-01"]
     )
     end_date: Optional[str] = Field(
         None,
         description="End date (YYYY-MM format). Defaults to current month.",
-        example="2024-12"
+        examples=["2024-12"]
     )
     state: Optional[str] = Field(
         None,
         description="Filter by state code (e.g., 'TX', 'CA', 'NY')",
-        example="TX"
+        examples=["TX"]
     )
     border: Optional[BorderType] = Field(
         None,
@@ -84,17 +84,17 @@ class VMTIngestRequest(BaseModel):
     start_date: Optional[str] = Field(
         None,
         description="Start date (YYYY-MM format). Defaults to 3 years ago.",
-        example="2022-01"
+        examples=["2022-01"]
     )
     end_date: Optional[str] = Field(
         None,
         description="End date (YYYY-MM format). Defaults to current month.",
-        example="2024-12"
+        examples=["2024-12"]
     )
     state: Optional[str] = Field(
         None,
         description="Filter by state name (e.g., 'Texas', 'California')",
-        example="Texas"
+        examples=["Texas"]
     )
 
 

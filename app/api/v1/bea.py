@@ -49,7 +49,7 @@ class NIPAIngestRequest(BaseModel):
     table_name: str = Field(
         default="T10101",
         description="NIPA table name (e.g., T10101 for GDP, T20100 for Personal Income)",
-        example="T10101"
+        examples=["T10101"]
     )
     frequency: NIPAFrequency = Field(
         default=NIPAFrequency.ANNUAL,
@@ -58,7 +58,7 @@ class NIPAIngestRequest(BaseModel):
     year: Optional[str] = Field(
         None,
         description="Year(s) to retrieve - 'ALL', single year, or comma-separated. Defaults to last 10 years.",
-        example="2020,2021,2022,2023,2024"
+        examples=["2020,2021,2022,2023,2024"]
     )
 
 
@@ -67,22 +67,22 @@ class RegionalIngestRequest(BaseModel):
     table_name: str = Field(
         default="SAGDP2N",
         description="Regional table name (e.g., SAGDP2N for GDP by state, SAINC1 for Personal Income)",
-        example="SAGDP2N"
+        examples=["SAGDP2N"]
     )
     line_code: str = Field(
         default="1",
         description="Line code for specific measure within table",
-        example="1"
+        examples=["1"]
     )
     geo_fips: str = Field(
         default="STATE",
         description="Geographic area: STATE, COUNTY, MSA, or specific FIPS code",
-        example="STATE"
+        examples=["STATE"]
     )
     year: Optional[str] = Field(
         None,
         description="Year(s) to retrieve. Defaults to last 10 years.",
-        example="2020,2021,2022,2023,2024"
+        examples=["2020,2021,2022,2023,2024"]
     )
 
 
@@ -91,7 +91,7 @@ class GDPIndustryIngestRequest(BaseModel):
     table_id: str = Field(
         default="1",
         description="Table ID (1=Value Added, 5=% of GDP, 6=Real Value Added, 10=Gross Output)",
-        example="1"
+        examples=["1"]
     )
     frequency: GDPIndustryFrequency = Field(
         default=GDPIndustryFrequency.ANNUAL,
@@ -100,12 +100,12 @@ class GDPIndustryIngestRequest(BaseModel):
     year: Optional[str] = Field(
         None,
         description="Year(s) to retrieve. Defaults to last 5 years.",
-        example="2020,2021,2022,2023,2024"
+        examples=["2020,2021,2022,2023,2024"]
     )
     industry: str = Field(
         default="ALL",
         description="Industry code or 'ALL' for all industries",
-        example="ALL"
+        examples=["ALL"]
     )
 
 
@@ -114,12 +114,12 @@ class InternationalIngestRequest(BaseModel):
     indicator: str = Field(
         default="BalGds",
         description="Transaction indicator (e.g., BalGds for Balance on Goods)",
-        example="BalGds"
+        examples=["BalGds"]
     )
     area_or_country: str = Field(
         default="AllCountries",
         description="Geographic area or 'AllCountries'",
-        example="AllCountries"
+        examples=["AllCountries"]
     )
     frequency: GDPIndustryFrequency = Field(
         default=GDPIndustryFrequency.ANNUAL,
@@ -128,7 +128,7 @@ class InternationalIngestRequest(BaseModel):
     year: Optional[str] = Field(
         None,
         description="Year(s) to retrieve. Defaults to ALL.",
-        example="ALL"
+        examples=["ALL"]
     )
 
 

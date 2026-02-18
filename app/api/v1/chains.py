@@ -35,7 +35,7 @@ class ChainCreate(BaseModel):
     """Request schema for creating a job chain."""
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
-    jobs: List[JobDefinition] = Field(..., min_items=1)
+    jobs: List[JobDefinition] = Field(..., min_length=1)
 
 
 class ChainResponse(BaseModel):

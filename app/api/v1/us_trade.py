@@ -39,24 +39,24 @@ class ExportsHSIngestRequest(BaseModel):
         ...,
         description="Data year (2013 to present)",
         ge=2013,
-        example=2024
+        examples=[2024]
     )
     month: Optional[int] = Field(
         None,
         description="Month (1-12). Leave empty for annual totals.",
         ge=1,
         le=12,
-        example=6
+        examples=[6]
     )
     hs_code: Optional[str] = Field(
         None,
         description="HS code filter (2, 4, 6, or 10 digit). Example: '84' for machinery.",
-        example="84"
+        examples=["84"]
     )
     country: Optional[str] = Field(
         None,
         description="Census country code filter. Example: '5700' for China.",
-        example="5700"
+        examples=["5700"]
     )
 
 
@@ -66,24 +66,24 @@ class ImportsHSIngestRequest(BaseModel):
         ...,
         description="Data year (2013 to present)",
         ge=2013,
-        example=2024
+        examples=[2024]
     )
     month: Optional[int] = Field(
         None,
         description="Month (1-12). Leave empty for annual totals.",
         ge=1,
         le=12,
-        example=6
+        examples=[6]
     )
     hs_code: Optional[str] = Field(
         None,
         description="HS code filter (2, 4, 6, or 10 digit). Example: '85' for electronics.",
-        example="85"
+        examples=["85"]
     )
     country: Optional[str] = Field(
         None,
         description="Census country code filter. Example: '5700' for China.",
-        example="5700"
+        examples=["5700"]
     )
 
 
@@ -93,7 +93,7 @@ class StateExportsIngestRequest(BaseModel):
         ...,
         description="Data year (2013 to present)",
         ge=2013,
-        example=2024
+        examples=[2024]
     )
     month: Optional[int] = Field(
         None,
@@ -104,7 +104,7 @@ class StateExportsIngestRequest(BaseModel):
     state: Optional[str] = Field(
         None,
         description="State FIPS code. Example: '48' for Texas.",
-        example="48"
+        examples=["48"]
     )
     hs_code: Optional[str] = Field(
         None,
@@ -122,7 +122,7 @@ class PortTradeIngestRequest(BaseModel):
         ...,
         description="Data year (2013 to present)",
         ge=2013,
-        example=2024
+        examples=[2024]
     )
     trade_type: TradeType = Field(
         ...,
@@ -137,7 +137,7 @@ class PortTradeIngestRequest(BaseModel):
     district: Optional[str] = Field(
         None,
         description="Customs district code. Example: '55' for Houston.",
-        example="55"
+        examples=["55"]
     )
     hs_code: Optional[str] = Field(
         None,
@@ -155,7 +155,7 @@ class TradeSummaryIngestRequest(BaseModel):
         ...,
         description="Data year (2013 to present)",
         ge=2013,
-        example=2024
+        examples=[2024]
     )
     month: Optional[int] = Field(
         None,

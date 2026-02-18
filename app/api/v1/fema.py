@@ -44,13 +44,13 @@ class DisasterDeclarationsIngestRequest(BaseModel):
     state: Optional[str] = Field(
         None,
         description="Filter by state code (e.g., 'TX', 'CA', 'FL')",
-        example="TX",
+        examples=["TX"],
         max_length=2
     )
     year: Optional[int] = Field(
         None,
         description="Filter by fiscal year declared",
-        example=2023,
+        examples=[2023],
         ge=1953,
         le=2030
     )
@@ -71,13 +71,13 @@ class PAProjectsIngestRequest(BaseModel):
     state: Optional[str] = Field(
         None,
         description="Filter by state code",
-        example="FL",
+        examples=["FL"],
         max_length=2
     )
     disaster_number: Optional[int] = Field(
         None,
         description="Filter by specific disaster number",
-        example=4673
+        examples=[4673]
     )
     max_records: int = Field(
         default=50000,
@@ -92,7 +92,7 @@ class HMAProjectsIngestRequest(BaseModel):
     state: Optional[str] = Field(
         None,
         description="Filter by state code",
-        example="CA",
+        examples=["CA"],
         max_length=2
     )
     program_area: Optional[HMAProgram] = Field(

@@ -30,12 +30,12 @@ class StatVarIngestRequest(BaseModel):
     variable_dcid: str = Field(
         default="Count_Person",
         description="Statistical variable DCID (e.g., Count_Person, Median_Income_Household)",
-        example="Count_Person"
+        examples=["Count_Person"]
     )
     places: List[str] = Field(
         default=["geoId/06", "geoId/48", "geoId/36"],
         description="List of place DCIDs to fetch data for",
-        example=["geoId/06", "geoId/48"]
+        examples=[["geoId/06", "geoId/48"]]
     )
 
 
@@ -44,12 +44,12 @@ class PlaceStatsIngestRequest(BaseModel):
     place_dcid: str = Field(
         default="geoId/06",
         description="Place DCID (e.g., geoId/06 for California)",
-        example="geoId/06"
+        examples=["geoId/06"]
     )
     variables: Optional[List[str]] = Field(
         None,
         description="List of variable DCIDs (defaults to common variables)",
-        example=["Count_Person", "Median_Income_Household"]
+        examples=[["Count_Person", "Median_Income_Household"]]
     )
 
 
@@ -58,7 +58,7 @@ class USStateDataRequest(BaseModel):
     variables: Optional[List[str]] = Field(
         None,
         description="List of variable DCIDs (defaults to common demographics)",
-        example=["Count_Person", "Median_Income_Household", "UnemploymentRate_Person"]
+        examples=[["Count_Person", "Median_Income_Household", "UnemploymentRate_Person"]]
     )
 
 

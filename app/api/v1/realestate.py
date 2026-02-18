@@ -79,8 +79,8 @@ class OSMIngestRequest(BaseModel):
     bounding_box: List[float] = Field(
         ...,
         description="Bounding box as [south, west, north, east]",
-        min_items=4,
-        max_items=4
+        min_length=4,
+        max_length=4
     )
     building_type: Optional[str] = Field(
         None,

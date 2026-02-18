@@ -43,17 +43,17 @@ class BusinessSearchRequest(BaseModel):
     location: str = Field(
         ...,
         description="Location string (e.g., 'San Francisco, CA', 'NYC')",
-        example="San Francisco, CA"
+        examples=["San Francisco, CA"]
     )
     term: Optional[str] = Field(
         None,
         description="Search term (e.g., 'restaurants', 'coffee')",
-        example="restaurants"
+        examples=["restaurants"]
     )
     categories: Optional[str] = Field(
         None,
         description="Category filter (comma-separated, e.g., 'restaurants,bars')",
-        example="restaurants"
+        examples=["restaurants"]
     )
     limit: int = Field(
         default=50,
@@ -68,17 +68,17 @@ class MultiLocationRequest(BaseModel):
     locations: List[str] = Field(
         ...,
         description="List of location strings",
-        example=["San Francisco, CA", "Los Angeles, CA", "New York, NY"]
+        examples=[["San Francisco, CA", "Los Angeles, CA", "New York, NY"]]
     )
     term: Optional[str] = Field(
         None,
         description="Search term",
-        example="restaurants"
+        examples=["restaurants"]
     )
     categories: Optional[str] = Field(
         None,
         description="Category filter",
-        example="restaurants"
+        examples=["restaurants"]
     )
     limit_per_location: int = Field(
         default=20,

@@ -30,45 +30,45 @@ router = APIRouter(
 class FamilyOfficeCreate(BaseModel):
     """Request model for creating/updating a family office."""
     
-    name: str = Field(..., description="Family office name", example="Soros Fund Management")
-    legal_name: Optional[str] = Field(None, example="Soros Fund Management LLC")
-    
-    region: Optional[str] = Field(None, example="US")
-    country: Optional[str] = Field(None, example="United States")
-    
-    principal_family: Optional[str] = Field(None, example="Soros")
-    principal_name: Optional[str] = Field(None, example="George Soros")
-    estimated_wealth: Optional[str] = Field(None, example="$30B+")
-    
-    headquarters_address: Optional[str] = Field(None, example="250 West 55th Street")
-    city: Optional[str] = Field(None, example="New York")
-    state_province: Optional[str] = Field(None, example="NY")
-    postal_code: Optional[str] = Field(None, example="10019")
-    
-    main_phone: Optional[str] = Field(None, example="+1-212-555-0100")
-    main_email: Optional[str] = Field(None, example="info@example.com")
-    website: Optional[str] = Field(None, example="https://www.example.com")
-    linkedin: Optional[str] = Field(None, example="https://linkedin.com/company/example")
-    
-    investment_focus: Optional[List[str]] = Field(None, example=["Private Equity", "Venture Capital"])
-    sectors_of_interest: Optional[List[str]] = Field(None, example=["AI/ML", "Healthcare", "Climate Tech"])
-    geographic_focus: Optional[List[str]] = Field(None, example=["North America", "Europe"])
-    stage_preference: Optional[List[str]] = Field(None, example=["Growth", "Late Stage"])
-    check_size_range: Optional[str] = Field(None, example="$10M-$100M")
-    
-    investment_thesis: Optional[str] = Field(None, example="Focus on transformative technology")
-    notable_investments: Optional[List[str]] = Field(None, example=["Company A", "Company B"])
-    
-    sec_crd_number: Optional[str] = Field(None, example="158626")
+    name: str = Field(..., description="Family office name", examples=["Soros Fund Management"])
+    legal_name: Optional[str] = Field(None, examples=["Soros Fund Management LLC"])
+
+    region: Optional[str] = Field(None, examples=["US"])
+    country: Optional[str] = Field(None, examples=["United States"])
+
+    principal_family: Optional[str] = Field(None, examples=["Soros"])
+    principal_name: Optional[str] = Field(None, examples=["George Soros"])
+    estimated_wealth: Optional[str] = Field(None, examples=["$30B+"])
+
+    headquarters_address: Optional[str] = Field(None, examples=["250 West 55th Street"])
+    city: Optional[str] = Field(None, examples=["New York"])
+    state_province: Optional[str] = Field(None, examples=["NY"])
+    postal_code: Optional[str] = Field(None, examples=["10019"])
+
+    main_phone: Optional[str] = Field(None, examples=["+1-212-555-0100"])
+    main_email: Optional[str] = Field(None, examples=["info@example.com"])
+    website: Optional[str] = Field(None, examples=["https://www.example.com"])
+    linkedin: Optional[str] = Field(None, examples=["https://linkedin.com/company/example"])
+
+    investment_focus: Optional[List[str]] = Field(None, examples=[["Private Equity", "Venture Capital"]])
+    sectors_of_interest: Optional[List[str]] = Field(None, examples=[["AI/ML", "Healthcare", "Climate Tech"]])
+    geographic_focus: Optional[List[str]] = Field(None, examples=[["North America", "Europe"]])
+    stage_preference: Optional[List[str]] = Field(None, examples=[["Growth", "Late Stage"]])
+    check_size_range: Optional[str] = Field(None, examples=["$10M-$100M"])
+
+    investment_thesis: Optional[str] = Field(None, examples=["Focus on transformative technology"])
+    notable_investments: Optional[List[str]] = Field(None, examples=[["Company A", "Company B"]])
+
+    sec_crd_number: Optional[str] = Field(None, examples=["158626"])
     sec_registered: Optional[bool] = Field(False)
-    estimated_aum: Optional[str] = Field(None, example="$5B-$10B")
-    employee_count: Optional[str] = Field(None, example="50-100")
-    
-    status: Optional[str] = Field("Active", example="Active")
+    estimated_aum: Optional[str] = Field(None, examples=["$5B-$10B"])
+    employee_count: Optional[str] = Field(None, examples=["50-100"])
+
+    status: Optional[str] = Field("Active", examples=["Active"])
     actively_investing: Optional[bool] = Field(None)
     accepts_outside_capital: Optional[bool] = Field(False)
-    
-    notes: Optional[str] = Field(None, example="Additional notes here")
+
+    notes: Optional[str] = Field(None, examples=["Additional notes here"])
 
 
 class FamilyOfficeResponse(FamilyOfficeCreate):
