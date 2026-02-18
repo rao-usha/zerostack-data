@@ -173,41 +173,6 @@ async def ingest_all_major_crops_endpoint(
 
 # ========== Background Tasks ==========
 
-def _run_usda_bg(job_id, ingest_coro):
-    """Shared background task wrapper for USDA ingestion."""
-    import asyncio
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        job = db.get(IngestionJob, job_id)
-        if job:
-            job.status = JobStatus.RUNNING
-            job.started_at = datetime.utcnow()
-            db.commit()
-
-        conn = db.connection().connection
-        total_rows = asyncio.get_event_loop().run_until_complete(ingest_coro(conn))
-
-        job = db.get(IngestionJob, job_id)
-        if job:
-            job.status = JobStatus.SUCCESS
-            job.rows_inserted = total_rows
-            job.completed_at = datetime.utcnow()
-            db.commit()
-
-        logger.info("USDA job %d completed: %d rows", job_id, total_rows)
-    except Exception as e:
-        logger.error("USDA job %d failed: %s", job_id, e, exc_info=True)
-        job = db.get(IngestionJob, job_id)
-        if job:
-            job.status = JobStatus.FAILED
-            job.error_message = str(e)
-            job.completed_at = datetime.utcnow()
-            db.commit()
-    finally:
-        db.close()
-
-
 async def _run_crop_ingestion(job_id, commodity, year, state, all_stats):
     """Background task for crop ingestion."""
     SessionLocal = get_session_factory()
