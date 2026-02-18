@@ -100,7 +100,6 @@ class SiteIntelSource(str, Enum):
     EPA_SDWIS = "epa_sdwis"  # EPA Safe Drinking Water Information System
     EIA_GAS = "eia_gas"  # EIA natural gas pipelines and storage
     OPENEI_URDB = "openei_urdb"  # OpenEI Utility Rate Database
-    EIA_ELECTRICITY = "eia_electricity"  # EIA electricity prices and consumption
 
 
 class CollectionStatus(str, Enum):

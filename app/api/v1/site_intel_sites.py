@@ -112,7 +112,6 @@ async def _run_collection(
     api_keys = {}
     key_mapping = {
         "eia": "eia_api_key",
-        "eia_electricity": "eia_api_key",
         "eia_gas": "eia_api_key",
         "bls": "bls_api_key",
         "bls_oes": "bls_api_key",
@@ -424,7 +423,6 @@ async def collect_with_dependencies(
         api_keys = {}
         key_mapping = {
             "eia": "eia_api_key",
-            "eia_electricity": "eia_api_key",
             "eia_gas": "eia_api_key",
             "bls": "bls_api_key",
             "bls_oes": "bls_api_key",

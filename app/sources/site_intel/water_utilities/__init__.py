@@ -9,7 +9,6 @@ Sources:
 - EPA SDWIS: Public water systems, violations
 - EIA Natural Gas: Pipelines, storage facilities
 - OpenEI URDB: Utility rate database
-- EIA Electricity: Electricity prices and consumption
 """
 
 from app.sources.site_intel.water_utilities.usgs_water_collector import (
@@ -20,14 +19,10 @@ from app.sources.site_intel.water_utilities.eia_gas_collector import EIAGasColle
 from app.sources.site_intel.water_utilities.openei_rates_collector import (
     OpenEIRatesCollector,
 )
-from app.sources.site_intel.water_utilities.eia_electricity_collector import (
-    EIAElectricityCollector,
-)
 
 __all__ = [
     "USGSWaterCollector",
     "EPASDWISCollector",
     "EIAGasCollector",
     "OpenEIRatesCollector",
-    "EIAElectricityCollector",
 ]

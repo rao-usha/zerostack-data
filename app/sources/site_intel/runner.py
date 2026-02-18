@@ -390,7 +390,6 @@ class SiteIntelOrchestrator:
                 SiteIntelSource.EPA_SDWIS,
                 SiteIntelSource.EIA_GAS,
                 SiteIntelSource.OPENEI_URDB,
-                SiteIntelSource.EIA_ELECTRICITY,
             ],
             SiteIntelDomain.SCORING: [],
         }
