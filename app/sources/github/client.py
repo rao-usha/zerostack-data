@@ -45,11 +45,11 @@ class GitHubClient:
 
     async def _rate_limit(self):
         """Enforce rate limits."""
-        now = asyncio.get_event_loop().time()
+        now = asyncio.get_running_loop().time()
         elapsed = now - self._last_request_time
         if elapsed < self.RATE_LIMIT_DELAY:
             await asyncio.sleep(self.RATE_LIMIT_DELAY - elapsed)
-        self._last_request_time = asyncio.get_event_loop().time()
+        self._last_request_time = asyncio.get_running_loop().time()
 
     async def _request(self, endpoint: str, params: Optional[Dict] = None) -> Optional[Dict]:
         """Make an authenticated request to GitHub API."""

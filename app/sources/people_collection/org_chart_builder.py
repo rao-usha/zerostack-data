@@ -249,7 +249,7 @@ class OrgChartBuilder:
             import asyncio
             client = self._get_llm_client()
 
-            response = await asyncio.get_event_loop().run_in_executor(
+            response = await asyncio.get_running_loop().run_in_executor(
                 None,
                 lambda: client.chat.completions.create(
                     model="gpt-4o",
@@ -381,7 +381,7 @@ class OrgChartBuilder:
                 import asyncio
                 client = self._get_llm_client()
 
-                response = await asyncio.get_event_loop().run_in_executor(
+                response = await asyncio.get_running_loop().run_in_executor(
                     None,
                     lambda: client.chat.completions.create(
                         model="gpt-4o",

@@ -139,13 +139,13 @@ class BaseAPIClient(ABC):
             return
 
         async with self._rate_limit_lock:
-            now = asyncio.get_event_loop().time()
+            now = asyncio.get_running_loop().time()
             elapsed = now - self._last_request_time
             if elapsed < self.rate_limit_interval:
                 wait_time = self.rate_limit_interval - elapsed
                 logger.debug(f"Rate limiting: waiting {wait_time:.2f}s")
                 await asyncio.sleep(wait_time)
-            self._last_request_time = asyncio.get_event_loop().time()
+            self._last_request_time = asyncio.get_running_loop().time()
 
     async def _backoff(self, attempt: int, base_delay: float = 1.0) -> None:
         """

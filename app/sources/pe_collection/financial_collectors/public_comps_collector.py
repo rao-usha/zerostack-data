@@ -170,7 +170,7 @@ class PublicCompsCollector(BasePECollector):
             t = yf.Ticker(ticker)
             return t.info
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         info = await loop.run_in_executor(None, _fetch)
 
         if not info or not info.get("symbol"):

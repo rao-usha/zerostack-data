@@ -129,7 +129,7 @@ class KaggleClient:
         Raises:
             Exception: On download failure
         """
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             None,
             self._download_competition_files_sync,
@@ -316,7 +316,7 @@ class KaggleClient:
         Returns:
             List of file info dictionaries with name, size, etc.
         """
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             None,
             self._list_competition_files_sync,

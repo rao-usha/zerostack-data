@@ -89,7 +89,7 @@ async def resolve_ticker(ticker: str) -> Optional[str]:
         return _ticker_cache[ticker]
 
     # Run sync function in thread pool
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     name = await loop.run_in_executor(None, resolve_ticker_sync, ticker)
 
     # Cache result (even if None)

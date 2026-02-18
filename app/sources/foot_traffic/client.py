@@ -105,12 +105,12 @@ class BaseFootTrafficClient(ABC):
         
         async with self._semaphore:
             # Rate limiting
-            now = asyncio.get_event_loop().time()
+            now = asyncio.get_running_loop().time()
             elapsed = now - self._last_request_time
             if elapsed < self.min_request_interval:
                 await asyncio.sleep(self.min_request_interval - elapsed)
             
-            self._last_request_time = asyncio.get_event_loop().time()
+            self._last_request_time = asyncio.get_running_loop().time()
             
             # Retry logic
             last_error = None
@@ -126,14 +126,14 @@ class BaseFootTrafficClient(ABC):
                         logger.warning(f"Rate limited by {self.source_name}, waiting {retry_after}s")
                         await asyncio.sleep(retry_after)
                     elif e.response.status_code >= 500:  # Server error
-                        wait_time = (2 ** attempt) + (asyncio.get_event_loop().time() % 1)
+                        wait_time = (2 ** attempt) + (asyncio.get_running_loop().time() % 1)
                         logger.warning(f"Server error from {self.source_name}, retry in {wait_time:.1f}s")
                         await asyncio.sleep(wait_time)
                     else:
                         raise
                 except httpx.RequestError as e:
                     last_error = e
-                    wait_time = (2 ** attempt) + (asyncio.get_event_loop().time() % 1)
+                    wait_time = (2 ** attempt) + (asyncio.get_running_loop().time() % 1)
                     logger.warning(f"Request error to {self.source_name}: {e}, retry in {wait_time:.1f}s")
                     await asyncio.sleep(wait_time)
             
