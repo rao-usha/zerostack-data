@@ -294,7 +294,6 @@ class FootTrafficAgent:
         errors: List[Dict[str, Any]] = []
         total_requests = 0
         total_cost = 0.0
-        reasoning_log: List[Dict[str, Any]] = []
 
         logger.info(f"Collecting traffic for {len(locations)} locations")
 
