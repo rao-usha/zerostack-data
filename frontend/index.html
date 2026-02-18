@@ -514,9 +514,115 @@
 
         .jobs-load-more { text-align: center; padding: 0.75rem; }
         .jobs-load-more .btn { font-size: 0.8rem; padding: 0.5rem 1.5rem; }
+
+        /* ===== Toast Notifications ===== */
+        .toast-container {
+            position: fixed; top: 1rem; right: 1rem; z-index: 9999;
+            display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none;
+        }
+        .toast {
+            pointer-events: auto; min-width: 280px; max-width: 420px;
+            padding: 0.75rem 1rem; border-radius: 8px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-left: 4px solid var(--text-muted);
+            color: var(--text); font-size: 0.85rem; line-height: 1.4;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: toastIn 0.25s ease-out;
+            display: flex; align-items: flex-start; gap: 0.5rem;
+        }
+        .toast.success { border-left-color: var(--success); }
+        .toast.error { border-left-color: var(--error); }
+        .toast.info { border-left-color: var(--accent); }
+        .toast-icon { font-size: 1rem; flex-shrink: 0; margin-top: 0.05rem; }
+        .toast-close {
+            margin-left: auto; cursor: pointer; color: var(--text-muted); font-size: 1rem;
+            background: none; border: none; padding: 0; line-height: 1;
+        }
+        .toast-close:hover { color: var(--text); }
+        .toast.removing { animation: toastOut 0.25s ease-in forwards; }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes toastOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(40px); } }
+
+        /* ===== Confirm Modal ===== */
+        .confirm-overlay {
+            position: fixed; inset: 0; z-index: 10000;
+            background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;
+        }
+        .confirm-dialog {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+            padding: 1.5rem; min-width: 340px; max-width: 480px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+        .confirm-message { font-size: 0.95rem; margin-bottom: 1.25rem; line-height: 1.5; }
+        .confirm-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
+
+        /* ===== Trigger Form Panel ===== */
+        .trigger-form-panel {
+            background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+            padding: 1rem 1.25rem; margin: 0.25rem 0 0.75rem 0;
+            animation: epSlideDown 0.2s ease-out;
+        }
+        .trigger-form-panel .tf-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+        .trigger-form-panel .tf-field { display: flex; flex-direction: column; gap: 0.25rem; min-width: 140px; }
+        .trigger-form-panel .tf-field label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 500; }
+        .trigger-form-panel .tf-field select,
+        .trigger-form-panel .tf-field input,
+        .trigger-form-panel .tf-field textarea {
+            padding: 0.45rem 0.65rem; background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: 6px; color: var(--text); font-size: 0.85rem;
+        }
+        .trigger-form-panel .tf-field select:focus,
+        .trigger-form-panel .tf-field input:focus { outline: none; border-color: var(--primary); }
+        .trigger-form-panel .tf-actions { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem; }
+        .trigger-form-panel .tf-result { font-size: 0.8rem; margin-top: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; }
+        .trigger-form-panel .tf-result.success { background: rgba(34,197,94,0.1); color: var(--success); }
+        .trigger-form-panel .tf-result.error { background: rgba(239,68,68,0.1); color: var(--error); }
+
+        /* ===== Toggle Switch ===== */
+        .toggle-row { display: flex; align-items: center; gap: 0.75rem; margin: 0.75rem 0; }
+        .toggle-label { font-size: 0.8rem; color: var(--text-muted); }
+        .toggle-switch {
+            position: relative; width: 36px; height: 20px; flex-shrink: 0;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute; inset: 0; cursor: pointer; border-radius: 10px;
+            background: var(--bg-input); border: 1px solid var(--border); transition: background 0.2s;
+        }
+        .toggle-slider::before {
+            content: ''; position: absolute; left: 2px; top: 2px;
+            width: 14px; height: 14px; border-radius: 50%;
+            background: var(--text-muted); transition: transform 0.2s, background 0.2s;
+        }
+        .toggle-switch input:checked + .toggle-slider { background: var(--primary); border-color: var(--primary); }
+        .toggle-switch input:checked + .toggle-slider::before { transform: translateX(16px); background: white; }
+        .schedule-fields { margin-top: 0.5rem; padding: 0.75rem; background: var(--bg-input); border-radius: 6px; }
+        .schedule-fields .tf-row { margin-bottom: 0.5rem; }
+
+        /* ===== Schedule List in Detail View ===== */
+        .schedule-list-item {
+            display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem;
+            background: var(--bg-input); border-radius: 8px; margin-bottom: 0.5rem; font-size: 0.85rem;
+        }
+        .schedule-list-item .sched-name { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .schedule-list-item .sched-freq { color: var(--text-muted); font-size: 0.75rem; }
+        .schedule-badge { padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+        .schedule-badge.active { background: rgba(34,197,94,0.15); color: var(--success); }
+        .schedule-badge.paused { background: rgba(148,163,184,0.15); color: var(--text-muted); }
+
+        /* ===== Checkbox Group (trigger forms) ===== */
+        .tf-checkbox-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .tf-checkbox-group label {
+            display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--text-muted);
+            cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 4px; transition: background 0.15s;
+        }
+        .tf-checkbox-group label:hover { background: var(--bg-input); color: var(--text); }
+        .tf-checkbox-group input[type="checkbox"] { accent-color: var(--primary); }
     </style>
 </head>
 <body>
+    <div id="toast-container" class="toast-container"></div>
+    <div id="confirm-overlay" class="confirm-overlay hidden"></div>
     <header class="header">
         <div class="logo">
             <span style="font-size: 1.5rem;">📈</span>
@@ -648,6 +754,46 @@
     <script>
         const API = '/api/v1';
 
+        // ===== Toast Notifications =====
+        function showToast(message, type = 'info', duration = 4000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            const icons = { success: '\u2705', error: '\u274C', info: '\u2139\uFE0F' };
+            toast.innerHTML = `<span class="toast-icon">${icons[type] || icons.info}</span>
+                <span style="flex:1;">${message}</span>
+                <button class="toast-close" onclick="this.parentElement.classList.add('removing');setTimeout(()=>this.parentElement.remove(),250)">&times;</button>`;
+            container.appendChild(toast);
+            if (duration > 0) {
+                setTimeout(() => {
+                    if (toast.parentElement) { toast.classList.add('removing'); setTimeout(() => toast.remove(), 250); }
+                }, duration);
+            }
+        }
+
+        let _confirmCallback = null;
+        function showConfirm(message, onConfirm) {
+            _confirmCallback = onConfirm;
+            const overlay = document.getElementById('confirm-overlay');
+            overlay.classList.remove('hidden');
+            overlay.innerHTML = `<div class="confirm-dialog">
+                <div class="confirm-message">${message}</div>
+                <div class="confirm-actions">
+                    <button class="btn btn-secondary" onclick="closeConfirm()">Cancel</button>
+                    <button class="btn" onclick="confirmAction()">Confirm</button>
+                </div>
+            </div>`;
+        }
+        function closeConfirm() {
+            document.getElementById('confirm-overlay').classList.add('hidden');
+            _confirmCallback = null;
+        }
+        function confirmAction() {
+            const cb = _confirmCallback;
+            closeConfirm();
+            if (cb) cb();
+        }
+
         // ===== Tab Navigation =====
         let _currentTab = 'sources';
         function showTab(tab) {
@@ -670,6 +816,491 @@
             .catch(() => {
                 document.getElementById('health-status').textContent = 'API Offline';
             });
+
+        // ===================================================================
+        //  TRIGGER FORMS — source-aware field definitions
+        // ===================================================================
+        const INCREMENTAL_SOURCES = new Set(['fred','bls','eia','sec','treasury','bts','census','bea']);
+
+        const TRIGGER_FORMS = {
+            // ── FRED ──
+            '/api/v1/fred/ingest': {
+                fields: [
+                    { name: 'category', label: 'Category', type: 'select', options: [
+                        {value:'interest_rates',label:'Interest Rates (H.15 — 7 series)'},
+                        {value:'monetary_aggregates',label:'Monetary Aggregates (M1, M2 — 4 series)'},
+                        {value:'industrial_production',label:'Industrial Production (5 series)'},
+                        {value:'economic_indicators',label:'Core Economic Indicators (GDP, CPI — 6 series)'},
+                    ]},
+                    { name: 'series_ids', label: 'Series IDs (optional)', type: 'text', placeholder: 'DFF,DGS10 (comma-separated, blank = all in category)' },
+                    { name: 'observation_start', label: 'Start Date', type: 'date' },
+                    { name: 'observation_end', label: 'End Date', type: 'date' },
+                ]
+            },
+            '/api/v1/fred/ingest/batch': {
+                fields: [
+                    { name: 'categories', label: 'Categories', type: 'checkbox-group', options: [
+                        {value:'interest_rates',label:'Interest Rates'},
+                        {value:'monetary_aggregates',label:'Monetary Aggregates'},
+                        {value:'industrial_production',label:'Industrial Production'},
+                        {value:'economic_indicators',label:'Economic Indicators'},
+                    ]},
+                    { name: 'observation_start', label: 'Start Date', type: 'date' },
+                    { name: 'observation_end', label: 'End Date', type: 'date' },
+                ]
+            },
+
+            // ── BEA ──
+            '/api/v1/bea/nipa/ingest': {
+                fields: [
+                    { name: 'table_name', label: 'NIPA Table', type: 'select', options: [
+                        {value:'T10101',label:'T10101 — GDP'},
+                        {value:'T10105',label:'T10105 — GDP % Change'},
+                        {value:'T10106',label:'T10106 — Real GDP (Chained $)'},
+                        {value:'T20100',label:'T20100 — Personal Income'},
+                        {value:'T20200',label:'T20200 — PCE'},
+                        {value:'T30100',label:'T30100 — Govt Receipts & Expenditures'},
+                        {value:'T50100',label:'T50100 — Saving & Investment'},
+                        {value:'T60100',label:'T60100 — Corporate Profits'},
+                    ]},
+                    { name: 'frequency', label: 'Frequency', type: 'select', options: [
+                        {value:'A',label:'Annual'},{value:'Q',label:'Quarterly'},{value:'M',label:'Monthly'},
+                    ]},
+                    { name: 'year', label: 'Year(s)', type: 'text', placeholder: '2024 or 2020,2021,2022 or ALL' },
+                ]
+            },
+            '/api/v1/bea/regional/ingest': {
+                fields: [
+                    { name: 'table_name', label: 'Regional Table', type: 'select', options: [
+                        {value:'SAGDP2N',label:'SAGDP2N — GDP by State (all industries)'},
+                        {value:'SAGDP9N',label:'SAGDP9N — Real GDP by State'},
+                        {value:'SAINC1',label:'SAINC1 — Personal Income by State'},
+                        {value:'SAINC4',label:'SAINC4 — Income & Employment by State'},
+                        {value:'SAINC51',label:'SAINC51 — Per Capita Income by State'},
+                        {value:'CAINC1',label:'CAINC1 — Personal Income by County'},
+                        {value:'CAGDP2',label:'CAGDP2 — GDP by County'},
+                        {value:'MAGDP2',label:'MAGDP2 — GDP by Metro Area (MSA)'},
+                    ]},
+                    { name: 'line_code', label: 'Line Code', type: 'text', placeholder: '1', default: '1' },
+                    { name: 'geo_fips', label: 'Geography', type: 'select', options: [
+                        {value:'STATE',label:'State'},{value:'COUNTY',label:'County'},{value:'MSA',label:'MSA'},
+                    ]},
+                    { name: 'year', label: 'Year(s)', type: 'text', placeholder: '2024 or 2020,2021,2022' },
+                ]
+            },
+            '/api/v1/bea/gdp-industry/ingest': {
+                fields: [
+                    { name: 'table_id', label: 'Table', type: 'select', options: [
+                        {value:'1',label:'1 — Value Added by Industry'},
+                        {value:'5',label:'5 — Value Added as % of GDP'},
+                        {value:'6',label:'6 — Real Value Added by Industry'},
+                        {value:'10',label:'10 — Gross Output by Industry'},
+                        {value:'11',label:'11 — Intermediate Inputs by Industry'},
+                    ]},
+                    { name: 'frequency', label: 'Frequency', type: 'select', options: [
+                        {value:'A',label:'Annual'},{value:'Q',label:'Quarterly'},
+                    ]},
+                    { name: 'industry', label: 'Industry', type: 'text', placeholder: 'ALL (or specific industry code)', default: 'ALL' },
+                    { name: 'year', label: 'Year(s)', type: 'text', placeholder: '2024 or 2020,2021,2022' },
+                ]
+            },
+            '/api/v1/bea/international/ingest': {
+                fields: [
+                    { name: 'indicator', label: 'Indicator', type: 'select', options: [
+                        {value:'BalGds',label:'BalGds — Balance on Goods'},
+                        {value:'BalServ',label:'BalServ — Balance on Services'},
+                        {value:'BalCurAcct',label:'BalCurAcct — Current Account Balance'},
+                        {value:'ExpGds',label:'ExpGds — Exports of Goods'},
+                        {value:'ImpGds',label:'ImpGds — Imports of Goods'},
+                    ]},
+                    { name: 'area_or_country', label: 'Area/Country', type: 'text', placeholder: 'AllCountries', default: 'AllCountries' },
+                    { name: 'frequency', label: 'Frequency', type: 'select', options: [
+                        {value:'A',label:'Annual'},{value:'Q',label:'Quarterly'},
+                    ]},
+                    { name: 'year', label: 'Year(s)', type: 'text', placeholder: 'ALL or 2024' },
+                ]
+            },
+
+            // ── BLS ──
+            '/api/v1/bls/{dataset}/ingest': {
+                pathParams: [
+                    { name: 'dataset', label: 'Dataset', type: 'select', options: [
+                        {value:'ces',label:'CES — Current Employment Statistics'},
+                        {value:'cps',label:'CPS — Current Population Survey'},
+                        {value:'jolts',label:'JOLTS — Job Openings & Labor Turnover'},
+                        {value:'cpi',label:'CPI — Consumer Price Index'},
+                        {value:'ppi',label:'PPI — Producer Price Index'},
+                        {value:'oes',label:'OES — Occupational Employment & Wages'},
+                    ]},
+                ],
+                fields: [
+                    { name: 'start_year', label: 'Start Year', type: 'number', placeholder: '2014 (10yr default w/o key, 20yr w/ key)' },
+                    { name: 'end_year', label: 'End Year', type: 'number', placeholder: '2024' },
+                    { name: 'series_ids', label: 'Series IDs (optional)', type: 'text', placeholder: 'LNS14000000,CUUR0000SA0 (blank = common series)' },
+                ]
+            },
+            '/api/v1/bls/all/ingest': {
+                fields: [
+                    { name: 'start_year', label: 'Start Year', type: 'number', placeholder: '2014' },
+                    { name: 'end_year', label: 'End Year', type: 'number', placeholder: '2024' },
+                ]
+            },
+
+            // ── Treasury ──
+            '/api/v1/treasury/{type}/ingest': {
+                pathParams: [
+                    { name: 'type', label: 'Dataset', type: 'select', options: [
+                        {value:'interest-rates',label:'Interest Rates'},
+                        {value:'debt',label:'Debt Outstanding'},
+                        {value:'revenue-spending',label:'Revenue & Spending (Monthly Statement)'},
+                        {value:'auctions',label:'Auction Results'},
+                        {value:'all',label:'All Datasets'},
+                    ]},
+                ],
+                fields: [
+                    { name: 'start_date', label: 'Start Date', type: 'date' },
+                    { name: 'end_date', label: 'End Date', type: 'date' },
+                    { name: 'security_type', label: 'Security Type (optional)', type: 'select', options: [
+                        {value:'',label:'All'},
+                        {value:'Treasury Bills',label:'Treasury Bills'},
+                        {value:'Treasury Notes',label:'Treasury Notes'},
+                        {value:'Treasury Bonds',label:'Treasury Bonds'},
+                        {value:'TIPS',label:'TIPS'},
+                        {value:'FRN',label:'Floating Rate Notes'},
+                        {value:'CMB',label:'Cash Management Bills'},
+                    ]},
+                ]
+            },
+            // Static Treasury endpoints (no path param) — inherit fields from generic
+            '/api/v1/treasury/interest-rates/ingest': {
+                fields: [
+                    { name: 'start_date', label: 'Start Date', type: 'date' },
+                    { name: 'end_date', label: 'End Date', type: 'date' },
+                    { name: 'security_type', label: 'Security Type', type: 'select', options: [
+                        {value:'',label:'All'},{value:'Treasury Bills',label:'Bills'},{value:'Treasury Notes',label:'Notes'},
+                        {value:'Treasury Bonds',label:'Bonds'},{value:'TIPS',label:'TIPS'},{value:'FRN',label:'FRN'},
+                    ]},
+                ]
+            },
+            '/api/v1/treasury/debt/ingest': {
+                fields: [
+                    { name: 'start_date', label: 'Start Date', type: 'date' },
+                    { name: 'end_date', label: 'End Date', type: 'date' },
+                ]
+            },
+            '/api/v1/treasury/revenue-spending/ingest': {
+                fields: [
+                    { name: 'start_date', label: 'Start Date', type: 'date' },
+                    { name: 'end_date', label: 'End Date', type: 'date' },
+                    { name: 'classification', label: 'Classification (optional)', type: 'text', placeholder: 'e.g. Receipts, Outlays' },
+                ]
+            },
+            '/api/v1/treasury/auctions/ingest': {
+                fields: [
+                    { name: 'start_date', label: 'Start Date', type: 'date' },
+                    { name: 'end_date', label: 'End Date', type: 'date' },
+                    { name: 'security_type', label: 'Security Type', type: 'select', options: [
+                        {value:'',label:'All'},{value:'Bill',label:'Bill'},{value:'Note',label:'Note'},
+                        {value:'Bond',label:'Bond'},{value:'TIPS',label:'TIPS'},{value:'FRN',label:'FRN'},{value:'CMB',label:'CMB'},
+                    ]},
+                ]
+            },
+            '/api/v1/treasury/all/ingest': {
+                fields: [
+                    { name: 'start_date', label: 'Start Date', type: 'date' },
+                    { name: 'end_date', label: 'End Date', type: 'date' },
+                ]
+            },
+
+            // ── EIA ──
+            '/api/v1/eia/{category}/ingest': {
+                pathParams: [
+                    { name: 'category', label: 'Category', type: 'select', options: [
+                        {value:'petroleum',label:'Petroleum'},
+                        {value:'electricity',label:'Electricity'},
+                        {value:'natural-gas',label:'Natural Gas'},
+                        {value:'retail-gas-prices',label:'Retail Gas Prices'},
+                        {value:'steo',label:'STEO (Short-Term Energy Outlook)'},
+                    ]},
+                ],
+                fields: [
+                    { name: 'subcategory', label: 'Subcategory (optional)', type: 'text', placeholder: 'e.g. consumption, production, imports, stocks' },
+                    { name: 'frequency', label: 'Frequency', type: 'select', options: [
+                        {value:'',label:'Default'},{value:'annual',label:'Annual'},{value:'monthly',label:'Monthly'},
+                        {value:'weekly',label:'Weekly'},{value:'daily',label:'Daily'},
+                    ]},
+                    { name: 'start', label: 'Start Date', type: 'date' },
+                    { name: 'end', label: 'End Date', type: 'date' },
+                ]
+            },
+            // Static EIA endpoints with specific subcategory fields
+            '/api/v1/eia/petroleum/ingest': {
+                fields: [
+                    { name: 'subcategory', label: 'Subcategory', type: 'select', options: [
+                        {value:'consumption',label:'Consumption'},{value:'production',label:'Production'},
+                        {value:'imports',label:'Imports'},{value:'exports',label:'Exports'},{value:'stocks',label:'Stocks'},
+                    ]},
+                    { name: 'frequency', label: 'Frequency', type: 'select', options: [
+                        {value:'annual',label:'Annual'},{value:'monthly',label:'Monthly'},{value:'weekly',label:'Weekly'},{value:'daily',label:'Daily'},
+                    ]},
+                    { name: 'start', label: 'Start Date', type: 'date' },
+                    { name: 'end', label: 'End Date', type: 'date' },
+                ]
+            },
+            '/api/v1/eia/electricity/ingest': {
+                fields: [
+                    { name: 'subcategory', label: 'Subcategory', type: 'select', options: [
+                        {value:'retail_sales',label:'Retail Sales'},{value:'generation',label:'Generation'},
+                        {value:'revenue',label:'Revenue'},{value:'customers',label:'Customers'},
+                    ]},
+                    { name: 'frequency', label: 'Frequency', type: 'select', options: [
+                        {value:'annual',label:'Annual'},{value:'monthly',label:'Monthly'},
+                    ]},
+                    { name: 'start', label: 'Start Date', type: 'date' },
+                    { name: 'end', label: 'End Date', type: 'date' },
+                ]
+            },
+            '/api/v1/eia/natural-gas/ingest': {
+                fields: [
+                    { name: 'subcategory', label: 'Subcategory', type: 'select', options: [
+                        {value:'consumption',label:'Consumption'},{value:'production',label:'Production'},
+                        {value:'storage',label:'Storage'},{value:'prices',label:'Prices'},
+                    ]},
+                    { name: 'frequency', label: 'Frequency', type: 'select', options: [
+                        {value:'annual',label:'Annual'},{value:'monthly',label:'Monthly'},
+                    ]},
+                    { name: 'start', label: 'Start Date', type: 'date' },
+                    { name: 'end', label: 'End Date', type: 'date' },
+                ]
+            },
+            '/api/v1/eia/retail-gas-prices/ingest': {
+                fields: [
+                    { name: 'frequency', label: 'Frequency', type: 'select', options: [
+                        {value:'weekly',label:'Weekly'},{value:'daily',label:'Daily'},
+                    ]},
+                    { name: 'start', label: 'Start Date', type: 'date' },
+                    { name: 'end', label: 'End Date', type: 'date' },
+                ]
+            },
+            '/api/v1/eia/steo/ingest': {
+                fields: [
+                    { name: 'start', label: 'Start (YYYY-MM)', type: 'text', placeholder: '2023-01' },
+                    { name: 'end', label: 'End (YYYY-MM)', type: 'text', placeholder: '2024-12' },
+                ]
+            },
+
+            // ── Census ──
+            '/api/v1/census/{level}': {
+                pathParams: [
+                    { name: 'level', label: 'Geography Level', type: 'select', options: [
+                        {value:'state',label:'State'},
+                        {value:'county',label:'County'},
+                        {value:'tract',label:'Census Tract'},
+                        {value:'zip',label:'ZIP Code (ZCTA)'},
+                    ]},
+                ],
+                fields: [
+                    { name: 'survey', label: 'Survey', type: 'select', options: [
+                        {value:'acs5',label:'ACS 5-Year Estimates'},{value:'acs1',label:'ACS 1-Year Estimates'},
+                    ]},
+                    { name: 'year', label: 'Year', type: 'number', required: true, placeholder: '2022 (required)' },
+                    { name: 'table_id', label: 'Table ID', type: 'text', required: true, placeholder: 'B01001 (required)' },
+                    { name: 'state_fips', label: 'State FIPS (optional)', type: 'text', placeholder: '06 for California' },
+                ]
+            },
+            '/api/v1/census/state': {
+                fields: [
+                    { name: 'survey', label: 'Survey', type: 'select', options: [
+                        {value:'acs5',label:'ACS 5-Year'},{value:'acs1',label:'ACS 1-Year'},
+                    ]},
+                    { name: 'year', label: 'Year', type: 'number', required: true, placeholder: '2022' },
+                    { name: 'table_id', label: 'Table ID', type: 'text', required: true, placeholder: 'B01001' },
+                ]
+            },
+            '/api/v1/census/county': {
+                fields: [
+                    { name: 'survey', label: 'Survey', type: 'select', options: [
+                        {value:'acs5',label:'ACS 5-Year'},{value:'acs1',label:'ACS 1-Year'},
+                    ]},
+                    { name: 'year', label: 'Year', type: 'number', required: true, placeholder: '2022' },
+                    { name: 'table_id', label: 'Table ID', type: 'text', required: true, placeholder: 'B01001' },
+                    { name: 'state_fips', label: 'State FIPS (optional)', type: 'text', placeholder: '06' },
+                ]
+            },
+            '/api/v1/census/zip': {
+                fields: [
+                    { name: 'survey', label: 'Survey', type: 'select', options: [
+                        {value:'acs5',label:'ACS 5-Year'},{value:'acs1',label:'ACS 1-Year'},
+                    ]},
+                    { name: 'year', label: 'Year', type: 'number', required: true, placeholder: '2022' },
+                    { name: 'table_id', label: 'Table ID', type: 'text', required: true, placeholder: 'B01001' },
+                    { name: 'state_fips', label: 'State FIPS (optional)', type: 'text', placeholder: '06' },
+                ]
+            },
+            '/api/v1/census/batch/state': {
+                fields: [
+                    { name: 'survey', label: 'Survey', type: 'select', options: [
+                        {value:'acs5',label:'ACS 5-Year'},{value:'acs1',label:'ACS 1-Year'},
+                    ]},
+                    { name: 'table_id', label: 'Table ID', type: 'text', required: true, placeholder: 'B01001' },
+                    { name: 'years', label: 'Years (comma-separated)', type: 'text', required: true, placeholder: '2020,2021,2022 (max 10)' },
+                ]
+            },
+            '/api/v1/census/batch/county': {
+                fields: [
+                    { name: 'survey', label: 'Survey', type: 'select', options: [
+                        {value:'acs5',label:'ACS 5-Year'},{value:'acs1',label:'ACS 1-Year'},
+                    ]},
+                    { name: 'table_id', label: 'Table ID', type: 'text', required: true, placeholder: 'B01001' },
+                    { name: 'years', label: 'Years (comma-separated)', type: 'text', required: true, placeholder: '2020,2021,2022 (max 10)' },
+                    { name: 'state_fips', label: 'State FIPS (optional)', type: 'text', placeholder: '06' },
+                ]
+            },
+
+            // ── SEC ──
+            '/api/v1/sec/ingest/company': {
+                fields: [
+                    { name: 'cik', label: 'CIK', type: 'text', required: true, placeholder: '0000320193 (Apple)' },
+                    { name: 'filing_types', label: 'Filing Types', type: 'text', placeholder: '10-K,10-Q (comma-sep, default: 10-K,10-Q)' },
+                    { name: 'start_date', label: 'Start Date', type: 'date' },
+                    { name: 'end_date', label: 'End Date', type: 'date' },
+                ]
+            },
+            '/api/v1/sec/ingest/multiple': {
+                fields: [
+                    { name: 'ciks', label: 'CIKs', type: 'text', required: true, placeholder: '0000320193,0000789019 (comma-separated)' },
+                    { name: 'filing_types', label: 'Filing Types', type: 'text', placeholder: '10-K,10-Q' },
+                    { name: 'start_date', label: 'Start Date', type: 'date' },
+                    { name: 'end_date', label: 'End Date', type: 'date' },
+                ]
+            },
+            '/api/v1/sec/ingest/industrial-companies': { fields: [] },
+            '/api/v1/sec/form-adv/ingest/family-offices': {
+                fields: [
+                    { name: 'family_office_names', label: 'Family Office Names', type: 'text', required: true, placeholder: 'Soros Fund Management,Cascade Investment (comma-sep)' },
+                    { name: 'max_concurrency', label: 'Max Concurrency', type: 'number', placeholder: '1', default: '1' },
+                ]
+            },
+            '/api/v1/sec/form-adv/ingest/crd': {
+                fields: [
+                    { name: 'crd_number', label: 'CRD Number', type: 'text', required: true, placeholder: '158626' },
+                ],
+            },
+
+            // ── FDIC ──
+            '/api/v1/fdic/{type}/ingest': {
+                pathParams: [
+                    { name: 'type', label: 'Dataset', type: 'select', options: [
+                        {value:'financials',label:'Bank Financials'},
+                        {value:'institutions',label:'Institution Demographics'},
+                        {value:'failed-banks',label:'Failed Banks (Historical)'},
+                        {value:'deposits',label:'Deposits (Branch-Level — large)'},
+                        {value:'all',label:'All Datasets'},
+                    ]},
+                ],
+                fields: [
+                    { name: 'year', label: 'Year (optional)', type: 'number', placeholder: '2024' },
+                    { name: 'state', label: 'State (optional)', type: 'text', placeholder: 'NY (2-letter code)' },
+                    { name: 'cert', label: 'FDIC Cert # (optional)', type: 'text', placeholder: '628 (JPMorgan), 3510 (BofA)' },
+                ]
+            },
+            '/api/v1/fdic/financials/ingest': {
+                fields: [
+                    { name: 'cert', label: 'FDIC Cert #', type: 'text', placeholder: '628 (JPMorgan)' },
+                    { name: 'report_date', label: 'Report Date', type: 'text', placeholder: 'YYYYMMDD format' },
+                    { name: 'year', label: 'Year', type: 'number', placeholder: '2024' },
+                ]
+            },
+            '/api/v1/fdic/institutions/ingest': {
+                fields: [
+                    { name: 'state', label: 'State', type: 'text', placeholder: 'NY (2-letter code)' },
+                    { name: 'active_only', label: 'Active Only', type: 'select', options: [
+                        {value:'true',label:'Yes (active only)'},{value:'false',label:'No (include inactive)'},
+                    ]},
+                ]
+            },
+            '/api/v1/fdic/failed-banks/ingest': {
+                fields: [
+                    { name: 'year_start', label: 'Start Year', type: 'number', placeholder: '2000' },
+                    { name: 'year_end', label: 'End Year', type: 'number', placeholder: '2024' },
+                ]
+            },
+            '/api/v1/fdic/deposits/ingest': {
+                fields: [
+                    { name: 'year', label: 'Year', type: 'number', placeholder: '2024' },
+                    { name: 'cert', label: 'FDIC Cert #', type: 'text', placeholder: '628' },
+                    { name: 'state', label: 'State', type: 'text', placeholder: 'NY' },
+                ]
+            },
+            '/api/v1/fdic/all/ingest': {
+                fields: [
+                    { name: 'year', label: 'Year', type: 'number', placeholder: '2024' },
+                ]
+            },
+
+            // ── CMS ──
+            '/api/v1/cms/ingest/{dataset}': {
+                pathParams: [
+                    { name: 'dataset', label: 'Dataset', type: 'select', options: [
+                        {value:'medicare-utilization',label:'Medicare Provider Utilization & Payment'},
+                        {value:'hospital-cost-reports',label:'Hospital Cost Reports (HCRIS)'},
+                        {value:'drug-pricing',label:'Medicare Part D Drug Spending'},
+                    ]},
+                ],
+                fields: [
+                    { name: 'year', label: 'Year (optional)', type: 'number', placeholder: '2024' },
+                    { name: 'state', label: 'State (optional)', type: 'text', placeholder: 'NY (2-letter)' },
+                    { name: 'limit', label: 'Row Limit (optional)', type: 'number', placeholder: 'e.g. 1000 for testing' },
+                ]
+            },
+            '/api/v1/cms/ingest/medicare-utilization': {
+                fields: [
+                    { name: 'year', label: 'Year', type: 'number', placeholder: '2024' },
+                    { name: 'state', label: 'State', type: 'text', placeholder: 'NY' },
+                    { name: 'limit', label: 'Row Limit', type: 'number', placeholder: '1000' },
+                ]
+            },
+            '/api/v1/cms/ingest/hospital-cost-reports': {
+                fields: [
+                    { name: 'year', label: 'Fiscal Year', type: 'number', placeholder: '2024' },
+                    { name: 'limit', label: 'Row Limit', type: 'number', placeholder: '1000' },
+                ]
+            },
+            '/api/v1/cms/ingest/drug-pricing': {
+                fields: [
+                    { name: 'year', label: 'Year', type: 'number', placeholder: '2024' },
+                    { name: 'brand_name', label: 'Brand Name (optional)', type: 'text', placeholder: 'e.g. Humira' },
+                    { name: 'limit', label: 'Row Limit', type: 'number', placeholder: '1000' },
+                ]
+            },
+
+            // ── People ──
+            '/api/v1/people-jobs/test/{company_id}': {
+                pathParams: [
+                    { name: 'company_id', label: 'Company ID', type: 'number', required: true, placeholder: 'e.g. 1' },
+                ],
+            },
+            '/api/v1/people-jobs/test/{company_id}?sources=website': {
+                pathParams: [
+                    { name: 'company_id', label: 'Company ID', type: 'number', required: true, placeholder: 'e.g. 1' },
+                ],
+            },
+            '/api/v1/people-jobs/deep-collect/{company_id}': {
+                pathParams: [
+                    { name: 'company_id', label: 'Company ID', type: 'number', required: true, placeholder: 'e.g. 1' },
+                ],
+            },
+            '/api/v1/people-jobs/recursive-collect/{company_id}': {
+                pathParams: [
+                    { name: 'company_id', label: 'Company ID', type: 'number', required: true, placeholder: 'e.g. 1' },
+                ],
+            },
+            '/api/v1/people-jobs/schedule': { fields: [] },
+
+            // ── Site Intel & PE (body pre-defined in trigger) ──
+            '/api/v1/site-intel/sites/collect': { fields: [] },
+            '/api/v1/pe/collection/collect': { fields: [] },
+        };
 
         // ===================================================================
         //  DATA SOURCES DASHBOARD
@@ -699,7 +1330,7 @@
                       endpoints: [{method:'GET', path:'/api/v1/bls/reference/datasets', label:'List datasets'}, {method:'GET', path:'/api/v1/bls/reference/series', label:'Search series'}, {method:'GET', path:'/api/v1/bls/reference/quick', label:'Quick lookup'}],
                       scheduleOptions: ['daily','weekly','monthly'] },
                     { key: 'treasury', label: 'US Treasury', tablePrefix: 'treasury_',
-                      triggers: [{method:'POST', path:'/api/v1/treasury/interest-rates/ingest', label:'Ingest interest rates'}, {method:'POST', path:'/api/v1/treasury/debt/ingest', label:'Ingest debt data'}, {method:'POST', path:'/api/v1/treasury/auctions/ingest', label:'Ingest auctions'}, {method:'POST', path:'/api/v1/treasury/all/ingest', label:'Ingest all'}],
+                      triggers: [{method:'POST', path:'/api/v1/treasury/interest-rates/ingest', label:'Ingest interest rates'}, {method:'POST', path:'/api/v1/treasury/debt/ingest', label:'Ingest debt data'}, {method:'POST', path:'/api/v1/treasury/revenue-spending/ingest', label:'Ingest revenue & spending'}, {method:'POST', path:'/api/v1/treasury/auctions/ingest', label:'Ingest auctions'}, {method:'POST', path:'/api/v1/treasury/all/ingest', label:'Ingest all'}],
                       endpoints: [{method:'GET', path:'/api/v1/treasury/reference/datasets', label:'List datasets'}, {method:'GET', path:'/api/v1/treasury/reference/security-types', label:'Security types'}],
                       scheduleOptions: ['daily','weekly'] },
                     { key: 'data_commons', label: 'Google Data Commons', tables: ['data_commons_observations'],
@@ -722,7 +1353,7 @@
                     { key: 'us_trade', label: 'US Trade (Census)', tablePrefix: 'us_trade_',
                       scheduleOptions: ['monthly','quarterly'] },
                     { key: 'census', label: 'Census Bureau', tablePrefix: 'census_',
-                      triggers: [{method:'POST', path:'/api/v1/census/state', label:'Ingest state-level'}, {method:'POST', path:'/api/v1/census/county', label:'Ingest county-level'}, {method:'POST', path:'/api/v1/census/zip', label:'Ingest ZIP-level'}, {method:'POST', path:'/api/v1/census/batch/state', label:'Batch ingest states'}],
+                      triggers: [{method:'POST', path:'/api/v1/census/state', label:'Ingest state-level'}, {method:'POST', path:'/api/v1/census/county', label:'Ingest county-level'}, {method:'POST', path:'/api/v1/census/zip', label:'Ingest ZIP-level'}, {method:'POST', path:'/api/v1/census/batch/state', label:'Batch ingest states'}, {method:'POST', path:'/api/v1/census/batch/county', label:'Batch ingest counties'}],
                       scheduleOptions: ['monthly','quarterly','yearly'] },
                     { key: 'cftc_cot', label: 'CFTC Commitments of Traders', tablePrefix: 'cftc_cot_',
                       scheduleOptions: ['weekly'] },
@@ -744,7 +1375,7 @@
                       endpoints: [{method:'GET', path:'/api/v1/sec/supported-filing-types', label:'Filing types'}, {method:'GET', path:'/api/v1/sec/common-companies', label:'Common companies'}, {method:'POST', path:'/api/v1/sec/form-adv/ingest/family-offices', label:'Ingest Form ADV FOs'}, {method:'GET', path:'/api/v1/sec/form-adv/firms', label:'Query Form ADV firms'}, {method:'GET', path:'/api/v1/sec/form-adv/stats', label:'Form ADV stats'}],
                       scheduleOptions: ['daily','weekly','monthly'] },
                     { key: 'fdic', label: 'FDIC (Banking)', tablePrefix: 'fdic_',
-                      triggers: [{method:'POST', path:'/api/v1/fdic/financials/ingest', label:'Ingest financials'}, {method:'POST', path:'/api/v1/fdic/institutions/ingest', label:'Ingest institutions'}, {method:'POST', path:'/api/v1/fdic/all/ingest', label:'Ingest all'}],
+                      triggers: [{method:'POST', path:'/api/v1/fdic/financials/ingest', label:'Ingest financials'}, {method:'POST', path:'/api/v1/fdic/institutions/ingest', label:'Ingest institutions'}, {method:'POST', path:'/api/v1/fdic/failed-banks/ingest', label:'Ingest failed banks'}, {method:'POST', path:'/api/v1/fdic/deposits/ingest', label:'Ingest deposits (large)'}, {method:'POST', path:'/api/v1/fdic/all/ingest', label:'Ingest all'}],
                       endpoints: [{method:'GET', path:'/api/v1/fdic/search', label:'Search banks'}, {method:'GET', path:'/api/v1/fdic/reference/datasets', label:'List datasets'}, {method:'GET', path:'/api/v1/fdic/reference/major-banks', label:'Major banks'}],
                       scheduleOptions: ['weekly','monthly','quarterly'] },
                     { key: 'form_d', label: 'SEC Form D', tables: ['form_d_filings', 'form_d_related_persons'],
@@ -761,7 +1392,7 @@
                 label: 'Energy & Agriculture',
                 sources: [
                     { key: 'eia', label: 'EIA (Energy)', tables: ['electricity_price', 'natural_gas_pipeline', 'natural_gas_storage'],
-                      triggers: [{method:'POST', path:'/api/v1/eia/petroleum/ingest', label:'Ingest petroleum'}, {method:'POST', path:'/api/v1/eia/electricity/ingest', label:'Ingest electricity'}, {method:'POST', path:'/api/v1/eia/natural-gas/ingest', label:'Ingest natural gas'}, {method:'POST', path:'/api/v1/eia/steo/ingest', label:'Ingest STEO'}],
+                      triggers: [{method:'POST', path:'/api/v1/eia/petroleum/ingest', label:'Ingest petroleum'}, {method:'POST', path:'/api/v1/eia/electricity/ingest', label:'Ingest electricity'}, {method:'POST', path:'/api/v1/eia/natural-gas/ingest', label:'Ingest natural gas'}, {method:'POST', path:'/api/v1/eia/retail-gas-prices/ingest', label:'Ingest retail gas prices'}, {method:'POST', path:'/api/v1/eia/steo/ingest', label:'Ingest STEO'}],
                       scheduleOptions: ['daily','weekly','monthly'] },
                     { key: 'usda', label: 'USDA', tablePrefix: 'usda_',
                       scheduleOptions: ['weekly','monthly'] },
@@ -1577,6 +2208,7 @@
             expandedTable = null;
             tablePreview = null;
             previewPage = 0;
+            expandedTriggerId = null;
             renderSources();
         }
 
@@ -1974,6 +2606,166 @@
             renderDetailView();
         }
 
+        // ===== Trigger Form Rendering Helpers =====
+        let expandedTriggerId = null;
+
+        function renderFormField(field, prefix) {
+            const id = `${prefix}-${field.name}`;
+            const req = field.required ? ' <span style="color:var(--error);">*</span>' : '';
+            let input = '';
+            if (field.type === 'select') {
+                input = `<select id="${id}">` +
+                    field.options.map(o => `<option value="${o.value}">${o.label}</option>`).join('') +
+                    `</select>`;
+            } else if (field.type === 'checkbox-group') {
+                return `<div class="tf-field" style="min-width:100%;"><label>${field.label}${req}</label>
+                    <div class="tf-checkbox-group">
+                        ${field.options.map(o => `<label><input type="checkbox" name="${id}" value="${o.value}" checked> ${o.label}</label>`).join('')}
+                    </div></div>`;
+            } else if (field.type === 'date') {
+                input = `<input type="date" id="${id}" value="${field.default || ''}">`;
+            } else if (field.type === 'number') {
+                input = `<input type="number" id="${id}" placeholder="${field.placeholder || ''}" value="${field.default || ''}">`;
+            } else {
+                input = `<input type="text" id="${id}" placeholder="${field.placeholder || ''}" value="${field.default || ''}">`;
+            }
+            return `<div class="tf-field"><label>${field.label}${req}</label>${input}</div>`;
+        }
+
+        function renderTriggerForm(formDef, triggerId) {
+            if (!formDef) return `<div class="tf-field" style="min-width:100%;">
+                <label>Request Body (JSON)</label>
+                <textarea id="tf-json-${triggerId}" rows="3" style="width:100%;font-family:monospace;font-size:0.8rem;" placeholder='{}'></textarea>
+            </div>`;
+            const prefix = `tf-${triggerId}`;
+            let html = '';
+            if (formDef.pathParams?.length) {
+                html += '<div class="tf-row">';
+                formDef.pathParams.forEach(p => { html += renderFormField(p, prefix + '-pp'); });
+                html += '</div>';
+            }
+            if (formDef.fields?.length) {
+                html += '<div class="tf-row">';
+                formDef.fields.forEach(f => { html += renderFormField(f, prefix); });
+                html += '</div>';
+            }
+            return html;
+        }
+
+        function collectFormValues(formDef, triggerPath, triggerBody, triggerId) {
+            const prefix = `tf-${triggerId}`;
+            let resolvedPath = triggerPath;
+            let body = triggerBody ? { ...triggerBody } : {};
+
+            if (formDef) {
+                if (formDef.pathParams) {
+                    for (const p of formDef.pathParams) {
+                        const el = document.getElementById(`${prefix}-pp-${p.name}`);
+                        const val = el?.value?.trim();
+                        if (p.required && !val) return { error: `${p.label} is required` };
+                        if (val) resolvedPath = resolvedPath.replace(`{${p.name}}`, val);
+                    }
+                }
+                if (formDef.fields) {
+                    for (const f of formDef.fields) {
+                        if (f.type === 'checkbox-group') {
+                            const vals = [...document.querySelectorAll(`input[name="${prefix}-${f.name}"]:checked`)].map(c => c.value);
+                            if (vals.length > 0) body[f.name] = vals;
+                        } else {
+                            const el = document.getElementById(`${prefix}-${f.name}`);
+                            let val = el?.value?.trim();
+                            if (f.required && !val) return { error: `${f.label} is required` };
+                            if (val) {
+                                // comma-separated text => array for known array fields
+                                if (f.type === 'text' && val.includes(',') && ['filing_types','ciks','categories','years','family_office_names','series_ids'].includes(f.name)) {
+                                    body[f.name] = val.split(',').map(s => s.trim()).filter(Boolean);
+                                } else if (f.type === 'number') {
+                                    body[f.name] = parseInt(val) || val;
+                                } else {
+                                    body[f.name] = val;
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // JSON textarea fallback
+                const ta = document.getElementById(`tf-json-${triggerId}`);
+                if (ta?.value?.trim()) {
+                    try { body = { ...body, ...JSON.parse(ta.value) }; }
+                    catch { return { error: 'Invalid JSON' }; }
+                }
+            }
+            return { resolvedPath, body };
+        }
+
+        function renderScheduleToggle(triggerId, sourceKey) {
+            const isIncremental = INCREMENTAL_SOURCES.has(sourceKey);
+            return `<div class="toggle-row">
+                <label class="toggle-switch"><input type="checkbox" id="tf-sched-toggle-${triggerId}" onchange="toggleScheduleFields(${triggerId})"><span class="toggle-slider"></span></label>
+                <span class="toggle-label">Save as recurring schedule</span>
+                ${isIncremental ? `<label style="margin-left:1rem;display:flex;align-items:center;gap:0.35rem;font-size:0.8rem;color:var(--text-muted);cursor:pointer;">
+                    <input type="checkbox" id="tf-incremental-${triggerId}" style="accent-color:var(--primary);"> Incremental
+                </label>` : ''}
+            </div>
+            <div id="tf-sched-fields-${triggerId}" class="schedule-fields hidden">
+                <div class="tf-row">
+                    <div class="tf-field" style="flex:1;">
+                        <label>Schedule Name</label>
+                        <input type="text" id="tf-sched-name-${triggerId}" placeholder="e.g. FRED Daily Interest Rates">
+                    </div>
+                    <div class="tf-field" style="flex:1;">
+                        <label>Description (optional)</label>
+                        <input type="text" id="tf-sched-desc-${triggerId}" placeholder="What this schedule does">
+                    </div>
+                </div>
+                <div class="tf-row">
+                    <div class="tf-field">
+                        <label>Frequency</label>
+                        <select id="tf-sched-freq-${triggerId}" onchange="schedFreqChanged(${triggerId})">
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                        </select>
+                    </div>
+                    <div class="tf-field">
+                        <label>Hour (UTC)</label>
+                        <input type="number" id="tf-sched-hour-${triggerId}" value="6" min="0" max="23">
+                    </div>
+                    <div class="tf-field hidden" id="tf-sched-dow-wrap-${triggerId}">
+                        <label>Day of Week</label>
+                        <select id="tf-sched-dow-${triggerId}">
+                            <option value="0">Monday</option><option value="1">Tuesday</option>
+                            <option value="2">Wednesday</option><option value="3">Thursday</option>
+                            <option value="4">Friday</option><option value="5">Saturday</option>
+                            <option value="6">Sunday</option>
+                        </select>
+                    </div>
+                    <div class="tf-field hidden" id="tf-sched-dom-wrap-${triggerId}">
+                        <label>Day of Month</label>
+                        <input type="number" id="tf-sched-dom-${triggerId}" value="1" min="1" max="31">
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function toggleScheduleFields(triggerId) {
+            const toggle = document.getElementById(`tf-sched-toggle-${triggerId}`);
+            const fields = document.getElementById(`tf-sched-fields-${triggerId}`);
+            if (toggle && fields) {
+                fields.classList.toggle('hidden', !toggle.checked);
+            }
+        }
+
+        function schedFreqChanged(triggerId) {
+            const freq = document.getElementById(`tf-sched-freq-${triggerId}`)?.value;
+            const dowWrap = document.getElementById(`tf-sched-dow-wrap-${triggerId}`);
+            const domWrap = document.getElementById(`tf-sched-dom-wrap-${triggerId}`);
+            if (dowWrap) dowWrap.classList.toggle('hidden', freq !== 'weekly');
+            if (domWrap) domWrap.classList.toggle('hidden', freq !== 'monthly' && freq !== 'quarterly');
+        }
+
         function renderDetailView() {
             const src = selectedSource;
             if (!src) { backToList(); return; }
@@ -2006,40 +2798,65 @@
 
             // ---- Run Collection section ----
             const triggers = src.triggers || [];
-            const schedOpts = src.scheduleOptions || [];
-            if (triggers.length > 0 || schedOpts.length > 0) {
+            if (triggers.length > 0) {
                 html += `<div class="ds-detail-tables" style="padding-bottom:1.25rem;">
-                    <h3>Run Collection</h3>`;
-                if (triggers.length > 0) {
-                    html += `<div style="margin-bottom:1rem;">`;
-                    triggers.forEach((t, i) => {
-                        html += `<div class="ds-detail-table-row" style="cursor:default;margin-bottom:0.375rem;">
-                            <div style="flex:1;">
-                                <div class="ds-detail-table-name" style="font-size:0.85rem;">${t.label}</div>
-                                <div style="font-family:monospace;font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">${t.method} ${t.path}</div>
-                                ${t.body ? `<div style="font-family:monospace;font-size:0.7rem;color:var(--text-muted);margin-top:0.125rem;">Body: ${JSON.stringify(t.body)}</div>` : ''}
-                            </div>
-                            <button class="btn" style="padding:0.375rem 1rem;font-size:0.8rem;" onclick="triggerCollection(${i})">Run</button>
+                    <h3>Run Collection</h3>
+                    <div style="margin-bottom:1rem;">`;
+                triggers.forEach((t, i) => {
+                    const isExpanded = expandedTriggerId === i;
+                    // Find the best matching form def: try exact path first, then strip query string
+                    const basePath = t.path.split('?')[0];
+                    const formDef = TRIGGER_FORMS[t.path] || TRIGGER_FORMS[basePath] || null;
+                    const hasForm = formDef && ((formDef.pathParams?.length) || (formDef.fields?.length));
+                    const needsForm = t.path.includes('{') || hasForm;
+                    html += `<div class="ds-detail-table-row" style="cursor:default;margin-bottom:${isExpanded ? '0' : '0.375rem'};">
+                        <div style="flex:1;">
+                            <div class="ds-detail-table-name" style="font-size:0.85rem;">${t.label}</div>
+                            <div style="font-family:monospace;font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">${t.method} ${t.path}</div>
+                            ${t.body && !isExpanded ? `<div style="font-family:monospace;font-size:0.7rem;color:var(--text-muted);margin-top:0.125rem;">Body: ${JSON.stringify(t.body)}</div>` : ''}
+                        </div>
+                        <button class="btn${isExpanded ? ' btn-secondary' : ''}" style="padding:0.375rem 1rem;font-size:0.8rem;"
+                            onclick="triggerCollection(${i})">${isExpanded ? 'Close' : 'Run'}</button>
+                    </div>`;
+                    if (isExpanded) {
+                        html += `<div class="trigger-form-panel">`;
+                        html += renderTriggerForm(formDef, i);
+                        html += renderScheduleToggle(i, src.key);
+                        html += `<div class="tf-actions">
+                            <button class="btn" style="padding:0.4rem 1.25rem;font-size:0.8rem;" onclick="submitTrigger(${i})">Submit</button>
+                            <button class="btn btn-secondary" style="padding:0.4rem 1rem;font-size:0.8rem;" onclick="cancelTrigger()">Cancel</button>
+                        </div>
+                        <div id="tf-result-${i}"></div>`;
+                        html += `</div>`;
+                    }
+                });
+                html += `</div>`;
+
+                // ---- Existing Schedules for this source ----
+                const sourceSchedules = (schedulesData || []).filter(s => s.source === src.key);
+                html += `<div style="margin-top:0.5rem;">
+                    <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;">Schedules</div>`;
+                if (sourceSchedules.length > 0) {
+                    sourceSchedules.forEach(sched => {
+                        const isActive = sched.is_active !== false;
+                        const statusCls = isActive ? 'active' : 'paused';
+                        const statusLabel = isActive ? 'Active' : 'Paused';
+                        const nextRun = sched.next_run_time ? new Date(sched.next_run_time).toLocaleString() : 'N/A';
+                        html += `<div class="schedule-list-item">
+                            <span class="sched-name">${escapeHtml(sched.name || sched.source)}</span>
+                            <span class="sched-freq">${sched.frequency || ''}</span>
+                            <span style="font-size:0.7rem;color:var(--text-muted);">Next: ${nextRun}</span>
+                            <span class="schedule-badge ${statusCls}">${statusLabel}</span>
+                            <button class="btn-sm" onclick="toggleScheduleActive(${sched.id}, ${!isActive})">${isActive ? 'Pause' : 'Activate'}</button>
+                            <button class="btn-sm primary" onclick="runScheduleNow(${sched.id})">Run Now</button>
                         </div>`;
                     });
-                    html += `</div>`;
-                }
-                if (schedOpts.length > 0) {
-                    html += `<div style="margin-top:0.5rem;">
-                        <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;">Schedule Options</div>
-                        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">`;
-                    schedOpts.forEach(freq => {
-                        const label = freq.charAt(0).toUpperCase() + freq.slice(1);
-                        html += `<span class="ds-detail-chip" style="background:rgba(99,102,241,0.1);color:var(--primary);font-weight:500;">${label}</span>`;
-                    });
-                    html += `</div>
-                        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">
-                            Configure schedules via <a href="http://localhost:8001/docs#/schedules" target="_blank" style="color:var(--accent);">POST /api/v1/schedules</a>
-                            with source="${src.key}" and desired frequency.
-                        </div>
+                } else {
+                    html += `<div style="font-size:0.8rem;color:var(--text-muted);padding:0.5rem 0;">
+                        No schedules configured. Use the <strong>Run</strong> button above and toggle "Save as recurring schedule" to create one.
                     </div>`;
                 }
-                html += `</div>`;
+                html += `</div></div>`;
             }
 
             // ---- Available Endpoints section ----
@@ -2228,40 +3045,165 @@
                 });
                 if (res.ok) {
                     const job = await res.json();
-                    alert(`Export job #${job.id} created for ${tableName}. Check API docs to download when complete.`);
+                    showToast(`Export job #${job.id} created for ${tableName}. Check API docs to download when complete.`, 'success', 6000);
                 } else {
                     const err = await res.json();
-                    alert(`Export failed: ${err.detail || 'Unknown error'}`);
+                    showToast(`Export failed: ${err.detail || 'Unknown error'}`, 'error');
                 }
             } catch (e) {
-                alert(`Export failed: ${e.message}`);
+                showToast(`Export failed: ${e.message}`, 'error');
             }
         }
 
-        async function triggerCollection(triggerIndex) {
+        function triggerCollection(triggerIndex) {
+            if (expandedTriggerId === triggerIndex) {
+                expandedTriggerId = null;
+            } else {
+                expandedTriggerId = triggerIndex;
+            }
+            renderDetailView();
+        }
+
+        function cancelTrigger() {
+            expandedTriggerId = null;
+            renderDetailView();
+        }
+
+        async function submitTrigger(triggerIndex) {
             if (!selectedSource?.triggers?.[triggerIndex]) return;
             const trigger = selectedSource.triggers[triggerIndex];
-            const pathHasParam = trigger.path.includes('{');
-            if (pathHasParam) {
-                alert(`This endpoint requires parameters.\n\n${trigger.method} ${trigger.path}\n\nUse the API docs (Swagger UI) to fill in the required values and run it.`);
-                window.open('http://localhost:8001/docs', '_blank');
+            const resultEl = document.getElementById(`tf-result-${triggerIndex}`);
+            const basePath = trigger.path.split('?')[0];
+            const formDef = TRIGGER_FORMS[trigger.path] || TRIGGER_FORMS[basePath] || null;
+
+            const collected = collectFormValues(formDef, trigger.path, trigger.body, triggerIndex);
+            if (collected.error) {
+                if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(collected.error)}</div>`;
                 return;
             }
-            if (!confirm(`Run "${trigger.label}"?\n\n${trigger.method} ${trigger.path}`)) return;
+
+            // Check if schedule toggle is on
+            const schedToggle = document.getElementById(`tf-sched-toggle-${triggerIndex}`);
+            if (schedToggle?.checked) {
+                return submitAsSchedule(triggerIndex, collected, trigger);
+            }
+
+            // Check incremental
+            const incrEl = document.getElementById(`tf-incremental-${triggerIndex}`);
+            if (incrEl?.checked) {
+                collected.body.incremental = true;
+            }
+
+            if (resultEl) resultEl.innerHTML = '<span style="color:var(--text-muted);font-size:0.8rem;">Submitting...</span>';
             try {
                 const opts = { method: trigger.method, headers: { 'Content-Type': 'application/json' } };
-                if (trigger.body) opts.body = JSON.stringify(trigger.body);
-                const res = await fetch(trigger.path, opts);
+                if (Object.keys(collected.body).length > 0) opts.body = JSON.stringify(collected.body);
+                const res = await fetch(collected.resolvedPath, opts);
                 const data = await res.json();
                 if (res.ok) {
                     const jobId = data.job_id || data.id || '';
-                    alert(`Collection started successfully!${jobId ? ` Job ID: ${jobId}` : ''}`);
+                    showToast(`Collection started!${jobId ? ` Job ID: ${jobId}` : ''}`, 'success');
+                    if (resultEl) resultEl.innerHTML = `<div class="tf-result success">Started${jobId ? ` (Job ${jobId})` : ''}</div>`;
                 } else {
-                    alert(`Failed: ${data.detail || JSON.stringify(data)}`);
+                    showToast(`Failed: ${data.detail || JSON.stringify(data)}`, 'error');
+                    if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(data.detail || JSON.stringify(data))}</div>`;
                 }
             } catch (e) {
-                alert(`Request failed: ${e.message}`);
+                showToast(`Request failed: ${e.message}`, 'error');
+                if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(e.message)}</div>`;
             }
+        }
+
+        async function submitAsSchedule(triggerIndex, collected, trigger) {
+            const resultEl = document.getElementById(`tf-result-${triggerIndex}`);
+            const name = document.getElementById(`tf-sched-name-${triggerIndex}`)?.value?.trim();
+            const description = document.getElementById(`tf-sched-desc-${triggerIndex}`)?.value?.trim() || null;
+            const frequency = document.getElementById(`tf-sched-freq-${triggerIndex}`)?.value || 'daily';
+            const hour = parseInt(document.getElementById(`tf-sched-hour-${triggerIndex}`)?.value) || 6;
+            const dayOfWeekEl = document.getElementById(`tf-sched-dow-${triggerIndex}`);
+            const dayOfMonthEl = document.getElementById(`tf-sched-dom-${triggerIndex}`);
+            const dayOfWeek = (frequency === 'weekly' && dayOfWeekEl) ? parseInt(dayOfWeekEl.value) : null;
+            const dayOfMonth = ((frequency === 'monthly' || frequency === 'quarterly') && dayOfMonthEl) ? parseInt(dayOfMonthEl.value) : null;
+
+            if (!name) {
+                if (resultEl) resultEl.innerHTML = '<div class="tf-result error">Schedule name is required</div>';
+                return;
+            }
+
+            const incrEl = document.getElementById(`tf-incremental-${triggerIndex}`);
+            const config = { ...collected.body };
+            if (incrEl?.checked) config.incremental = true;
+            config._trigger_path = collected.resolvedPath;
+            config._trigger_method = trigger.method;
+
+            if (resultEl) resultEl.innerHTML = '<span style="color:var(--text-muted);font-size:0.8rem;">Creating schedule...</span>';
+            try {
+                const schedBody = {
+                    name,
+                    source: selectedSource.key,
+                    config,
+                    frequency,
+                    hour,
+                    is_active: true,
+                    priority: 5,
+                };
+                if (description) schedBody.description = description;
+                if (dayOfWeek !== null) schedBody.day_of_week = dayOfWeek;
+                if (dayOfMonth !== null) schedBody.day_of_month = dayOfMonth;
+                const res = await fetch(`${API}/schedules`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(schedBody),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(`Schedule "${name}" created!`, 'success');
+                    // Refresh schedules data
+                    schedulesData = await fetch(`${API}/schedules`).then(r => r.ok ? r.json() : schedulesData).catch(() => schedulesData);
+                    expandedTriggerId = null;
+                    renderDetailView();
+                } else {
+                    showToast(`Schedule creation failed: ${data.detail || JSON.stringify(data)}`, 'error');
+                    if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(data.detail || JSON.stringify(data))}</div>`;
+                }
+            } catch (e) {
+                showToast(`Schedule creation failed: ${e.message}`, 'error');
+                if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        // ===== Schedule Management Helpers =====
+        async function toggleScheduleActive(schedId, activate) {
+            const action = activate ? 'activate' : 'pause';
+            try {
+                const res = await fetch(`${API}/schedules/${schedId}/${action}`, { method: 'POST' });
+                if (res.ok) {
+                    showToast(`Schedule ${activate ? 'activated' : 'paused'}`, 'success');
+                    schedulesData = await fetch(`${API}/schedules`).then(r => r.ok ? r.json() : schedulesData).catch(() => schedulesData);
+                    renderDetailView();
+                } else {
+                    const data = await res.json();
+                    showToast(`Failed: ${data.detail || res.status}`, 'error');
+                }
+            } catch (e) {
+                showToast(`Error: ${e.message}`, 'error');
+            }
+        }
+
+        function runScheduleNow(schedId) {
+            showConfirm('Run this schedule immediately?', async () => {
+                try {
+                    const res = await fetch(`${API}/schedules/${schedId}/run`, { method: 'POST' });
+                    if (res.ok) {
+                        showToast('Schedule triggered!', 'success');
+                    } else {
+                        const data = await res.json();
+                        showToast(`Failed: ${data.detail || res.status}`, 'error');
+                    }
+                } catch (e) {
+                    showToast(`Error: ${e.message}`, 'error');
+                }
+            });
         }
 
         function toggleSourceCategory(catKey) {
@@ -2469,10 +3411,14 @@
             } catch (err) { showTestResult(source, false, err.message); input.disabled = false; }
         }
 
-        async function deleteKey(source) {
-            if (!confirm(`Remove the stored key for "${source}"?`)) return;
-            try { const res = await fetch(`${API}/settings/api-keys/${source}`, {method:'DELETE'}); if (res.ok) await loadApiKeys(); }
-            catch (err) { showTestResult(source, false, err.message); }
+        function deleteKey(source) {
+            showConfirm(`Remove the stored key for "${escapeHtml(source)}"?`, async () => {
+                try {
+                    const res = await fetch(`${API}/settings/api-keys/${source}`, {method:'DELETE'});
+                    if (res.ok) { showToast(`Key for "${source}" removed`, 'success'); await loadApiKeys(); }
+                    else showTestResult(source, false, 'Failed to remove key');
+                } catch (err) { showTestResult(source, false, err.message); }
+            });
         }
 
         async function testKey(source) {
@@ -2717,19 +3663,63 @@
                     <div class="jobs-launcher-row">
                         <div class="jobs-launcher-field" style="flex:1;">
                             <label>Source</label>
-                            <select id="jobs-ingest-source">
-                                ${['fred','bea','bls','census','treasury','eia','noaa','epa','sec','usda','dot','fema','hud','osha','fcc','fdic','sba','patent','trade','yelp','data_gov','kaggle'].map(s =>
+                            <select id="jobs-ingest-source" onchange="jobsIngestSourceChanged()">
+                                <option value="">Select source...</option>
+                                ${['fred','bea','bls','census','treasury','eia','sec','fdic','cms','noaa','epa','usda','dot','fema','hud','osha','fcc','sba','patent','trade','yelp','data_gov','kaggle'].map(s =>
                                     `<option value="${s}">${s.toUpperCase()}</option>`
                                 ).join('')}
                             </select>
                         </div>
                     </div>
-                    <div class="jobs-launcher-field" style="margin-top:0.5rem;">
-                        <label>Config (JSON, optional)</label>
-                        <textarea id="jobs-ingest-config" rows="2" style="width:100%;font-family:monospace;font-size:0.8rem;" placeholder='{"category": "GDP"}'></textarea>
-                    </div>`,
+                    <div id="jobs-ingest-fields" style="margin-top:0.5rem;"></div>
+                    ${`<div style="margin-top:0.5rem;">
+                        <label style="display:flex;align-items:center;gap:0.35rem;font-size:0.8rem;color:var(--text-muted);cursor:pointer;">
+                            <input type="checkbox" id="jobs-ingest-incremental" style="accent-color:var(--primary);"> Incremental pull
+                        </label>
+                    </div>`}`,
             };
             panel.innerHTML = opts[type] || '';
+        }
+
+        // Source-to-trigger mapping for Jobs ingestion form
+        const INGEST_SOURCE_TRIGGERS = {
+            fred: '/api/v1/fred/ingest',
+            bea: '/api/v1/bea/nipa/ingest',
+            bls: '/api/v1/bls/{dataset}/ingest',
+            census: '/api/v1/census/{level}',
+            treasury: '/api/v1/treasury/{type}/ingest',
+            eia: '/api/v1/eia/{category}/ingest',
+            sec: '/api/v1/sec/ingest/company',
+            fdic: '/api/v1/fdic/{type}/ingest',
+            cms: '/api/v1/cms/ingest/{dataset}',
+        };
+
+        function jobsIngestSourceChanged() {
+            const source = document.getElementById('jobs-ingest-source')?.value;
+            const container = document.getElementById('jobs-ingest-fields');
+            const incrCheckbox = document.getElementById('jobs-ingest-incremental');
+            if (!container) return;
+
+            // Show/hide incremental based on source
+            if (incrCheckbox) {
+                incrCheckbox.parentElement.style.display = (source && INCREMENTAL_SOURCES.has(source)) ? 'flex' : 'none';
+                incrCheckbox.checked = false;
+            }
+
+            if (!source) { container.innerHTML = ''; return; }
+
+            const triggerPath = INGEST_SOURCE_TRIGGERS[source];
+            const formDef = triggerPath ? TRIGGER_FORMS[triggerPath] : null;
+
+            if (formDef && ((formDef.pathParams?.length) || (formDef.fields?.length))) {
+                container.innerHTML = `<div class="trigger-form-panel" style="animation:none;">` +
+                    renderTriggerForm(formDef, 'jobs-ingest') + `</div>`;
+            } else {
+                container.innerHTML = `<div class="jobs-launcher-field" style="margin-top:0.25rem;">
+                    <label>Config (JSON, optional)</label>
+                    <textarea id="jobs-ingest-config" rows="2" style="width:100%;font-family:monospace;font-size:0.8rem;" placeholder='{"category": "GDP"}'></textarea>
+                </div>`;
+            }
         }
 
         async function jobsRunCollection() {
@@ -2773,12 +3763,24 @@
                         break;
                     }
                     case 'ingestion': {
-                        const source = document.getElementById('jobs-ingest-source')?.value || 'fred';
-                        let config = {};
-                        const configText = document.getElementById('jobs-ingest-config')?.value?.trim();
-                        if (configText) { try { config = JSON.parse(configText); } catch { resultEl.innerHTML = '<div class="jobs-run-result error">Invalid JSON config</div>'; return; } }
-                        url = `/api/v1/${source}/ingest`;
-                        body = config;
+                        const source = document.getElementById('jobs-ingest-source')?.value;
+                        if (!source) { resultEl.innerHTML = '<div class="jobs-run-result error">Select a source</div>'; return; }
+                        const triggerPath = INGEST_SOURCE_TRIGGERS[source];
+                        const formDef = triggerPath ? TRIGGER_FORMS[triggerPath] : null;
+                        if (formDef && ((formDef.pathParams?.length) || (formDef.fields?.length))) {
+                            const collected = collectFormValues(formDef, triggerPath || `/api/v1/${source}/ingest`, {}, 'jobs-ingest');
+                            if (collected.error) { resultEl.innerHTML = `<div class="jobs-run-result error">${escapeHtml(collected.error)}</div>`; return; }
+                            url = collected.resolvedPath;
+                            body = collected.body;
+                        } else {
+                            let config = {};
+                            const configText = document.getElementById('jobs-ingest-config')?.value?.trim();
+                            if (configText) { try { config = JSON.parse(configText); } catch { resultEl.innerHTML = '<div class="jobs-run-result error">Invalid JSON config</div>'; return; } }
+                            url = `/api/v1/${source}/ingest`;
+                            body = config;
+                        }
+                        const incrEl = document.getElementById('jobs-ingest-incremental');
+                        if (incrEl?.checked) body.incremental = true;
                         break;
                     }
                     default: resultEl.innerHTML = '<div class="jobs-run-result error">Unknown type</div>'; return;
@@ -2961,12 +3963,13 @@
             try {
                 const resp = await fetch(`${API}/jobs/${jobId}/retry`, { method: 'POST' });
                 if (resp.ok) {
+                    showToast('Job retry submitted', 'success');
                     setTimeout(() => jobsLoadHistory(), 500);
                 } else {
                     const data = await resp.json();
-                    alert('Retry failed: ' + (data.detail || resp.status));
+                    showToast('Retry failed: ' + (data.detail || resp.status), 'error');
                 }
-            } catch (err) { alert('Retry error: ' + err.message); }
+            } catch (err) { showToast('Retry error: ' + err.message, 'error'); }
         }
 
     </script>
