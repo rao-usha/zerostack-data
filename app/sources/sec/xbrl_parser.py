@@ -264,7 +264,7 @@ def _parse_fact(
                 # Try to convert to Decimal
                 try:
                     numeric_value = Decimal(str(val))
-                except:
+                except (ValueError, TypeError):
                     numeric_value = None
                 
                 # Extract dates
@@ -275,7 +275,7 @@ def _parse_fact(
                 if end_date:
                     try:
                         period_end = datetime.strptime(end_date, "%Y-%m-%d").date()
-                    except:
+                    except (ValueError, TypeError):
                         period_end = None
                 else:
                     period_end = None
@@ -284,7 +284,7 @@ def _parse_fact(
                 if start_date:
                     try:
                         period_start = datetime.strptime(start_date, "%Y-%m-%d").date()
-                    except:
+                    except (ValueError, TypeError):
                         period_start = None
                 else:
                     period_start = None
@@ -302,7 +302,7 @@ def _parse_fact(
                 if filed:
                     try:
                         filing_date = datetime.strptime(filed, "%Y-%m-%d").date()
-                    except:
+                    except (ValueError, TypeError):
                         filing_date = None
                 else:
                     filing_date = None

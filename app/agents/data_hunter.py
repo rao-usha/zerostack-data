@@ -376,8 +376,8 @@ class DataHunterAgent:
             if count > 0:
                 importance += 0.15
 
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to check research history for %s: %s", entity_name, e)
 
         return min(importance, 1.0)
 

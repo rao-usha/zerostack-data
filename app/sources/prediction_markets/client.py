@@ -246,7 +246,7 @@ class KalshiClient:
         if close_time:
             try:
                 close_date = datetime.fromisoformat(close_time.replace("Z", "+00:00"))
-            except:
+            except (ValueError, TypeError):
                 pass
         
         # Auto-categorize
@@ -467,7 +467,7 @@ class PolymarketClient:
                     prices = json.loads(outcome_prices) if isinstance(outcome_prices, str) else outcome_prices
                     if prices and len(prices) >= 1:
                         yes_prob = float(prices[0])
-                except:
+                except (ValueError, TypeError):
                     pass
             
             # Parse volumes
@@ -479,7 +479,7 @@ class PolymarketClient:
                 volume = float(volume) if volume else 0
                 volume_24h = float(volume_24h) if volume_24h else 0
                 liquidity = float(liquidity) if liquidity else 0
-            except:
+            except (ValueError, TypeError):
                 volume = volume_24h = liquidity = 0
             
             # Parse close date
@@ -488,7 +488,7 @@ class PolymarketClient:
             if end_date:
                 try:
                     close_date = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
-                except:
+                except (ValueError, TypeError):
                     pass
             
             # Market ID

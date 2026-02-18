@@ -534,9 +534,9 @@ async def create_job(
             trigger_source="/jobs",
             config_snapshot=job.config,
         )
-    except Exception:
-        pass
-    
+    except Exception as e:
+        logger.debug("Audit trail logging failed: %s", e)
+
     # Start background ingestion
     background_tasks.add_task(
         run_ingestion_job,

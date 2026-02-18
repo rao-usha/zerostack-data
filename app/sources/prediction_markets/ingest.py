@@ -179,7 +179,7 @@ def store_observation(db: Session, market: PredictionMarket, market_data: Market
             time_diff = datetime.utcnow() - prev_obs.observation_timestamp
             if time_diff <= timedelta(hours=48):
                 prob_change_24h = str(round(curr_prob - prev_prob, 4))
-        except:
+        except (ValueError, TypeError):
             pass
     
     observation = MarketObservation(

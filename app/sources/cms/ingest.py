@@ -507,9 +507,9 @@ def _normalize_value(value: Any, col_type: str) -> Any:
             # CMS dates are typically in format: YYYY-MM-DD or MM/DD/YYYY
             from dateutil import parser
             return parser.parse(str(value)).date()
-        except:
+        except (ValueError, TypeError):
             return None
-    
+
     # Text types - return as-is
     return str(value)
 

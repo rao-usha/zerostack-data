@@ -414,7 +414,7 @@ async def _store_geojson_features(
                     bbox_miny = str(min(lats))
                     bbox_maxx = str(max(lons))
                     bbox_maxy = str(max(lats))
-            except:
+            except (ValueError, TypeError):
                 pass
         
         # Store the feature

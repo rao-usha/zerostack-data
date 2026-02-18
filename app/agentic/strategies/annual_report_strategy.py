@@ -478,7 +478,7 @@ class AnnualReportStrategy(BaseStrategy):
                     value_str = str(row[value_col]).replace(',', '').replace('$', '')
                     value = float(re.sub(r'[^\d.]', '', value_str))
                     holding["market_value_usd"] = str(int(value))
-                except:
+                except (ValueError, TypeError):
                     pass
             
             # Add shares if found
@@ -487,7 +487,7 @@ class AnnualReportStrategy(BaseStrategy):
                     shares_str = str(row[shares_col]).replace(',', '')
                     shares = int(float(re.sub(r'[^\d.]', '', shares_str)))
                     holding["shares_held"] = str(shares)
-                except:
+                except (ValueError, TypeError):
                     pass
             
             holdings.append(holding)

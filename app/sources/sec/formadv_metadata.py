@@ -312,11 +312,11 @@ def _parse_date(date_value: Any) -> Optional[date]:
         try:
             # Try ISO format first
             return datetime.fromisoformat(date_value.replace('Z', '+00:00')).date()
-        except:
+        except (ValueError, TypeError):
             try:
                 # Try common US format
                 return datetime.strptime(date_value, "%m/%d/%Y").date()
-            except:
+            except (ValueError, TypeError):
                 logger.warning(f"Unable to parse date: {date_value}")
                 return None
     
@@ -336,7 +336,7 @@ def _parse_numeric(value: Any) -> Optional[float]:
             # Remove commas and dollar signs
             clean = value.replace(",", "").replace("$", "").strip()
             return float(clean)
-        except:
+        except (ValueError, TypeError):
             return None
     
     return None
@@ -353,7 +353,7 @@ def _parse_int(value: Any) -> Optional[int]:
     if isinstance(value, (float, str)):
         try:
             return int(float(value))
-        except:
+        except (ValueError, TypeError):
             return None
     
     return None

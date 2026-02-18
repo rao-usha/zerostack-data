@@ -916,8 +916,8 @@ class CompetitiveIntelAgent:
                     "impact_score": 0.8 if amount > 10_000_000 else 0.6,
                     "detected_at": row["date_of_first_sale"].isoformat() if row.get("date_of_first_sale") else None,
                 })
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to fetch Form D movements for %s: %s", company_name, e)
 
         return movements
 

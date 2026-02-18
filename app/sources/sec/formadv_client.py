@@ -349,7 +349,7 @@ class FormADVClient:
                         data = response.json()
                         logger.debug(f"Successfully fetched data for {identifier}")
                         return data
-                    except:
+                    except (ValueError, KeyError):
                         # If not JSON, return text
                         return {"content": response.text}
                 

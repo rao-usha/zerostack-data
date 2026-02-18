@@ -663,7 +663,7 @@ class NewsAgent(BaseCollector):
                 try:
                     from dateutil import parser as date_parser
                     return date_parser.parse(match.group(1)).date()
-                except:
+                except (ValueError, TypeError):
                     pass
 
         return None
