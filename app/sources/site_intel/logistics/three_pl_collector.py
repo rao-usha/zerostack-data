@@ -16,6 +16,7 @@ No API key required for most public data.
 
 import asyncio
 import logging
+import os
 import re
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -120,16 +121,22 @@ class ThreePLCollector(BaseCollector):
             return True
 
         try:
-            self._playwright = await async_playwright().start()
-            self._browser = await self._playwright.chromium.launch(
-                headless=True,
-                args=[
+            headed = os.getenv("BROWSER_HEADED", "0") == "1"
+            launch_kwargs = {
+                "headless": not headed,
+                "args": [
                     "--disable-gpu",
                     "--no-sandbox",
                     "--disable-dev-shm-usage",
                     "--disable-setuid-sandbox",
                 ],
-            )
+            }
+            if headed:
+                launch_kwargs["slow_mo"] = 250
+                logger.info("Headed browser mode enabled — launching visible browser window")
+
+            self._playwright = await async_playwright().start()
+            self._browser = await self._playwright.chromium.launch(**launch_kwargs)
             self._browser_context = await self._browser.new_context(
                 user_agent=self.get_default_headers()["User-Agent"],
                 viewport={"width": 1280, "height": 720},
@@ -138,6 +145,8 @@ class ThreePLCollector(BaseCollector):
             return True
         except Exception as e:
             logger.error(f"Failed to initialize Playwright: {e}")
+            if headed:
+                logger.warning("Headed mode failed (no display?), falling back to headless")
             return False
 
     async def _close_playwright(self):

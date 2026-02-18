@@ -77,6 +77,7 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
       MAX_CONCURRENCY: 4
       LOG_LEVEL: INFO
+      BROWSER_HEADED: ${BROWSER_HEADED:-0}
       # Set to "1" to route jobs through the queue instead of BackgroundTasks
       WORKER_MODE: ${WORKER_MODE:-}
     depends_on:

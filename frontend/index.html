@@ -546,7 +546,10 @@
         /* ===== Confirm Modal ===== */
         .confirm-overlay {
             position: fixed; inset: 0; z-index: 10000;
-            background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center;
+        }
+        .confirm-overlay:not(.hidden) {
+            display: flex;
         }
         .confirm-dialog {
             background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
@@ -3859,6 +3862,10 @@
                                 <option value="deep_dive">Deep Dive</option>
                             </select>
                         </div>
+                        <div class="jobs-launcher-field" style="display:flex;align-items:center;gap:0.5rem;padding-top:1.25rem;">
+                            <input type="checkbox" id="jobs-agentic-headed" style="width:auto;">
+                            <label for="jobs-agentic-headed" style="margin:0;cursor:pointer;">Headed Browser (visible)</label>
+                        </div>
                     </div>`,
                 ingestion: `
                     <div class="jobs-launcher-row">
@@ -3982,8 +3989,9 @@
                     case 'agentic': {
                         const investorId = document.getElementById('jobs-agentic-investor')?.value;
                         const resType = document.getElementById('jobs-agentic-type')?.value || 'portfolio';
+                        const headed = document.getElementById('jobs-agentic-headed')?.checked || false;
                         url = '/api/v1/agentic/portfolio/collect';
-                        body = { investor_id: parseInt(investorId) || 0, research_type: resType };
+                        body = { investor_id: parseInt(investorId) || 0, investor_type: 'lp', headed: headed };
                         break;
                     }
                     case 'ingestion': {

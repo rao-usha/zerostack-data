@@ -61,6 +61,7 @@ class PortfolioResearchAgent:
         max_time_seconds: int = DEFAULT_MAX_TIME_SECONDS,
         min_companies_target: int = DEFAULT_MIN_COMPANIES_TARGET,
         min_sources: int = DEFAULT_MIN_SOURCES,
+        headed: bool = False,
     ):
         """
         Initialize the portfolio research agent.
@@ -71,19 +72,21 @@ class PortfolioResearchAgent:
             max_time_seconds: Maximum execution time
             min_companies_target: Target number of companies to find
             min_sources: Minimum sources for validation
+            headed: Run browser in headed (visible) mode for debugging
         """
         self.db = db
         self.max_strategies = max_strategies
         self.max_time_seconds = max_time_seconds
         self.min_companies_target = min_companies_target
         self.min_sources = min_sources
+        self.headed = headed
 
         # Initialize synthesizer
         self.synthesizer = DataSynthesizer()
 
         # Initialize strategies
         self.strategies: List[BaseStrategy] = [
-            strategy_class() for strategy_class in AVAILABLE_STRATEGIES
+            strategy_class(headed=headed) for strategy_class in AVAILABLE_STRATEGIES
         ]
 
         logger.info(

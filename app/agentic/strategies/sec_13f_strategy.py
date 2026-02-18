@@ -61,9 +61,11 @@ class SEC13FStrategy(BaseStrategy):
         max_requests_per_second: Optional[float] = None,
         max_concurrent_requests: Optional[int] = None,
         timeout_seconds: Optional[int] = None,
+        **kwargs,
     ):
         super().__init__(
-            max_requests_per_second, max_concurrent_requests, timeout_seconds
+            max_requests_per_second, max_concurrent_requests, timeout_seconds,
+            **kwargs,
         )
         self._client: Optional[httpx.AsyncClient] = None
         self._rate_limiter = asyncio.Semaphore(1)

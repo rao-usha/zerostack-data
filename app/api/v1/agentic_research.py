@@ -42,6 +42,10 @@ class PortfolioCollectionRequest(BaseModel):
         description="Specific strategies to use (if None, agent decides). "
         "Options: 'sec_13f', 'website_scraping'",
     )
+    headed: bool = Field(
+        False,
+        description="Run browser in headed (visible) mode for debugging",
+    )
 
 
 class BatchCollectionRequest(BaseModel):
@@ -92,6 +96,7 @@ async def run_portfolio_collection(
     strategies: Optional[List[str]],
     job_id: int,
     db_url: str,
+    headed: bool = False,
 ):
     """Background task to run portfolio collection."""
     from sqlalchemy import create_engine
@@ -154,7 +159,7 @@ async def run_portfolio_collection(
         )
 
         # Run agent
-        agent = PortfolioResearchAgent(db)
+        agent = PortfolioResearchAgent(db, headed=headed)
         result = await agent.collect_portfolio(
             context=context, strategies_to_use=strategies, job_id=job_id
         )
@@ -296,11 +301,11 @@ async def trigger_portfolio_collection(
         result = db.execute(
             text("""
                 INSERT INTO agentic_collection_jobs (
-                    job_type, target_investor_id, target_investor_type, 
-                    target_investor_name, status, strategies_used
+                    job_type, target_investor_id, target_investor_type,
+                    target_investor_name, status, strategies_used, created_at
                 ) VALUES (
                     'portfolio_discovery', :investor_id, :investor_type,
-                    :investor_name, 'pending', :strategies
+                    :investor_name, 'pending', :strategies, NOW()
                 )
                 RETURNING id
             """),
@@ -333,6 +338,7 @@ async def trigger_portfolio_collection(
                 "strategies": request.strategies,
                 "job_id": job_id,
                 "db_url": settings.database_url,
+                "headed": request.headed,
             },
             job_table_id=job_id,
             background_tasks=background_tasks,
@@ -343,6 +349,7 @@ async def trigger_portfolio_collection(
                 request.strategies,
                 job_id,
                 settings.database_url,
+                request.headed,
             ),
         )
 
@@ -432,11 +439,11 @@ async def batch_portfolio_collection(
             result = db.execute(
                 text("""
                     INSERT INTO agentic_collection_jobs (
-                        job_type, target_investor_id, target_investor_type, 
-                        target_investor_name, status
+                        job_type, target_investor_id, target_investor_type,
+                        target_investor_name, status, created_at
                     ) VALUES (
                         'portfolio_discovery', :investor_id, :investor_type,
-                        :investor_name, 'pending'
+                        :investor_name, 'pending', NOW()
                     )
                     RETURNING id
                 """),

@@ -25,6 +25,7 @@ JS Rendering Support (T10):
 
 import asyncio
 import logging
+import os
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -129,14 +130,19 @@ class WebsiteStrategy(BaseStrategy):
         max_concurrent_requests: Optional[int] = None,
         timeout_seconds: Optional[int] = None,
         enable_js_rendering: bool = True,
+        headed: bool = False,
     ):
         super().__init__(
-            max_requests_per_second, max_concurrent_requests, timeout_seconds
+            max_requests_per_second, max_concurrent_requests, timeout_seconds,
+            headed=headed,
         )
         self._client: Optional[httpx.AsyncClient] = None
         self._rate_limiter = asyncio.Semaphore(1)
         self._last_request_time: Dict[str, float] = {}  # Per-domain rate limiting
         self._cache = get_cache()  # Use shared cache for robots.txt and pages
+
+        # Headed mode: per-request param takes priority, then env var
+        self._headed = headed or os.getenv("BROWSER_HEADED", "0") == "1"
 
         # Playwright state for JS rendering
         self._enable_js_rendering = enable_js_rendering and PLAYWRIGHT_AVAILABLE
@@ -193,22 +199,29 @@ class WebsiteStrategy(BaseStrategy):
 
         if self._browser is None:
             try:
-                self._playwright = await async_playwright().start()
-                self._browser = await self._playwright.chromium.launch(
-                    headless=True,
-                    args=[
+                launch_kwargs = {
+                    "headless": not self._headed,
+                    "args": [
                         "--disable-gpu",
                         "--no-sandbox",
                         "--disable-dev-shm-usage",
                         "--disable-setuid-sandbox",
                     ],
-                )
+                }
+                if self._headed:
+                    launch_kwargs["slow_mo"] = 250
+                    logger.info("Headed browser mode enabled — launching visible browser window")
+
+                self._playwright = await async_playwright().start()
+                self._browser = await self._playwright.chromium.launch(**launch_kwargs)
                 self._browser_context = await self._browser.new_context(
                     user_agent=self.USER_AGENT, viewport={"width": 1280, "height": 720}
                 )
                 logger.info("Playwright browser initialized for JS rendering")
             except Exception as e:
                 logger.warning(f"Failed to initialize Playwright browser: {e}")
+                if self._headed:
+                    logger.warning("Headed mode failed (no display?), falling back to headless")
                 self._enable_js_rendering = False
                 return None
 

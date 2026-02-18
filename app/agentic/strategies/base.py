@@ -123,6 +123,7 @@ class BaseStrategy(ABC):
         timeout_seconds: Optional[int] = None,
         max_retries: Optional[int] = None,
         retry_base_delay: Optional[float] = None,
+        headed: bool = False,
     ):
         """
         Initialize strategy with rate limiting and retry configuration.
@@ -133,7 +134,9 @@ class BaseStrategy(ABC):
             timeout_seconds: Override default timeout
             max_retries: Override default retry count
             retry_base_delay: Override default retry delay
+            headed: Run browser in headed (visible) mode for debugging
         """
+        self.headed = headed
         if max_requests_per_second is not None:
             self.max_requests_per_second = max_requests_per_second
         if max_concurrent_requests is not None:
