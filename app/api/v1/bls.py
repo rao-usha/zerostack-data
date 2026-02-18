@@ -22,11 +22,9 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db, get_session_factory
-from app.core.models import IngestionJob, JobStatus
+from app.core.database import get_db
+from app.core.job_helpers import create_and_dispatch_job
 from app.sources.bls import (
-    ingest_bls_dataset,
-    ingest_bls_series,
     get_series_for_dataset,
     get_series_reference,
     get_default_date_range,
@@ -120,7 +118,7 @@ async def ingest_bls_dataset_endpoint(
 ):
     """
     Ingest BLS data for a specific dataset.
-    
+
     **Available Datasets:**
     - **ces**: Current Employment Statistics (employment, hours, earnings by industry)
     - **cps**: Current Population Survey (unemployment rate, labor force participation)
@@ -128,12 +126,12 @@ async def ingest_bls_dataset_endpoint(
     - **cpi**: Consumer Price Index (inflation measures, CPI-U, Core CPI)
     - **ppi**: Producer Price Index (wholesale prices, final demand, intermediate demand)
     - **oes**: Occupational Employment Statistics (wages by occupation)
-    
+
     **API Key:** Optional but recommended
     - Without key: 25 queries/day, 10 years max
     - With key: 500 queries/day, 20 years max
     - Set `BLS_API_KEY` environment variable
-    
+
     **Example Request:**
     ```json
     {
@@ -145,7 +143,7 @@ async def ingest_bls_dataset_endpoint(
     try:
         settings = get_settings()
         api_key_present = settings.get_bls_api_key() is not None
-        
+
         # Set defaults
         if request.start_year is None or request.end_year is None:
             default_start, default_end = get_default_date_range(api_key_present)
@@ -154,52 +152,29 @@ async def ingest_bls_dataset_endpoint(
         else:
             start_year = request.start_year
             end_year = request.end_year
-        
+
         # Get series IDs
         series_ids = request.series_ids
         if not series_ids:
             series_ids = get_series_for_dataset(dataset.value)
-        
-        job_config = {
-            "dataset": dataset.value,
-            "start_year": start_year,
-            "end_year": end_year,
-            "series_count": len(series_ids),
-            "series_ids": series_ids[:10],  # Store first 10 for reference
-            "api_key_configured": api_key_present,
-        }
-        
-        job = IngestionJob(
-            source="bls",
-            status=JobStatus.PENDING,
-            config=job_config
+
+        return create_and_dispatch_job(
+            db, background_tasks, source="bls",
+            config={
+                "dataset": dataset.value,
+                "start_year": start_year,
+                "end_year": end_year,
+                "series_count": len(series_ids),
+                "series_ids": series_ids[:10],  # Store first 10 for reference
+                "api_key_configured": api_key_present,
+            },
+            message=f"BLS {dataset.value.upper()} ingestion job created",
         )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_dataset_ingestion,
-            job.id,
-            dataset.value,
-            start_year,
-            end_year,
-            series_ids
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"BLS {dataset.value.upper()} ingestion job created",
-            "dataset": dataset.value,
-            "series_count": len(series_ids),
-            "year_range": f"{start_year}-{end_year}",
-            "api_key_configured": api_key_present,
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to create BLS {dataset.value} job: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -213,13 +188,13 @@ async def ingest_custom_series(
 ):
     """
     Ingest specific BLS series by ID.
-    
+
     Use this endpoint to ingest custom series that aren't in the default sets.
-    
+
     **Finding Series IDs:**
     - Visit https://www.bls.gov/data/ and search for your series
     - Use the reference endpoints below to see common series IDs
-    
+
     **Example Request:**
     ```json
     {
@@ -233,47 +208,24 @@ async def ingest_custom_series(
     try:
         settings = get_settings()
         api_key_present = settings.get_bls_api_key() is not None
-        
-        job_config = {
-            "dataset": request.dataset.value,
-            "start_year": request.start_year,
-            "end_year": request.end_year,
-            "series_ids": request.series_ids,
-            "series_count": len(request.series_ids),
-            "api_key_configured": api_key_present,
-        }
-        
-        job = IngestionJob(
-            source="bls",
-            status=JobStatus.PENDING,
-            config=job_config
+
+        return create_and_dispatch_job(
+            db, background_tasks, source="bls",
+            config={
+                "dataset": request.dataset.value,
+                "start_year": request.start_year,
+                "end_year": request.end_year,
+                "series_ids": request.series_ids,
+                "series_count": len(request.series_ids),
+                "api_key_configured": api_key_present,
+            },
+            message="BLS custom series ingestion job created",
         )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_series_ingestion,
-            job.id,
-            request.series_ids,
-            request.start_year,
-            request.end_year,
-            request.dataset.value
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"BLS custom series ingestion job created",
-            "series_count": len(request.series_ids),
-            "series_ids": request.series_ids,
-            "year_range": f"{request.start_year}-{request.end_year}",
-            "target_table": f"bls_{request.dataset.value}",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to create BLS series job: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -287,9 +239,9 @@ async def ingest_all_datasets(
 ):
     """
     Ingest multiple BLS datasets at once.
-    
+
     Creates separate jobs for each dataset. Useful for initial data load.
-    
+
     **Example Request:**
     ```json
     {
@@ -298,19 +250,19 @@ async def ingest_all_datasets(
         "end_year": 2024
     }
     ```
-    
+
     **Note:** This creates one job per dataset. Monitor each job separately.
     """
     try:
         settings = get_settings()
         api_key_present = settings.get_bls_api_key() is not None
-        
+
         # Determine datasets to ingest
         if request.datasets:
             datasets = [d.value for d in request.datasets]
         else:
             datasets = list(COMMON_SERIES.keys())
-        
+
         # Set defaults
         if request.start_year is None or request.end_year is None:
             default_start, default_end = get_default_date_range(api_key_present)
@@ -319,44 +271,30 @@ async def ingest_all_datasets(
         else:
             start_year = request.start_year
             end_year = request.end_year
-        
+
         jobs = []
         for dataset in datasets:
             series_ids = get_series_for_dataset(dataset)
-            
-            job_config = {
-                "dataset": dataset,
-                "start_year": start_year,
-                "end_year": end_year,
-                "series_count": len(series_ids),
-                "api_key_configured": api_key_present,
-                "batch_job": True,
-            }
-            
-            job = IngestionJob(
-                source="bls",
-                status=JobStatus.PENDING,
-                config=job_config
+
+            result = create_and_dispatch_job(
+                db, background_tasks, source="bls",
+                config={
+                    "dataset": dataset,
+                    "start_year": start_year,
+                    "end_year": end_year,
+                    "series_count": len(series_ids),
+                    "api_key_configured": api_key_present,
+                    "batch_job": True,
+                },
+                message=f"BLS {dataset.upper()} ingestion job created",
             )
-            db.add(job)
-            db.commit()
-            db.refresh(job)
-            
-            background_tasks.add_task(
-                _run_dataset_ingestion,
-                job.id,
-                dataset,
-                start_year,
-                end_year,
-                series_ids
-            )
-            
+
             jobs.append({
-                "job_id": job.id,
+                "job_id": result["job_id"],
                 "dataset": dataset,
                 "series_count": len(series_ids),
             })
-        
+
         return {
             "status": "pending",
             "message": f"Created {len(jobs)} BLS ingestion jobs",
@@ -364,9 +302,11 @@ async def ingest_all_datasets(
             "year_range": f"{start_year}-{end_year}",
             "api_key_configured": api_key_present,
         }
-    
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to create BLS batch jobs: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -388,7 +328,7 @@ async def get_available_datasets():
             "series_count": len(series),
             "description": ALL_SERIES_REFERENCE.get(dataset, {}).get("description", ""),
         }
-    
+
     return {"datasets": datasets}
 
 
@@ -396,10 +336,10 @@ async def get_available_datasets():
 async def get_common_series(dataset: Optional[BLSDataset] = None):
     """
     Get commonly used BLS series IDs.
-    
+
     **Query Parameters:**
     - `dataset`: Filter by dataset (optional)
-    
+
     Returns series organized by dataset with descriptions.
     """
     try:
@@ -414,7 +354,7 @@ async def get_common_series(dataset: Optional[BLSDataset] = None):
 async def get_dataset_series(dataset: BLSDataset):
     """
     Get series IDs for a specific BLS dataset.
-    
+
     **Available Datasets:** ces, cps, jolts, cpi, ppi, oes
     """
     try:
@@ -428,7 +368,7 @@ async def get_dataset_series(dataset: BLSDataset):
 async def get_quick_reference():
     """
     Get quick reference for most popular BLS series.
-    
+
     Returns the most commonly used series for economic analysis.
     """
     return {
@@ -460,69 +400,3 @@ async def get_quick_reference():
             "with_key": "500 queries/day, 20 years, 50 series per query",
         }
     }
-
-
-# =============================================================================
-# BACKGROUND TASKS
-# =============================================================================
-
-async def _run_dataset_ingestion(
-    job_id: int,
-    dataset: str,
-    start_year: int,
-    end_year: int,
-    series_ids: List[str]
-):
-    """Background task for dataset ingestion."""
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    
-    try:
-        await ingest_bls_series(
-            db=db,
-            job_id=job_id,
-            series_ids=series_ids,
-            start_year=start_year,
-            end_year=end_year,
-            dataset=dataset
-        )
-        
-        logger.info(f"BLS {dataset} ingestion job {job_id} completed")
-    
-    except Exception as e:
-        logger.error(f"BLS {dataset} ingestion job {job_id} failed: {e}", exc_info=True)
-        # Job status is updated in the ingest function
-    
-    finally:
-        db.close()
-
-
-async def _run_series_ingestion(
-    job_id: int,
-    series_ids: List[str],
-    start_year: int,
-    end_year: int,
-    dataset: str
-):
-    """Background task for custom series ingestion."""
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    
-    try:
-        await ingest_bls_series(
-            db=db,
-            job_id=job_id,
-            series_ids=series_ids,
-            start_year=start_year,
-            end_year=end_year,
-            dataset=dataset
-        )
-        
-        logger.info(f"BLS series ingestion job {job_id} completed")
-    
-    except Exception as e:
-        logger.error(f"BLS series ingestion job {job_id} failed: {e}", exc_info=True)
-        # Job status is updated in the ingest function
-    
-    finally:
-        db.close()

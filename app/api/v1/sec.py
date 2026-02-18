@@ -14,12 +14,13 @@ from sqlalchemy import text
 
 from app.core.database import get_db
 from app.core.models import IngestionJob, JobStatus
-from app.sources.sec import ingest, metadata, ingest_xbrl, formadv_ingest
+from app.core.job_helpers import create_and_dispatch_job
+from app.sources.sec import metadata, ingest_xbrl
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
-    prefix="/sec", 
+    prefix="/sec",
     tags=["SEC EDGAR"],
     responses={
         404: {"description": "Not found"},
@@ -35,7 +36,7 @@ router = APIRouter(
 
 class IngestCompanyRequest(BaseModel):
     """Request model for ingesting a single company's filings."""
-    
+
     cik: str = Field(
         ...,
         description="Company CIK (Central Index Key), e.g., '0000320193' for Apple",
@@ -60,7 +61,7 @@ class IngestCompanyRequest(BaseModel):
 
 class IngestMultipleCompaniesRequest(BaseModel):
     """Request model for ingesting multiple companies."""
-    
+
     ciks: List[str] = Field(
         ...,
         description="List of company CIKs",
@@ -85,7 +86,7 @@ class IngestMultipleCompaniesRequest(BaseModel):
 
 class IngestResponse(BaseModel):
     """Response model for ingestion requests."""
-    
+
     job_id: int
     status: str
     message: str
@@ -95,7 +96,7 @@ class IngestResponse(BaseModel):
 
 class IngestFormADVRequest(BaseModel):
     """Request model for ingesting Form ADV data."""
-    
+
     family_office_names: List[str] = Field(
         ...,
         description="List of family office names to search and ingest",
@@ -117,7 +118,7 @@ class IngestFormADVRequest(BaseModel):
 
 class IngestFormADVByCRDRequest(BaseModel):
     """Request model for ingesting Form ADV by CRD number."""
-    
+
     crd_number: str = Field(
         ...,
         description="Investment adviser CRD (Central Registration Depository) number",
@@ -138,22 +139,22 @@ async def ingest_company(
 ):
     """
     Ingest SEC filings for a single company.
-    
+
     This endpoint:
     1. Validates the CIK
     2. Creates an ingestion job
     3. Fetches filings from SEC EDGAR API
     4. Stores filings in appropriate tables
-    
+
     The ingestion runs in the background. Use the `/jobs/{job_id}` endpoint
     to check status.
-    
+
     **Rate Limits:**
     - SEC enforces 10 requests/second per IP
     - This service uses conservative rate limiting (8 req/sec)
-    
+
     **Examples:**
-    
+
     Ingest Apple's 10-K and 10-Q filings from 2020-2024:
     ```json
     {
@@ -164,56 +165,33 @@ async def ingest_company(
     }
     ```
     """
-    try:
-        # Validate CIK
-        if not metadata.validate_cik(request.cik):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid CIK format: {request.cik}"
-            )
-        
-        cik_normalized = metadata.normalize_cik(request.cik)
-        
-        # Create job
-        job_config = {
+    # Validate CIK
+    if not metadata.validate_cik(request.cik):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid CIK format: {request.cik}"
+        )
+
+    cik_normalized = metadata.normalize_cik(request.cik)
+
+    result = create_and_dispatch_job(
+        db, background_tasks, source="sec",
+        config={
             "source": "sec",
             "cik": cik_normalized,
             "filing_types": request.filing_types or ["10-K", "10-Q"],
             "start_date": request.start_date.isoformat() if request.start_date else None,
             "end_date": request.end_date.isoformat() if request.end_date else None,
-        }
-        
-        job = IngestionJob(
-            source="sec",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        # Run ingestion in background
-        background_tasks.add_task(
-            _run_company_ingestion,
-            job.id,
-            cik_normalized,
-            request.filing_types,
-            request.start_date,
-            request.end_date
-        )
-        
-        return IngestResponse(
-            job_id=job.id,
-            status="pending",
-            message=f"Ingestion job created for CIK {cik_normalized}",
-            cik=cik_normalized
-        )
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create ingestion job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        },
+        message=f"Ingestion job created for CIK {cik_normalized}",
+    )
+
+    return IngestResponse(
+        job_id=result["job_id"],
+        status=result["status"],
+        message=result["message"],
+        cik=cik_normalized
+    )
 
 
 @router.post("/ingest/multiple", response_model=dict)
@@ -224,12 +202,12 @@ async def ingest_multiple_companies(
 ):
     """
     Ingest SEC filings for multiple companies.
-    
+
     This endpoint creates separate jobs for each company and runs them
     in the background.
-    
+
     **Example:**
-    
+
     Ingest filings for Apple, Microsoft, and Google:
     ```json
     {
@@ -242,54 +220,38 @@ async def ingest_multiple_companies(
     """
     try:
         jobs_created = []
-        
+
         for cik in request.ciks:
             # Validate CIK
             if not metadata.validate_cik(cik):
                 logger.warning(f"Skipping invalid CIK: {cik}")
                 continue
-            
+
             cik_normalized = metadata.normalize_cik(cik)
-            
-            # Create job
-            job_config = {
-                "source": "sec",
-                "cik": cik_normalized,
-                "filing_types": request.filing_types or ["10-K", "10-Q"],
-                "start_date": request.start_date.isoformat() if request.start_date else None,
-                "end_date": request.end_date.isoformat() if request.end_date else None,
-            }
-            
-            job = IngestionJob(
-                source="sec",
-                status=JobStatus.PENDING,
-                config=job_config
+
+            result = create_and_dispatch_job(
+                db, background_tasks, source="sec",
+                config={
+                    "source": "sec",
+                    "cik": cik_normalized,
+                    "filing_types": request.filing_types or ["10-K", "10-Q"],
+                    "start_date": request.start_date.isoformat() if request.start_date else None,
+                    "end_date": request.end_date.isoformat() if request.end_date else None,
+                },
+                message=f"Ingestion job created for CIK {cik_normalized}",
             )
-            db.add(job)
-            db.commit()
-            db.refresh(job)
-            
-            # Run ingestion in background
-            background_tasks.add_task(
-                _run_company_ingestion,
-                job.id,
-                cik_normalized,
-                request.filing_types,
-                request.start_date,
-                request.end_date
-            )
-            
+
             jobs_created.append({
-                "job_id": job.id,
+                "job_id": result["job_id"],
                 "cik": cik_normalized,
                 "status": "pending"
             })
-        
+
         return {
             "message": f"Created {len(jobs_created)} ingestion jobs",
             "jobs": jobs_created
         }
-    
+
     except Exception as e:
         logger.error(f"Failed to create ingestion jobs: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -299,7 +261,7 @@ async def ingest_multiple_companies(
 async def get_supported_filing_types():
     """
     Get list of supported SEC filing types.
-    
+
     Returns a dictionary mapping filing type codes to descriptions.
     """
     return {
@@ -311,11 +273,11 @@ async def get_supported_filing_types():
 async def get_common_companies():
     """
     Get CIK numbers for commonly requested companies.
-    
+
     Returns a dictionary of company categories with CIK numbers.
     """
     from app.sources.sec.client import COMMON_COMPANIES
-    
+
     return {
         "companies": COMMON_COMPANIES
     }
@@ -329,75 +291,55 @@ async def ingest_financial_data(
 ):
     """
     Ingest structured financial data (XBRL) for a company.
-    
+
     This endpoint fetches and parses:
     - Income statements
     - Balance sheets
     - Cash flow statements
     - Individual financial facts
-    
+
     The data is extracted from SEC's Company Facts API which provides
     structured XBRL data in JSON format.
-    
+
     **Example:**
-    
+
     ```json
     {
         "cik": "0000320193"
     }
     ```
-    
+
     The financial data is stored in normalized tables:
     - `sec_financial_facts` - All financial facts
     - `sec_income_statement` - Income statement line items
     - `sec_balance_sheet` - Balance sheet line items
     - `sec_cash_flow_statement` - Cash flow statement line items
     """
-    try:
-        # Validate CIK
-        if not metadata.validate_cik(request.cik):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid CIK format: {request.cik}"
-            )
-        
-        cik_normalized = metadata.normalize_cik(request.cik)
-        
-        # Create job
-        job_config = {
+    # Validate CIK
+    if not metadata.validate_cik(request.cik):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid CIK format: {request.cik}"
+        )
+
+    cik_normalized = metadata.normalize_cik(request.cik)
+
+    result = create_and_dispatch_job(
+        db, background_tasks, source="sec",
+        config={
             "source": "sec",
             "type": "xbrl_financial_data",
             "cik": cik_normalized,
-        }
-        
-        job = IngestionJob(
-            source="sec",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        # Run ingestion in background
-        background_tasks.add_task(
-            _run_financial_data_ingestion,
-            job.id,
-            cik_normalized
-        )
-        
-        return IngestResponse(
-            job_id=job.id,
-            status="pending",
-            message=f"XBRL financial data ingestion job created for CIK {cik_normalized}",
-            cik=cik_normalized
-        )
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create XBRL ingestion job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        },
+        message=f"XBRL financial data ingestion job created for CIK {cik_normalized}",
+    )
+
+    return IngestResponse(
+        job_id=result["job_id"],
+        status=result["status"],
+        message=result["message"],
+        cik=cik_normalized
+    )
 
 
 @router.post("/ingest/full-company")
@@ -408,13 +350,13 @@ async def ingest_full_company(
 ):
     """
     Comprehensive ingestion: Both filings AND financial data.
-    
+
     This endpoint triggers:
     1. Filing metadata ingestion (10-K, 10-Q, etc.)
     2. XBRL financial data ingestion (income statements, balance sheets, cash flows)
-    
+
     **Example:**
-    
+
     ```json
     {
         "cik": "0000320193",
@@ -424,77 +366,51 @@ async def ingest_full_company(
     }
     ```
     """
+    # Validate CIK
+    if not metadata.validate_cik(request.cik):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid CIK format: {request.cik}"
+        )
+
+    cik_normalized = metadata.normalize_cik(request.cik)
+
     try:
-        # Validate CIK
-        if not metadata.validate_cik(request.cik):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid CIK format: {request.cik}"
-            )
-        
-        cik_normalized = metadata.normalize_cik(request.cik)
-        
         jobs_created = []
-        
+
         # Job 1: Filing metadata
-        job_config_filings = {
-            "source": "sec",
-            "type": "filings",
-            "cik": cik_normalized,
-            "filing_types": request.filing_types or ["10-K", "10-Q"],
-            "start_date": request.start_date.isoformat() if request.start_date else None,
-            "end_date": request.end_date.isoformat() if request.end_date else None,
-        }
-        
-        job_filings = IngestionJob(
-            source="sec",
-            status=JobStatus.PENDING,
-            config=job_config_filings
+        result_filings = create_and_dispatch_job(
+            db, background_tasks, source="sec",
+            config={
+                "source": "sec",
+                "type": "filings",
+                "cik": cik_normalized,
+                "filing_types": request.filing_types or ["10-K", "10-Q"],
+                "start_date": request.start_date.isoformat() if request.start_date else None,
+                "end_date": request.end_date.isoformat() if request.end_date else None,
+            },
+            message=f"Filings ingestion job created for CIK {cik_normalized}",
         )
-        db.add(job_filings)
-        db.commit()
-        db.refresh(job_filings)
-        jobs_created.append({"type": "filings", "job_id": job_filings.id})
-        
+        jobs_created.append({"type": "filings", "job_id": result_filings["job_id"]})
+
         # Job 2: Financial data
-        job_config_xbrl = {
-            "source": "sec",
-            "type": "xbrl_financial_data",
-            "cik": cik_normalized,
-        }
-        
-        job_xbrl = IngestionJob(
-            source="sec",
-            status=JobStatus.PENDING,
-            config=job_config_xbrl
+        result_xbrl = create_and_dispatch_job(
+            db, background_tasks, source="sec",
+            config={
+                "source": "sec",
+                "type": "xbrl_financial_data",
+                "cik": cik_normalized,
+            },
+            message=f"XBRL financial data ingestion job created for CIK {cik_normalized}",
         )
-        db.add(job_xbrl)
-        db.commit()
-        db.refresh(job_xbrl)
-        jobs_created.append({"type": "financial_data", "job_id": job_xbrl.id})
-        
-        # Run both in background
-        background_tasks.add_task(
-            _run_company_ingestion,
-            job_filings.id,
-            cik_normalized,
-            request.filing_types,
-            request.start_date,
-            request.end_date
-        )
-        
-        background_tasks.add_task(
-            _run_financial_data_ingestion,
-            job_xbrl.id,
-            cik_normalized
-        )
-        
+        jobs_created.append({"type": "financial_data", "job_id": result_xbrl["job_id"]})
+
         return {
             "message": f"Full company ingestion started for CIK {cik_normalized}",
             "cik": cik_normalized,
             "jobs": jobs_created
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -571,66 +487,8 @@ async def ingest_industrial_companies(
 
 
 # =============================================================================
-# Background Task Functions
+# Background Task Functions (kept: complex batch with loop/sub-jobs)
 # =============================================================================
-
-
-async def _run_company_ingestion(
-    job_id: int,
-    cik: str,
-    filing_types: Optional[List[str]],
-    start_date: Optional[date],
-    end_date: Optional[date]
-):
-    """
-    Background task for running company ingestion.
-    
-    This function is called by FastAPI's background tasks system.
-    """
-    from app.core.database import get_session_factory
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    
-    try:
-        await ingest.ingest_company_filings(
-            db=db,
-            job_id=job_id,
-            cik=cik,
-            filing_types=filing_types,
-            start_date=start_date,
-            end_date=end_date
-        )
-    except Exception as e:
-        logger.error(f"Background ingestion failed for job {job_id}: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_financial_data_ingestion(
-    job_id: int,
-    cik: str
-):
-    """
-    Background task for running XBRL financial data ingestion.
-
-    This function is called by FastAPI's background tasks system.
-    """
-    from app.core.database import get_session_factory
-
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-
-    try:
-        await ingest_xbrl.ingest_company_financial_data(
-            db=db,
-            job_id=job_id,
-            cik=cik
-        )
-    except Exception as e:
-        logger.error(f"Background XBRL ingestion failed for job {job_id}: {e}", exc_info=True)
-    finally:
-        db.close()
 
 
 async def _run_industrial_companies_batch(
@@ -688,7 +546,7 @@ async def _run_industrial_companies_batch(
                     db=db,
                     job_id=sub_job.id,
                     cik=cik_normalized,
-                    skip_facts=True,  # Skip raw facts for batch — much faster
+                    skip_facts=True,  # Skip raw facts for batch -- much faster
                 )
                 results.append({"company": name, "cik": cik_normalized, "status": "success", **result})
                 succeeded += 1
@@ -740,32 +598,32 @@ async def ingest_form_adv_family_offices(
     db: Session = Depends(get_db)
 ):
     """
-    🏛️ Ingest SEC Form ADV data for family offices.
-    
+    Ingest SEC Form ADV data for family offices.
+
     This endpoint:
     1. Searches IAPD (Investment Adviser Public Disclosure) for each firm
     2. Fetches Form ADV data including business contact information
     3. Stores adviser details in `sec_form_adv` table
     4. Stores key personnel in `sec_form_adv_personnel` table
-    
+
     **Data Retrieved:**
     - Business addresses and contact information
     - Phone numbers and email addresses (business-level)
     - Key personnel and their titles
     - Assets under management
     - Registration status
-    
+
     **Important Notes:**
     - Many family offices qualify for regulatory exemptions and may NOT be registered
     - Only registered investment advisers have Form ADV data
     - This retrieves **business contact info only** (not personal PII)
-    
+
     **Rate Limits:**
     - Default: 2 requests/second (conservative for IAPD)
     - Max concurrency: 1-3 (to avoid overwhelming the API)
-    
+
     **Example:**
-    
+
     ```json
     {
         "family_office_names": [
@@ -778,51 +636,29 @@ async def ingest_form_adv_family_offices(
     }
     ```
     """
-    try:
-        if not request.family_office_names:
-            raise HTTPException(
-                status_code=400,
-                detail="At least one family office name must be provided"
-            )
-        
-        # Create job
-        job_config = {
+    if not request.family_office_names:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one family office name must be provided"
+        )
+
+    result = create_and_dispatch_job(
+        db, background_tasks, source="sec",
+        config={
             "source": "sec",
             "type": "form_adv",
             "family_offices": request.family_office_names,
             "max_concurrency": request.max_concurrency,
             "max_requests_per_second": request.max_requests_per_second,
-        }
-        
-        job = IngestionJob(
-            source="sec",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        # Run ingestion in background
-        background_tasks.add_task(
-            _run_formadv_ingestion,
-            job.id,
-            request.family_office_names,
-            request.max_concurrency,
-            request.max_requests_per_second
-        )
-        
-        return IngestResponse(
-            job_id=job.id,
-            status="pending",
-            message=f"Form ADV ingestion job created for {len(request.family_office_names)} family offices"
-        )
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create Form ADV ingestion job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        },
+        message=f"Form ADV ingestion job created for {len(request.family_office_names)} family offices",
+    )
+
+    return IngestResponse(
+        job_id=result["job_id"],
+        status=result["status"],
+        message=result["message"],
+    )
 
 
 @router.post("/form-adv/ingest/crd", response_model=IngestResponse, tags=["Form ADV - Ingestion"])
@@ -832,112 +668,40 @@ async def ingest_form_adv_by_crd(
     db: Session = Depends(get_db)
 ):
     """
-    🏛️ Ingest SEC Form ADV data for a specific firm by CRD number.
-    
+    Ingest SEC Form ADV data for a specific firm by CRD number.
+
     Use this endpoint when you already know the CRD number for a firm.
     CRD numbers can be found via the IAPD website or previous searches.
-    
+
     **Example:**
-    
+
     ```json
     {
         "crd_number": "158626"
     }
     ```
     """
-    try:
-        if not request.crd_number:
-            raise HTTPException(
-                status_code=400,
-                detail="CRD number is required"
-            )
-        
-        # Create job
-        job_config = {
+    if not request.crd_number:
+        raise HTTPException(
+            status_code=400,
+            detail="CRD number is required"
+        )
+
+    result = create_and_dispatch_job(
+        db, background_tasks, source="sec",
+        config={
             "source": "sec",
             "type": "form_adv_crd",
             "crd_number": request.crd_number,
-        }
-        
-        job = IngestionJob(
-            source="sec",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        # Run ingestion in background
-        background_tasks.add_task(
-            _run_formadv_crd_ingestion,
-            job.id,
-            request.crd_number
-        )
-        
-        return IngestResponse(
-            job_id=job.id,
-            status="pending",
-            message=f"Form ADV ingestion job created for CRD {request.crd_number}"
-        )
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create Form ADV CRD ingestion job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        },
+        message=f"Form ADV ingestion job created for CRD {request.crd_number}",
+    )
 
-
-async def _run_formadv_ingestion(
-    job_id: int,
-    family_office_names: List[str],
-    max_concurrency: int,
-    max_requests_per_second: float
-):
-    """
-    Background task for running Form ADV ingestion for family offices.
-    """
-    from app.core.database import get_session_factory
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    
-    try:
-        await formadv_ingest.ingest_family_offices(
-            db=db,
-            job_id=job_id,
-            family_office_names=family_office_names,
-            max_concurrency=max_concurrency,
-            max_requests_per_second=max_requests_per_second
-        )
-    except Exception as e:
-        logger.error(f"Background Form ADV ingestion failed for job {job_id}: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_formadv_crd_ingestion(
-    job_id: int,
-    crd_number: str
-):
-    """
-    Background task for running Form ADV ingestion by CRD number.
-    """
-    from app.core.database import get_session_factory
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    
-    try:
-        await formadv_ingest.ingest_firm_by_crd(
-            db=db,
-            job_id=job_id,
-            crd_number=crd_number
-        )
-    except Exception as e:
-        logger.error(f"Background Form ADV CRD ingestion failed for job {job_id}: {e}", exc_info=True)
-    finally:
-        db.close()
+    return IngestResponse(
+        job_id=result["job_id"],
+        status=result["status"],
+        message=result["message"],
+    )
 
 
 # =============================================================================
@@ -954,16 +718,16 @@ async def query_form_adv_firms(
     db: Session = Depends(get_db)
 ):
     """
-    📊 Query Form ADV firms from the database.
-    
+    Query Form ADV firms from the database.
+
     Returns business contact information for registered investment advisers.
-    
+
     **Parameters:**
     - `limit`: Maximum number of results (default: 100, max: 1000)
     - `offset`: Pagination offset (default: 0)
     - `family_office_only`: Filter to only family offices (default: false)
     - `state`: Filter by state (e.g., "NY", "CA")
-    
+
     **Example:**
     ```
     GET /api/v1/sec/form-adv/firms?limit=50&family_office_only=true&state=NY
@@ -971,13 +735,13 @@ async def query_form_adv_firms(
     """
     try:
         from sqlalchemy import text
-        
+
         # Validate limit
         limit = min(limit, 1000)
-        
+
         # Build query
         query = """
-            SELECT 
+            SELECT
                 crd_number,
                 sec_number,
                 firm_name,
@@ -997,27 +761,27 @@ async def query_form_adv_firms(
             FROM sec_form_adv
             WHERE 1=1
         """
-        
+
         params = {}
-        
+
         if family_office_only:
             query += " AND is_family_office = :family_office"
             params["family_office"] = True
-        
+
         if state:
             query += " AND business_address_state = :state"
             params["state"] = state.upper()
-        
+
         query += """
             ORDER BY assets_under_management DESC NULLS LAST
             LIMIT :limit OFFSET :offset
         """
         params["limit"] = limit
         params["offset"] = offset
-        
+
         result = db.execute(text(query), params)
         rows = result.fetchall()
-        
+
         # Convert to dict
         firms = []
         for row in rows:
@@ -1043,14 +807,14 @@ async def query_form_adv_firms(
                 "registration_date": row[14].isoformat() if row[14] else None,
                 "ingested_at": row[15].isoformat() if row[15] else None
             })
-        
+
         return {
             "count": len(firms),
             "limit": limit,
             "offset": offset,
             "firms": firms
         }
-    
+
     except Exception as e:
         logger.error(f"Error querying Form ADV firms: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -1062,10 +826,10 @@ async def get_form_adv_firm(
     db: Session = Depends(get_db)
 ):
     """
-    📋 Get detailed information for a specific firm by CRD number.
-    
+    Get detailed information for a specific firm by CRD number.
+
     Includes personnel information if available.
-    
+
     **Example:**
     ```
     GET /api/v1/sec/form-adv/firms/158626
@@ -1073,10 +837,10 @@ async def get_form_adv_firm(
     """
     try:
         from sqlalchemy import text
-        
+
         # Query firm
         firm_query = text("""
-            SELECT 
+            SELECT
                 crd_number,
                 sec_number,
                 firm_name,
@@ -1110,16 +874,16 @@ async def get_form_adv_firm(
             FROM sec_form_adv
             WHERE crd_number = :crd_number
         """)
-        
+
         result = db.execute(firm_query, {"crd_number": crd_number})
         row = result.fetchone()
-        
+
         if not row:
             raise HTTPException(status_code=404, detail=f"Firm with CRD {crd_number} not found")
-        
+
         # Query personnel
         personnel_query = text("""
-            SELECT 
+            SELECT
                 full_name,
                 title,
                 position_type,
@@ -1129,10 +893,10 @@ async def get_form_adv_firm(
             WHERE crd_number = :crd_number
             ORDER BY full_name
         """)
-        
+
         personnel_result = db.execute(personnel_query, {"crd_number": crd_number})
         personnel_rows = personnel_result.fetchall()
-        
+
         personnel = []
         for p_row in personnel_rows:
             personnel.append({
@@ -1142,7 +906,7 @@ async def get_form_adv_firm(
                 "email": p_row[3],
                 "phone": p_row[4]
             })
-        
+
         # Build response
         firm = {
             "crd_number": row[0],
@@ -1191,9 +955,9 @@ async def get_form_adv_firm(
                 "ingested_at": row[29].isoformat() if row[29] else None
             }
         }
-        
+
         return firm
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1204,10 +968,10 @@ async def get_form_adv_firm(
 @router.get("/form-adv/stats", tags=["Form ADV - Query"])
 async def get_form_adv_stats(db: Session = Depends(get_db)):
     """
-    📈 Get statistics about ingested Form ADV data.
-    
+    Get statistics about ingested Form ADV data.
+
     Returns counts by various dimensions.
-    
+
     **Example:**
     ```
     GET /api/v1/sec/form-adv/stats
@@ -1215,9 +979,9 @@ async def get_form_adv_stats(db: Session = Depends(get_db)):
     """
     try:
         from sqlalchemy import text
-        
+
         stats_query = text("""
-            SELECT 
+            SELECT
                 COUNT(*) as total_firms,
                 COUNT(CASE WHEN is_family_office = true THEN 1 END) as family_offices,
                 COUNT(DISTINCT business_address_state) as states_represented,
@@ -1229,16 +993,16 @@ async def get_form_adv_stats(db: Session = Depends(get_db)):
                 COUNT(website) as firms_with_website
             FROM sec_form_adv
         """)
-        
+
         result = db.execute(stats_query)
         row = result.fetchone()
-        
+
         personnel_query = text("""
             SELECT COUNT(*) FROM sec_form_adv_personnel
         """)
         personnel_result = db.execute(personnel_query)
         personnel_count = personnel_result.scalar()
-        
+
         return {
             "firms": {
                 "total": row[0],
@@ -1259,8 +1023,7 @@ async def get_form_adv_stats(db: Session = Depends(get_db)):
                 "total_records": personnel_count
             }
         }
-    
+
     except Exception as e:
         logger.error(f"Error fetching Form ADV stats: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
-

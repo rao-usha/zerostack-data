@@ -11,15 +11,14 @@ No API key required - all data is public domain.
 """
 import logging
 from enum import Enum
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.models import IngestionJob, JobStatus
-from app.sources.irs_soi import ingest
+from app.core.job_helpers import create_and_dispatch_job
 from app.sources.irs_soi.client import AVAILABLE_YEARS, DEFAULT_YEAR
 from app.sources.irs_soi.metadata import AGI_BRACKETS
 
@@ -117,66 +116,38 @@ async def ingest_zip_income_data(
 ):
     """
     Ingest IRS SOI individual income by ZIP code data.
-    
+
     This endpoint creates an ingestion job and runs it in the background.
     Use GET /api/v1/jobs/{job_id} to check progress.
-    
+
     **Data includes:**
     - Number of returns by AGI bracket
     - Total AGI, wages, dividends, capital gains
     - Tax liability, credits, deductions
     - Breakdown by filing status
-    
+
     **No API key required** (public government data)
-    
+
     **Available years:** 2017-2021
     """
-    try:
-        year = request.year or DEFAULT_YEAR
-        
-        # Validate year
-        if year not in AVAILABLE_YEARS["zip_income"]:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['zip_income']}"
-            )
-        
-        # Create job
-        job_config = {
+    year = request.year or DEFAULT_YEAR
+
+    # Validate year
+    if year not in AVAILABLE_YEARS["zip_income"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['zip_income']}"
+        )
+
+    return create_and_dispatch_job(
+        db, background_tasks, source="irs_soi",
+        config={
             "dataset": "zip_income",
             "year": year,
-            "use_cache": request.use_cache
-        }
-        
-        job = IngestionJob(
-            source="irs_soi",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        # Run ingestion in background
-        background_tasks.add_task(
-            _run_zip_income_ingestion,
-            job.id,
-            year,
-            request.use_cache
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"IRS SOI ZIP income ingestion job created for year {year}",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create IRS SOI ZIP income job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "use_cache": request.use_cache,
+        },
+        message=f"IRS SOI ZIP income ingestion job created for year {year}",
+    )
 
 
 @router.post("/irs-soi/county-income/ingest")
@@ -187,62 +158,36 @@ async def ingest_county_income_data(
 ):
     """
     Ingest IRS SOI individual income by county data.
-    
+
     Similar to ZIP data but aggregated at the county level with FIPS codes.
-    
+
     **Data includes:**
     - Number of returns by AGI bracket
     - Total AGI, wages, dividends, capital gains
     - Tax liability and income sources
     - County FIPS codes for geographic joins
-    
+
     **No API key required** (public government data)
-    
+
     **Available years:** 2017-2021
     """
-    try:
-        year = request.year or DEFAULT_YEAR
-        
-        if year not in AVAILABLE_YEARS["county_income"]:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['county_income']}"
-            )
-        
-        job_config = {
+    year = request.year or DEFAULT_YEAR
+
+    if year not in AVAILABLE_YEARS["county_income"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['county_income']}"
+        )
+
+    return create_and_dispatch_job(
+        db, background_tasks, source="irs_soi",
+        config={
             "dataset": "county_income",
             "year": year,
-            "use_cache": request.use_cache
-        }
-        
-        job = IngestionJob(
-            source="irs_soi",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_county_income_ingestion,
-            job.id,
-            year,
-            request.use_cache
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"IRS SOI county income ingestion job created for year {year}",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create IRS SOI county income job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "use_cache": request.use_cache,
+        },
+        message=f"IRS SOI county income ingestion job created for year {year}",
+    )
 
 
 @router.post("/irs-soi/migration/ingest")
@@ -253,69 +198,42 @@ async def ingest_migration_data(
 ):
     """
     Ingest IRS SOI county-to-county migration data.
-    
+
     Migration patterns are derived from tax return address changes.
-    
+
     **Data includes:**
     - County-to-county migration flows
     - Number of returns/exemptions migrating
     - Aggregate income of migrants
     - Inflow and outflow perspectives
-    
+
     **Use cases:**
     - Track population movements
     - Analyze income migration patterns
     - Identify growth/decline areas
-    
+
     **No API key required** (public government data)
-    
+
     **Available years:** 2017-2021
     """
-    try:
-        year = request.year or DEFAULT_YEAR
-        
-        if year not in AVAILABLE_YEARS["migration"]:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['migration']}"
-            )
-        
-        job_config = {
+    year = request.year or DEFAULT_YEAR
+
+    if year not in AVAILABLE_YEARS["migration"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['migration']}"
+        )
+
+    return create_and_dispatch_job(
+        db, background_tasks, source="irs_soi",
+        config={
             "dataset": "migration",
             "year": year,
             "flow_type": request.flow_type.value,
-            "use_cache": request.use_cache
-        }
-        
-        job = IngestionJob(
-            source="irs_soi",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_migration_ingestion,
-            job.id,
-            year,
-            request.flow_type.value,
-            request.use_cache
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"IRS SOI migration ingestion job created for year {year} ({request.flow_type.value})",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create IRS SOI migration job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "use_cache": request.use_cache,
+        },
+        message=f"IRS SOI migration ingestion job created for year {year} ({request.flow_type.value})",
+    )
 
 
 @router.post("/irs-soi/business-income/ingest")
@@ -326,63 +244,37 @@ async def ingest_business_income_data(
 ):
     """
     Ingest IRS SOI business income by ZIP code data.
-    
+
     Business and self-employment income statistics.
-    
+
     **Data includes:**
     - Schedule C (sole proprietorships)
     - Partnership/S-corp income
     - Rental real estate income
     - Farm income
     - Self-employment tax
-    
+
     **No API key required** (public government data)
-    
+
     **Available years:** 2017-2021
     """
-    try:
-        year = request.year or DEFAULT_YEAR
-        
-        if year not in AVAILABLE_YEARS["business_income"]:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['business_income']}"
-            )
-        
-        job_config = {
+    year = request.year or DEFAULT_YEAR
+
+    if year not in AVAILABLE_YEARS["business_income"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['business_income']}"
+        )
+
+    return create_and_dispatch_job(
+        db, background_tasks, source="irs_soi",
+        config={
             "dataset": "business_income",
             "year": year,
-            "use_cache": request.use_cache
-        }
-        
-        job = IngestionJob(
-            source="irs_soi",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_business_income_ingestion,
-            job.id,
-            year,
-            request.use_cache
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"IRS SOI business income ingestion job created for year {year}",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create IRS SOI business income job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "use_cache": request.use_cache,
+        },
+        message=f"IRS SOI business income ingestion job created for year {year}",
+    )
 
 
 @router.post("/irs-soi/all/ingest")
@@ -393,53 +285,28 @@ async def ingest_all_soi_datasets(
 ):
     """
     Ingest all IRS SOI datasets for a given year.
-    
+
     This is a convenience endpoint that ingests:
     - ZIP code income data
     - County income data
     - Migration data (inflow + outflow)
     - Business income data
-    
+
     **Note:** This downloads multiple large files. May take 10+ minutes.
-    
+
     **No API key required** (public government data)
     """
-    try:
-        year = request.year or DEFAULT_YEAR
-        
-        job_config = {
+    year = request.year or DEFAULT_YEAR
+
+    return create_and_dispatch_job(
+        db, background_tasks, source="irs_soi",
+        config={
             "dataset": "all",
             "year": year,
-            "use_cache": request.use_cache
-        }
-        
-        job = IngestionJob(
-            source="irs_soi",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_all_datasets_ingestion,
-            job.id,
-            year,
-            request.use_cache
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"IRS SOI all datasets ingestion job created for year {year}",
-            "note": "This downloads multiple large files. May take 10+ minutes.",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create IRS SOI all datasets job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "use_cache": request.use_cache,
+        },
+        message=f"IRS SOI all datasets ingestion job created for year {year}",
+    )
 
 
 # ========== Reference Endpoints ==========
@@ -448,7 +315,7 @@ async def ingest_all_soi_datasets(
 async def get_agi_brackets():
     """
     Get AGI (Adjusted Gross Income) bracket definitions.
-    
+
     These brackets are used to categorize income levels in IRS SOI data.
     """
     return {
@@ -511,122 +378,3 @@ async def list_soi_datasets():
         ],
         "note": "No API key required for any IRS SOI data (public domain)"
     }
-
-
-# ========== Background Task Functions ==========
-
-async def _run_zip_income_ingestion(
-    job_id: int,
-    year: int,
-    use_cache: bool
-):
-    """Run ZIP income ingestion in background."""
-    from app.core.database import get_session_factory
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        await ingest.ingest_zip_income_data(
-            db=db,
-            job_id=job_id,
-            year=year,
-            use_cache=use_cache
-        )
-    except Exception as e:
-        logger.error(f"Background ZIP income ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_county_income_ingestion(
-    job_id: int,
-    year: int,
-    use_cache: bool
-):
-    """Run county income ingestion in background."""
-    from app.core.database import get_session_factory
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        await ingest.ingest_county_income_data(
-            db=db,
-            job_id=job_id,
-            year=year,
-            use_cache=use_cache
-        )
-    except Exception as e:
-        logger.error(f"Background county income ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_migration_ingestion(
-    job_id: int,
-    year: int,
-    flow_type: str,
-    use_cache: bool
-):
-    """Run migration data ingestion in background."""
-    from app.core.database import get_session_factory
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        await ingest.ingest_migration_data(
-            db=db,
-            job_id=job_id,
-            year=year,
-            flow_type=flow_type,
-            use_cache=use_cache
-        )
-    except Exception as e:
-        logger.error(f"Background migration ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_business_income_ingestion(
-    job_id: int,
-    year: int,
-    use_cache: bool
-):
-    """Run business income ingestion in background."""
-    from app.core.database import get_session_factory
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        await ingest.ingest_business_income_data(
-            db=db,
-            job_id=job_id,
-            year=year,
-            use_cache=use_cache
-        )
-    except Exception as e:
-        logger.error(f"Background business income ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_all_datasets_ingestion(
-    job_id: int,
-    year: int,
-    use_cache: bool
-):
-    """Run all datasets ingestion in background."""
-    from app.core.database import get_session_factory
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        await ingest.ingest_all_soi_data(
-            db=db,
-            job_id=job_id,
-            year=year,
-            use_cache=use_cache
-        )
-    except Exception as e:
-        logger.error(f"Background all datasets ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()

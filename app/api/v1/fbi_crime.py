@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from app.core.database import get_db
 from app.core.models import IngestionJob, JobStatus
+from app.core.job_helpers import create_and_dispatch_job
 from app.sources.fbi_crime import ingest, metadata
 from app.sources.fbi_crime.client import FBICrimeClient
 
@@ -130,7 +131,7 @@ class FBIStatesResponse(BaseModel):
 async def get_available_datasets():
     """
     Get available FBI crime datasets.
-    
+
     Returns all datasets that can be ingested from the FBI Crime Data Explorer.
     """
     try:
@@ -141,9 +142,9 @@ async def get_available_datasets():
                 "display_name": metadata.get_dataset_display_name(dataset_type.split("_")[0]),
                 "description": metadata.get_dataset_description(dataset_type.split("_")[0])
             })
-        
+
         return {"datasets": datasets_info}
-    
+
     except Exception as e:
         logger.error(f"Failed to get FBI crime datasets: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -153,7 +154,7 @@ async def get_available_datasets():
 async def get_available_offenses():
     """
     Get available offense types for FBI crime data.
-    
+
     Returns all offense types that can be queried from the API.
     """
     try:
@@ -164,9 +165,9 @@ async def get_available_offenses():
                 "display_name": offense.replace("-", " ").title(),
                 "category": "violent" if offense in ["violent-crime", "homicide", "rape", "robbery", "aggravated-assault"] else "property"
             })
-        
+
         return {"offenses": offenses_info}
-    
+
     except Exception as e:
         logger.error(f"Failed to get offense types: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -176,7 +177,7 @@ async def get_available_offenses():
 async def get_available_states():
     """
     Get available state abbreviations for FBI crime data.
-    
+
     Returns all U.S. states that can be queried.
     """
     try:
@@ -196,15 +197,15 @@ async def get_available_states():
             "UT": "Utah", "VT": "Vermont", "VA": "Virginia", "WA": "Washington",
             "WV": "West Virginia", "WI": "Wisconsin", "WY": "Wyoming"
         }
-        
+
         for abbr in FBICrimeClient.STATE_ABBRS:
             states_info.append({
                 "abbreviation": abbr,
                 "name": state_names.get(abbr, abbr)
             })
-        
+
         return {"states": states_info}
-    
+
     except Exception as e:
         logger.error(f"Failed to get states: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -222,15 +223,15 @@ async def ingest_fbi_estimates(
 ):
     """
     Ingest FBI crime estimates data.
-    
+
     **Scope Options:**
     - `national`: National-level crime estimates (default)
     - `state`: State-level crime estimates
-    
+
     **Available Offenses:**
     - violent-crime, property-crime, homicide, rape, robbery
     - aggravated-assault, burglary, larceny, motor-vehicle-theft, arson
-    
+
     **Example:**
     ```json
     {
@@ -238,64 +239,36 @@ async def ingest_fbi_estimates(
         "offenses": ["violent-crime", "property-crime", "homicide"]
     }
     ```
-    
+
     **Note:** Requires FBI_CRIME_API_KEY environment variable.
     Get a free key at: https://api.data.gov/signup/
     """
-    try:
-        # Validate scope
-        if request.scope not in ["national", "state"]:
+    # Validate scope
+    if request.scope not in ["national", "state"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid scope. Must be 'national' or 'state'"
+        )
+
+    # Validate offenses if provided
+    if request.offenses:
+        invalid_offenses = [o for o in request.offenses if o not in FBICrimeClient.OFFENSE_TYPES]
+        if invalid_offenses:
             raise HTTPException(
                 status_code=400,
-                detail="Invalid scope. Must be 'national' or 'state'"
+                detail=f"Invalid offenses: {', '.join(invalid_offenses)}"
             )
-        
-        # Validate offenses if provided
-        if request.offenses:
-            invalid_offenses = [o for o in request.offenses if o not in FBICrimeClient.OFFENSE_TYPES]
-            if invalid_offenses:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid offenses: {', '.join(invalid_offenses)}"
-                )
-        
-        # Create job
-        job_config = {
+
+    return create_and_dispatch_job(
+        db, background_tasks, source="fbi_crime",
+        config={
+            "dataset": "estimates",
             "scope": request.scope,
             "offenses": request.offenses,
-            "states": request.states
-        }
-        
-        job = IngestionJob(
-            source="fbi_crime",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        # Run in background
-        background_tasks.add_task(
-            _run_estimates_ingestion,
-            job.id,
-            request.scope,
-            request.offenses,
-            request.states
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "FBI Crime estimates ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create FBI estimates job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "states": request.states,
+        },
+        message="FBI Crime estimates ingestion job created",
+    )
 
 
 @router.post("/fbi-crime/summarized/ingest")
@@ -306,9 +279,9 @@ async def ingest_fbi_summarized(
 ):
     """
     Ingest FBI summarized agency crime data.
-    
+
     Summarized data provides crime counts by agency over time.
-    
+
     **Example:**
     ```json
     {
@@ -319,43 +292,17 @@ async def ingest_fbi_summarized(
     }
     ```
     """
-    try:
-        # Create job
-        job_config = {
+    return create_and_dispatch_job(
+        db, background_tasks, source="fbi_crime",
+        config={
+            "dataset": "summarized",
             "states": request.states,
             "offenses": request.offenses,
             "since": request.since,
-            "until": request.until
-        }
-        
-        job = IngestionJob(
-            source="fbi_crime",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_summarized_ingestion,
-            job.id,
-            request.states,
-            request.offenses,
-            request.since,
-            request.until
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "FBI Crime summarized ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create FBI summarized job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "until": request.until,
+        },
+        message="FBI Crime summarized ingestion job created",
+    )
 
 
 @router.post("/fbi-crime/nibrs/ingest")
@@ -366,13 +313,13 @@ async def ingest_fbi_nibrs(
 ):
     """
     Ingest FBI NIBRS (National Incident-Based Reporting) data.
-    
+
     NIBRS provides detailed incident-level crime data.
-    
+
     **Available Variables:**
     - count, offense, victim/age, victim/race, victim/sex
     - offender/age, offender/race, offender/sex, relationship
-    
+
     **Example:**
     ```json
     {
@@ -381,38 +328,15 @@ async def ingest_fbi_nibrs(
     }
     ```
     """
-    try:
-        job_config = {
+    return create_and_dispatch_job(
+        db, background_tasks, source="fbi_crime",
+        config={
+            "dataset": "nibrs",
             "states": request.states,
-            "variables": request.variables
-        }
-        
-        job = IngestionJob(
-            source="fbi_crime",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_nibrs_ingestion,
-            job.id,
-            request.states,
-            request.variables
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "FBI NIBRS ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create FBI NIBRS job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "variables": request.variables,
+        },
+        message="FBI NIBRS ingestion job created",
+    )
 
 
 @router.post("/fbi-crime/hate-crime/ingest")
@@ -423,51 +347,29 @@ async def ingest_fbi_hate_crime(
 ):
     """
     Ingest FBI hate crime statistics.
-    
+
     Includes national and optionally state-level hate crime data.
-    
+
     **Example:**
     ```json
     {
         "states": ["CA", "TX", "NY"]
     }
     ```
-    
+
     Or for national data only:
     ```json
     {}
     ```
     """
-    try:
-        job_config = {
-            "states": request.states
-        }
-        
-        job = IngestionJob(
-            source="fbi_crime",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_hate_crime_ingestion,
-            job.id,
-            request.states
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "FBI Hate Crime ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create FBI Hate Crime job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    return create_and_dispatch_job(
+        db, background_tasks, source="fbi_crime",
+        config={
+            "dataset": "hate_crime",
+            "states": request.states,
+        },
+        message="FBI Hate Crime ingestion job created",
+    )
 
 
 @router.post("/fbi-crime/leoka/ingest")
@@ -478,9 +380,9 @@ async def ingest_fbi_leoka(
 ):
     """
     Ingest FBI LEOKA (Law Enforcement Officers Killed and Assaulted) data.
-    
+
     Includes national and optionally state-level LEOKA data.
-    
+
     **Example:**
     ```json
     {
@@ -488,36 +390,14 @@ async def ingest_fbi_leoka(
     }
     ```
     """
-    try:
-        job_config = {
-            "states": request.states
-        }
-        
-        job = IngestionJob(
-            source="fbi_crime",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_leoka_ingestion,
-            job.id,
-            request.states
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "FBI LEOKA ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create FBI LEOKA job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    return create_and_dispatch_job(
+        db, background_tasks, source="fbi_crime",
+        config={
+            "dataset": "leoka",
+            "states": request.states,
+        },
+        message="FBI LEOKA ingestion job created",
+    )
 
 
 @router.post("/fbi-crime/ingest/all")
@@ -528,7 +408,7 @@ async def ingest_all_fbi_crime_data(
 ):
     """
     Ingest multiple FBI crime datasets at once.
-    
+
     **Available Datasets:**
     - estimates_national: National crime estimates
     - estimates_state: State-level crime estimates
@@ -536,7 +416,7 @@ async def ingest_all_fbi_crime_data(
     - nibrs: NIBRS incident-based data
     - hate_crime: Hate crime statistics
     - leoka: Law enforcement officers killed/assaulted
-    
+
     **Example:**
     ```json
     {
@@ -550,7 +430,7 @@ async def ingest_all_fbi_crime_data(
             "estimates_national", "estimates_state", "summarized",
             "nibrs", "hate_crime", "leoka"
         ]
-        
+
         invalid_datasets = [d for d in request.datasets if d not in valid_datasets]
         if invalid_datasets:
             raise HTTPException(
@@ -558,7 +438,7 @@ async def ingest_all_fbi_crime_data(
                 detail=f"Invalid datasets: {', '.join(invalid_datasets)}. "
                        f"Valid options: {', '.join(valid_datasets)}"
             )
-        
+
         # Create jobs for each dataset
         job_ids = []
         for dataset in request.datasets:
@@ -567,7 +447,7 @@ async def ingest_all_fbi_crime_data(
                 "include_states": request.include_states,
                 "batch": True
             }
-            
+
             job = IngestionJob(
                 source="fbi_crime",
                 status=JobStatus.PENDING,
@@ -577,21 +457,21 @@ async def ingest_all_fbi_crime_data(
             db.commit()
             db.refresh(job)
             job_ids.append(job.id)
-        
-        # Run batch ingestion
+
+        # Run batch ingestion (no job_id — kept as-is)
         background_tasks.add_task(
             _run_batch_ingestion,
             request.datasets,
             request.include_states
         )
-        
+
         return {
             "job_ids": job_ids,
             "status": "pending",
             "message": f"Created {len(job_ids)} FBI Crime ingestion jobs",
             "datasets": request.datasets
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -600,150 +480,8 @@ async def ingest_all_fbi_crime_data(
 
 
 # ============================================
-# Background Task Functions
+# Background Task Functions (batch only — no job_id)
 # ============================================
-
-async def _run_estimates_ingestion(
-    job_id: int,
-    scope: str,
-    offenses: Optional[List[str]],
-    states: Optional[List[str]]
-):
-    """Run FBI estimates ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_fbi_crime_api_key()
-        
-        await ingest.ingest_fbi_crime_estimates(
-            db=db,
-            job_id=job_id,
-            scope=scope,
-            offenses=offenses,
-            states=states,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background FBI estimates ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_summarized_ingestion(
-    job_id: int,
-    states: Optional[List[str]],
-    offenses: Optional[List[str]],
-    since: int,
-    until: int
-):
-    """Run FBI summarized ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_fbi_crime_api_key()
-        
-        await ingest.ingest_fbi_crime_summarized(
-            db=db,
-            job_id=job_id,
-            states=states,
-            offenses=offenses,
-            since=since,
-            until=until,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background FBI summarized ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_nibrs_ingestion(
-    job_id: int,
-    states: Optional[List[str]],
-    variables: Optional[List[str]]
-):
-    """Run FBI NIBRS ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_fbi_crime_api_key()
-        
-        await ingest.ingest_fbi_crime_nibrs(
-            db=db,
-            job_id=job_id,
-            states=states,
-            variables=variables,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background FBI NIBRS ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_hate_crime_ingestion(
-    job_id: int,
-    states: Optional[List[str]]
-):
-    """Run FBI hate crime ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_fbi_crime_api_key()
-        
-        await ingest.ingest_fbi_hate_crime(
-            db=db,
-            job_id=job_id,
-            states=states,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background FBI hate crime ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_leoka_ingestion(
-    job_id: int,
-    states: Optional[List[str]]
-):
-    """Run FBI LEOKA ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_fbi_crime_api_key()
-        
-        await ingest.ingest_fbi_leoka(
-            db=db,
-            job_id=job_id,
-            states=states,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background FBI LEOKA ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
 
 async def _run_batch_ingestion(
     datasets: List[str],
@@ -752,13 +490,13 @@ async def _run_batch_ingestion(
     """Run batch FBI crime ingestion in background."""
     from app.core.database import get_session_factory
     from app.core.config import get_settings
-    
+
     SessionLocal = get_session_factory()
     db = SessionLocal()
     try:
         settings = get_settings()
         api_key = settings.get_fbi_crime_api_key()
-        
+
         await ingest.ingest_all_fbi_crime_data(
             db=db,
             api_key=api_key,

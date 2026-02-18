@@ -7,15 +7,15 @@ Provides HTTP endpoints for ingesting BTS data:
 - Vehicle Miles Traveled (VMT)
 """
 import logging
-from typing import Dict, Optional, List
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from typing import Optional
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from enum import Enum
 
 from app.core.database import get_db
-from app.core.models import IngestionJob, JobStatus
-from app.sources.bts import ingest
+from app.core.config import get_settings
+from app.core.job_helpers import create_and_dispatch_job
 
 logger = logging.getLogger(__name__)
 
@@ -116,63 +116,37 @@ async def ingest_border_crossing_data(
 ):
     """
     Ingest BTS border crossing entry data.
-    
+
     This endpoint creates an ingestion job and runs it in the background.
     Use GET /jobs/{job_id} to check progress.
-    
+
     **Data includes:**
     - Monthly statistics at all US ports of entry
     - Trucks, containers, trains, buses, personal vehicles, pedestrians
     - US-Canada and US-Mexico borders
-    
+
     **No API key required** (public data via Socrata)
-    
+
     **Example filters:**
     - Get Texas border crossings: `state="TX"`
     - Get Mexico border only: `border="US-Mexico Border"`
     - Get truck traffic only: `measure="Trucks"`
     """
-    try:
-        # Create job
-        job_config = {
+    settings = get_settings()
+    app_token = settings.get_bts_app_token()
+    return create_and_dispatch_job(
+        db, background_tasks, source="bts",
+        config={
             "dataset": "border_crossing",
             "start_date": request.start_date,
             "end_date": request.end_date,
             "state": request.state,
             "border": request.border.value if request.border else None,
-            "measure": request.measure.value if request.measure else None
-        }
-        
-        job = IngestionJob(
-            source="bts",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        # Run ingestion in background
-        background_tasks.add_task(
-            _run_border_crossing_ingestion,
-            job.id,
-            request.start_date,
-            request.end_date,
-            request.state,
-            request.border.value if request.border else None,
-            request.measure.value if request.measure else None
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "BTS border crossing ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create BTS border crossing job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "measure": request.measure.value if request.measure else None,
+            "app_token": app_token,
+        },
+        message="BTS border crossing ingestion job created",
+    )
 
 
 @router.post("/bts/vmt/ingest")
@@ -183,52 +157,30 @@ async def ingest_vmt_data(
 ):
     """
     Ingest BTS Vehicle Miles Traveled (VMT) data.
-    
+
     VMT is a key economic indicator measuring traffic volume on all public roads.
     Often used as a proxy for consumer activity and economic health.
-    
+
     **Data includes:**
     - Monthly VMT by state
     - Seasonally adjusted values
     - Year-over-year percent change
-    
+
     **No API key required** (public data via Socrata)
     """
-    try:
-        job_config = {
+    settings = get_settings()
+    app_token = settings.get_bts_app_token()
+    return create_and_dispatch_job(
+        db, background_tasks, source="bts",
+        config={
             "dataset": "vmt",
             "start_date": request.start_date,
             "end_date": request.end_date,
-            "state": request.state
-        }
-        
-        job = IngestionJob(
-            source="bts",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_vmt_ingestion,
-            job.id,
-            request.start_date,
-            request.end_date,
-            request.state
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "BTS VMT ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create BTS VMT job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "state": request.state,
+            "app_token": app_token,
+        },
+        message="BTS VMT ingestion job created",
+    )
 
 
 @router.post("/bts/faf/ingest")
@@ -239,54 +191,34 @@ async def ingest_faf_data(
 ):
     """
     Ingest BTS Freight Analysis Framework (FAF5) data.
-    
+
     FAF5 provides comprehensive freight flow data for freight planning and analysis.
-    
+
     **Data includes:**
     - Freight tonnage, value, and ton-miles
     - Origin-destination pairs (132 FAF zones)
     - 43 commodity types (SCTG2 codes)
     - Transport modes (Truck, Rail, Water, Air, Pipeline)
     - Trade types (Domestic, Import, Export)
-    
+
     **Versions available:**
     - `regional_2018_2024`: Regional database 2018-2024 (recommended)
     - `regional_forecasts`: Regional with forecasts to 2050
     - `state_2018_2024`: State-level 2018-2024
-    
+
     **Note:** This downloads a large CSV file (~100MB+). May take several minutes.
     """
-    try:
-        job_config = {
-            "dataset": "faf_regional",
-            "version": request.version.value
-        }
-        
-        job = IngestionJob(
-            source="bts",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_faf_ingestion,
-            job.id,
-            request.version.value
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "BTS FAF5 ingestion job created (large download, may take several minutes)",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create BTS FAF job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    settings = get_settings()
+    app_token = settings.get_bts_app_token()
+    return create_and_dispatch_job(
+        db, background_tasks, source="bts",
+        config={
+            "dataset": "faf",
+            "version": request.version.value,
+            "app_token": app_token,
+        },
+        message="BTS FAF5 ingestion job created (large download, may take several minutes)",
+    )
 
 
 @router.get("/bts/datasets")
@@ -323,95 +255,3 @@ async def list_bts_datasets():
         ],
         "note": "No API key required for BTS public data"
     }
-
-
-# ========== Background Task Functions ==========
-
-async def _run_border_crossing_ingestion(
-    job_id: int,
-    start_date: Optional[str],
-    end_date: Optional[str],
-    state: Optional[str],
-    border: Optional[str],
-    measure: Optional[str]
-):
-    """Run BTS border crossing ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        app_token = settings.get_bts_app_token() if hasattr(settings, 'get_bts_app_token') else None
-        
-        await ingest.ingest_border_crossing_data(
-            db=db,
-            job_id=job_id,
-            start_date=start_date,
-            end_date=end_date,
-            state=state,
-            border=border,
-            measure=measure,
-            app_token=app_token
-        )
-    except Exception as e:
-        logger.error(f"Background BTS border crossing ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_vmt_ingestion(
-    job_id: int,
-    start_date: Optional[str],
-    end_date: Optional[str],
-    state: Optional[str]
-):
-    """Run BTS VMT ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        app_token = settings.get_bts_app_token() if hasattr(settings, 'get_bts_app_token') else None
-        
-        await ingest.ingest_vmt_data(
-            db=db,
-            job_id=job_id,
-            start_date=start_date,
-            end_date=end_date,
-            state=state,
-            app_token=app_token
-        )
-    except Exception as e:
-        logger.error(f"Background BTS VMT ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_faf_ingestion(
-    job_id: int,
-    version: str
-):
-    """Run BTS FAF ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        app_token = settings.get_bts_app_token() if hasattr(settings, 'get_bts_app_token') else None
-        
-        await ingest.ingest_faf_regional_data(
-            db=db,
-            job_id=job_id,
-            version=version,
-            app_token=app_token
-        )
-    except Exception as e:
-        logger.error(f"Background BTS FAF ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()

@@ -8,15 +8,14 @@ Provides HTTP endpoints for ingesting BEA data:
 - International Transactions - Trade balance, foreign investment
 """
 import logging
-from typing import Dict, Optional, List
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from typing import Optional
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from enum import Enum
 
 from app.core.database import get_db
-from app.core.models import IngestionJob, JobStatus
-from app.sources.bea import ingest
+from app.core.job_helpers import create_and_dispatch_job
 
 logger = logging.getLogger(__name__)
 
@@ -142,10 +141,10 @@ async def ingest_nipa_data(
 ):
     """
     Ingest BEA NIPA (National Income and Product Accounts) data.
-    
+
     This endpoint creates an ingestion job and runs it in the background.
     Use GET /jobs/{job_id} to check progress.
-    
+
     **Common NIPA Tables:**
     - **T10101**: Gross Domestic Product (GDP)
     - **T10105**: GDP Percent Change
@@ -155,45 +154,20 @@ async def ingest_nipa_data(
     - **T30100**: Government Receipts and Expenditures
     - **T50100**: Saving and Investment
     - **T60100**: Corporate Profits by Industry
-    
+
     **API Key Required:** Set BEA_API_KEY in environment variables.
     Get a free key at: https://apps.bea.gov/api/signup/
     """
-    try:
-        job_config = {
+    return create_and_dispatch_job(
+        db, background_tasks, source="bea",
+        config={
             "dataset": "nipa",
             "table_name": request.table_name,
             "frequency": request.frequency.value,
-            "year": request.year
-        }
-        
-        job = IngestionJob(
-            source="bea",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_nipa_ingestion,
-            job.id,
-            request.table_name,
-            request.frequency.value,
-            request.year
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"BEA NIPA ingestion job created for table {request.table_name}",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create BEA NIPA job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "year": request.year,
+        },
+        message=f"BEA NIPA ingestion job created for table {request.table_name}",
+    )
 
 
 @router.post("/bea/regional/ingest")
@@ -204,7 +178,7 @@ async def ingest_regional_data(
 ):
     """
     Ingest BEA Regional Economic Accounts data.
-    
+
     **Common Regional Tables:**
     - **SAGDP2N**: GDP by State (all industries)
     - **SAGDP9N**: Real GDP by State
@@ -214,52 +188,26 @@ async def ingest_regional_data(
     - **CAINC1**: Personal Income by County
     - **CAGDP2**: GDP by County
     - **MAGDP2**: GDP by Metro Area (MSA)
-    
+
     **Geographic Options:**
     - `STATE`: All 50 states + DC
     - `COUNTY`: All US counties
     - `MSA`: Metropolitan Statistical Areas
     - Specific FIPS code (e.g., "06000" for California)
-    
+
     **API Key Required:** Set BEA_API_KEY in environment variables.
     """
-    try:
-        job_config = {
+    return create_and_dispatch_job(
+        db, background_tasks, source="bea",
+        config={
             "dataset": "regional",
             "table_name": request.table_name,
             "line_code": request.line_code,
             "geo_fips": request.geo_fips,
-            "year": request.year
-        }
-        
-        job = IngestionJob(
-            source="bea",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_regional_ingestion,
-            job.id,
-            request.table_name,
-            request.line_code,
-            request.geo_fips,
-            request.year
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"BEA Regional ingestion job created for table {request.table_name}",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create BEA Regional job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "year": request.year,
+        },
+        message=f"BEA Regional ingestion job created for table {request.table_name}",
+    )
 
 
 @router.post("/bea/gdp-industry/ingest")
@@ -270,55 +218,29 @@ async def ingest_gdp_industry_data(
 ):
     """
     Ingest BEA GDP by Industry data.
-    
+
     **Table IDs:**
     - **1**: Value Added by Industry
     - **5**: Value Added by Industry as Percentage of GDP
     - **6**: Real Value Added by Industry
     - **10**: Gross Output by Industry
     - **11**: Intermediate Inputs by Industry
-    
+
     Provides breakdown of economic output by industry sector (NAICS codes).
-    
+
     **API Key Required:** Set BEA_API_KEY in environment variables.
     """
-    try:
-        job_config = {
+    return create_and_dispatch_job(
+        db, background_tasks, source="bea",
+        config={
             "dataset": "gdp_industry",
             "table_id": request.table_id,
             "frequency": request.frequency.value,
             "year": request.year,
-            "industry": request.industry
-        }
-        
-        job = IngestionJob(
-            source="bea",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_gdp_industry_ingestion,
-            job.id,
-            request.table_id,
-            request.frequency.value,
-            request.year,
-            request.industry
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"BEA GDP by Industry ingestion job created for table {request.table_id}",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create BEA GDP by Industry job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "industry": request.industry,
+        },
+        message=f"BEA GDP by Industry ingestion job created for table {request.table_id}",
+    )
 
 
 @router.post("/bea/international/ingest")
@@ -329,55 +251,29 @@ async def ingest_international_data(
 ):
     """
     Ingest BEA International Transactions data.
-    
+
     **Common Indicators:**
     - **BalGds**: Balance on Goods
     - **BalServ**: Balance on Services
     - **BalCurAcct**: Current Account Balance
     - **ExpGds**: Exports of Goods
     - **ImpGds**: Imports of Goods
-    
+
     Provides data on US trade balance and international investment.
-    
+
     **API Key Required:** Set BEA_API_KEY in environment variables.
     """
-    try:
-        job_config = {
+    return create_and_dispatch_job(
+        db, background_tasks, source="bea",
+        config={
             "dataset": "international",
             "indicator": request.indicator,
             "area_or_country": request.area_or_country,
             "frequency": request.frequency.value,
-            "year": request.year
-        }
-        
-        job = IngestionJob(
-            source="bea",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_international_ingestion,
-            job.id,
-            request.indicator,
-            request.area_or_country,
-            request.frequency.value,
-            request.year
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"BEA International ingestion job created for indicator {request.indicator}",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create BEA International job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "year": request.year,
+        },
+        message=f"BEA International ingestion job created for indicator {request.indicator}",
+    )
 
 
 @router.get("/bea/datasets")
@@ -447,155 +343,3 @@ async def list_bea_datasets():
             "signup_url": "https://apps.bea.gov/api/signup/"
         }
     }
-
-
-# ========== Background Task Functions ==========
-
-async def _run_nipa_ingestion(
-    job_id: int,
-    table_name: str,
-    frequency: str,
-    year: Optional[str]
-):
-    """Run BEA NIPA ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_bea_api_key()
-        
-        if not api_key:
-            raise ValueError(
-                "BEA_API_KEY is required. "
-                "Get a free key at: https://apps.bea.gov/api/signup/"
-            )
-        
-        await ingest.ingest_nipa_data(
-            db=db,
-            job_id=job_id,
-            table_name=table_name,
-            frequency=frequency,
-            year=year,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background BEA NIPA ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_regional_ingestion(
-    job_id: int,
-    table_name: str,
-    line_code: str,
-    geo_fips: str,
-    year: Optional[str]
-):
-    """Run BEA Regional ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_bea_api_key()
-        
-        if not api_key:
-            raise ValueError(
-                "BEA_API_KEY is required. "
-                "Get a free key at: https://apps.bea.gov/api/signup/"
-            )
-        
-        await ingest.ingest_regional_data(
-            db=db,
-            job_id=job_id,
-            table_name=table_name,
-            line_code=line_code,
-            geo_fips=geo_fips,
-            year=year,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background BEA Regional ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_gdp_industry_ingestion(
-    job_id: int,
-    table_id: str,
-    frequency: str,
-    year: Optional[str],
-    industry: str
-):
-    """Run BEA GDP by Industry ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_bea_api_key()
-        
-        if not api_key:
-            raise ValueError(
-                "BEA_API_KEY is required. "
-                "Get a free key at: https://apps.bea.gov/api/signup/"
-            )
-        
-        await ingest.ingest_gdp_by_industry_data(
-            db=db,
-            job_id=job_id,
-            table_id=table_id,
-            frequency=frequency,
-            year=year,
-            industry=industry,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background BEA GDP by Industry ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_international_ingestion(
-    job_id: int,
-    indicator: str,
-    area_or_country: str,
-    frequency: str,
-    year: Optional[str]
-):
-    """Run BEA International ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_bea_api_key()
-        
-        if not api_key:
-            raise ValueError(
-                "BEA_API_KEY is required. "
-                "Get a free key at: https://apps.bea.gov/api/signup/"
-            )
-        
-        await ingest.ingest_international_data(
-            db=db,
-            job_id=job_id,
-            indicator=indicator,
-            area_or_country=area_or_country,
-            frequency=frequency,
-            year=year,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background BEA International ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()

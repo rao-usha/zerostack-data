@@ -7,15 +7,13 @@ Provides HTTP endpoints for ingesting Data Commons data:
 - Custom variable/place combinations
 """
 import logging
-from typing import Dict, Optional, List
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from typing import Optional, List
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
-from enum import Enum
 
 from app.core.database import get_db
-from app.core.models import IngestionJob, JobStatus
-from app.sources.data_commons import ingest
+from app.core.job_helpers import create_and_dispatch_job
 from app.sources.data_commons.client import STATISTICAL_VARIABLES, PLACE_DCIDS
 
 logger = logging.getLogger(__name__)
@@ -72,10 +70,10 @@ async def ingest_stat_var_data(
 ):
     """
     Ingest Data Commons statistical variable data for specified places.
-    
+
     This endpoint creates an ingestion job and runs it in the background.
     Use GET /jobs/{job_id} to check progress.
-    
+
     **Common Statistical Variables:**
     - **Count_Person**: Total population
     - **Median_Income_Household**: Median household income
@@ -83,47 +81,23 @@ async def ingest_stat_var_data(
     - **Median_Age_Person**: Median age
     - **Count_Household**: Number of households
     - **Count_CriminalActivities_CombinedCrime**: Total crimes
-    
+
     **Place DCID Format:**
     - US States: geoId/XX (e.g., geoId/06 for California)
     - US Counties: geoId/XXXXX (5-digit FIPS)
     - Countries: country/XXX (e.g., country/USA)
-    
+
     **API Key:** Optional but recommended for higher rate limits.
     """
-    try:
-        job_config = {
+    return create_and_dispatch_job(
+        db, background_tasks, source="data_commons",
+        config={
             "dataset": "observations",
             "variable_dcid": request.variable_dcid,
-            "places": request.places
-        }
-        
-        job = IngestionJob(
-            source="data_commons",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_stat_var_ingestion,
-            job.id,
-            request.variable_dcid,
-            request.places
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"Data Commons ingestion job created for {request.variable_dcid}",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create Data Commons job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "places": request.places,
+        },
+        message=f"Data Commons ingestion job created for {request.variable_dcid}",
+    )
 
 
 @router.post("/data-commons/place-stats/ingest")
@@ -134,49 +108,25 @@ async def ingest_place_stats_data(
 ):
     """
     Ingest multiple statistical variables for a single place.
-    
+
     Fetches data for many variables at once for a given location.
     Useful for building a complete statistical profile of a place.
-    
+
     **Place Examples:**
     - geoId/06 - California
     - geoId/48 - Texas
     - geoId/36 - New York
     - country/USA - United States
     """
-    try:
-        job_config = {
-            "dataset": "observations",
+    return create_and_dispatch_job(
+        db, background_tasks, source="data_commons",
+        config={
+            "dataset": "place_stats",
             "place_dcid": request.place_dcid,
-            "variables": request.variables
-        }
-        
-        job = IngestionJob(
-            source="data_commons",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_place_stats_ingestion,
-            job.id,
-            request.place_dcid,
-            request.variables
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"Data Commons place stats job created for {request.place_dcid}",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create Data Commons place stats job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "variables": request.variables,
+        },
+        message=f"Data Commons place stats job created for {request.place_dcid}",
+    )
 
 
 @router.post("/data-commons/us-states/ingest")
@@ -187,10 +137,10 @@ async def ingest_us_state_data(
 ):
     """
     Ingest statistical data for all US states.
-    
+
     Fetches specified variables for all 50 US states plus DC.
     Great for building comparative state-level datasets.
-    
+
     **Default Variables:**
     - Count_Person (Population)
     - Median_Income_Household
@@ -198,37 +148,14 @@ async def ingest_us_state_data(
     - Median_Age_Person
     - Count_Household
     """
-    try:
-        job_config = {
+    return create_and_dispatch_job(
+        db, background_tasks, source="data_commons",
+        config={
             "dataset": "us_states",
-            "variables": request.variables
-        }
-        
-        job = IngestionJob(
-            source="data_commons",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_us_state_ingestion,
-            job.id,
-            request.variables
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "Data Commons US states ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create Data Commons US states job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "variables": request.variables,
+        },
+        message="Data Commons US states ingestion job created",
+    )
 
 
 @router.get("/data-commons/variables")
@@ -344,87 +271,3 @@ async def list_common_places():
             "country": "country/XXX (ISO 3166-1 alpha-3)"
         }
     }
-
-
-# ========== Background Task Functions ==========
-
-async def _run_stat_var_ingestion(
-    job_id: int,
-    variable_dcid: str,
-    places: List[str]
-):
-    """Run Data Commons statistical variable ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_data_commons_api_key()
-        
-        await ingest.ingest_statistical_variable(
-            db=db,
-            job_id=job_id,
-            variable_dcid=variable_dcid,
-            places=places,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background Data Commons stat var ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_place_stats_ingestion(
-    job_id: int,
-    place_dcid: str,
-    variables: Optional[List[str]]
-):
-    """Run Data Commons place stats ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_data_commons_api_key()
-        
-        await ingest.ingest_place_statistics(
-            db=db,
-            job_id=job_id,
-            place_dcid=place_dcid,
-            variables=variables,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background Data Commons place stats ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_us_state_ingestion(
-    job_id: int,
-    variables: Optional[List[str]]
-):
-    """Run Data Commons US state ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_data_commons_api_key()
-        
-        await ingest.ingest_us_state_data(
-            db=db,
-            job_id=job_id,
-            variables=variables,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background Data Commons US state ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()

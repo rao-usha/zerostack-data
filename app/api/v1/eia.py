@@ -5,13 +5,13 @@ Provides HTTP endpoints for ingesting EIA data.
 """
 import logging
 from typing import Dict, Optional
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from app.core.database import get_db
-from app.core.models import IngestionJob, JobStatus
-from app.sources.eia import ingest
+from app.core.config import get_settings
+from app.core.job_helpers import create_and_dispatch_job
 
 logger = logging.getLogger(__name__)
 
@@ -150,64 +150,37 @@ async def ingest_petroleum_data(
 ):
     """
     Ingest EIA petroleum data.
-    
+
     This endpoint creates an ingestion job and runs it in the background.
     Use GET /jobs/{job_id} to check progress.
-    
+
     **Subcategories:**
     - consumption: Petroleum consumption by product
     - production: Petroleum production by product
     - imports: Petroleum imports by product
     - exports: Petroleum exports by product
     - stocks: Petroleum stocks by product
-    
+
     **Note:** EIA API key is REQUIRED.
     Set EIA_API_KEY environment variable.
     Get a free key at: https://www.eia.gov/opendata/register.php
     """
-    try:
-        # Create job
-        job_config = {
-            "category": "petroleum",
+    settings = get_settings()
+    api_key = settings.get_eia_api_key()
+    return create_and_dispatch_job(
+        db, background_tasks, source="eia",
+        config={
+            "dataset": "petroleum",
             "subcategory": request.subcategory,
             "route": request.route,
             "frequency": request.frequency,
             "start": request.start,
             "end": request.end,
-            "facets": request.facets
-        }
-        
-        job = IngestionJob(
-            source="eia",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        # Run ingestion in background
-        background_tasks.add_task(
-            _run_petroleum_ingestion,
-            job.id,
-            request.subcategory,
-            request.route,
-            request.frequency,
-            request.start,
-            request.end,
-            request.facets
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "EIA petroleum ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create EIA petroleum ingestion job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "facets": request.facets,
+            "api_key": api_key,
+        },
+        message="EIA petroleum ingestion job created",
+    )
 
 
 @router.post("/eia/natural-gas/ingest")
@@ -218,54 +191,29 @@ async def ingest_natural_gas_data(
 ):
     """
     Ingest EIA natural gas data.
-    
+
     **Subcategories:**
     - consumption: Natural gas consumption by sector
     - production: Natural gas production
     - storage: Natural gas storage levels
     - prices: Natural gas prices
     """
-    try:
-        job_config = {
-            "category": "natural_gas",
+    settings = get_settings()
+    api_key = settings.get_eia_api_key()
+    return create_and_dispatch_job(
+        db, background_tasks, source="eia",
+        config={
+            "dataset": "natural_gas",
             "subcategory": request.subcategory,
             "route": request.route,
             "frequency": request.frequency,
             "start": request.start,
             "end": request.end,
-            "facets": request.facets
-        }
-        
-        job = IngestionJob(
-            source="eia",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_natural_gas_ingestion,
-            job.id,
-            request.subcategory,
-            request.route,
-            request.frequency,
-            request.start,
-            request.end,
-            request.facets
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "EIA natural gas ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create EIA natural gas ingestion job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "facets": request.facets,
+            "api_key": api_key,
+        },
+        message="EIA natural gas ingestion job created",
+    )
 
 
 @router.post("/eia/electricity/ingest")
@@ -276,54 +224,29 @@ async def ingest_electricity_data(
 ):
     """
     Ingest EIA electricity data.
-    
+
     **Subcategories:**
     - retail_sales: Electricity retail sales by sector and state
     - generation: Electricity generation by fuel type
     - revenue: Electricity revenue by sector
     - customers: Number of electricity customers
     """
-    try:
-        job_config = {
-            "category": "electricity",
+    settings = get_settings()
+    api_key = settings.get_eia_api_key()
+    return create_and_dispatch_job(
+        db, background_tasks, source="eia",
+        config={
+            "dataset": "electricity",
             "subcategory": request.subcategory,
             "route": request.route,
             "frequency": request.frequency,
             "start": request.start,
             "end": request.end,
-            "facets": request.facets
-        }
-        
-        job = IngestionJob(
-            source="eia",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_electricity_ingestion,
-            job.id,
-            request.subcategory,
-            request.route,
-            request.frequency,
-            request.start,
-            request.end,
-            request.facets
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "EIA electricity ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create EIA electricity ingestion job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "facets": request.facets,
+            "api_key": api_key,
+        },
+        message="EIA electricity ingestion job created",
+    )
 
 
 @router.post("/eia/retail-gas-prices/ingest")
@@ -334,46 +257,23 @@ async def ingest_retail_gas_prices(
 ):
     """
     Ingest EIA retail gasoline prices.
-    
+
     Includes regular, midgrade, premium, and diesel prices by region.
     """
-    try:
-        job_config = {
-            "category": "retail_gas_prices",
+    settings = get_settings()
+    api_key = settings.get_eia_api_key()
+    return create_and_dispatch_job(
+        db, background_tasks, source="eia",
+        config={
+            "dataset": "retail_gas_prices",
             "frequency": request.frequency,
             "start": request.start,
             "end": request.end,
-            "facets": request.facets
-        }
-        
-        job = IngestionJob(
-            source="eia",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_retail_gas_prices_ingestion,
-            job.id,
-            request.frequency,
-            request.start,
-            request.end,
-            request.facets
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "EIA retail gas prices ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create EIA retail gas prices ingestion job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "facets": request.facets,
+            "api_key": api_key,
+        },
+        message="EIA retail gas prices ingestion job created",
+    )
 
 
 @router.post("/eia/steo/ingest")
@@ -384,248 +284,20 @@ async def ingest_steo_projections(
 ):
     """
     Ingest EIA Short-Term Energy Outlook (STEO) projections.
-    
+
     Includes monthly projections for energy supply, demand, and prices.
     """
-    try:
-        job_config = {
-            "category": "steo",
+    settings = get_settings()
+    api_key = settings.get_eia_api_key()
+    return create_and_dispatch_job(
+        db, background_tasks, source="eia",
+        config={
+            "dataset": "steo",
             "frequency": request.frequency,
             "start": request.start,
             "end": request.end,
-            "facets": request.facets
-        }
-        
-        job = IngestionJob(
-            source="eia",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_steo_ingestion,
-            job.id,
-            request.frequency,
-            request.start,
-            request.end,
-            request.facets
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "EIA STEO ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create EIA STEO ingestion job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# Background task functions
-
-async def _run_petroleum_ingestion(
-    job_id: int,
-    subcategory: str,
-    route: Optional[str],
-    frequency: str,
-    start: Optional[str],
-    end: Optional[str],
-    facets: Optional[Dict[str, str]]
-):
-    """Run EIA petroleum ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_eia_api_key()
-        
-        if not api_key:
-            raise ValueError(
-                "EIA_API_KEY is required. "
-                "Get a free key at: https://www.eia.gov/opendata/register.php"
-            )
-        
-        await ingest.ingest_eia_petroleum_data(
-            db=db,
-            job_id=job_id,
-            subcategory=subcategory,
-            route=route,
-            frequency=frequency,
-            start=start,
-            end=end,
-            facets=facets,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background EIA petroleum ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_natural_gas_ingestion(
-    job_id: int,
-    subcategory: str,
-    route: Optional[str],
-    frequency: str,
-    start: Optional[str],
-    end: Optional[str],
-    facets: Optional[Dict[str, str]]
-):
-    """Run EIA natural gas ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_eia_api_key()
-        
-        if not api_key:
-            raise ValueError(
-                "EIA_API_KEY is required. "
-                "Get a free key at: https://www.eia.gov/opendata/register.php"
-            )
-        
-        await ingest.ingest_eia_natural_gas_data(
-            db=db,
-            job_id=job_id,
-            subcategory=subcategory,
-            route=route,
-            frequency=frequency,
-            start=start,
-            end=end,
-            facets=facets,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background EIA natural gas ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_electricity_ingestion(
-    job_id: int,
-    subcategory: str,
-    route: Optional[str],
-    frequency: str,
-    start: Optional[str],
-    end: Optional[str],
-    facets: Optional[Dict[str, str]]
-):
-    """Run EIA electricity ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_eia_api_key()
-        
-        if not api_key:
-            raise ValueError(
-                "EIA_API_KEY is required. "
-                "Get a free key at: https://www.eia.gov/opendata/register.php"
-            )
-        
-        await ingest.ingest_eia_electricity_data(
-            db=db,
-            job_id=job_id,
-            subcategory=subcategory,
-            route=route,
-            frequency=frequency,
-            start=start,
-            end=end,
-            facets=facets,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background EIA electricity ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_retail_gas_prices_ingestion(
-    job_id: int,
-    frequency: str,
-    start: Optional[str],
-    end: Optional[str],
-    facets: Optional[Dict[str, str]]
-):
-    """Run EIA retail gas prices ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_eia_api_key()
-        
-        if not api_key:
-            raise ValueError(
-                "EIA_API_KEY is required. "
-                "Get a free key at: https://www.eia.gov/opendata/register.php"
-            )
-        
-        await ingest.ingest_eia_retail_gas_prices(
-            db=db,
-            job_id=job_id,
-            frequency=frequency,
-            start=start,
-            end=end,
-            facets=facets,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background EIA retail gas prices ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_steo_ingestion(
-    job_id: int,
-    frequency: str,
-    start: Optional[str],
-    end: Optional[str],
-    facets: Optional[Dict[str, str]]
-):
-    """Run EIA STEO ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_eia_api_key()
-        
-        if not api_key:
-            raise ValueError(
-                "EIA_API_KEY is required. "
-                "Get a free key at: https://www.eia.gov/opendata/register.php"
-            )
-        
-        await ingest.ingest_eia_steo_projections(
-            db=db,
-            job_id=job_id,
-            frequency=frequency,
-            start=start,
-            end=end,
-            facets=facets,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background EIA STEO ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
+            "facets": request.facets,
+            "api_key": api_key,
+        },
+        message="EIA STEO ingestion job created",
+    )

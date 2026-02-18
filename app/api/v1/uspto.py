@@ -4,16 +4,16 @@ USPTO Patent API endpoints.
 Provides HTTP endpoints for searching and ingesting USPTO patent data.
 """
 import logging
-from typing import List, Optional
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel, Field
 
 from app.core.database import get_db
-from app.core.models import IngestionJob, JobStatus
-from app.sources.uspto import ingest, metadata
-from app.sources.uspto.client import USPTOClient, CPC_CODES, MAJOR_TECH_ASSIGNEES
+from app.core.job_helpers import create_and_dispatch_job
+from app.sources.uspto import metadata
+from app.sources.uspto.client import CPC_CODES, MAJOR_TECH_ASSIGNEES
 
 logger = logging.getLogger(__name__)
 
@@ -424,53 +424,23 @@ async def ingest_by_assignee(
 
     **Note:** Requires USPTO_PATENTSVIEW_API_KEY environment variable.
     """
-    try:
-        # Validate dates
-        if request.date_from and not metadata.validate_date_format(request.date_from):
-            raise HTTPException(400, "Invalid date_from format. Use YYYY-MM-DD")
-        if request.date_to and not metadata.validate_date_format(request.date_to):
-            raise HTTPException(400, "Invalid date_to format. Use YYYY-MM-DD")
+    # Validate dates
+    if request.date_from and not metadata.validate_date_format(request.date_from):
+        raise HTTPException(400, "Invalid date_from format. Use YYYY-MM-DD")
+    if request.date_to and not metadata.validate_date_format(request.date_to):
+        raise HTTPException(400, "Invalid date_to format. Use YYYY-MM-DD")
 
-        # Create job
-        job_config = {
+    return create_and_dispatch_job(
+        db, background_tasks, source="uspto",
+        config={
             "type": "assignee",
             "assignee_name": request.assignee_name,
             "date_from": request.date_from,
             "date_to": request.date_to,
-            "max_patents": request.max_patents
-        }
-
-        job = IngestionJob(
-            source="uspto",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-
-        # Run in background
-        background_tasks.add_task(
-            _run_assignee_ingestion,
-            job.id,
-            request.assignee_name,
-            request.date_from,
-            request.date_to,
-            request.max_patents
-        )
-
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"USPTO ingestion job created for assignee: {request.assignee_name}",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create USPTO ingestion job: {e}", exc_info=True)
-        raise HTTPException(500, str(e))
+            "max_patents": request.max_patents,
+        },
+        message=f"USPTO ingestion job created for assignee: {request.assignee_name}",
+    )
 
 
 @router.post("/uspto/ingest/cpc")
@@ -497,46 +467,17 @@ async def ingest_by_cpc(
     - H01L: Semiconductors
     - A61K: Pharmaceuticals
     """
-    try:
-        job_config = {
+    return create_and_dispatch_job(
+        db, background_tasks, source="uspto",
+        config={
             "type": "cpc",
             "cpc_code": request.cpc_code,
             "date_from": request.date_from,
             "date_to": request.date_to,
-            "max_patents": request.max_patents
-        }
-
-        job = IngestionJob(
-            source="uspto",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-
-        background_tasks.add_task(
-            _run_cpc_ingestion,
-            job.id,
-            request.cpc_code,
-            request.date_from,
-            request.date_to,
-            request.max_patents
-        )
-
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"USPTO ingestion job created for CPC: {request.cpc_code}",
-            "cpc_description": metadata.get_cpc_class_description(request.cpc_code),
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create USPTO CPC ingestion job: {e}", exc_info=True)
-        raise HTTPException(500, str(e))
+            "max_patents": request.max_patents,
+        },
+        message=f"USPTO ingestion job created for CPC: {request.cpc_code}",
+    )
 
 
 @router.post("/uspto/ingest/search")
@@ -559,170 +500,14 @@ async def ingest_by_search(
     }
     ```
     """
-    try:
-        job_config = {
+    return create_and_dispatch_job(
+        db, background_tasks, source="uspto",
+        config={
             "type": "search",
             "search_query": request.search_query,
             "date_from": request.date_from,
             "date_to": request.date_to,
-            "max_patents": request.max_patents
-        }
-
-        job = IngestionJob(
-            source="uspto",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-
-        background_tasks.add_task(
-            _run_search_ingestion,
-            job.id,
-            request.search_query,
-            request.date_from,
-            request.date_to,
-            request.max_patents
-        )
-
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"USPTO ingestion job created for search: {request.search_query}",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to create USPTO search ingestion job: {e}", exc_info=True)
-        raise HTTPException(500, str(e))
-
-
-# Background task functions
-
-async def _run_assignee_ingestion(
-    job_id: int,
-    assignee_name: str,
-    date_from: Optional[str],
-    date_to: Optional[str],
-    max_patents: int
-):
-    """Run assignee ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    from datetime import datetime
-
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_api_key("uspto")
-
-        await ingest.ingest_patents_by_assignee(
-            db=db,
-            job_id=job_id,
-            assignee_name=assignee_name,
-            date_from=date_from,
-            date_to=date_to,
-            max_patents=max_patents,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background USPTO ingestion failed: {e}", exc_info=True)
-        try:
-            job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
-            if job and job.status not in (JobStatus.SUCCESS, JobStatus.FAILED):
-                job.status = JobStatus.FAILED
-                job.error_message = str(e)
-                job.completed_at = datetime.utcnow()
-                db.commit()
-        except Exception as update_err:
-            logger.error(f"Failed to update job status: {update_err}")
-    finally:
-        db.close()
-
-
-async def _run_cpc_ingestion(
-    job_id: int,
-    cpc_code: str,
-    date_from: Optional[str],
-    date_to: Optional[str],
-    max_patents: int
-):
-    """Run CPC ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    from datetime import datetime
-
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_api_key("uspto")
-
-        await ingest.ingest_patents_by_cpc(
-            db=db,
-            job_id=job_id,
-            cpc_code=cpc_code,
-            date_from=date_from,
-            date_to=date_to,
-            max_patents=max_patents,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background USPTO CPC ingestion failed: {e}", exc_info=True)
-        try:
-            job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
-            if job and job.status not in (JobStatus.SUCCESS, JobStatus.FAILED):
-                job.status = JobStatus.FAILED
-                job.error_message = str(e)
-                job.completed_at = datetime.utcnow()
-                db.commit()
-        except Exception as update_err:
-            logger.error(f"Failed to update job status: {update_err}")
-    finally:
-        db.close()
-
-
-async def _run_search_ingestion(
-    job_id: int,
-    search_query: str,
-    date_from: Optional[str],
-    date_to: Optional[str],
-    max_patents: int
-):
-    """Run search ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    from datetime import datetime
-
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = settings.get_api_key("uspto")
-
-        await ingest.ingest_patents_by_search(
-            db=db,
-            job_id=job_id,
-            search_query=search_query,
-            date_from=date_from,
-            date_to=date_to,
-            max_patents=max_patents,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background USPTO search ingestion failed: {e}", exc_info=True)
-        try:
-            job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
-            if job and job.status not in (JobStatus.SUCCESS, JobStatus.FAILED):
-                job.status = JobStatus.FAILED
-                job.error_message = str(e)
-                job.completed_at = datetime.utcnow()
-                db.commit()
-        except Exception as update_err:
-            logger.error(f"Failed to update job status: {update_err}")
-    finally:
-        db.close()
+            "max_patents": request.max_patents,
+        },
+        message=f"USPTO ingestion job created for search: {request.search_query}",
+    )

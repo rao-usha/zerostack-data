@@ -9,15 +9,15 @@ Provides HTTP endpoints for ingesting US Census Bureau International Trade data:
 - Trade summaries by country
 """
 import logging
-from typing import Dict, Optional, List
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from typing import Optional
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from enum import Enum
 
 from app.core.database import get_db
-from app.core.models import IngestionJob, JobStatus
-from app.sources.us_trade import ingest
+from app.core.config import get_settings
+from app.core.job_helpers import create_and_dispatch_job
 
 logger = logging.getLogger(__name__)
 
@@ -175,24 +175,24 @@ async def ingest_exports_by_hs(
 ):
     """
     Ingest US export data by HS code (Harmonized System).
-    
+
     This endpoint creates an ingestion job and runs it in the background.
     Use GET /jobs/{job_id} to check progress.
-    
+
     **Data includes:**
     - Export value (USD) by commodity and country
     - Monthly and year-to-date values
     - Quantity with units
-    
+
     **No API key required** (Census Bureau public API)
-    
+
     **HS Code Examples:**
     - '84': Machinery, mechanical appliances
     - '85': Electrical machinery, equipment
     - '87': Vehicles
     - '27': Mineral fuels, oils
     - '30': Pharmaceutical products
-    
+
     **Common Country Codes:**
     - '5700': China
     - '2010': Mexico
@@ -200,43 +200,20 @@ async def ingest_exports_by_hs(
     - '5880': Japan
     - '4280': Germany
     """
-    try:
-        job_config = {
+    settings = get_settings()
+    api_key = getattr(settings, 'census_survey_api_key', None)
+    return create_and_dispatch_job(
+        db, background_tasks, source="us_trade",
+        config={
             "dataset": "exports_hs",
             "year": request.year,
             "month": request.month,
             "hs_code": request.hs_code,
-            "country": request.country
-        }
-        
-        job = IngestionJob(
-            source="us_trade",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_exports_hs_ingestion,
-            job.id,
-            request.year,
-            request.month,
-            request.hs_code,
-            request.country
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "US exports by HS ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create US exports job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "country": request.country,
+            "api_key": api_key,
+        },
+        message="US exports by HS ingestion job created",
+    )
 
 
 @router.post("/us-trade/imports/hs/ingest")
@@ -247,53 +224,30 @@ async def ingest_imports_by_hs(
 ):
     """
     Ingest US import data by HS code (Harmonized System).
-    
+
     **Data includes:**
     - General import value (total value of goods entering)
     - Consumption value (value for domestic use)
     - Duty-free and dutiable value breakdown
     - Monthly and year-to-date values
     - Quantity with units
-    
+
     **No API key required** (Census Bureau public API)
     """
-    try:
-        job_config = {
+    settings = get_settings()
+    api_key = getattr(settings, 'census_survey_api_key', None)
+    return create_and_dispatch_job(
+        db, background_tasks, source="us_trade",
+        config={
             "dataset": "imports_hs",
             "year": request.year,
             "month": request.month,
             "hs_code": request.hs_code,
-            "country": request.country
-        }
-        
-        job = IngestionJob(
-            source="us_trade",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_imports_hs_ingestion,
-            job.id,
-            request.year,
-            request.month,
-            request.hs_code,
-            request.country
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "US imports by HS ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create US imports job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "country": request.country,
+            "api_key": api_key,
+        },
+        message="US imports by HS ingestion job created",
+    )
 
 
 @router.post("/us-trade/exports/state/ingest")
@@ -304,61 +258,37 @@ async def ingest_state_exports(
 ):
     """
     Ingest US state-level export data.
-    
+
     Shows which states export what commodities to which countries.
-    
+
     **Data includes:**
     - State-level export values by commodity and destination
     - Monthly and year-to-date values
-    
+
     **State FIPS Code Examples:**
     - '48': Texas
     - '06': California
     - '36': New York
     - '17': Illinois
     - '39': Ohio
-    
+
     **No API key required** (Census Bureau public API)
     """
-    try:
-        job_config = {
-            "dataset": "exports_state",
+    settings = get_settings()
+    api_key = getattr(settings, 'census_survey_api_key', None)
+    return create_and_dispatch_job(
+        db, background_tasks, source="us_trade",
+        config={
+            "dataset": "state_exports",
             "year": request.year,
             "month": request.month,
             "state": request.state,
             "hs_code": request.hs_code,
-            "country": request.country
-        }
-        
-        job = IngestionJob(
-            source="us_trade",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_state_exports_ingestion,
-            job.id,
-            request.year,
-            request.month,
-            request.state,
-            request.hs_code,
-            request.country
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "US state exports ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create US state exports job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "country": request.country,
+            "api_key": api_key,
+        },
+        message="US state exports ingestion job created",
+    )
 
 
 @router.post("/us-trade/port/ingest")
@@ -369,9 +299,9 @@ async def ingest_port_trade(
 ):
     """
     Ingest US trade data by customs district (port of entry).
-    
+
     Shows trade volumes through each port by commodity and country.
-    
+
     **District Code Examples:**
     - '55': Houston, TX
     - '68': Los Angeles, CA
@@ -379,50 +309,25 @@ async def ingest_port_trade(
     - '60': Seattle, WA
     - '39': Miami, FL
     - '57': Laredo, TX
-    
+
     **No API key required** (Census Bureau public API)
     """
-    try:
-        job_config = {
-            "dataset": f"{request.trade_type.value}s_port",
+    settings = get_settings()
+    api_key = getattr(settings, 'census_survey_api_key', None)
+    return create_and_dispatch_job(
+        db, background_tasks, source="us_trade",
+        config={
+            "dataset": "port_trade",
             "year": request.year,
             "trade_type": request.trade_type.value,
             "month": request.month,
             "district": request.district,
             "hs_code": request.hs_code,
-            "country": request.country
-        }
-        
-        job = IngestionJob(
-            source="us_trade",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_port_trade_ingestion,
-            job.id,
-            request.year,
-            request.trade_type.value,
-            request.month,
-            request.district,
-            request.hs_code,
-            request.country
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"US port {request.trade_type.value}s ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create US port trade job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "country": request.country,
+            "api_key": api_key,
+        },
+        message=f"US port {request.trade_type.value}s ingestion job created",
+    )
 
 
 @router.post("/us-trade/summary/ingest")
@@ -433,56 +338,35 @@ async def ingest_trade_summary(
 ):
     """
     Ingest aggregated US trade summary by country.
-    
+
     Fetches exports and imports, then aggregates by country to show
     total trade and trade balance.
-    
+
     **Data includes:**
     - Total exports by country
     - Total imports by country
     - Total trade (exports + imports)
     - Trade balance (exports - imports)
-    
+
     **Use cases:**
     - Identify top trading partners
     - Analyze trade deficits/surpluses
     - Track trade concentration
-    
+
     **No API key required** (Census Bureau public API)
     """
-    try:
-        job_config = {
-            "dataset": "trade_summary",
+    settings = get_settings()
+    api_key = getattr(settings, 'census_survey_api_key', None)
+    return create_and_dispatch_job(
+        db, background_tasks, source="us_trade",
+        config={
+            "dataset": "summary",
             "year": request.year,
-            "month": request.month
-        }
-        
-        job = IngestionJob(
-            source="us_trade",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_trade_summary_ingestion,
-            job.id,
-            request.year,
-            request.month
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": "US trade summary ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create US trade summary job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+            "month": request.month,
+            "api_key": api_key,
+        },
+        message="US trade summary ingestion job created",
+    )
 
 
 @router.get("/us-trade/datasets")
@@ -625,167 +509,3 @@ async def get_state_codes():
         ],
         "note": "Use FIPS code as state filter in state export queries"
     }
-
-
-# ========== Background Task Functions ==========
-
-async def _run_exports_hs_ingestion(
-    job_id: int,
-    year: int,
-    month: Optional[int],
-    hs_code: Optional[str],
-    country: Optional[str]
-):
-    """Run US exports by HS ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = getattr(settings, 'census_api_key', None)
-        
-        await ingest.ingest_exports_by_hs(
-            db=db,
-            job_id=job_id,
-            year=year,
-            month=month,
-            hs_code=hs_code,
-            country=country,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background US exports ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_imports_hs_ingestion(
-    job_id: int,
-    year: int,
-    month: Optional[int],
-    hs_code: Optional[str],
-    country: Optional[str]
-):
-    """Run US imports by HS ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = getattr(settings, 'census_api_key', None)
-        
-        await ingest.ingest_imports_by_hs(
-            db=db,
-            job_id=job_id,
-            year=year,
-            month=month,
-            hs_code=hs_code,
-            country=country,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background US imports ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_state_exports_ingestion(
-    job_id: int,
-    year: int,
-    month: Optional[int],
-    state: Optional[str],
-    hs_code: Optional[str],
-    country: Optional[str]
-):
-    """Run US state exports ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = getattr(settings, 'census_api_key', None)
-        
-        await ingest.ingest_exports_by_state(
-            db=db,
-            job_id=job_id,
-            year=year,
-            month=month,
-            state=state,
-            hs_code=hs_code,
-            country=country,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background US state exports ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_port_trade_ingestion(
-    job_id: int,
-    year: int,
-    trade_type: str,
-    month: Optional[int],
-    district: Optional[str],
-    hs_code: Optional[str],
-    country: Optional[str]
-):
-    """Run US port trade ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = getattr(settings, 'census_api_key', None)
-        
-        await ingest.ingest_port_trade(
-            db=db,
-            job_id=job_id,
-            year=year,
-            trade_type=trade_type,
-            month=month,
-            district=district,
-            hs_code=hs_code,
-            country=country,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background US port trade ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
-
-
-async def _run_trade_summary_ingestion(
-    job_id: int,
-    year: int,
-    month: Optional[int]
-):
-    """Run US trade summary ingestion in background."""
-    from app.core.database import get_session_factory
-    from app.core.config import get_settings
-    
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        settings = get_settings()
-        api_key = getattr(settings, 'census_api_key', None)
-        
-        await ingest.ingest_trade_summary(
-            db=db,
-            job_id=job_id,
-            year=year,
-            month=month,
-            api_key=api_key
-        )
-    except Exception as e:
-        logger.error(f"Background US trade summary ingestion failed: {e}", exc_info=True)
-    finally:
-        db.close()
