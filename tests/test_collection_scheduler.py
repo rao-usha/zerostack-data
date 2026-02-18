@@ -378,7 +378,7 @@ class TestScheduledJobFunctions:
         result = schedule_website_refresh(test_db, limit=50)
 
         assert result is not None
-        job = test_db.query(PeopleCollectionJob).get(result)
+        job = test_db.get(PeopleCollectionJob, result)
         assert job.job_type == "website_crawl"
 
     @pytest.mark.unit
@@ -395,7 +395,7 @@ class TestScheduledJobFunctions:
         result = schedule_sec_check(test_db, limit=30)
 
         if result is not None:
-            job = test_db.query(PeopleCollectionJob).get(result)
+            job = test_db.get(PeopleCollectionJob, result)
             assert job.job_type == "sec_8k_check"
 
     @pytest.mark.unit

@@ -97,7 +97,7 @@ class TestShouldUpdate:
 
 class TestNullPreservingUpdate:
     def test_fills_nulls_regardless_of_confidence(self, persister, pe_db):
-        company = pe_db.query(PEPortfolioCompany).get(1)
+        company = pe_db.get(PEPortfolioCompany, 1)
         assert company.industry is None
         changed = persister._null_preserving_update(
             company,
@@ -109,7 +109,7 @@ class TestNullPreservingUpdate:
         assert company.industry == "Technology"
 
     def test_respects_confidence_for_non_null(self, persister, pe_db):
-        company = pe_db.query(PEPortfolioCompany).get(1)
+        company = pe_db.get(PEPortfolioCompany, 1)
         company.industry = "Original"
         pe_db.flush()
 
@@ -123,7 +123,7 @@ class TestNullPreservingUpdate:
         assert company.industry == "Original"
 
     def test_overwrites_when_confidence_sufficient(self, persister, pe_db):
-        company = pe_db.query(PEPortfolioCompany).get(1)
+        company = pe_db.get(PEPortfolioCompany, 1)
         company.industry = "Original"
         pe_db.flush()
 
@@ -195,7 +195,7 @@ class TestPersistFirmUpdate:
             _make_result(1, "Blackstone", [item])
         ])
         assert results["updated"] == 1
-        firm = pe_db.query(PEFirm).get(1)
+        firm = pe_db.get(PEFirm, 1)
         assert firm.headquarters_city == "New York"
         assert firm.cik == "0001234567"
         assert "https://example.com/blackstone" in (firm.data_sources or [])
@@ -234,7 +234,7 @@ class TestPersistPortfolioCompany:
             _make_result(1, "Blackstone", [item])
         ])
         assert results["updated"] >= 1
-        co = pe_db.query(PEPortfolioCompany).get(1)
+        co = pe_db.get(PEPortfolioCompany, 1)
         assert co.website == "https://techco.com"
 
 
@@ -342,7 +342,7 @@ class TestPersistCompanyUpdate:
             _make_result(1, "Blackstone", [item])
         ])
         assert results["updated"] >= 1
-        co = pe_db.query(PEPortfolioCompany).get(1)
+        co = pe_db.get(PEPortfolioCompany, 1)
         assert co.industry == "Software"
         assert co.ticker == "TCO"
 

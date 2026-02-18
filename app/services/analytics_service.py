@@ -103,7 +103,7 @@ class AnalyticsService:
         instability_flags = []
         for company_id, count in company_change_counts.items():
             if count >= 3:
-                company = self.db.query(IndustrialCompany).get(company_id)
+                company = self.db.get(IndustrialCompany, company_id)
                 if company:
                     instability_flags.append({
                         "company_id": company_id,
@@ -390,7 +390,7 @@ class AnalyticsService:
         """
         Get analytics for a specific portfolio.
         """
-        portfolio = self.db.query(PeoplePortfolio).get(portfolio_id)
+        portfolio = self.db.get(PeoplePortfolio, portfolio_id)
         if not portfolio:
             return {"error": "Portfolio not found"}
 
@@ -461,7 +461,7 @@ class AnalyticsService:
 
         Returns 0-100 score based on team completeness, tenure, and stability.
         """
-        company = self.db.query(IndustrialCompany).get(company_id)
+        company = self.db.get(IndustrialCompany, company_id)
         if not company:
             return {"error": "Company not found"}
 

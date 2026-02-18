@@ -212,8 +212,8 @@ class DedupService:
         missing fields from the duplicate, reassigns FK references,
         and marks the duplicate as non-canonical.
         """
-        person_a = self.session.query(Person).get(id_a)
-        person_b = self.session.query(Person).get(id_b)
+        person_a = self.session.get(Person, id_a)
+        person_b = self.session.get(Person, id_b)
 
         if not person_a or not person_b:
             return
@@ -379,7 +379,7 @@ class DedupService:
         Returns:
             Dict with merge result details.
         """
-        candidate = self.session.query(PeopleMergeCandidate).get(candidate_id)
+        candidate = self.session.get(PeopleMergeCandidate, candidate_id)
         if not candidate:
             return {"error": "Candidate not found"}
 
@@ -394,8 +394,8 @@ class DedupService:
         else:
             return {"error": "canonical_person_id must be one of the candidate pair"}
 
-        canonical = self.session.query(Person).get(canonical_person_id)
-        duplicate = self.session.query(Person).get(duplicate_id)
+        canonical = self.session.get(Person, canonical_person_id)
+        duplicate = self.session.get(Person, duplicate_id)
 
         if not canonical or not duplicate:
             return {"error": "Person record not found"}
@@ -423,7 +423,7 @@ class DedupService:
 
     def reject_merge(self, candidate_id: int) -> Dict[str, Any]:
         """Reject a merge candidate."""
-        candidate = self.session.query(PeopleMergeCandidate).get(candidate_id)
+        candidate = self.session.get(PeopleMergeCandidate, candidate_id)
         if not candidate:
             return {"error": "Candidate not found"}
 
@@ -459,8 +459,8 @@ class DedupService:
 
         results = []
         for c in candidates:
-            person_a = self.session.query(Person).get(c.person_id_a)
-            person_b = self.session.query(Person).get(c.person_id_b)
+            person_a = self.session.get(Person, c.person_id_a)
+            person_b = self.session.get(Person, c.person_id_b)
 
             if not person_a or not person_b:
                 continue
@@ -508,8 +508,8 @@ class DedupService:
 
         results = []
         for c in candidates:
-            person_a = self.session.query(Person).get(c.person_id_a)
-            person_b = self.session.query(Person).get(c.person_id_b)
+            person_a = self.session.get(Person, c.person_id_a)
+            person_b = self.session.get(Person, c.person_id_b)
 
             results.append({
                 "id": c.id,

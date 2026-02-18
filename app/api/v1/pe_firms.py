@@ -32,32 +32,32 @@ router = APIRouter(
 
 class PEFirmCreate(BaseModel):
     """Request model for creating/updating a PE firm."""
-    name: str = Field(..., description="Firm name", example="Blackstone")
-    legal_name: Optional[str] = Field(None, example="Blackstone Inc.")
-    website: Optional[str] = Field(None, example="https://www.blackstone.com")
+    name: str = Field(..., description="Firm name", examples=["Blackstone"])
+    legal_name: Optional[str] = Field(None, examples=["Blackstone Inc."])
+    website: Optional[str] = Field(None, examples=["https://www.blackstone.com"])
 
-    headquarters_city: Optional[str] = Field(None, example="New York")
-    headquarters_state: Optional[str] = Field(None, example="NY")
-    headquarters_country: Optional[str] = Field("USA", example="USA")
+    headquarters_city: Optional[str] = Field(None, examples=["New York"])
+    headquarters_state: Optional[str] = Field(None, examples=["NY"])
+    headquarters_country: Optional[str] = Field("USA", examples=["USA"])
 
-    firm_type: Optional[str] = Field(None, example="PE")
-    primary_strategy: Optional[str] = Field(None, example="Buyout")
-    sector_focus: Optional[List[str]] = Field(None, example=["Technology", "Healthcare"])
-    geography_focus: Optional[List[str]] = Field(None, example=["North America", "Europe"])
+    firm_type: Optional[str] = Field(None, examples=["PE"])
+    primary_strategy: Optional[str] = Field(None, examples=["Buyout"])
+    sector_focus: Optional[List[str]] = Field(None, examples=[["Technology", "Healthcare"]])
+    geography_focus: Optional[List[str]] = Field(None, examples=[["North America", "Europe"]])
 
-    aum_usd_millions: Optional[float] = Field(None, example=1000000)
-    employee_count: Optional[int] = Field(None, example=5000)
+    aum_usd_millions: Optional[float] = Field(None, examples=[1000000])
+    employee_count: Optional[int] = Field(None, examples=[5000])
 
-    typical_check_size_min: Optional[float] = Field(None, example=100)
-    typical_check_size_max: Optional[float] = Field(None, example=5000)
+    typical_check_size_min: Optional[float] = Field(None, examples=[100])
+    typical_check_size_max: Optional[float] = Field(None, examples=[5000])
 
-    cik: Optional[str] = Field(None, example="1393818")
-    sec_file_number: Optional[str] = Field(None, example="801-12345")
-    crd_number: Optional[str] = Field(None, example="12345")
+    cik: Optional[str] = Field(None, examples=["1393818"])
+    sec_file_number: Optional[str] = Field(None, examples=["801-12345"])
+    crd_number: Optional[str] = Field(None, examples=["12345"])
     is_sec_registered: Optional[bool] = Field(False)
 
-    founded_year: Optional[int] = Field(None, example=1985)
-    status: Optional[str] = Field("Active", example="Active")
+    founded_year: Optional[int] = Field(None, examples=[1985])
+    status: Optional[str] = Field("Active", examples=["Active"])
 
     linkedin_url: Optional[str] = Field(None)
     crunchbase_url: Optional[str] = Field(None)
@@ -82,13 +82,13 @@ class PEFirmResponse(BaseModel):
 
 class PEFundCreate(BaseModel):
     """Request model for creating a fund."""
-    name: str = Field(..., example="Blackstone Capital Partners IX")
-    fund_number: Optional[int] = Field(None, example=9)
-    vintage_year: Optional[int] = Field(None, example=2023)
-    target_size_usd_millions: Optional[float] = Field(None, example=25000)
-    final_close_usd_millions: Optional[float] = Field(None, example=24000)
-    strategy: Optional[str] = Field(None, example="Buyout")
-    status: Optional[str] = Field("Active", example="Active")
+    name: str = Field(..., examples=["Blackstone Capital Partners IX"])
+    fund_number: Optional[int] = Field(None, examples=[9])
+    vintage_year: Optional[int] = Field(None, examples=[2023])
+    target_size_usd_millions: Optional[float] = Field(None, examples=[25000])
+    final_close_usd_millions: Optional[float] = Field(None, examples=[24000])
+    strategy: Optional[str] = Field(None, examples=["Buyout"])
+    status: Optional[str] = Field("Active", examples=["Active"])
 
 
 # =============================================================================

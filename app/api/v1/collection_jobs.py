@@ -132,7 +132,7 @@ async def list_jobs(
     for job in jobs:
         company_name = None
         if job.company_id:
-            company = db.query(IndustrialCompany).get(job.company_id)
+            company = db.get(IndustrialCompany, job.company_id)
             company_name = company.name if company else None
 
         error_count = len(job.errors) if job.errors else 0
@@ -179,7 +179,7 @@ async def get_job(
 
     company_name = None
     if job.company_id:
-        company = db.query(IndustrialCompany).get(job.company_id)
+        company = db.get(IndustrialCompany, job.company_id)
         company_name = company.name if company else None
 
     return JobDetail(
@@ -360,7 +360,7 @@ async def get_job_queue(
     for job in jobs:
         company_name = None
         if job.company_id:
-            company = db.query(IndustrialCompany).get(job.company_id)
+            company = db.get(IndustrialCompany, job.company_id)
             company_name = company.name if company else None
 
         items.append({

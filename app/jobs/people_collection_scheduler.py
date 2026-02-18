@@ -109,7 +109,7 @@ class PeopleCollectionScheduler:
 
     def mark_job_running(self, job_id: int) -> bool:
         """Mark a job as running."""
-        job = self.db.query(PeopleCollectionJob).get(job_id)
+        job = self.db.get(PeopleCollectionJob, job_id)
         if not job:
             return False
 
@@ -129,7 +129,7 @@ class PeopleCollectionScheduler:
         warnings: Optional[List[str]] = None,
     ) -> bool:
         """Mark a job as complete with results."""
-        job = self.db.query(PeopleCollectionJob).get(job_id)
+        job = self.db.get(PeopleCollectionJob, job_id)
         if not job:
             return False
 
@@ -152,7 +152,7 @@ class PeopleCollectionScheduler:
         errors: List[str],
     ) -> bool:
         """Mark a job as failed."""
-        job = self.db.query(PeopleCollectionJob).get(job_id)
+        job = self.db.get(PeopleCollectionJob, job_id)
         if not job:
             return False
 

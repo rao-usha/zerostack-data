@@ -294,7 +294,7 @@ def search_by_developer(
 def get_top_apps(
     store: str = Query("ios"),
     category: Optional[str] = Query(None, description="Filter by category"),
-    sort_by: str = Query("rating_count", regex="^(rating_count|current_rating)$"),
+    sort_by: str = Query("rating_count", pattern="^(rating_count|current_rating)$"),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db)
 ):

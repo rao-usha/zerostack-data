@@ -31,19 +31,19 @@ router = APIRouter(
 
 class PersonCreate(BaseModel):
     """Request model for creating a person."""
-    full_name: str = Field(..., example="John Smith")
-    first_name: Optional[str] = Field(None, example="John")
-    last_name: Optional[str] = Field(None, example="Smith")
+    full_name: str = Field(..., examples=["John Smith"])
+    first_name: Optional[str] = Field(None, examples=["John"])
+    last_name: Optional[str] = Field(None, examples=["Smith"])
 
     email: Optional[str] = Field(None)
     phone: Optional[str] = Field(None)
 
-    city: Optional[str] = Field(None, example="New York")
-    state: Optional[str] = Field(None, example="NY")
-    country: Optional[str] = Field(None, example="USA")
+    city: Optional[str] = Field(None, examples=["New York"])
+    state: Optional[str] = Field(None, examples=["NY"])
+    country: Optional[str] = Field(None, examples=["USA"])
 
-    current_title: Optional[str] = Field(None, example="Managing Director")
-    current_company: Optional[str] = Field(None, example="Blackstone")
+    current_title: Optional[str] = Field(None, examples=["Managing Director"])
+    current_company: Optional[str] = Field(None, examples=["Blackstone"])
     bio: Optional[str] = Field(None)
 
     linkedin_url: Optional[str] = Field(None)

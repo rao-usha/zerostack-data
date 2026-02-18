@@ -44,7 +44,7 @@ def get_company_score(
 def get_portfolio_scores(
     investor_id: int,
     min_score: Optional[float] = Query(None, ge=0, le=100, description="Filter by minimum score"),
-    tier: Optional[str] = Query(None, regex="^[A-F]$", description="Filter by tier (A-F)"),
+    tier: Optional[str] = Query(None, pattern="^[A-F]$", description="Filter by tier (A-F)"),
     db: Session = Depends(get_db)
 ):
     """
@@ -67,7 +67,7 @@ def get_portfolio_scores(
 
 @router.get("/rankings")
 def get_score_rankings(
-    order: str = Query("top", regex="^(top|bottom)$", description="Ranking order"),
+    order: str = Query("top", pattern="^(top|bottom)$", description="Ranking order"),
     limit: int = Query(20, ge=1, le=100, description="Number of results"),
     sector: Optional[str] = Query(None, description="Filter by sector"),
     min_confidence: float = Query(0.0, ge=0, le=1, description="Minimum confidence threshold"),

@@ -223,7 +223,7 @@ async def get_watchlist(
 
     people = []
     for wp in watched:
-        person = db.query(Person).get(wp.person_id)
+        person = db.get(Person, wp.person_id)
         if not person:
             continue
 
@@ -238,7 +238,7 @@ async def get_watchlist(
         current_company_id = None
         if current_role:
             current_title = current_role.title
-            company = db.query(IndustrialCompany).get(current_role.company_id)
+            company = db.get(IndustrialCompany, current_role.company_id)
             if company:
                 current_company = company.name
                 current_company_id = company.id
@@ -382,7 +382,7 @@ async def add_person_to_watchlist(
     current_company_id = None
     if current_role:
         current_title = current_role.title
-        company = db.query(IndustrialCompany).get(current_role.company_id)
+        company = db.get(IndustrialCompany, current_role.company_id)
         if company:
             current_company = company.name
             current_company_id = company.id
@@ -479,7 +479,7 @@ async def get_watchlist_alerts(
         if change.old_company:
             old_company = change.old_company
         if change.company_id:
-            company = db.query(IndustrialCompany).get(change.company_id)
+            company = db.get(IndustrialCompany, change.company_id)
             new_company = company.name if company else None
 
         alerts.append(PersonChangeAlert(
@@ -531,7 +531,7 @@ async def get_all_alerts(
     for wp in watched:
         if wp.person_id not in person_watchlist_map:
             person_watchlist_map[wp.person_id] = []
-        watchlist = db.query(PeopleWatchlist).get(wp.watchlist_id)
+        watchlist = db.get(PeopleWatchlist, wp.watchlist_id)
         if watchlist:
             person_watchlist_map[wp.person_id].append(watchlist)
 

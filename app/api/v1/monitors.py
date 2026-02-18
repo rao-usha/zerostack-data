@@ -329,7 +329,7 @@ def mark_as_read(match_id: int, db: Session = Depends(get_db)):
 
 @router.get("/digest", response_model=DigestResponse)
 def get_digest(
-    period: str = Query("daily", regex="^(daily|weekly)$", description="Digest period"),
+    period: str = Query("daily", pattern="^(daily|weekly)$", description="Digest period"),
     date_str: Optional[str] = Query(None, alias="date", description="Date (YYYY-MM-DD)"),
     db: Session = Depends(get_db)
 ):
@@ -381,7 +381,7 @@ def get_digest(
 
 @router.post("/digest/generate", response_model=DigestResponse)
 def regenerate_digest(
-    period: str = Query("daily", regex="^(daily|weekly)$"),
+    period: str = Query("daily", pattern="^(daily|weekly)$"),
     date_str: Optional[str] = Query(None, alias="date"),
     db: Session = Depends(get_db)
 ):

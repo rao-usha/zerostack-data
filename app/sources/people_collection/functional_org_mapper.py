@@ -221,7 +221,7 @@ class FunctionalOrgMapper:
                         if p.extraction_notes and gap["company_name"] in (p.extraction_notes or "")
                     ]
                     if gap_people:
-                        gap_company = db_session.query(IndustrialCompany).get(gap["company_id"])
+                        gap_company = db_session.get(IndustrialCompany, gap["company_id"])
                         if gap_company:
                             await orchestrator._store_people(
                                 gap_people, gap_company, db_session
@@ -440,7 +440,7 @@ class FunctionalOrgMapper:
 
             # Infer: subsidiary top functional leader -> parent functional leader
             try:
-                cp = db_session.query(CompanyPerson).get(sub_top["company_person_id"])
+                cp = db_session.get(CompanyPerson, sub_top["company_person_id"])
                 if cp:
                     cp.reports_to_id = parent_c_level["company_person_id"]
                     updates.append((sub_top["company_person_id"], parent_c_level["company_person_id"]))

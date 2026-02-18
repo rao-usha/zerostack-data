@@ -219,7 +219,7 @@ async def list_people(
         company_name = None
         company_id_val = None
         if current_role:
-            company = db.query(IndustrialCompany).get(current_role.company_id)
+            company = db.get(IndustrialCompany, current_role.company_id)
             if company:
                 company_name = company.name
                 company_id_val = company.id
@@ -270,7 +270,7 @@ async def get_person(
     ).all()
 
     for cp in company_persons:
-        company = db.query(IndustrialCompany).get(cp.company_id)
+        company = db.get(IndustrialCompany, cp.company_id)
         if company:
             current_roles.append(CurrentRole(
                 company_id=company.id,
@@ -387,7 +387,7 @@ async def get_leadership_changes(
     # Build response
     items = []
     for change in changes:
-        company = db.query(IndustrialCompany).get(change.company_id)
+        company = db.get(IndustrialCompany, change.company_id)
         company_name = company.name if company else "Unknown"
 
         items.append(LeadershipChangeItem(
@@ -447,7 +447,7 @@ async def search_executives(
         company_name = None
         company_id = None
         if current_role:
-            company = db.query(IndustrialCompany).get(current_role.company_id)
+            company = db.get(IndustrialCompany, current_role.company_id)
             if company:
                 company_name = company.name
                 company_id = company.id

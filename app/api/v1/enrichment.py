@@ -358,7 +358,7 @@ async def batch_enrich(
 )
 async def trigger_investor_enrichment(
     investor_id: int,
-    investor_type: str = Query(..., regex="^(lp|family_office)$"),
+    investor_type: str = Query(..., pattern="^(lp|family_office)$"),
     db: Session = Depends(get_db),
 ):
     """Trigger enrichment for an investor."""
@@ -393,7 +393,7 @@ async def trigger_investor_enrichment(
 )
 def get_investor_enrichment_status(
     investor_id: int,
-    investor_type: str = Query(..., regex="^(lp|family_office)$"),
+    investor_type: str = Query(..., pattern="^(lp|family_office)$"),
     db: Session = Depends(get_db),
 ):
     """Get investor enrichment status."""
@@ -429,7 +429,7 @@ def get_investor_enrichment_status(
 )
 def get_investor_contacts(
     investor_id: int,
-    investor_type: str = Query(..., regex="^(lp|family_office)$"),
+    investor_type: str = Query(..., pattern="^(lp|family_office)$"),
     db: Session = Depends(get_db),
 ):
     """Get investor contacts."""
@@ -457,7 +457,7 @@ def get_investor_contacts(
 )
 def get_investor_aum_history(
     investor_id: int,
-    investor_type: str = Query(..., regex="^(lp|family_office)$"),
+    investor_type: str = Query(..., pattern="^(lp|family_office)$"),
     db: Session = Depends(get_db),
 ):
     """Get investor AUM history."""
@@ -494,7 +494,7 @@ def get_investor_aum_history(
 )
 def get_investor_preferences(
     investor_id: int,
-    investor_type: str = Query(..., regex="^(lp|family_office)$"),
+    investor_type: str = Query(..., pattern="^(lp|family_office)$"),
     db: Session = Depends(get_db),
 ):
     """Get investor investment preferences."""

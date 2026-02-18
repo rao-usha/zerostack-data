@@ -32,24 +32,24 @@ router = APIRouter(
 
 class PortfolioCompanyCreate(BaseModel):
     """Request model for creating a portfolio company."""
-    name: str = Field(..., example="ServiceTitan")
+    name: str = Field(..., examples=["ServiceTitan"])
     legal_name: Optional[str] = Field(None)
-    website: Optional[str] = Field(None, example="https://www.servicetitan.com")
+    website: Optional[str] = Field(None, examples=["https://www.servicetitan.com"])
     description: Optional[str] = Field(None)
 
-    headquarters_city: Optional[str] = Field(None, example="Glendale")
-    headquarters_state: Optional[str] = Field(None, example="CA")
+    headquarters_city: Optional[str] = Field(None, examples=["Glendale"])
+    headquarters_state: Optional[str] = Field(None, examples=["CA"])
     headquarters_country: Optional[str] = Field("USA")
 
-    industry: Optional[str] = Field(None, example="Software")
-    sub_industry: Optional[str] = Field(None, example="Field Service Management")
+    industry: Optional[str] = Field(None, examples=["Software"])
+    sub_industry: Optional[str] = Field(None, examples=["Field Service Management"])
     sector: Optional[str] = Field(None)
 
-    founded_year: Optional[int] = Field(None, example=2012)
-    employee_count: Optional[int] = Field(None, example=2000)
+    founded_year: Optional[int] = Field(None, examples=[2012])
+    employee_count: Optional[int] = Field(None, examples=[2000])
 
-    ownership_status: Optional[str] = Field(None, example="PE-Backed")
-    current_pe_owner: Optional[str] = Field(None, example="Thoma Bravo")
+    ownership_status: Optional[str] = Field(None, examples=["PE-Backed"])
+    current_pe_owner: Optional[str] = Field(None, examples=["Thoma Bravo"])
 
     linkedin_url: Optional[str] = Field(None)
     status: Optional[str] = Field("Active")

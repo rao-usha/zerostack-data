@@ -33,28 +33,28 @@ router = APIRouter(
 class DealCreate(BaseModel):
     """Request model for creating a deal."""
     company_id: int = Field(..., description="Portfolio company ID")
-    deal_name: Optional[str] = Field(None, example="Blackstone Acquisition of XYZ")
-    deal_type: str = Field(..., example="LBO")
-    deal_sub_type: Optional[str] = Field(None, example="Platform")
+    deal_name: Optional[str] = Field(None, examples=["Blackstone Acquisition of XYZ"])
+    deal_type: str = Field(..., examples=["LBO"])
+    deal_sub_type: Optional[str] = Field(None, examples=["Platform"])
 
     announced_date: Optional[date] = Field(None)
     closed_date: Optional[date] = Field(None)
 
-    enterprise_value_usd: Optional[float] = Field(None, example=1000000000)
+    enterprise_value_usd: Optional[float] = Field(None, examples=[1000000000])
     equity_value_usd: Optional[float] = Field(None)
     debt_amount_usd: Optional[float] = Field(None)
 
-    ev_revenue_multiple: Optional[float] = Field(None, example=12.5)
-    ev_ebitda_multiple: Optional[float] = Field(None, example=15.0)
+    ev_revenue_multiple: Optional[float] = Field(None, examples=[12.5])
+    ev_ebitda_multiple: Optional[float] = Field(None, examples=[15.0])
 
     ltm_revenue_usd: Optional[float] = Field(None)
     ltm_ebitda_usd: Optional[float] = Field(None)
 
-    buyer_name: Optional[str] = Field(None, example="Blackstone")
-    seller_name: Optional[str] = Field(None, example="Previous Owner LLC")
-    seller_type: Optional[str] = Field(None, example="PE")
+    buyer_name: Optional[str] = Field(None, examples=["Blackstone"])
+    seller_name: Optional[str] = Field(None, examples=["Previous Owner LLC"])
+    seller_type: Optional[str] = Field(None, examples=["PE"])
 
-    status: Optional[str] = Field("Closed", example="Closed")
+    status: Optional[str] = Field("Closed", examples=["Closed"])
 
 
 # =============================================================================

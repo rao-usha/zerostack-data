@@ -30,9 +30,9 @@ class WorkflowStep(BaseModel):
 
 class StartWorkflowRequest(BaseModel):
     """Request to start a workflow."""
-    workflow_type: str = Field(..., description="Workflow template ID", example="full_due_diligence")
-    entity_name: str = Field(..., description="Target entity name", example="Stripe")
-    entity_type: str = Field("company", description="Entity type", example="company")
+    workflow_type: str = Field(..., description="Workflow template ID", examples=["full_due_diligence"])
+    entity_name: str = Field(..., description="Target entity name", examples=["Stripe"])
+    entity_type: str = Field("company", description="Entity type", examples=["company"])
     domain: Optional[str] = Field(None, description="Company domain for enrichment")
     params: Optional[dict] = Field(None, description="Additional parameters")
 

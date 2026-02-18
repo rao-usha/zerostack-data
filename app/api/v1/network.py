@@ -137,7 +137,7 @@ def get_network_graph(
 )
 def get_investor_network(
     investor_id: int,
-    investor_type: str = Query(..., regex="^(lp|family_office)$", description="Investor type"),
+    investor_type: str = Query(..., pattern="^(lp|family_office)$", description="Investor type"),
     depth: int = Query(1, ge=1, le=3, description="Network depth (hops from investor)"),
     min_weight: int = Query(1, ge=1, description="Minimum relationship weight"),
     db: Session = Depends(get_db),
@@ -216,9 +216,9 @@ def get_clusters(
 )
 def find_path(
     source_id: int = Query(..., description="Source investor ID"),
-    source_type: str = Query(..., regex="^(lp|family_office)$", description="Source investor type"),
+    source_type: str = Query(..., pattern="^(lp|family_office)$", description="Source investor type"),
     target_id: int = Query(..., description="Target investor ID"),
-    target_type: str = Query(..., regex="^(lp|family_office)$", description="Target investor type"),
+    target_type: str = Query(..., pattern="^(lp|family_office)$", description="Target investor type"),
     db: Session = Depends(get_db),
 ):
     """Find shortest path between two investors."""

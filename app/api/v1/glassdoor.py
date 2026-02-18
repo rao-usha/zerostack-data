@@ -232,7 +232,7 @@ def get_rankings(
     metric: str = Query(
         "overall",
         description="Metric to rank by",
-        regex="^(overall|compensation|culture|career|work_life_balance|management|ceo_approval)$"
+        pattern="^(overall|compensation|culture|career|work_life_balance|management|ceo_approval)$"
     ),
     industry: Optional[str] = Query(None, description="Filter by industry"),
     limit: int = Query(20, ge=1, le=100),

@@ -543,7 +543,7 @@ async def get_company_data_coverage(
     """
     from app.core.people_models import IndustrialCompany, CompanyPerson, Person
 
-    company = db.query(IndustrialCompany).get(company_id)
+    company = db.get(IndustrialCompany, company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 

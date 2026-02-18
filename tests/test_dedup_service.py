@@ -219,7 +219,7 @@ class TestDedupServiceReject:
         service = DedupService(session)
 
         candidate = _make_mock_candidate(1, 10, 20, status="pending")
-        session.query.return_value.get.return_value = candidate
+        session.get.return_value = candidate
 
         result = service.reject_merge(1)
 
@@ -236,7 +236,7 @@ class TestDedupServiceReject:
         service = DedupService(session)
 
         candidate = _make_mock_candidate(1, 10, 20, status="auto_merged")
-        session.query.return_value.get.return_value = candidate
+        session.get.return_value = candidate
 
         result = service.reject_merge(1)
 
@@ -249,7 +249,7 @@ class TestDedupServiceReject:
 
         session = MagicMock()
         service = DedupService(session)
-        session.query.return_value.get.return_value = None
+        session.get.return_value = None
 
         result = service.reject_merge(999)
 

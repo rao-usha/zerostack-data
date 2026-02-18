@@ -235,7 +235,7 @@ class DataQualityService:
 
         Returns 0-100 score with breakdown by component.
         """
-        person = self.db.query(Person).get(person_id)
+        person = self.db.get(Person, person_id)
         if not person:
             return {"error": "Person not found"}
 
@@ -423,7 +423,7 @@ class DataQualityService:
 
         Keeps canonical_id as the master record, marks others as duplicates.
         """
-        canonical = self.db.query(Person).get(canonical_id)
+        canonical = self.db.get(Person, canonical_id)
         if not canonical:
             return {"error": "Canonical person not found"}
 
@@ -432,7 +432,7 @@ class DataQualityService:
             if dup_id == canonical_id:
                 continue
 
-            duplicate = self.db.query(Person).get(dup_id)
+            duplicate = self.db.get(Person, dup_id)
             if not duplicate:
                 continue
 
@@ -553,7 +553,7 @@ class DataQualityService:
         # Convert quality score (0-100) to confidence (0.00-1.00)
         confidence = quality["quality_score"] / 100.0
 
-        person = self.db.query(Person).get(person_id)
+        person = self.db.get(Person, person_id)
         person.confidence_score = confidence
         self.db.commit()
 

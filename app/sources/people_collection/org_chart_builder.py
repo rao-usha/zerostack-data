@@ -469,7 +469,7 @@ class OrgChartBuilder:
         updated = 0
         for p in people_data:
             try:
-                cp = db_session.query(CompanyPerson).get(p["company_person_id"])
+                cp = db_session.get(CompanyPerson, p["company_person_id"])
                 if cp:
                     cp.management_level = p["management_level"]
                     cp.reports_to_id = p.get("reports_to_id")

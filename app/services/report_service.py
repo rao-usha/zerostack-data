@@ -41,7 +41,7 @@ class ReportService:
 
         Includes team overview, individual profiles, tenure analysis, and gaps.
         """
-        company = self.db.query(IndustrialCompany).get(company_id)
+        company = self.db.get(IndustrialCompany, company_id)
         if not company:
             return {"error": "Company not found"}
 
@@ -58,7 +58,7 @@ class ReportService:
         board = []
 
         for cp in leadership:
-            person = self.db.query(Person).get(cp.person_id) if cp.person_id else None
+            person = self.db.get(Person, cp.person_id) if cp.person_id else None
 
             profile = self._build_person_profile(
                 cp, person,
@@ -254,7 +254,7 @@ class ReportService:
 
         Compares a company's leadership against peer companies.
         """
-        company = self.db.query(IndustrialCompany).get(company_id)
+        company = self.db.get(IndustrialCompany, company_id)
         if not company:
             return {"error": "Company not found"}
 
@@ -307,7 +307,7 @@ class ReportService:
 
     def _get_company_metrics(self, company_id: int) -> Dict[str, Any]:
         """Get leadership metrics for a single company."""
-        company = self.db.query(IndustrialCompany).get(company_id)
+        company = self.db.get(IndustrialCompany, company_id)
         if not company:
             return {"company_id": company_id, "error": "Not found"}
 

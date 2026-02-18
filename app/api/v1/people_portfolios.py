@@ -260,7 +260,7 @@ async def get_portfolio(
     thirty_days_ago = date.today() - timedelta(days=30)
 
     for pc in portfolio_companies:
-        company = db.query(IndustrialCompany).get(pc.company_id)
+        company = db.get(IndustrialCompany, pc.company_id)
         if not company:
             continue
 
@@ -524,7 +524,7 @@ async def get_portfolio_changes(
 
     items = []
     for change in changes:
-        company = db.query(IndustrialCompany).get(change.company_id)
+        company = db.get(IndustrialCompany, change.company_id)
         company_name = company.name if company else "Unknown"
 
         items.append(LeadershipChangeItem(

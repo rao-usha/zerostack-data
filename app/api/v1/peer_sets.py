@@ -160,7 +160,7 @@ async def list_peer_sets(
         primary_name = None
         primary_id = None
         if primary:
-            company = db.query(IndustrialCompany).get(primary.company_id)
+            company = db.get(IndustrialCompany, primary.company_id)
             if company:
                 primary_name = company.name
                 primary_id = company.id
@@ -235,7 +235,7 @@ async def get_peer_set(
 
     members = []
     for member in members_db:
-        company = db.query(IndustrialCompany).get(member.company_id)
+        company = db.get(IndustrialCompany, member.company_id)
         if not company:
             continue
 
@@ -411,7 +411,7 @@ async def benchmark_peer_set(
     primary_company = None
 
     for member in members:
-        company = db.query(IndustrialCompany).get(member.company_id)
+        company = db.get(IndustrialCompany, member.company_id)
         if not company:
             continue
 

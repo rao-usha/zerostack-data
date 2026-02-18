@@ -146,7 +146,7 @@ class DiversificationRankingsResponse(BaseModel):
 )
 def get_investor_benchmark(
     investor_id: int,
-    investor_type: str = Query(..., regex="^(lp|family_office)$"),
+    investor_type: str = Query(..., pattern="^(lp|family_office)$"),
     db: Session = Depends(get_db),
 ):
     """Compare investor to their peer benchmark."""
@@ -173,7 +173,7 @@ def get_investor_benchmark(
 )
 def get_peer_group(
     investor_id: int,
-    investor_type: str = Query(..., regex="^(lp|family_office)$"),
+    investor_type: str = Query(..., pattern="^(lp|family_office)$"),
     db: Session = Depends(get_db),
 ):
     """Get peer group for an investor."""
@@ -221,7 +221,7 @@ def get_sector_benchmarks(
     """,
 )
 def get_diversification_rankings(
-    investor_type: Optional[str] = Query(None, regex="^(lp|family_office)$"),
+    investor_type: Optional[str] = Query(None, pattern="^(lp|family_office)$"),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):

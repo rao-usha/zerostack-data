@@ -653,7 +653,7 @@ class PeopleCollectionOrchestrator:
                         CompanyPerson.is_current == True,
                     ).first()
                     if existing_cp:
-                        existing_person = session.query(Person).get(existing_cp.person_id)
+                        existing_person = session.get(Person, existing_cp.person_id)
 
                 if existing_person:
                     # Update existing person
@@ -704,7 +704,7 @@ class PeopleCollectionOrchestrator:
         """
         try:
             # Skip if person already has email
-            person = session.query(Person).get(person_id)
+            person = session.get(Person, person_id)
             if not person:
                 return False
 
@@ -1182,7 +1182,7 @@ class PeopleCollectionOrchestrator:
         session = self._get_session()
 
         try:
-            company = session.query(IndustrialCompany).get(company_id)
+            company = session.get(IndustrialCompany, company_id)
             if not company:
                 return CollectionResult(
                     company_id=company_id,

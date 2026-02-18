@@ -95,7 +95,7 @@ class ChangeMonitor:
 
         alerts = []
         for change in changes:
-            company = self.db.query(IndustrialCompany).get(change.company_id)
+            company = self.db.get(IndustrialCompany, change.company_id)
             alerts.append({
                 "change_id": change.id,
                 "person_id": change.person_id,
@@ -140,7 +140,7 @@ class ChangeMonitor:
 
         alerts = []
         for change in changes:
-            company = self.db.query(IndustrialCompany).get(change.company_id)
+            company = self.db.get(IndustrialCompany, change.company_id)
             alerts.append({
                 "change_id": change.id,
                 "person_name": change.person_name,
@@ -276,7 +276,7 @@ class AlertDigestGenerator:
 
         if portfolio_id:
             digest["filter"] = {"type": "portfolio", "id": portfolio_id}
-            portfolio = self.db.query(PeoplePortfolio).get(portfolio_id)
+            portfolio = self.db.get(PeoplePortfolio, portfolio_id)
             if portfolio:
                 digest["filter"]["name"] = portfolio.name
             alerts = self.monitor.get_portfolio_alerts(portfolio_id, days=days)
@@ -288,7 +288,7 @@ class AlertDigestGenerator:
             changes = self.monitor.get_recent_changes(days=days)
             alerts = []
             for change in changes:
-                company = self.db.query(IndustrialCompany).get(change.company_id)
+                company = self.db.get(IndustrialCompany, change.company_id)
                 alerts.append({
                     "change_id": change.id,
                     "person_name": change.person_name,
@@ -324,7 +324,7 @@ class AlertDigestGenerator:
         """
         Generate digest for a specific watchlist.
         """
-        watchlist = self.db.query(PeopleWatchlist).get(watchlist_id)
+        watchlist = self.db.get(PeopleWatchlist, watchlist_id)
         if not watchlist:
             return {"error": "Watchlist not found"}
 

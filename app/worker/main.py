@@ -124,7 +124,7 @@ def claim_job(db: Session) -> Optional[JobQueue]:
     db.commit()
 
     # Load as ORM object for the executor
-    job = db.query(JobQueue).get(row[0])
+    job = db.get(JobQueue, row[0])
     return job
 
 
@@ -206,7 +206,7 @@ async def execute_job(job: JobQueue, db: Session):
         except Exception:
             pass
 
-        job = db.query(JobQueue).get(job.id)
+        job = db.get(JobQueue, job.id)
         job.status = QueueJobStatus.FAILED
         job.error_message = str(e)[:2000]
         job.completed_at = datetime.utcnow()

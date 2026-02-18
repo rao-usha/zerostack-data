@@ -393,7 +393,7 @@ async def get_job(
     """
     Get detailed information about a specific job.
     """
-    job = db.query(PeopleCollectionJob).get(job_id)
+    job = db.get(PeopleCollectionJob, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -480,7 +480,7 @@ async def cancel_job(
 
     Only pending jobs can be cancelled.
     """
-    job = db.query(PeopleCollectionJob).get(job_id)
+    job = db.get(PeopleCollectionJob, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -580,7 +580,7 @@ async def get_recent_alerts(
     from app.core.people_models import IndustrialCompany
     alerts = []
     for change in changes:
-        company = db.query(IndustrialCompany).get(change.company_id)
+        company = db.get(IndustrialCompany, change.company_id)
         alerts.append(ChangeAlertItem(
             change_id=change.id,
             person_name=change.person_name,
