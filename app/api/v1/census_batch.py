@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from app.core.database import get_db
-from app.core.models import IngestionJob, JobStatus
-from app.core.schemas import JobResponse
+from app.core.job_helpers import create_and_dispatch_job
+from app.core.models import IngestionJob
 
 logger = logging.getLogger(__name__)
 
@@ -50,38 +50,24 @@ async def batch_ingest_state_data(
 ) -> BatchJobResponse:
     """
     Batch ingest Census data at STATE level for multiple years.
-    
+
     Creates separate jobs for each year. Jobs run in parallel.
     """
-    from app.api.v1.jobs import run_ingestion_job
-    
     job_ids = []
-    
+
     for year in request.years:
-        config = {
-            "survey": request.survey,
-            "year": year,
-            "table_id": request.table_id,
-            "geo_level": "state",
-            "include_geojson": request.include_geojson
-        }
-        
-        job = IngestionJob(
-            source="census",
-            status=JobStatus.PENDING,
-            config=config
+        result = create_and_dispatch_job(
+            db, background_tasks, source="census",
+            config={
+                "survey": request.survey,
+                "year": year,
+                "table_id": request.table_id,
+                "geo_level": "state",
+                "include_geojson": request.include_geojson,
+            },
         )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        job_ids.append(job.id)
-        
-        # Start background ingestion
-        background_tasks.add_task(run_ingestion_job, job.id, "census", config)
-        
-        logger.info(f"Created STATE-level batch job {job.id} for {year}/{request.table_id}")
-    
+        job_ids.append(result["job_id"])
+
     return BatchJobResponse(
         job_ids=job_ids,
         total_jobs=len(job_ids),
@@ -97,41 +83,28 @@ async def batch_ingest_county_data(
 ) -> BatchJobResponse:
     """
     Batch ingest Census data at COUNTY level for multiple years.
-    
+
     Creates separate jobs for each year. Jobs run in parallel.
     """
-    from app.api.v1.jobs import run_ingestion_job
-    
     job_ids = []
-    
+
     for year in request.years:
         config = {
             "survey": request.survey,
             "year": year,
             "table_id": request.table_id,
             "geo_level": "county",
-            "include_geojson": request.include_geojson
+            "include_geojson": request.include_geojson,
         }
-        
         if request.state_fips:
             config["geo_filter"] = {"state": request.state_fips}
-        
-        job = IngestionJob(
-            source="census",
-            status=JobStatus.PENDING,
-            config=config
+
+        result = create_and_dispatch_job(
+            db, background_tasks, source="census",
+            config=config,
         )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        job_ids.append(job.id)
-        
-        # Start background ingestion
-        background_tasks.add_task(run_ingestion_job, job.id, "census", config)
-        
-        logger.info(f"Created COUNTY-level batch job {job.id} for {year}/{request.table_id}")
-    
+        job_ids.append(result["job_id"])
+
     return BatchJobResponse(
         job_ids=job_ids,
         total_jobs=len(job_ids),
@@ -146,35 +119,29 @@ async def batch_job_status(
 ) -> dict:
     """
     Check status of multiple jobs.
-    
+
     Args:
         job_ids: Comma-separated list of job IDs (e.g., "1,2,3,4,5")
-    
-    Returns:
-        Summary of job statuses
     """
-    # Parse job IDs
     try:
         job_id_list = [int(x.strip()) for x in job_ids.split(",")]
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid job_ids format. Use comma-separated integers.")
-    
-    # Fetch jobs
+
     jobs = db.query(IngestionJob).filter(IngestionJob.id.in_(job_id_list)).all()
-    
+
     if not jobs:
         raise HTTPException(status_code=404, detail="No jobs found")
-    
-    # Count by status
+
     status_counts = {}
     total_rows = 0
-    
+
     for job in jobs:
         status = job.status.value
         status_counts[status] = status_counts.get(status, 0) + 1
         if job.rows_inserted:
             total_rows += job.rows_inserted
-    
+
     return {
         "total_jobs": len(jobs),
         "status_counts": status_counts,
@@ -190,7 +157,3 @@ async def batch_job_status(
             for job in jobs
         ]
     }
-
-
-
-

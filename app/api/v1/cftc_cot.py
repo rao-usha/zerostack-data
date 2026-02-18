@@ -52,33 +52,31 @@ async def ingest_cot_data(
 ):
     """
     Ingest CFTC COT data for a given year.
-    
+
     Report types:
     - **legacy**: Commercial vs Non-commercial positions
     - **disaggregated**: Producer, Swap Dealer, Managed Money, Other
     - **tff**: Traders in Financial Futures (Dealer, Asset Manager, Leveraged)
     - **all**: All report types
-    
+
     Data is released weekly on Tuesday afternoons.
     No API key required (public data).
     """
     try:
-        job_config = {
-            "dataset": "cot",
-            "year": request.year,
-            "report_type": request.report_type.value,
-            "combined": request.combined,
-        }
-        
         job = IngestionJob(
             source="cftc_cot",
             status=JobStatus.PENDING,
-            config=job_config
+            config={
+                "dataset": "cot",
+                "year": request.year,
+                "report_type": request.report_type.value,
+                "combined": request.combined,
+            }
         )
         db.add(job)
         db.commit()
         db.refresh(job)
-        
+
         background_tasks.add_task(
             _run_cot_ingestion,
             job.id,
@@ -86,16 +84,16 @@ async def ingest_cot_data(
             request.report_type.value,
             request.combined
         )
-        
+
         return {
             "job_id": job.id,
             "status": "pending",
             "message": f"CFTC COT {request.report_type.value} ingestion job created for {request.year}",
             "check_status": f"/api/v1/jobs/{job.id}"
         }
-    
+
     except Exception as e:
-        logger.error(f"Failed to create COT job: {e}", exc_info=True)
+        logger.error("Failed to create COT job: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -108,18 +106,16 @@ async def _run_cot_ingestion(
     """Background task to run COT ingestion."""
     SessionLocal = get_session_factory()
     db = SessionLocal()
-    
+
     try:
-        # Update job to running
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+        job = db.get(IngestionJob, job_id)
         if job:
             job.status = JobStatus.RUNNING
             job.started_at = datetime.utcnow()
             db.commit()
-        
-        # Get raw psycopg2 connection for the ingest functions
+
         conn = db.connection().connection
-        
+
         if report_type == "all":
             results = await ingest_cot_all_reports(conn, year, combined)
             total_rows = sum(results.values())
@@ -131,26 +127,25 @@ async def _run_cot_ingestion(
             total_rows = await ingest_cot_tff(conn, year, combined)
         else:
             raise ValueError(f"Unknown report type: {report_type}")
-        
-        # Update job to success
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+
+        job = db.get(IngestionJob, job_id)
         if job:
             job.status = JobStatus.SUCCESS
             job.rows_inserted = total_rows
             job.completed_at = datetime.utcnow()
             db.commit()
-        
-        logger.info(f"COT ingestion job {job_id} completed: {total_rows} rows")
-    
+
+        logger.info("COT ingestion job %d completed: %d rows", job_id, total_rows)
+
     except Exception as e:
-        logger.error(f"COT ingestion job {job_id} failed: {e}", exc_info=True)
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+        logger.error("COT ingestion job %d failed: %s", job_id, e, exc_info=True)
+        job = db.get(IngestionJob, job_id)
         if job:
             job.status = JobStatus.FAILED
             job.error_message = str(e)
             job.completed_at = datetime.utcnow()
             db.commit()
-    
+
     finally:
         db.close()
 
@@ -161,8 +156,6 @@ async def _run_cot_ingestion(
 async def get_major_contracts():
     """
     Get list of major futures contracts tracked in COT reports.
-    
-    Returns common contract names with their full exchange names.
     """
     return {
         "contracts": [
@@ -176,7 +169,7 @@ async def get_major_contracts():
 async def get_commodity_groups():
     """
     Get commodity groupings for analysis.
-    
+
     Groups: energy, metals, grains, softs, livestock, financials, currencies, rates
     """
     return {"groups": COMMODITY_GROUPS}

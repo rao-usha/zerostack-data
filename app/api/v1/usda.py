@@ -57,6 +57,25 @@ class AllMajorCropsIngestRequest(BaseModel):
 
 # ========== Ingestion Endpoints ==========
 
+def _create_usda_job(db, background_tasks, config, run_func, run_args, message):
+    """Helper to create a USDA ingestion job with custom background task."""
+    try:
+        job = IngestionJob(source="usda", status=JobStatus.PENDING, config=config)
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        background_tasks.add_task(run_func, job.id, *run_args)
+        return {
+            "job_id": job.id,
+            "status": "pending",
+            "message": message,
+            "check_status": f"/api/v1/jobs/{job.id}",
+        }
+    except Exception as e:
+        logger.error("Failed to create USDA job: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/crop/ingest")
 async def ingest_crop_data(
     request: CropIngestRequest,
@@ -65,49 +84,24 @@ async def ingest_crop_data(
 ):
     """
     Ingest crop data for a specific commodity.
-    
+
     Available commodities: CORN, SOYBEANS, WHEAT, COTTON, RICE, OATS, BARLEY, SORGHUM
-    
+
     **Requires USDA_API_KEY environment variable.**
-    Register free at: https://quickstats.nass.usda.gov/api
     """
-    try:
-        job_config = {
+    return _create_usda_job(
+        db, background_tasks,
+        config={
             "dataset": "crop",
             "commodity": request.commodity.upper(),
             "year": request.year,
             "state": request.state,
             "all_stats": request.all_stats,
-        }
-        
-        job = IngestionJob(
-            source="usda",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_crop_ingestion,
-            job.id,
-            request.commodity.upper(),
-            request.year,
-            request.state,
-            request.all_stats
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"USDA {request.commodity.upper()} ingestion job created for {request.year}",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create USDA crop job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        },
+        run_func=_run_crop_ingestion,
+        run_args=(request.commodity.upper(), request.year, request.state, request.all_stats),
+        message=f"USDA {request.commodity.upper()} ingestion job created for {request.year}",
+    )
 
 
 @router.post("/livestock/ingest")
@@ -118,46 +112,23 @@ async def ingest_livestock_data(
 ):
     """
     Ingest livestock inventory data.
-    
+
     Available types: CATTLE, HOGS, SHEEP, CHICKENS, TURKEYS
-    
+
     **Requires USDA_API_KEY environment variable.**
     """
-    try:
-        job_config = {
+    return _create_usda_job(
+        db, background_tasks,
+        config={
             "dataset": "livestock",
             "commodity": request.commodity.upper(),
             "year": request.year,
             "state": request.state,
-        }
-        
-        job = IngestionJob(
-            source="usda",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_livestock_ingestion,
-            job.id,
-            request.commodity.upper(),
-            request.year,
-            request.state
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"USDA {request.commodity.upper()} livestock ingestion job created",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create USDA livestock job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        },
+        run_func=_run_livestock_ingestion,
+        run_args=(request.commodity.upper(), request.year, request.state),
+        message=f"USDA {request.commodity.upper()} livestock ingestion job created",
+    )
 
 
 @router.post("/annual-summary/ingest")
@@ -168,42 +139,16 @@ async def ingest_annual_summary(
 ):
     """
     Ingest annual crop production summary for all crops.
-    
-    National-level annual production data.
-    
+
     **Requires USDA_API_KEY environment variable.**
     """
-    try:
-        job_config = {
-            "dataset": "annual_summary",
-            "year": request.year,
-        }
-        
-        job = IngestionJob(
-            source="usda",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_annual_ingestion,
-            job.id,
-            request.year
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"USDA annual summary ingestion job created for {request.year}",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create USDA annual job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    return _create_usda_job(
+        db, background_tasks,
+        config={"dataset": "annual_summary", "year": request.year},
+        run_func=_run_annual_ingestion,
+        run_args=(request.year,),
+        message=f"USDA annual summary ingestion job created for {request.year}",
+    )
 
 
 @router.post("/all-major-crops/ingest")
@@ -214,209 +159,187 @@ async def ingest_all_major_crops_endpoint(
 ):
     """
     Ingest data for all major crops (CORN, SOYBEANS, WHEAT, COTTON, RICE).
-    
-    Includes production, yield, area planted/harvested, and prices.
-    
+
     **Requires USDA_API_KEY environment variable.**
     """
-    try:
-        job_config = {
-            "dataset": "all_major_crops",
-            "year": request.year,
-        }
-        
-        job = IngestionJob(
-            source="usda",
-            status=JobStatus.PENDING,
-            config=job_config
-        )
-        db.add(job)
-        db.commit()
-        db.refresh(job)
-        
-        background_tasks.add_task(
-            _run_all_crops_ingestion,
-            job.id,
-            request.year
-        )
-        
-        return {
-            "job_id": job.id,
-            "status": "pending",
-            "message": f"USDA all major crops ingestion job created for {request.year}",
-            "check_status": f"/api/v1/jobs/{job.id}"
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to create USDA all crops job: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    return _create_usda_job(
+        db, background_tasks,
+        config={"dataset": "all_major_crops", "year": request.year},
+        run_func=_run_all_crops_ingestion,
+        run_args=(request.year,),
+        message=f"USDA all major crops ingestion job created for {request.year}",
+    )
 
 
 # ========== Background Tasks ==========
 
-async def _run_crop_ingestion(
-    job_id: int,
-    commodity: str,
-    year: int,
-    state: Optional[str],
-    all_stats: bool
-):
-    """Background task for crop ingestion."""
+def _run_usda_bg(job_id, ingest_coro):
+    """Shared background task wrapper for USDA ingestion."""
+    import asyncio
     SessionLocal = get_session_factory()
     db = SessionLocal()
-    
     try:
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+        job = db.get(IngestionJob, job_id)
         if job:
             job.status = JobStatus.RUNNING
             job.started_at = datetime.utcnow()
             db.commit()
-        
+
         conn = db.connection().connection
-        
+        total_rows = asyncio.get_event_loop().run_until_complete(ingest_coro(conn))
+
+        job = db.get(IngestionJob, job_id)
+        if job:
+            job.status = JobStatus.SUCCESS
+            job.rows_inserted = total_rows
+            job.completed_at = datetime.utcnow()
+            db.commit()
+
+        logger.info("USDA job %d completed: %d rows", job_id, total_rows)
+    except Exception as e:
+        logger.error("USDA job %d failed: %s", job_id, e, exc_info=True)
+        job = db.get(IngestionJob, job_id)
+        if job:
+            job.status = JobStatus.FAILED
+            job.error_message = str(e)
+            job.completed_at = datetime.utcnow()
+            db.commit()
+    finally:
+        db.close()
+
+
+async def _run_crop_ingestion(job_id, commodity, year, state, all_stats):
+    """Background task for crop ingestion."""
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+    try:
+        job = db.get(IngestionJob, job_id)
+        if job:
+            job.status = JobStatus.RUNNING
+            job.started_at = datetime.utcnow()
+            db.commit()
+
+        conn = db.connection().connection
         if all_stats:
             total_rows = await ingest_crop_all_stats(conn, commodity, year, state)
         else:
             total_rows = await ingest_crop_production(conn, commodity, year, state)
-        
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+
+        job = db.get(IngestionJob, job_id)
         if job:
             job.status = JobStatus.SUCCESS
             job.rows_inserted = total_rows
             job.completed_at = datetime.utcnow()
             db.commit()
-        
-        logger.info(f"USDA crop ingestion job {job_id} completed: {total_rows} rows")
-    
+        logger.info("USDA crop job %d completed: %d rows", job_id, total_rows)
     except Exception as e:
-        logger.error(f"USDA crop ingestion job {job_id} failed: {e}", exc_info=True)
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+        logger.error("USDA crop job %d failed: %s", job_id, e, exc_info=True)
+        job = db.get(IngestionJob, job_id)
         if job:
             job.status = JobStatus.FAILED
             job.error_message = str(e)
             job.completed_at = datetime.utcnow()
             db.commit()
-    
     finally:
         db.close()
 
 
-async def _run_livestock_ingestion(
-    job_id: int,
-    commodity: str,
-    year: int,
-    state: Optional[str]
-):
+async def _run_livestock_ingestion(job_id, commodity, year, state):
     """Background task for livestock ingestion."""
     SessionLocal = get_session_factory()
     db = SessionLocal()
-    
     try:
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+        job = db.get(IngestionJob, job_id)
         if job:
             job.status = JobStatus.RUNNING
             job.started_at = datetime.utcnow()
             db.commit()
-        
+
         conn = db.connection().connection
-        
         total_rows = await ingest_livestock_inventory(conn, commodity, year, state)
-        
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+
+        job = db.get(IngestionJob, job_id)
         if job:
             job.status = JobStatus.SUCCESS
             job.rows_inserted = total_rows
             job.completed_at = datetime.utcnow()
             db.commit()
-        
-        logger.info(f"USDA livestock ingestion job {job_id} completed: {total_rows} rows")
-    
+        logger.info("USDA livestock job %d completed: %d rows", job_id, total_rows)
     except Exception as e:
-        logger.error(f"USDA livestock ingestion job {job_id} failed: {e}", exc_info=True)
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+        logger.error("USDA livestock job %d failed: %s", job_id, e, exc_info=True)
+        job = db.get(IngestionJob, job_id)
         if job:
             job.status = JobStatus.FAILED
             job.error_message = str(e)
             job.completed_at = datetime.utcnow()
             db.commit()
-    
     finally:
         db.close()
 
 
-async def _run_annual_ingestion(job_id: int, year: int):
+async def _run_annual_ingestion(job_id, year):
     """Background task for annual summary ingestion."""
     SessionLocal = get_session_factory()
     db = SessionLocal()
-    
     try:
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+        job = db.get(IngestionJob, job_id)
         if job:
             job.status = JobStatus.RUNNING
             job.started_at = datetime.utcnow()
             db.commit()
-        
+
         conn = db.connection().connection
-        
         total_rows = await ingest_annual_crops(conn, year)
-        
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+
+        job = db.get(IngestionJob, job_id)
         if job:
             job.status = JobStatus.SUCCESS
             job.rows_inserted = total_rows
             job.completed_at = datetime.utcnow()
             db.commit()
-        
-        logger.info(f"USDA annual summary job {job_id} completed: {total_rows} rows")
-    
+        logger.info("USDA annual job %d completed: %d rows", job_id, total_rows)
     except Exception as e:
-        logger.error(f"USDA annual summary job {job_id} failed: {e}", exc_info=True)
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+        logger.error("USDA annual job %d failed: %s", job_id, e, exc_info=True)
+        job = db.get(IngestionJob, job_id)
         if job:
             job.status = JobStatus.FAILED
             job.error_message = str(e)
             job.completed_at = datetime.utcnow()
             db.commit()
-    
     finally:
         db.close()
 
 
-async def _run_all_crops_ingestion(job_id: int, year: int):
+async def _run_all_crops_ingestion(job_id, year):
     """Background task for all major crops ingestion."""
     SessionLocal = get_session_factory()
     db = SessionLocal()
-    
     try:
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+        job = db.get(IngestionJob, job_id)
         if job:
             job.status = JobStatus.RUNNING
             job.started_at = datetime.utcnow()
             db.commit()
-        
+
         conn = db.connection().connection
-        
         results = await ingest_all_major_crops(conn, year)
         total_rows = sum(results.values())
-        
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+
+        job = db.get(IngestionJob, job_id)
         if job:
             job.status = JobStatus.SUCCESS
             job.rows_inserted = total_rows
             job.completed_at = datetime.utcnow()
             db.commit()
-        
-        logger.info(f"USDA all crops job {job_id} completed: {total_rows} rows")
-    
+        logger.info("USDA all crops job %d completed: %d rows", job_id, total_rows)
     except Exception as e:
-        logger.error(f"USDA all crops job {job_id} failed: {e}", exc_info=True)
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+        logger.error("USDA all crops job %d failed: %s", job_id, e, exc_info=True)
+        job = db.get(IngestionJob, job_id)
         if job:
             job.status = JobStatus.FAILED
             job.error_message = str(e)
             job.completed_at = datetime.utcnow()
             db.commit()
-    
     finally:
         db.close()
 
@@ -425,23 +348,17 @@ async def _run_all_crops_ingestion(job_id: int, year: int):
 
 @router.get("/reference/commodities")
 async def get_commodities():
-    """
-    Get available commodities by category.
-    """
+    """Get available commodities by category."""
     return {"commodities": COMMODITY_CATEGORIES}
 
 
 @router.get("/reference/crop-states")
 async def get_major_crop_states():
-    """
-    Get top producing states for major crops.
-    """
+    """Get top producing states for major crops."""
     return {"crop_states": MAJOR_CROP_STATES}
 
 
 @router.get("/reference/state-fips")
 async def get_state_fips_codes():
-    """
-    Get state FIPS codes for filtering.
-    """
+    """Get state FIPS codes for filtering."""
     return {"states": STATE_FIPS}
