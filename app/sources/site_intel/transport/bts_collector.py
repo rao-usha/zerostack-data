@@ -11,6 +11,7 @@ Data sources:
 
 No API key required - public data via ArcGIS REST services.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -20,7 +21,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import IntermodalTerminal, Port, Airport
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -87,7 +92,9 @@ class BTSTransportCollector(BaseCollector):
             if airports_result.get("error"):
                 errors.append({"source": "airports", "error": airports_result["error"]})
 
-            status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            status = (
+                CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            )
 
             return self.create_result(
                 status=status,
@@ -131,7 +138,9 @@ class BTSTransportCollector(BaseCollector):
                     break
 
                 all_ports.extend(features)
-                logger.info(f"Fetched {len(features)} port records (total: {len(all_ports)})")
+                logger.info(
+                    f"Fetched {len(features)} port records (total: {len(all_ports)})"
+                )
 
                 if len(features) < page_size:
                     break
@@ -153,9 +162,16 @@ class BTSTransportCollector(BaseCollector):
                     records,
                     unique_columns=["port_code"],
                     update_columns=[
-                        "name", "city", "state", "latitude", "longitude",
-                        "port_type", "has_container_terminal", "has_bulk_terminal",
-                        "channel_depth_ft", "collected_at"
+                        "name",
+                        "city",
+                        "state",
+                        "latitude",
+                        "longitude",
+                        "port_type",
+                        "has_container_terminal",
+                        "has_bulk_terminal",
+                        "channel_depth_ft",
+                        "collected_at",
                     ],
                 )
                 return {"processed": len(all_ports), "inserted": inserted}
@@ -189,7 +205,9 @@ class BTSTransportCollector(BaseCollector):
         foreign = self._safe_int(attrs.get("foreign_") or attrs.get("FOREIGN")) or 0
 
         # Parse state from port_name (e.g. "Unalaska Island, AK")
-        port_name = attrs.get("port_name") or attrs.get("PORT_NAME") or f"Port {port_id}"
+        port_name = (
+            attrs.get("port_name") or attrs.get("PORT_NAME") or f"Port {port_id}"
+        )
         state = None
         city = None
         if ", " in port_name:
@@ -254,7 +272,9 @@ class BTSTransportCollector(BaseCollector):
                     break
 
                 all_airports.extend(features)
-                logger.info(f"Fetched {len(features)} airport records (total: {len(all_airports)})")
+                logger.info(
+                    f"Fetched {len(features)} airport records (total: {len(all_airports)})"
+                )
 
                 if len(features) < page_size:
                     break
@@ -276,9 +296,16 @@ class BTSTransportCollector(BaseCollector):
                     records,
                     unique_columns=["faa_code"],
                     update_columns=[
-                        "icao_code", "name", "city", "state",
-                        "latitude", "longitude", "airport_type",
-                        "has_cargo_facility", "longest_runway_ft", "collected_at"
+                        "icao_code",
+                        "name",
+                        "city",
+                        "state",
+                        "latitude",
+                        "longitude",
+                        "airport_type",
+                        "has_cargo_facility",
+                        "longest_runway_ft",
+                        "collected_at",
                     ],
                 )
                 return {"processed": len(all_airports), "inserted": inserted}
@@ -300,8 +327,10 @@ class BTSTransportCollector(BaseCollector):
 
         # New hosted service uses lowercase field names
         faa_id = (
-            attrs.get("locid") or attrs.get("loc_id") or
-            attrs.get("LOCID") or attrs.get("FAA_ID")
+            attrs.get("locid")
+            or attrs.get("loc_id")
+            or attrs.get("LOCID")
+            or attrs.get("FAA_ID")
         )
         if not faa_id:
             return None
@@ -319,8 +348,10 @@ class BTSTransportCollector(BaseCollector):
             "faa_code": faa_id,
             "icao_code": attrs.get("icao_identifier") or attrs.get("ICAO_ID"),
             "name": (
-                attrs.get("fac_name") or attrs.get("FULLNAME") or
-                attrs.get("airport") or f"Airport {faa_id}"
+                attrs.get("fac_name")
+                or attrs.get("FULLNAME")
+                or attrs.get("airport")
+                or f"Airport {faa_id}"
             ),
             "city": attrs.get("city") or attrs.get("CITY"),
             "state": attrs.get("state") or attrs.get("STATE"),

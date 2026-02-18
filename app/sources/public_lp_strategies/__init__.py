@@ -19,5 +19,3 @@ Usage:
 
 __version__ = "0.1.0"
 __source_name__ = "public_lp_strategies"
-
-

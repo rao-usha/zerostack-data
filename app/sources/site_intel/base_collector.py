@@ -4,6 +4,7 @@ Site Intelligence Platform - Base Collector.
 Abstract base class for all site intelligence data collectors.
 Provides common functionality for API calls, rate limiting, and database operations.
 """
+
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -109,6 +110,7 @@ class BaseCollector(ABC):
     async def apply_rate_limit(self):
         """Apply rate limiting delay between requests."""
         import asyncio
+
         if self.rate_limit_delay > 0:
             await asyncio.sleep(self.rate_limit_delay)
 
@@ -155,7 +157,9 @@ class BaseCollector(ABC):
                 if method.upper() == "GET":
                     response = await client.get(endpoint, params=params)
                 elif method.upper() == "POST":
-                    response = await client.post(endpoint, params=params, json=json_body)
+                    response = await client.post(
+                        endpoint, params=params, json=json_body
+                    )
                 else:
                     raise ValueError(f"Unsupported HTTP method: {method}")
 
@@ -165,7 +169,8 @@ class BaseCollector(ABC):
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 429:  # Rate limited
                     import asyncio
-                    wait_time = self.rate_limit_delay * (2 ** attempt)
+
+                    wait_time = self.rate_limit_delay * (2**attempt)
                     logger.warning(f"Rate limited, waiting {wait_time}s before retry")
                     await asyncio.sleep(wait_time)
                     continue
@@ -174,6 +179,7 @@ class BaseCollector(ABC):
             except httpx.RequestError as e:
                 if attempt < self.default_retries - 1:
                     import asyncio
+
                     await asyncio.sleep(self.rate_limit_delay)
                     continue
                 raise
@@ -222,7 +228,9 @@ class BaseCollector(ABC):
                 break
 
             all_items.extend(items)
-            logger.debug(f"Fetched page {page}, {len(items)} items, total: {len(all_items)}")
+            logger.debug(
+                f"Fetched page {page}, {len(items)} items, total: {len(all_items)}"
+            )
 
             if len(items) < per_page:
                 break
@@ -239,7 +247,9 @@ class BaseCollector(ABC):
     # JOB MANAGEMENT
     # =========================================================================
 
-    def create_job(self, config: CollectionConfig, bridge_to_ingestion: bool = False) -> SiteIntelCollectionJob:
+    def create_job(
+        self, config: CollectionConfig, bridge_to_ingestion: bool = False
+    ) -> SiteIntelCollectionJob:
         """
         Create a collection job record.
 
@@ -252,7 +262,7 @@ class BaseCollector(ABC):
             source=self.source.value,
             job_type=config.job_type,
             status="pending",
-            config=config.model_dump(mode='json'),
+            config=config.model_dump(mode="json"),
             created_at=datetime.utcnow(),
         )
         self.db.add(job)
@@ -265,6 +275,7 @@ class BaseCollector(ABC):
         if bridge_to_ingestion:
             try:
                 from app.core.models import IngestionJob, JobStatus
+
                 bridge_job = IngestionJob(
                     source=f"site_intel_{self.source.value}",
                     status=JobStatus.PENDING,
@@ -287,11 +298,14 @@ class BaseCollector(ABC):
             self.db.commit()
 
         # Publish SSE event
-        self._publish_event("started", {
-            "domain": self.domain.value,
-            "source": self.source.value,
-            "job_id": self._job.id if self._job else None,
-        })
+        self._publish_event(
+            "started",
+            {
+                "domain": self.domain.value,
+                "source": self.source.value,
+                "job_id": self._job.id if self._job else None,
+            },
+        )
 
     def complete_job(self, result: CollectionResult):
         """Mark job as completed with results."""
@@ -310,33 +324,49 @@ class BaseCollector(ABC):
             self.db.commit()
 
         # Update bridge job if it exists
-        if getattr(self, '_bridge_job_id', None):
+        if getattr(self, "_bridge_job_id", None):
             try:
                 from app.core.models import IngestionJob, JobStatus
                 from app.core import dependency_service
-                bridge = self.db.query(IngestionJob).filter(IngestionJob.id == self._bridge_job_id).first()
+
+                bridge = (
+                    self.db.query(IngestionJob)
+                    .filter(IngestionJob.id == self._bridge_job_id)
+                    .first()
+                )
                 if bridge:
-                    bridge.status = JobStatus.SUCCESS if result.status == CollectionStatus.SUCCESS else JobStatus.FAILED
+                    bridge.status = (
+                        JobStatus.SUCCESS
+                        if result.status == CollectionStatus.SUCCESS
+                        else JobStatus.FAILED
+                    )
                     bridge.completed_at = datetime.utcnow()
                     bridge.rows_inserted = result.inserted_items
                     if result.error_message:
                         bridge.error_message = result.error_message
                     self.db.commit()
-                    dependency_service.check_and_unblock_dependent_jobs(self.db, self._bridge_job_id)
+                    dependency_service.check_and_unblock_dependent_jobs(
+                        self.db, self._bridge_job_id
+                    )
             except Exception as e:
                 logger.warning(f"Failed to update bridge job: {e}")
 
         # Publish SSE event
-        event_type = "completed" if result.status == CollectionStatus.SUCCESS else "failed"
-        self._publish_event(event_type, {
-            "domain": self.domain.value,
-            "source": self.source.value,
-            "job_id": self._job.id if self._job else None,
-            "status": result.status.value,
-            "inserted": result.inserted_items,
-            "failed": result.failed_items,
-            "error": result.error_message,
-        })
+        event_type = (
+            "completed" if result.status == CollectionStatus.SUCCESS else "failed"
+        )
+        self._publish_event(
+            event_type,
+            {
+                "domain": self.domain.value,
+                "source": self.source.value,
+                "job_id": self._job.id if self._job else None,
+                "status": result.status.value,
+                "inserted": result.inserted_items,
+                "failed": result.failed_items,
+                "error": result.error_message,
+            },
+        )
 
         # Fire webhook notification (non-blocking)
         self._fire_webhook(result)
@@ -344,6 +374,7 @@ class BaseCollector(ABC):
     def _fire_webhook(self, result: CollectionResult):
         """Fire webhook notification for collection result (non-blocking)."""
         import asyncio
+
         try:
             from app.core import webhook_service
             from app.core.models import WebhookEventType
@@ -359,13 +390,17 @@ class BaseCollector(ABC):
                 "job_id": self._job.id if self._job else None,
                 "status": result.status.value,
                 "inserted": result.inserted_items,
-                "error_message": result.error_message[:500] if result.error_message else None,
+                "error_message": result.error_message[:500]
+                if result.error_message
+                else None,
             }
 
             try:
                 loop = asyncio.get_running_loop()
                 asyncio.ensure_future(
-                    webhook_service.trigger_webhooks(event_type, event_data, source=self.source.value)
+                    webhook_service.trigger_webhooks(
+                        event_type, event_data, source=self.source.value
+                    )
                 )
             except RuntimeError:
                 pass  # No event loop running
@@ -376,6 +411,7 @@ class BaseCollector(ABC):
         """Publish an SSE event to the event bus (best-effort)."""
         try:
             from app.core.event_bus import EventBus
+
             EventBus.publish("collection_all", event_type, data)
             if self._job:
                 EventBus.publish(f"collection_{self._job.id}", event_type, data)
@@ -399,16 +435,19 @@ class BaseCollector(ABC):
         progress_pct = (processed / total * 100) if total > 0 else 0
 
         # Publish SSE event
-        self._publish_event("progress", {
-            "domain": self.domain.value,
-            "source": self.source.value,
-            "job_id": self._job.id if self._job else 0,
-            "processed": processed,
-            "total": total,
-            "progress_pct": round(progress_pct, 1),
-            "current_step": current_step,
-            "errors": errors,
-        })
+        self._publish_event(
+            "progress",
+            {
+                "domain": self.domain.value,
+                "source": self.source.value,
+                "job_id": self._job.id if self._job else 0,
+                "processed": processed,
+                "total": total,
+                "progress_pct": round(progress_pct, 1),
+                "current_step": current_step,
+                "errors": errors,
+            },
+        )
 
         return CollectionProgress(
             job_id=self._job.id if self._job else 0,
@@ -428,6 +467,7 @@ class BaseCollector(ABC):
         """Get the last-collected timestamp for this collector's domain/source."""
         try:
             from app.core import watermark_service
+
             return watermark_service.get_watermark(
                 self.db, self.domain.value, self.source.value, state=state
             )
@@ -443,6 +483,7 @@ class BaseCollector(ABC):
         """Update the watermark after successful collection."""
         try:
             from app.core import watermark_service
+
             watermark_service.update_watermark(
                 self.db,
                 self.domain.value,
@@ -489,10 +530,10 @@ class BaseCollector(ABC):
         # Determine update columns
         if update_columns is None:
             all_columns = set(records[0].keys())
-            update_columns = list(all_columns - set(unique_columns) - {'id'})
+            update_columns = list(all_columns - set(unique_columns) - {"id"})
 
         for i in range(0, len(records), batch_size):
-            batch = records[i:i + batch_size]
+            batch = records[i : i + batch_size]
 
             # Deduplicate batch by unique columns to prevent CardinalityViolation
             seen = {}
@@ -523,20 +564,26 @@ class BaseCollector(ABC):
                 batch_affected = result.rowcount
                 inserted += batch_affected
             except Exception as e:
-                logger.warning(f"Batch upsert failed ({len(batch)} records), retrying individually: {e}")
+                logger.warning(
+                    f"Batch upsert failed ({len(batch)} records), retrying individually: {e}"
+                )
                 self.db.rollback()
                 # Fall back to individual record inserts
                 for rec in batch:
                     try:
                         stmt = insert(model).values([rec])
                         if update_columns:
-                            update_dict = {col: stmt.excluded[col] for col in update_columns}
+                            update_dict = {
+                                col: stmt.excluded[col] for col in update_columns
+                            }
                             stmt = stmt.on_conflict_do_update(
                                 index_elements=unique_columns,
                                 set_=update_dict,
                             )
                         else:
-                            stmt = stmt.on_conflict_do_nothing(index_elements=unique_columns)
+                            stmt = stmt.on_conflict_do_nothing(
+                                index_elements=unique_columns
+                            )
                         result = self.db.execute(stmt)
                         self.db.commit()
                         inserted += result.rowcount
@@ -579,19 +626,18 @@ class BaseCollector(ABC):
 
         if update_columns is None:
             all_columns = set(records[0].keys())
-            update_columns = list(all_columns - set(unique_columns) - {'id'})
+            update_columns = list(all_columns - set(unique_columns) - {"id"})
 
         # Normalize records: all dicts must have the same keys for batch insert
         all_keys = set()
         for record in records:
             all_keys.update(record.keys())
         normalized_records = [
-            {k: record.get(k, None) for k in all_keys}
-            for record in records
+            {k: record.get(k, None) for k in all_keys} for record in records
         ]
 
         for i in range(0, len(normalized_records), batch_size):
-            batch = normalized_records[i:i + batch_size]
+            batch = normalized_records[i : i + batch_size]
 
             stmt = insert(model).values(batch)
 
@@ -639,7 +685,7 @@ class BaseCollector(ABC):
         inserted = 0
 
         for i in range(0, len(records), batch_size):
-            batch = records[i:i + batch_size]
+            batch = records[i : i + batch_size]
             self.db.bulk_insert_mappings(model, batch)
             self.db.commit()
             inserted += len(batch)
@@ -677,8 +723,8 @@ class BaseCollector(ABC):
         delta_lng = math.radians(lng2 - lng1)
 
         a = (
-            math.sin(delta_lat / 2) ** 2 +
-            math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lng / 2) ** 2
+            math.sin(delta_lat / 2) ** 2
+            + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lng / 2) ** 2
         )
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
@@ -704,10 +750,11 @@ class BaseCollector(ABC):
             Filtered records within bounding box
         """
         return [
-            r for r in records
+            r
+            for r in records
             if (
-                bbox["min_lat"] <= r.get(lat_key, 0) <= bbox["max_lat"] and
-                bbox["min_lng"] <= r.get(lng_key, 0) <= bbox["max_lng"]
+                bbox["min_lat"] <= r.get(lat_key, 0) <= bbox["max_lat"]
+                and bbox["min_lng"] <= r.get(lng_key, 0) <= bbox["max_lng"]
             )
         ]
 

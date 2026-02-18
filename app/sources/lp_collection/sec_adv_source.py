@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 
 
 # SEC IAPD (Investment Adviser Public Disclosure) API
-SEC_IAPD_SEARCH_URL = "https://api.advfn.com/apa/v4/firms"  # Example - actual SEC API varies
+SEC_IAPD_SEARCH_URL = (
+    "https://api.advfn.com/apa/v4/firms"  # Example - actual SEC API varies
+)
 SEC_FORM_ADV_BASE_URL = "https://reports.advfn.com/v4/firms"
 
 
@@ -156,30 +158,34 @@ class SecAdvCollector(BaseCollector):
         # Extract AUM
         aum = adv_data.get("aum") or adv_data.get("regulatory_assets_under_management")
         if aum:
-            items.append(CollectedItem(
-                item_type="strategy_info",
-                data={
-                    "lp_id": lp_id,
-                    "aum_usd_millions": str(aum),
-                    "source_type": "sec_adv",
-                },
-                source_url=f"SEC Form ADV for {lp_name}",
-                confidence="high",
-            ))
+            items.append(
+                CollectedItem(
+                    item_type="strategy_info",
+                    data={
+                        "lp_id": lp_id,
+                        "aum_usd_millions": str(aum),
+                        "source_type": "sec_adv",
+                    },
+                    source_url=f"SEC Form ADV for {lp_name}",
+                    confidence="high",
+                )
+            )
 
         # Extract CRD number
         crd = adv_data.get("crd_number") or adv_data.get("cik")
         if crd:
-            items.append(CollectedItem(
-                item_type="identifier",
-                data={
-                    "lp_id": lp_id,
-                    "sec_crd_number": str(crd),
-                    "source_type": "sec_adv",
-                },
-                source_url=f"SEC Form ADV for {lp_name}",
-                confidence="high",
-            ))
+            items.append(
+                CollectedItem(
+                    item_type="identifier",
+                    data={
+                        "lp_id": lp_id,
+                        "sec_crd_number": str(crd),
+                        "source_type": "sec_adv",
+                    },
+                    source_url=f"SEC Form ADV for {lp_name}",
+                    confidence="high",
+                )
+            )
 
         # Extract officers/executives
         officers = adv_data.get("officers", [])
@@ -189,46 +195,52 @@ class SecAdvCollector(BaseCollector):
 
             if name:
                 role_category = self._categorize_sec_role(title or "")
-                items.append(CollectedItem(
-                    item_type="contact",
-                    data={
-                        "lp_id": lp_id,
-                        "full_name": name,
-                        "title": title,
-                        "role_category": role_category,
-                        "source_type": "sec_adv",
-                    },
-                    source_url=f"SEC Form ADV for {lp_name}",
-                    confidence="high",
-                ))
+                items.append(
+                    CollectedItem(
+                        item_type="contact",
+                        data={
+                            "lp_id": lp_id,
+                            "full_name": name,
+                            "title": title,
+                            "role_category": role_category,
+                            "source_type": "sec_adv",
+                        },
+                        source_url=f"SEC Form ADV for {lp_name}",
+                        confidence="high",
+                    )
+                )
 
         # Extract client types
         client_types = adv_data.get("client_types", {})
         if client_types:
-            items.append(CollectedItem(
-                item_type="client_info",
-                data={
-                    "lp_id": lp_id,
-                    "client_types": client_types,
-                    "source_type": "sec_adv",
-                },
-                source_url=f"SEC Form ADV for {lp_name}",
-                confidence="high",
-            ))
+            items.append(
+                CollectedItem(
+                    item_type="client_info",
+                    data={
+                        "lp_id": lp_id,
+                        "client_types": client_types,
+                        "source_type": "sec_adv",
+                    },
+                    source_url=f"SEC Form ADV for {lp_name}",
+                    confidence="high",
+                )
+            )
 
         # Extract investment types
         investment_types = adv_data.get("advisory_activities", {})
         if investment_types:
-            items.append(CollectedItem(
-                item_type="investment_activities",
-                data={
-                    "lp_id": lp_id,
-                    "advisory_activities": investment_types,
-                    "source_type": "sec_adv",
-                },
-                source_url=f"SEC Form ADV for {lp_name}",
-                confidence="high",
-            ))
+            items.append(
+                CollectedItem(
+                    item_type="investment_activities",
+                    data={
+                        "lp_id": lp_id,
+                        "advisory_activities": investment_types,
+                        "source_type": "sec_adv",
+                    },
+                    source_url=f"SEC Form ADV for {lp_name}",
+                    confidence="high",
+                )
+            )
 
         return items
 

@@ -21,7 +21,9 @@ router = APIRouter(
 
 
 class CollectRequest(BaseModel):
-    entity_type: str = Field(default="firm", description="firm, company, person, or deal")
+    entity_type: str = Field(
+        default="firm", description="firm, company, person, or deal"
+    )
     sources: List[str] = Field(
         default=["firm_website"],
         description="Collection sources (sec_adv, firm_website, sec_form_d, etc.)",
@@ -29,7 +31,9 @@ class CollectRequest(BaseModel):
     firm_id: Optional[int] = Field(default=None, description="Single firm ID")
     firm_ids: Optional[List[int]] = Field(default=None, description="Multiple firm IDs")
     company_id: Optional[int] = Field(default=None, description="Single company ID")
-    company_ids: Optional[List[int]] = Field(default=None, description="Multiple company IDs")
+    company_ids: Optional[List[int]] = Field(
+        default=None, description="Multiple company IDs"
+    )
     max_concurrent: int = Field(default=5, ge=1, le=20)
     rate_limit_delay: float = Field(default=2.0, ge=0.1, le=30.0)
 
@@ -83,9 +87,15 @@ async def trigger_collection(
     valid_sources = {s.value for s in PECollectionOrchestrator._collectors.keys()}
     for src in request.sources:
         if src not in valid_sources and src not in [
-            "sec_adv", "firm_website", "sec_form_d", "sec_13d",
-            "linkedin_firm", "linkedin_people", "crunchbase",
-            "news_api", "public_comps",
+            "sec_adv",
+            "firm_website",
+            "sec_form_d",
+            "sec_13d",
+            "linkedin_firm",
+            "linkedin_people",
+            "crunchbase",
+            "news_api",
+            "public_comps",
         ]:
             raise HTTPException(
                 status_code=400,
@@ -104,6 +114,7 @@ async def trigger_collection(
     }
 
     from app.core.job_queue_service import submit_job
+
     result = submit_job(
         db=db,
         job_type="pe",

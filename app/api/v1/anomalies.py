@@ -24,8 +24,10 @@ router = APIRouter(tags=["Anomaly Detection"])
 # Request/Response Models
 # =============================================================================
 
+
 class ScanRequest(BaseModel):
     """Request to start anomaly scan."""
+
     scan_type: str = Field("full", description="Scan type: full, company, sector")
     target: Optional[str] = Field(None, description="Target company or sector name")
     force: bool = Field(False, description="Force re-scan even if recent")
@@ -33,6 +35,7 @@ class ScanRequest(BaseModel):
 
 class ScanResponse(BaseModel):
     """Response for scan operations."""
+
     scan_id: str
     status: str
     records_scanned: int = 0
@@ -43,18 +46,25 @@ class ScanResponse(BaseModel):
 
 class InvestigateRequest(BaseModel):
     """Request to investigate an anomaly."""
+
     anomaly_id: int
-    depth: str = Field("standard", description="Investigation depth: quick, standard, deep")
+    depth: str = Field(
+        "standard", description="Investigation depth: quick, standard, deep"
+    )
 
 
 class UpdateStatusRequest(BaseModel):
     """Request to update anomaly status."""
-    status: str = Field(..., description="New status: acknowledged, investigating, resolved")
+
+    status: str = Field(
+        ..., description="New status: acknowledged, investigating, resolved"
+    )
     resolution_notes: Optional[str] = Field(None, description="Notes for resolution")
 
 
 class AnomalyResponse(BaseModel):
     """Single anomaly response."""
+
     id: int
     company_name: str
     anomaly_type: str
@@ -72,6 +82,7 @@ class AnomalyResponse(BaseModel):
 
 class RecentAnomaliesResponse(BaseModel):
     """Response for recent anomalies."""
+
     anomalies: List[Dict[str, Any]]
     total: int
     by_severity: Dict[str, int]
@@ -80,6 +91,7 @@ class RecentAnomaliesResponse(BaseModel):
 
 class CompanyAnomaliesResponse(BaseModel):
     """Response for company anomalies."""
+
     company: str
     anomalies: List[Dict[str, Any]]
     total: int
@@ -89,12 +101,14 @@ class CompanyAnomaliesResponse(BaseModel):
 
 class InvestigationResponse(BaseModel):
     """Response for anomaly investigation."""
+
     anomaly: Dict[str, Any]
     investigation: Dict[str, Any]
 
 
 class PatternsResponse(BaseModel):
     """Response for baseline patterns."""
+
     patterns: List[Dict[str, Any]]
     total: int
 
@@ -103,13 +117,16 @@ class PatternsResponse(BaseModel):
 # API Endpoints
 # =============================================================================
 
+
 @router.get("/anomalies/recent", response_model=RecentAnomaliesResponse)
 async def get_recent_anomalies(
     hours: int = Query(24, ge=1, le=720, description="Time window in hours"),
     severity: Optional[str] = Query(None, description="Filter by severity level"),
-    type: Optional[str] = Query(None, alias="type", description="Filter by anomaly type"),
+    type: Optional[str] = Query(
+        None, alias="type", description="Filter by anomaly type"
+    ),
     limit: int = Query(50, ge=1, le=200, description="Max results"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get recent anomalies across all companies.
@@ -119,17 +136,14 @@ async def get_recent_anomalies(
     """
     detector = AnomalyDetectorAgent(db)
     result = detector.get_recent_anomalies(
-        hours=hours,
-        severity=severity,
-        anomaly_type=type,
-        limit=limit
+        hours=hours, severity=severity, anomaly_type=type, limit=limit
     )
 
     return RecentAnomaliesResponse(
         anomalies=result.get("anomalies", []),
         total=result.get("total", 0),
         by_severity=result.get("by_severity", {}),
-        by_type=result.get("by_type", {})
+        by_type=result.get("by_type", {}),
     )
 
 
@@ -139,7 +153,7 @@ async def get_company_anomalies(
     days: int = Query(30, ge=1, le=365, description="Time window in days"),
     status: Optional[str] = Query(None, description="Filter by status"),
     include_resolved: bool = Query(False, description="Include resolved anomalies"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get anomalies for a specific company.
@@ -148,10 +162,7 @@ async def get_company_anomalies(
     """
     detector = AnomalyDetectorAgent(db)
     result = detector.get_company_anomalies(
-        company_name=name,
-        days=days,
-        status=status,
-        include_resolved=include_resolved
+        company_name=name, days=days, status=status, include_resolved=include_resolved
     )
 
     return CompanyAnomaliesResponse(
@@ -159,14 +170,13 @@ async def get_company_anomalies(
         anomalies=result.get("anomalies", []),
         total=result.get("total", 0),
         unresolved=result.get("unresolved", 0),
-        risk_summary=result.get("risk_summary", {})
+        risk_summary=result.get("risk_summary", {}),
     )
 
 
 @router.post("/anomalies/investigate", response_model=InvestigationResponse)
 async def investigate_anomaly(
-    request: InvestigateRequest,
-    db: Session = Depends(get_db)
+    request: InvestigateRequest, db: Session = Depends(get_db)
 ):
     """
     Deep investigation of an anomaly.
@@ -175,17 +185,13 @@ async def investigate_anomaly(
     historical context, and provides recommendations.
     """
     detector = AnomalyDetectorAgent(db)
-    result = detector.investigate(
-        anomaly_id=request.anomaly_id,
-        depth=request.depth
-    )
+    result = detector.investigate(anomaly_id=request.anomaly_id, depth=request.depth)
 
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
 
     return InvestigationResponse(
-        anomaly=result.get("anomaly", {}),
-        investigation=result.get("investigation", {})
+        anomaly=result.get("anomaly", {}), investigation=result.get("investigation", {})
     )
 
 
@@ -195,7 +201,7 @@ async def get_patterns(
     entity_name: Optional[str] = Query(None, description="Filter by entity name"),
     metric: Optional[str] = Query(None, description="Filter by metric name"),
     limit: int = Query(100, ge=1, le=500, description="Max results"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get learned baseline patterns.
@@ -205,15 +211,11 @@ async def get_patterns(
     """
     detector = AnomalyDetectorAgent(db)
     result = detector.get_patterns(
-        entity_type=entity_type,
-        entity_name=entity_name,
-        metric=metric,
-        limit=limit
+        entity_type=entity_type, entity_name=entity_name, metric=metric, limit=limit
     )
 
     return PatternsResponse(
-        patterns=result.get("patterns", []),
-        total=result.get("total", 0)
+        patterns=result.get("patterns", []), total=result.get("total", 0)
     )
 
 
@@ -221,7 +223,7 @@ async def get_patterns(
 async def start_anomaly_scan(
     request: ScanRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Start an anomaly detection scan.
@@ -232,9 +234,7 @@ async def start_anomaly_scan(
 
     # Run scan (synchronously for now - could be made async)
     result = detector.scan_for_anomalies(
-        scan_type=request.scan_type,
-        target=request.target,
-        force=request.force
+        scan_type=request.scan_type, target=request.target, force=request.force
     )
 
     return ScanResponse(
@@ -243,15 +243,12 @@ async def start_anomaly_scan(
         records_scanned=result.get("records_scanned", 0),
         anomalies_found=result.get("anomalies_found", 0),
         anomalies=result.get("anomalies"),
-        error=result.get("error")
+        error=result.get("error"),
     )
 
 
 @router.get("/anomalies/scan/{scan_id}")
-async def get_scan_status(
-    scan_id: str,
-    db: Session = Depends(get_db)
-):
+async def get_scan_status(scan_id: str, db: Session = Depends(get_db)):
     """
     Get status of an anomaly scan.
     """
@@ -266,9 +263,7 @@ async def get_scan_status(
 
 @router.patch("/anomalies/{anomaly_id}")
 async def update_anomaly(
-    anomaly_id: int,
-    request: UpdateStatusRequest,
-    db: Session = Depends(get_db)
+    anomaly_id: int, request: UpdateStatusRequest, db: Session = Depends(get_db)
 ):
     """
     Update anomaly status (acknowledge, investigate, resolve).
@@ -277,7 +272,7 @@ async def update_anomaly(
     result = detector.update_anomaly_status(
         anomaly_id=anomaly_id,
         status=request.status,
-        resolution_notes=request.resolution_notes
+        resolution_notes=request.resolution_notes,
     )
 
     if not result:
@@ -290,10 +285,7 @@ async def update_anomaly(
 
 
 @router.get("/anomalies/{anomaly_id}")
-async def get_anomaly(
-    anomaly_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_anomaly(anomaly_id: int, db: Session = Depends(get_db)):
     """
     Get a single anomaly by ID.
     """
@@ -314,7 +306,7 @@ async def learn_baseline(
     entity_name: str = Query(..., description="Entity name"),
     metric: str = Query(..., description="Metric name"),
     values: List[float] = [],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Learn baseline pattern for a metric.
@@ -326,10 +318,7 @@ async def learn_baseline(
 
     detector = AnomalyDetectorAgent(db)
     result = detector.learn_baseline(
-        entity_type=entity_type,
-        entity_name=entity_name,
-        metric=metric,
-        values=values
+        entity_type=entity_type, entity_name=entity_name, metric=metric, values=values
     )
 
     if "error" in result:

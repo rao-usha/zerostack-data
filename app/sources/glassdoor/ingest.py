@@ -89,13 +89,24 @@ class GlassdoorCSVImporter:
                     errors.append(f"Row {i+1}: missing company_name")
                     continue
                 # Coerce numeric fields
-                for field in ("founded_year", "review_count", "salary_count", "interview_count"):
+                for field in (
+                    "founded_year",
+                    "review_count",
+                    "salary_count",
+                    "interview_count",
+                ):
                     if row.get(field):
                         row[field] = int(float(row[field]))
                 for field in (
-                    "overall_rating", "work_life_balance", "compensation_benefits",
-                    "career_opportunities", "culture_values", "senior_management",
-                    "ceo_approval", "recommend_to_friend", "business_outlook",
+                    "overall_rating",
+                    "work_life_balance",
+                    "compensation_benefits",
+                    "career_opportunities",
+                    "culture_values",
+                    "senior_management",
+                    "ceo_approval",
+                    "recommend_to_friend",
+                    "business_outlook",
                 ):
                     if row.get(field):
                         row[field] = float(row[field])
@@ -152,8 +163,12 @@ class GlassdoorCSVImporter:
                     continue
                 # Coerce numeric fields
                 for field in (
-                    "base_salary_min", "base_salary_median", "base_salary_max",
-                    "total_comp_min", "total_comp_median", "total_comp_max",
+                    "base_salary_min",
+                    "base_salary_median",
+                    "base_salary_max",
+                    "total_comp_min",
+                    "total_comp_median",
+                    "total_comp_max",
                     "sample_size",
                 ):
                     if row.get(field):
@@ -166,7 +181,9 @@ class GlassdoorCSVImporter:
         for company, salaries in rows_by_company.items():
             # Look up company ID
             result = self.db.execute(
-                text("SELECT id FROM glassdoor_companies WHERE LOWER(company_name) = LOWER(:name)"),
+                text(
+                    "SELECT id FROM glassdoor_companies WHERE LOWER(company_name) = LOWER(:name)"
+                ),
                 {"name": company},
             )
             company_row = result.fetchone()
@@ -193,7 +210,9 @@ class GlassdoorCSVImporter:
             "errors": errors,
         }
 
-    def _map_columns(self, raw_row: Dict[str, str], column_map: Dict[str, str]) -> Dict[str, Any]:
+    def _map_columns(
+        self, raw_row: Dict[str, str], column_map: Dict[str, str]
+    ) -> Dict[str, Any]:
         """Map CSV columns to DB columns using the mapping dict."""
         mapped = {}
         for csv_col, value in raw_row.items():

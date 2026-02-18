@@ -24,16 +24,23 @@ router = APIRouter(tags=["Data Hunter"])
 # Request/Response Models
 # =============================================================================
 
+
 class StartHuntRequest(BaseModel):
     """Request to start a hunt job."""
-    entity_type: Optional[str] = Field(None, description="Filter by entity type (company)")
+
+    entity_type: Optional[str] = Field(
+        None, description="Filter by entity type (company)"
+    )
     fields: Optional[List[str]] = Field(None, description="Specific fields to hunt")
     limit: int = Field(50, ge=1, le=500, description="Max gaps to process")
-    min_priority: float = Field(0.0, ge=0.0, le=1.0, description="Minimum priority score")
+    min_priority: float = Field(
+        0.0, ge=0.0, le=1.0, description="Minimum priority score"
+    )
 
 
 class HuntJobResponse(BaseModel):
     """Response for hunt job operations."""
+
     job_id: str
     status: str
     total_gaps: int
@@ -50,6 +57,7 @@ class HuntJobResponse(BaseModel):
 
 class GapItem(BaseModel):
     """A single data gap."""
+
     id: int
     entity_type: str
     entity_name: str
@@ -65,6 +73,7 @@ class GapItem(BaseModel):
 
 class GapQueueResponse(BaseModel):
     """Response for gap queue listing."""
+
     gaps: List[Dict[str, Any]]
     total: int
     by_field: Dict[str, int]
@@ -73,6 +82,7 @@ class GapQueueResponse(BaseModel):
 
 class ScanResponse(BaseModel):
     """Response for gap scan operation."""
+
     scanned_records: int
     new_gaps_found: int
     gaps_by_field: Dict[str, int]
@@ -80,6 +90,7 @@ class ScanResponse(BaseModel):
 
 class HuntStatsResponse(BaseModel):
     """Response for hunt statistics."""
+
     total_gaps: int
     gaps_by_status: Dict[str, int]
     fill_rate: float
@@ -90,6 +101,7 @@ class HuntStatsResponse(BaseModel):
 
 class EntityHuntResponse(BaseModel):
     """Response for single entity hunt."""
+
     entity: str
     gaps_found: int
     gaps_filled: int
@@ -100,11 +112,12 @@ class EntityHuntResponse(BaseModel):
 # API Endpoints
 # =============================================================================
 
+
 @router.post("/hunter/start", response_model=HuntJobResponse)
 async def start_hunt_job(
     request: StartHuntRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Start a new hunt job to fill data gaps.
@@ -119,7 +132,7 @@ async def start_hunt_job(
         entity_type=request.entity_type,
         fields=request.fields,
         limit=request.limit,
-        min_priority=request.min_priority
+        min_priority=request.min_priority,
     )
 
     if not job:
@@ -136,7 +149,7 @@ async def start_hunt_job(
         processed=0,
         filled=0,
         failed=0,
-        created_at=job.get("created_at")
+        created_at=job.get("created_at"),
     )
 
 
@@ -150,7 +163,7 @@ def _process_hunt_job(db: Session, job_id: str):
 async def get_job_status(
     job_id: str,
     include_results: bool = Query(True, description="Include detailed results"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get the status and results of a hunt job.
@@ -185,7 +198,7 @@ async def get_job_status(
         results=job.get("results") if include_results else None,
         created_at=job.get("created_at"),
         started_at=job.get("started_at"),
-        completed_at=job.get("completed_at")
+        completed_at=job.get("completed_at"),
     )
 
 
@@ -197,7 +210,7 @@ async def get_gap_queue(
     min_priority: float = Query(0.0, ge=0.0, le=1.0, description="Minimum priority"),
     limit: int = Query(50, ge=1, le=500, description="Max results"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     View the queue of data gaps waiting to be filled.
@@ -209,14 +222,14 @@ async def get_gap_queue(
         status=status,
         min_priority=min_priority,
         limit=limit,
-        offset=offset
+        offset=offset,
     )
 
     return GapQueueResponse(
         gaps=result.get("gaps", []),
         total=result.get("total", 0),
         by_field=result.get("by_field", {}),
-        by_status=result.get("by_status", {})
+        by_status=result.get("by_status", {}),
     )
 
 
@@ -240,14 +253,14 @@ async def get_hunt_stats(db: Session = Depends(get_db)):
         fill_rate=stats.get("fill_rate", 0.0),
         by_field=stats.get("by_field", {}),
         source_performance=stats.get("source_performance", []),
-        recent_fills=stats.get("recent_fills", [])
+        recent_fills=stats.get("recent_fills", []),
     )
 
 
 @router.post("/hunter/scan", response_model=ScanResponse)
 async def scan_for_gaps(
     entity_type: Optional[str] = Query("company", description="Entity type to scan"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Scan for new data gaps in the database.
@@ -260,15 +273,12 @@ async def scan_for_gaps(
     return ScanResponse(
         scanned_records=result.get("scanned_records", 0),
         new_gaps_found=result.get("new_gaps_found", 0),
-        gaps_by_field=result.get("gaps_by_field", {})
+        gaps_by_field=result.get("gaps_by_field", {}),
     )
 
 
 @router.post("/hunter/entity/{name}", response_model=EntityHuntResponse)
-async def hunt_entity(
-    name: str,
-    db: Session = Depends(get_db)
-):
+async def hunt_entity(name: str, db: Session = Depends(get_db)):
     """
     Hunt missing data for a specific entity.
 
@@ -281,7 +291,7 @@ async def hunt_entity(
         entity=name,
         gaps_found=result.get("gaps_found", 0),
         gaps_filled=result.get("gaps_filled", 0),
-        results=result.get("results", [])
+        results=result.get("results", []),
     )
 
 
@@ -290,7 +300,7 @@ async def get_provenance(
     entity_name: str,
     field: Optional[str] = Query(None, description="Filter by field"),
     limit: int = Query(50, ge=1, le=200, description="Max results"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get data provenance (audit trail) for an entity.
@@ -300,11 +310,7 @@ async def get_provenance(
     hunter = DataHunterAgent(db)
     provenance = hunter.get_provenance(entity_name, field=field, limit=limit)
 
-    return {
-        "entity": entity_name,
-        "records": provenance,
-        "total": len(provenance)
-    }
+    return {"entity": entity_name, "records": provenance, "total": len(provenance)}
 
 
 @router.get("/hunter/sources")
@@ -317,7 +323,4 @@ async def get_source_reliability(db: Session = Depends(get_db)):
     hunter = DataHunterAgent(db)
     sources = hunter.get_source_reliability()
 
-    return {
-        "sources": sources,
-        "total": len(sources)
-    }
+    return {"sources": sources, "total": len(sources)}

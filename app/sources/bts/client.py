@@ -11,6 +11,7 @@ Rate limits (Socrata):
 
 No API key required for public datasets.
 """
+
 import logging
 import zipfile
 import io
@@ -56,7 +57,7 @@ class BTSClient(BaseAPIClient):
         app_token: Optional[str] = None,
         max_concurrency: int = 2,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize BTS client.
@@ -76,7 +77,7 @@ class BTSClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=120.0,  # Longer timeout for large downloads
             connect_timeout=30.0,
-            rate_limit_interval=config.get_rate_limit_interval()
+            rate_limit_interval=config.get_rate_limit_interval(),
         )
 
         self.app_token = app_token
@@ -92,7 +93,7 @@ class BTSClient(BaseAPIClient):
         border: Optional[str] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        measure: Optional[str] = None
+        measure: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Fetch border crossing entry data from Socrata.
@@ -126,11 +127,7 @@ class BTSClient(BaseAPIClient):
         if end_date:
             where_clauses.append(f"date <= '{end_date}'")
 
-        params = {
-            "$limit": limit,
-            "$offset": offset,
-            "$order": "date DESC"
-        }
+        params = {"$limit": limit, "$offset": offset, "$order": "date DESC"}
 
         if where_clauses:
             params["$where"] = " AND ".join(where_clauses)
@@ -139,9 +136,7 @@ class BTSClient(BaseAPIClient):
             params["$$app_token"] = self.app_token
 
         return await self.get(
-            f"resource/{dataset_id}.json",
-            params=params,
-            resource_id="border_crossing"
+            f"resource/{dataset_id}.json", params=params, resource_id="border_crossing"
         )
 
     async def get_vmt_data(
@@ -150,7 +145,7 @@ class BTSClient(BaseAPIClient):
         offset: int = 0,
         state: Optional[str] = None,
         start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        end_date: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Fetch Vehicle Miles Traveled (VMT) data from Socrata.
@@ -175,11 +170,7 @@ class BTSClient(BaseAPIClient):
         if end_date:
             where_clauses.append(f"date <= '{end_date}'")
 
-        params = {
-            "$limit": limit,
-            "$offset": offset,
-            "$order": "date DESC"
-        }
+        params = {"$limit": limit, "$offset": offset, "$order": "date DESC"}
 
         if where_clauses:
             params["$where"] = " AND ".join(where_clauses)
@@ -188,16 +179,13 @@ class BTSClient(BaseAPIClient):
             params["$$app_token"] = self.app_token
 
         return await self.get(
-            f"resource/{dataset_id}.json",
-            params=params,
-            resource_id="vmt"
+            f"resource/{dataset_id}.json", params=params, resource_id="vmt"
         )
 
     # ========== FAF5 CSV Download Methods ==========
 
     async def download_faf_data(
-        self,
-        version: str = "regional_2018_2024"
+        self, version: str = "regional_2018_2024"
     ) -> List[Dict[str, Any]]:
         """
         Download and parse FAF5 Freight Analysis Framework data.
@@ -229,9 +217,7 @@ class BTSClient(BaseAPIClient):
         return self._parse_faf_zip(io.BytesIO(response), version)
 
     def _parse_faf_zip(
-        self,
-        zip_data: io.BytesIO,
-        version: str
+        self, zip_data: io.BytesIO, version: str
     ) -> List[Dict[str, Any]]:
         """
         Parse FAF5 ZIP file containing CSV data.
@@ -245,8 +231,8 @@ class BTSClient(BaseAPIClient):
         """
         records = []
 
-        with zipfile.ZipFile(zip_data, 'r') as zf:
-            csv_files = [f for f in zf.namelist() if f.endswith('.csv')]
+        with zipfile.ZipFile(zip_data, "r") as zf:
+            csv_files = [f for f in zf.namelist() if f.endswith(".csv")]
 
             if not csv_files:
                 raise ValueError("No CSV files found in FAF ZIP archive")
@@ -255,7 +241,7 @@ class BTSClient(BaseAPIClient):
             logger.info(f"Parsing FAF CSV: {main_csv}")
 
             with zf.open(main_csv) as csv_file:
-                text_wrapper = io.TextIOWrapper(csv_file, encoding='utf-8')
+                text_wrapper = io.TextIOWrapper(csv_file, encoding="utf-8")
                 reader = csv.DictReader(text_wrapper)
 
                 for row in reader:
@@ -266,9 +252,7 @@ class BTSClient(BaseAPIClient):
         return records
 
     def _normalize_faf_record(
-        self,
-        row: Dict[str, str],
-        version: str
+        self, row: Dict[str, str], version: str
     ) -> Optional[Dict[str, Any]]:
         """Normalize a FAF CSV record to standard format."""
         try:
@@ -331,7 +315,7 @@ BORDER_MEASURES = [
     "Bus Passengers",
     "Personal Vehicles",
     "Personal Vehicle Passengers",
-    "Pedestrians"
+    "Pedestrians",
 ]
 
 FAF_MODES = {
@@ -342,12 +326,12 @@ FAF_MODES = {
     "5": "Multiple modes & mail",
     "6": "Pipeline",
     "7": "Other and unknown",
-    "8": "No domestic mode"
+    "8": "No domestic mode",
 }
 
 FAF_TRADE_TYPES = {
     "1": "Domestic",
     "2": "Import",
     "3": "Export",
-    "4": "Foreign Trade Zone"
+    "4": "Foreign Trade Zone",
 }

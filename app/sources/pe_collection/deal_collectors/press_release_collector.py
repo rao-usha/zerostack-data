@@ -23,28 +23,43 @@ from app.sources.pe_collection.config import settings
 logger = logging.getLogger(__name__)
 
 # PR search endpoints
-PR_NEWSWIRE_SEARCH = "https://www.prnewswire.com/search/news/?keyword={query}&page=1&pagesize=25"
+PR_NEWSWIRE_SEARCH = (
+    "https://www.prnewswire.com/search/news/?keyword={query}&page=1&pagesize=25"
+)
 BUSINESS_WIRE_SEARCH = "https://www.businesswire.com/portal/site/home/search/?searchType=news&searchTerm={query}"
-GLOBENEWSWIRE_SEARCH = "https://www.globenewswire.com/search?keyword={query}&pageSize=25"
+GLOBENEWSWIRE_SEARCH = (
+    "https://www.globenewswire.com/search?keyword={query}&pageSize=25"
+)
 SEC_8K_SEARCH = "https://efts.sec.gov/LATEST/search-index?q={query}&dateRange=custom&startdt={start}&enddt={end}&forms=8-K"
 
 # Deal-related keywords for filtering
 DEAL_KEYWORDS = [
-    "acquisition", "acquire", "acquired",
-    "investment", "invest",
+    "acquisition",
+    "acquire",
+    "acquired",
+    "investment",
+    "invest",
     "portfolio company",
-    "completes", "completed",
-    "merger", "merge",
+    "completes",
+    "completed",
+    "merger",
+    "merge",
     "recapitalization",
-    "buyout", "buy-out",
-    "majority stake", "minority stake",
+    "buyout",
+    "buy-out",
+    "majority stake",
+    "minority stake",
     "strategic partnership",
     "capital investment",
     "growth equity",
-    "add-on", "bolt-on",
+    "add-on",
+    "bolt-on",
     "platform investment",
-    "exit", "divest", "divestiture",
-    "ipo", "public offering",
+    "exit",
+    "divest",
+    "divestiture",
+    "ipo",
+    "public offering",
 ]
 
 # Maximum press releases to process with LLM per firm
@@ -98,6 +113,7 @@ class PressReleaseCollector(BasePECollector):
         """Lazily initialize LLM client."""
         if self._llm_client is None:
             from app.agentic.llm_client import get_llm_client
+
             self._llm_client = get_llm_client(model="gpt-4o-mini")
         return self._llm_client
 
@@ -123,7 +139,9 @@ class PressReleaseCollector(BasePECollector):
 
         try:
             # Build search query
-            query = f'"{entity_name}" acquisition OR investment OR portfolio OR completes'
+            query = (
+                f'"{entity_name}" acquisition OR investment OR portfolio OR completes'
+            )
 
             # Search PR services
             press_releases = await self._search_all_sources(query, entity_name)
@@ -347,14 +365,18 @@ class PressReleaseCollector(BasePECollector):
                 filing_items = source.get("items", [])
                 # Clean company name from display format
                 company_name = title.split("(")[0].strip() if title else ""
-                releases.append({
-                    "url": sec_url,
-                    "title": f"8-K: {company_name}" if company_name else f"8-K filing {filing_date}",
-                    "source": "sec_8k",
-                    "date": filing_date,
-                    "company_name": company_name,
-                    "items": filing_items,
-                })
+                releases.append(
+                    {
+                        "url": sec_url,
+                        "title": f"8-K: {company_name}"
+                        if company_name
+                        else f"8-K filing {filing_date}",
+                        "source": "sec_8k",
+                        "date": filing_date,
+                        "company_name": company_name,
+                        "items": filing_items,
+                    }
+                )
 
         return releases
 
@@ -419,11 +441,13 @@ class PressReleaseCollector(BasePECollector):
                 href = link.get("href", "")
                 title = link.get_text(strip=True)
                 if href and title and "/news-releases/" in href:
-                    releases.append({
-                        "url": urljoin("https://www.prnewswire.com", href),
-                        "title": title,
-                        "source": "pr_newswire",
-                    })
+                    releases.append(
+                        {
+                            "url": urljoin("https://www.prnewswire.com", href),
+                            "title": title,
+                            "source": "pr_newswire",
+                        }
+                    )
 
         return releases[:15]
 
@@ -447,11 +471,13 @@ class PressReleaseCollector(BasePECollector):
                 href = link.get("href", "")
                 title = link.get_text(strip=True)
                 if href and title:
-                    releases.append({
-                        "url": urljoin("https://www.businesswire.com", href),
-                        "title": title,
-                        "source": "business_wire",
-                    })
+                    releases.append(
+                        {
+                            "url": urljoin("https://www.businesswire.com", href),
+                            "title": title,
+                            "source": "business_wire",
+                        }
+                    )
 
         return releases[:15]
 
@@ -470,11 +496,13 @@ class PressReleaseCollector(BasePECollector):
             href = link.get("href", "")
             title = link.get_text(strip=True)
             if href and title and len(title) > 15 and "/news-release/" in href:
-                releases.append({
-                    "url": urljoin("https://www.globenewswire.com", href),
-                    "title": title,
-                    "source": "globenewswire",
-                })
+                releases.append(
+                    {
+                        "url": urljoin("https://www.globenewswire.com", href),
+                        "title": title,
+                        "source": "globenewswire",
+                    }
+                )
 
         return releases[:15]
 
@@ -531,7 +559,9 @@ class PressReleaseCollector(BasePECollector):
         # Try to find the article body
         article = (
             soup.find("article")
-            or soup.find("div", class_=re.compile(r"release|article|body|content", re.I))
+            or soup.find(
+                "div", class_=re.compile(r"release|article|body|content", re.I)
+            )
             or soup.find("main")
         )
         if article:
@@ -559,7 +589,10 @@ class PressReleaseCollector(BasePECollector):
         doc_links = []
         for link in soup.find_all("a", href=True):
             href = link.get("href", "")
-            if href.endswith((".htm", ".html", ".txt")) and "primary_doc" not in href.lower():
+            if (
+                href.endswith((".htm", ".html", ".txt"))
+                and "primary_doc" not in href.lower()
+            ):
                 doc_links.append(href)
 
         if not doc_links:
@@ -611,7 +644,9 @@ class PressReleaseCollector(BasePECollector):
         target = deal_data.get("target_company")
         deal_type = deal_data.get("deal_type", "Other")
 
-        deal_name = f"{entity_name} - {target}" if target else pr_title or "Unknown Deal"
+        deal_name = (
+            f"{entity_name} - {target}" if target else pr_title or "Unknown Deal"
+        )
 
         return self._create_item(
             item_type="deal",

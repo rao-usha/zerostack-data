@@ -3,6 +3,7 @@ Collection Audit Trail API.
 
 Query endpoints for the collection audit log.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional
@@ -22,8 +23,12 @@ router = APIRouter(prefix="/audit-trail", tags=["Audit Trail"])
 async def get_audit_trail(
     source: Optional[str] = Query(None, description="Filter by source"),
     domain: Optional[str] = Query(None, description="Filter by domain"),
-    trigger_type: Optional[str] = Query(None, description="Filter by trigger type (api, schedule, retry)"),
-    since: Optional[str] = Query(None, description="ISO datetime to filter entries after"),
+    trigger_type: Optional[str] = Query(
+        None, description="Filter by trigger type (api, schedule, retry)"
+    ),
+    since: Optional[str] = Query(
+        None, description="ISO datetime to filter entries after"
+    ),
     limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
 ):

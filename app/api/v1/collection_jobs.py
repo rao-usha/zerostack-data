@@ -27,8 +27,10 @@ router = APIRouter(prefix="/collection-jobs", tags=["Collection Jobs"])
 # Response Models
 # =============================================================================
 
+
 class JobSummary(BaseModel):
     """Summary of a collection job."""
+
     id: int
     job_type: str
     company_id: Optional[int] = None
@@ -48,6 +50,7 @@ class JobSummary(BaseModel):
 
 class JobDetail(BaseModel):
     """Detailed job information."""
+
     id: int
     job_type: str
     company_id: Optional[int] = None
@@ -69,6 +72,7 @@ class JobDetail(BaseModel):
 
 class JobListResponse(BaseModel):
     """Paginated list of jobs."""
+
     items: List[JobSummary]
     total: int
     page: int
@@ -77,14 +81,22 @@ class JobListResponse(BaseModel):
 
 class BatchJobRequest(BaseModel):
     """Request to trigger a batch collection job."""
-    company_ids: Optional[List[int]] = Field(None, description="Specific company IDs to collect")
-    industry: Optional[str] = Field(None, description="Collect all companies in industry")
+
+    company_ids: Optional[List[int]] = Field(
+        None, description="Specific company IDs to collect"
+    )
+    industry: Optional[str] = Field(
+        None, description="Collect all companies in industry"
+    )
     sources: List[str] = Field(["website"], description="Sources to collect from")
-    max_companies: int = Field(50, ge=1, le=500, description="Maximum companies to process")
+    max_companies: int = Field(
+        50, ge=1, le=500, description="Maximum companies to process"
+    )
 
 
 class BatchJobResponse(BaseModel):
     """Response when creating a batch job."""
+
     job_ids: List[int]
     total_companies: int
     status: str
@@ -94,6 +106,7 @@ class BatchJobResponse(BaseModel):
 # =============================================================================
 # Endpoints
 # =============================================================================
+
 
 @router.get("", response_model=JobListResponse)
 async def list_jobs(
@@ -137,20 +150,22 @@ async def list_jobs(
 
         error_count = len(job.errors) if job.errors else 0
 
-        items.append(JobSummary(
-            id=job.id,
-            job_type=job.job_type,
-            company_id=job.company_id,
-            company_name=company_name,
-            status=job.status,
-            started_at=job.started_at,
-            completed_at=job.completed_at,
-            people_found=job.people_found or 0,
-            people_created=job.people_created or 0,
-            people_updated=job.people_updated or 0,
-            changes_detected=job.changes_detected or 0,
-            error_count=error_count,
-        ))
+        items.append(
+            JobSummary(
+                id=job.id,
+                job_type=job.job_type,
+                company_id=job.company_id,
+                company_name=company_name,
+                status=job.status,
+                started_at=job.started_at,
+                completed_at=job.completed_at,
+                people_found=job.people_found or 0,
+                people_created=job.people_created or 0,
+                people_updated=job.people_updated or 0,
+                changes_detected=job.changes_detected or 0,
+                error_count=error_count,
+            )
+        )
 
     return JobListResponse(
         items=items,
@@ -170,9 +185,7 @@ async def get_job(
 
     Includes configuration, timing, and any errors.
     """
-    job = db.query(PeopleCollectionJob).filter(
-        PeopleCollectionJob.id == job_id
-    ).first()
+    job = db.query(PeopleCollectionJob).filter(PeopleCollectionJob.id == job_id).first()
 
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -227,7 +240,9 @@ async def create_batch_job(
     companies = query.limit(request.max_companies).all()
 
     if not companies:
-        raise HTTPException(status_code=404, detail="No companies found matching criteria")
+        raise HTTPException(
+            status_code=404, detail="No companies found matching criteria"
+        )
 
     # Create individual jobs for each company
     job_ids = []
@@ -265,17 +280,14 @@ async def cancel_job(
 
     Jobs that have already completed cannot be cancelled.
     """
-    job = db.query(PeopleCollectionJob).filter(
-        PeopleCollectionJob.id == job_id
-    ).first()
+    job = db.query(PeopleCollectionJob).filter(PeopleCollectionJob.id == job_id).first()
 
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
     if job.status in ["success", "failed", "cancelled"]:
         raise HTTPException(
-            status_code=400,
-            detail=f"Cannot cancel job with status: {job.status}"
+            status_code=400, detail=f"Cannot cancel job with status: {job.status}"
         )
 
     job.status = "cancelled"
@@ -296,6 +308,7 @@ async def get_job_stats(
     Shows job counts, success rates, and data collected.
     """
     from datetime import timedelta
+
     cutoff_date = datetime.utcnow() - timedelta(days=days)
 
     # Query jobs in date range
@@ -306,29 +319,35 @@ async def get_job_stats(
     total_jobs = query.count()
 
     # Count by status
-    status_counts = db.query(
-        PeopleCollectionJob.status,
-        func.count(PeopleCollectionJob.id)
-    ).filter(
-        PeopleCollectionJob.created_at >= cutoff_date
-    ).group_by(PeopleCollectionJob.status).all()
+    status_counts = (
+        db.query(PeopleCollectionJob.status, func.count(PeopleCollectionJob.id))
+        .filter(PeopleCollectionJob.created_at >= cutoff_date)
+        .group_by(PeopleCollectionJob.status)
+        .all()
+    )
 
     by_status = {status: count for status, count in status_counts}
 
     # Sum results
-    results = db.query(
-        func.sum(PeopleCollectionJob.people_found),
-        func.sum(PeopleCollectionJob.people_created),
-        func.sum(PeopleCollectionJob.people_updated),
-        func.sum(PeopleCollectionJob.changes_detected),
-    ).filter(
-        PeopleCollectionJob.created_at >= cutoff_date,
-        PeopleCollectionJob.status == "success",
-    ).first()
+    results = (
+        db.query(
+            func.sum(PeopleCollectionJob.people_found),
+            func.sum(PeopleCollectionJob.people_created),
+            func.sum(PeopleCollectionJob.people_updated),
+            func.sum(PeopleCollectionJob.changes_detected),
+        )
+        .filter(
+            PeopleCollectionJob.created_at >= cutoff_date,
+            PeopleCollectionJob.status == "success",
+        )
+        .first()
+    )
 
     # Calculate success rate
     completed = by_status.get("success", 0) + by_status.get("failed", 0)
-    success_rate = (by_status.get("success", 0) / completed * 100) if completed > 0 else 0
+    success_rate = (
+        (by_status.get("success", 0) / completed * 100) if completed > 0 else 0
+    )
 
     return {
         "period_days": days,
@@ -352,9 +371,13 @@ async def get_job_queue(
 
     Useful for monitoring collection status.
     """
-    jobs = db.query(PeopleCollectionJob).filter(
-        PeopleCollectionJob.status.in_(["pending", "running"])
-    ).order_by(PeopleCollectionJob.created_at.asc()).limit(limit).all()
+    jobs = (
+        db.query(PeopleCollectionJob)
+        .filter(PeopleCollectionJob.status.in_(["pending", "running"]))
+        .order_by(PeopleCollectionJob.created_at.asc())
+        .limit(limit)
+        .all()
+    )
 
     items = []
     for job in jobs:
@@ -363,23 +386,29 @@ async def get_job_queue(
             company = db.get(IndustrialCompany, job.company_id)
             company_name = company.name if company else None
 
-        items.append({
-            "id": job.id,
-            "job_type": job.job_type,
-            "company_id": job.company_id,
-            "company_name": company_name,
-            "status": job.status,
-            "created_at": job.created_at,
-            "started_at": job.started_at,
-        })
+        items.append(
+            {
+                "id": job.id,
+                "job_type": job.job_type,
+                "company_id": job.company_id,
+                "company_name": company_name,
+                "status": job.status,
+                "created_at": job.created_at,
+                "started_at": job.started_at,
+            }
+        )
 
-    pending_count = db.query(PeopleCollectionJob).filter(
-        PeopleCollectionJob.status == "pending"
-    ).count()
+    pending_count = (
+        db.query(PeopleCollectionJob)
+        .filter(PeopleCollectionJob.status == "pending")
+        .count()
+    )
 
-    running_count = db.query(PeopleCollectionJob).filter(
-        PeopleCollectionJob.status == "running"
-    ).count()
+    running_count = (
+        db.query(PeopleCollectionJob)
+        .filter(PeopleCollectionJob.status == "running")
+        .count()
+    )
 
     return {
         "queue": items,

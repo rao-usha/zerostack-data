@@ -12,6 +12,7 @@ Provides one row per (LP, program, fiscal_year, fiscal_quarter) with:
 - Key forward-looking metrics (3-year commitment plans)
 - Thematic flags
 """
+
 import logging
 from typing import Dict, Any, Optional, List
 from sqlalchemy import text
@@ -131,14 +132,14 @@ GROUP BY
 def create_analytics_view(db: Session) -> None:
     """
     Create the lp_strategy_quarterly_view analytics view.
-    
+
     Idempotent: Drops and recreates the view if it exists.
-    
+
     Args:
         db: Database session
     """
     logger.info("Creating lp_strategy_quarterly_view...")
-    
+
     try:
         db.execute(text(CREATE_QUARTERLY_VIEW_SQL))
         db.commit()
@@ -155,27 +156,23 @@ def create_analytics_view(db: Session) -> None:
 
 
 def query_strategy_by_lp_program_quarter(
-    db: Session,
-    lp_name: str,
-    program: str,
-    fiscal_year: int,
-    fiscal_quarter: str
+    db: Session, lp_name: str, program: str, fiscal_year: int, fiscal_quarter: str
 ) -> Optional[Dict[str, Any]]:
     """
     Query the quarterly strategy view for a specific LP/program/quarter.
-    
+
     Example:
         query_strategy_by_lp_program_quarter(
             db, "CalPERS", "private_equity", 2025, "Q3"
         )
-    
+
     Args:
         db: Database session
         lp_name: LP fund name (e.g., "CalPERS")
         program: Program name (e.g., "private_equity")
         fiscal_year: Fiscal year (e.g., 2025)
         fiscal_quarter: Fiscal quarter (e.g., "Q3")
-        
+
     Returns:
         Dictionary with strategy data or None if not found
     """
@@ -186,7 +183,7 @@ def query_strategy_by_lp_program_quarter(
       AND fiscal_year = :fiscal_year
       AND fiscal_quarter = :fiscal_quarter
     """
-    
+
     result = db.execute(
         text(query_sql),
         {
@@ -194,33 +191,30 @@ def query_strategy_by_lp_program_quarter(
             "program": program,
             "fiscal_year": fiscal_year,
             "fiscal_quarter": fiscal_quarter,
-        }
+        },
     ).fetchone()
-    
+
     if result:
         return dict(result._mapping)
     return None
 
 
 def query_strategies_by_lp_quarter(
-    db: Session,
-    lp_name: str,
-    fiscal_year: int,
-    fiscal_quarter: str
+    db: Session, lp_name: str, fiscal_year: int, fiscal_quarter: str
 ) -> List[Dict[str, Any]]:
     """
     Query all programs for a given LP and quarter.
-    
+
     Example:
         query_strategies_by_lp_quarter(db, "CalPERS", 2025, "Q3")
         # Returns strategies for all programs (total_fund, private_equity, etc.)
-    
+
     Args:
         db: Database session
         lp_name: LP fund name
         fiscal_year: Fiscal year
         fiscal_quarter: Fiscal quarter
-        
+
     Returns:
         List of dictionaries with strategy data
     """
@@ -231,40 +225,36 @@ def query_strategies_by_lp_quarter(
       AND fiscal_quarter = :fiscal_quarter
     ORDER BY program
     """
-    
+
     results = db.execute(
         text(query_sql),
         {
             "lp_name": lp_name,
             "fiscal_year": fiscal_year,
             "fiscal_quarter": fiscal_quarter,
-        }
+        },
     ).fetchall()
-    
+
     return [dict(row._mapping) for row in results]
 
 
 def query_strategies_by_program_quarter(
-    db: Session,
-    program: str,
-    fiscal_year: int,
-    fiscal_quarter: str,
-    limit: int = 100
+    db: Session, program: str, fiscal_year: int, fiscal_quarter: str, limit: int = 100
 ) -> List[Dict[str, Any]]:
     """
     Query all LPs for a given program and quarter.
-    
+
     Example:
         query_strategies_by_program_quarter(db, "private_equity", 2025, "Q3")
         # Returns private equity strategies for all LPs in Q3 2025
-    
+
     Args:
         db: Database session
         program: Program name
         fiscal_year: Fiscal year
         fiscal_quarter: Fiscal quarter
         limit: Maximum results to return
-        
+
     Returns:
         List of dictionaries with strategy data
     """
@@ -276,7 +266,7 @@ def query_strategies_by_program_quarter(
     ORDER BY lp_name
     LIMIT :limit
     """
-    
+
     results = db.execute(
         text(query_sql),
         {
@@ -284,9 +274,9 @@ def query_strategies_by_program_quarter(
             "fiscal_year": fiscal_year,
             "fiscal_quarter": fiscal_quarter,
             "limit": limit,
-        }
+        },
     ).fetchall()
-    
+
     return [dict(row._mapping) for row in results]
 
 
@@ -295,48 +285,48 @@ def query_strategies_with_theme(
     theme: str,
     fiscal_year: Optional[int] = None,
     fiscal_quarter: Optional[str] = None,
-    limit: int = 100
+    limit: int = 100,
 ) -> List[Dict[str, Any]]:
     """
     Query strategies that have a specific thematic tag.
-    
+
     Example:
         query_strategies_with_theme(db, "ai", fiscal_year=2025)
         # Returns all strategies in 2025 with AI theme
-    
+
     Args:
         db: Database session
         theme: Theme name (e.g., "ai", "energy_transition")
         fiscal_year: Optional fiscal year filter
         fiscal_quarter: Optional fiscal quarter filter
         limit: Maximum results to return
-        
+
     Returns:
         List of dictionaries with strategy data
     """
     # Build dynamic WHERE clause
     where_clauses = [f"theme_{theme} = 1"]
     params = {"limit": limit}
-    
+
     if fiscal_year:
         where_clauses.append("fiscal_year = :fiscal_year")
         params["fiscal_year"] = fiscal_year
-    
+
     if fiscal_quarter:
         where_clauses.append("fiscal_quarter = :fiscal_quarter")
         params["fiscal_quarter"] = fiscal_quarter
-    
+
     where_clause = " AND ".join(where_clauses)
-    
+
     query_sql = f"""
     SELECT * FROM lp_strategy_quarterly_view
     WHERE {where_clause}
     ORDER BY fiscal_year DESC, fiscal_quarter, lp_name
     LIMIT :limit
     """
-    
+
     results = db.execute(text(query_sql), params).fetchall()
-    
+
     return [dict(row._mapping) for row in results]
 
 
@@ -403,5 +393,3 @@ USAGE EXAMPLES:
     
     results = db.execute(query, {"year": 2025}).fetchall()
 """
-
-

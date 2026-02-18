@@ -90,7 +90,9 @@ class FormDParser:
             ns[""] = default_ns
         return ns
 
-    def _find_text(self, elem: ET.Element, path: str, ns: Dict, default: str = None) -> Optional[str]:
+    def _find_text(
+        self, elem: ET.Element, path: str, ns: Dict, default: str = None
+    ) -> Optional[str]:
         """Find element text, handling namespaces."""
         # Try without namespace first
         found = elem.find(path)
@@ -135,40 +137,39 @@ class FormDParser:
         issuer = {}
 
         # Try multiple possible paths for issuer data
-        issuer_elem = root.find(".//issuerInfo") or root.find(".//primaryIssuer") or root
+        issuer_elem = (
+            root.find(".//issuerInfo") or root.find(".//primaryIssuer") or root
+        )
 
         issuer["name"] = (
-            self._find_text(issuer_elem, ".//issuerName", ns) or
-            self._find_text(issuer_elem, ".//entityName", ns) or
-            self._find_text(root, ".//issuerName", ns)
+            self._find_text(issuer_elem, ".//issuerName", ns)
+            or self._find_text(issuer_elem, ".//entityName", ns)
+            or self._find_text(root, ".//issuerName", ns)
         )
 
         issuer["cik"] = (
-            self._find_text(issuer_elem, ".//issuerCik", ns) or
-            self._find_text(issuer_elem, ".//cik", ns) or
-            self._find_text(root, ".//filerCik", ns)
+            self._find_text(issuer_elem, ".//issuerCik", ns)
+            or self._find_text(issuer_elem, ".//cik", ns)
+            or self._find_text(root, ".//filerCik", ns)
         )
 
         # Address
         issuer["street"] = self._find_text(issuer_elem, ".//street1", ns)
         issuer["street2"] = self._find_text(issuer_elem, ".//street2", ns)
         issuer["city"] = self._find_text(issuer_elem, ".//city", ns)
-        issuer["state"] = (
-            self._find_text(issuer_elem, ".//stateOrCountry", ns) or
-            self._find_text(issuer_elem, ".//state", ns)
-        )
-        issuer["zip"] = (
-            self._find_text(issuer_elem, ".//zipCode", ns) or
-            self._find_text(issuer_elem, ".//zip", ns)
-        )
+        issuer["state"] = self._find_text(
+            issuer_elem, ".//stateOrCountry", ns
+        ) or self._find_text(issuer_elem, ".//state", ns)
+        issuer["zip"] = self._find_text(
+            issuer_elem, ".//zipCode", ns
+        ) or self._find_text(issuer_elem, ".//zip", ns)
         issuer["phone"] = self._find_text(issuer_elem, ".//issuerPhoneNumber", ns)
 
         # Entity details
         issuer["entity_type"] = self._find_text(issuer_elem, ".//entityType", ns)
-        issuer["jurisdiction"] = (
-            self._find_text(issuer_elem, ".//jurisdictionOfInc", ns) or
-            self._find_text(issuer_elem, ".//stateOfIncorporation", ns)
-        )
+        issuer["jurisdiction"] = self._find_text(
+            issuer_elem, ".//jurisdictionOfInc", ns
+        ) or self._find_text(issuer_elem, ".//stateOfIncorporation", ns)
 
         year_text = self._find_text(issuer_elem, ".//yearOfInc", ns)
         if year_text:
@@ -186,10 +187,16 @@ class FormDParser:
         persons = []
 
         # Find related person elements
-        for person in root.findall(".//relatedPersonInfo") or root.findall(".//relatedPersonsList/relatedPersonInfo"):
+        for person in root.findall(".//relatedPersonInfo") or root.findall(
+            ".//relatedPersonsList/relatedPersonInfo"
+        ):
             p = {
-                "first_name": self._find_text(person, ".//relatedPersonName/firstName", ns),
-                "last_name": self._find_text(person, ".//relatedPersonName/lastName", ns),
+                "first_name": self._find_text(
+                    person, ".//relatedPersonName/firstName", ns
+                ),
+                "last_name": self._find_text(
+                    person, ".//relatedPersonName/lastName", ns
+                ),
                 "relationship": [],
             }
 
@@ -215,15 +222,21 @@ class FormDParser:
         offering_elem = root.find(".//offeringData") or root
 
         # Industry (Item 4)
-        industry = self._find_text(offering_elem, ".//industryGroup/industryGroupType", ns)
+        industry = self._find_text(
+            offering_elem, ".//industryGroup/industryGroupType", ns
+        )
         offering["industry_group"] = self.INDUSTRY_MAP.get(industry, industry)
 
         # Revenue range (Item 5)
-        offering["revenue_range"] = self._find_text(offering_elem, ".//issuerSize/revenueRange", ns)
+        offering["revenue_range"] = self._find_text(
+            offering_elem, ".//issuerSize/revenueRange", ns
+        )
 
         # Federal exemptions (Item 6)
         exemptions = []
-        for exempt in offering_elem.findall(".//federalExemptionsExclusions/item") or []:
+        for exempt in (
+            offering_elem.findall(".//federalExemptionsExclusions/item") or []
+        ):
             if exempt.text:
                 code = exempt.text.strip()
                 exemptions.append(self.EXEMPTION_MAP.get(code, f"Rule {code}"))
@@ -232,15 +245,25 @@ class FormDParser:
         # Date of first sale (Item 7)
         first_sale = self._find_text(offering_elem, ".//dateOfFirstSale/value", ns)
         offering["date_of_first_sale"] = first_sale
-        offering["yet_to_occur"] = self._find_bool(offering_elem, ".//dateOfFirstSale/yetToOccur", ns)
+        offering["yet_to_occur"] = self._find_bool(
+            offering_elem, ".//dateOfFirstSale/yetToOccur", ns
+        )
 
         # Duration (Item 8)
-        offering["more_than_one_year"] = self._find_bool(offering_elem, ".//durationOfOffering/moreThanOneYear", ns)
+        offering["more_than_one_year"] = self._find_bool(
+            offering_elem, ".//durationOfOffering/moreThanOneYear", ns
+        )
 
         # Types of securities (Item 9)
-        offering["is_equity"] = self._find_bool(offering_elem, ".//typesOfSecuritiesOffered/isEquityType", ns)
-        offering["is_debt"] = self._find_bool(offering_elem, ".//typesOfSecuritiesOffered/isDebtType", ns)
-        offering["is_option"] = self._find_bool(offering_elem, ".//typesOfSecuritiesOffered/isOptionToAcquireType", ns)
+        offering["is_equity"] = self._find_bool(
+            offering_elem, ".//typesOfSecuritiesOffered/isEquityType", ns
+        )
+        offering["is_debt"] = self._find_bool(
+            offering_elem, ".//typesOfSecuritiesOffered/isDebtType", ns
+        )
+        offering["is_option"] = self._find_bool(
+            offering_elem, ".//typesOfSecuritiesOffered/isOptionToAcquireType", ns
+        )
         offering["is_security_to_be_acquired"] = self._find_bool(
             offering_elem, ".//typesOfSecuritiesOffered/isSecurityToBeAcquiredType", ns
         )
@@ -250,7 +273,9 @@ class FormDParser:
 
         # Business combination (Item 10)
         offering["is_business_combination"] = self._find_bool(
-            offering_elem, ".//businessCombinationTransaction/isBusinessCombinationTransaction", ns
+            offering_elem,
+            ".//businessCombinationTransaction/isBusinessCombinationTransaction",
+            ns,
         )
 
         # Minimum investment (Item 11)
@@ -271,7 +296,9 @@ class FormDParser:
 
         # Clarification of response (if indefinite offering)
         offering["indefinite"] = self._find_bool(
-            offering_elem, ".//offeringSalesAmounts/totalOfferingAmount[@indefiniteInd='true']", ns
+            offering_elem,
+            ".//offeringSalesAmounts/totalOfferingAmount[@indefiniteInd='true']",
+            ns,
         )
 
         return offering
@@ -282,15 +309,15 @@ class FormDParser:
 
         investors_elem = root.find(".//investors") or root
 
-        investors["total"] = self._find_int(investors_elem, ".//totalNumberAlreadyInvested", ns)
-        investors["accredited"] = (
-            self._find_int(investors_elem, ".//accreditedInvestors/numberInvested", ns) or
-            self._find_int(investors_elem, ".//numberAccreditedInvestors", ns)
+        investors["total"] = self._find_int(
+            investors_elem, ".//totalNumberAlreadyInvested", ns
         )
-        investors["non_accredited"] = (
-            self._find_int(investors_elem, ".//nonAccreditedInvestors/numberInvested", ns) or
-            self._find_int(investors_elem, ".//numberNonAccreditedInvestors", ns)
-        )
+        investors["accredited"] = self._find_int(
+            investors_elem, ".//accreditedInvestors/numberInvested", ns
+        ) or self._find_int(investors_elem, ".//numberAccreditedInvestors", ns)
+        investors["non_accredited"] = self._find_int(
+            investors_elem, ".//nonAccreditedInvestors/numberInvested", ns
+        ) or self._find_int(investors_elem, ".//numberNonAccreditedInvestors", ns)
 
         return investors
 

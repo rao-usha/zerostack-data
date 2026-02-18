@@ -75,14 +75,11 @@ RETURN_PATTERNS = {
 }
 
 # Percentage pattern - matches numbers like 8.5%, -2.3%, etc.
-PERCENTAGE_PATTERN = re.compile(
-    r'(-?\d{1,3}(?:\.\d{1,2})?)\s*%'
-)
+PERCENTAGE_PATTERN = re.compile(r"(-?\d{1,3}(?:\.\d{1,2})?)\s*%")
 
 # Fiscal year pattern
 FISCAL_YEAR_PATTERN = re.compile(
-    r'(?:fiscal\s+year|fy)\s*(\d{4})|(\d{4})\s*(?:fiscal|annual)',
-    re.IGNORECASE
+    r"(?:fiscal\s+year|fy)\s*(\d{4})|(\d{4})\s*(?:fiscal|annual)", re.IGNORECASE
 )
 
 
@@ -136,9 +133,7 @@ class PerformanceCollector(BaseCollector):
 
         try:
             # Try to find performance data on website
-            perf_items = await self._collect_from_website(
-                website_url, lp_id, lp_name
-            )
+            perf_items = await self._collect_from_website(website_url, lp_id, lp_name)
             items.extend(perf_items)
 
             success = len(items) > 0
@@ -250,7 +245,7 @@ class PerformanceCollector(BaseCollector):
                 pass
 
         # Look for year in common formats
-        year_pattern = re.compile(r'20[12][0-9]')
+        year_pattern = re.compile(r"20[12][0-9]")
         years = year_pattern.findall(html)
         if years:
             # Return the most recent year found
@@ -319,9 +314,7 @@ class PerformanceCollector(BaseCollector):
         # Look for benchmark returns
         # This is simplified - in production would need more sophisticated parsing
         bm_section_match = re.search(
-            r'benchmark.*?(\d{1,2}(?:\.\d{1,2})?)\s*%',
-            html_lower,
-            re.DOTALL
+            r"benchmark.*?(\d{1,2}(?:\.\d{1,2})?)\s*%", html_lower, re.DOTALL
         )
         if bm_section_match:
             try:
@@ -335,8 +328,7 @@ class PerformanceCollector(BaseCollector):
         """Extract total fund value/AUM from the page."""
         # Look for billion/million patterns
         value_pattern = re.compile(
-            r'\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)\s*(?:billion|B)',
-            re.IGNORECASE
+            r"\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)\s*(?:billion|B)", re.IGNORECASE
         )
 
         match = value_pattern.search(html)

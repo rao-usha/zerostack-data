@@ -20,18 +20,17 @@ from app.core.database import get_db
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(
-    prefix="/pe/deals",
-    tags=["PE Intelligence - Deals"]
-)
+router = APIRouter(prefix="/pe/deals", tags=["PE Intelligence - Deals"])
 
 
 # =============================================================================
 # Request/Response Models
 # =============================================================================
 
+
 class DealCreate(BaseModel):
     """Request model for creating a deal."""
+
     company_id: int = Field(..., description="Portfolio company ID")
     deal_name: Optional[str] = Field(None, examples=["Blackstone Acquisition of XYZ"])
     deal_type: str = Field(..., examples=["LBO"])
@@ -61,6 +60,7 @@ class DealCreate(BaseModel):
 # Endpoints
 # =============================================================================
 
+
 @router.get("/")
 async def list_deals(
     limit: int = Query(100, le=1000),
@@ -70,7 +70,7 @@ async def list_deals(
     buyer: Optional[str] = None,
     year: Optional[int] = None,
     min_ev: Optional[float] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     List deals with filtering.
@@ -124,38 +124,31 @@ async def list_deals(
 
         deals = []
         for row in rows:
-            deals.append({
-                "id": row[0],
-                "deal_name": row[1],
-                "deal_type": row[2],
-                "deal_sub_type": row[3],
-                "company": {
-                    "id": row[4],
-                    "name": row[5],
-                    "industry": row[6]
-                },
-                "dates": {
-                    "announced": row[7].isoformat() if row[7] else None,
-                    "closed": row[8].isoformat() if row[8] else None
-                },
-                "valuation": {
-                    "enterprise_value_usd": float(row[9]) if row[9] else None,
-                    "ev_ebitda_multiple": float(row[10]) if row[10] else None
-                },
-                "parties": {
-                    "buyer": row[11],
-                    "seller": row[12],
-                    "seller_type": row[13]
-                },
-                "status": row[14]
-            })
+            deals.append(
+                {
+                    "id": row[0],
+                    "deal_name": row[1],
+                    "deal_type": row[2],
+                    "deal_sub_type": row[3],
+                    "company": {"id": row[4], "name": row[5], "industry": row[6]},
+                    "dates": {
+                        "announced": row[7].isoformat() if row[7] else None,
+                        "closed": row[8].isoformat() if row[8] else None,
+                    },
+                    "valuation": {
+                        "enterprise_value_usd": float(row[9]) if row[9] else None,
+                        "ev_ebitda_multiple": float(row[10]) if row[10] else None,
+                    },
+                    "parties": {
+                        "buyer": row[11],
+                        "seller": row[12],
+                        "seller_type": row[13],
+                    },
+                    "status": row[14],
+                }
+            )
 
-        return {
-            "count": len(deals),
-            "limit": limit,
-            "offset": offset,
-            "deals": deals
-        }
+        return {"count": len(deals), "limit": limit, "offset": offset, "deals": deals}
 
     except Exception as e:
         logger.error(f"Error listing deals: {e}", exc_info=True)
@@ -166,7 +159,7 @@ async def list_deals(
 async def search_deals(
     q: str = Query(..., min_length=2),
     limit: int = Query(20, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Search deals by company name or deal name.
@@ -187,15 +180,17 @@ async def search_deals(
 
         deals = []
         for row in rows:
-            deals.append({
-                "id": row[0],
-                "deal_name": row[1],
-                "deal_type": row[2],
-                "company_name": row[3],
-                "enterprise_value_usd": float(row[4]) if row[4] else None,
-                "closed_date": row[5].isoformat() if row[5] else None,
-                "buyer": row[6]
-            })
+            deals.append(
+                {
+                    "id": row[0],
+                    "deal_name": row[1],
+                    "deal_type": row[2],
+                    "company_name": row[3],
+                    "enterprise_value_usd": float(row[4]) if row[4] else None,
+                    "closed_date": row[5].isoformat() if row[5] else None,
+                    "buyer": row[6],
+                }
+            )
 
         return {"count": len(deals), "results": deals}
 
@@ -205,10 +200,7 @@ async def search_deals(
 
 
 @router.post("/")
-async def create_deal(
-    deal: DealCreate,
-    db: Session = Depends(get_db)
-):
+async def create_deal(deal: DealCreate, db: Session = Depends(get_db)):
     """
     Create a deal record.
     """
@@ -242,7 +234,7 @@ async def create_deal(
             "id": row[0],
             "deal_name": row[1],
             "created_at": row[2].isoformat() if row[2] else None,
-            "message": "Deal created successfully"
+            "message": "Deal created successfully",
         }
 
     except Exception as e:
@@ -252,10 +244,7 @@ async def create_deal(
 
 
 @router.get("/{deal_id}")
-async def get_deal(
-    deal_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_deal(deal_id: int, db: Session = Depends(get_db)):
     """
     Get detailed information for a deal.
     """
@@ -305,7 +294,7 @@ async def get_deal(
                 "equity_contribution_usd": float(p[5]) if p[5] else None,
                 "ownership_pct": float(p[6]) if p[6] else None,
                 "firm_id": p[7],
-                "fund_id": p[8]
+                "fund_id": p[8],
             }
             for p in part_result.fetchall()
         ]
@@ -319,13 +308,7 @@ async def get_deal(
         """)
         adv_result = db.execute(advisors_query, {"deal_id": deal_id})
         advisors = [
-            {
-                "id": a[0],
-                "name": a[1],
-                "type": a[2],
-                "side": a[3],
-                "role": a[4]
-            }
+            {"id": a[0], "name": a[1], "type": a[2], "side": a[3], "role": a[4]}
             for a in adv_result.fetchall()
         ]
 
@@ -346,7 +329,7 @@ async def get_deal(
                 "name": t[2],
                 "role": t[3],
                 "side": t[4],
-                "firm": t[5]
+                "firm": t[5],
             }
             for t in team_result.fetchall()
         ]
@@ -356,57 +339,49 @@ async def get_deal(
             "deal_name": row[1],
             "deal_type": row[2],
             "deal_sub_type": row[3],
-            "company": {
-                "id": row[4],
-                "name": row[5],
-                "industry": row[6]
-            },
+            "company": {"id": row[4], "name": row[5], "industry": row[6]},
             "dates": {
                 "announced": row[7].isoformat() if row[7] else None,
                 "closed": row[8].isoformat() if row[8] else None,
-                "expected_close": row[9].isoformat() if row[9] else None
+                "expected_close": row[9].isoformat() if row[9] else None,
             },
             "valuation": {
                 "enterprise_value_usd": float(row[10]) if row[10] else None,
                 "equity_value_usd": float(row[11]) if row[11] else None,
-                "debt_amount_usd": float(row[12]) if row[12] else None
+                "debt_amount_usd": float(row[12]) if row[12] else None,
             },
             "multiples": {
                 "ev_revenue": float(row[13]) if row[13] else None,
                 "ev_ebitda": float(row[14]) if row[14] else None,
-                "ev_ebit": float(row[15]) if row[15] else None
+                "ev_ebit": float(row[15]) if row[15] else None,
             },
             "financials_at_deal": {
                 "ltm_revenue_usd": float(row[16]) if row[16] else None,
-                "ltm_ebitda_usd": float(row[17]) if row[17] else None
+                "ltm_ebitda_usd": float(row[17]) if row[17] else None,
             },
             "structure": {
                 "equity_pct": float(row[18]) if row[18] else None,
                 "debt_pct": float(row[19]) if row[19] else None,
-                "management_rollover_pct": float(row[20]) if row[20] else None
+                "management_rollover_pct": float(row[20]) if row[20] else None,
             },
-            "parties": {
-                "buyer": row[21],
-                "seller": row[22],
-                "seller_type": row[23]
-            },
+            "parties": {"buyer": row[21], "seller": row[22], "seller_type": row[23]},
             "status": {
                 "status": row[24],
                 "is_announced": row[25],
-                "is_confidential": row[26]
+                "is_confidential": row[26],
             },
             "sources": {
                 "data_source": row[27],
                 "source_url": row[28],
-                "press_release_url": row[29]
+                "press_release_url": row[29],
             },
             "metadata": {
                 "created_at": row[30].isoformat() if row[30] else None,
-                "updated_at": row[31].isoformat() if row[31] else None
+                "updated_at": row[31].isoformat() if row[31] else None,
             },
             "participants": participants,
             "advisors": advisors,
-            "deal_team": deal_team
+            "deal_team": deal_team,
         }
 
     except HTTPException:
@@ -417,10 +392,7 @@ async def get_deal(
 
 
 @router.get("/stats/overview")
-async def get_deal_stats(
-    year: Optional[int] = None,
-    db: Session = Depends(get_db)
-):
+async def get_deal_stats(year: Optional[int] = None, db: Session = Depends(get_db)):
     """
     Get deal statistics.
     """
@@ -456,16 +428,16 @@ async def get_deal_stats(
                 "lbo": row[1],
                 "growth": row[2],
                 "add_on": row[3],
-                "exit": row[4]
+                "exit": row[4],
             },
             "valuations": {
                 "total_ev_usd": float(row[5]) if row[5] else 0,
-                "average_ev_usd": float(row[6]) if row[6] else 0
+                "average_ev_usd": float(row[6]) if row[6] else 0,
             },
             "multiples": {
                 "avg_ev_ebitda": float(row[7]) if row[7] else None,
-                "avg_ev_revenue": float(row[8]) if row[8] else None
-            }
+                "avg_ev_revenue": float(row[8]) if row[8] else None,
+            },
         }
 
     except Exception as e:
@@ -477,7 +449,7 @@ async def get_deal_stats(
 async def get_recent_deals(
     days: int = Query(30, le=365),
     limit: int = Query(20, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get recent deal activity.
@@ -501,23 +473,21 @@ async def get_recent_deals(
 
         deals = []
         for row in rows:
-            deals.append({
-                "id": row[0],
-                "deal_name": row[1],
-                "deal_type": row[2],
-                "company_name": row[3],
-                "enterprise_value_usd": float(row[4]) if row[4] else None,
-                "closed_date": row[5].isoformat() if row[5] else None,
-                "announced_date": row[6].isoformat() if row[6] else None,
-                "buyer": row[7],
-                "status": row[8]
-            })
+            deals.append(
+                {
+                    "id": row[0],
+                    "deal_name": row[1],
+                    "deal_type": row[2],
+                    "company_name": row[3],
+                    "enterprise_value_usd": float(row[4]) if row[4] else None,
+                    "closed_date": row[5].isoformat() if row[5] else None,
+                    "announced_date": row[6].isoformat() if row[6] else None,
+                    "buyer": row[7],
+                    "status": row[8],
+                }
+            )
 
-        return {
-            "period_days": days,
-            "count": len(deals),
-            "deals": deals
-        }
+        return {"period_days": days, "count": len(deals), "deals": deals}
 
     except Exception as e:
         logger.error(f"Error fetching recent deals: {e}", exc_info=True)

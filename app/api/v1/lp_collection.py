@@ -57,29 +57,25 @@ router = APIRouter(
 
 class CollectionJobCreate(BaseModel):
     """Request to create a collection job."""
+
     lp_types: Optional[List[str]] = Field(
-        None,
-        description="Filter by LP types (public_pension, sovereign_wealth, etc.)"
+        None, description="Filter by LP types (public_pension, sovereign_wealth, etc.)"
     )
     regions: Optional[List[str]] = Field(
-        None,
-        description="Filter by regions (us, europe, asia, etc.)"
+        None, description="Filter by regions (us, europe, asia, etc.)"
     )
     sources: List[str] = Field(
         default=["website"],
-        description="Collection sources (website, sec_adv, cafr, news)"
+        description="Collection sources (website, sec_adv, cafr, news)",
     )
     mode: str = Field(
-        default="incremental",
-        description="Collection mode: incremental or full"
+        default="incremental", description="Collection mode: incremental or full"
     )
     max_age_days: int = Field(
-        default=90,
-        description="Re-collect data older than this (for incremental mode)"
+        default=90, description="Re-collect data older than this (for incremental mode)"
     )
     max_concurrent_lps: int = Field(
-        default=5,
-        description="Maximum concurrent LP collections"
+        default=5, description="Maximum concurrent LP collections"
     )
 
     class Config:
@@ -89,13 +85,14 @@ class CollectionJobCreate(BaseModel):
                 "regions": ["us"],
                 "sources": ["website", "sec_adv"],
                 "mode": "incremental",
-                "max_age_days": 90
+                "max_age_days": 90,
             }
         }
 
 
 class CollectionJobResponse(BaseModel):
     """Response for a collection job."""
+
     job_id: int
     status: str
     job_type: str
@@ -113,24 +110,32 @@ class CollectionJobResponse(BaseModel):
 
 class SingleLpCollectRequest(BaseModel):
     """Request to collect a single LP."""
+
     sources: List[str] = Field(
-        default=["website"],
-        description="Collection sources to use"
+        default=["website"], description="Collection sources to use"
     )
 
 
 class ScheduleCreate(BaseModel):
     """Request to create a collection schedule."""
+
     lp_id: int = Field(..., description="LP fund ID")
     source_type: str = Field(..., description="Collection source type")
-    frequency: str = Field(default="weekly", description="Frequency: daily, weekly, monthly, quarterly")
-    day_of_week: Optional[int] = Field(None, description="Day of week (0=Monday) for weekly schedules")
-    day_of_month: Optional[int] = Field(None, description="Day of month (1-31) for monthly schedules")
+    frequency: str = Field(
+        default="weekly", description="Frequency: daily, weekly, monthly, quarterly"
+    )
+    day_of_week: Optional[int] = Field(
+        None, description="Day of week (0=Monday) for weekly schedules"
+    )
+    day_of_month: Optional[int] = Field(
+        None, description="Day of month (1-31) for monthly schedules"
+    )
     hour: int = Field(default=2, description="Hour to run (0-23)")
 
 
 class ScheduleResponse(BaseModel):
     """Response for a collection schedule."""
+
     id: int
     lp_id: int
     lp_name: str
@@ -144,6 +149,7 @@ class ScheduleResponse(BaseModel):
 
 class CoverageResponse(BaseModel):
     """Response for coverage statistics."""
+
     total_lps: int
     lps_with_data: int
     lps_never_collected: int
@@ -154,6 +160,7 @@ class CoverageResponse(BaseModel):
 
 class CollectionStatusResponse(BaseModel):
     """Response for overall collection system status."""
+
     active_jobs: int
     pending_schedules: int
     total_lps: int
@@ -220,6 +227,7 @@ async def create_collection_job(
             logger.error(f"Error in collection job {job.id}: {e}")
 
     from app.core.job_queue_service import submit_job
+
     submit_result = submit_job(
         db=db,
         job_type="lp",
@@ -259,8 +267,7 @@ async def get_job_status(
         raise HTTPException(status_code=404, detail="Job not found")
 
     progress_pct = (
-        (job.completed_lps / job.total_lps * 100)
-        if job.total_lps > 0 else 0.0
+        (job.completed_lps / job.total_lps * 100) if job.total_lps > 0 else 0.0
     )
 
     return CollectionJobResponse(
@@ -309,8 +316,7 @@ async def list_collection_jobs(
             started_at=job.started_at,
             completed_at=job.completed_at,
             progress_pct=(
-                (job.completed_lps / job.total_lps * 100)
-                if job.total_lps > 0 else 0.0
+                (job.completed_lps / job.total_lps * 100) if job.total_lps > 0 else 0.0
             ),
         )
         for job in jobs
@@ -385,10 +391,13 @@ async def collect_stale_lps(
 
     # Get stale LPs count
     cutoff = datetime.utcnow() - timedelta(days=max_age_days)
-    stale_count = db.query(LpFund).filter(
-        (LpFund.last_collection_at == None) |
-        (LpFund.last_collection_at < cutoff)
-    ).count()
+    stale_count = (
+        db.query(LpFund)
+        .filter(
+            (LpFund.last_collection_at == None) | (LpFund.last_collection_at < cutoff)
+        )
+        .count()
+    )
 
     # Run in background
     job = await orchestrator.collect_stale_lps(
@@ -400,7 +409,7 @@ async def collect_stale_lps(
         "job_id": job.id,
         "total_stale_lps": stale_count,
         "lps_queued": job.total_lps,
-        "message": f"Started collection for {job.total_lps} stale LPs"
+        "message": f"Started collection for {job.total_lps} stale LPs",
     }
 
 
@@ -433,15 +442,19 @@ async def create_schedule(
         raise HTTPException(status_code=400, detail="Invalid frequency")
 
     # Check for existing schedule
-    existing = db.query(LpCollectionSchedule).filter(
-        LpCollectionSchedule.lp_id == request.lp_id,
-        LpCollectionSchedule.source_type == source_type,
-    ).first()
+    existing = (
+        db.query(LpCollectionSchedule)
+        .filter(
+            LpCollectionSchedule.lp_id == request.lp_id,
+            LpCollectionSchedule.source_type == source_type,
+        )
+        .first()
+    )
 
     if existing:
         raise HTTPException(
             status_code=400,
-            detail="Schedule already exists for this LP/source combination"
+            detail="Schedule already exists for this LP/source combination",
         )
 
     # Calculate next run
@@ -507,17 +520,19 @@ async def list_schedules(
     result = []
     for schedule in schedules:
         lp = db.query(LpFund).filter(LpFund.id == schedule.lp_id).first()
-        result.append(ScheduleResponse(
-            id=schedule.id,
-            lp_id=schedule.lp_id,
-            lp_name=lp.name if lp else "Unknown",
-            source_type=schedule.source_type.value,
-            frequency=schedule.frequency.value,
-            is_active=bool(schedule.is_active),
-            last_run_at=schedule.last_run_at,
-            next_run_at=schedule.next_run_at,
-            consecutive_failures=schedule.consecutive_failures,
-        ))
+        result.append(
+            ScheduleResponse(
+                id=schedule.id,
+                lp_id=schedule.lp_id,
+                lp_name=lp.name if lp else "Unknown",
+                source_type=schedule.source_type.value,
+                frequency=schedule.frequency.value,
+                is_active=bool(schedule.is_active),
+                last_run_at=schedule.last_run_at,
+                next_run_at=schedule.next_run_at,
+                consecutive_failures=schedule.consecutive_failures,
+            )
+        )
 
     return result
 
@@ -528,9 +543,11 @@ async def delete_schedule(
     db: Session = Depends(get_db),
 ):
     """Delete a collection schedule."""
-    schedule = db.query(LpCollectionSchedule).filter(
-        LpCollectionSchedule.id == schedule_id
-    ).first()
+    schedule = (
+        db.query(LpCollectionSchedule)
+        .filter(LpCollectionSchedule.id == schedule_id)
+        .first()
+    )
 
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -547,9 +564,11 @@ async def toggle_schedule(
     db: Session = Depends(get_db),
 ):
     """Toggle a schedule active/inactive."""
-    schedule = db.query(LpCollectionSchedule).filter(
-        LpCollectionSchedule.id == schedule_id
-    ).first()
+    schedule = (
+        db.query(LpCollectionSchedule)
+        .filter(LpCollectionSchedule.id == schedule_id)
+        .first()
+    )
 
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -574,36 +593,43 @@ async def get_collection_status(
 ):
     """Get overall collection system status."""
     # Active jobs
-    active_jobs = db.query(LpCollectionJob).filter(
-        LpCollectionJob.status.in_(["pending", "running"])
-    ).count()
+    active_jobs = (
+        db.query(LpCollectionJob)
+        .filter(LpCollectionJob.status.in_(["pending", "running"]))
+        .count()
+    )
 
     # Pending schedules
     now = datetime.utcnow()
-    pending_schedules = db.query(LpCollectionSchedule).filter(
-        LpCollectionSchedule.is_active == 1,
-        LpCollectionSchedule.next_run_at <= now,
-    ).count()
+    pending_schedules = (
+        db.query(LpCollectionSchedule)
+        .filter(
+            LpCollectionSchedule.is_active == 1,
+            LpCollectionSchedule.next_run_at <= now,
+        )
+        .count()
+    )
 
     # Total LPs
     total_lps = db.query(LpFund).count()
 
     # LPs collected today
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    lps_today = db.query(LpFund).filter(
-        LpFund.last_collection_at >= today_start
-    ).count()
+    lps_today = (
+        db.query(LpFund).filter(LpFund.last_collection_at >= today_start).count()
+    )
 
     # LPs collected this week
     week_start = today_start - timedelta(days=today_start.weekday())
-    lps_week = db.query(LpFund).filter(
-        LpFund.last_collection_at >= week_start
-    ).count()
+    lps_week = db.query(LpFund).filter(LpFund.last_collection_at >= week_start).count()
 
     # Recent runs
-    recent_runs = db.query(LpCollectionRun).order_by(
-        LpCollectionRun.created_at.desc()
-    ).limit(10).all()
+    recent_runs = (
+        db.query(LpCollectionRun)
+        .order_by(LpCollectionRun.created_at.desc())
+        .limit(10)
+        .all()
+    )
 
     return CollectionStatusResponse(
         active_jobs=active_jobs,
@@ -637,47 +663,49 @@ async def get_coverage(
     total_lps = db.query(LpFund).count()
 
     # LPs with data (have been collected)
-    lps_with_data = db.query(LpFund).filter(
-        LpFund.last_collection_at != None
-    ).count()
+    lps_with_data = db.query(LpFund).filter(LpFund.last_collection_at != None).count()
 
     # LPs never collected
-    lps_never = db.query(LpFund).filter(
-        LpFund.last_collection_at == None
-    ).count()
+    lps_never = db.query(LpFund).filter(LpFund.last_collection_at == None).count()
 
     # Stale LPs (>90 days)
     cutoff = datetime.utcnow() - timedelta(days=90)
-    lps_stale = db.query(LpFund).filter(
-        LpFund.last_collection_at < cutoff
-    ).count()
+    lps_stale = db.query(LpFund).filter(LpFund.last_collection_at < cutoff).count()
 
     # Coverage by type
     coverage_by_type = {}
-    for lp_type in ["public_pension", "sovereign_wealth", "endowment", "corporate_pension", "insurance"]:
+    for lp_type in [
+        "public_pension",
+        "sovereign_wealth",
+        "endowment",
+        "corporate_pension",
+        "insurance",
+    ]:
         total = db.query(LpFund).filter(LpFund.lp_type == lp_type).count()
-        collected = db.query(LpFund).filter(
-            LpFund.lp_type == lp_type,
-            LpFund.last_collection_at != None
-        ).count()
+        collected = (
+            db.query(LpFund)
+            .filter(LpFund.lp_type == lp_type, LpFund.last_collection_at != None)
+            .count()
+        )
         coverage_by_type[lp_type] = {
             "total": total,
             "collected": collected,
-            "coverage_pct": round(collected / total * 100, 1) if total > 0 else 0
+            "coverage_pct": round(collected / total * 100, 1) if total > 0 else 0,
         }
 
     # Coverage by region
     coverage_by_region = {}
     for region in ["us", "europe", "asia", "middle_east", "oceania"]:
         total = db.query(LpFund).filter(LpFund.region == region).count()
-        collected = db.query(LpFund).filter(
-            LpFund.region == region,
-            LpFund.last_collection_at != None
-        ).count()
+        collected = (
+            db.query(LpFund)
+            .filter(LpFund.region == region, LpFund.last_collection_at != None)
+            .count()
+        )
         coverage_by_region[region] = {
             "total": total,
             "collected": collected,
-            "coverage_pct": round(collected / total * 100, 1) if total > 0 else 0
+            "coverage_pct": round(collected / total * 100, 1) if total > 0 else 0,
         }
 
     return CoverageResponse(
@@ -767,6 +795,7 @@ async def seed_lps_from_registry(
 
 class GovernanceMemberResponse(BaseModel):
     """Response for a governance member."""
+
     id: int
     full_name: str
     title: Optional[str]
@@ -780,6 +809,7 @@ class GovernanceMemberResponse(BaseModel):
 
 class BoardMeetingResponse(BaseModel):
     """Response for a board meeting."""
+
     id: int
     meeting_date: datetime
     meeting_type: str
@@ -792,6 +822,7 @@ class BoardMeetingResponse(BaseModel):
 
 class PerformanceReturnResponse(BaseModel):
     """Response for performance return data."""
+
     id: int
     fiscal_year: int
     one_year_return_pct: Optional[str]
@@ -807,6 +838,7 @@ class PerformanceReturnResponse(BaseModel):
 
 class GovernanceOverviewResponse(BaseModel):
     """Complete governance overview for an LP."""
+
     lp_id: int
     lp_name: str
     board_members: List[GovernanceMemberResponse]
@@ -815,6 +847,7 @@ class GovernanceOverviewResponse(BaseModel):
 
 class PerformanceHistoryResponse(BaseModel):
     """Performance history for an LP."""
+
     lp_id: int
     lp_name: str
     returns: List[PerformanceReturnResponse]
@@ -835,15 +868,26 @@ async def get_lp_governance(
         raise HTTPException(status_code=404, detail=f"LP {lp_id} not found")
 
     # Get governance members (current only)
-    members = db.query(LpGovernanceMember).filter(
-        LpGovernanceMember.lp_id == lp_id,
-        LpGovernanceMember.is_current == 1,
-    ).order_by(LpGovernanceMember.governance_role).all()
+    members = (
+        db.query(LpGovernanceMember)
+        .filter(
+            LpGovernanceMember.lp_id == lp_id,
+            LpGovernanceMember.is_current == 1,
+        )
+        .order_by(LpGovernanceMember.governance_role)
+        .all()
+    )
 
     # Get recent meetings
-    meetings = db.query(LpBoardMeeting).filter(
-        LpBoardMeeting.lp_id == lp_id,
-    ).order_by(LpBoardMeeting.meeting_date.desc()).limit(20).all()
+    meetings = (
+        db.query(LpBoardMeeting)
+        .filter(
+            LpBoardMeeting.lp_id == lp_id,
+        )
+        .order_by(LpBoardMeeting.meeting_date.desc())
+        .limit(20)
+        .all()
+    )
 
     return GovernanceOverviewResponse(
         lp_id=lp_id,
@@ -893,9 +937,14 @@ async def get_lp_performance(
         raise HTTPException(status_code=404, detail=f"LP {lp_id} not found")
 
     # Get performance returns (most recent first)
-    returns = db.query(LpPerformanceReturn).filter(
-        LpPerformanceReturn.lp_id == lp_id,
-    ).order_by(LpPerformanceReturn.fiscal_year.desc()).all()
+    returns = (
+        db.query(LpPerformanceReturn)
+        .filter(
+            LpPerformanceReturn.lp_id == lp_id,
+        )
+        .order_by(LpPerformanceReturn.fiscal_year.desc())
+        .all()
+    )
 
     return PerformanceHistoryResponse(
         lp_id=lp_id,
@@ -1018,14 +1067,21 @@ async def get_lp_allocation_history(
         raise HTTPException(status_code=404, detail="LP not found")
 
     # Get strategy snapshots
-    snapshots = db.query(LpStrategySnapshot).filter(
-        LpStrategySnapshot.lp_id == lp_id
-    ).order_by(LpStrategySnapshot.fiscal_year.desc()).limit(years).all()
+    snapshots = (
+        db.query(LpStrategySnapshot)
+        .filter(LpStrategySnapshot.lp_id == lp_id)
+        .order_by(LpStrategySnapshot.fiscal_year.desc())
+        .limit(years)
+        .all()
+    )
 
     # Get asset class allocations
-    allocations = db.query(LpAssetClassTargetAllocation).filter(
-        LpAssetClassTargetAllocation.lp_id == lp_id
-    ).order_by(LpAssetClassTargetAllocation.fiscal_year.desc()).all()
+    allocations = (
+        db.query(LpAssetClassTargetAllocation)
+        .filter(LpAssetClassTargetAllocation.lp_id == lp_id)
+        .order_by(LpAssetClassTargetAllocation.fiscal_year.desc())
+        .all()
+    )
 
     return {
         "lp_id": lp_id,
@@ -1070,10 +1126,15 @@ async def get_lp_holdings(
         raise HTTPException(status_code=404, detail="LP not found")
 
     # Get portfolio companies from 13F
-    holdings = db.query(PortfolioCompany).filter(
-        PortfolioCompany.investor_id == lp_id,
-        PortfolioCompany.investor_type == "lp"
-    ).limit(limit).all()
+    holdings = (
+        db.query(PortfolioCompany)
+        .filter(
+            PortfolioCompany.investor_id == lp_id,
+            PortfolioCompany.investor_type == "lp",
+        )
+        .limit(limit)
+        .all()
+    )
 
     # market_value_usd is stored as string, convert safely
     total_value = 0
@@ -1122,9 +1183,9 @@ async def get_lp_managers(
         raise HTTPException(status_code=404, detail="LP not found")
 
     # Get strategy snapshot IDs for this LP
-    snapshot_ids = db.query(LpStrategySnapshot.id).filter(
-        LpStrategySnapshot.lp_id == lp_id
-    ).all()
+    snapshot_ids = (
+        db.query(LpStrategySnapshot.id).filter(LpStrategySnapshot.lp_id == lp_id).all()
+    )
     snapshot_id_list = [s[0] for s in snapshot_ids]
 
     if not snapshot_id_list:
@@ -1136,9 +1197,11 @@ async def get_lp_managers(
         }
 
     # Get manager exposures via strategy snapshots
-    exposures = db.query(LpManagerOrVehicleExposure).filter(
-        LpManagerOrVehicleExposure.strategy_id.in_(snapshot_id_list)
-    ).all()
+    exposures = (
+        db.query(LpManagerOrVehicleExposure)
+        .filter(LpManagerOrVehicleExposure.strategy_id.in_(snapshot_id_list))
+        .all()
+    )
 
     return {
         "lp_id": lp_id,
@@ -1173,24 +1236,30 @@ async def get_lp_contacts(
 
     # Use raw SQL to avoid column mismatch issues
     from sqlalchemy import text
-    result = db.execute(text("""
+
+    result = db.execute(
+        text("""
         SELECT id, lp_id, full_name, title, email, phone, linkedin_url, source_type, source_url
         FROM lp_key_contact
         WHERE lp_id = :lp_id
-    """), {"lp_id": lp_id})
+    """),
+        {"lp_id": lp_id},
+    )
 
     contacts = []
     for row in result:
-        contacts.append({
-            "id": row[0],
-            "full_name": row[2],
-            "title": row[3],
-            "email": row[4],
-            "phone": row[5],
-            "linkedin_url": row[6],
-            "source_type": row[7],
-            "source_url": row[8],
-        })
+        contacts.append(
+            {
+                "id": row[0],
+                "full_name": row[2],
+                "title": row[3],
+                "email": row[4],
+                "phone": row[5],
+                "linkedin_url": row[6],
+                "source_type": row[7],
+                "source_url": row[8],
+            }
+        )
 
     return {
         "lp_id": lp_id,
@@ -1215,34 +1284,51 @@ async def get_lp_summary(
         raise HTTPException(status_code=404, detail="LP not found")
 
     # Get latest strategy snapshot
-    latest_snapshot = db.query(LpStrategySnapshot).filter(
-        LpStrategySnapshot.lp_id == lp_id
-    ).order_by(LpStrategySnapshot.fiscal_year.desc()).first()
+    latest_snapshot = (
+        db.query(LpStrategySnapshot)
+        .filter(LpStrategySnapshot.lp_id == lp_id)
+        .order_by(LpStrategySnapshot.fiscal_year.desc())
+        .first()
+    )
 
     # Get latest performance
-    latest_performance = db.query(LpPerformanceReturn).filter(
-        LpPerformanceReturn.lp_id == lp_id
-    ).order_by(LpPerformanceReturn.fiscal_year.desc()).first()
+    latest_performance = (
+        db.query(LpPerformanceReturn)
+        .filter(LpPerformanceReturn.lp_id == lp_id)
+        .order_by(LpPerformanceReturn.fiscal_year.desc())
+        .first()
+    )
 
     # Count contacts, holdings, managers using raw SQL to avoid model mismatch
     from sqlalchemy import text
-    contact_count = db.execute(text(
-        "SELECT COUNT(*) FROM lp_key_contact WHERE lp_id = :lp_id"
-    ), {"lp_id": lp_id}).scalar() or 0
-    holding_count = db.query(PortfolioCompany).filter(
-        PortfolioCompany.investor_id == lp_id,
-        PortfolioCompany.investor_type == "lp"
-    ).count()
+
+    contact_count = (
+        db.execute(
+            text("SELECT COUNT(*) FROM lp_key_contact WHERE lp_id = :lp_id"),
+            {"lp_id": lp_id},
+        ).scalar()
+        or 0
+    )
+    holding_count = (
+        db.query(PortfolioCompany)
+        .filter(
+            PortfolioCompany.investor_id == lp_id,
+            PortfolioCompany.investor_type == "lp",
+        )
+        .count()
+    )
     # Manager count via strategy snapshots
-    snapshot_ids = db.query(LpStrategySnapshot.id).filter(
-        LpStrategySnapshot.lp_id == lp_id
-    ).all()
+    snapshot_ids = (
+        db.query(LpStrategySnapshot.id).filter(LpStrategySnapshot.lp_id == lp_id).all()
+    )
     snapshot_id_list = [s[0] for s in snapshot_ids]
     manager_count = 0
     if snapshot_id_list:
-        manager_count = db.query(LpManagerOrVehicleExposure).filter(
-            LpManagerOrVehicleExposure.strategy_id.in_(snapshot_id_list)
-        ).count()
+        manager_count = (
+            db.query(LpManagerOrVehicleExposure)
+            .filter(LpManagerOrVehicleExposure.strategy_id.in_(snapshot_id_list))
+            .count()
+        )
 
     return {
         "lp": {
@@ -1260,13 +1346,25 @@ async def get_lp_summary(
             "fiscal_year": latest_snapshot.fiscal_year if latest_snapshot else None,
             "program": latest_snapshot.program if latest_snapshot else None,
             "summary_text": latest_snapshot.summary_text if latest_snapshot else None,
-            "risk_positioning": latest_snapshot.risk_positioning if latest_snapshot else None,
-        } if latest_snapshot else None,
+            "risk_positioning": latest_snapshot.risk_positioning
+            if latest_snapshot
+            else None,
+        }
+        if latest_snapshot
+        else None,
         "latest_performance": {
-            "fiscal_year": latest_performance.fiscal_year if latest_performance else None,
-            "one_year_return_pct": latest_performance.one_year_return_pct if latest_performance else None,
-            "five_year_return_pct": latest_performance.five_year_return_pct if latest_performance else None,
-        } if latest_performance else None,
+            "fiscal_year": latest_performance.fiscal_year
+            if latest_performance
+            else None,
+            "one_year_return_pct": latest_performance.one_year_return_pct
+            if latest_performance
+            else None,
+            "five_year_return_pct": latest_performance.five_year_return_pct
+            if latest_performance
+            else None,
+        }
+        if latest_performance
+        else None,
         "counts": {
             "contacts": contact_count,
             "holdings": holding_count,
@@ -1301,7 +1399,9 @@ def _calculate_next_run(
             next_run += timedelta(days=days_ahead)
         elif frequency == LpCollectionFrequency.MONTHLY:
             if now.month == 12:
-                next_run = next_run.replace(year=now.year + 1, month=1, day=day_of_month or 1)
+                next_run = next_run.replace(
+                    year=now.year + 1, month=1, day=day_of_month or 1
+                )
             else:
                 next_run = next_run.replace(month=now.month + 1, day=day_of_month or 1)
         elif frequency == LpCollectionFrequency.QUARTERLY:

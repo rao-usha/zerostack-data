@@ -3,6 +3,7 @@ EIA API endpoints.
 
 Provides HTTP endpoints for ingesting EIA data.
 """
+
 import logging
 from typing import Dict, Optional
 from fastapi import APIRouter, Depends, BackgroundTasks
@@ -20,133 +21,90 @@ router = APIRouter(tags=["eia"])
 
 class EIAPetroleumIngestRequest(BaseModel):
     """Request model for EIA petroleum ingestion."""
+
     subcategory: str = Field(
         default="consumption",
-        description="Subcategory (consumption, production, imports, exports, stocks)"
+        description="Subcategory (consumption, production, imports, exports, stocks)",
     )
-    route: Optional[str] = Field(
-        None,
-        description="Optional custom API route"
-    )
+    route: Optional[str] = Field(None, description="Optional custom API route")
     frequency: str = Field(
-        default="annual",
-        description="Data frequency (annual, monthly, weekly, daily)"
+        default="annual", description="Data frequency (annual, monthly, weekly, daily)"
     )
     start: Optional[str] = Field(
-        None,
-        description="Start date (format depends on frequency)"
+        None, description="Start date (format depends on frequency)"
     )
     end: Optional[str] = Field(
-        None,
-        description="End date (format depends on frequency)"
+        None, description="End date (format depends on frequency)"
     )
     facets: Optional[Dict[str, str]] = Field(
         None,
-        description="Optional facet filters (e.g., {'process': 'VPP', 'product': 'EPP0'})"
+        description="Optional facet filters (e.g., {'process': 'VPP', 'product': 'EPP0'})",
     )
 
 
 class EIANaturalGasIngestRequest(BaseModel):
     """Request model for EIA natural gas ingestion."""
+
     subcategory: str = Field(
         default="consumption",
-        description="Subcategory (consumption, production, storage, prices)"
+        description="Subcategory (consumption, production, storage, prices)",
     )
-    route: Optional[str] = Field(
-        None,
-        description="Optional custom API route"
-    )
+    route: Optional[str] = Field(None, description="Optional custom API route")
     frequency: str = Field(
-        default="annual",
-        description="Data frequency (annual, monthly)"
+        default="annual", description="Data frequency (annual, monthly)"
     )
-    start: Optional[str] = Field(
-        None,
-        description="Start date"
-    )
-    end: Optional[str] = Field(
-        None,
-        description="End date"
-    )
-    facets: Optional[Dict[str, str]] = Field(
-        None,
-        description="Optional facet filters"
-    )
+    start: Optional[str] = Field(None, description="Start date")
+    end: Optional[str] = Field(None, description="End date")
+    facets: Optional[Dict[str, str]] = Field(None, description="Optional facet filters")
 
 
 class EIAElectricityIngestRequest(BaseModel):
     """Request model for EIA electricity ingestion."""
+
     subcategory: str = Field(
         default="retail_sales",
-        description="Subcategory (retail_sales, generation, revenue, customers)"
+        description="Subcategory (retail_sales, generation, revenue, customers)",
     )
-    route: Optional[str] = Field(
-        None,
-        description="Optional custom API route"
-    )
+    route: Optional[str] = Field(None, description="Optional custom API route")
     frequency: str = Field(
-        default="annual",
-        description="Data frequency (annual, monthly)"
+        default="annual", description="Data frequency (annual, monthly)"
     )
-    start: Optional[str] = Field(
-        None,
-        description="Start date"
-    )
-    end: Optional[str] = Field(
-        None,
-        description="End date"
-    )
+    start: Optional[str] = Field(None, description="Start date")
+    end: Optional[str] = Field(None, description="End date")
     facets: Optional[Dict[str, str]] = Field(
         None,
-        description="Optional facet filters (e.g., {'sectorid': 'RES', 'stateid': 'CA'})"
+        description="Optional facet filters (e.g., {'sectorid': 'RES', 'stateid': 'CA'})",
     )
 
 
 class EIARetailGasPricesIngestRequest(BaseModel):
     """Request model for EIA retail gas prices ingestion."""
+
     frequency: str = Field(
-        default="weekly",
-        description="Data frequency (weekly, daily)"
+        default="weekly", description="Data frequency (weekly, daily)"
     )
-    start: Optional[str] = Field(
-        None,
-        description="Start date (YYYY-MM-DD)"
-    )
-    end: Optional[str] = Field(
-        None,
-        description="End date (YYYY-MM-DD)"
-    )
+    start: Optional[str] = Field(None, description="Start date (YYYY-MM-DD)")
+    end: Optional[str] = Field(None, description="End date (YYYY-MM-DD)")
     facets: Optional[Dict[str, str]] = Field(
         None,
-        description="Optional facet filters (e.g., {'product': 'EPM0', 'area': 'NUS'})"
+        description="Optional facet filters (e.g., {'product': 'EPM0', 'area': 'NUS'})",
     )
 
 
 class EIASTEOIngestRequest(BaseModel):
     """Request model for EIA STEO ingestion."""
-    frequency: str = Field(
-        default="monthly",
-        description="Data frequency (monthly)"
-    )
-    start: Optional[str] = Field(
-        None,
-        description="Start date (YYYY-MM)"
-    )
-    end: Optional[str] = Field(
-        None,
-        description="End date (YYYY-MM)"
-    )
-    facets: Optional[Dict[str, str]] = Field(
-        None,
-        description="Optional facet filters"
-    )
+
+    frequency: str = Field(default="monthly", description="Data frequency (monthly)")
+    start: Optional[str] = Field(None, description="Start date (YYYY-MM)")
+    end: Optional[str] = Field(None, description="End date (YYYY-MM)")
+    facets: Optional[Dict[str, str]] = Field(None, description="Optional facet filters")
 
 
 @router.post("/eia/petroleum/ingest")
 async def ingest_petroleum_data(
     request: EIAPetroleumIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest EIA petroleum data.
@@ -168,7 +126,9 @@ async def ingest_petroleum_data(
     settings = get_settings()
     api_key = settings.get_eia_api_key()
     return create_and_dispatch_job(
-        db, background_tasks, source="eia",
+        db,
+        background_tasks,
+        source="eia",
         config={
             "dataset": "petroleum",
             "subcategory": request.subcategory,
@@ -187,7 +147,7 @@ async def ingest_petroleum_data(
 async def ingest_natural_gas_data(
     request: EIANaturalGasIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest EIA natural gas data.
@@ -201,7 +161,9 @@ async def ingest_natural_gas_data(
     settings = get_settings()
     api_key = settings.get_eia_api_key()
     return create_and_dispatch_job(
-        db, background_tasks, source="eia",
+        db,
+        background_tasks,
+        source="eia",
         config={
             "dataset": "natural_gas",
             "subcategory": request.subcategory,
@@ -220,7 +182,7 @@ async def ingest_natural_gas_data(
 async def ingest_electricity_data(
     request: EIAElectricityIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest EIA electricity data.
@@ -234,7 +196,9 @@ async def ingest_electricity_data(
     settings = get_settings()
     api_key = settings.get_eia_api_key()
     return create_and_dispatch_job(
-        db, background_tasks, source="eia",
+        db,
+        background_tasks,
+        source="eia",
         config={
             "dataset": "electricity",
             "subcategory": request.subcategory,
@@ -253,7 +217,7 @@ async def ingest_electricity_data(
 async def ingest_retail_gas_prices(
     request: EIARetailGasPricesIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest EIA retail gasoline prices.
@@ -263,7 +227,9 @@ async def ingest_retail_gas_prices(
     settings = get_settings()
     api_key = settings.get_eia_api_key()
     return create_and_dispatch_job(
-        db, background_tasks, source="eia",
+        db,
+        background_tasks,
+        source="eia",
         config={
             "dataset": "retail_gas_prices",
             "frequency": request.frequency,
@@ -280,7 +246,7 @@ async def ingest_retail_gas_prices(
 async def ingest_steo_projections(
     request: EIASTEOIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest EIA Short-Term Energy Outlook (STEO) projections.
@@ -290,7 +256,9 @@ async def ingest_steo_projections(
     settings = get_settings()
     api_key = settings.get_eia_api_key()
     return create_and_dispatch_job(
-        db, background_tasks, source="eia",
+        db,
+        background_tasks,
+        source="eia",
         config={
             "dataset": "steo",
             "frequency": request.frequency,

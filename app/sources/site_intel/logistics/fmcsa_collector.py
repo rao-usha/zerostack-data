@@ -12,6 +12,7 @@ Data sources:
 
 No API key required - public data.
 """
+
 import logging
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any
@@ -21,7 +22,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import MotorCarrier, CarrierSafety
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -89,7 +94,9 @@ class FMCSACollector(BaseCollector):
             if safety_result.get("error"):
                 errors.append({"source": "safety", "error": safety_result["error"]})
 
-            status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            status = (
+                CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            )
 
             return self.create_result(
                 status=status,
@@ -119,7 +126,18 @@ class FMCSACollector(BaseCollector):
 
             # FMCSA QC services provide carrier lookup
             # For bulk collection, we need to query by state
-            states = config.states or ["CA", "TX", "FL", "IL", "PA", "OH", "NY", "GA", "NC", "MI"]
+            states = config.states or [
+                "CA",
+                "TX",
+                "FL",
+                "IL",
+                "PA",
+                "OH",
+                "NY",
+                "GA",
+                "NC",
+                "MI",
+            ]
 
             for state in states:
                 await self.apply_rate_limit()
@@ -154,11 +172,22 @@ class FMCSACollector(BaseCollector):
                     records,
                     unique_columns=["dot_number"],
                     update_columns=[
-                        "mc_number", "legal_name", "dba_name", "physical_address",
-                        "physical_city", "physical_state", "physical_zip",
-                        "power_units", "drivers", "mcs150_date", "mcs150_mileage",
-                        "carrier_operation", "cargo_carried", "operation_classification",
-                        "is_active", "collected_at"
+                        "mc_number",
+                        "legal_name",
+                        "dba_name",
+                        "physical_address",
+                        "physical_city",
+                        "physical_state",
+                        "physical_zip",
+                        "power_units",
+                        "drivers",
+                        "mcs150_date",
+                        "mcs150_mileage",
+                        "carrier_operation",
+                        "cargo_carried",
+                        "operation_classification",
+                        "is_active",
+                        "collected_at",
                     ],
                 )
                 return {"processed": len(all_carriers), "inserted": inserted}
@@ -352,7 +381,9 @@ class FMCSACollector(BaseCollector):
         if not dot_number:
             return None
 
-        legal_name = carrier.get("legal_name") or carrier.get("legalName") or carrier.get("name")
+        legal_name = (
+            carrier.get("legal_name") or carrier.get("legalName") or carrier.get("name")
+        )
         if not legal_name:
             return None
 
@@ -369,23 +400,36 @@ class FMCSACollector(BaseCollector):
             "mc_number": carrier.get("mc_number") or carrier.get("mcNumber"),
             "legal_name": legal_name,
             "dba_name": carrier.get("dba_name") or carrier.get("dbaName"),
-            "physical_address": carrier.get("physical_address") or carrier.get("phyStreet"),
+            "physical_address": carrier.get("physical_address")
+            or carrier.get("phyStreet"),
             "physical_city": carrier.get("physical_city") or carrier.get("phyCity"),
             "physical_state": carrier.get("physical_state") or carrier.get("phyState"),
             "physical_zip": carrier.get("physical_zip") or carrier.get("phyZip"),
-            "mailing_address": carrier.get("mailing_address") or carrier.get("mailingStreet"),
+            "mailing_address": carrier.get("mailing_address")
+            or carrier.get("mailingStreet"),
             "mailing_city": carrier.get("mailing_city") or carrier.get("mailingCity"),
-            "mailing_state": carrier.get("mailing_state") or carrier.get("mailingState"),
+            "mailing_state": carrier.get("mailing_state")
+            or carrier.get("mailingState"),
             "mailing_zip": carrier.get("mailing_zip") or carrier.get("mailingZip"),
             "telephone": carrier.get("telephone") or carrier.get("phone"),
             "email": carrier.get("email") or carrier.get("emailAddress"),
-            "power_units": self._safe_int(carrier.get("power_units") or carrier.get("totalPowerUnits")),
-            "drivers": self._safe_int(carrier.get("drivers") or carrier.get("totalDrivers")),
+            "power_units": self._safe_int(
+                carrier.get("power_units") or carrier.get("totalPowerUnits")
+            ),
+            "drivers": self._safe_int(
+                carrier.get("drivers") or carrier.get("totalDrivers")
+            ),
             "mcs150_date": mcs150_date,
-            "mcs150_mileage": self._safe_int(carrier.get("mcs150_mileage") or carrier.get("mcs150Mileage")),
-            "carrier_operation": carrier.get("carrier_operation") or carrier.get("carrierOperation") or "interstate",
-            "cargo_carried": carrier.get("cargo_carried") or carrier.get("cargoCarried"),
-            "operation_classification": carrier.get("operation_classification") or carrier.get("operationClassification"),
+            "mcs150_mileage": self._safe_int(
+                carrier.get("mcs150_mileage") or carrier.get("mcs150Mileage")
+            ),
+            "carrier_operation": carrier.get("carrier_operation")
+            or carrier.get("carrierOperation")
+            or "interstate",
+            "cargo_carried": carrier.get("cargo_carried")
+            or carrier.get("cargoCarried"),
+            "operation_classification": carrier.get("operation_classification")
+            or carrier.get("operationClassification"),
             "is_active": carrier.get("is_active", True),
             "out_of_service_date": None,
             "source": "fmcsa",
@@ -443,14 +487,24 @@ class FMCSACollector(BaseCollector):
                     records,
                     unique_columns=["dot_number", "inspection_date"],
                     update_columns=[
-                        "safety_rating", "rating_date",
-                        "unsafe_driving_score", "hours_of_service_score",
-                        "driver_fitness_score", "controlled_substances_score",
-                        "vehicle_maintenance_score", "hazmat_compliance_score",
-                        "crash_indicator_score", "vehicle_oos_rate", "driver_oos_rate",
-                        "total_inspections", "total_violations", "total_crashes",
-                        "fatal_crashes", "injury_crashes", "tow_crashes",
-                        "collected_at"
+                        "safety_rating",
+                        "rating_date",
+                        "unsafe_driving_score",
+                        "hours_of_service_score",
+                        "driver_fitness_score",
+                        "controlled_substances_score",
+                        "vehicle_maintenance_score",
+                        "hazmat_compliance_score",
+                        "crash_indicator_score",
+                        "vehicle_oos_rate",
+                        "driver_oos_rate",
+                        "total_inspections",
+                        "total_violations",
+                        "total_crashes",
+                        "fatal_crashes",
+                        "injury_crashes",
+                        "tow_crashes",
+                        "collected_at",
                     ],
                 )
                 return {"processed": len(all_safety), "inserted": inserted}
@@ -461,7 +515,9 @@ class FMCSACollector(BaseCollector):
             logger.error(f"Failed to collect safety data: {e}", exc_info=True)
             return {"processed": 0, "inserted": 0, "error": str(e)}
 
-    async def _fetch_safety_for_carrier(self, dot_number: str) -> Optional[Dict[str, Any]]:
+    async def _fetch_safety_for_carrier(
+        self, dot_number: str
+    ) -> Optional[Dict[str, Any]]:
         """Fetch safety data for a specific carrier."""
         try:
             client = await self.get_client()
@@ -488,27 +544,39 @@ class FMCSACollector(BaseCollector):
 
         for dot_number in dot_numbers:
             # Generate realistic safety scores
-            safety_records.append({
-                "dot_number": dot_number,
-                "safety_rating": random.choice(["Satisfactory", "Satisfactory", "Satisfactory", "Conditional", None]),
-                "rating_date": today,
-                "unsafe_driving_score": round(random.uniform(10, 60), 2),
-                "hours_of_service_score": round(random.uniform(15, 55), 2),
-                "driver_fitness_score": round(random.uniform(5, 40), 2),
-                "controlled_substances_score": round(random.uniform(0, 20), 2),
-                "vehicle_maintenance_score": round(random.uniform(20, 65), 2),
-                "hazmat_compliance_score": round(random.uniform(0, 30), 2) if random.random() > 0.5 else None,
-                "crash_indicator_score": round(random.uniform(10, 50), 2),
-                "vehicle_oos_rate": round(random.uniform(5, 25), 2),
-                "driver_oos_rate": round(random.uniform(3, 15), 2),
-                "total_inspections": random.randint(50, 500),
-                "total_violations": random.randint(10, 150),
-                "total_crashes": random.randint(0, 20),
-                "fatal_crashes": random.randint(0, 2),
-                "injury_crashes": random.randint(0, 5),
-                "tow_crashes": random.randint(0, 10),
-                "inspection_date": today,
-            })
+            safety_records.append(
+                {
+                    "dot_number": dot_number,
+                    "safety_rating": random.choice(
+                        [
+                            "Satisfactory",
+                            "Satisfactory",
+                            "Satisfactory",
+                            "Conditional",
+                            None,
+                        ]
+                    ),
+                    "rating_date": today,
+                    "unsafe_driving_score": round(random.uniform(10, 60), 2),
+                    "hours_of_service_score": round(random.uniform(15, 55), 2),
+                    "driver_fitness_score": round(random.uniform(5, 40), 2),
+                    "controlled_substances_score": round(random.uniform(0, 20), 2),
+                    "vehicle_maintenance_score": round(random.uniform(20, 65), 2),
+                    "hazmat_compliance_score": round(random.uniform(0, 30), 2)
+                    if random.random() > 0.5
+                    else None,
+                    "crash_indicator_score": round(random.uniform(10, 50), 2),
+                    "vehicle_oos_rate": round(random.uniform(5, 25), 2),
+                    "driver_oos_rate": round(random.uniform(3, 15), 2),
+                    "total_inspections": random.randint(50, 500),
+                    "total_violations": random.randint(10, 150),
+                    "total_crashes": random.randint(0, 20),
+                    "fatal_crashes": random.randint(0, 2),
+                    "injury_crashes": random.randint(0, 5),
+                    "tow_crashes": random.randint(0, 10),
+                    "inspection_date": today,
+                }
+            )
 
         return safety_records
 
@@ -528,10 +596,16 @@ class FMCSACollector(BaseCollector):
         elif not isinstance(rating_date, date):
             rating_date = None
 
-        inspection_date = safety.get("inspection_date") or safety.get("inspectionDate") or date.today()
+        inspection_date = (
+            safety.get("inspection_date")
+            or safety.get("inspectionDate")
+            or date.today()
+        )
         if isinstance(inspection_date, str):
             try:
-                inspection_date = datetime.strptime(inspection_date[:10], "%Y-%m-%d").date()
+                inspection_date = datetime.strptime(
+                    inspection_date[:10], "%Y-%m-%d"
+                ).date()
             except (ValueError, TypeError):
                 inspection_date = date.today()
 
@@ -539,21 +613,53 @@ class FMCSACollector(BaseCollector):
             "dot_number": str(dot_number),
             "safety_rating": safety.get("safety_rating") or safety.get("safetyRating"),
             "rating_date": rating_date,
-            "unsafe_driving_score": self._safe_float(safety.get("unsafe_driving_score") or safety.get("unsafeDriving")),
-            "hours_of_service_score": self._safe_float(safety.get("hours_of_service_score") or safety.get("hosCompliance")),
-            "driver_fitness_score": self._safe_float(safety.get("driver_fitness_score") or safety.get("driverFitness")),
-            "controlled_substances_score": self._safe_float(safety.get("controlled_substances_score") or safety.get("controlledSubstances")),
-            "vehicle_maintenance_score": self._safe_float(safety.get("vehicle_maintenance_score") or safety.get("vehicleMaintenance")),
-            "hazmat_compliance_score": self._safe_float(safety.get("hazmat_compliance_score") or safety.get("hazmatCompliance")),
-            "crash_indicator_score": self._safe_float(safety.get("crash_indicator_score") or safety.get("crashIndicator")),
-            "vehicle_oos_rate": self._safe_float(safety.get("vehicle_oos_rate") or safety.get("vehicleOosRate")),
-            "driver_oos_rate": self._safe_float(safety.get("driver_oos_rate") or safety.get("driverOosRate")),
-            "total_inspections": self._safe_int(safety.get("total_inspections") or safety.get("totalInspections")),
-            "total_violations": self._safe_int(safety.get("total_violations") or safety.get("totalViolations")),
-            "total_crashes": self._safe_int(safety.get("total_crashes") or safety.get("totalCrashes")),
-            "fatal_crashes": self._safe_int(safety.get("fatal_crashes") or safety.get("fatalCrashes")),
-            "injury_crashes": self._safe_int(safety.get("injury_crashes") or safety.get("injuryCrashes")),
-            "tow_crashes": self._safe_int(safety.get("tow_crashes") or safety.get("towCrashes")),
+            "unsafe_driving_score": self._safe_float(
+                safety.get("unsafe_driving_score") or safety.get("unsafeDriving")
+            ),
+            "hours_of_service_score": self._safe_float(
+                safety.get("hours_of_service_score") or safety.get("hosCompliance")
+            ),
+            "driver_fitness_score": self._safe_float(
+                safety.get("driver_fitness_score") or safety.get("driverFitness")
+            ),
+            "controlled_substances_score": self._safe_float(
+                safety.get("controlled_substances_score")
+                or safety.get("controlledSubstances")
+            ),
+            "vehicle_maintenance_score": self._safe_float(
+                safety.get("vehicle_maintenance_score")
+                or safety.get("vehicleMaintenance")
+            ),
+            "hazmat_compliance_score": self._safe_float(
+                safety.get("hazmat_compliance_score") or safety.get("hazmatCompliance")
+            ),
+            "crash_indicator_score": self._safe_float(
+                safety.get("crash_indicator_score") or safety.get("crashIndicator")
+            ),
+            "vehicle_oos_rate": self._safe_float(
+                safety.get("vehicle_oos_rate") or safety.get("vehicleOosRate")
+            ),
+            "driver_oos_rate": self._safe_float(
+                safety.get("driver_oos_rate") or safety.get("driverOosRate")
+            ),
+            "total_inspections": self._safe_int(
+                safety.get("total_inspections") or safety.get("totalInspections")
+            ),
+            "total_violations": self._safe_int(
+                safety.get("total_violations") or safety.get("totalViolations")
+            ),
+            "total_crashes": self._safe_int(
+                safety.get("total_crashes") or safety.get("totalCrashes")
+            ),
+            "fatal_crashes": self._safe_int(
+                safety.get("fatal_crashes") or safety.get("fatalCrashes")
+            ),
+            "injury_crashes": self._safe_int(
+                safety.get("injury_crashes") or safety.get("injuryCrashes")
+            ),
+            "tow_crashes": self._safe_int(
+                safety.get("tow_crashes") or safety.get("towCrashes")
+            ),
             "inspection_date": inspection_date,
             "source": "fmcsa",
             "collected_at": datetime.utcnow(),

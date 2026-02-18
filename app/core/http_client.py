@@ -4,6 +4,7 @@ Base HTTP client with unified retry logic, rate limiting, and error handling.
 Provides a reusable foundation for all external API clients in the application.
 Implements bounded concurrency, exponential backoff, and standardized error handling.
 """
+
 import asyncio
 import logging
 import random
@@ -20,12 +21,12 @@ from app.core.api_errors import (
     AuthenticationError,
     NotFoundError,
     ValidationError,
-    classify_http_error
+    classify_http_error,
 )
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class BaseAPIClient(ABC):
@@ -66,7 +67,7 @@ class BaseAPIClient(ABC):
         backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
         timeout: float = DEFAULT_TIMEOUT,
         connect_timeout: float = DEFAULT_CONNECT_TIMEOUT,
-        rate_limit_interval: Optional[float] = None
+        rate_limit_interval: Optional[float] = None,
     ):
         """
         Initialize the API client.
@@ -113,8 +114,8 @@ class BaseAPIClient(ABC):
                 follow_redirects=True,
                 limits=httpx.Limits(
                     max_connections=self.max_concurrency * 2,
-                    max_keepalive_connections=self.max_concurrency
-                )
+                    max_keepalive_connections=self.max_concurrency,
+                ),
             )
         return self._client
 
@@ -156,21 +157,20 @@ class BaseAPIClient(ABC):
             base_delay: Base delay in seconds
         """
         delay = min(
-            base_delay * (self.backoff_factor ** attempt),
-            self.DEFAULT_MAX_BACKOFF
+            base_delay * (self.backoff_factor**attempt), self.DEFAULT_MAX_BACKOFF
         )
 
         # Add jitter (±25% by default)
         jitter = delay * self.DEFAULT_JITTER_FACTOR * (2 * random.random() - 1)
         delay_with_jitter = max(0.1, delay + jitter)
 
-        logger.debug(f"Backing off for {delay_with_jitter:.2f}s (attempt {attempt + 1})")
+        logger.debug(
+            f"Backing off for {delay_with_jitter:.2f}s (attempt {attempt + 1})"
+        )
         await asyncio.sleep(delay_with_jitter)
 
     def _check_api_error(
-        self,
-        data: Dict[str, Any],
-        resource_id: str
+        self, data: Dict[str, Any], resource_id: str
     ) -> Optional[APIError]:
         """
         Check API response for source-specific errors.
@@ -193,9 +193,7 @@ class BaseAPIClient(ABC):
             if isinstance(error_msg, dict):
                 error_msg = error_msg.get("message", str(error_msg))
             return FatalError(
-                message=str(error_msg),
-                source=self.SOURCE_NAME,
-                response_data=data
+                message=str(error_msg), source=self.SOURCE_NAME, response_data=data
             )
 
         # Common pattern: "error_code" field
@@ -207,13 +205,13 @@ class BaseAPIClient(ABC):
                     message=f"API error {error_code}: {error_message}",
                     source=self.SOURCE_NAME,
                     status_code=error_code,
-                    response_data=data
+                    response_data=data,
                 )
             return RetryableError(
                 message=f"API error {error_code}: {error_message}",
                 source=self.SOURCE_NAME,
                 status_code=error_code,
-                response_data=data
+                response_data=data,
             )
 
         return None
@@ -229,7 +227,7 @@ class BaseAPIClient(ABC):
         """
         return {
             "Accept": "application/json",
-            "User-Agent": f"Nexdata/{self.SOURCE_NAME}-client"
+            "User-Agent": f"Nexdata/{self.SOURCE_NAME}-client",
         }
 
     def _add_auth_to_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -253,7 +251,7 @@ class BaseAPIClient(ABC):
         params: Optional[Dict[str, Any]] = None,
         json_body: Optional[Dict[str, Any]] = None,
         resource_id: str = "unknown",
-        extra_headers: Optional[Dict[str, str]] = None
+        extra_headers: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         """
         Make HTTP request with retry logic.
@@ -303,15 +301,11 @@ class BaseAPIClient(ABC):
                             url,
                             params=params,
                             json=json_body,
-                            headers={**headers, "Content-Type": "application/json"}
+                            headers={**headers, "Content-Type": "application/json"},
                         )
                     else:
                         response = await client.request(
-                            method,
-                            url,
-                            params=params,
-                            json=json_body,
-                            headers=headers
+                            method, url, params=params, json=json_body, headers=headers
                         )
 
                     # Check HTTP status
@@ -333,19 +327,21 @@ class BaseAPIClient(ABC):
                         raise api_error
 
                     # Success!
-                    logger.debug(f"[{self.SOURCE_NAME}] Successfully fetched {resource_id}")
+                    logger.debug(
+                        f"[{self.SOURCE_NAME}] Successfully fetched {resource_id}"
+                    )
                     return data
 
                 except httpx.HTTPStatusError as e:
                     error = classify_http_error(
-                        e.response.status_code,
-                        e.response.text[:500],
-                        self.SOURCE_NAME
+                        e.response.status_code, e.response.text[:500], self.SOURCE_NAME
                     )
 
                     if isinstance(error, RateLimitError):
                         retry_after = e.response.headers.get("Retry-After")
-                        wait_time = int(retry_after) if retry_after else error.retry_after
+                        wait_time = (
+                            int(retry_after) if retry_after else error.retry_after
+                        )
                         logger.warning(
                             f"[{self.SOURCE_NAME}] Rate limited. Waiting {wait_time}s"
                         )
@@ -373,11 +369,15 @@ class BaseAPIClient(ABC):
                         last_error = e
                         continue
                     raise RetryableError(
-                        message=f"Request failed: {str(e)}",
-                        source=self.SOURCE_NAME
+                        message=f"Request failed: {str(e)}", source=self.SOURCE_NAME
                     )
 
-                except (FatalError, ValidationError, AuthenticationError, NotFoundError):
+                except (
+                    FatalError,
+                    ValidationError,
+                    AuthenticationError,
+                    NotFoundError,
+                ):
                     # Don't retry fatal errors
                     raise
 
@@ -392,7 +392,7 @@ class BaseAPIClient(ABC):
                     raise APIError(
                         message=f"Unexpected error: {str(e)}",
                         source=self.SOURCE_NAME,
-                        retryable=False
+                        retryable=False,
                     )
 
             # All retries exhausted
@@ -401,19 +401,19 @@ class BaseAPIClient(ABC):
                     raise last_error
                 raise RetryableError(
                     message=f"Failed after {self.max_retries} attempts: {str(last_error)}",
-                    source=self.SOURCE_NAME
+                    source=self.SOURCE_NAME,
                 )
 
             raise APIError(
                 message=f"Failed to fetch {resource_id} after {self.max_retries} attempts",
-                source=self.SOURCE_NAME
+                source=self.SOURCE_NAME,
             )
 
     async def get(
         self,
         url: str,
         params: Optional[Dict[str, Any]] = None,
-        resource_id: str = "unknown"
+        resource_id: str = "unknown",
     ) -> Dict[str, Any]:
         """
         Make GET request.
@@ -433,7 +433,7 @@ class BaseAPIClient(ABC):
         url: str,
         json_body: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
-        resource_id: str = "unknown"
+        resource_id: str = "unknown",
     ) -> Dict[str, Any]:
         """
         Make POST request.
@@ -448,18 +448,14 @@ class BaseAPIClient(ABC):
             Parsed JSON response
         """
         return await self._request(
-            "POST",
-            url,
-            params=params,
-            json_body=json_body,
-            resource_id=resource_id
+            "POST", url, params=params, json_body=json_body, resource_id=resource_id
         )
 
     async def fetch_multiple(
         self,
         items: List[T],
         fetch_func: Callable[[T], Any],
-        item_id_func: Callable[[T], str] = str
+        item_id_func: Callable[[T], str] = str,
     ) -> Dict[str, Any]:
         """
         Fetch multiple items concurrently (bounded by semaphore).

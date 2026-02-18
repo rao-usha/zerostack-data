@@ -15,6 +15,7 @@ Rate limits:
 - 100 MB data volume per minute
 - API key required (free registration)
 """
+
 import logging
 from typing import Dict, Optional, Any
 
@@ -54,7 +55,7 @@ class BEAClient(BaseAPIClient):
         api_key: str,
         max_concurrency: int = 3,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize BEA API client.
@@ -80,7 +81,7 @@ class BEAClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=config.timeout_seconds,
             connect_timeout=config.connect_timeout_seconds,
-            rate_limit_interval=config.get_rate_limit_interval()
+            rate_limit_interval=config.get_rate_limit_interval(),
         )
 
     def _add_auth_to_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -90,9 +91,7 @@ class BEAClient(BaseAPIClient):
         return params
 
     def _check_api_error(
-        self,
-        data: Dict[str, Any],
-        resource_id: str
+        self, data: Dict[str, Any], resource_id: str
     ) -> Optional[Exception]:
         """Check for BEA-specific API errors."""
         if "BEAAPI" in data:
@@ -109,22 +108,19 @@ class BEAClient(BaseAPIClient):
                     return RetryableError(
                         message=f"BEA rate limit: {error_msg}",
                         source=self.SOURCE_NAME,
-                        response_data=data
+                        response_data=data,
                     )
 
                 return FatalError(
                     message=f"BEA API error: {error_msg}",
                     source=self.SOURCE_NAME,
-                    response_data=data
+                    response_data=data,
                 )
 
         return None
 
     async def get_nipa_data(
-        self,
-        table_name: str,
-        frequency: str = "A",
-        year: str = "ALL"
+        self, table_name: str, frequency: str = "A", year: str = "ALL"
     ) -> Dict[str, Any]:
         """
         Fetch NIPA (National Income and Product Accounts) data.
@@ -157,7 +153,7 @@ class BEAClient(BaseAPIClient):
         table_name: str,
         line_code: str = "1",
         geo_fips: str = "STATE",
-        year: str = "ALL"
+        year: str = "ALL",
     ) -> Dict[str, Any]:
         """
         Fetch Regional Economic Accounts data.
@@ -192,7 +188,7 @@ class BEAClient(BaseAPIClient):
         table_id: str = "1",
         frequency: str = "A",
         year: str = "ALL",
-        industry: str = "ALL"
+        industry: str = "ALL",
     ) -> Dict[str, Any]:
         """Fetch GDP by Industry data."""
         params = {
@@ -203,14 +199,16 @@ class BEAClient(BaseAPIClient):
             "Year": year,
             "Industry": industry,
         }
-        return await self.get("", params=params, resource_id=f"GDPbyIndustry:{table_id}")
+        return await self.get(
+            "", params=params, resource_id=f"GDPbyIndustry:{table_id}"
+        )
 
     async def get_international_transactions(
         self,
         indicator: str = "BalGds",
         area_or_country: str = "AllCountries",
         frequency: str = "A",
-        year: str = "ALL"
+        year: str = "ALL",
     ) -> Dict[str, Any]:
         """Fetch International Transactions data."""
         params = {
@@ -224,9 +222,7 @@ class BEAClient(BaseAPIClient):
         return await self.get("", params=params, resource_id=f"ITA:{indicator}")
 
     async def get_input_output_data(
-        self,
-        table_id: str = "56",
-        year: str = "ALL"
+        self, table_id: str = "56", year: str = "ALL"
     ) -> Dict[str, Any]:
         """Fetch Input-Output Tables data."""
         params = {
@@ -248,12 +244,12 @@ class BEAClient(BaseAPIClient):
             "method": "GetParameterList",
             "DataSetName": dataset_name,
         }
-        return await self.get("", params=params, resource_id=f"ParameterList:{dataset_name}")
+        return await self.get(
+            "", params=params, resource_id=f"ParameterList:{dataset_name}"
+        )
 
     async def get_parameter_values(
-        self,
-        dataset_name: str,
-        parameter_name: str
+        self, dataset_name: str, parameter_name: str
     ) -> Dict[str, Any]:
         """Get valid values for a specific parameter."""
         params = {
@@ -264,7 +260,7 @@ class BEAClient(BaseAPIClient):
         return await self.get(
             "",
             params=params,
-            resource_id=f"ParameterValues:{dataset_name}:{parameter_name}"
+            resource_id=f"ParameterValues:{dataset_name}:{parameter_name}",
         )
 
 

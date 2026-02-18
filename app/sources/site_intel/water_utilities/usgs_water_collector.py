@@ -9,6 +9,7 @@ Fetches water monitoring station data from USGS Water Services:
 Data source: https://waterservices.usgs.gov/
 OGC REST API - No API key required.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -18,7 +19,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import WaterMonitoringSite
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -27,11 +32,56 @@ logger = logging.getLogger(__name__)
 
 # State codes for US states
 US_STATES = [
-    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
-    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
-    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"
+    "AL",
+    "AK",
+    "AZ",
+    "AR",
+    "CA",
+    "CO",
+    "CT",
+    "DE",
+    "FL",
+    "GA",
+    "HI",
+    "ID",
+    "IL",
+    "IN",
+    "IA",
+    "KS",
+    "KY",
+    "LA",
+    "ME",
+    "MD",
+    "MA",
+    "MI",
+    "MN",
+    "MS",
+    "MO",
+    "MT",
+    "NE",
+    "NV",
+    "NH",
+    "NJ",
+    "NM",
+    "NY",
+    "NC",
+    "ND",
+    "OH",
+    "OK",
+    "OR",
+    "PA",
+    "RI",
+    "SC",
+    "SD",
+    "TN",
+    "TX",
+    "UT",
+    "VT",
+    "VA",
+    "WA",
+    "WV",
+    "WI",
+    "WY",
 ]
 
 # Site type codes
@@ -103,7 +153,9 @@ class USGSWaterCollector(BaseCollector):
                     logger.error(f"Failed to collect USGS data for {state}: {e}")
                     errors.append({"state": state, "error": str(e)})
 
-            status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            status = (
+                CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            )
 
             return self.create_result(
                 status=status,
@@ -120,7 +172,9 @@ class USGSWaterCollector(BaseCollector):
                 error_message=str(e),
             )
 
-    async def _collect_state_sites(self, state: str, config: CollectionConfig) -> Dict[str, Any]:
+    async def _collect_state_sites(
+        self, state: str, config: CollectionConfig
+    ) -> Dict[str, Any]:
         """Collect monitoring sites for a state."""
         try:
             client = await self.get_client()
@@ -137,7 +191,9 @@ class USGSWaterCollector(BaseCollector):
             response = await client.get(self.SITE_SERVICE_URL, params=params)
 
             if response.status_code != 200:
-                logger.warning(f"USGS API returned {response.status_code} for state {state}")
+                logger.warning(
+                    f"USGS API returned {response.status_code} for state {state}"
+                )
                 return {"processed": 0, "inserted": 0}
 
             # Parse RDB format (tab-delimited with comment headers)
@@ -154,8 +210,10 @@ class USGSWaterCollector(BaseCollector):
                     if config.bbox:
                         lat = float(transformed.get("latitude", 0))
                         lng = float(transformed.get("longitude", 0))
-                        if not (config.bbox["min_lat"] <= lat <= config.bbox["max_lat"] and
-                                config.bbox["min_lng"] <= lng <= config.bbox["max_lng"]):
+                        if not (
+                            config.bbox["min_lat"] <= lat <= config.bbox["max_lat"]
+                            and config.bbox["min_lng"] <= lng <= config.bbox["max_lng"]
+                        ):
                             continue
                     records.append(transformed)
 
@@ -165,11 +223,21 @@ class USGSWaterCollector(BaseCollector):
                     records,
                     unique_columns=["site_number"],
                     update_columns=[
-                        "site_name", "site_type", "state", "county",
-                        "latitude", "longitude", "drainage_area_sq_mi",
-                        "aquifer_code", "aquifer_name", "well_depth_ft",
-                        "has_streamflow", "has_groundwater", "has_quality",
-                        "source", "collected_at"
+                        "site_name",
+                        "site_type",
+                        "state",
+                        "county",
+                        "latitude",
+                        "longitude",
+                        "drainage_area_sq_mi",
+                        "aquifer_code",
+                        "aquifer_name",
+                        "well_depth_ft",
+                        "has_streamflow",
+                        "has_groundwater",
+                        "has_quality",
+                        "source",
+                        "collected_at",
                     ],
                 )
                 logger.info(f"Inserted/updated {inserted} USGS sites for {state}")
@@ -201,7 +269,9 @@ class USGSWaterCollector(BaseCollector):
 
         return records
 
-    def _transform_site(self, site: Dict[str, Any], state: str) -> Optional[Dict[str, Any]]:
+    def _transform_site(
+        self, site: Dict[str, Any], state: str
+    ) -> Optional[Dict[str, Any]]:
         """Transform USGS site data to database format."""
         site_no = site.get("site_no")
         if not site_no:
@@ -209,7 +279,9 @@ class USGSWaterCollector(BaseCollector):
 
         # Map site type code
         site_type_cd = site.get("site_tp_cd", "")
-        site_type = SITE_TYPE_MAP.get(site_type_cd, site_type_cd.lower() if site_type_cd else None)
+        site_type = SITE_TYPE_MAP.get(
+            site_type_cd, site_type_cd.lower() if site_type_cd else None
+        )
 
         # Parse coordinates
         lat = self._parse_float(site.get("dec_lat_va"))

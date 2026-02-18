@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 # CONSTANTS
 # =============================================================================
 
+
 class WatchType(str, Enum):
     COMPANY = "company"
     INVESTOR = "investor"
@@ -56,24 +57,80 @@ EVENT_IMPACT_SCORES = {
 
 # Keywords for event type detection
 EVENT_KEYWORDS = {
-    EventType.FUNDING: ["raises", "funding", "series", "investment", "valuation", "round"],
-    EventType.ACQUISITION: ["acquires", "acquisition", "merger", "buys", "purchased", "deal"],
+    EventType.FUNDING: [
+        "raises",
+        "funding",
+        "series",
+        "investment",
+        "valuation",
+        "round",
+    ],
+    EventType.ACQUISITION: [
+        "acquires",
+        "acquisition",
+        "merger",
+        "buys",
+        "purchased",
+        "deal",
+    ],
     EventType.IPO: ["ipo", "public", "listing", "nasdaq", "nyse", "goes public"],
-    EventType.REGULATORY: ["sec", "charges", "fine", "investigation", "compliance", "enforcement"],
+    EventType.REGULATORY: [
+        "sec",
+        "charges",
+        "fine",
+        "investigation",
+        "compliance",
+        "enforcement",
+    ],
     EventType.LEADERSHIP: ["ceo", "cfo", "appoints", "resigns", "executive", "board"],
-    EventType.PARTNERSHIP: ["partnership", "partners", "collaboration", "alliance", "joint venture"],
-    EventType.PRODUCT: ["launches", "announces", "release", "product", "feature", "update"],
+    EventType.PARTNERSHIP: [
+        "partnership",
+        "partners",
+        "collaboration",
+        "alliance",
+        "joint venture",
+    ],
+    EventType.PRODUCT: [
+        "launches",
+        "announces",
+        "release",
+        "product",
+        "feature",
+        "update",
+    ],
     EventType.FILING: ["13f", "13d", "10-k", "10-q", "8-k", "form d", "filing"],
 }
 
 # Sentiment keywords
 POSITIVE_KEYWORDS = [
-    "growth", "profit", "success", "wins", "award", "expansion", "record",
-    "breakthrough", "innovative", "leading", "best", "exceeds", "outperforms"
+    "growth",
+    "profit",
+    "success",
+    "wins",
+    "award",
+    "expansion",
+    "record",
+    "breakthrough",
+    "innovative",
+    "leading",
+    "best",
+    "exceeds",
+    "outperforms",
 ]
 NEGATIVE_KEYWORDS = [
-    "loss", "decline", "layoffs", "lawsuit", "fraud", "investigation", "fails",
-    "bankruptcy", "downturn", "crisis", "scandal", "breach", "default"
+    "loss",
+    "decline",
+    "layoffs",
+    "lawsuit",
+    "fraud",
+    "investigation",
+    "fails",
+    "bankruptcy",
+    "downturn",
+    "crisis",
+    "scandal",
+    "breach",
+    "default",
 ]
 
 # Breaking news thresholds
@@ -85,9 +142,11 @@ BREAKING_RELEVANCE_THRESHOLD = 0.7
 # DATA CLASSES
 # =============================================================================
 
+
 @dataclass
 class WatchItem:
     """A watch list item."""
+
     id: int
     watch_type: str
     watch_value: str
@@ -102,6 +161,7 @@ class WatchItem:
 @dataclass
 class NewsMatch:
     """A news item matched to a watch item."""
+
     id: int
     news_title: str
     news_url: Optional[str]
@@ -125,6 +185,7 @@ class NewsMatch:
 @dataclass
 class Digest:
     """A generated news digest."""
+
     id: int
     period_type: str
     period_start: datetime
@@ -138,6 +199,7 @@ class Digest:
 # =============================================================================
 # NEWS MONITOR CLASS
 # =============================================================================
+
 
 class NewsMonitor:
     """
@@ -252,14 +314,17 @@ class NewsMonitor:
             RETURNING id, created_at, updated_at
         """)
 
-        result = self.db.execute(query, {
-            "watch_type": watch_type,
-            "watch_value": watch_value,
-            "event_types": event_types or [],
-            "min_relevance": min_relevance,
-            "alert_enabled": alert_enabled,
-            "digest_enabled": digest_enabled,
-        })
+        result = self.db.execute(
+            query,
+            {
+                "watch_type": watch_type,
+                "watch_value": watch_value,
+                "event_types": event_types or [],
+                "min_relevance": min_relevance,
+                "alert_enabled": alert_enabled,
+                "digest_enabled": digest_enabled,
+            },
+        )
         row = result.fetchone()
         self.db.commit()
 
@@ -275,13 +340,17 @@ class NewsMonitor:
             updated_at=row[2],
         )
 
-    def _get_watch_by_value(self, watch_type: str, watch_value: str) -> Optional[WatchItem]:
+    def _get_watch_by_value(
+        self, watch_type: str, watch_value: str
+    ) -> Optional[WatchItem]:
         """Get watch item by type and value."""
         query = text("""
             SELECT * FROM news_watch_items
             WHERE watch_type = :watch_type AND LOWER(watch_value) = LOWER(:watch_value)
         """)
-        result = self.db.execute(query, {"watch_type": watch_type, "watch_value": watch_value})
+        result = self.db.execute(
+            query, {"watch_type": watch_type, "watch_value": watch_value}
+        )
         row = result.mappings().fetchone()
         if row:
             return WatchItem(
@@ -322,17 +391,19 @@ class NewsMonitor:
         result = self.db.execute(query)
         watches = []
         for row in result.mappings():
-            watches.append(WatchItem(
-                id=row["id"],
-                watch_type=row["watch_type"],
-                watch_value=row["watch_value"],
-                event_types=row["event_types"] or [],
-                min_relevance=row["min_relevance"],
-                alert_enabled=row["alert_enabled"],
-                digest_enabled=row["digest_enabled"],
-                created_at=row["created_at"],
-                updated_at=row["updated_at"],
-            ))
+            watches.append(
+                WatchItem(
+                    id=row["id"],
+                    watch_type=row["watch_type"],
+                    watch_value=row["watch_value"],
+                    event_types=row["event_types"] or [],
+                    min_relevance=row["min_relevance"],
+                    alert_enabled=row["alert_enabled"],
+                    digest_enabled=row["digest_enabled"],
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                )
+            )
         return watches
 
     def update_watch(
@@ -417,7 +488,7 @@ class NewsMonitor:
 
         # For keywords, check word boundaries
         if watch.watch_type == WatchType.KEYWORD.value:
-            pattern = r'\b' + re.escape(watch_value_lower) + r'\b'
+            pattern = r"\b" + re.escape(watch_value_lower) + r"\b"
             if re.search(pattern, title_lower):
                 return 0.9, "keyword"
             if re.search(pattern, body_lower):
@@ -445,9 +516,29 @@ class NewsMonitor:
     def _get_sector_terms(self, sector: str) -> List[str]:
         """Get related terms for a sector."""
         sector_map = {
-            "fintech": ["payments", "banking", "finance", "lending", "crypto", "blockchain"],
-            "healthtech": ["healthcare", "medical", "health", "biotech", "pharma", "telemedicine"],
-            "ai": ["artificial intelligence", "machine learning", "ml", "deep learning", "llm"],
+            "fintech": [
+                "payments",
+                "banking",
+                "finance",
+                "lending",
+                "crypto",
+                "blockchain",
+            ],
+            "healthtech": [
+                "healthcare",
+                "medical",
+                "health",
+                "biotech",
+                "pharma",
+                "telemedicine",
+            ],
+            "ai": [
+                "artificial intelligence",
+                "machine learning",
+                "ml",
+                "deep learning",
+                "llm",
+            ],
             "saas": ["software", "cloud", "subscription", "enterprise"],
             "ecommerce": ["retail", "shopping", "marketplace", "commerce"],
             "climate": ["cleantech", "sustainability", "renewable", "green", "carbon"],
@@ -457,13 +548,17 @@ class NewsMonitor:
     def _score_impact(self, title: str, event_type: str) -> float:
         """Score the business impact of a news item."""
         base_score = EVENT_IMPACT_SCORES.get(
-            EventType(event_type) if event_type in [e.value for e in EventType] else EventType.NEWS,
-            0.3
+            EventType(event_type)
+            if event_type in [e.value for e in EventType]
+            else EventType.NEWS,
+            0.3,
         )
 
         # Boost for specific high-impact keywords
         title_lower = title.lower()
-        if any(word in title_lower for word in ["billion", "major", "breaking", "urgent"]):
+        if any(
+            word in title_lower for word in ["billion", "major", "breaking", "urgent"]
+        ):
             base_score = min(base_score + 0.1, 1.0)
 
         return base_score
@@ -499,7 +594,9 @@ class NewsMonitor:
             EventType.FILING.value: "SEC filing",
         }
         prefix = event_summaries.get(event_type, "News")
-        return f"{prefix}: {title[:100]}..." if len(title) > 100 else f"{prefix}: {title}"
+        return (
+            f"{prefix}: {title[:100]}..." if len(title) > 100 else f"{prefix}: {title}"
+        )
 
     # -------------------------------------------------------------------------
     # NEWS MATCHING
@@ -538,9 +635,9 @@ class NewsMonitor:
 
             # Check if breaking
             is_breaking = (
-                relevance_score >= BREAKING_RELEVANCE_THRESHOLD and
-                impact_score >= BREAKING_IMPACT_THRESHOLD and
-                watch.alert_enabled
+                relevance_score >= BREAKING_RELEVANCE_THRESHOLD
+                and impact_score >= BREAKING_IMPACT_THRESHOLD
+                and watch.alert_enabled
             )
 
             summary = self._generate_summary(title, event_type)
@@ -586,10 +683,9 @@ class NewsMonitor:
             SELECT id FROM news_matches
             WHERE news_title = :title AND watch_item_id = :watch_id
         """)
-        existing = self.db.execute(check_query, {
-            "title": title,
-            "watch_id": watch.id
-        }).fetchone()
+        existing = self.db.execute(
+            check_query, {"title": title, "watch_id": watch.id}
+        ).fetchone()
 
         if existing:
             return None  # Already matched
@@ -606,22 +702,25 @@ class NewsMonitor:
             RETURNING id, created_at
         """)
 
-        result = self.db.execute(query, {
-            "title": title,
-            "url": url,
-            "source": source,
-            "published_at": published_at,
-            "watch_id": watch.id,
-            "watch_type": watch.watch_type,
-            "watch_value": watch.watch_value,
-            "match_type": match_type,
-            "relevance": relevance_score,
-            "impact": impact_score,
-            "sentiment": sentiment,
-            "event_type": event_type,
-            "summary": summary,
-            "is_breaking": is_breaking,
-        })
+        result = self.db.execute(
+            query,
+            {
+                "title": title,
+                "url": url,
+                "source": source,
+                "published_at": published_at,
+                "watch_id": watch.id,
+                "watch_type": watch.watch_type,
+                "watch_value": watch.watch_value,
+                "match_type": match_type,
+                "relevance": relevance_score,
+                "impact": impact_score,
+                "sentiment": sentiment,
+                "event_type": event_type,
+                "summary": summary,
+                "is_breaking": is_breaking,
+            },
+        )
         row = result.fetchone()
         self.db.commit()
 
@@ -716,26 +815,32 @@ class NewsMonitor:
         result = self.db.execute(query, params)
         items = []
         for row in result.mappings():
-            items.append({
-                "id": row["id"],
-                "title": row["news_title"],
-                "url": row["news_url"],
-                "source": row["news_source"],
-                "published_at": row["news_published_at"].isoformat() if row["news_published_at"] else None,
-                "matched_watch": {
-                    "id": row["watch_item_id"],
-                    "type": row["watch_type"],
-                    "value": row["watch_value"],
-                },
-                "relevance_score": row["relevance_score"],
-                "impact_score": row["impact_score"],
-                "sentiment": row["sentiment"],
-                "event_type": row["event_type"],
-                "summary": row["summary"],
-                "is_breaking": row["is_breaking"],
-                "is_read": row["is_read"],
-                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-            })
+            items.append(
+                {
+                    "id": row["id"],
+                    "title": row["news_title"],
+                    "url": row["news_url"],
+                    "source": row["news_source"],
+                    "published_at": row["news_published_at"].isoformat()
+                    if row["news_published_at"]
+                    else None,
+                    "matched_watch": {
+                        "id": row["watch_item_id"],
+                        "type": row["watch_type"],
+                        "value": row["watch_value"],
+                    },
+                    "relevance_score": row["relevance_score"],
+                    "impact_score": row["impact_score"],
+                    "sentiment": row["sentiment"],
+                    "event_type": row["event_type"],
+                    "summary": row["summary"],
+                    "is_breaking": row["is_breaking"],
+                    "is_read": row["is_read"],
+                    "created_at": row["created_at"].isoformat()
+                    if row["created_at"]
+                    else None,
+                }
+            )
 
         # Get counts
         count_query = text(f"""
@@ -794,21 +899,27 @@ class NewsMonitor:
         result = self.db.execute(query, params)
         alerts = []
         for row in result.mappings():
-            alerts.append({
-                "id": row["id"],
-                "title": row["news_title"],
-                "url": row["news_url"],
-                "impact_score": row["impact_score"],
-                "event_type": row["event_type"],
-                "matched_watch": {
-                    "type": row["watch_type"],
-                    "value": row["watch_value"],
-                },
-                "summary": row["summary"],
-                "published_at": row["news_published_at"].isoformat() if row["news_published_at"] else None,
-                "acknowledged": row["is_alerted"],
-                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-            })
+            alerts.append(
+                {
+                    "id": row["id"],
+                    "title": row["news_title"],
+                    "url": row["news_url"],
+                    "impact_score": row["impact_score"],
+                    "event_type": row["event_type"],
+                    "matched_watch": {
+                        "type": row["watch_type"],
+                        "value": row["watch_value"],
+                    },
+                    "summary": row["summary"],
+                    "published_at": row["news_published_at"].isoformat()
+                    if row["news_published_at"]
+                    else None,
+                    "acknowledged": row["is_alerted"],
+                    "created_at": row["created_at"].isoformat()
+                    if row["created_at"]
+                    else None,
+                }
+            )
 
         # Count unacknowledged
         count_query = text("""
@@ -870,12 +981,18 @@ class NewsMonitor:
         seen_titles = set()
         for m in sorted(matches, key=lambda x: x["impact_score"], reverse=True)[:5]:
             if m["news_title"] not in seen_titles:
-                highlights.append({
-                    "title": m["news_title"],
-                    "impact": "high" if m["impact_score"] >= 0.8 else "medium" if m["impact_score"] >= 0.5 else "low",
-                    "event_type": m["event_type"],
-                    "summary": m["summary"],
-                })
+                highlights.append(
+                    {
+                        "title": m["news_title"],
+                        "impact": "high"
+                        if m["impact_score"] >= 0.8
+                        else "medium"
+                        if m["impact_score"] >= 0.5
+                        else "low",
+                        "event_type": m["event_type"],
+                        "summary": m["summary"],
+                    }
+                )
                 seen_titles.add(m["news_title"])
 
         # Calculate stats
@@ -908,7 +1025,9 @@ class NewsMonitor:
         }
 
         # Generate summary text
-        summary = self._generate_digest_summary(period_type, target_date, highlights, stats)
+        summary = self._generate_digest_summary(
+            period_type, target_date, highlights, stats
+        )
 
         # Store digest
         digest = self._store_digest(
@@ -938,7 +1057,9 @@ class NewsMonitor:
         if highlights:
             lines.append("## Top Stories")
             for i, h in enumerate(highlights, 1):
-                lines.append(f"{i}. **{h['title'][:80]}** - {h.get('event_type', 'news')}")
+                lines.append(
+                    f"{i}. **{h['title'][:80]}** - {h.get('event_type', 'news')}"
+                )
             lines.append("")
 
         total = stats.get("total_matches", 0)
@@ -990,14 +1111,17 @@ class NewsMonitor:
             RETURNING id, generated_at
         """)
 
-        result = self.db.execute(query, {
-            "period_type": period_type,
-            "period_start": period_start,
-            "period_end": period_end,
-            "summary": summary,
-            "highlights": json.dumps(highlights),
-            "stats": json.dumps(stats),
-        })
+        result = self.db.execute(
+            query,
+            {
+                "period_type": period_type,
+                "period_start": period_start,
+                "period_end": period_end,
+                "summary": summary,
+                "highlights": json.dumps(highlights),
+                "stats": json.dumps(stats),
+            },
+        )
         row = result.fetchone()
         self.db.commit()
 
@@ -1032,10 +1156,13 @@ class NewsMonitor:
             SELECT * FROM news_digests
             WHERE period_type = :period_type AND period_start = :period_start
         """)
-        result = self.db.execute(query, {
-            "period_type": period_type,
-            "period_start": period_start,
-        })
+        result = self.db.execute(
+            query,
+            {
+                "period_type": period_type,
+                "period_start": period_start,
+            },
+        )
         row = result.mappings().fetchone()
 
         if row:
@@ -1058,39 +1185,45 @@ class NewsMonitor:
     def get_stats(self) -> Dict[str, Any]:
         """Get monitoring statistics."""
         # Watch count
-        watch_count = self.db.execute(
-            text("SELECT COUNT(*) FROM news_watch_items")
-        ).scalar() or 0
+        watch_count = (
+            self.db.execute(text("SELECT COUNT(*) FROM news_watch_items")).scalar() or 0
+        )
 
         # Match counts
-        match_stats = self.db.execute(text("""
+        match_stats = self.db.execute(
+            text("""
             SELECT
                 COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '1 day') as today,
                 COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') as week,
                 COUNT(*) FILTER (WHERE is_read = FALSE) as unread,
                 COUNT(*) FILTER (WHERE is_breaking = TRUE AND is_alerted = FALSE) as pending_alerts
             FROM news_matches
-        """)).fetchone()
+        """)
+        ).fetchone()
 
         # Top sources
-        top_sources = self.db.execute(text("""
+        top_sources = self.db.execute(
+            text("""
             SELECT news_source, COUNT(*) as count
             FROM news_matches
             WHERE created_at > NOW() - INTERVAL '7 days'
             GROUP BY news_source
             ORDER BY count DESC
             LIMIT 5
-        """)).fetchall()
+        """)
+        ).fetchall()
 
         # Top event types
-        top_events = self.db.execute(text("""
+        top_events = self.db.execute(
+            text("""
             SELECT event_type, COUNT(*) as count
             FROM news_matches
             WHERE created_at > NOW() - INTERVAL '7 days'
             GROUP BY event_type
             ORDER BY count DESC
             LIMIT 5
-        """)).fetchall()
+        """)
+        ).fetchall()
 
         return {
             "watch_items": watch_count,
@@ -1098,8 +1231,12 @@ class NewsMonitor:
             "matches_this_week": match_stats[1] or 0,
             "unread": match_stats[2] or 0,
             "pending_alerts": match_stats[3] or 0,
-            "top_sources": [{"source": r[0] or "unknown", "count": r[1]} for r in top_sources],
-            "top_event_types": [{"type": r[0] or "other", "count": r[1]} for r in top_events],
+            "top_sources": [
+                {"source": r[0] or "unknown", "count": r[1]} for r in top_sources
+            ],
+            "top_event_types": [
+                {"type": r[0] or "other", "count": r[1]} for r in top_events
+            ],
         }
 
     # -------------------------------------------------------------------------
@@ -1128,13 +1265,15 @@ class NewsMonitor:
             """)
             result = self.db.execute(query, {"days": days})
             for row in result.mappings():
-                news_items.append({
-                    "title": row["title"],
-                    "url": row.get("url"),
-                    "source": row.get("source"),
-                    "published_at": row.get("published_at"),
-                    "body": row.get("body"),
-                })
+                news_items.append(
+                    {
+                        "title": row["title"],
+                        "url": row.get("url"),
+                        "source": row.get("source"),
+                        "published_at": row.get("published_at"),
+                        "body": row.get("body"),
+                    }
+                )
         except Exception as e:
             logger.warning(f"Could not fetch from news_items table: {e}")
 
@@ -1153,13 +1292,15 @@ class NewsMonitor:
             """)
             result = self.db.execute(query, {"days": days})
             for row in result.mappings():
-                news_items.append({
-                    "title": row["title"],
-                    "url": row.get("url"),
-                    "source": row.get("source"),
-                    "published_at": row.get("published_at"),
-                    "body": row.get("body"),
-                })
+                news_items.append(
+                    {
+                        "title": row["title"],
+                        "url": row.get("url"),
+                        "source": row.get("source"),
+                        "published_at": row.get("published_at"),
+                        "body": row.get("body"),
+                    }
+                )
         except Exception as e:
             logger.debug(f"Could not fetch from sec_filings table: {e}")
 

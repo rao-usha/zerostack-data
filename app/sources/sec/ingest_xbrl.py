@@ -4,6 +4,7 @@ SEC XBRL financial data ingestion.
 Fetches and parses structured financial data from SEC Company Facts API.
 Uses upsert (ON CONFLICT) to safely handle re-ingestion.
 """
+
 import logging
 from typing import Dict, Any, List, Set
 from datetime import datetime
@@ -18,7 +19,7 @@ from app.sources.sec.models import (
     SECFinancialFact,
     SECIncomeStatement,
     SECBalanceSheet,
-    SECCashFlowStatement
+    SECCashFlowStatement,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,12 +31,16 @@ def _get_model_columns(model_class) -> Set[str]:
     return {col.key for col in mapper.column_attrs}
 
 
-def _filter_to_model_columns(record: Dict[str, Any], valid_columns: Set[str]) -> Dict[str, Any]:
+def _filter_to_model_columns(
+    record: Dict[str, Any], valid_columns: Set[str]
+) -> Dict[str, Any]:
     """Filter a record dict to only include keys that are valid model columns."""
     return {k: v for k, v in record.items() if k in valid_columns}
 
 
-def _deduplicate_records(records: List[Dict[str, Any]], conflict_columns: List[str]) -> List[Dict[str, Any]]:
+def _deduplicate_records(
+    records: List[Dict[str, Any]], conflict_columns: List[str]
+) -> List[Dict[str, Any]]:
     """
     Deduplicate records by conflict columns, keeping the last occurrence.
 
@@ -55,7 +60,7 @@ def _upsert_financial_statements(
     records: List[Dict[str, Any]],
     model_class,
     conflict_columns: List[str],
-    batch_size: int = 500
+    batch_size: int = 500,
 ) -> int:
     """
     Upsert financial statement records using PostgreSQL ON CONFLICT.
@@ -106,7 +111,7 @@ def _upsert_financial_statements(
     update_col_names = [k for k in all_keys if k not in conflict_columns and k != "id"]
 
     for i in range(0, len(filtered_records), batch_size):
-        batch = filtered_records[i:i + batch_size]
+        batch = filtered_records[i : i + batch_size]
 
         stmt = pg_insert(table).values(batch)
 
@@ -129,10 +134,7 @@ def _upsert_financial_statements(
 
 
 async def ingest_company_financial_data(
-    db: Session,
-    job_id: int,
-    cik: str,
-    skip_facts: bool = False
+    db: Session, job_id: int, cik: str, skip_facts: bool = False
 ) -> Dict[str, Any]:
     """
     Ingest structured financial data from SEC XBRL.
@@ -169,27 +171,45 @@ async def ingest_company_financial_data(
         # Upsert financial facts (optional — slowest part)
         facts_count = 0
         if not skip_facts and parsed_data["financial_facts"]:
-            logger.info(f"Upserting {len(parsed_data['financial_facts'])} financial facts")
+            logger.info(
+                f"Upserting {len(parsed_data['financial_facts'])} financial facts"
+            )
             facts_count = _upsert_financial_statements(
                 db,
                 parsed_data["financial_facts"],
                 SECFinancialFact,
-                conflict_columns=["cik", "fact_name", "period_end_date", "fiscal_year", "fiscal_period", "unit"],
+                conflict_columns=[
+                    "cik",
+                    "fact_name",
+                    "period_end_date",
+                    "fiscal_year",
+                    "fiscal_period",
+                    "unit",
+                ],
                 batch_size=500,
             )
             logger.info(f"Upserted {facts_count} financial facts")
         elif skip_facts:
-            logger.info(f"Skipping {len(parsed_data.get('financial_facts', []))} financial facts (skip_facts=True)")
+            logger.info(
+                f"Skipping {len(parsed_data.get('financial_facts', []))} financial facts (skip_facts=True)"
+            )
 
         # Upsert income statements
         income_count = 0
         if parsed_data["income_statement"]:
-            logger.info(f"Upserting {len(parsed_data['income_statement'])} income statements")
+            logger.info(
+                f"Upserting {len(parsed_data['income_statement'])} income statements"
+            )
             income_count = _upsert_financial_statements(
                 db,
                 parsed_data["income_statement"],
                 SECIncomeStatement,
-                conflict_columns=["cik", "period_end_date", "fiscal_year", "fiscal_period"],
+                conflict_columns=[
+                    "cik",
+                    "period_end_date",
+                    "fiscal_year",
+                    "fiscal_period",
+                ],
             )
             logger.info(f"Upserted {income_count} income statements")
 
@@ -201,19 +221,31 @@ async def ingest_company_financial_data(
                 db,
                 parsed_data["balance_sheet"],
                 SECBalanceSheet,
-                conflict_columns=["cik", "period_end_date", "fiscal_year", "fiscal_period"],
+                conflict_columns=[
+                    "cik",
+                    "period_end_date",
+                    "fiscal_year",
+                    "fiscal_period",
+                ],
             )
             logger.info(f"Upserted {balance_count} balance sheets")
 
         # Upsert cash flow statements
         cashflow_count = 0
         if parsed_data["cash_flow"]:
-            logger.info(f"Upserting {len(parsed_data['cash_flow'])} cash flow statements")
+            logger.info(
+                f"Upserting {len(parsed_data['cash_flow'])} cash flow statements"
+            )
             cashflow_count = _upsert_financial_statements(
                 db,
                 parsed_data["cash_flow"],
                 SECCashFlowStatement,
-                conflict_columns=["cik", "period_end_date", "fiscal_year", "fiscal_period"],
+                conflict_columns=[
+                    "cik",
+                    "period_end_date",
+                    "fiscal_year",
+                    "fiscal_period",
+                ],
             )
             logger.info(f"Upserted {cashflow_count} cash flow statements")
 
@@ -232,7 +264,7 @@ async def ingest_company_financial_data(
             "income_statements": income_count,
             "balance_sheets": balance_count,
             "cash_flow_statements": cashflow_count,
-            "total_rows": total_rows
+            "total_rows": total_rows,
         }
 
     except Exception as e:

@@ -7,6 +7,7 @@ Handles:
 - Data parsing and transformation
 - Schema definitions for coverage, provider, and summary data
 """
+
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -19,16 +20,28 @@ logger = logging.getLogger(__name__)
 # Broadband coverage by geography
 BROADBAND_COVERAGE_COLUMNS = {
     "geography_type": ("TEXT NOT NULL", "Geography level: state, county, census_block"),
-    "geography_id": ("TEXT NOT NULL", "Geography identifier (state code, FIPS, block ID)"),
+    "geography_id": (
+        "TEXT NOT NULL",
+        "Geography identifier (state code, FIPS, block ID)",
+    ),
     "geography_name": ("TEXT", "Human-readable geography name"),
     "provider_id": ("TEXT NOT NULL", "FCC provider ID (FRN)"),
     "provider_name": ("TEXT NOT NULL", "Provider name"),
     "brand_name": ("TEXT", "Consumer-facing brand name"),
-    "technology_code": ("TEXT NOT NULL", "FCC technology code (10=DSL, 40=Cable, 50=Fiber)"),
+    "technology_code": (
+        "TEXT NOT NULL",
+        "FCC technology code (10=DSL, 40=Cable, 50=Fiber)",
+    ),
     "technology_name": ("TEXT NOT NULL", "Technology type description"),
-    "max_advertised_down_mbps": ("NUMERIC(10, 2)", "Max advertised download speed (Mbps)"),
+    "max_advertised_down_mbps": (
+        "NUMERIC(10, 2)",
+        "Max advertised download speed (Mbps)",
+    ),
     "max_advertised_up_mbps": ("NUMERIC(10, 2)", "Max advertised upload speed (Mbps)"),
-    "speed_tier": ("TEXT", "Speed classification: sub_broadband, basic, high_speed, gigabit"),
+    "speed_tier": (
+        "TEXT",
+        "Speed classification: sub_broadband, basic, high_speed, gigabit",
+    ),
     "business_service": ("BOOLEAN", "Offers business service"),
     "consumer_service": ("BOOLEAN", "Offers consumer service"),
     "data_date": ("DATE", "Date of data collection"),
@@ -49,10 +62,16 @@ BROADBAND_SUMMARY_COLUMNS = {
     "mobile_5g_available": ("BOOLEAN", "5G mobile is available"),
     "max_speed_down_mbps": ("NUMERIC(10, 2)", "Highest available download speed"),
     "max_speed_up_mbps": ("NUMERIC(10, 2)", "Highest available upload speed"),
-    "avg_speed_down_mbps": ("NUMERIC(10, 2)", "Average download speed across providers"),
+    "avg_speed_down_mbps": (
+        "NUMERIC(10, 2)",
+        "Average download speed across providers",
+    ),
     "broadband_coverage_pct": ("NUMERIC(5, 2)", "% with 25/3 Mbps broadband"),
     "gigabit_coverage_pct": ("NUMERIC(5, 2)", "% with 1000+ Mbps available"),
-    "provider_competition": ("TEXT", "Competition level: monopoly, duopoly, competitive"),
+    "provider_competition": (
+        "TEXT",
+        "Competition level: monopoly, duopoly, competitive",
+    ),
     "data_date": ("DATE", "Date of data collection"),
 }
 
@@ -75,13 +94,13 @@ PROVIDER_COLUMNS = {
 def generate_table_name(dataset: str) -> str:
     """
     Generate PostgreSQL table name for FCC broadband data.
-    
+
     Args:
         dataset: Dataset identifier
-        
+
     Returns:
         PostgreSQL table name
-        
+
     Examples:
         >>> generate_table_name("broadband_coverage")
         'fcc_broadband_coverage'
@@ -95,11 +114,11 @@ def generate_table_name(dataset: str) -> str:
 def generate_create_table_sql(table_name: str, dataset: str) -> str:
     """
     Generate CREATE TABLE SQL for FCC broadband data.
-    
+
     Args:
         table_name: PostgreSQL table name
         dataset: Dataset type to determine schema
-        
+
     Returns:
         CREATE TABLE SQL statement (idempotent)
     """
@@ -132,34 +151,34 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
         ]
     else:
         raise ValueError(f"Unknown FCC dataset: {dataset}")
-    
+
     # Build column definitions
     column_defs = []
     column_defs.append("id SERIAL PRIMARY KEY")
-    
+
     for col_name, (col_type, _) in columns.items():
         column_defs.append(f'"{col_name}" {col_type}')
-    
+
     column_defs.append("ingested_at TIMESTAMP DEFAULT NOW()")
-    
+
     columns_sql = ",\n        ".join(column_defs)
-    
+
     # Build indexes
     index_sql_parts = []
     for idx_name, idx_cols in indexes:
         index_sql_parts.append(
-            f'CREATE INDEX IF NOT EXISTS idx_{table_name}_{idx_name} '
-            f'ON {table_name} ({idx_cols});'
+            f"CREATE INDEX IF NOT EXISTS idx_{table_name}_{idx_name} "
+            f"ON {table_name} ({idx_cols});"
         )
-    
+
     # Add unique index
     index_sql_parts.append(
-        f'CREATE UNIQUE INDEX IF NOT EXISTS idx_{table_name}_unique '
-        f'ON {table_name} ({unique_expr});'
+        f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{table_name}_unique "
+        f"ON {table_name} ({unique_expr});"
     )
-    
+
     indexes_sql = "\n    ".join(index_sql_parts)
-    
+
     sql = f"""
     CREATE TABLE IF NOT EXISTS {table_name} (
         {columns_sql}
@@ -167,20 +186,20 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
     
     {indexes_sql}
     """
-    
+
     return sql
 
 
 def classify_speed_tier(speed_mbps: Optional[float]) -> str:
     """
     Classify download speed into FCC-relevant tiers.
-    
+
     Args:
         speed_mbps: Download speed in Mbps
-        
+
     Returns:
         Speed tier classification
-        
+
     FCC defines broadband as 25/3 Mbps (as of 2024).
     Proposed update to 100/20 Mbps.
     """
@@ -199,10 +218,10 @@ def classify_speed_tier(speed_mbps: Optional[float]) -> str:
 def classify_competition(provider_count: int) -> str:
     """
     Classify market competition level.
-    
+
     Args:
         provider_count: Number of providers in area
-        
+
     Returns:
         Competition classification
     """
@@ -219,10 +238,10 @@ def classify_competition(provider_count: int) -> str:
 def get_technology_name(code: str) -> str:
     """
     Get human-readable technology name from FCC code.
-    
+
     Args:
         code: FCC technology code
-        
+
     Returns:
         Technology name
     """
@@ -275,11 +294,11 @@ def parse_broadband_coverage_response(
     records: List[Dict[str, Any]],
     geography_type: str,
     geography_id: str,
-    geography_name: Optional[str] = None
+    geography_name: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Parse broadband coverage data from FCC API response.
-    
+
     FCC Open Data field names (from 4kuc-phrr dataset):
     - provider_id: Provider ID
     - frn: FCC Registration Number
@@ -293,63 +312,63 @@ def parse_broadband_coverage_response(
     - business: Business service flag (1/0)
     - maxaddown: Max advertised download (Mbps)
     - maxadup: Max advertised upload (Mbps)
-    
+
     Args:
         records: Raw API response records
         geography_type: Type of geography (state, county, etc.)
         geography_id: Geography identifier
         geography_name: Optional human-readable name
-        
+
     Returns:
         List of parsed records ready for insertion
     """
     parsed_records = []
-    
+
     for record in records:
         try:
             # FCC Open Data uses specific field names
             provider_id = (
-                record.get("frn") or 
-                record.get("provider_id") or 
-                record.get("providerId")
+                record.get("frn")
+                or record.get("provider_id")
+                or record.get("providerId")
             )
-            
+
             provider_name = (
-                record.get("providername") or 
-                record.get("dbaname") or
-                record.get("provider_name") or
-                record.get("holdingcompanyname")
+                record.get("providername")
+                or record.get("dbaname")
+                or record.get("provider_name")
+                or record.get("holdingcompanyname")
             )
-            
+
             brand_name = (
-                record.get("dbaname") or
-                record.get("brand_name") or
-                record.get("brandName")
+                record.get("dbaname")
+                or record.get("brand_name")
+                or record.get("brandName")
             )
-            
+
             technology_code = str(
-                record.get("techcode") or 
-                record.get("technology_code") or
-                record.get("technology") or
-                "90"  # Default to "Other"
+                record.get("techcode")
+                or record.get("technology_code")
+                or record.get("technology")
+                or "90"  # Default to "Other"
             )
-            
+
             max_down = _safe_float(
-                record.get("maxaddown") or
-                record.get("max_advertised_down_mbps") or
-                record.get("max_down")
+                record.get("maxaddown")
+                or record.get("max_advertised_down_mbps")
+                or record.get("max_down")
             )
-            
+
             max_up = _safe_float(
-                record.get("maxadup") or
-                record.get("max_advertised_up_mbps") or
-                record.get("max_up")
+                record.get("maxadup")
+                or record.get("max_advertised_up_mbps")
+                or record.get("max_up")
             )
-            
+
             # Handle 1/0 flags from FCC data
             business_flag = record.get("business")
             consumer_flag = record.get("consumer")
-            
+
             parsed = {
                 "geography_type": geography_type,
                 "geography_id": geography_id,
@@ -364,18 +383,20 @@ def parse_broadband_coverage_response(
                 "speed_tier": classify_speed_tier(max_down),
                 "business_service": _safe_bool(business_flag),
                 "consumer_service": _safe_bool(consumer_flag),
-                "data_date": _parse_date(record.get("data_date") or record.get("as_of_date")),
+                "data_date": _parse_date(
+                    record.get("data_date") or record.get("as_of_date")
+                ),
             }
-            
+
             # Skip records without required fields
             if parsed["provider_id"] and parsed["provider_name"]:
                 parsed_records.append(parsed)
             else:
                 logger.debug(f"Skipping incomplete record: {record}")
-        
+
         except Exception as e:
             logger.warning(f"Failed to parse coverage record: {e}")
-    
+
     logger.info(f"Parsed {len(parsed_records)} coverage records")
     return parsed_records
 
@@ -384,35 +405,35 @@ def parse_broadband_summary(
     records: List[Dict[str, Any]],
     geography_type: str,
     geography_id: str,
-    geography_name: Optional[str] = None
+    geography_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Generate summary statistics from coverage records.
-    
+
     Args:
         records: Parsed coverage records for a geography
         geography_type: Type of geography
         geography_id: Geography identifier
         geography_name: Human-readable name
-        
+
     Returns:
         Summary dict ready for insertion
     """
     if not records:
         return None
-    
+
     # Count unique providers and technologies
     providers = set()
     technologies = set()
     speeds_down = []
     speeds_up = []
-    
+
     fiber_available = False
     cable_available = False
     dsl_available = False
     fixed_wireless_available = False
     satellite_available = False
-    
+
     for r in records:
         if r.get("provider_id"):
             providers.add(r["provider_id"])
@@ -429,17 +450,17 @@ def parse_broadband_summary(
                 fixed_wireless_available = True
             if is_satellite(tech):
                 satellite_available = True
-        
+
         if r.get("max_advertised_down_mbps"):
             speeds_down.append(r["max_advertised_down_mbps"])
         if r.get("max_advertised_up_mbps"):
             speeds_up.append(r["max_advertised_up_mbps"])
-    
+
     total_providers = len(providers)
     max_down = max(speeds_down) if speeds_down else None
     max_up = max(speeds_up) if speeds_up else None
     avg_down = sum(speeds_down) / len(speeds_down) if speeds_down else None
-    
+
     # Estimate coverage percentages (simplified)
     broadband_pct = None
     gigabit_pct = None
@@ -448,7 +469,7 @@ def parse_broadband_summary(
         gigabit_count = sum(1 for s in speeds_down if s >= 1000)
         broadband_pct = (broadband_count / len(speeds_down)) * 100
         gigabit_pct = (gigabit_count / len(speeds_down)) * 100
-    
+
     summary = {
         "geography_type": geography_type,
         "geography_id": geography_id,
@@ -469,7 +490,7 @@ def parse_broadband_summary(
         "provider_competition": classify_competition(total_providers),
         "data_date": datetime.now().strftime("%Y-%m-%d"),
     }
-    
+
     return summary
 
 
@@ -542,43 +563,169 @@ def get_dataset_description(dataset: str) -> str:
 
 # State name to FIPS mapping
 STATE_FIPS = {
-    "AL": "01", "AK": "02", "AZ": "04", "AR": "05", "CA": "06",
-    "CO": "08", "CT": "09", "DE": "10", "DC": "11", "FL": "12",
-    "GA": "13", "HI": "15", "ID": "16", "IL": "17", "IN": "18",
-    "IA": "19", "KS": "20", "KY": "21", "LA": "22", "ME": "23",
-    "MD": "24", "MA": "25", "MI": "26", "MN": "27", "MS": "28",
-    "MO": "29", "MT": "30", "NE": "31", "NV": "32", "NH": "33",
-    "NJ": "34", "NM": "35", "NY": "36", "NC": "37", "ND": "38",
-    "OH": "39", "OK": "40", "OR": "41", "PA": "42", "RI": "44",
-    "SC": "45", "SD": "46", "TN": "47", "TX": "48", "UT": "49",
-    "VT": "50", "VA": "51", "WA": "53", "WV": "54", "WI": "55",
-    "WY": "56", "PR": "72", "VI": "78",
+    "AL": "01",
+    "AK": "02",
+    "AZ": "04",
+    "AR": "05",
+    "CA": "06",
+    "CO": "08",
+    "CT": "09",
+    "DE": "10",
+    "DC": "11",
+    "FL": "12",
+    "GA": "13",
+    "HI": "15",
+    "ID": "16",
+    "IL": "17",
+    "IN": "18",
+    "IA": "19",
+    "KS": "20",
+    "KY": "21",
+    "LA": "22",
+    "ME": "23",
+    "MD": "24",
+    "MA": "25",
+    "MI": "26",
+    "MN": "27",
+    "MS": "28",
+    "MO": "29",
+    "MT": "30",
+    "NE": "31",
+    "NV": "32",
+    "NH": "33",
+    "NJ": "34",
+    "NM": "35",
+    "NY": "36",
+    "NC": "37",
+    "ND": "38",
+    "OH": "39",
+    "OK": "40",
+    "OR": "41",
+    "PA": "42",
+    "RI": "44",
+    "SC": "45",
+    "SD": "46",
+    "TN": "47",
+    "TX": "48",
+    "UT": "49",
+    "VT": "50",
+    "VA": "51",
+    "WA": "53",
+    "WV": "54",
+    "WI": "55",
+    "WY": "56",
+    "PR": "72",
+    "VI": "78",
 }
 
 # State name lookup
 STATE_NAMES = {
-    "01": "Alabama", "02": "Alaska", "04": "Arizona", "05": "Arkansas",
-    "06": "California", "08": "Colorado", "09": "Connecticut", "10": "Delaware",
-    "11": "District of Columbia", "12": "Florida", "13": "Georgia", "15": "Hawaii",
-    "16": "Idaho", "17": "Illinois", "18": "Indiana", "19": "Iowa",
-    "20": "Kansas", "21": "Kentucky", "22": "Louisiana", "23": "Maine",
-    "24": "Maryland", "25": "Massachusetts", "26": "Michigan", "27": "Minnesota",
-    "28": "Mississippi", "29": "Missouri", "30": "Montana", "31": "Nebraska",
-    "32": "Nevada", "33": "New Hampshire", "34": "New Jersey", "35": "New Mexico",
-    "36": "New York", "37": "North Carolina", "38": "North Dakota", "39": "Ohio",
-    "40": "Oklahoma", "41": "Oregon", "42": "Pennsylvania", "44": "Rhode Island",
-    "45": "South Carolina", "46": "South Dakota", "47": "Tennessee", "48": "Texas",
-    "49": "Utah", "50": "Vermont", "51": "Virginia", "53": "Washington",
-    "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming",
-    "72": "Puerto Rico", "78": "Virgin Islands",
+    "01": "Alabama",
+    "02": "Alaska",
+    "04": "Arizona",
+    "05": "Arkansas",
+    "06": "California",
+    "08": "Colorado",
+    "09": "Connecticut",
+    "10": "Delaware",
+    "11": "District of Columbia",
+    "12": "Florida",
+    "13": "Georgia",
+    "15": "Hawaii",
+    "16": "Idaho",
+    "17": "Illinois",
+    "18": "Indiana",
+    "19": "Iowa",
+    "20": "Kansas",
+    "21": "Kentucky",
+    "22": "Louisiana",
+    "23": "Maine",
+    "24": "Maryland",
+    "25": "Massachusetts",
+    "26": "Michigan",
+    "27": "Minnesota",
+    "28": "Mississippi",
+    "29": "Missouri",
+    "30": "Montana",
+    "31": "Nebraska",
+    "32": "Nevada",
+    "33": "New Hampshire",
+    "34": "New Jersey",
+    "35": "New Mexico",
+    "36": "New York",
+    "37": "North Carolina",
+    "38": "North Dakota",
+    "39": "Ohio",
+    "40": "Oklahoma",
+    "41": "Oregon",
+    "42": "Pennsylvania",
+    "44": "Rhode Island",
+    "45": "South Carolina",
+    "46": "South Dakota",
+    "47": "Tennessee",
+    "48": "Texas",
+    "49": "Utah",
+    "50": "Vermont",
+    "51": "Virginia",
+    "53": "Washington",
+    "54": "West Virginia",
+    "55": "Wisconsin",
+    "56": "Wyoming",
+    "72": "Puerto Rico",
+    "78": "Virgin Islands",
 }
 
 # All 50 states + DC
 US_STATES = [
-    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
-    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
-    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
-    "DC"
+    "AL",
+    "AK",
+    "AZ",
+    "AR",
+    "CA",
+    "CO",
+    "CT",
+    "DE",
+    "FL",
+    "GA",
+    "HI",
+    "ID",
+    "IL",
+    "IN",
+    "IA",
+    "KS",
+    "KY",
+    "LA",
+    "ME",
+    "MD",
+    "MA",
+    "MI",
+    "MN",
+    "MS",
+    "MO",
+    "MT",
+    "NE",
+    "NV",
+    "NH",
+    "NJ",
+    "NM",
+    "NY",
+    "NC",
+    "ND",
+    "OH",
+    "OK",
+    "OR",
+    "PA",
+    "RI",
+    "SC",
+    "SD",
+    "TN",
+    "TX",
+    "UT",
+    "VT",
+    "VA",
+    "WA",
+    "WV",
+    "WI",
+    "WY",
+    "DC",
 ]

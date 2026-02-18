@@ -17,8 +17,10 @@ router = APIRouter(prefix="/form-adv", tags=["form-adv"])
 
 # Response Models
 
+
 class AdviserSummary(BaseModel):
     """Brief adviser information for search results."""
+
     crd_number: str
     sec_number: Optional[str] = None
     legal_name: str
@@ -32,6 +34,7 @@ class AdviserSummary(BaseModel):
 
 class SearchResponse(BaseModel):
     """Search results response."""
+
     total: int
     limit: int
     offset: int
@@ -40,6 +43,7 @@ class SearchResponse(BaseModel):
 
 class LocationInfo(BaseModel):
     """Location details."""
+
     address: Optional[str] = None
     city: Optional[str] = None
     state: Optional[str] = None
@@ -49,6 +53,7 @@ class LocationInfo(BaseModel):
 
 class AUMInfo(BaseModel):
     """AUM details."""
+
     regulatory: Optional[int] = None
     discretionary: Optional[int] = None
     non_discretionary: Optional[int] = None
@@ -56,6 +61,7 @@ class AUMInfo(BaseModel):
 
 class ClientBreakdown(BaseModel):
     """Client type percentages."""
+
     individuals: Optional[int] = 0
     high_net_worth: Optional[int] = 0
     banking_institutions: Optional[int] = 0
@@ -70,6 +76,7 @@ class ClientBreakdown(BaseModel):
 
 class ClientsInfo(BaseModel):
     """Client information."""
+
     total_accounts: Optional[int] = None
     discretionary_accounts: Optional[int] = None
     breakdown: ClientBreakdown
@@ -77,6 +84,7 @@ class ClientsInfo(BaseModel):
 
 class EmployeesInfo(BaseModel):
     """Employee information."""
+
     total: Optional[int] = None
     investment_advisory: Optional[int] = None
     registered_reps: Optional[int] = None
@@ -84,6 +92,7 @@ class EmployeesInfo(BaseModel):
 
 class RegistrationInfo(BaseModel):
     """Registration details."""
+
     sec_registered: bool = True
     registration_date: Optional[str] = None
     form_of_organization: Optional[str] = None
@@ -92,6 +101,7 @@ class RegistrationInfo(BaseModel):
 
 class CustodyInfo(BaseModel):
     """Custody details."""
+
     has_custody: bool = False
     client_cash: bool = False
     client_securities: bool = False
@@ -99,11 +109,13 @@ class CustodyInfo(BaseModel):
 
 class RegulatoryInfo(BaseModel):
     """Regulatory details."""
+
     has_disciplinary_events: bool = False
 
 
 class AdviserDetail(BaseModel):
     """Full adviser details."""
+
     crd_number: str
     sec_number: Optional[str] = None
     legal_name: str
@@ -120,6 +132,7 @@ class AdviserDetail(BaseModel):
 
 class RankingEntry(BaseModel):
     """AUM ranking entry."""
+
     rank: int
     crd_number: str
     legal_name: str
@@ -132,6 +145,7 @@ class RankingEntry(BaseModel):
 
 class RankingsResponse(BaseModel):
     """AUM rankings response."""
+
     rankings: List[RankingEntry]
     total_advisers: int
     total_aum: Optional[int] = None
@@ -139,6 +153,7 @@ class RankingsResponse(BaseModel):
 
 class StateCount(BaseModel):
     """State adviser count."""
+
     state: str
     count: int
     aum: Optional[int] = None
@@ -146,12 +161,14 @@ class StateCount(BaseModel):
 
 class OrgCount(BaseModel):
     """Organization type count."""
+
     type: str
     count: int
 
 
 class StatsResponse(BaseModel):
     """Aggregate statistics."""
+
     total_advisers: int
     total_aum: Optional[int] = None
     average_aum: Optional[int] = None
@@ -163,6 +180,7 @@ class StatsResponse(BaseModel):
 
 class IngestionResult(BaseModel):
     """Ingestion result."""
+
     advisers_found: int
     advisers_ingested: int
     advisers_skipped: int
@@ -170,6 +188,7 @@ class IngestionResult(BaseModel):
 
 
 # Endpoints
+
 
 @router.get(
     "/search",
@@ -201,7 +220,7 @@ def search_advisers(
         min_aum=min_aum,
         max_aum=max_aum,
         limit=limit,
-        offset=offset
+        offset=offset,
     )
 
 

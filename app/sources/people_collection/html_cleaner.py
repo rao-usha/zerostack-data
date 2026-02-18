@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CleanedContent:
     """Result of cleaning HTML content."""
+
     text: str
     structured_data: Dict[str, Any]
     people_sections: List[Dict[str, str]]
@@ -39,48 +40,107 @@ class HTMLCleaner:
 
     # Elements to completely remove
     REMOVE_ELEMENTS = [
-        'script', 'style', 'noscript', 'iframe', 'svg', 'canvas',
-        'video', 'audio', 'object', 'embed', 'applet',
-        'form', 'input', 'button', 'select', 'textarea',
-        'template', 'slot',
+        "script",
+        "style",
+        "noscript",
+        "iframe",
+        "svg",
+        "canvas",
+        "video",
+        "audio",
+        "object",
+        "embed",
+        "applet",
+        "form",
+        "input",
+        "button",
+        "select",
+        "textarea",
+        "template",
+        "slot",
     ]
 
     # Elements that are likely noise
     NOISE_SELECTORS = [
         # Navigation
-        'nav', 'header nav', '.nav', '.navigation', '.menu', '.navbar',
-        '#navigation', '#nav', '#menu',
-
+        "nav",
+        "header nav",
+        ".nav",
+        ".navigation",
+        ".menu",
+        ".navbar",
+        "#navigation",
+        "#nav",
+        "#menu",
         # Footer
-        'footer', '.footer', '#footer', '.site-footer',
-
+        "footer",
+        ".footer",
+        "#footer",
+        ".site-footer",
         # Sidebars
-        'aside', '.sidebar', '#sidebar', '.widget',
-
+        "aside",
+        ".sidebar",
+        "#sidebar",
+        ".widget",
         # Ads and popups
-        '.ad', '.ads', '.advertisement', '.popup', '.modal',
-        '[class*="cookie"]', '[class*="banner"]', '[class*="promo"]',
-
+        ".ad",
+        ".ads",
+        ".advertisement",
+        ".popup",
+        ".modal",
+        '[class*="cookie"]',
+        '[class*="banner"]',
+        '[class*="promo"]',
         # Social
-        '.social', '.share', '.social-links', '.social-icons',
-
+        ".social",
+        ".share",
+        ".social-links",
+        ".social-icons",
         # Comments
-        '.comments', '#comments', '.comment-section',
+        ".comments",
+        "#comments",
+        ".comment-section",
     ]
 
     # Keywords indicating leadership content
     LEADERSHIP_KEYWORDS = [
-        'leadership', 'team', 'executive', 'management', 'board',
-        'director', 'officer', 'president', 'chief', 'ceo', 'cfo',
-        'coo', 'cto', 'vp', 'vice president', 'founder', 'partner',
+        "leadership",
+        "team",
+        "executive",
+        "management",
+        "board",
+        "director",
+        "officer",
+        "president",
+        "chief",
+        "ceo",
+        "cfo",
+        "coo",
+        "cto",
+        "vp",
+        "vice president",
+        "founder",
+        "partner",
     ]
 
     # Keywords indicating person bio
     BIO_KEYWORDS = [
-        'joined', 'appointed', 'serves as', 'responsible for',
-        'leads', 'oversees', 'experience', 'previously',
-        'prior to', 'before joining', 'career', 'background',
-        'education', 'degree', 'mba', 'university',
+        "joined",
+        "appointed",
+        "serves as",
+        "responsible for",
+        "leads",
+        "oversees",
+        "experience",
+        "previously",
+        "prior to",
+        "before joining",
+        "career",
+        "background",
+        "education",
+        "degree",
+        "mba",
+        "university",
     ]
 
     def __init__(self, max_length: int = 100000):
@@ -106,11 +166,11 @@ class HTMLCleaner:
         original_length = len(html)
 
         try:
-            soup = BeautifulSoup(html, 'html.parser')
+            soup = BeautifulSoup(html, "html.parser")
         except Exception as e:
             logger.warning(f"HTML parsing failed: {e}")
             return CleanedContent(
-                text=html[:self.max_length],
+                text=html[: self.max_length],
                 structured_data={},
                 people_sections=[],
                 has_leadership_content=False,
@@ -137,14 +197,14 @@ class HTMLCleaner:
         if preserve_structure:
             text = self._extract_structured_text(soup)
         else:
-            text = soup.get_text(separator='\n', strip=True)
+            text = soup.get_text(separator="\n", strip=True)
 
         # Clean up whitespace
         text = self._clean_whitespace(text)
 
         # Truncate if needed
         if len(text) > self.max_length:
-            text = text[:self.max_length] + "\n\n[Content truncated...]"
+            text = text[: self.max_length] + "\n\n[Content truncated...]"
 
         return CleanedContent(
             text=text,
@@ -179,21 +239,22 @@ class HTMLCleaner:
         data = {}
 
         # JSON-LD
-        for script in soup.find_all('script', type='application/ld+json'):
+        for script in soup.find_all("script", type="application/ld+json"):
             try:
                 import json
+
                 content = script.string
                 if content:
                     parsed = json.loads(content)
                     if isinstance(parsed, list):
                         for item in parsed:
                             if isinstance(item, dict):
-                                item_type = item.get('@type', 'unknown')
+                                item_type = item.get("@type", "unknown")
                                 if item_type not in data:
                                     data[item_type] = []
                                 data[item_type].append(item)
                     elif isinstance(parsed, dict):
-                        item_type = parsed.get('@type', 'unknown')
+                        item_type = parsed.get("@type", "unknown")
                         if item_type not in data:
                             data[item_type] = []
                         data[item_type].append(parsed)
@@ -208,10 +269,19 @@ class HTMLCleaner:
 
         # Look for common person card patterns
         person_selectors = [
-            '.team-member', '.person', '.leader', '.executive',
-            '.bio', '.profile', '.staff-member', '.management-team',
-            '[class*="team"]', '[class*="leader"]', '[class*="executive"]',
-            '[class*="bio"]', '[class*="profile"]',
+            ".team-member",
+            ".person",
+            ".leader",
+            ".executive",
+            ".bio",
+            ".profile",
+            ".staff-member",
+            ".management-team",
+            '[class*="team"]',
+            '[class*="leader"]',
+            '[class*="executive"]',
+            '[class*="bio"]',
+            '[class*="profile"]',
         ]
 
         for selector in person_selectors:
@@ -223,34 +293,38 @@ class HTMLCleaner:
                         name = self._extract_name_from_element(element)
                         title = self._extract_title_from_element(element)
 
-                        sections.append({
-                            'selector': selector,
-                            'text': text[:500],
-                            'name': name,
-                            'title': title,
-                        })
+                        sections.append(
+                            {
+                                "selector": selector,
+                                "text": text[:500],
+                                "name": name,
+                                "title": title,
+                            }
+                        )
             except Exception:
                 pass
 
         # Also look for heading + content patterns
-        for heading in soup.find_all(['h1', 'h2', 'h3', 'h4']):
+        for heading in soup.find_all(["h1", "h2", "h3", "h4"]):
             heading_text = heading.get_text().lower()
             if any(kw in heading_text for kw in self.LEADERSHIP_KEYWORDS):
                 # Get following content
                 content = []
                 for sibling in heading.find_next_siblings():
-                    if sibling.name in ['h1', 'h2', 'h3']:
+                    if sibling.name in ["h1", "h2", "h3"]:
                         break
                     text = sibling.get_text(strip=True)
                     if text:
                         content.append(text)
 
                 if content:
-                    sections.append({
-                        'selector': 'heading_section',
-                        'heading': heading_text,
-                        'text': '\n'.join(content)[:1000],
-                    })
+                    sections.append(
+                        {
+                            "selector": "heading_section",
+                            "heading": heading_text,
+                            "text": "\n".join(content)[:1000],
+                        }
+                    )
 
         return sections
 
@@ -258,8 +332,15 @@ class HTMLCleaner:
         """Try to extract a person's name from an element."""
         # Look for common name patterns
         name_selectors = [
-            '.name', '.person-name', '.team-name', '.title-name',
-            'h3', 'h4', 'h5', '.heading', 'strong',
+            ".name",
+            ".person-name",
+            ".team-name",
+            ".title-name",
+            "h3",
+            "h4",
+            "h5",
+            ".heading",
+            "strong",
         ]
 
         for selector in name_selectors:
@@ -279,8 +360,13 @@ class HTMLCleaner:
     def _extract_title_from_element(self, element: Tag) -> Optional[str]:
         """Try to extract a person's title from an element."""
         title_selectors = [
-            '.title', '.position', '.role', '.job-title',
-            '.designation', 'em', 'span.title',
+            ".title",
+            ".position",
+            ".role",
+            ".job-title",
+            ".designation",
+            "em",
+            "span.title",
         ]
 
         for selector in title_selectors:
@@ -289,7 +375,17 @@ class HTMLCleaner:
                 if found:
                     title = found.get_text(strip=True)
                     # Title keywords
-                    if any(kw in title.lower() for kw in ['chief', 'president', 'vp', 'director', 'manager', 'officer']):
+                    if any(
+                        kw in title.lower()
+                        for kw in [
+                            "chief",
+                            "president",
+                            "vp",
+                            "director",
+                            "manager",
+                            "officer",
+                        ]
+                    ):
                         return title
             except Exception:
                 pass
@@ -312,37 +408,46 @@ class HTMLCleaner:
         lines = []
 
         # Process main content
-        for element in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'p', 'li', 'div', 'article', 'section']):
+        for element in soup.find_all(
+            ["h1", "h2", "h3", "h4", "h5", "p", "li", "div", "article", "section"]
+        ):
             # Skip if inside another tracked element
-            if element.parent and element.parent.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'li']:
+            if element.parent and element.parent.name in [
+                "h1",
+                "h2",
+                "h3",
+                "h4",
+                "h5",
+                "li",
+            ]:
                 continue
 
-            text = element.get_text(separator=' ', strip=True)
+            text = element.get_text(separator=" ", strip=True)
 
             if not text or len(text) < 10:
                 continue
 
             # Add heading markers
-            if element.name in ['h1', 'h2', 'h3', 'h4', 'h5']:
+            if element.name in ["h1", "h2", "h3", "h4", "h5"]:
                 level = int(element.name[1])
-                prefix = '#' * level + ' '
+                prefix = "#" * level + " "
                 lines.append(f"\n{prefix}{text}\n")
             else:
                 lines.append(text)
 
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
     def _clean_whitespace(self, text: str) -> str:
         """Clean up excessive whitespace."""
         # Replace multiple spaces with single space
-        text = re.sub(r'[ \t]+', ' ', text)
+        text = re.sub(r"[ \t]+", " ", text)
 
         # Replace multiple newlines with double newline
-        text = re.sub(r'\n{3,}', '\n\n', text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
 
         # Strip lines
-        lines = [line.strip() for line in text.split('\n')]
-        text = '\n'.join(lines)
+        lines = [line.strip() for line in text.split("\n")]
+        text = "\n".join(lines)
 
         return text.strip()
 
@@ -382,26 +487,29 @@ def extract_people_cards(html: str) -> List[Dict[str, Any]]:
     Returns:
         List of dicts with name, title, bio, image_url, linkedin_url
     """
-    soup = BeautifulSoup(html, 'html.parser')
+    soup = BeautifulSoup(html, "html.parser")
     people = []
     seen_names = set()
 
     def add_person(person: Dict[str, Any]) -> bool:
         """Add person if valid and not seen."""
-        if not person or not person.get('name'):
+        if not person or not person.get("name"):
             return False
-        name_key = person['name'].lower().strip()
+        name_key = person["name"].lower().strip()
         if name_key in seen_names or len(name_key) < 3:
             return False
         seen_names.add(name_key)
         people.append(person)
-        logger.debug(f"[HTMLCleaner] Found person: {person.get('name')} - {person.get('title', 'No title')}")
+        logger.debug(
+            f"[HTMLCleaner] Found person: {person.get('name')} - {person.get('title', 'No title')}"
+        )
         return True
 
     # Strategy 1: Schema.org Person markup (JSON-LD)
-    for script in soup.find_all('script', type='application/ld+json'):
+    for script in soup.find_all("script", type="application/ld+json"):
         try:
             import json
+
             data = json.loads(script.string)
             if isinstance(data, list):
                 items = data
@@ -409,55 +517,80 @@ def extract_people_cards(html: str) -> List[Dict[str, Any]]:
                 items = [data]
 
             for item in items:
-                if item.get('@type') == 'Person':
+                if item.get("@type") == "Person":
                     person = {
-                        'name': item.get('name'),
-                        'title': item.get('jobTitle'),
-                        'bio': item.get('description'),
-                        'image_url': item.get('image'),
-                        'linkedin_url': _extract_social_url(item.get('sameAs', []), 'linkedin'),
+                        "name": item.get("name"),
+                        "title": item.get("jobTitle"),
+                        "bio": item.get("description"),
+                        "image_url": item.get("image"),
+                        "linkedin_url": _extract_social_url(
+                            item.get("sameAs", []), "linkedin"
+                        ),
                     }
                     add_person(person)
         except Exception:
             pass
 
     # Strategy 2: Schema.org microdata (itemprop)
-    for person_el in soup.find_all(attrs={'itemtype': re.compile(r'schema.org/Person', re.I)}):
+    for person_el in soup.find_all(
+        attrs={"itemtype": re.compile(r"schema.org/Person", re.I)}
+    ):
         person = {
-            'name': _get_itemprop(person_el, 'name'),
-            'title': _get_itemprop(person_el, 'jobTitle'),
-            'bio': _get_itemprop(person_el, 'description'),
-            'image_url': _get_itemprop(person_el, 'image', attr='src'),
+            "name": _get_itemprop(person_el, "name"),
+            "title": _get_itemprop(person_el, "jobTitle"),
+            "bio": _get_itemprop(person_el, "description"),
+            "image_url": _get_itemprop(person_el, "image", attr="src"),
         }
         add_person(person)
 
     # Strategy 3: Common card CSS selectors
     card_selectors = [
         # Team-specific classes
-        '.team-member', '.team-card', '.team-item', '.team-block',
-        '.person-card', '.person-item', '.person-block',
-        '.leader-card', '.leader-item', '.leader-block',
-        '.executive-card', '.executive-item', '.executive-block',
-        '.bio-card', '.profile-card', '.staff-card', '.member-card',
-
+        ".team-member",
+        ".team-card",
+        ".team-item",
+        ".team-block",
+        ".person-card",
+        ".person-item",
+        ".person-block",
+        ".leader-card",
+        ".leader-item",
+        ".leader-block",
+        ".executive-card",
+        ".executive-item",
+        ".executive-block",
+        ".bio-card",
+        ".profile-card",
+        ".staff-card",
+        ".member-card",
         # Attribute selectors
-        '[class*="team-member"]', '[class*="team-card"]',
-        '[class*="person-card"]', '[class*="person-item"]',
-        '[class*="leader"]', '[class*="executive"]',
-        '[class*="bio-card"]', '[class*="profile-card"]',
-
+        '[class*="team-member"]',
+        '[class*="team-card"]',
+        '[class*="person-card"]',
+        '[class*="person-item"]',
+        '[class*="leader"]',
+        '[class*="executive"]',
+        '[class*="bio-card"]',
+        '[class*="profile-card"]',
         # Structural patterns
-        'article.person', 'div.person', 'li.person',
-        'article.team', 'div.team', 'li.team',
-        '.leadership-grid > div', '.team-grid > div',
-        '.leadership-list > li', '.team-list > li',
-
+        "article.person",
+        "div.person",
+        "li.person",
+        "article.team",
+        "div.team",
+        "li.team",
+        ".leadership-grid > div",
+        ".team-grid > div",
+        ".leadership-list > li",
+        ".team-list > li",
         # WordPress patterns
-        '.wp-block-group.person', '.elementor-widget-container .person',
-
+        ".wp-block-group.person",
+        ".elementor-widget-container .person",
         # Generic card in team section
-        '.about-team .card', '.our-team .card',
-        '.leadership .card', '.executives .card',
+        ".about-team .card",
+        ".our-team .card",
+        ".leadership .card",
+        ".executives .card",
     ]
 
     for selector in card_selectors:
@@ -470,16 +603,24 @@ def extract_people_cards(html: str) -> List[Dict[str, Any]]:
 
     # Strategy 4: Grid/flex containers that look like team sections
     container_selectors = [
-        '.team', '.leadership', '.executives', '.management',
-        '.our-team', '.the-team', '.meet-the-team',
-        '[class*="team-section"]', '[class*="leadership-section"]',
+        ".team",
+        ".leadership",
+        ".executives",
+        ".management",
+        ".our-team",
+        ".the-team",
+        ".meet-the-team",
+        '[class*="team-section"]',
+        '[class*="leadership-section"]',
     ]
 
     for selector in container_selectors:
         try:
             for container in soup.select(selector):
                 # Find child elements that could be person cards
-                for child in container.find_all(['div', 'article', 'li'], recursive=False):
+                for child in container.find_all(
+                    ["div", "article", "li"], recursive=False
+                ):
                     # Skip if too small
                     if len(child.get_text(strip=True)) < 20:
                         continue
@@ -489,13 +630,13 @@ def extract_people_cards(html: str) -> List[Dict[str, Any]]:
             pass
 
     # Strategy 5: Image + name + title pattern (common layout)
-    for img in soup.find_all('img'):
+    for img in soup.find_all("img"):
         parent = img.parent
         if not parent:
             continue
 
         # Look for text near image that looks like name + title
-        container = parent.parent if parent.name == 'a' else parent
+        container = parent.parent if parent.name == "a" else parent
 
         # Go up a few levels to find the card container
         for _ in range(3):
@@ -509,35 +650,35 @@ def extract_people_cards(html: str) -> List[Dict[str, Any]]:
             container = container.parent
 
     # Strategy 6: Heading patterns (h3/h4 followed by title/bio)
-    for heading in soup.find_all(['h3', 'h4', 'h5']):
+    for heading in soup.find_all(["h3", "h4", "h5"]):
         name = heading.get_text(strip=True)
 
         # Skip if doesn't look like a name
         if not _looks_like_name(name):
             continue
 
-        person = {'name': name}
+        person = {"name": name}
 
         # Look for title in next sibling
         next_el = heading.find_next_sibling()
         if next_el:
             next_text = next_el.get_text(strip=True)
             if _looks_like_title(next_text):
-                person['title'] = next_text
+                person["title"] = next_text
 
                 # Look for bio after title
                 bio_el = next_el.find_next_sibling()
-                if bio_el and bio_el.name == 'p':
+                if bio_el and bio_el.name == "p":
                     bio = bio_el.get_text(strip=True)
                     if len(bio) > 50:
-                        person['bio'] = bio[:500]
+                        person["bio"] = bio[:500]
 
         # Check parent for LinkedIn link
         parent = heading.parent
         if parent:
-            for a in parent.find_all('a', href=True):
-                if 'linkedin.com' in a['href']:
-                    person['linkedin_url'] = a['href']
+            for a in parent.find_all("a", href=True):
+                if "linkedin.com" in a["href"]:
+                    person["linkedin_url"] = a["href"]
                     break
 
         add_person(person)
@@ -561,7 +702,7 @@ def _extract_social_url(same_as: Any, platform: str) -> Optional[str]:
 
 def _get_itemprop(element: Tag, prop: str, attr: str = None) -> Optional[str]:
     """Get value of a schema.org itemprop."""
-    el = element.find(attrs={'itemprop': prop})
+    el = element.find(attrs={"itemprop": prop})
     if not el:
         return None
     if attr:
@@ -581,16 +722,16 @@ def _strip_name_from_title(title: str, name: Optional[str]) -> str:
 
     # Check if title starts with the person's name (with or without separator)
     if title.startswith(name):
-        remainder = title[len(name):].lstrip(' ,;:-\t\n')
+        remainder = title[len(name) :].lstrip(" ,;:-\t\n")
         if remainder and _looks_like_title(remainder):
             return remainder
 
     # Also check first name + last name without space (concatenation artifact)
-    name_no_space = name.replace(' ', '')
-    if title.replace(' ', '').startswith(name_no_space):
+    name_no_space = name.replace(" ", "")
+    if title.replace(" ", "").startswith(name_no_space):
         # Find where the name part ends in the original title
         for i in range(len(name), len(title)):
-            remainder = title[i:].lstrip(' ,;:-\t\n')
+            remainder = title[i:].lstrip(" ,;:-\t\n")
             if remainder and _looks_like_title(remainder):
                 return remainder
 
@@ -616,7 +757,16 @@ def _looks_like_name(text: str) -> bool:
         return False
 
     # Should not contain these
-    bad_words = ['team', 'leadership', 'about', 'contact', 'learn', 'read', 'more', 'view']
+    bad_words = [
+        "team",
+        "leadership",
+        "about",
+        "contact",
+        "learn",
+        "read",
+        "more",
+        "view",
+    ]
     if any(w in text.lower() for w in bad_words):
         return False
 
@@ -632,11 +782,26 @@ def _looks_like_title(text: str) -> bool:
 
     # Title keywords
     title_keywords = [
-        'chief', 'ceo', 'cfo', 'coo', 'cto', 'cio', 'cmo',
-        'president', 'vice president', 'vp',
-        'director', 'manager', 'head of',
-        'founder', 'co-founder', 'partner',
-        'officer', 'executive', 'lead', 'senior',
+        "chief",
+        "ceo",
+        "cfo",
+        "coo",
+        "cto",
+        "cio",
+        "cmo",
+        "president",
+        "vice president",
+        "vp",
+        "director",
+        "manager",
+        "head of",
+        "founder",
+        "co-founder",
+        "partner",
+        "officer",
+        "executive",
+        "lead",
+        "senior",
     ]
 
     return any(kw in text_lower for kw in title_keywords)
@@ -648,9 +813,18 @@ def _extract_person_from_card(card: Tag) -> Optional[Dict[str, Any]]:
 
     # Name - try multiple selectors
     name_selectors = [
-        '.name', '.person-name', '.team-name', '.member-name',
-        '.leader-name', '.executive-name', '.profile-name',
-        'h3', 'h4', 'h5', '.heading', 'strong',
+        ".name",
+        ".person-name",
+        ".team-name",
+        ".member-name",
+        ".leader-name",
+        ".executive-name",
+        ".profile-name",
+        "h3",
+        "h4",
+        "h5",
+        ".heading",
+        "strong",
         '[class*="name"]',
     ]
 
@@ -660,75 +834,89 @@ def _extract_person_from_card(card: Tag) -> Optional[Dict[str, Any]]:
             if el:
                 name = el.get_text(strip=True)
                 if _looks_like_name(name):
-                    person['name'] = name
+                    person["name"] = name
                     break
         except Exception:
             pass
 
     # Title - try multiple selectors
     title_selectors = [
-        '.title', '.position', '.role', '.job-title', '.designation',
-        '.person-title', '.team-title', '.member-title',
-        '[class*="title"]', '[class*="position"]', '[class*="role"]',
-        'em', 'span.title', 'p.title',
+        ".title",
+        ".position",
+        ".role",
+        ".job-title",
+        ".designation",
+        ".person-title",
+        ".team-title",
+        ".member-title",
+        '[class*="title"]',
+        '[class*="position"]',
+        '[class*="role"]',
+        "em",
+        "span.title",
+        "p.title",
     ]
 
     for sel in title_selectors:
         try:
             el = card.select_one(sel)
-            if el and el != card.select_one('.name'):  # Don't pick name as title
+            if el and el != card.select_one(".name"):  # Don't pick name as title
                 title = el.get_text(strip=True)
-                if len(title) < 150 and title != person.get('name'):
+                if len(title) < 150 and title != person.get("name"):
                     # Strip person's name from title if concatenated
-                    title = _strip_name_from_title(title, person.get('name'))
-                    person['title'] = title
+                    title = _strip_name_from_title(title, person.get("name"))
+                    person["title"] = title
                     break
         except Exception:
             pass
 
     # If no title found, try to find text that looks like a title
-    if not person.get('title'):
-        for el in card.find_all(['span', 'p', 'div', 'em']):
+    if not person.get("title"):
+        for el in card.find_all(["span", "p", "div", "em"]):
             text = el.get_text(strip=True)
-            if text != person.get('name') and _looks_like_title(text):
+            if text != person.get("name") and _looks_like_title(text):
                 # Strip person's name from title if concatenated
-                text = _strip_name_from_title(text, person.get('name'))
-                person['title'] = text
+                text = _strip_name_from_title(text, person.get("name"))
+                person["title"] = text
                 break
 
     # Bio
-    bio_selectors = ['.bio', '.description', '.about', '.summary', '.excerpt', 'p']
+    bio_selectors = [".bio", ".description", ".about", ".summary", ".excerpt", "p"]
     for sel in bio_selectors:
         try:
             el = card.select_one(sel)
             if el:
                 bio = el.get_text(strip=True)
                 # Don't use name or title as bio
-                if len(bio) > 50 and bio != person.get('name') and bio != person.get('title'):
-                    person['bio'] = bio[:500]
+                if (
+                    len(bio) > 50
+                    and bio != person.get("name")
+                    and bio != person.get("title")
+                ):
+                    person["bio"] = bio[:500]
                     break
         except Exception:
             pass
 
     # Image
-    img = card.select_one('img')
+    img = card.select_one("img")
     if img:
-        src = img.get('src') or img.get('data-src') or img.get('data-lazy-src')
+        src = img.get("src") or img.get("data-src") or img.get("data-lazy-src")
         if src:
-            person['image_url'] = src
+            person["image_url"] = src
 
     # LinkedIn - check all links
-    for a in card.find_all('a', href=True):
-        href = a['href']
-        if 'linkedin.com' in href.lower():
-            person['linkedin_url'] = href
+    for a in card.find_all("a", href=True):
+        href = a["href"]
+        if "linkedin.com" in href.lower():
+            person["linkedin_url"] = href
             break
 
     # Email
-    for a in card.find_all('a', href=True):
-        href = a['href']
-        if href.startswith('mailto:'):
-            person['email'] = href.replace('mailto:', '').split('?')[0]
+    for a in card.find_all("a", href=True):
+        href = a["href"]
+        if href.startswith("mailto:"):
+            person["email"] = href.replace("mailto:", "").split("?")[0]
             break
 
-    return person if person.get('name') else None
+    return person if person.get("name") else None

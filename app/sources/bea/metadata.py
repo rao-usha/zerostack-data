@@ -7,6 +7,7 @@ Handles:
 - Data parsing and transformation
 - Schema definitions for NIPA, Regional, GDP by Industry data
 """
+
 import logging
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
@@ -69,14 +70,14 @@ INTERNATIONAL_COLUMNS = {
 def generate_table_name(dataset: str, table_id: Optional[str] = None) -> str:
     """
     Generate PostgreSQL table name for BEA data.
-    
+
     Args:
         dataset: Dataset identifier (nipa, regional, gdp_industry, international)
         table_id: Optional specific table ID
-        
+
     Returns:
         PostgreSQL table name
-        
+
     Examples:
         >>> generate_table_name("nipa")
         'bea_nipa'
@@ -84,7 +85,7 @@ def generate_table_name(dataset: str, table_id: Optional[str] = None) -> str:
         'bea_regional_sagdp2n'
     """
     dataset_clean = dataset.lower().replace("-", "_").replace(" ", "_")
-    
+
     if table_id:
         table_id_clean = table_id.lower().replace("-", "_").replace(" ", "_")
         return f"bea_{dataset_clean}_{table_id_clean}"
@@ -95,11 +96,11 @@ def generate_table_name(dataset: str, table_id: Optional[str] = None) -> str:
 def generate_create_table_sql(table_name: str, dataset: str) -> str:
     """
     Generate CREATE TABLE SQL for BEA data.
-    
+
     Args:
         table_name: PostgreSQL table name
         dataset: Dataset type to determine schema
-        
+
     Returns:
         CREATE TABLE SQL statement
     """
@@ -139,18 +140,18 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
         ]
     else:
         raise ValueError(f"Unknown BEA dataset: {dataset}")
-    
+
     # Build column definitions (no inline comments - they break SQL parsing)
     column_defs = []
     column_defs.append("id SERIAL PRIMARY KEY")
-    
+
     for col_name, (col_type, col_desc) in columns.items():
         column_defs.append(f"{col_name} {col_type}")
-    
+
     column_defs.append("ingested_at TIMESTAMP DEFAULT NOW()")
-    
+
     columns_sql = ",\n        ".join(column_defs)
-    
+
     # Build indexes
     index_sql_parts = []
     for idx_name, idx_cols in indexes:
@@ -158,9 +159,9 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
             f"CREATE INDEX IF NOT EXISTS idx_{table_name}_{idx_name} "
             f"ON {table_name} ({idx_cols});"
         )
-    
+
     indexes_sql = "\n    ".join(index_sql_parts)
-    
+
     sql = f"""
     CREATE TABLE IF NOT EXISTS {table_name} (
         {columns_sql},
@@ -169,41 +170,40 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
     
     {indexes_sql}
     """
-    
+
     return sql
 
 
 def parse_nipa_response(
-    response: Dict[str, Any],
-    table_name_param: str
+    response: Dict[str, Any], table_name_param: str
 ) -> List[Dict[str, Any]]:
     """
     Parse NIPA data from BEA API response.
-    
+
     Args:
         response: Raw API response
         table_name_param: Table name parameter used in request
-        
+
     Returns:
         List of parsed records ready for insertion
     """
     parsed_records = []
-    
+
     try:
         # Navigate BEA response structure
         results = response.get("BEAAPI", {}).get("Results", {})
-        
+
         if not results:
             logger.warning("No results in BEA NIPA response")
             return []
-        
+
         # Get data array
         data = results.get("Data", [])
-        
+
         if not data:
             logger.warning("No data in BEA NIPA response")
             return []
-        
+
         for record in data:
             try:
                 parsed = {
@@ -217,60 +217,59 @@ def parse_nipa_response(
                     "data_value": _safe_float(record.get("DataValue")),
                     "notes": record.get("NoteRef"),
                 }
-                
+
                 # Skip records without required fields
                 if parsed["time_period"] and parsed["series_code"]:
                     parsed_records.append(parsed)
-            
+
             except Exception as e:
                 logger.warning(f"Failed to parse NIPA record: {e}")
-        
+
         logger.info(f"Parsed {len(parsed_records)} NIPA records")
         return parsed_records
-    
+
     except Exception as e:
         logger.error(f"Failed to parse NIPA response: {e}")
         return []
 
 
 def parse_regional_response(
-    response: Dict[str, Any],
-    table_name_param: str
+    response: Dict[str, Any], table_name_param: str
 ) -> List[Dict[str, Any]]:
     """
     Parse Regional data from BEA API response.
-    
+
     Args:
         response: Raw API response
         table_name_param: Table name parameter used in request
-        
+
     Returns:
         List of parsed records ready for insertion
     """
     parsed_records = []
-    
+
     try:
         results = response.get("BEAAPI", {}).get("Results", {})
-        
+
         if not results:
             logger.warning("No results in BEA Regional response")
             return []
-        
+
         # Get metadata
         statistic = results.get("Statistic", "")
         public_table = results.get("PublicTable", "")
-        
+
         data = results.get("Data", [])
-        
+
         if not data:
             logger.warning("No data in BEA Regional response")
             return []
-        
+
         for record in data:
             try:
                 # Regional uses 'Code' field for line code (e.g., "SAINC1-1")
                 code = record.get("Code", "")
-                
+
                 parsed = {
                     "table_name": table_name_param,
                     "geo_fips": record.get("GeoFips"),
@@ -282,56 +281,55 @@ def parse_regional_response(
                     "unit_mult": _safe_int(record.get("UNIT_MULT")),
                     "data_value": _safe_float(record.get("DataValue")),
                 }
-                
+
                 if parsed["time_period"] and parsed["geo_fips"]:
                     parsed_records.append(parsed)
-            
+
             except Exception as e:
                 logger.warning(f"Failed to parse Regional record: {e}")
-        
+
         logger.info(f"Parsed {len(parsed_records)} Regional records")
         return parsed_records
-    
+
     except Exception as e:
         logger.error(f"Failed to parse Regional response: {e}")
         return []
 
 
 def parse_gdp_industry_response(
-    response: Dict[str, Any],
-    table_id_param: str
+    response: Dict[str, Any], table_id_param: str
 ) -> List[Dict[str, Any]]:
     """
     Parse GDP by Industry data from BEA API response.
-    
+
     Args:
         response: Raw API response
         table_id_param: Table ID parameter used in request
-        
+
     Returns:
         List of parsed records ready for insertion
     """
     parsed_records = []
-    
+
     try:
         beaapi = response.get("BEAAPI", {})
         results = beaapi.get("Results", {})
-        
+
         if not results:
             logger.warning("No results in BEA GDP by Industry response")
             return []
-        
+
         # Results can be a list or dict depending on the response
         if isinstance(results, list):
             # If results is a list, it might be the data directly
             data = results
         else:
             data = results.get("Data", [])
-        
+
         if not data:
             logger.warning("No data in BEA GDP by Industry response")
             return []
-        
+
         for record in data:
             try:
                 # Handle different field names in GDP by Industry API
@@ -339,65 +337,65 @@ def parse_gdp_industry_response(
                     "table_id": record.get("TableID") or table_id_param,
                     "industry_id": record.get("Industry") or record.get("IndustrYId"),
                     "industry_description": (
-                        record.get("IndustrYDescription") or 
-                        record.get("IndustryDescription") or 
-                        record.get("Description") or
-                        ""
+                        record.get("IndustrYDescription")
+                        or record.get("IndustryDescription")
+                        or record.get("Description")
+                        or ""
                     ),
                     "frequency": record.get("Frequency") or "A",
                     "time_period": record.get("Year") or record.get("TimePeriod"),
                     "data_value": _safe_float(record.get("DataValue")),
                     "notes": record.get("NoteRef") or record.get("Notes"),
                 }
-                
+
                 if parsed["time_period"] and parsed["industry_id"]:
                     parsed_records.append(parsed)
-            
+
             except Exception as e:
                 logger.warning(f"Failed to parse GDP by Industry record: {e}")
-        
+
         logger.info(f"Parsed {len(parsed_records)} GDP by Industry records")
         return parsed_records
-    
+
     except Exception as e:
         logger.error(f"Failed to parse GDP by Industry response: {e}")
         return []
 
 
 def parse_international_response(
-    response: Dict[str, Any],
-    indicator_param: str
+    response: Dict[str, Any], indicator_param: str
 ) -> List[Dict[str, Any]]:
     """
     Parse International Transactions data from BEA API response.
-    
+
     Args:
         response: Raw API response
         indicator_param: Indicator parameter used in request
-        
+
     Returns:
         List of parsed records ready for insertion
     """
     parsed_records = []
-    
+
     try:
         results = response.get("BEAAPI", {}).get("Results", {})
-        
+
         if not results:
             logger.warning("No results in BEA International response")
             return []
-        
+
         data = results.get("Data", [])
-        
+
         if not data:
             logger.warning("No data in BEA International response")
             return []
-        
+
         for record in data:
             try:
                 parsed = {
                     "indicator": record.get("Indicator", indicator_param),
-                    "indicator_description": record.get("IndicatorDescription") or record.get("Description"),
+                    "indicator_description": record.get("IndicatorDescription")
+                    or record.get("Description"),
                     "area_or_country": record.get("AreaOrCountry"),
                     "frequency": record.get("Frequency"),
                     "time_period": record.get("TimePeriod") or record.get("Year"),
@@ -405,16 +403,16 @@ def parse_international_response(
                     "unit_mult": _safe_int(record.get("UNIT_MULT")),
                     "data_value": _safe_float(record.get("DataValue")),
                 }
-                
+
                 if parsed["time_period"] and parsed["area_or_country"]:
                     parsed_records.append(parsed)
-            
+
             except Exception as e:
                 logger.warning(f"Failed to parse International record: {e}")
-        
+
         logger.info(f"Parsed {len(parsed_records)} International records")
         return parsed_records
-    
+
     except Exception as e:
         logger.error(f"Failed to parse International response: {e}")
         return []
@@ -446,15 +444,15 @@ def _safe_int(value: Any) -> Optional[int]:
 def get_default_year_range(dataset: str) -> str:
     """
     Get default year range for BEA data.
-    
+
     Args:
         dataset: Dataset identifier
-        
+
     Returns:
         Year specification string
     """
     current_year = datetime.now().year
-    
+
     if dataset in ("nipa", "regional"):
         # Last 10 years
         years = [str(y) for y in range(current_year - 10, current_year + 1)]
@@ -499,10 +497,7 @@ def get_dataset_description(dataset: str) -> str:
             "Foreign Direct Investment, and International Investment Position."
         ),
     }
-    return descriptions.get(
-        dataset,
-        f"Economic data from Bureau of Economic Analysis"
-    )
+    return descriptions.get(dataset, f"Economic data from Bureau of Economic Analysis")
 
 
 # Reference data for common geographic codes

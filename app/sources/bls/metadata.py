@@ -7,6 +7,7 @@ Handles:
 - Data parsing and transformation
 - Dataset descriptions and categories
 """
+
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -31,34 +32,33 @@ DATASET_TABLES = {
 def generate_table_name(dataset: str) -> str:
     """
     Generate table name for BLS dataset.
-    
+
     Convention: bls_{dataset}_description
-    
+
     Args:
         dataset: Dataset name (ces, cps, jolts, cpi, ppi, oes)
-        
+
     Returns:
         Table name (e.g., "bls_ces_employment")
-        
+
     Raises:
         ValueError: If dataset is not recognized
     """
     dataset_lower = dataset.lower()
-    
+
     if dataset_lower not in DATASET_TABLES:
         available = ", ".join(DATASET_TABLES.keys())
         raise ValueError(
-            f"Unknown BLS dataset: {dataset}. "
-            f"Available datasets: {available}"
+            f"Unknown BLS dataset: {dataset}. " f"Available datasets: {available}"
         )
-    
+
     return DATASET_TABLES[dataset_lower]
 
 
 def generate_create_table_sql(table_name: str, dataset: str) -> str:
     """
     Generate CREATE TABLE SQL for BLS data.
-    
+
     Table schema (common for all BLS datasets):
     - id SERIAL PRIMARY KEY
     - series_id TEXT: BLS series ID
@@ -69,18 +69,18 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
     - value NUMERIC: Observation value
     - footnote_codes TEXT: Footnote codes from BLS
     - ingested_at TIMESTAMP: When the data was ingested
-    
+
     Unique constraint: (series_id, year, period)
-    
+
     Args:
         table_name: Name of the table to create
         dataset: Dataset type for comments
-        
+
     Returns:
         CREATE TABLE SQL statement (idempotent)
     """
     dataset_description = get_dataset_description(dataset)
-    
+
     sql = f"""
     CREATE TABLE IF NOT EXISTS {table_name} (
         id SERIAL PRIMARY KEY,
@@ -104,7 +104,7 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
     -- Add comment documenting the table
     COMMENT ON TABLE {table_name} IS 'BLS {dataset.upper()} - {dataset_description}';
     """
-    
+
     return sql
 
 
@@ -112,14 +112,13 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
 # DATA PARSING
 # =============================================================================
 
+
 def parse_bls_observation(
-    obs: Dict[str, Any],
-    series_id: str,
-    series_title: Optional[str] = None
+    obs: Dict[str, Any], series_id: str, series_title: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Parse a single BLS API observation into a database row.
-    
+
     BLS API observation format:
     {
         "year": "2024",
@@ -128,40 +127,42 @@ def parse_bls_observation(
         "value": "3.7",
         "footnotes": [{"code": "P", "text": "Preliminary"}]
     }
-    
+
     Args:
         obs: Raw observation from BLS API
         series_id: BLS series ID
         series_title: Human-readable title (optional)
-        
+
     Returns:
         Dictionary suitable for database insertion
     """
     year_str = obs.get("year")
     period = obs.get("period")
     value_str = obs.get("value")
-    
+
     # Skip if missing required fields
     if not year_str or not period:
         logger.warning(f"Skipping observation with missing year/period: {obs}")
         return None
-    
+
     # Parse year
     try:
         year = int(year_str)
     except (ValueError, TypeError):
         logger.warning(f"Invalid year '{year_str}' for {series_id}")
         return None
-    
+
     # Parse value (may be missing or "-" for unavailable)
     value = None
     if value_str and value_str not in ("-", "", "N/A"):
         try:
             value = float(value_str)
         except ValueError:
-            logger.warning(f"Invalid value '{value_str}' for {series_id} on {year} {period}")
+            logger.warning(
+                f"Invalid value '{value_str}' for {series_id} on {year} {period}"
+            )
             # Continue with None value
-    
+
     # Extract footnote codes
     footnotes = obs.get("footnotes", [])
     footnote_codes = None
@@ -169,7 +170,7 @@ def parse_bls_observation(
         codes = [f.get("code", "") for f in footnotes if f.get("code")]
         if codes:
             footnote_codes = ",".join(codes)
-    
+
     return {
         "series_id": series_id,
         "series_title": series_title,
@@ -182,11 +183,11 @@ def parse_bls_observation(
 
 
 def parse_bls_series_response(
-    api_response: Dict[str, Any]
+    api_response: Dict[str, Any],
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
     Parse BLS API response containing multiple series.
-    
+
     BLS API response format:
     {
         "status": "REQUEST_SUCCEEDED",
@@ -209,57 +210,57 @@ def parse_bls_series_response(
             ]
         }
     }
-    
+
     Args:
         api_response: Raw API response
-        
+
     Returns:
         Dict mapping series_id to list of parsed observations
     """
     results: Dict[str, List[Dict[str, Any]]] = {}
-    
+
     if api_response.get("status") != "REQUEST_SUCCEEDED":
         logger.warning(f"BLS API response status: {api_response.get('status')}")
         return results
-    
+
     series_list = api_response.get("Results", {}).get("series", [])
-    
+
     for series in series_list:
         series_id = series.get("seriesID")
         if not series_id:
             continue
-        
+
         observations = series.get("data", [])
         parsed_obs = []
-        
+
         for obs in observations:
             parsed = parse_bls_observation(obs, series_id)
             if parsed:
                 parsed_obs.append(parsed)
-        
+
         results[series_id] = parsed_obs
         logger.debug(f"Parsed {len(parsed_obs)} observations for {series_id}")
-    
+
     return results
 
 
 def build_insert_values(
-    parsed_data: Dict[str, List[Dict[str, Any]]]
+    parsed_data: Dict[str, List[Dict[str, Any]]],
 ) -> List[Dict[str, Any]]:
     """
     Build list of dictionaries for parameterized INSERT.
-    
+
     Args:
         parsed_data: Dict mapping series_id to list of parsed observations
-        
+
     Returns:
         Flat list of dictionaries for parameterized INSERT
     """
     all_rows = []
-    
+
     for series_id, observations in parsed_data.items():
         all_rows.extend(observations)
-    
+
     logger.info(f"Built {len(all_rows)} rows for insertion")
     return all_rows
 
@@ -268,13 +269,14 @@ def build_insert_values(
 # DATASET METADATA
 # =============================================================================
 
+
 def get_dataset_display_name(dataset: str) -> str:
     """
     Get display name for a BLS dataset.
-    
+
     Args:
         dataset: Dataset code (ces, cps, jolts, cpi, ppi, oes)
-        
+
     Returns:
         Human-readable display name
     """
@@ -286,17 +288,17 @@ def get_dataset_display_name(dataset: str) -> str:
         "ppi": "Producer Price Index (PPI)",
         "oes": "Occupational Employment Statistics (OES)",
     }
-    
+
     return display_names.get(dataset.lower(), dataset.upper())
 
 
 def get_dataset_description(dataset: str) -> str:
     """
     Get description for a BLS dataset.
-    
+
     Args:
         dataset: Dataset code
-        
+
     Returns:
         Description text
     """
@@ -330,71 +332,66 @@ def get_dataset_description(dataset: str) -> str:
             "Annual survey covering approximately 1.2 million establishments."
         ),
     }
-    
+
     return descriptions.get(
-        dataset.lower(),
-        f"Bureau of Labor Statistics {dataset.upper()} data series"
+        dataset.lower(), f"Bureau of Labor Statistics {dataset.upper()} data series"
     )
 
 
 def get_default_date_range(api_key_present: bool = False) -> tuple[int, int]:
     """
     Get default year range for BLS data ingestion.
-    
+
     Args:
         api_key_present: Whether an API key is configured
-        
+
     Returns:
         Tuple of (start_year, end_year)
-        
+
     Default: Last 10 years without key, 20 years with key
     """
     end_year = datetime.now().year
     max_years = 20 if api_key_present else 10
     start_year = end_year - max_years + 1
-    
+
     return (start_year, end_year)
 
 
 def validate_year_range(
-    start_year: int,
-    end_year: int,
-    api_key_present: bool = False
+    start_year: int, end_year: int, api_key_present: bool = False
 ) -> bool:
     """
     Validate year range against BLS API limits.
-    
+
     Args:
         start_year: Start year
         end_year: End year
         api_key_present: Whether an API key is configured
-        
+
     Returns:
         True if valid
-        
+
     Raises:
         ValueError: If range is invalid
     """
     max_years = 20 if api_key_present else 10
-    
+
     if start_year > end_year:
-        raise ValueError(
-            f"Start year ({start_year}) must be <= end year ({end_year})"
-        )
-    
+        raise ValueError(f"Start year ({start_year}) must be <= end year ({end_year})")
+
     if end_year - start_year > max_years:
         raise ValueError(
             f"Year range ({end_year - start_year} years) exceeds maximum "
             f"({max_years} years {'with' if api_key_present else 'without'} API key)"
         )
-    
+
     current_year = datetime.now().year
     if end_year > current_year + 1:
         raise ValueError(f"End year ({end_year}) cannot be in the future")
-    
+
     if start_year < 1900:
         raise ValueError(f"Start year ({start_year}) is too early")
-    
+
     return True
 
 
@@ -414,7 +411,7 @@ ALL_SERIES_REFERENCE = {
             "LNS11000000": "Civilian Labor Force Level",
             "LNS12300000": "Employment-Population Ratio",
             "LNS13327709": "U-6 Total unemployed + marginally attached + part-time for economic reasons",
-        }
+        },
     },
     "ces": {
         "description": "Current Employment Statistics - Establishment Survey",
@@ -430,7 +427,7 @@ ALL_SERIES_REFERENCE = {
             "CES5500000001": "Financial Activities",
             "CES0500000003": "Average Hourly Earnings, All Private",
             "CES0500000002": "Average Weekly Hours, All Private",
-        }
+        },
     },
     "jolts": {
         "description": "Job Openings and Labor Turnover Survey",
@@ -445,7 +442,7 @@ ALL_SERIES_REFERENCE = {
             "JTS000000000000000LDR": "Layoffs and Discharges Rate",
             "JTS000000000000000TSL": "Total Separations Level",
             "JTS000000000000000TSR": "Total Separations Rate",
-        }
+        },
     },
     "cpi": {
         "description": "Consumer Price Index - Measures of Inflation",
@@ -463,7 +460,7 @@ ALL_SERIES_REFERENCE = {
             "CUUR0000SAA": "CPI Apparel",
             "CUSR0000SA0": "CPI-U All Items (seasonally adjusted)",
             "CUSR0000SA0L1E": "Core CPI (seasonally adjusted)",
-        }
+        },
     },
     "ppi": {
         "description": "Producer Price Index - Wholesale/Producer Prices",
@@ -476,7 +473,7 @@ ALL_SERIES_REFERENCE = {
             "WPUFD49104": "PPI Finished Goods",
             "PCU31-33--31-33--": "PPI Manufacturing Industries",
             "PCU23----23----": "PPI Construction",
-        }
+        },
     },
 }
 
@@ -484,10 +481,10 @@ ALL_SERIES_REFERENCE = {
 def get_series_reference(dataset: Optional[str] = None) -> Dict[str, Any]:
     """
     Get reference information about BLS series.
-    
+
     Args:
         dataset: Optional dataset to filter by
-        
+
     Returns:
         Dictionary with series reference information
     """
@@ -497,5 +494,5 @@ def get_series_reference(dataset: Optional[str] = None) -> Dict[str, Any]:
             return {dataset_lower: ALL_SERIES_REFERENCE[dataset_lower]}
         else:
             raise ValueError(f"Unknown dataset: {dataset}")
-    
+
     return ALL_SERIES_REFERENCE

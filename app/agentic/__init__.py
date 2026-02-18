@@ -16,7 +16,11 @@ Key Components:
 from app.agentic.portfolio_agent import PortfolioResearchAgent
 from app.agentic.synthesizer import DataSynthesizer
 from app.agentic.llm_client import LLMClient, get_llm_client, LLMResponse
-from app.agentic.ticker_resolver import TickerResolver, resolve_ticker, resolve_tickers_batch
+from app.agentic.ticker_resolver import (
+    TickerResolver,
+    resolve_ticker,
+    resolve_tickers_batch,
+)
 
 __all__ = [
     "PortfolioResearchAgent",

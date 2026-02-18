@@ -34,8 +34,18 @@ News Tables (2):
 """
 
 from sqlalchemy import (
-    Column, Integer, String, Text, Date, DateTime, Boolean,
-    Numeric, JSON, ForeignKey, Index, UniqueConstraint
+    Column,
+    Integer,
+    String,
+    Text,
+    Date,
+    DateTime,
+    Boolean,
+    Numeric,
+    JSON,
+    ForeignKey,
+    Index,
+    UniqueConstraint,
 )
 from sqlalchemy.sql import func
 from app.core.models import Base
@@ -45,6 +55,7 @@ from app.core.models import Base
 # CORE PE FIRM TABLES (3)
 # =============================================================================
 
+
 class PEFirm(Base):
     """
     PE/VC firm (General Partner) master data.
@@ -52,6 +63,7 @@ class PEFirm(Base):
     Stores comprehensive information about private equity and venture capital
     firms including their investment focus, AUM, and SEC registration details.
     """
+
     __tablename__ = "pe_firms"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -118,6 +130,7 @@ class PEFund(Base):
     Tracks individual fund vintages for each firm with target sizes,
     focus areas, and status.
     """
+
     __tablename__ = "pe_funds"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -146,7 +159,9 @@ class PEFund(Base):
     investment_period_years = Column(Integer)
 
     # Status
-    status = Column(String(50), default="Active")  # Fundraising, Active, Harvesting, Closed
+    status = Column(
+        String(50), default="Active"
+    )  # Fundraising, Active, Harvesting, Closed
     first_close_date = Column(Date)
     final_close_date = Column(Date)
 
@@ -157,9 +172,7 @@ class PEFund(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    __table_args__ = (
-        Index("ix_pe_funds_firm_vintage", "firm_id", "vintage_year"),
-    )
+    __table_args__ = (Index("ix_pe_funds_firm_vintage", "firm_id", "vintage_year"),)
 
     def __repr__(self):
         return f"<PEFund {self.name} ({self.vintage_year})>"
@@ -171,6 +184,7 @@ class PEFundPerformance(Base):
 
     Tracks IRR, TVPI, DPI, RVPI over time for each fund.
     """
+
     __tablename__ = "pe_fund_performance"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -218,12 +232,14 @@ class PEFundPerformance(Base):
 # PORTFOLIO COMPANY TABLES (6)
 # =============================================================================
 
+
 class PEPortfolioCompany(Base):
     """
     Portfolio company master data.
 
     Companies that are or were owned by PE/VC firms.
     """
+
     __tablename__ = "pe_portfolio_companies"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -252,7 +268,9 @@ class PEPortfolioCompany(Base):
     employee_count_range = Column(String(50))  # "100-500", "1000+"
 
     # Ownership Status
-    ownership_status = Column(String(50), index=True)  # PE-Backed, VC-Backed, Public, Private
+    ownership_status = Column(
+        String(50), index=True
+    )  # PE-Backed, VC-Backed, Public, Private
     current_pe_owner = Column(String(500))  # Current majority PE owner name
     is_platform_company = Column(Boolean, default=False)
 
@@ -279,11 +297,14 @@ class PEFundInvestment(Base):
 
     Tracks when a fund invested, ownership percentage, and exit details.
     """
+
     __tablename__ = "pe_fund_investments"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     fund_id = Column(Integer, ForeignKey("pe_funds.id"), nullable=False, index=True)
-    company_id = Column(Integer, ForeignKey("pe_portfolio_companies.id"), nullable=False, index=True)
+    company_id = Column(
+        Integer, ForeignKey("pe_portfolio_companies.id"), nullable=False, index=True
+    )
 
     # Investment Details
     investment_date = Column(Date, index=True)
@@ -331,10 +352,13 @@ class PECompanyFinancials(Base):
 
     Historical financials for portfolio companies.
     """
+
     __tablename__ = "pe_company_financials"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    company_id = Column(Integer, ForeignKey("pe_portfolio_companies.id"), nullable=False, index=True)
+    company_id = Column(
+        Integer, ForeignKey("pe_portfolio_companies.id"), nullable=False, index=True
+    )
 
     # Period
     fiscal_year = Column(Integer, nullable=False, index=True)
@@ -377,8 +401,12 @@ class PECompanyFinancials(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
-        UniqueConstraint("company_id", "fiscal_year", "fiscal_period",
-                        name="uq_company_financials_period"),
+        UniqueConstraint(
+            "company_id",
+            "fiscal_year",
+            "fiscal_period",
+            name="uq_company_financials_period",
+        ),
     )
 
     def __repr__(self):
@@ -391,10 +419,13 @@ class PECompanyValuation(Base):
 
     Tracks point-in-time valuations from various sources.
     """
+
     __tablename__ = "pe_company_valuations"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    company_id = Column(Integer, ForeignKey("pe_portfolio_companies.id"), nullable=False, index=True)
+    company_id = Column(
+        Integer, ForeignKey("pe_portfolio_companies.id"), nullable=False, index=True
+    )
 
     # Valuation Date
     valuation_date = Column(Date, nullable=False, index=True)
@@ -412,7 +443,9 @@ class PECompanyValuation(Base):
 
     # Methodology
     valuation_type = Column(String(100))  # Transaction, Mark-to-Market, Third-Party
-    methodology = Column(String(200))  # DCF, Comparable Companies, Precedent Transactions
+    methodology = Column(
+        String(200)
+    )  # DCF, Comparable Companies, Precedent Transactions
 
     # Context
     event_type = Column(String(100))  # Investment, Exit, Quarterly Mark, Fundraise
@@ -436,10 +469,13 @@ class PECompanyLeadership(Base):
 
     Links people to their roles at portfolio companies.
     """
+
     __tablename__ = "pe_company_leadership"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    company_id = Column(Integer, ForeignKey("pe_portfolio_companies.id"), nullable=False, index=True)
+    company_id = Column(
+        Integer, ForeignKey("pe_portfolio_companies.id"), nullable=False, index=True
+    )
     person_id = Column(Integer, ForeignKey("pe_people.id"), nullable=False, index=True)
 
     # Role
@@ -476,7 +512,9 @@ class PECompanyLeadership(Base):
     )
 
     def __repr__(self):
-        return f"<PECompanyLeadership Person {self.person_id} @ Company {self.company_id}>"
+        return (
+            f"<PECompanyLeadership Person {self.person_id} @ Company {self.company_id}>"
+        )
 
 
 class PECompetitorMapping(Base):
@@ -485,14 +523,19 @@ class PECompetitorMapping(Base):
 
     Maps each portfolio company to its competitors.
     """
+
     __tablename__ = "pe_competitor_mappings"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    company_id = Column(Integer, ForeignKey("pe_portfolio_companies.id"), nullable=False, index=True)
+    company_id = Column(
+        Integer, ForeignKey("pe_portfolio_companies.id"), nullable=False, index=True
+    )
 
     # Competitor Info
     competitor_name = Column(String(500), nullable=False)
-    competitor_company_id = Column(Integer, ForeignKey("pe_portfolio_companies.id"))  # If in our DB
+    competitor_company_id = Column(
+        Integer, ForeignKey("pe_portfolio_companies.id")
+    )  # If in our DB
 
     # Competitor Classification
     is_public = Column(Boolean, default=False)
@@ -523,20 +566,26 @@ class PECompetitorMapping(Base):
 # DEAL TABLES (3)
 # =============================================================================
 
+
 class PEDeal(Base):
     """
     M&A transactions and investments.
 
     Every deal involving PE/VC investors.
     """
+
     __tablename__ = "pe_deals"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    company_id = Column(Integer, ForeignKey("pe_portfolio_companies.id"), nullable=False, index=True)
+    company_id = Column(
+        Integer, ForeignKey("pe_portfolio_companies.id"), nullable=False, index=True
+    )
 
     # Deal Basics
     deal_name = Column(String(500))
-    deal_type = Column(String(100), nullable=False, index=True)  # LBO, Growth, Add-on, Exit, Recap
+    deal_type = Column(
+        String(100), nullable=False, index=True
+    )  # LBO, Growth, Add-on, Exit, Recap
     deal_sub_type = Column(String(100))  # Platform, Bolt-on, Carve-out, etc.
 
     # Dates
@@ -569,7 +618,9 @@ class PEDeal(Base):
     seller_type = Column(String(100))  # PE, Strategic, Founder, Public
 
     # Status
-    status = Column(String(50), default="Closed")  # Announced, Pending, Closed, Terminated
+    status = Column(
+        String(50), default="Closed"
+    )  # Announced, Pending, Closed, Terminated
     is_announced = Column(Boolean, default=True)
     is_confidential = Column(Boolean, default=False)
 
@@ -592,6 +643,7 @@ class PEDealParticipant(Base):
 
     Tracks all firms involved in each deal.
     """
+
     __tablename__ = "pe_deal_participants"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -603,7 +655,9 @@ class PEDealParticipant(Base):
     participant_type = Column(String(100))  # PE Firm, Strategic, Family Office, etc.
 
     # Role
-    role = Column(String(100), nullable=False)  # Lead Sponsor, Co-Investor, Seller, etc.
+    role = Column(
+        String(100), nullable=False
+    )  # Lead Sponsor, Co-Investor, Seller, etc.
     is_lead = Column(Boolean, default=False)
 
     # Investment
@@ -616,9 +670,7 @@ class PEDealParticipant(Base):
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (
-        Index("ix_deal_participants_firm", "firm_id", "deal_id"),
-    )
+    __table_args__ = (Index("ix_deal_participants_firm", "firm_id", "deal_id"),)
 
     def __repr__(self):
         return f"<PEDealParticipant {self.participant_name} ({self.role})>"
@@ -630,6 +682,7 @@ class PEDealAdvisor(Base):
 
     Investment banks, law firms, accounting firms, consultants.
     """
+
     __tablename__ = "pe_deal_advisors"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -637,11 +690,15 @@ class PEDealAdvisor(Base):
 
     # Advisor Info
     advisor_name = Column(String(500), nullable=False)
-    advisor_type = Column(String(100), nullable=False)  # Investment Bank, Law Firm, Accounting, Consulting
+    advisor_type = Column(
+        String(100), nullable=False
+    )  # Investment Bank, Law Firm, Accounting, Consulting
 
     # Role
     side = Column(String(50))  # Buy-Side, Sell-Side
-    role_description = Column(String(200))  # Financial Advisor, Legal Counsel, Due Diligence
+    role_description = Column(
+        String(200)
+    )  # Financial Advisor, Legal Counsel, Due Diligence
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -654,12 +711,14 @@ class PEDealAdvisor(Base):
 # PEOPLE TABLES (5)
 # =============================================================================
 
+
 class PEPerson(Base):
     """
     Person master data.
 
     Executives, investors, board members in the PE ecosystem.
     """
+
     __tablename__ = "pe_people"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -709,6 +768,7 @@ class PEPersonEducation(Base):
     """
     Education history for people.
     """
+
     __tablename__ = "pe_person_education"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -741,6 +801,7 @@ class PEPersonExperience(Base):
     """
     Work history for people.
     """
+
     __tablename__ = "pe_person_experience"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -748,7 +809,9 @@ class PEPersonExperience(Base):
 
     # Company
     company = Column(String(500), nullable=False)
-    company_id = Column(Integer, ForeignKey("pe_portfolio_companies.id"))  # If in our DB
+    company_id = Column(
+        Integer, ForeignKey("pe_portfolio_companies.id")
+    )  # If in our DB
 
     # Role
     title = Column(String(300), nullable=False)
@@ -766,9 +829,7 @@ class PEPersonExperience(Base):
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (
-        Index("ix_person_experience_current", "person_id", "is_current"),
-    )
+    __table_args__ = (Index("ix_person_experience_current", "person_id", "is_current"),)
 
     def __repr__(self):
         return f"<PEPersonExperience {self.title} @ {self.company}>"
@@ -780,6 +841,7 @@ class PEFirmPeople(Base):
 
     Links people to firms with their roles and seniority.
     """
+
     __tablename__ = "pe_firm_people"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -808,9 +870,7 @@ class PEFirmPeople(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    __table_args__ = (
-        Index("ix_firm_people_current", "firm_id", "is_current"),
-    )
+    __table_args__ = (Index("ix_firm_people_current", "firm_id", "is_current"),)
 
     def __repr__(self):
         return f"<PEFirmPeople Person {self.person_id} @ Firm {self.firm_id}>"
@@ -822,6 +882,7 @@ class PEDealPersonInvolvement(Base):
 
     Deal team tracking for both buy-side and sell-side.
     """
+
     __tablename__ = "pe_deal_person_involvement"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -838,26 +899,30 @@ class PEDealPersonInvolvement(Base):
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (
-        UniqueConstraint("deal_id", "person_id", name="uq_deal_person"),
-    )
+    __table_args__ = (UniqueConstraint("deal_id", "person_id", name="uq_deal_person"),)
 
     def __repr__(self):
-        return f"<PEDealPersonInvolvement Person {self.person_id} on Deal {self.deal_id}>"
+        return (
+            f"<PEDealPersonInvolvement Person {self.person_id} on Deal {self.deal_id}>"
+        )
 
 
 # =============================================================================
 # NEWS TABLES (2)
 # =============================================================================
 
+
 class PECompanyNews(Base):
     """
     News articles about portfolio companies.
     """
+
     __tablename__ = "pe_company_news"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    company_id = Column(Integer, ForeignKey("pe_portfolio_companies.id"), nullable=False, index=True)
+    company_id = Column(
+        Integer, ForeignKey("pe_portfolio_companies.id"), nullable=False, index=True
+    )
 
     # Article Info
     title = Column(String(1000), nullable=False)
@@ -885,9 +950,7 @@ class PECompanyNews(Base):
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (
-        Index("ix_company_news_date", "company_id", "published_date"),
-    )
+    __table_args__ = (Index("ix_company_news_date", "company_id", "published_date"),)
 
     def __repr__(self):
         return f"<PECompanyNews {self.title[:50]}...>"
@@ -897,6 +960,7 @@ class PEFirmNews(Base):
     """
     News articles about PE/VC firms.
     """
+
     __tablename__ = "pe_firm_news"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -928,9 +992,7 @@ class PEFirmNews(Base):
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (
-        Index("ix_firm_news_date", "firm_id", "published_date"),
-    )
+    __table_args__ = (Index("ix_firm_news_date", "firm_id", "published_date"),)
 
     def __repr__(self):
         return f"<PEFirmNews {self.title[:50]}...>"

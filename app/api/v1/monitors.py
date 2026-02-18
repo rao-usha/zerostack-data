@@ -26,8 +26,10 @@ router = APIRouter(prefix="/monitors/news", tags=["News Monitor"])
 # Request/Response Models
 # ============================================================================
 
+
 class WatchItemCreate(BaseModel):
     """Request to add a watch item."""
+
     watch_type: str = Field(..., description="Type: company, investor, sector, keyword")
     watch_value: str = Field(..., description="Value to watch")
     event_types: Optional[List[str]] = Field(None, description="Filter by event types")
@@ -38,6 +40,7 @@ class WatchItemCreate(BaseModel):
 
 class WatchItemUpdate(BaseModel):
     """Request to update a watch item."""
+
     event_types: Optional[List[str]] = None
     min_relevance: Optional[float] = Field(None, ge=0, le=1)
     alert_enabled: Optional[bool] = None
@@ -46,6 +49,7 @@ class WatchItemUpdate(BaseModel):
 
 class WatchItemResponse(BaseModel):
     """Watch item response."""
+
     id: int
     watch_type: str
     watch_value: str
@@ -59,6 +63,7 @@ class WatchItemResponse(BaseModel):
 
 class MatchedWatch(BaseModel):
     """Matched watch info in feed response."""
+
     id: int
     type: str
     value: str
@@ -66,6 +71,7 @@ class MatchedWatch(BaseModel):
 
 class FeedItem(BaseModel):
     """News feed item."""
+
     id: int
     title: str
     url: Optional[str]
@@ -83,6 +89,7 @@ class FeedItem(BaseModel):
 
 class FeedResponse(BaseModel):
     """News feed response."""
+
     items: List[FeedItem]
     total: int
     unread: int
@@ -90,6 +97,7 @@ class FeedResponse(BaseModel):
 
 class DigestHighlight(BaseModel):
     """Digest highlight item."""
+
     title: str
     impact: str
     summary: Optional[str]
@@ -97,6 +105,7 @@ class DigestHighlight(BaseModel):
 
 class DigestResponse(BaseModel):
     """Digest response."""
+
     period: str
     date: str
     summary: Optional[str]
@@ -108,6 +117,7 @@ class DigestResponse(BaseModel):
 
 class AlertItem(BaseModel):
     """Breaking news alert."""
+
     id: int
     title: str
     impact_score: float
@@ -120,12 +130,14 @@ class AlertItem(BaseModel):
 
 class AlertsResponse(BaseModel):
     """Breaking alerts response."""
+
     alerts: List[AlertItem]
     unacknowledged: int
 
 
 class StatsResponse(BaseModel):
     """Monitoring statistics."""
+
     watch_items: int
     matches_today: int
     matches_this_week: int
@@ -139,11 +151,9 @@ class StatsResponse(BaseModel):
 # Watch List Management
 # ============================================================================
 
+
 @router.post("/watch", response_model=WatchItemResponse)
-def add_watch(
-    request: WatchItemCreate,
-    db: Session = Depends(get_db)
-):
+def add_watch(request: WatchItemCreate, db: Session = Depends(get_db)):
     """
     Add item to watch list.
 
@@ -162,7 +172,7 @@ def add_watch(
             event_types=request.event_types,
             min_relevance=request.min_relevance,
             alert_enabled=request.alert_enabled,
-            digest_enabled=request.digest_enabled
+            digest_enabled=request.digest_enabled,
         )
 
         return WatchItemResponse(
@@ -174,7 +184,7 @@ def add_watch(
             alert_enabled=watch.alert_enabled,
             digest_enabled=watch.digest_enabled,
             created_at=watch.created_at,
-            updated_at=watch.updated_at
+            updated_at=watch.updated_at,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -196,7 +206,7 @@ def list_watches(db: Session = Depends(get_db)):
             alert_enabled=w.alert_enabled,
             digest_enabled=w.digest_enabled,
             created_at=w.created_at,
-            updated_at=w.updated_at
+            updated_at=w.updated_at,
         )
         for w in watches
     ]
@@ -215,9 +225,7 @@ def remove_watch(watch_id: int, db: Session = Depends(get_db)):
 
 @router.patch("/watch/{watch_id}", response_model=WatchItemResponse)
 def update_watch(
-    watch_id: int,
-    request: WatchItemUpdate,
-    db: Session = Depends(get_db)
+    watch_id: int, request: WatchItemUpdate, db: Session = Depends(get_db)
 ):
     """Update watch item settings."""
     monitor = NewsMonitor(db)
@@ -227,7 +235,7 @@ def update_watch(
         event_types=request.event_types,
         min_relevance=request.min_relevance,
         alert_enabled=request.alert_enabled,
-        digest_enabled=request.digest_enabled
+        digest_enabled=request.digest_enabled,
     )
 
     if not watch:
@@ -242,7 +250,7 @@ def update_watch(
         alert_enabled=watch.alert_enabled,
         digest_enabled=watch.digest_enabled,
         created_at=watch.created_at,
-        updated_at=watch.updated_at
+        updated_at=watch.updated_at,
     )
 
 
@@ -250,14 +258,17 @@ def update_watch(
 # Personalized Feed
 # ============================================================================
 
+
 @router.get("/feed", response_model=FeedResponse)
 def get_feed(
     days: int = Query(7, ge=1, le=90, description="Time range in days"),
-    min_relevance: float = Query(0.5, ge=0, le=1, description="Minimum relevance score"),
+    min_relevance: float = Query(
+        0.5, ge=0, le=1, description="Minimum relevance score"
+    ),
     event_type: Optional[str] = Query(None, description="Filter by event type"),
     limit: int = Query(50, ge=1, le=200, description="Max items to return"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get personalized news feed matched to watch list.
@@ -271,7 +282,7 @@ def get_feed(
         min_relevance=min_relevance,
         event_type=event_type,
         limit=limit,
-        offset=offset
+        offset=offset,
     )
 
     items = []
@@ -280,35 +291,35 @@ def get_feed(
         published_at = match.get("published_at")
         if published_at and isinstance(published_at, str):
             try:
-                published_at = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+                published_at = datetime.fromisoformat(
+                    published_at.replace("Z", "+00:00")
+                )
             except ValueError:
                 published_at = None
 
-        items.append(FeedItem(
-            id=match["id"],
-            title=match["title"],
-            url=match.get("url"),
-            source=match.get("source"),
-            published_at=published_at,
-            matched_watch=MatchedWatch(
-                id=match["matched_watch"]["id"],
-                type=match["matched_watch"]["type"],
-                value=match["matched_watch"]["value"]
-            ),
-            relevance_score=match.get("relevance_score", 0),
-            impact_score=match.get("impact_score", 0),
-            sentiment=match.get("sentiment", 0),
-            event_type=match.get("event_type"),
-            summary=match.get("summary"),
-            is_breaking=match.get("is_breaking", False),
-            is_read=match.get("is_read", False)
-        ))
+        items.append(
+            FeedItem(
+                id=match["id"],
+                title=match["title"],
+                url=match.get("url"),
+                source=match.get("source"),
+                published_at=published_at,
+                matched_watch=MatchedWatch(
+                    id=match["matched_watch"]["id"],
+                    type=match["matched_watch"]["type"],
+                    value=match["matched_watch"]["value"],
+                ),
+                relevance_score=match.get("relevance_score", 0),
+                impact_score=match.get("impact_score", 0),
+                sentiment=match.get("sentiment", 0),
+                event_type=match.get("event_type"),
+                summary=match.get("summary"),
+                is_breaking=match.get("is_breaking", False),
+                is_read=match.get("is_read", False),
+            )
+        )
 
-    return FeedResponse(
-        items=items,
-        total=result["total"],
-        unread=result["unread"]
-    )
+    return FeedResponse(items=items, total=result["total"], unread=result["unread"])
 
 
 @router.post("/feed/{match_id}/read")
@@ -327,11 +338,16 @@ def mark_as_read(match_id: int, db: Session = Depends(get_db)):
 # Digest Generation
 # ============================================================================
 
+
 @router.get("/digest", response_model=DigestResponse)
 def get_digest(
-    period: str = Query("daily", pattern="^(daily|weekly)$", description="Digest period"),
-    date_str: Optional[str] = Query(None, alias="date", description="Date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db)
+    period: str = Query(
+        "daily", pattern="^(daily|weekly)$", description="Digest period"
+    ),
+    date_str: Optional[str] = Query(
+        None, alias="date", description="Date (YYYY-MM-DD)"
+    ),
+    db: Session = Depends(get_db),
 ):
     """
     Get AI-generated news digest.
@@ -345,7 +361,9 @@ def get_digest(
         try:
             target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+            raise HTTPException(
+                status_code=400, detail="Invalid date format. Use YYYY-MM-DD"
+            )
     else:
         target_date = date.today()
 
@@ -359,11 +377,13 @@ def get_digest(
     highlights = []
     if digest.highlights:
         for h in digest.highlights:
-            highlights.append(DigestHighlight(
-                title=h.get("title", ""),
-                impact=h.get("impact", "medium"),
-                summary=h.get("summary")
-            ))
+            highlights.append(
+                DigestHighlight(
+                    title=h.get("title", ""),
+                    impact=h.get("impact", "medium"),
+                    summary=h.get("summary"),
+                )
+            )
 
     # Parse stats
     stats = digest.stats or {}
@@ -375,7 +395,7 @@ def get_digest(
         highlights=highlights,
         by_category=stats.get("by_category", {}),
         sentiment_summary=stats.get("sentiment_summary", {}),
-        generated_at=digest.generated_at
+        generated_at=digest.generated_at,
     )
 
 
@@ -383,7 +403,7 @@ def get_digest(
 def regenerate_digest(
     period: str = Query("daily", pattern="^(daily|weekly)$"),
     date_str: Optional[str] = Query(None, alias="date"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Force regenerate digest for a period."""
     monitor = NewsMonitor(db)
@@ -401,11 +421,13 @@ def regenerate_digest(
     highlights = []
     if digest.highlights:
         for h in digest.highlights:
-            highlights.append(DigestHighlight(
-                title=h.get("title", ""),
-                impact=h.get("impact", "medium"),
-                summary=h.get("summary")
-            ))
+            highlights.append(
+                DigestHighlight(
+                    title=h.get("title", ""),
+                    impact=h.get("impact", "medium"),
+                    summary=h.get("summary"),
+                )
+            )
 
     stats = digest.stats or {}
 
@@ -416,7 +438,7 @@ def regenerate_digest(
         highlights=highlights,
         by_category=stats.get("by_category", {}),
         sentiment_summary=stats.get("sentiment_summary", {}),
-        generated_at=digest.generated_at
+        generated_at=digest.generated_at,
     )
 
 
@@ -424,11 +446,14 @@ def regenerate_digest(
 # Breaking Alerts
 # ============================================================================
 
+
 @router.get("/alerts", response_model=AlertsResponse)
 def get_alerts(
-    acknowledged: Optional[bool] = Query(None, description="Filter by acknowledged status"),
+    acknowledged: Optional[bool] = Query(
+        None, description="Filter by acknowledged status"
+    ),
     limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get breaking/high-impact news alerts.
@@ -445,29 +470,32 @@ def get_alerts(
         published_at = alert.get("published_at")
         if published_at and isinstance(published_at, str):
             try:
-                published_at = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+                published_at = datetime.fromisoformat(
+                    published_at.replace("Z", "+00:00")
+                )
             except ValueError:
                 published_at = None
 
         # Get matched watch value
         matched_watch = alert.get("matched_watch", {})
-        watch_values = [matched_watch.get("value")] if matched_watch.get("value") else []
+        watch_values = (
+            [matched_watch.get("value")] if matched_watch.get("value") else []
+        )
 
-        alerts.append(AlertItem(
-            id=alert["id"],
-            title=alert["title"],
-            impact_score=alert.get("impact_score", 0),
-            event_type=alert.get("event_type"),
-            matched_watches=watch_values,
-            summary=alert.get("summary"),
-            published_at=published_at,
-            acknowledged=alert.get("acknowledged", False)
-        ))
+        alerts.append(
+            AlertItem(
+                id=alert["id"],
+                title=alert["title"],
+                impact_score=alert.get("impact_score", 0),
+                event_type=alert.get("event_type"),
+                matched_watches=watch_values,
+                summary=alert.get("summary"),
+                published_at=published_at,
+                acknowledged=alert.get("acknowledged", False),
+            )
+        )
 
-    return AlertsResponse(
-        alerts=alerts,
-        unacknowledged=result["unacknowledged"]
-    )
+    return AlertsResponse(alerts=alerts, unacknowledged=result["unacknowledged"])
 
 
 @router.post("/alerts/{alert_id}/acknowledge")
@@ -485,6 +513,7 @@ def acknowledge_alert(alert_id: int, db: Session = Depends(get_db)):
 # Statistics
 # ============================================================================
 
+
 @router.get("/stats", response_model=StatsResponse)
 def get_stats(db: Session = Depends(get_db)):
     """Get news monitoring statistics."""
@@ -498,13 +527,14 @@ def get_stats(db: Session = Depends(get_db)):
         unread=stats["unread"],
         pending_alerts=stats["pending_alerts"],
         top_sources=stats["top_sources"],
-        top_event_types=stats["top_event_types"]
+        top_event_types=stats["top_event_types"],
     )
 
 
 # ============================================================================
 # News Processing (Internal/Admin)
 # ============================================================================
+
 
 @router.post("/process")
 def process_news(db: Session = Depends(get_db)):
@@ -521,5 +551,5 @@ def process_news(db: Session = Depends(get_db)):
         "status": "processed",
         "news_processed": result["news_processed"],
         "matches_created": result["matches_created"],
-        "alerts_triggered": result["alerts_triggered"]
+        "alerts_triggered": result["alerts_triggered"],
     }

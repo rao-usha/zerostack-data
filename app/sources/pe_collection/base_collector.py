@@ -172,7 +172,9 @@ class BasePECollector(ABC):
 
                 # Client error - don't retry
                 if 400 <= response.status_code < 500:
-                    logger.warning(f"Client error {response.status_code} fetching {url}")
+                    logger.warning(
+                        f"Client error {response.status_code} fetching {url}"
+                    )
                     return response
 
                 # Server error - retry with backoff

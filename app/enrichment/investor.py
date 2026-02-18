@@ -4,6 +4,7 @@ Investor Profile Enrichment Engine.
 Enriches LP and Family Office profiles with contacts,
 AUM history, and investment preferences.
 """
+
 import json
 import logging
 from typing import Dict, List, Optional, Tuple
@@ -129,10 +130,9 @@ class InvestorEnrichmentEngine:
               AND investor_type = :investor_type
               AND current_holding = 1
         """)
-        result = self.db.execute(query, {
-            "investor_id": investor_id,
-            "investor_type": investor_type
-        })
+        result = self.db.execute(
+            query, {"investor_id": investor_id, "investor_type": investor_type}
+        )
         companies = list(result.mappings())
 
         if not companies:
@@ -141,7 +141,7 @@ class InvestorEnrichmentEngine:
                 "stages": [],
                 "regions": [],
                 "check_sizes": {},
-                "company_count": 0
+                "company_count": 0,
             }
 
         # Analyze sectors
@@ -202,23 +202,27 @@ class InvestorEnrichmentEngine:
                 "avg": int(sum(amounts) / len(amounts)),
                 "min": min(amounts),
                 "max": max(amounts),
-                "count": len(amounts)
+                "count": len(amounts),
             }
 
         # Save preferences
-        self._save_preferences(investor_id, investor_type, {
-            "sectors": sectors,
-            "stages": stages,
-            "regions": regions,
-            "check_sizes": check_sizes
-        })
+        self._save_preferences(
+            investor_id,
+            investor_type,
+            {
+                "sectors": sectors,
+                "stages": stages,
+                "regions": regions,
+                "check_sizes": check_sizes,
+            },
+        )
 
         return {
             "sectors": sectors[:10],  # Top 10
             "stages": stages,
             "regions": regions[:10],
             "check_sizes": check_sizes,
-            "company_count": total
+            "company_count": total,
         }
 
     def _extract_region(self, location: str) -> str:
@@ -226,8 +230,18 @@ class InvestorEnrichmentEngine:
         location_lower = location.lower()
 
         # US regions
-        us_states = ["california", "new york", "texas", "florida", "massachusetts",
-                     "washington", "colorado", "illinois", "georgia", "virginia"]
+        us_states = [
+            "california",
+            "new york",
+            "texas",
+            "florida",
+            "massachusetts",
+            "washington",
+            "colorado",
+            "illinois",
+            "georgia",
+            "virginia",
+        ]
         for state in us_states:
             if state in location_lower:
                 return "North America"
@@ -236,9 +250,14 @@ class InvestorEnrichmentEngine:
             return "North America"
 
         # Other regions
-        if any(x in location_lower for x in ["uk", "london", "germany", "france", "europe"]):
+        if any(
+            x in location_lower for x in ["uk", "london", "germany", "france", "europe"]
+        ):
             return "Europe"
-        if any(x in location_lower for x in ["china", "japan", "singapore", "asia", "india"]):
+        if any(
+            x in location_lower
+            for x in ["china", "japan", "singapore", "asia", "india"]
+        ):
             return "Asia Pacific"
         if any(x in location_lower for x in ["brazil", "mexico", "latin"]):
             return "Latin America"
@@ -272,7 +291,9 @@ class InvestorEnrichmentEngine:
         except (ValueError, TypeError):
             return None
 
-    def _save_preferences(self, investor_id: int, investor_type: str, prefs: Dict) -> None:
+    def _save_preferences(
+        self, investor_id: int, investor_type: str, prefs: Dict
+    ) -> None:
         """Save analyzed preferences to database."""
         query = text("""
             INSERT INTO investor_preferences (
@@ -295,16 +316,19 @@ class InvestorEnrichmentEngine:
 
         check_sizes = prefs.get("check_sizes", {})
 
-        self.db.execute(query, {
-            "investor_id": investor_id,
-            "investor_type": investor_type,
-            "sectors": json.dumps(prefs.get("sectors", [])),
-            "stages": json.dumps(prefs.get("stages", [])),
-            "regions": json.dumps(prefs.get("regions", [])),
-            "avg": check_sizes.get("avg"),
-            "min": check_sizes.get("min"),
-            "max": check_sizes.get("max"),
-        })
+        self.db.execute(
+            query,
+            {
+                "investor_id": investor_id,
+                "investor_type": investor_type,
+                "sectors": json.dumps(prefs.get("sectors", [])),
+                "stages": json.dumps(prefs.get("stages", [])),
+                "regions": json.dumps(prefs.get("regions", [])),
+                "avg": check_sizes.get("avg"),
+                "min": check_sizes.get("min"),
+                "max": check_sizes.get("max"),
+            },
+        )
         self.db.commit()
 
     def calculate_commitment_pace(self, investor_id: int, investor_type: str) -> Dict:
@@ -324,10 +348,9 @@ class InvestorEnrichmentEngine:
               AND investment_date IS NOT NULL
             ORDER BY investment_date DESC
         """)
-        result = self.db.execute(query, {
-            "investor_id": investor_id,
-            "investor_type": investor_type
-        })
+        result = self.db.execute(
+            query, {"investor_id": investor_id, "investor_type": investor_type}
+        )
         dates = [row["investment_date"] for row in result.mappings()]
 
         if not dates:
@@ -335,7 +358,7 @@ class InvestorEnrichmentEngine:
                 "investments_per_year": 0,
                 "last_investment_date": None,
                 "avg_days_between_investments": None,
-                "total_investments": 0
+                "total_investments": 0,
             }
 
         last_date = dates[0]
@@ -367,19 +390,22 @@ class InvestorEnrichmentEngine:
             WHERE investor_id = :investor_id
               AND investor_type = :investor_type
         """)
-        self.db.execute(update_query, {
-            "investor_id": investor_id,
-            "investor_type": investor_type,
-            "pace": investments_per_year,
-            "last_date": last_date
-        })
+        self.db.execute(
+            update_query,
+            {
+                "investor_id": investor_id,
+                "investor_type": investor_type,
+                "pace": investments_per_year,
+                "last_date": last_date,
+            },
+        )
         self.db.commit()
 
         return {
             "investments_per_year": investments_per_year,
             "last_investment_date": last_date.isoformat() if last_date else None,
             "avg_days_between_investments": avg_days,
-            "total_investments": len(dates)
+            "total_investments": len(dates),
         }
 
     def extract_contacts(self, investor_id: int, investor_type: str) -> List[Dict]:
@@ -404,17 +430,23 @@ class InvestorEnrichmentEngine:
             try:
                 result = self.db.execute(query, {"investor_id": investor_id})
                 for row in result.mappings():
-                    contacts.append({
-                        "name": row["name"],
-                        "title": row.get("title"),
-                        "email": row.get("email"),
-                        "phone": row.get("phone"),
-                        "linkedin_url": row.get("linkedin_url"),
-                        "role_type": self._classify_role(row.get("title"), row.get("role")),
-                        "is_primary": row.get("role") == "primary",
-                        "source": row.get("source", "family_office_contacts"),
-                        "confidence_score": self._parse_confidence(row.get("confidence_level"))
-                    })
+                    contacts.append(
+                        {
+                            "name": row["name"],
+                            "title": row.get("title"),
+                            "email": row.get("email"),
+                            "phone": row.get("phone"),
+                            "linkedin_url": row.get("linkedin_url"),
+                            "role_type": self._classify_role(
+                                row.get("title"), row.get("role")
+                            ),
+                            "is_primary": row.get("role") == "primary",
+                            "source": row.get("source", "family_office_contacts"),
+                            "confidence_score": self._parse_confidence(
+                                row.get("confidence_level")
+                            ),
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Error fetching family office contacts: {e}")
 
@@ -444,7 +476,9 @@ class InvestorEnrichmentEngine:
             return "partner"
         if any(x in title_lower for x in ["analyst", "associate"]):
             return "analyst"
-        if any(x in title_lower for x in ["ceo", "chief executive", "president", "founder"]):
+        if any(
+            x in title_lower for x in ["ceo", "chief executive", "president", "founder"]
+        ):
             return "executive"
         if any(x in title_lower for x in ["cfo", "chief financial"]):
             return "cfo"
@@ -466,7 +500,9 @@ class InvestorEnrichmentEngine:
 
         return 0.5
 
-    def _save_contact(self, investor_id: int, investor_type: str, contact: Dict) -> None:
+    def _save_contact(
+        self, investor_id: int, investor_type: str, contact: Dict
+    ) -> None:
         """Save contact to database."""
         query = text("""
             INSERT INTO investor_contacts (
@@ -480,19 +516,22 @@ class InvestorEnrichmentEngine:
         """)
 
         try:
-            self.db.execute(query, {
-                "investor_id": investor_id,
-                "investor_type": investor_type,
-                "name": contact.get("name"),
-                "title": contact.get("title"),
-                "email": contact.get("email"),
-                "phone": contact.get("phone"),
-                "linkedin": contact.get("linkedin_url"),
-                "role_type": contact.get("role_type"),
-                "is_primary": contact.get("is_primary", False),
-                "source": contact.get("source"),
-                "confidence": contact.get("confidence_score", 0.5)
-            })
+            self.db.execute(
+                query,
+                {
+                    "investor_id": investor_id,
+                    "investor_type": investor_type,
+                    "name": contact.get("name"),
+                    "title": contact.get("title"),
+                    "email": contact.get("email"),
+                    "phone": contact.get("phone"),
+                    "linkedin": contact.get("linkedin_url"),
+                    "role_type": contact.get("role_type"),
+                    "is_primary": contact.get("is_primary", False),
+                    "source": contact.get("source"),
+                    "confidence": contact.get("confidence_score", 0.5),
+                },
+            )
             self.db.commit()
         except Exception as e:
             logger.warning(f"Error saving contact: {e}")
@@ -518,7 +557,9 @@ class InvestorEnrichmentEngine:
             try:
                 aum_value = self._parse_amount(current_aum)
                 if aum_value:
-                    self._save_aum_snapshot(investor_id, investor_type, aum_value, "investor_record")
+                    self._save_aum_snapshot(
+                        investor_id, investor_type, aum_value, "investor_record"
+                    )
             except (ValueError, TypeError):
                 pass
 
@@ -531,24 +572,24 @@ class InvestorEnrichmentEngine:
             ORDER BY aum_date DESC
             LIMIT 20
         """)
-        result = self.db.execute(query, {
-            "investor_id": investor_id,
-            "investor_type": investor_type
-        })
+        result = self.db.execute(
+            query, {"investor_id": investor_id, "investor_type": investor_type}
+        )
 
         history = [
             {
                 "date": row["aum_date"].isoformat(),
                 "aum_usd": row["aum_usd"],
-                "source": row["source"]
+                "source": row["source"],
             }
             for row in result.mappings()
         ]
 
         return history
 
-    def _save_aum_snapshot(self, investor_id: int, investor_type: str,
-                          aum_value: int, source: str) -> None:
+    def _save_aum_snapshot(
+        self, investor_id: int, investor_type: str, aum_value: int, source: str
+    ) -> None:
         """Save AUM snapshot to history."""
         today = datetime.utcnow().date()
 
@@ -564,13 +605,16 @@ class InvestorEnrichmentEngine:
         """)
 
         try:
-            self.db.execute(query, {
-                "investor_id": investor_id,
-                "investor_type": investor_type,
-                "aum": aum_value,
-                "date": today,
-                "source": source
-            })
+            self.db.execute(
+                query,
+                {
+                    "investor_id": investor_id,
+                    "investor_type": investor_type,
+                    "aum": aum_value,
+                    "date": today,
+                    "source": source,
+                },
+            )
             self.db.commit()
         except Exception as e:
             logger.warning(f"Error saving AUM snapshot: {e}")
@@ -599,19 +643,23 @@ class InvestorEnrichmentEngine:
             "preferences": None,
             "commitment_pace": None,
             "contacts": None,
-            "aum_history": None
+            "aum_history": None,
         }
 
         # Analyze preferences
         try:
-            results["preferences"] = self.analyze_preferences(investor_id, investor_type)
+            results["preferences"] = self.analyze_preferences(
+                investor_id, investor_type
+            )
         except Exception as e:
             logger.error(f"Preference analysis error: {e}")
             results["preferences"] = {"error": str(e)}
 
         # Calculate commitment pace
         try:
-            results["commitment_pace"] = self.calculate_commitment_pace(investor_id, investor_type)
+            results["commitment_pace"] = self.calculate_commitment_pace(
+                investor_id, investor_type
+            )
         except Exception as e:
             logger.error(f"Commitment pace error: {e}")
             results["commitment_pace"] = {"error": str(e)}
@@ -644,10 +692,9 @@ class InvestorEnrichmentEngine:
               AND investor_type = :investor_type
             ORDER BY is_primary DESC, confidence_score DESC
         """)
-        result = self.db.execute(query, {
-            "investor_id": investor_id,
-            "investor_type": investor_type
-        })
+        result = self.db.execute(
+            query, {"investor_id": investor_id, "investor_type": investor_type}
+        )
 
         return [dict(row) for row in result.mappings()]
 
@@ -656,11 +703,7 @@ class InvestorEnrichmentEngine:
         history = self.track_aum_history(investor_id, investor_type)
 
         if not history:
-            return {
-                "current_aum_usd": None,
-                "history": [],
-                "growth_rate_1y": None
-            }
+            return {"current_aum_usd": None, "history": [], "growth_rate_1y": None}
 
         current = history[0]["aum_usd"] if history else None
 
@@ -672,13 +715,15 @@ class InvestorEnrichmentEngine:
                 item_date = datetime.fromisoformat(item["date"]).date()
                 if item_date <= one_year_ago:
                     if current and item["aum_usd"]:
-                        growth_rate = round((current - item["aum_usd"]) / item["aum_usd"], 3)
+                        growth_rate = round(
+                            (current - item["aum_usd"]) / item["aum_usd"], 3
+                        )
                     break
 
         return {
             "current_aum_usd": current,
             "history": history,
-            "growth_rate_1y": growth_rate
+            "growth_rate_1y": growth_rate,
         }
 
     def get_preferences(self, investor_id: int, investor_type: str) -> Dict:
@@ -693,10 +738,9 @@ class InvestorEnrichmentEngine:
             WHERE investor_id = :investor_id
               AND investor_type = :investor_type
         """)
-        result = self.db.execute(query, {
-            "investor_id": investor_id,
-            "investor_type": investor_type
-        })
+        result = self.db.execute(
+            query, {"investor_id": investor_id, "investor_type": investor_type}
+        )
         row = result.mappings().fetchone()
 
         if not row:
@@ -710,11 +754,15 @@ class InvestorEnrichmentEngine:
             "check_sizes": {
                 "avg": row["avg_check_size_usd"],
                 "min": row["min_check_size_usd"],
-                "max": row["max_check_size_usd"]
+                "max": row["max_check_size_usd"],
             },
             "commitment_pace": {
                 "investments_per_year": row["investments_per_year"],
-                "last_investment_date": row["last_investment_date"].isoformat() if row["last_investment_date"] else None
+                "last_investment_date": row["last_investment_date"].isoformat()
+                if row["last_investment_date"]
+                else None,
             },
-            "analyzed_at": row["analyzed_at"].isoformat() if row["analyzed_at"] else None
+            "analyzed_at": row["analyzed_at"].isoformat()
+            if row["analyzed_at"]
+            else None,
         }

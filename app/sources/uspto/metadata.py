@@ -3,6 +3,7 @@ USPTO PatentsView metadata and field definitions.
 
 Contains field mappings, CPC code descriptions, and validation utilities.
 """
+
 import re
 from typing import Dict, List, Optional, Any
 from datetime import datetime
@@ -276,7 +277,9 @@ def extract_patent_summary(patent_data: Dict[str, Any]) -> Dict[str, Any]:
         "inventor": first_inventor,
         "assignee": first_assignee,
         "cpc_code": primary_cpc,
-        "cpc_description": get_cpc_class_description(primary_cpc) if primary_cpc else None,
+        "cpc_description": get_cpc_class_description(primary_cpc)
+        if primary_cpc
+        else None,
     }
 
 
@@ -309,7 +312,9 @@ def build_patent_search_summary(response: Dict[str, Any]) -> Dict[str, Any]:
                 cpc_counts[desc] = cpc_counts.get(desc, 0) + 1
 
     # Sort and get top items
-    top_assignees = sorted(assignee_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    top_assignees = sorted(assignee_counts.items(), key=lambda x: x[1], reverse=True)[
+        :10
+    ]
     top_cpc = sorted(cpc_counts.items(), key=lambda x: x[1], reverse=True)[:5]
 
     return {

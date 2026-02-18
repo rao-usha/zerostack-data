@@ -84,7 +84,9 @@ class WebsiteAgent(BaseCollector):
 
         try:
             # Step 1: Find leadership pages
-            logger.info(f"[WebsiteAgent] Finding leadership pages for {company_name} at {website_url}")
+            logger.info(
+                f"[WebsiteAgent] Finding leadership pages for {company_name} at {website_url}"
+            )
             pages = await self.page_finder.find_leadership_pages(website_url, max_pages)
 
             if not pages:
@@ -96,18 +98,22 @@ class WebsiteAgent(BaseCollector):
                 )
                 return self._finalize_result(result)
 
-            logger.info(f"[WebsiteAgent] Found {len(pages)} potential leadership pages for {company_name}")
+            logger.info(
+                f"[WebsiteAgent] Found {len(pages)} potential leadership pages for {company_name}"
+            )
             for page in pages:
-                logger.debug(f"[WebsiteAgent] Page: {page['url']} (type={page.get('page_type')}, score={page.get('score')})")
-                result.page_urls.append(page['url'])
+                logger.debug(
+                    f"[WebsiteAgent] Page: {page['url']} (type={page.get('page_type')}, score={page.get('score')})"
+                )
+                result.page_urls.append(page["url"])
 
             # Step 2: Extract people from each page
             all_people: List[ExtractedPerson] = []
             page_results: List[LeadershipPageResult] = []
 
             for page_info in pages:
-                page_url = page_info['url']
-                page_type = page_info.get('page_type', 'unknown')
+                page_url = page_info["url"]
+                page_type = page_info.get("page_type", "unknown")
 
                 logger.info(f"[WebsiteAgent] Extracting from page: {page_url}")
 
@@ -123,22 +129,34 @@ class WebsiteAgent(BaseCollector):
                         f"(confidence={page_result.extraction_confidence})"
                     )
                     if page_result.extraction_notes:
-                        logger.debug(f"[WebsiteAgent] Notes: {page_result.extraction_notes}")
+                        logger.debug(
+                            f"[WebsiteAgent] Notes: {page_result.extraction_notes}"
+                        )
 
                 except Exception as e:
-                    logger.warning(f"[WebsiteAgent] Error extracting from {page_url}: {e}")
-                    result.warnings.append(f"Failed to extract from {page_url}: {str(e)}")
+                    logger.warning(
+                        f"[WebsiteAgent] Error extracting from {page_url}: {e}"
+                    )
+                    result.warnings.append(
+                        f"Failed to extract from {page_url}: {str(e)}"
+                    )
 
             # Step 3: Deduplicate people
-            logger.info(f"[WebsiteAgent] Deduplicating {len(all_people)} raw extractions")
+            logger.info(
+                f"[WebsiteAgent] Deduplicating {len(all_people)} raw extractions"
+            )
             unique_people = self._deduplicate_people(all_people)
-            logger.info(f"[WebsiteAgent] After dedup: {len(unique_people)} unique people")
+            logger.info(
+                f"[WebsiteAgent] After dedup: {len(unique_people)} unique people"
+            )
 
             # Step 4: Validate and filter
             valid_people = self._validate_people(unique_people, company_name)
             filtered_count = len(unique_people) - len(valid_people)
             if filtered_count > 0:
-                logger.info(f"[WebsiteAgent] Validation filtered out {filtered_count} people")
+                logger.info(
+                    f"[WebsiteAgent] Validation filtered out {filtered_count} people"
+                )
 
             # Update result
             result.extracted_people = valid_people
@@ -206,7 +224,9 @@ class WebsiteAgent(BaseCollector):
 
         # Try structured extraction first (faster, no LLM cost)
         structured_people = self._extract_structured(html, page_url, company_name)
-        logger.debug(f"[WebsiteAgent] Structured extraction found {len(structured_people)} people")
+        logger.debug(
+            f"[WebsiteAgent] Structured extraction found {len(structured_people)} people"
+        )
 
         # Pre-filter: skip LLM if no leadership keywords AND no structured people found
         if not cleaned.has_leadership_content and len(structured_people) == 0:
@@ -298,8 +318,8 @@ class WebsiteAgent(BaseCollector):
             cards = extract_people_cards(html)
 
             for card in cards:
-                name = card.get('name', '')
-                title = card.get('title', '')
+                name = card.get("name", "")
+                title = card.get("title", "")
 
                 if not name or not title:
                     continue
@@ -311,9 +331,9 @@ class WebsiteAgent(BaseCollector):
                 person = ExtractedPerson(
                     full_name=name,
                     title=title,
-                    bio=card.get('bio'),
-                    linkedin_url=card.get('linkedin_url'),
-                    photo_url=card.get('image_url'),
+                    bio=card.get("bio"),
+                    linkedin_url=card.get("linkedin_url"),
+                    photo_url=card.get("image_url"),
                     source_url=page_url,
                     confidence=ExtractionConfidence.MEDIUM,
                     is_executive=True,
@@ -321,9 +341,9 @@ class WebsiteAgent(BaseCollector):
 
                 # Try to parse name
                 name_parts = self._parse_name(name)
-                person.first_name = name_parts.get('first_name')
-                person.last_name = name_parts.get('last_name')
-                person.suffix = name_parts.get('suffix')
+                person.first_name = name_parts.get("first_name")
+                person.last_name = name_parts.get("last_name")
+                person.suffix = name_parts.get("suffix")
 
                 # Infer title level
                 person.title_level = self._infer_title_level(title)
@@ -403,13 +423,19 @@ class WebsiteAgent(BaseCollector):
             target.photo_url = source.photo_url
         if not target.reports_to and source.reports_to:
             target.reports_to = source.reports_to
-        if target.title_level == TitleLevel.UNKNOWN and source.title_level != TitleLevel.UNKNOWN:
+        if (
+            target.title_level == TitleLevel.UNKNOWN
+            and source.title_level != TitleLevel.UNKNOWN
+        ):
             target.title_level = source.title_level
         if not target.department and source.department:
             target.department = source.department
 
         # Use higher confidence
-        if source.confidence == ExtractionConfidence.HIGH and target.confidence != ExtractionConfidence.HIGH:
+        if (
+            source.confidence == ExtractionConfidence.HIGH
+            and target.confidence != ExtractionConfidence.HIGH
+        ):
             target.confidence = source.confidence
 
     def _validate_people(
@@ -430,23 +456,41 @@ class WebsiteAgent(BaseCollector):
                 continue
 
             # Filter out company name as person name
-            if self._normalize_name(person.full_name) == self._normalize_name(company_name):
+            if self._normalize_name(person.full_name) == self._normalize_name(
+                company_name
+            ):
                 continue
 
             # Filter obvious non-people
             lower_name = person.full_name.lower()
-            invalid_names = ['contact us', 'our team', 'leadership', 'management', 'learn more']
+            invalid_names = [
+                "contact us",
+                "our team",
+                "leadership",
+                "management",
+                "learn more",
+            ]
             if any(inv in lower_name for inv in invalid_names):
                 continue
 
             # Filter LLM-hallucinated placeholder names
             placeholder_names = {
-                'jane doe', 'john doe', 'john smith', 'jane smith',
-                'bob smith', 'alice smith', 'joe smith', 'mary smith',
-                'test user', 'sample person', 'example name',
+                "jane doe",
+                "john doe",
+                "john smith",
+                "jane smith",
+                "bob smith",
+                "alice smith",
+                "joe smith",
+                "mary smith",
+                "test user",
+                "sample person",
+                "example name",
             }
             if self._normalize_name(person.full_name) in placeholder_names:
-                logger.warning(f"[WebsiteAgent] Filtering placeholder name: {person.full_name}")
+                logger.warning(
+                    f"[WebsiteAgent] Filtering placeholder name: {person.full_name}"
+                )
                 continue
 
             valid.append(person)
@@ -476,11 +520,11 @@ class WebsiteAgent(BaseCollector):
             return False
 
         # Shouldn't contain URLs
-        if 'http' in name.lower() or 'www.' in name.lower():
+        if "http" in name.lower() or "www." in name.lower():
             return False
 
         # Shouldn't contain @
-        if '@' in name:
+        if "@" in name:
             return False
 
         return True
@@ -494,16 +538,16 @@ class WebsiteAgent(BaseCollector):
         name = name.lower()
 
         # Remove common suffixes
-        suffixes = [' jr', ' sr', ' iii', ' ii', ' iv', ' phd', ' md', ' esq', ' cpa']
+        suffixes = [" jr", " sr", " iii", " ii", " iv", " phd", " md", " esq", " cpa"]
         for suffix in suffixes:
             if name.endswith(suffix):
-                name = name[:-len(suffix)]
+                name = name[: -len(suffix)]
 
         # Remove punctuation
-        name = ''.join(c for c in name if c.isalnum() or c.isspace())
+        name = "".join(c for c in name if c.isalnum() or c.isspace())
 
         # Collapse whitespace
-        name = ' '.join(name.split())
+        name = " ".join(name.split())
 
         return name
 
@@ -533,24 +577,36 @@ class WebsiteAgent(BaseCollector):
         parts = full_name.split()
 
         if len(parts) == 1:
-            return {'first_name': parts[0], 'last_name': None, 'suffix': None}
+            return {"first_name": parts[0], "last_name": None, "suffix": None}
 
         # Check for suffix
         suffix = None
-        suffixes = ['Jr.', 'Jr', 'Sr.', 'Sr', 'III', 'II', 'IV', 'PhD', 'MD', 'Esq', 'CPA']
+        suffixes = [
+            "Jr.",
+            "Jr",
+            "Sr.",
+            "Sr",
+            "III",
+            "II",
+            "IV",
+            "PhD",
+            "MD",
+            "Esq",
+            "CPA",
+        ]
         if parts[-1] in suffixes:
             suffix = parts[-1]
             parts = parts[:-1]
 
         if len(parts) == 0:
-            return {'first_name': None, 'last_name': None, 'suffix': suffix}
+            return {"first_name": None, "last_name": None, "suffix": suffix}
         elif len(parts) == 1:
-            return {'first_name': parts[0], 'last_name': None, 'suffix': suffix}
+            return {"first_name": parts[0], "last_name": None, "suffix": suffix}
         else:
             return {
-                'first_name': parts[0],
-                'last_name': ' '.join(parts[1:]),
-                'suffix': suffix,
+                "first_name": parts[0],
+                "last_name": " ".join(parts[1:]),
+                "suffix": suffix,
             }
 
     def _infer_title_level(self, title: str) -> TitleLevel:
@@ -560,42 +616,56 @@ class WebsiteAgent(BaseCollector):
 
         title_lower = title.lower()
         # Add spaces for word boundary matching
-        title_spaced = f' {title_lower} '
+        title_spaced = f" {title_lower} "
 
         # C-Suite (check first, highest priority)
         # Use word boundaries to avoid matching "cto" in "director"
-        c_suite_patterns = [' chief ', ' ceo ', ' cfo ', ' coo ', ' cto ', ' cio ', ' cmo ', ' cro ', ' chro ']
+        c_suite_patterns = [
+            " chief ",
+            " ceo ",
+            " cfo ",
+            " coo ",
+            " cto ",
+            " cio ",
+            " cmo ",
+            " cro ",
+            " chro ",
+        ]
         if any(pat in title_spaced for pat in c_suite_patterns):
             return TitleLevel.C_SUITE
 
         # EVP (check before president since "Executive Vice President" contains "president")
-        if 'executive vice president' in title_lower or 'evp' in title_lower:
+        if "executive vice president" in title_lower or "evp" in title_lower:
             return TitleLevel.EVP
 
         # SVP (check before president and VP)
-        if 'senior vice president' in title_lower or 'svp' in title_lower:
+        if "senior vice president" in title_lower or "svp" in title_lower:
             return TitleLevel.SVP
 
         # VP (check before president since "Vice President" contains "president")
-        if 'vice president' in title_lower or ' vp ' in f' {title_lower} ':
+        if "vice president" in title_lower or " vp " in f" {title_lower} ":
             return TitleLevel.VP
 
         # President (standalone, after VP variants)
-        if 'president' in title_lower:
+        if "president" in title_lower:
             return TitleLevel.PRESIDENT
 
         # Board (check for "director" only if it's board-style, not "Director of X")
-        if 'board' in title_lower or 'chairman' in title_lower:
+        if "board" in title_lower or "chairman" in title_lower:
             return TitleLevel.BOARD
-        if 'director' in title_lower and 'director of' not in title_lower and 'director,' not in title_lower:
+        if (
+            "director" in title_lower
+            and "director of" not in title_lower
+            and "director," not in title_lower
+        ):
             return TitleLevel.BOARD
 
         # Director (functional role like "Director of Sales")
-        if 'director' in title_lower:
+        if "director" in title_lower:
             return TitleLevel.DIRECTOR
 
         # Manager
-        if 'manager' in title_lower:
+        if "manager" in title_lower:
             return TitleLevel.MANAGER
 
         return TitleLevel.UNKNOWN
@@ -603,7 +673,9 @@ class WebsiteAgent(BaseCollector):
     def _finalize_result(self, result: CollectionResult) -> CollectionResult:
         """Finalize collection result with timing."""
         result.completed_at = datetime.utcnow()
-        result.duration_seconds = (result.completed_at - result.started_at).total_seconds()
+        result.duration_seconds = (
+            result.completed_at - result.started_at
+        ).total_seconds()
         return result
 
 

@@ -4,6 +4,7 @@ Ticker Resolver - Resolve stock tickers to company names.
 Uses yfinance for ticker lookups with LRU caching.
 Falls back to SEC EDGAR company search if yfinance fails.
 """
+
 import asyncio
 import logging
 import re
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 # Try to import yfinance
 try:
     import yfinance as yf
+
     YFINANCE_AVAILABLE = True
 except ImportError:
     YFINANCE_AVAILABLE = False
@@ -37,7 +39,7 @@ def normalize_ticker(ticker: str) -> str:
     # Remove common suffixes for lookup
     for suffix in TICKER_SUFFIXES:
         if ticker.endswith(suffix):
-            return ticker[:-len(suffix)]
+            return ticker[: -len(suffix)]
     return ticker
 
 
@@ -153,16 +155,14 @@ async def resolve_cusip(cusip: str) -> Optional[str]:
 
             response = await client.get(
                 url,
-                headers={
-                    "User-Agent": "Nexdata Research Bot (research@example.com)"
-                }
+                headers={"User-Agent": "Nexdata Research Bot (research@example.com)"},
             )
 
             if response.status_code == 200:
                 # Parse company name from response
                 text = response.text
                 # Look for company name in the response
-                match = re.search(r'<title>([^<]+)</title>', text)
+                match = re.search(r"<title>([^<]+)</title>", text)
                 if match:
                     title = match.group(1)
                     # Extract company name from title

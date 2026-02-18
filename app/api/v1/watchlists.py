@@ -27,6 +27,7 @@ router = APIRouter(tags=["Watchlists & Saved Searches"])
 
 class WatchlistCreate(BaseModel):
     """Request to create a watchlist."""
+
     name: str = Field(..., min_length=1, max_length=255, description="Watchlist name")
     user_id: str = Field(..., min_length=1, description="User identifier (email)")
     description: Optional[str] = Field(None, description="Optional description")
@@ -34,27 +35,35 @@ class WatchlistCreate(BaseModel):
 
 class WatchlistUpdate(BaseModel):
     """Request to update a watchlist."""
+
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
 
 
 class WatchlistItemCreate(BaseModel):
     """Request to add an item to a watchlist."""
-    entity_type: str = Field(..., pattern="^(investor|company)$", description="Entity type")
+
+    entity_type: str = Field(
+        ..., pattern="^(investor|company)$", description="Entity type"
+    )
     entity_id: int = Field(..., gt=0, description="Entity ID")
     note: Optional[str] = Field(None, description="Optional note about this item")
 
 
 class SavedSearchCreate(BaseModel):
     """Request to save a search."""
+
     name: str = Field(..., min_length=1, max_length=255, description="Search name")
     user_id: str = Field(..., min_length=1, description="User identifier")
     query: Optional[str] = Field("", description="Search query text")
-    filters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Search filters")
+    filters: Optional[Dict[str, Any]] = Field(
+        default_factory=dict, description="Search filters"
+    )
 
 
 class SavedSearchUpdate(BaseModel):
     """Request to update a saved search."""
+
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     query: Optional[str] = None
     filters: Optional[Dict[str, Any]] = None
@@ -67,6 +76,7 @@ class SavedSearchUpdate(BaseModel):
 
 class WatchlistResponse(BaseModel):
     """Watchlist response."""
+
     id: int
     user_id: str
     name: str
@@ -79,6 +89,7 @@ class WatchlistResponse(BaseModel):
 
 class WatchlistItemResponse(BaseModel):
     """Watchlist item response."""
+
     id: int
     entity_type: str
     entity_id: int
@@ -90,6 +101,7 @@ class WatchlistItemResponse(BaseModel):
 
 class WatchlistItemsResponse(BaseModel):
     """Paginated list of watchlist items."""
+
     items: List[WatchlistItemResponse]
     total: int
     page: int
@@ -98,6 +110,7 @@ class WatchlistItemsResponse(BaseModel):
 
 class SavedSearchResponse(BaseModel):
     """Saved search response."""
+
     id: int
     user_id: str
     name: str
@@ -115,10 +128,7 @@ class SavedSearchResponse(BaseModel):
 
 
 @router.post("/watchlists", response_model=WatchlistResponse, status_code=201)
-async def create_watchlist(
-    request: WatchlistCreate,
-    db: Session = Depends(get_db)
-):
+async def create_watchlist(request: WatchlistCreate, db: Session = Depends(get_db)):
     """
     Create a new watchlist.
 
@@ -135,9 +145,7 @@ async def create_watchlist(
 
     try:
         watchlist = service.create_watchlist(
-            user_id=request.user_id,
-            name=request.name,
-            description=request.description
+            user_id=request.user_id, name=request.name, description=request.description
         )
 
         return WatchlistResponse(
@@ -148,17 +156,19 @@ async def create_watchlist(
             is_public=watchlist.is_public,
             item_count=watchlist.item_count,
             created_at=watchlist.created_at.isoformat(),
-            updated_at=watchlist.updated_at.isoformat()
+            updated_at=watchlist.updated_at.isoformat(),
         )
     except Exception as e:
         logger.error(f"Error creating watchlist: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to create watchlist: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create watchlist: {str(e)}"
+        )
 
 
 @router.get("/watchlists", response_model=List[WatchlistResponse])
 async def list_watchlists(
     user_id: str = Query(..., description="User identifier"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     List all watchlists for a user.
@@ -179,26 +189,27 @@ async def list_watchlists(
                 is_public=w.is_public,
                 item_count=w.item_count,
                 created_at=w.created_at.isoformat(),
-                updated_at=w.updated_at.isoformat()
+                updated_at=w.updated_at.isoformat(),
             )
             for w in watchlists
         ]
     except Exception as e:
         logger.error(f"Error listing watchlists: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to list watchlists: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to list watchlists: {str(e)}"
+        )
 
 
 @router.get("/watchlists/{watchlist_id}", response_model=WatchlistResponse)
-async def get_watchlist(
-    watchlist_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_watchlist(watchlist_id: int, db: Session = Depends(get_db)):
     """Get a watchlist by ID."""
     service = WatchlistService(db)
 
     watchlist = service.get_watchlist(watchlist_id)
     if not watchlist:
-        raise HTTPException(status_code=404, detail=f"Watchlist {watchlist_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Watchlist {watchlist_id} not found"
+        )
 
     return WatchlistResponse(
         id=watchlist.id,
@@ -208,15 +219,13 @@ async def get_watchlist(
         is_public=watchlist.is_public,
         item_count=watchlist.item_count,
         created_at=watchlist.created_at.isoformat(),
-        updated_at=watchlist.updated_at.isoformat()
+        updated_at=watchlist.updated_at.isoformat(),
     )
 
 
 @router.patch("/watchlists/{watchlist_id}", response_model=WatchlistResponse)
 async def update_watchlist(
-    watchlist_id: int,
-    request: WatchlistUpdate,
-    db: Session = Depends(get_db)
+    watchlist_id: int, request: WatchlistUpdate, db: Session = Depends(get_db)
 ):
     """Update a watchlist."""
     service = WatchlistService(db)
@@ -224,12 +233,12 @@ async def update_watchlist(
     # Check exists
     existing = service.get_watchlist(watchlist_id)
     if not existing:
-        raise HTTPException(status_code=404, detail=f"Watchlist {watchlist_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Watchlist {watchlist_id} not found"
+        )
 
     watchlist = service.update_watchlist(
-        watchlist_id=watchlist_id,
-        name=request.name,
-        description=request.description
+        watchlist_id=watchlist_id, name=request.name, description=request.description
     )
 
     return WatchlistResponse(
@@ -240,21 +249,20 @@ async def update_watchlist(
         is_public=watchlist.is_public,
         item_count=watchlist.item_count,
         created_at=watchlist.created_at.isoformat(),
-        updated_at=watchlist.updated_at.isoformat()
+        updated_at=watchlist.updated_at.isoformat(),
     )
 
 
 @router.delete("/watchlists/{watchlist_id}", status_code=204)
-async def delete_watchlist(
-    watchlist_id: int,
-    db: Session = Depends(get_db)
-):
+async def delete_watchlist(watchlist_id: int, db: Session = Depends(get_db)):
     """Delete a watchlist and all its items."""
     service = WatchlistService(db)
 
     deleted = service.delete_watchlist(watchlist_id)
     if not deleted:
-        raise HTTPException(status_code=404, detail=f"Watchlist {watchlist_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Watchlist {watchlist_id} not found"
+        )
 
     return None
 
@@ -264,11 +272,13 @@ async def delete_watchlist(
 # =============================================================================
 
 
-@router.post("/watchlists/{watchlist_id}/items", response_model=WatchlistItemResponse, status_code=201)
+@router.post(
+    "/watchlists/{watchlist_id}/items",
+    response_model=WatchlistItemResponse,
+    status_code=201,
+)
 async def add_watchlist_item(
-    watchlist_id: int,
-    request: WatchlistItemCreate,
-    db: Session = Depends(get_db)
+    watchlist_id: int, request: WatchlistItemCreate, db: Session = Depends(get_db)
 ):
     """
     Add an item to a watchlist.
@@ -289,19 +299,21 @@ async def add_watchlist_item(
     # Check watchlist exists
     watchlist = service.get_watchlist(watchlist_id)
     if not watchlist:
-        raise HTTPException(status_code=404, detail=f"Watchlist {watchlist_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Watchlist {watchlist_id} not found"
+        )
 
     item = service.add_item(
         watchlist_id=watchlist_id,
         entity_type=request.entity_type,
         entity_id=request.entity_id,
-        note=request.note
+        note=request.note,
     )
 
     if not item:
         raise HTTPException(
             status_code=409,
-            detail=f"Item already exists in watchlist (entity_type={request.entity_type}, entity_id={request.entity_id})"
+            detail=f"Item already exists in watchlist (entity_type={request.entity_type}, entity_id={request.entity_id})",
         )
 
     return WatchlistItemResponse(
@@ -311,7 +323,7 @@ async def add_watchlist_item(
         entity_name=item.entity_name,
         entity_details=item.entity_details,
         note=item.note,
-        added_at=item.added_at.isoformat()
+        added_at=item.added_at.isoformat(),
     )
 
 
@@ -320,7 +332,7 @@ async def list_watchlist_items(
     watchlist_id: int,
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=100, description="Items per page"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """List items in a watchlist with pagination."""
     service = WatchlistService(db)
@@ -328,7 +340,9 @@ async def list_watchlist_items(
     # Check watchlist exists
     watchlist = service.get_watchlist(watchlist_id)
     if not watchlist:
-        raise HTTPException(status_code=404, detail=f"Watchlist {watchlist_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Watchlist {watchlist_id} not found"
+        )
 
     items, total = service.list_items(watchlist_id, page=page, page_size=page_size)
 
@@ -341,28 +355,29 @@ async def list_watchlist_items(
                 entity_name=item.entity_name,
                 entity_details=item.entity_details,
                 note=item.note,
-                added_at=item.added_at.isoformat()
+                added_at=item.added_at.isoformat(),
             )
             for item in items
         ],
         total=total,
         page=page,
-        page_size=page_size
+        page_size=page_size,
     )
 
 
 @router.delete("/watchlists/{watchlist_id}/items/{item_id}", status_code=204)
 async def remove_watchlist_item(
-    watchlist_id: int,
-    item_id: int,
-    db: Session = Depends(get_db)
+    watchlist_id: int, item_id: int, db: Session = Depends(get_db)
 ):
     """Remove an item from a watchlist by item ID."""
     service = WatchlistService(db)
 
     removed = service.remove_item(watchlist_id, item_id)
     if not removed:
-        raise HTTPException(status_code=404, detail=f"Item {item_id} not found in watchlist {watchlist_id}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Item {item_id} not found in watchlist {watchlist_id}",
+        )
 
     return None
 
@@ -374,8 +389,7 @@ async def remove_watchlist_item(
 
 @router.post("/searches/saved", response_model=SavedSearchResponse, status_code=201)
 async def create_saved_search(
-    request: SavedSearchCreate,
-    db: Session = Depends(get_db)
+    request: SavedSearchCreate, db: Session = Depends(get_db)
 ):
     """
     Save a search query for later re-execution.
@@ -400,7 +414,7 @@ async def create_saved_search(
             user_id=request.user_id,
             name=request.name,
             query=request.query,
-            filters=request.filters
+            filters=request.filters,
         )
 
         return SavedSearchResponse(
@@ -410,9 +424,11 @@ async def create_saved_search(
             query=search.query,
             filters=search.filters,
             execution_count=search.execution_count,
-            last_executed_at=search.last_executed_at.isoformat() if search.last_executed_at else None,
+            last_executed_at=search.last_executed_at.isoformat()
+            if search.last_executed_at
+            else None,
             created_at=search.created_at.isoformat(),
-            updated_at=search.updated_at.isoformat()
+            updated_at=search.updated_at.isoformat(),
         )
     except Exception as e:
         logger.error(f"Error creating saved search: {e}", exc_info=True)
@@ -423,7 +439,7 @@ async def create_saved_search(
 async def list_saved_searches(
     user_id: str = Query(..., description="User identifier"),
     name: Optional[str] = Query(None, description="Filter by name (substring match)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     List saved searches for a user.
@@ -443,28 +459,31 @@ async def list_saved_searches(
                 query=s.query,
                 filters=s.filters,
                 execution_count=s.execution_count,
-                last_executed_at=s.last_executed_at.isoformat() if s.last_executed_at else None,
+                last_executed_at=s.last_executed_at.isoformat()
+                if s.last_executed_at
+                else None,
                 created_at=s.created_at.isoformat(),
-                updated_at=s.updated_at.isoformat()
+                updated_at=s.updated_at.isoformat(),
             )
             for s in searches
         ]
     except Exception as e:
         logger.error(f"Error listing saved searches: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to list saved searches: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to list saved searches: {str(e)}"
+        )
 
 
 @router.get("/searches/saved/{search_id}", response_model=SavedSearchResponse)
-async def get_saved_search(
-    search_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_saved_search(search_id: int, db: Session = Depends(get_db)):
     """Get a saved search by ID."""
     service = WatchlistService(db)
 
     search = service.get_saved_search(search_id)
     if not search:
-        raise HTTPException(status_code=404, detail=f"Saved search {search_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Saved search {search_id} not found"
+        )
 
     return SavedSearchResponse(
         id=search.id,
@@ -473,9 +492,11 @@ async def get_saved_search(
         query=search.query,
         filters=search.filters,
         execution_count=search.execution_count,
-        last_executed_at=search.last_executed_at.isoformat() if search.last_executed_at else None,
+        last_executed_at=search.last_executed_at.isoformat()
+        if search.last_executed_at
+        else None,
         created_at=search.created_at.isoformat(),
-        updated_at=search.updated_at.isoformat()
+        updated_at=search.updated_at.isoformat(),
     )
 
 
@@ -484,7 +505,7 @@ async def execute_saved_search(
     search_id: int,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Execute a saved search and return results.
@@ -497,7 +518,9 @@ async def execute_saved_search(
     # Get saved search
     search = service.get_saved_search(search_id)
     if not search:
-        raise HTTPException(status_code=404, detail=f"Saved search {search_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Saved search {search_id} not found"
+        )
 
     # Record execution
     service.record_execution(search_id)
@@ -520,7 +543,7 @@ async def execute_saved_search(
             investor_type=investor_type,
             location=location,
             page=page,
-            page_size=page_size
+            page_size=page_size,
         )
 
         return {
@@ -536,24 +559,24 @@ async def execute_saved_search(
                     "industry": r.metadata.get("industry"),
                     "investor_type": r.metadata.get("investor_type"),
                     "location": r.metadata.get("location"),
-                    "rank": round(r.relevance_score, 4)
+                    "rank": round(r.relevance_score, 4),
                 }
                 for r in response.results
             ],
             "total": response.total,
             "page": page,
-            "page_size": page_size
+            "page_size": page_size,
         }
     except Exception as e:
         logger.error(f"Error executing saved search: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to execute search: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to execute search: {str(e)}"
+        )
 
 
 @router.patch("/searches/saved/{search_id}", response_model=SavedSearchResponse)
 async def update_saved_search(
-    search_id: int,
-    request: SavedSearchUpdate,
-    db: Session = Depends(get_db)
+    search_id: int, request: SavedSearchUpdate, db: Session = Depends(get_db)
 ):
     """Update a saved search."""
     service = WatchlistService(db)
@@ -561,13 +584,15 @@ async def update_saved_search(
     # Check exists
     existing = service.get_saved_search(search_id)
     if not existing:
-        raise HTTPException(status_code=404, detail=f"Saved search {search_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Saved search {search_id} not found"
+        )
 
     search = service.update_saved_search(
         search_id=search_id,
         name=request.name,
         query=request.query,
-        filters=request.filters
+        filters=request.filters,
     )
 
     return SavedSearchResponse(
@@ -577,22 +602,23 @@ async def update_saved_search(
         query=search.query,
         filters=search.filters,
         execution_count=search.execution_count,
-        last_executed_at=search.last_executed_at.isoformat() if search.last_executed_at else None,
+        last_executed_at=search.last_executed_at.isoformat()
+        if search.last_executed_at
+        else None,
         created_at=search.created_at.isoformat(),
-        updated_at=search.updated_at.isoformat()
+        updated_at=search.updated_at.isoformat(),
     )
 
 
 @router.delete("/searches/saved/{search_id}", status_code=204)
-async def delete_saved_search(
-    search_id: int,
-    db: Session = Depends(get_db)
-):
+async def delete_saved_search(search_id: int, db: Session = Depends(get_db)):
     """Delete a saved search."""
     service = WatchlistService(db)
 
     deleted = service.delete_saved_search(search_id)
     if not deleted:
-        raise HTTPException(status_code=404, detail=f"Saved search {search_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Saved search {search_id} not found"
+        )
 
     return None

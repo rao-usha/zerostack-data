@@ -88,7 +88,9 @@ class AppStoreIngestor:
                         search_query, limit=min(limit or 25, 25)
                     )
                     apps_discovered = len(search_results)
-                    logger.info(f"Discovered {apps_discovered} apps for query '{search_query}'")
+                    logger.info(
+                        f"Discovered {apps_discovered} apps for query '{search_query}'"
+                    )
                 except Exception as e:
                     errors.append(f"Search '{search_query}': {e}")
 

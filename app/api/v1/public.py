@@ -24,8 +24,10 @@ from app.auth.api_keys import APIKeyService, RateLimiter, RateLimitInfo
 # Response Models
 # ============================================================================
 
+
 class InvestorSummary(BaseModel):
     """Summary of an investor for list view."""
+
     id: int
     name: str
     lp_type: Optional[str]
@@ -35,6 +37,7 @@ class InvestorSummary(BaseModel):
 
 class InvestorDetail(BaseModel):
     """Detailed investor information."""
+
     id: int
     name: str
     formal_name: Optional[str]
@@ -47,6 +50,7 @@ class InvestorDetail(BaseModel):
 
 class SearchResult(BaseModel):
     """Search result item."""
+
     id: int
     name: str
     type: str  # 'investor' or 'company'
@@ -56,6 +60,7 @@ class SearchResult(BaseModel):
 
 class PaginatedResponse(BaseModel):
     """Paginated response wrapper."""
+
     data: List[Any]
     total: int
     page: int
@@ -66,6 +71,7 @@ class PaginatedResponse(BaseModel):
 # ============================================================================
 # Authentication Dependency
 # ============================================================================
+
 
 class APIKeyAuth:
     """Dependency for API key authentication and rate limiting."""
@@ -79,7 +85,7 @@ class APIKeyAuth:
         request: Request,
         x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
         api_key: Optional[str] = Query(None, alias="api_key"),
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
     ) -> Dict[str, Any]:
         """Validate API key and check rate limits."""
         # Get key from header or query param
@@ -88,7 +94,7 @@ class APIKeyAuth:
         if not raw_key:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="API key required. Provide via X-API-Key header or api_key query parameter."
+                detail="API key required. Provide via X-API-Key header or api_key query parameter.",
             )
 
         # Validate key
@@ -98,14 +104,14 @@ class APIKeyAuth:
         if not key_info:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired API key"
+                detail="Invalid or expired API key",
             )
 
         # Check rate limits
         limiter = RateLimiter(db)
         limits = {
             "per_minute": key_info["rate_limit_per_minute"],
-            "per_day": key_info["rate_limit_per_day"]
+            "per_day": key_info["rate_limit_per_day"],
         }
 
         allowed, rate_info = limiter.check_rate_limit(key_info["id"], limits)
@@ -118,8 +124,8 @@ class APIKeyAuth:
                     "X-RateLimit-Limit": str(rate_info.limit),
                     "X-RateLimit-Remaining": "0",
                     "X-RateLimit-Reset": str(rate_info.reset),
-                    "Retry-After": str(rate_info.reset - int(time.time()))
-                }
+                    "Retry-After": str(rate_info.reset - int(time.time())),
+                },
             )
 
         # Store rate info for response headers
@@ -151,7 +157,7 @@ def add_rate_limit_headers(request: Request) -> Dict[str, str]:
         return {
             "X-RateLimit-Limit": str(rate_info.limit),
             "X-RateLimit-Remaining": str(rate_info.remaining),
-            "X-RateLimit-Reset": str(rate_info.reset)
+            "X-RateLimit-Reset": str(rate_info.reset),
         }
     return {}
 
@@ -159,6 +165,7 @@ def add_rate_limit_headers(request: Request) -> Dict[str, str]:
 # ============================================================================
 # Endpoints
 # ============================================================================
+
 
 @router.get("/investors", response_model=PaginatedResponse)
 async def list_investors(
@@ -168,7 +175,7 @@ async def list_investors(
     lp_type: Optional[str] = Query(None, description="Filter by investor type"),
     jurisdiction: Optional[str] = Query(None, description="Filter by jurisdiction"),
     key_info: Dict = Depends(require_api_key),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     List investors with pagination and filtering.
@@ -196,29 +203,37 @@ async def list_investors(
     where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
     # Get total count
-    count_result = db.execute(text(f"""
+    count_result = db.execute(
+        text(f"""
         SELECT COUNT(*) FROM lp_fund {where_sql}
-    """), params)
+    """),
+        params,
+    )
     total = count_result.fetchone()[0]
 
     # Get paginated results
-    result = db.execute(text(f"""
+    result = db.execute(
+        text(f"""
         SELECT id, name, lp_type, jurisdiction, website_url
         FROM lp_fund
         {where_sql}
         ORDER BY name
         LIMIT :limit OFFSET :offset
-    """), params)
+    """),
+        params,
+    )
 
     investors = []
     for row in result:
-        investors.append(InvestorSummary(
-            id=row[0],
-            name=row[1],
-            lp_type=row[2],
-            jurisdiction=row[3],
-            website=row[4]
-        ).model_dump())
+        investors.append(
+            InvestorSummary(
+                id=row[0],
+                name=row[1],
+                lp_type=row[2],
+                jurisdiction=row[3],
+                website=row[4],
+            ).model_dump()
+        )
 
     # Record usage
     response_time = int((time.time() - start_time) * 1000)
@@ -228,7 +243,7 @@ async def list_investors(
         endpoint="/public/investors",
         method="GET",
         status_code=200,
-        response_time_ms=response_time
+        response_time_ms=response_time,
     )
 
     response = PaginatedResponse(
@@ -236,12 +251,11 @@ async def list_investors(
         total=total,
         page=page,
         per_page=per_page,
-        has_more=(page * per_page) < total
+        has_more=(page * per_page) < total,
     )
 
     return JSONResponse(
-        content=response.model_dump(),
-        headers=add_rate_limit_headers(request)
+        content=response.model_dump(), headers=add_rate_limit_headers(request)
     )
 
 
@@ -250,7 +264,7 @@ async def get_investor(
     request: Request,
     investor_id: int,
     key_info: Dict = Depends(require_api_key),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get detailed information about a specific investor.
@@ -260,32 +274,40 @@ async def get_investor(
     start_time = time.time()
 
     # Get investor
-    result = db.execute(text("""
+    result = db.execute(
+        text("""
         SELECT id, name, formal_name, lp_type, jurisdiction, website_url
         FROM lp_fund
         WHERE id = :investor_id
-    """), {"investor_id": investor_id})
+    """),
+        {"investor_id": investor_id},
+    )
 
     row = result.fetchone()
     if not row:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Investor not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Investor not found"
         )
 
     # Get portfolio count
-    portfolio_result = db.execute(text("""
+    portfolio_result = db.execute(
+        text("""
         SELECT COUNT(*) FROM portfolio_companies WHERE investor_id = :investor_id
-    """), {"investor_id": investor_id})
+    """),
+        {"investor_id": investor_id},
+    )
     portfolio_count = portfolio_result.fetchone()[0]
 
     # Get investment focus (distinct industries from portfolio)
-    focus_result = db.execute(text("""
+    focus_result = db.execute(
+        text("""
         SELECT DISTINCT company_industry
         FROM portfolio_companies
         WHERE investor_id = :investor_id AND company_industry IS NOT NULL
         LIMIT 10
-    """), {"investor_id": investor_id})
+    """),
+        {"investor_id": investor_id},
+    )
     investment_focus = [r[0] for r in focus_result]
 
     investor = InvestorDetail(
@@ -296,7 +318,7 @@ async def get_investor(
         jurisdiction=row[4],
         website=row[5],
         investment_focus=investment_focus,
-        portfolio_count=portfolio_count
+        portfolio_count=portfolio_count,
     )
 
     # Record usage
@@ -307,12 +329,11 @@ async def get_investor(
         endpoint=f"/public/investors/{investor_id}",
         method="GET",
         status_code=200,
-        response_time_ms=response_time
+        response_time_ms=response_time,
     )
 
     return JSONResponse(
-        content=investor.model_dump(),
-        headers=add_rate_limit_headers(request)
+        content=investor.model_dump(), headers=add_rate_limit_headers(request)
     )
 
 
@@ -320,11 +341,13 @@ async def get_investor(
 async def search(
     request: Request,
     q: str = Query(..., min_length=2, description="Search query"),
-    type: Optional[str] = Query(None, pattern="^(investor|company)$", description="Filter by type"),
+    type: Optional[str] = Query(
+        None, pattern="^(investor|company)$", description="Filter by type"
+    ),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     key_info: Dict = Depends(require_api_key),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Search investors and companies.
@@ -343,7 +366,8 @@ async def search(
 
     # Search investors
     if not type or type == "investor":
-        investor_result = db.execute(text("""
+        investor_result = db.execute(
+            text("""
             SELECT id, name, 'investor' as type,
                    CASE
                        WHEN name ILIKE :exact THEN 1.0
@@ -354,32 +378,40 @@ async def search(
             WHERE name ILIKE :pattern
             ORDER BY score DESC, name
             LIMIT :limit OFFSET :offset
-        """), {
-            "pattern": f"%{q}%",
-            "exact": q,
-            "starts": f"{q}%",
-            "limit": per_page if not type else per_page,
-            "offset": offset if not type else offset
-        })
+        """),
+            {
+                "pattern": f"%{q}%",
+                "exact": q,
+                "starts": f"{q}%",
+                "limit": per_page if not type else per_page,
+                "offset": offset if not type else offset,
+            },
+        )
 
         for row in investor_result:
-            results.append(SearchResult(
-                id=row[0],
-                name=row[1],
-                type=row[2],
-                snippet=None,
-                relevance_score=float(row[3])
-            ).model_dump())
+            results.append(
+                SearchResult(
+                    id=row[0],
+                    name=row[1],
+                    type=row[2],
+                    snippet=None,
+                    relevance_score=float(row[3]),
+                ).model_dump()
+            )
 
         # Count investors
-        count_result = db.execute(text("""
+        count_result = db.execute(
+            text("""
             SELECT COUNT(*) FROM lp_fund WHERE name ILIKE :pattern
-        """), {"pattern": f"%{q}%"})
+        """),
+            {"pattern": f"%{q}%"},
+        )
         total += count_result.fetchone()[0]
 
     # Search companies
     if not type or type == "company":
-        company_result = db.execute(text("""
+        company_result = db.execute(
+            text("""
             SELECT id, company_name, 'company' as type,
                    CASE
                        WHEN company_name ILIKE :exact THEN 1.0
@@ -390,27 +422,34 @@ async def search(
             WHERE company_name ILIKE :pattern
             ORDER BY score DESC, company_name
             LIMIT :limit OFFSET :offset
-        """), {
-            "pattern": f"%{q}%",
-            "exact": q,
-            "starts": f"{q}%",
-            "limit": per_page if not type else per_page,
-            "offset": offset if not type else offset
-        })
+        """),
+            {
+                "pattern": f"%{q}%",
+                "exact": q,
+                "starts": f"{q}%",
+                "limit": per_page if not type else per_page,
+                "offset": offset if not type else offset,
+            },
+        )
 
         for row in company_result:
-            results.append(SearchResult(
-                id=row[0],
-                name=row[1],
-                type=row[2],
-                snippet=None,
-                relevance_score=float(row[3])
-            ).model_dump())
+            results.append(
+                SearchResult(
+                    id=row[0],
+                    name=row[1],
+                    type=row[2],
+                    snippet=None,
+                    relevance_score=float(row[3]),
+                ).model_dump()
+            )
 
         # Count companies
-        count_result = db.execute(text("""
+        count_result = db.execute(
+            text("""
             SELECT COUNT(*) FROM portfolio_companies WHERE company_name ILIKE :pattern
-        """), {"pattern": f"%{q}%"})
+        """),
+            {"pattern": f"%{q}%"},
+        )
         total += count_result.fetchone()[0]
 
     # Sort by relevance
@@ -428,7 +467,7 @@ async def search(
         endpoint="/public/search",
         method="GET",
         status_code=200,
-        response_time_ms=response_time
+        response_time_ms=response_time,
     )
 
     response = PaginatedResponse(
@@ -436,10 +475,9 @@ async def search(
         total=total,
         page=page,
         per_page=per_page,
-        has_more=(page * per_page) < total
+        has_more=(page * per_page) < total,
     )
 
     return JSONResponse(
-        content=response.model_dump(),
-        headers=add_rate_limit_headers(request)
+        content=response.model_dump(), headers=add_rate_limit_headers(request)
     )

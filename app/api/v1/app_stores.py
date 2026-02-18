@@ -106,7 +106,9 @@ def get_ranking_history(
 ):
     """Get historical ranking data for an app."""
     client = AppStoreClient(db)
-    return client.get_ranking_history(app_id, store=store, rank_type=rank_type, limit=limit)
+    return client.get_ranking_history(
+        app_id, store=store, rank_type=rank_type, limit=limit
+    )
 
 
 @router.post("/link")
@@ -142,7 +144,9 @@ def get_top_apps(
 ):
     """Get top-ranked apps."""
     client = AppStoreClient(db)
-    return client.get_top_apps(store=store, category=category, sort_by=sort_by, limit=limit)
+    return client.get_top_apps(
+        store=store, category=category, sort_by=sort_by, limit=limit
+    )
 
 
 @router.get("/stats")

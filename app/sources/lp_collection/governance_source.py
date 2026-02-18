@@ -262,13 +262,13 @@ class GovernanceCollector(BaseCollector):
         # Pattern 1: "Role: Name" format (e.g., "Chair: John Smith")
         # Handles: <p>Chair: Debbie Stein</p>, Vice-Chair: Name, etc.
         role_name_pattern = re.compile(
-            r'(?:^|>)\s*'
-            r'(Chair(?:man|woman|person)?|Vice[- ]?Chair(?:man|woman|person)?|'
-            r'President|CEO|Executive\s+Director|Trustee|Director|Member)'
-            r'\s*:\s*'
-            r'([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'
-            r'\s*(?:<|$)',
-            re.IGNORECASE | re.MULTILINE
+            r"(?:^|>)\s*"
+            r"(Chair(?:man|woman|person)?|Vice[- ]?Chair(?:man|woman|person)?|"
+            r"President|CEO|Executive\s+Director|Trustee|Director|Member)"
+            r"\s*:\s*"
+            r"([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)"
+            r"\s*(?:<|$)",
+            re.IGNORECASE | re.MULTILINE,
         )
         for match in role_name_pattern.finditer(html):
             title = match.group(1).strip()
@@ -277,28 +277,28 @@ class GovernanceCollector(BaseCollector):
 
         # Pattern 2: "Members: Name1, Name2 and Name3" format
         members_list_pattern = re.compile(
-            r'(?:Members|Board\s+Members|Trustees|Directors)\s*:\s*'
-            r'([A-Z][^<]{10,200}?)(?:<|$)',
-            re.IGNORECASE
+            r"(?:Members|Board\s+Members|Trustees|Directors)\s*:\s*"
+            r"([A-Z][^<]{10,200}?)(?:<|$)",
+            re.IGNORECASE,
         )
         for match in members_list_pattern.finditer(html):
             names_text = match.group(1)
             # Split by comma and "and"
-            names = re.split(r'\s*,\s*|\s+and\s+', names_text)
+            names = re.split(r"\s*,\s*|\s+and\s+", names_text)
             for name in names:
                 # Clean up name (remove trailing punctuation)
-                name = re.sub(r'[.,;:\s]+$', '', name.strip())
+                name = re.sub(r"[.,;:\s]+$", "", name.strip())
                 add_member(name, "Board Member", "medium")
 
         # Pattern 3: List items with "Name, Organization" format
         # Handles: <li>Marie Moftah, L'Association des enseignantes...</li>
         li_name_org_pattern = re.compile(
-            r'<li[^>]*>\s*'
-            r'([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'
-            r'\s*,\s*'
-            r'([^<]+)'
-            r'\s*</li>',
-            re.IGNORECASE
+            r"<li[^>]*>\s*"
+            r"([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)"
+            r"\s*,\s*"
+            r"([^<]+)"
+            r"\s*</li>",
+            re.IGNORECASE,
         )
         for match in li_name_org_pattern.finditer(html):
             name = match.group(1).strip()
@@ -308,11 +308,11 @@ class GovernanceCollector(BaseCollector):
 
         # Pattern 4: Header tag followed by title/role (original pattern, improved)
         name_title_pattern = re.compile(
-            r'<(?:h[2-5]|strong|b)[^>]*>\s*'
-            r'([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'
-            r'\s*</(?:h[2-5]|strong|b)>'
-            r'[^<]{0,50}<[^>]*>\s*([^<]+)',
-            re.IGNORECASE
+            r"<(?:h[2-5]|strong|b)[^>]*>\s*"
+            r"([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)"
+            r"\s*</(?:h[2-5]|strong|b)>"
+            r"[^<]{0,50}<[^>]*>\s*([^<]+)",
+            re.IGNORECASE,
         )
         for match in name_title_pattern.finditer(html):
             name = match.group(1).strip()
@@ -322,11 +322,11 @@ class GovernanceCollector(BaseCollector):
         # Pattern 5: Card/div with class containing member/trustee/director
         card_pattern = re.compile(
             r'class="[^"]*(?:member|trustee|director|team|board|staff|person|profile)[^"]*"[^>]*>'
-            r'[^<]*(?:<[^>]+>[^<]*)*?'
-            r'([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'
-            r'[^<]*(?:<[^>]+>[^<]*)*?'
-            r'(?:title|role|position|job)[^>]*>([^<]+)',
-            re.IGNORECASE | re.DOTALL
+            r"[^<]*(?:<[^>]+>[^<]*)*?"
+            r"([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)"
+            r"[^<]*(?:<[^>]+>[^<]*)*?"
+            r"(?:title|role|position|job)[^>]*>([^<]+)",
+            re.IGNORECASE | re.DOTALL,
         )
         for match in card_pattern.finditer(html):
             name = match.group(1).strip()
@@ -336,7 +336,7 @@ class GovernanceCollector(BaseCollector):
         # Pattern 6: Structured data / JSON-LD for board members
         json_person_pattern = re.compile(
             r'"@type"\s*:\s*"Person"[^}]*"name"\s*:\s*"([^"]+)"[^}]*"jobTitle"\s*:\s*"([^"]+)"',
-            re.IGNORECASE
+            re.IGNORECASE,
         )
         for match in json_person_pattern.finditer(html):
             name = match.group(1).strip()
@@ -349,7 +349,7 @@ class GovernanceCollector(BaseCollector):
             governance_section = self._find_governance_section(html)
             if governance_section:
                 simple_name_pattern = re.compile(
-                    r'(?:^|[>\s])([A-Z][a-z]+\s+(?:[A-Z]\.?\s+)?[A-Z][a-z]+)(?:[,<\s]|$)'
+                    r"(?:^|[>\s])([A-Z][a-z]+\s+(?:[A-Z]\.?\s+)?[A-Z][a-z]+)(?:[,<\s]|$)"
                 )
                 for match in simple_name_pattern.finditer(governance_section):
                     name = match.group(1).strip()
@@ -361,13 +361,13 @@ class GovernanceCollector(BaseCollector):
         """Find the section of HTML most likely to contain governance info."""
         # Look for sections with governance-related headers
         section_pattern = re.compile(
-            r'(?:<(?:section|div|article)[^>]*>)?'
-            r'[^<]*<(?:h[1-4])[^>]*>[^<]*'
-            r'(?:Board|Trustees?|Directors?|Leadership|Governance|Committee)'
-            r'[^<]*</(?:h[1-4])>'
-            r'([\s\S]{0,5000}?)'
-            r'(?:</(?:section|div|article)>|<(?:h[1-4])[^>]*>)',
-            re.IGNORECASE
+            r"(?:<(?:section|div|article)[^>]*>)?"
+            r"[^<]*<(?:h[1-4])[^>]*>[^<]*"
+            r"(?:Board|Trustees?|Directors?|Leadership|Governance|Committee)"
+            r"[^<]*</(?:h[1-4])>"
+            r"([\s\S]{0,5000}?)"
+            r"(?:</(?:section|div|article)>|<(?:h[1-4])[^>]*>)",
+            re.IGNORECASE,
         )
         match = section_pattern.search(html)
         if match:
@@ -398,26 +398,77 @@ class GovernanceCollector(BaseCollector):
         # Check for common non-name patterns (organization names, categories, etc.)
         non_names = [
             # Generic web/nav terms
-            "board", "committee", "member", "trustee", "director",
-            "about", "contact", "home", "login", "menu", "search",
-            "privacy", "terms", "copyright", "read more", "click here",
-            "learn more", "view all", "see more", "our team", "our board",
+            "board",
+            "committee",
+            "member",
+            "trustee",
+            "director",
+            "about",
+            "contact",
+            "home",
+            "login",
+            "menu",
+            "search",
+            "privacy",
+            "terms",
+            "copyright",
+            "read more",
+            "click here",
+            "learn more",
+            "view all",
+            "see more",
+            "our team",
+            "our board",
             # Organization terms
-            "investment committee", "audit committee", "annual report",
-            "pension fund", "pension plan", "retirement system",
-            "foundation", "association", "corporation", "institute",
-            "university", "college", "school", "district",
+            "investment committee",
+            "audit committee",
+            "annual report",
+            "pension fund",
+            "pension plan",
+            "retirement system",
+            "foundation",
+            "association",
+            "corporation",
+            "institute",
+            "university",
+            "college",
+            "school",
+            "district",
             # Common non-person phrases
-            "ontario teachers", "natural resources", "allowed is",
-            "venture growth", "real estate", "capital markets",
-            "total fund", "private capital", "news releases",
-            "general plans", "safety plans", "retiree healthcare",
-            "leadership team", "executive team", "management team",
-            "policy", "strategy", "governance", "oversight",
-            "stakeholder", "relations", "services", "resources",
-            "portfolio", "solutions", "operations", "affairs",
+            "ontario teachers",
+            "natural resources",
+            "allowed is",
+            "venture growth",
+            "real estate",
+            "capital markets",
+            "total fund",
+            "private capital",
+            "news releases",
+            "general plans",
+            "safety plans",
+            "retiree healthcare",
+            "leadership team",
+            "executive team",
+            "management team",
+            "policy",
+            "strategy",
+            "governance",
+            "oversight",
+            "stakeholder",
+            "relations",
+            "services",
+            "resources",
+            "portfolio",
+            "solutions",
+            "operations",
+            "affairs",
             # URL/tech
-            "http", "www", ".com", ".org", ".gov", ".edu",
+            "http",
+            "www",
+            ".com",
+            ".org",
+            ".gov",
+            ".edu",
         ]
         name_lower = name.lower()
         if any(non in name_lower for non in non_names):
@@ -434,23 +485,63 @@ class GovernanceCollector(BaseCollector):
                 return False
 
         # Should not contain numbers or special characters (except periods, hyphens, apostrophes)
-        if re.search(r'[0-9@#$%^&*()+=\[\]{}|\\/<>]', name):
+        if re.search(r"[0-9@#$%^&*()+=\[\]{}|\\/<>]", name):
             return False
 
         # First name should look like a name (not a category word)
         first_name = parts[0].lower()
         category_words = [
-            "general", "safety", "public", "private", "corporate",
-            "state", "federal", "national", "local", "regional",
-            "early", "senior", "junior", "middle", "total",
-            "annual", "quarterly", "monthly", "weekly", "daily",
-            "our", "your", "their", "the", "this", "that",
-            "new", "old", "current", "former", "past", "future",
+            "general",
+            "safety",
+            "public",
+            "private",
+            "corporate",
+            "state",
+            "federal",
+            "national",
+            "local",
+            "regional",
+            "early",
+            "senior",
+            "junior",
+            "middle",
+            "total",
+            "annual",
+            "quarterly",
+            "monthly",
+            "weekly",
+            "daily",
+            "our",
+            "your",
+            "their",
+            "the",
+            "this",
+            "that",
+            "new",
+            "old",
+            "current",
+            "former",
+            "past",
+            "future",
             # Business/corporate terms
-            "responsible", "sustainable", "strategic", "global",
-            "business", "corporate", "financial", "investment",
-            "join", "discover", "explore", "learn", "read",
-            "view", "see", "click", "download", "subscribe",
+            "responsible",
+            "sustainable",
+            "strategic",
+            "global",
+            "business",
+            "corporate",
+            "financial",
+            "investment",
+            "join",
+            "discover",
+            "explore",
+            "learn",
+            "read",
+            "view",
+            "see",
+            "click",
+            "download",
+            "subscribe",
         ]
         if first_name in category_words:
             return False
@@ -458,13 +549,37 @@ class GovernanceCollector(BaseCollector):
         # Last word should also not be a category/nav word
         last_word = parts[-1].lower()
         nav_words = [
-            "management", "history", "mission", "vision", "values",
-            "overview", "information", "details", "news", "updates",
-            "benefits", "plans", "programs", "services", "contact",
+            "management",
+            "history",
+            "mission",
+            "vision",
+            "values",
+            "overview",
+            "information",
+            "details",
+            "news",
+            "updates",
+            "benefits",
+            "plans",
+            "programs",
+            "services",
+            "contact",
             # More business terms
-            "investor", "insurer", "employer", "citizen", "business",
-            "ethics", "report", "governance", "compliance", "risk",
-            "us", "here", "more", "all", "now",
+            "investor",
+            "insurer",
+            "employer",
+            "citizen",
+            "business",
+            "ethics",
+            "report",
+            "governance",
+            "compliance",
+            "risk",
+            "us",
+            "here",
+            "more",
+            "all",
+            "now",
         ]
         if last_word in nav_words:
             return False
@@ -472,10 +587,21 @@ class GovernanceCollector(BaseCollector):
         # Reject common two-word non-name phrases
         full_lower = name.lower()
         non_name_phrases = [
-            "join us", "contact us", "about us", "follow us",
-            "read more", "learn more", "view more", "see more",
-            "click here", "sign up", "log in", "sign in",
-            "remuneration report", "annual report", "business ethics",
+            "join us",
+            "contact us",
+            "about us",
+            "follow us",
+            "read more",
+            "learn more",
+            "view more",
+            "see more",
+            "click here",
+            "sign up",
+            "log in",
+            "sign in",
+            "remuneration report",
+            "annual report",
+            "business ethics",
         ]
         if full_lower in non_name_phrases:
             return False
@@ -595,14 +721,12 @@ class GovernanceCollector(BaseCollector):
         items = []
 
         # Look for date patterns near meeting-related text
-        date_pattern = re.compile(
-            r'(\w+\s+\d{1,2},?\s+\d{4}|\d{1,2}/\d{1,2}/\d{2,4})'
-        )
+        date_pattern = re.compile(r"(\w+\s+\d{1,2},?\s+\d{4}|\d{1,2}/\d{1,2}/\d{2,4})")
 
         # Look for document links (PDFs)
         pdf_pattern = re.compile(
             r'href=["\']([^"\']+\.pdf)["\'][^>]*>([^<]*(?:agenda|minutes|meeting)[^<]*)',
-            re.IGNORECASE
+            re.IGNORECASE,
         )
 
         # Extract PDF meeting documents
@@ -623,7 +747,7 @@ class GovernanceCollector(BaseCollector):
             # Try to extract date
             meeting_date = None
             context_start = max(0, match.start() - 100)
-            context = html[context_start:match.end() + 100]
+            context = html[context_start : match.end() + 100]
             date_match = date_pattern.search(context)
             if date_match:
                 meeting_date = self._parse_date(date_match.group(1))
@@ -647,7 +771,9 @@ class GovernanceCollector(BaseCollector):
                     "meeting_title": link_text[:200],
                     "agenda_url": pdf_url if is_agenda else None,
                     "minutes_url": pdf_url if is_minutes else None,
-                    "materials_url": pdf_url if not is_agenda and not is_minutes else None,
+                    "materials_url": pdf_url
+                    if not is_agenda and not is_minutes
+                    else None,
                     "source_type": "website",
                 },
                 source_url=source_url,

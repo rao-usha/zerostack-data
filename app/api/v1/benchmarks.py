@@ -18,14 +18,17 @@ router = APIRouter(prefix="/benchmarks", tags=["benchmarks"])
 
 # Response Models
 
+
 class PeerInfo(BaseModel):
     """Peer group summary."""
+
     type: str
     peer_count: int
 
 
 class SectorComparison(BaseModel):
     """Sector comparison to benchmark."""
+
     sector: str
     investor_allocation: float
     benchmark_median: float
@@ -37,6 +40,7 @@ class SectorComparison(BaseModel):
 
 class DiversificationSummary(BaseModel):
     """Diversification score summary."""
+
     investor_score: float
     hhi: float
     sector_count: int
@@ -44,6 +48,7 @@ class DiversificationSummary(BaseModel):
 
 class InvestorBenchmarkResponse(BaseModel):
     """Investor vs benchmark comparison."""
+
     investor_id: int
     investor_name: Optional[str] = None
     investor_type: str
@@ -54,6 +59,7 @@ class InvestorBenchmarkResponse(BaseModel):
 
 class PeerInvestor(BaseModel):
     """Peer investor info."""
+
     id: int
     name: str
     subtype: Optional[str] = None
@@ -62,6 +68,7 @@ class PeerInvestor(BaseModel):
 
 class PeerGroupResponse(BaseModel):
     """Detailed peer group information."""
+
     investor_id: int
     investor_name: Optional[str] = None
     investor_type: str
@@ -72,6 +79,7 @@ class PeerGroupResponse(BaseModel):
 
 class SectorBenchmark(BaseModel):
     """Sector allocation benchmark."""
+
     sector: str
     p25: float
     median: float
@@ -81,6 +89,7 @@ class SectorBenchmark(BaseModel):
 
 class TypeBenchmark(BaseModel):
     """Benchmarks for an investor type."""
+
     investor_type: str
     sample_size: int
     sector_allocations: List[SectorBenchmark]
@@ -88,6 +97,7 @@ class TypeBenchmark(BaseModel):
 
 class OverallMarket(BaseModel):
     """Overall market benchmarks."""
+
     lp_sample_size: int
     family_office_sample_size: int
     lp_sectors: List[SectorBenchmark]
@@ -96,12 +106,14 @@ class OverallMarket(BaseModel):
 
 class SectorBenchmarksResponse(BaseModel):
     """All sector benchmarks."""
+
     benchmarks_by_type: List[TypeBenchmark]
     overall_market: OverallMarket
 
 
 class DiversificationRanking(BaseModel):
     """Single diversification ranking entry."""
+
     rank: int
     investor_id: int
     investor_name: str
@@ -115,6 +127,7 @@ class DiversificationRanking(BaseModel):
 
 class ScoreDistribution(BaseModel):
     """Score distribution statistics."""
+
     mean: float
     median: float
     min: float
@@ -124,12 +137,14 @@ class ScoreDistribution(BaseModel):
 
 class DiversificationRankingsResponse(BaseModel):
     """Diversification rankings."""
+
     rankings: List[DiversificationRanking]
     total_investors: int
     score_distribution: ScoreDistribution
 
 
 # Endpoints
+
 
 @router.get(
     "/investor/{investor_id}",

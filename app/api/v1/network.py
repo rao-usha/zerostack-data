@@ -3,6 +3,7 @@ Co-investor Network Graph API endpoints.
 
 Provides network analysis for investor relationships.
 """
+
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -17,8 +18,10 @@ router = APIRouter(prefix="/network", tags=["network"])
 
 # Response Models
 
+
 class NodeResponse(BaseModel):
     """Network node (investor)."""
+
     id: str
     investor_id: Optional[int] = None
     type: str
@@ -34,6 +37,7 @@ class NodeResponse(BaseModel):
 
 class EdgeResponse(BaseModel):
     """Network edge (co-investment relationship)."""
+
     source: str
     target: str
     weight: int
@@ -44,6 +48,7 @@ class EdgeResponse(BaseModel):
 
 class NetworkStatsResponse(BaseModel):
     """Network statistics."""
+
     total_nodes: int
     total_edges: int
     total_weight: Optional[int] = None
@@ -54,6 +59,7 @@ class NetworkStatsResponse(BaseModel):
 
 class NetworkGraphResponse(BaseModel):
     """Full network graph response."""
+
     nodes: List[NodeResponse]
     edges: List[EdgeResponse]
     stats: NetworkStatsResponse
@@ -61,6 +67,7 @@ class NetworkGraphResponse(BaseModel):
 
 class InvestorNetworkResponse(BaseModel):
     """Investor ego network response."""
+
     center: Optional[NodeResponse] = None
     nodes: List[NodeResponse]
     edges: List[EdgeResponse]
@@ -69,6 +76,7 @@ class InvestorNetworkResponse(BaseModel):
 
 class ClusterMemberResponse(BaseModel):
     """Cluster member."""
+
     id: str
     name: str
     type: str
@@ -76,6 +84,7 @@ class ClusterMemberResponse(BaseModel):
 
 class ClusterResponse(BaseModel):
     """Investor cluster."""
+
     id: int
     size: int
     members: List[ClusterMemberResponse]
@@ -84,6 +93,7 @@ class ClusterResponse(BaseModel):
 
 class PathResponse(BaseModel):
     """Path between two investors."""
+
     found: bool
     path_length: int
     path: List[NodeResponse]
@@ -91,6 +101,7 @@ class PathResponse(BaseModel):
 
 
 # Endpoints
+
 
 @router.get(
     "/graph",
@@ -108,9 +119,13 @@ class PathResponse(BaseModel):
     """,
 )
 def get_network_graph(
-    limit: Optional[int] = Query(None, ge=1, le=1000, description="Max edges to return"),
+    limit: Optional[int] = Query(
+        None, ge=1, le=1000, description="Max edges to return"
+    ),
     min_weight: int = Query(1, ge=1, description="Minimum relationship weight"),
-    include_external: bool = Query(False, description="Include external (non-database) investors"),
+    include_external: bool = Query(
+        False, description="Include external (non-database) investors"
+    ),
     db: Session = Depends(get_db),
 ):
     """Get full network graph for visualization."""
@@ -137,7 +152,9 @@ def get_network_graph(
 )
 def get_investor_network(
     investor_id: int,
-    investor_type: str = Query(..., pattern="^(lp|family_office)$", description="Investor type"),
+    investor_type: str = Query(
+        ..., pattern="^(lp|family_office)$", description="Investor type"
+    ),
     depth: int = Query(1, ge=1, le=3, description="Network depth (hops from investor)"),
     min_weight: int = Query(1, ge=1, description="Minimum relationship weight"),
     db: Session = Depends(get_db),
@@ -154,7 +171,7 @@ def get_investor_network(
     if not result["nodes"]:
         raise HTTPException(
             status_code=404,
-            detail=f"Investor {investor_type}_{investor_id} not found or has no connections"
+            detail=f"Investor {investor_type}_{investor_id} not found or has no connections",
         )
 
     return result
@@ -216,9 +233,13 @@ def get_clusters(
 )
 def find_path(
     source_id: int = Query(..., description="Source investor ID"),
-    source_type: str = Query(..., pattern="^(lp|family_office)$", description="Source investor type"),
+    source_type: str = Query(
+        ..., pattern="^(lp|family_office)$", description="Source investor type"
+    ),
     target_id: int = Query(..., description="Target investor ID"),
-    target_type: str = Query(..., pattern="^(lp|family_office)$", description="Target investor type"),
+    target_type: str = Query(
+        ..., pattern="^(lp|family_office)$", description="Target investor type"
+    ),
     db: Session = Depends(get_db),
 ):
     """Find shortest path between two investors."""
@@ -231,9 +252,6 @@ def find_path(
     )
 
     if result is None:
-        raise HTTPException(
-            status_code=404,
-            detail="One or both investors not found"
-        )
+        raise HTTPException(status_code=404, detail="One or both investors not found")
 
     return result

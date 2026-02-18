@@ -75,19 +75,41 @@ CREATE INDEX IF NOT EXISTS idx_oc_filings_company ON oc_filings (company_number,
 """
 
 OC_COMPANY_COLUMNS = [
-    "company_number", "jurisdiction_code", "name", "incorporation_date",
-    "dissolution_date", "company_type", "current_status", "registered_address",
-    "registry_url", "opencorporates_url", "agent_name", "source",
+    "company_number",
+    "jurisdiction_code",
+    "name",
+    "incorporation_date",
+    "dissolution_date",
+    "company_type",
+    "current_status",
+    "registered_address",
+    "registry_url",
+    "opencorporates_url",
+    "agent_name",
+    "source",
 ]
 
 OC_OFFICER_COLUMNS = [
-    "company_number", "jurisdiction_code", "name", "position",
-    "start_date", "end_date", "nationality", "occupation", "opencorporates_url",
+    "company_number",
+    "jurisdiction_code",
+    "name",
+    "position",
+    "start_date",
+    "end_date",
+    "nationality",
+    "occupation",
+    "opencorporates_url",
 ]
 
 OC_FILING_COLUMNS = [
-    "company_number", "jurisdiction_code", "title", "filing_type",
-    "date", "description", "url", "opencorporates_url",
+    "company_number",
+    "jurisdiction_code",
+    "title",
+    "filing_type",
+    "date",
+    "description",
+    "url",
+    "opencorporates_url",
 ]
 
 
@@ -163,7 +185,9 @@ class OpenCorporatesIngestor:
                         continue
 
                     for company_wrapper in companies:
-                        company = company_wrapper if isinstance(company_wrapper, dict) else {}
+                        company = (
+                            company_wrapper if isinstance(company_wrapper, dict) else {}
+                        )
                         if "company" in company:
                             company = company["company"]
                         parsed = client._parse_company(company)
@@ -183,9 +207,16 @@ class OpenCorporatesIngestor:
                         # Ensure all columns present
                         row = {c: parsed.get(c) for c in OC_COMPANY_COLUMNS}
                         batch_insert(
-                            self.db, "oc_companies", [row], OC_COMPANY_COLUMNS,
+                            self.db,
+                            "oc_companies",
+                            [row],
+                            OC_COMPANY_COLUMNS,
                             conflict_columns=["company_number", "jurisdiction_code"],
-                            update_columns=[c for c in OC_COMPANY_COLUMNS if c not in ("company_number", "jurisdiction_code")],
+                            update_columns=[
+                                c
+                                for c in OC_COMPANY_COLUMNS
+                                if c not in ("company_number", "jurisdiction_code")
+                            ],
                         )
                         total_companies += 1
 
@@ -199,10 +230,17 @@ class OpenCorporatesIngestor:
                                 parsed_o = client._parse_officer(off)
                                 parsed_o["company_number"] = cn
                                 parsed_o["jurisdiction_code"] = jc
-                                officer_rows.append({c: parsed_o.get(c) for c in OC_OFFICER_COLUMNS})
+                                officer_rows.append(
+                                    {c: parsed_o.get(c) for c in OC_OFFICER_COLUMNS}
+                                )
 
                             if officer_rows:
-                                batch_insert(self.db, "oc_officers", officer_rows, OC_OFFICER_COLUMNS)
+                                batch_insert(
+                                    self.db,
+                                    "oc_officers",
+                                    officer_rows,
+                                    OC_OFFICER_COLUMNS,
+                                )
                                 total_officers += len(officer_rows)
                         except Exception as e:
                             logger.debug(f"Officers for {cn}: {e}")
@@ -217,10 +255,17 @@ class OpenCorporatesIngestor:
                                 parsed_f = client._parse_filing(fil)
                                 parsed_f["company_number"] = cn
                                 parsed_f["jurisdiction_code"] = jc
-                                filing_rows.append({c: parsed_f.get(c) for c in OC_FILING_COLUMNS})
+                                filing_rows.append(
+                                    {c: parsed_f.get(c) for c in OC_FILING_COLUMNS}
+                                )
 
                             if filing_rows:
-                                batch_insert(self.db, "oc_filings", filing_rows, OC_FILING_COLUMNS)
+                                batch_insert(
+                                    self.db,
+                                    "oc_filings",
+                                    filing_rows,
+                                    OC_FILING_COLUMNS,
+                                )
                                 total_filings += len(filing_rows)
                         except Exception as e:
                             logger.debug(f"Filings for {cn}: {e}")

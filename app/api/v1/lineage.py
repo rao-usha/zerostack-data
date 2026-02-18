@@ -7,6 +7,7 @@ Provides access to data lineage tracking, including:
 - Dataset versions
 - Impact analysis
 """
+
 import logging
 from datetime import datetime
 from typing import List, Optional, Dict, Any
@@ -16,8 +17,13 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.models import (
-    LineageNode, LineageEdge, LineageEvent, DatasetVersion, ImpactAnalysis,
-    LineageNodeType, LineageEdgeType
+    LineageNode,
+    LineageEdge,
+    LineageEvent,
+    DatasetVersion,
+    ImpactAnalysis,
+    LineageNodeType,
+    LineageEdgeType,
 )
 from app.core.lineage_service import LineageService
 
@@ -30,9 +36,14 @@ router = APIRouter(prefix="/lineage", tags=["lineage"])
 # Pydantic Schemas
 # =============================================================================
 
+
 class NodeCreate(BaseModel):
     """Schema for creating a lineage node."""
-    node_type: str = Field(..., description="Node type: external_api, database_table, ingestion_job, dataset, file, transformation")
+
+    node_type: str = Field(
+        ...,
+        description="Node type: external_api, database_table, ingestion_job, dataset, file, transformation",
+    )
     node_id: str = Field(..., min_length=1, max_length=255)
     name: str = Field(..., min_length=1, max_length=255)
     source: Optional[str] = None
@@ -42,6 +53,7 @@ class NodeCreate(BaseModel):
 
 class NodeResponse(BaseModel):
     """Response schema for a lineage node."""
+
     id: int
     node_type: str
     node_id: str
@@ -57,15 +69,20 @@ class NodeResponse(BaseModel):
 
 class EdgeCreate(BaseModel):
     """Schema for creating a lineage edge."""
+
     source_node_id: int
     target_node_id: int
-    edge_type: str = Field(..., description="Edge type: produces, consumes, derives_from, stored_in, exported_to")
+    edge_type: str = Field(
+        ...,
+        description="Edge type: produces, consumes, derives_from, stored_in, exported_to",
+    )
     job_id: Optional[int] = None
     properties: Optional[Dict[str, Any]] = None
 
 
 class EdgeResponse(BaseModel):
     """Response schema for a lineage edge."""
+
     id: int
     source_node_id: int
     target_node_id: int
@@ -77,6 +94,7 @@ class EdgeResponse(BaseModel):
 
 class EventResponse(BaseModel):
     """Response schema for a lineage event."""
+
     id: int
     event_type: str
     job_id: Optional[int]
@@ -93,6 +111,7 @@ class EventResponse(BaseModel):
 
 class DatasetVersionResponse(BaseModel):
     """Response schema for a dataset version."""
+
     id: int
     dataset_name: str
     source: str
@@ -112,6 +131,7 @@ class DatasetVersionResponse(BaseModel):
 
 class LineageGraphResponse(BaseModel):
     """Response schema for a lineage graph."""
+
     node: Dict[str, Any]
     upstream: List[Dict[str, Any]]
     downstream: List[Dict[str, Any]]
@@ -119,6 +139,7 @@ class LineageGraphResponse(BaseModel):
 
 class ImpactResponse(BaseModel):
     """Response schema for impact analysis."""
+
     source_node_id: int
     source_node_name: str
     impacted_node_id: int
@@ -131,6 +152,7 @@ class ImpactResponse(BaseModel):
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
 
 def node_to_response(node: LineageNode) -> NodeResponse:
     """Convert node model to response."""
@@ -145,7 +167,7 @@ def node_to_response(node: LineageNode) -> NodeResponse:
         version=node.version,
         is_current=bool(node.is_current),
         created_at=node.created_at.isoformat(),
-        updated_at=node.updated_at.isoformat()
+        updated_at=node.updated_at.isoformat(),
     )
 
 
@@ -158,7 +180,7 @@ def edge_to_response(edge: LineageEdge) -> EdgeResponse:
         edge_type=edge.edge_type.value,
         job_id=edge.job_id,
         properties=edge.properties,
-        created_at=edge.created_at.isoformat()
+        created_at=edge.created_at.isoformat(),
     )
 
 
@@ -176,7 +198,7 @@ def event_to_response(event: LineageEvent) -> EventResponse:
         bytes_processed=event.bytes_processed,
         success=bool(event.success),
         error_message=event.error_message,
-        created_at=event.created_at.isoformat()
+        created_at=event.created_at.isoformat(),
     )
 
 
@@ -197,7 +219,9 @@ def version_to_response(version: DatasetVersion) -> DatasetVersionResponse:
         max_date=version.max_date.isoformat() if version.max_date else None,
         job_id=version.job_id,
         created_at=version.created_at.isoformat(),
-        superseded_at=version.superseded_at.isoformat() if version.superseded_at else None
+        superseded_at=version.superseded_at.isoformat()
+        if version.superseded_at
+        else None,
     )
 
 
@@ -205,13 +229,14 @@ def version_to_response(version: DatasetVersion) -> DatasetVersionResponse:
 # Node Endpoints
 # =============================================================================
 
+
 @router.get("/nodes", response_model=List[NodeResponse])
 def list_nodes(
     node_type: Optional[str] = Query(default=None, description="Filter by node type"),
     source: Optional[str] = Query(default=None, description="Filter by data source"),
     current_only: bool = Query(default=True, description="Only show current versions"),
     limit: int = Query(default=100, ge=1, le=500),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> List[NodeResponse]:
     """List lineage nodes with optional filtering."""
     service = LineageService(db)
@@ -221,13 +246,12 @@ def list_nodes(
         try:
             node_type_enum = LineageNodeType(node_type)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid node_type: {node_type}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid node_type: {node_type}"
+            )
 
     nodes = service.list_nodes(
-        node_type=node_type_enum,
-        source=source,
-        current_only=current_only,
-        limit=limit
+        node_type=node_type_enum, source=source, current_only=current_only, limit=limit
     )
     return [node_to_response(n) for n in nodes]
 
@@ -251,7 +275,7 @@ def _get_type_description(t: LineageNodeType) -> str:
         LineageNodeType.INGESTION_JOB: "Data ingestion job",
         LineageNodeType.DATASET: "Logical dataset (may span multiple tables)",
         LineageNodeType.FILE: "Exported file (CSV, Parquet, etc.)",
-        LineageNodeType.TRANSFORMATION: "Data transformation step"
+        LineageNodeType.TRANSFORMATION: "Data transformation step",
     }
     return descriptions.get(t, "")
 
@@ -276,7 +300,9 @@ def create_node(request: NodeCreate, db: Session = Depends(get_db)) -> NodeRespo
     try:
         node_type = LineageNodeType(request.node_type)
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid node_type: {request.node_type}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid node_type: {request.node_type}"
+        )
 
     node = service.get_or_create_node(
         node_type=node_type,
@@ -284,7 +310,7 @@ def create_node(request: NodeCreate, db: Session = Depends(get_db)) -> NodeRespo
         name=request.name,
         source=request.source,
         description=request.description,
-        properties=request.properties
+        properties=request.properties,
     )
     return node_to_response(node)
 
@@ -293,12 +319,17 @@ def create_node(request: NodeCreate, db: Session = Depends(get_db)) -> NodeRespo
 # Edge Endpoints
 # =============================================================================
 
+
 @router.get("/edges", response_model=List[EdgeResponse])
 def list_edges(
-    source_node_id: Optional[int] = Query(default=None, description="Filter by source node"),
-    target_node_id: Optional[int] = Query(default=None, description="Filter by target node"),
+    source_node_id: Optional[int] = Query(
+        default=None, description="Filter by source node"
+    ),
+    target_node_id: Optional[int] = Query(
+        default=None, description="Filter by target node"
+    ),
     limit: int = Query(default=100, ge=1, le=500),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> List[EdgeResponse]:
     """List lineage edges with optional filtering."""
     query = db.query(LineageEdge)
@@ -315,12 +346,7 @@ def list_edges(
 @router.get("/edges/types")
 def list_edge_types():
     """List available edge types."""
-    return {
-        "types": [
-            {"value": t.value, "name": t.name}
-            for t in LineageEdgeType
-        ]
-    }
+    return {"types": [{"value": t.value, "name": t.name} for t in LineageEdgeType]}
 
 
 @router.post("/edges", response_model=EdgeResponse, status_code=201)
@@ -331,20 +357,26 @@ def create_edge(request: EdgeCreate, db: Session = Depends(get_db)) -> EdgeRespo
     try:
         edge_type = LineageEdgeType(request.edge_type)
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid edge_type: {request.edge_type}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid edge_type: {request.edge_type}"
+        )
 
     # Verify nodes exist
     if not service.get_node(request.source_node_id):
-        raise HTTPException(status_code=404, detail=f"Source node not found: {request.source_node_id}")
+        raise HTTPException(
+            status_code=404, detail=f"Source node not found: {request.source_node_id}"
+        )
     if not service.get_node(request.target_node_id):
-        raise HTTPException(status_code=404, detail=f"Target node not found: {request.target_node_id}")
+        raise HTTPException(
+            status_code=404, detail=f"Target node not found: {request.target_node_id}"
+        )
 
     edge = service.create_edge(
         source_node_id=request.source_node_id,
         target_node_id=request.target_node_id,
         edge_type=edge_type,
         job_id=request.job_id,
-        properties=request.properties
+        properties=request.properties,
     )
     return edge_to_response(edge)
 
@@ -353,11 +385,12 @@ def create_edge(request: EdgeCreate, db: Session = Depends(get_db)) -> EdgeRespo
 # Graph Traversal Endpoints
 # =============================================================================
 
+
 @router.get("/nodes/{node_id}/upstream", response_model=List[Dict])
 def get_upstream(
     node_id: int,
     max_depth: int = Query(default=10, ge=1, le=20),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get upstream lineage for a node.
@@ -378,7 +411,7 @@ def get_upstream(
             "name": item["node"].name,
             "source": item["node"].source,
             "edge_type": item["edge_type"],
-            "depth": item["depth"]
+            "depth": item["depth"],
         }
         for item in upstream
     ]
@@ -388,7 +421,7 @@ def get_upstream(
 def get_downstream(
     node_id: int,
     max_depth: int = Query(default=10, ge=1, le=20),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get downstream lineage for a node.
@@ -409,7 +442,7 @@ def get_downstream(
             "name": item["node"].name,
             "source": item["node"].source,
             "edge_type": item["edge_type"],
-            "depth": item["depth"]
+            "depth": item["depth"],
         }
         for item in downstream
     ]
@@ -434,21 +467,19 @@ def get_lineage_graph(node_id: int, db: Session = Depends(get_db)):
 # Event Endpoints
 # =============================================================================
 
+
 @router.get("/events", response_model=List[EventResponse])
 def list_events(
     event_type: Optional[str] = Query(default=None, description="Filter by event type"),
     job_id: Optional[int] = Query(default=None, description="Filter by job ID"),
     source: Optional[str] = Query(default=None, description="Filter by data source"),
     limit: int = Query(default=100, ge=1, le=500),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> List[EventResponse]:
     """List lineage events with optional filtering."""
     service = LineageService(db)
     events = service.get_events(
-        event_type=event_type,
-        job_id=job_id,
-        source=source,
-        limit=limit
+        event_type=event_type, job_id=job_id, source=source, limit=limit
     )
     return [event_to_response(e) for e in events]
 
@@ -460,9 +491,12 @@ def list_event_types():
         "types": [
             {"value": "ingest", "description": "Data ingestion from external source"},
             {"value": "transform", "description": "Data transformation"},
-            {"value": "export", "description": "Data export to file or external system"},
+            {
+                "value": "export",
+                "description": "Data export to file or external system",
+            },
             {"value": "delete", "description": "Data deletion"},
-            {"value": "schema_change", "description": "Schema modification"}
+            {"value": "schema_change", "description": "Schema modification"},
         ]
     }
 
@@ -471,11 +505,12 @@ def list_event_types():
 # Dataset Version Endpoints
 # =============================================================================
 
+
 @router.get("/datasets", response_model=List[DatasetVersionResponse])
 def list_datasets(
     source: Optional[str] = Query(default=None, description="Filter by data source"),
     limit: int = Query(default=100, ge=1, le=500),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> List[DatasetVersionResponse]:
     """List current versions of all datasets."""
     service = LineageService(db)
@@ -486,31 +521,39 @@ def list_datasets(
 @router.get("/datasets/{dataset_name}", response_model=DatasetVersionResponse)
 def get_dataset(
     dataset_name: str,
-    version: Optional[int] = Query(default=None, description="Specific version (default: current)"),
-    db: Session = Depends(get_db)
+    version: Optional[int] = Query(
+        default=None, description="Specific version (default: current)"
+    ),
+    db: Session = Depends(get_db),
 ) -> DatasetVersionResponse:
     """Get a dataset version."""
     service = LineageService(db)
     dataset = service.get_dataset_version(dataset_name, version=version)
 
     if not dataset:
-        raise HTTPException(status_code=404, detail=f"Dataset not found: {dataset_name}")
+        raise HTTPException(
+            status_code=404, detail=f"Dataset not found: {dataset_name}"
+        )
 
     return version_to_response(dataset)
 
 
-@router.get("/datasets/{dataset_name}/history", response_model=List[DatasetVersionResponse])
+@router.get(
+    "/datasets/{dataset_name}/history", response_model=List[DatasetVersionResponse]
+)
 def get_dataset_history(
     dataset_name: str,
     limit: int = Query(default=20, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> List[DatasetVersionResponse]:
     """Get version history for a dataset."""
     service = LineageService(db)
     versions = service.get_dataset_history(dataset_name, limit=limit)
 
     if not versions:
-        raise HTTPException(status_code=404, detail=f"Dataset not found: {dataset_name}")
+        raise HTTPException(
+            status_code=404, detail=f"Dataset not found: {dataset_name}"
+        )
 
     return [version_to_response(v) for v in versions]
 
@@ -518,6 +561,7 @@ def get_dataset_history(
 # =============================================================================
 # Impact Analysis Endpoints
 # =============================================================================
+
 
 @router.post("/nodes/{node_id}/impact", response_model=List[ImpactResponse])
 def compute_impact_analysis(node_id: int, db: Session = Depends(get_db)):
@@ -540,7 +584,7 @@ def compute_impact_analysis(node_id: int, db: Session = Depends(get_db)):
             impacted_node_name=i.impacted_node_name,
             impacted_node_type=i.impacted_node_type,
             impact_level=i.impact_level,
-            computed_at=i.computed_at.isoformat()
+            computed_at=i.computed_at.isoformat(),
         )
         for i in impacts
     ]
@@ -563,7 +607,7 @@ def get_impact_analysis(node_id: int, db: Session = Depends(get_db)):
             impacted_node_name=i.impacted_node_name,
             impacted_node_type=i.impacted_node_type,
             impact_level=i.impact_level,
-            computed_at=i.computed_at.isoformat()
+            computed_at=i.computed_at.isoformat(),
         )
         for i in impacts
     ]
@@ -573,38 +617,32 @@ def get_impact_analysis(node_id: int, db: Session = Depends(get_db)):
 # Summary Endpoints
 # =============================================================================
 
+
 @router.get("/summary")
 def get_lineage_summary(db: Session = Depends(get_db)):
     """Get summary statistics for lineage data."""
     node_counts = {}
     for node_type in LineageNodeType:
-        count = db.query(LineageNode).filter(
-            LineageNode.node_type == node_type,
-            LineageNode.is_current == 1
-        ).count()
+        count = (
+            db.query(LineageNode)
+            .filter(LineageNode.node_type == node_type, LineageNode.is_current == 1)
+            .count()
+        )
         node_counts[node_type.value] = count
 
     edge_counts = {}
     for edge_type in LineageEdgeType:
-        count = db.query(LineageEdge).filter(
-            LineageEdge.edge_type == edge_type
-        ).count()
+        count = db.query(LineageEdge).filter(LineageEdge.edge_type == edge_type).count()
         edge_counts[edge_type.value] = count
 
     total_events = db.query(LineageEvent).count()
-    total_datasets = db.query(DatasetVersion).filter(
-        DatasetVersion.is_current == 1
-    ).count()
+    total_datasets = (
+        db.query(DatasetVersion).filter(DatasetVersion.is_current == 1).count()
+    )
 
     return {
-        "nodes": {
-            "total": sum(node_counts.values()),
-            "by_type": node_counts
-        },
-        "edges": {
-            "total": sum(edge_counts.values()),
-            "by_type": edge_counts
-        },
+        "nodes": {"total": sum(node_counts.values()), "by_type": node_counts},
+        "edges": {"total": sum(edge_counts.values()), "by_type": edge_counts},
         "events": total_events,
-        "datasets": total_datasets
+        "datasets": total_datasets,
     }

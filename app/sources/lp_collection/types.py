@@ -15,6 +15,7 @@ from typing import List, Optional, Dict, Any
 
 class LpCollectionSource(str, Enum):
     """Available data collection sources."""
+
     WEBSITE = "website"
     SEC_ADV = "sec_adv"
     SEC_13F = "sec_13f"
@@ -27,6 +28,7 @@ class LpCollectionSource(str, Enum):
 
 class CollectionMode(str, Enum):
     """Collection mode options."""
+
     INCREMENTAL = "incremental"  # Only collect if stale
     FULL = "full"  # Force full re-collection
 
@@ -46,9 +48,12 @@ class CollectionConfig:
         rate_limit_delay: Delay between requests in seconds
         max_retries: Maximum retry attempts per LP
     """
+
     lp_types: Optional[List[str]] = None
     regions: Optional[List[str]] = None
-    sources: List[LpCollectionSource] = field(default_factory=lambda: [LpCollectionSource.WEBSITE])
+    sources: List[LpCollectionSource] = field(
+        default_factory=lambda: [LpCollectionSource.WEBSITE]
+    )
     mode: CollectionMode = CollectionMode.INCREMENTAL
     max_age_days: int = 90
     max_concurrent_lps: int = 5
@@ -105,6 +110,7 @@ class CollectedItem:
         confidence: Confidence level (high, medium, low)
         is_new: Whether this is a new item (not update)
     """
+
     item_type: str  # contact, document, allocation, projection, etc.
     data: Dict[str, Any]
     source_url: Optional[str] = None
@@ -140,6 +146,7 @@ class CollectionResult:
         started_at: When collection started
         completed_at: When collection completed
     """
+
     lp_id: int
     lp_name: str
     source: LpCollectionSource
@@ -205,6 +212,7 @@ class JobProgress:
         failed_lps: LPs that failed
         current_lp: Currently processing LP name
     """
+
     job_id: int
     total_lps: int = 0
     completed_lps: int = 0
@@ -232,6 +240,7 @@ class LpRegistryEntry:
 
     Mirrors the structure in expanded_lp_registry.json.
     """
+
     name: str
     formal_name: str
     lp_type: str

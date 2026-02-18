@@ -18,7 +18,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import SeismicHazard, FaultLine
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -128,7 +132,9 @@ class USGSEarthquakeCollector(BaseCollector):
             errors += 1
 
         result = self.create_result(
-            status=CollectionStatus.SUCCESS if total_inserted > 0 else CollectionStatus.PARTIAL,
+            status=CollectionStatus.SUCCESS
+            if total_inserted > 0
+            else CollectionStatus.PARTIAL,
             total=total_inserted,
             processed=total_inserted,
             inserted=total_inserted,
@@ -179,15 +185,21 @@ class USGSEarthquakeCollector(BaseCollector):
                 records,
                 unique_columns=["latitude", "longitude"],
                 update_columns=[
-                    "pga_2pct_50yr", "pga_10pct_50yr", "spectral_1sec_2pct",
-                    "spectral_02sec_2pct", "site_class", "seismic_design_category",
+                    "pga_2pct_50yr",
+                    "pga_10pct_50yr",
+                    "spectral_1sec_2pct",
+                    "spectral_02sec_2pct",
+                    "site_class",
+                    "seismic_design_category",
                     "collected_at",
                 ],
             )
 
         return {"processed": len(HAZARD_GRID_POINTS), "inserted": inserted}
 
-    async def _collect_recent_earthquakes(self, config: CollectionConfig) -> Dict[str, Any]:
+    async def _collect_recent_earthquakes(
+        self, config: CollectionConfig
+    ) -> Dict[str, Any]:
         """Collect recent significant earthquakes as hazard indicators."""
         params = {
             "format": "geojson",
@@ -225,13 +237,15 @@ class USGSEarthquakeCollector(BaseCollector):
         records = []
         for key, info in seen.items():
             pga_estimate = min(info["mag"] * 0.1, 2.0)
-            records.append({
-                "latitude": info["lat"],
-                "longitude": info["lng"],
-                "pga_2pct_50yr": pga_estimate,
-                "source": "usgs_earthquake_event",
-                "collected_at": datetime.utcnow(),
-            })
+            records.append(
+                {
+                    "latitude": info["lat"],
+                    "longitude": info["lng"],
+                    "pga_2pct_50yr": pga_estimate,
+                    "source": "usgs_earthquake_event",
+                    "collected_at": datetime.utcnow(),
+                }
+            )
 
         inserted = 0
         if records:

@@ -35,66 +35,96 @@ class DataQualityService:
         # Total counts
         total_people = self.db.query(Person).count()
         total_companies = self.db.query(IndustrialCompany).count()
-        total_positions = self.db.query(CompanyPerson).filter(
-            CompanyPerson.is_current == True
-        ).count()
+        total_positions = (
+            self.db.query(CompanyPerson)
+            .filter(CompanyPerson.is_current == True)
+            .count()
+        )
 
         if total_people == 0:
             return self._empty_stats()
 
         # LinkedIn coverage
-        with_linkedin = self.db.query(Person).filter(
-            Person.linkedin_url.isnot(None),
-            Person.linkedin_url != "",
-        ).count()
+        with_linkedin = (
+            self.db.query(Person)
+            .filter(
+                Person.linkedin_url.isnot(None),
+                Person.linkedin_url != "",
+            )
+            .count()
+        )
 
         # Photo coverage
-        with_photo = self.db.query(Person).filter(
-            Person.photo_url.isnot(None),
-            Person.photo_url != "",
-        ).count()
+        with_photo = (
+            self.db.query(Person)
+            .filter(
+                Person.photo_url.isnot(None),
+                Person.photo_url != "",
+            )
+            .count()
+        )
 
         # Email coverage
-        with_email = self.db.query(Person).filter(
-            Person.email.isnot(None),
-            Person.email != "",
-        ).count()
+        with_email = (
+            self.db.query(Person)
+            .filter(
+                Person.email.isnot(None),
+                Person.email != "",
+            )
+            .count()
+        )
 
         # Bio coverage
-        with_bio = self.db.query(Person).filter(
-            Person.bio.isnot(None),
-            Person.bio != "",
-        ).count()
+        with_bio = (
+            self.db.query(Person)
+            .filter(
+                Person.bio.isnot(None),
+                Person.bio != "",
+            )
+            .count()
+        )
 
         # Experience records
-        with_experience = self.db.query(
-            func.count(func.distinct(PersonExperience.person_id))
-        ).scalar() or 0
+        with_experience = (
+            self.db.query(
+                func.count(func.distinct(PersonExperience.person_id))
+            ).scalar()
+            or 0
+        )
 
         # Education records
-        with_education = self.db.query(
-            func.count(func.distinct(PersonEducation.person_id))
-        ).scalar() or 0
+        with_education = (
+            self.db.query(func.count(func.distinct(PersonEducation.person_id))).scalar()
+            or 0
+        )
 
         # Confidence scores
-        confidence_scores = self.db.query(Person.confidence_score).filter(
-            Person.confidence_score.isnot(None)
-        ).all()
+        confidence_scores = (
+            self.db.query(Person.confidence_score)
+            .filter(Person.confidence_score.isnot(None))
+            .all()
+        )
         avg_confidence = (
             sum(float(c[0]) for c in confidence_scores) / len(confidence_scores)
-            if confidence_scores else None
+            if confidence_scores
+            else None
         )
 
         # Data freshness
         thirty_days_ago = date.today() - timedelta(days=30)
-        recently_verified = self.db.query(Person).filter(
-            Person.last_verified_date >= thirty_days_ago
-        ).count()
+        recently_verified = (
+            self.db.query(Person)
+            .filter(Person.last_verified_date >= thirty_days_ago)
+            .count()
+        )
 
         # Companies with leadership data
-        companies_with_leadership = self.db.query(
-            func.count(func.distinct(CompanyPerson.company_id))
-        ).filter(CompanyPerson.is_current == True).scalar() or 0
+        companies_with_leadership = (
+            self.db.query(func.count(func.distinct(CompanyPerson.company_id)))
+            .filter(CompanyPerson.is_current == True)
+            .scalar()
+            or 0
+        )
 
         return {
             "total_people": total_people,
@@ -117,7 +147,9 @@ class DataQualityService:
                 "with_experience": with_experience,
                 "with_education": with_education,
             },
-            "avg_confidence_score": round(avg_confidence, 2) if avg_confidence else None,
+            "avg_confidence_score": round(avg_confidence, 2)
+            if avg_confidence
+            else None,
             "recently_verified_count": recently_verified,
             "recently_verified_pct": round(recently_verified / total_people * 100, 1),
         }
@@ -215,10 +247,10 @@ class DataQualityService:
 
         # Stale = over 90 days or never verified
         stale_count = (
-            buckets["91-180_days"] +
-            buckets["181-365_days"] +
-            buckets["over_365_days"] +
-            buckets["never_verified"]
+            buckets["91-180_days"]
+            + buckets["181-365_days"]
+            + buckets["over_365_days"]
+            + buckets["never_verified"]
         )
 
         return {
@@ -268,10 +300,14 @@ class DataQualityService:
             professional_score += 10
 
         # Check for current role
-        current_role = self.db.query(CompanyPerson).filter(
-            CompanyPerson.person_id == person_id,
-            CompanyPerson.is_current == True,
-        ).first()
+        current_role = (
+            self.db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.person_id == person_id,
+                CompanyPerson.is_current == True,
+            )
+            .first()
+        )
         if current_role:
             professional_score += 5
             if current_role.title_level:
@@ -280,17 +316,21 @@ class DataQualityService:
 
         # 4. Experience/Education (20 pts)
         history_score = 0
-        exp_count = self.db.query(PersonExperience).filter(
-            PersonExperience.person_id == person_id
-        ).count()
+        exp_count = (
+            self.db.query(PersonExperience)
+            .filter(PersonExperience.person_id == person_id)
+            .count()
+        )
         if exp_count >= 3:
             history_score += 10
         elif exp_count >= 1:
             history_score += 5
 
-        edu_count = self.db.query(PersonEducation).filter(
-            PersonEducation.person_id == person_id
-        ).count()
+        edu_count = (
+            self.db.query(PersonEducation)
+            .filter(PersonEducation.person_id == person_id)
+            .count()
+        )
         if edu_count >= 1:
             history_score += 10
         scores["history"] = history_score
@@ -355,24 +395,27 @@ class DataQualityService:
 
         # Method 1: Same LinkedIn URL
         linkedin_groups = defaultdict(list)
-        for person in self.db.query(Person).filter(
-            Person.linkedin_url.isnot(None),
-            Person.linkedin_url != "",
-        ).all():
+        for person in (
+            self.db.query(Person)
+            .filter(
+                Person.linkedin_url.isnot(None),
+                Person.linkedin_url != "",
+            )
+            .all()
+        ):
             # Normalize LinkedIn URL
             url = person.linkedin_url.lower().rstrip("/")
             linkedin_groups[url].append(person)
 
         for url, people in linkedin_groups.items():
             if len(people) > 1:
-                duplicates.append({
-                    "match_type": "linkedin_url",
-                    "match_value": url,
-                    "people": [
-                        {"id": p.id, "name": p.full_name}
-                        for p in people
-                    ],
-                })
+                duplicates.append(
+                    {
+                        "match_type": "linkedin_url",
+                        "match_value": url,
+                        "people": [{"id": p.id, "name": p.full_name} for p in people],
+                    }
+                )
 
         # Method 2: Exact name match
         name_groups = defaultdict(list)
@@ -386,19 +429,25 @@ class DataQualityService:
             if len(people) > 1:
                 # Check if already captured by LinkedIn match
                 already_found = any(
-                    d["match_type"] == "linkedin_url" and
-                    set(p["id"] for p in d["people"]) == set(p.id for p in people)
+                    d["match_type"] == "linkedin_url"
+                    and set(p["id"] for p in d["people"]) == set(p.id for p in people)
                     for d in duplicates
                 )
                 if not already_found:
-                    duplicates.append({
-                        "match_type": "exact_name",
-                        "match_value": name,
-                        "people": [
-                            {"id": p.id, "name": p.full_name, "linkedin": p.linkedin_url}
-                            for p in people
-                        ],
-                    })
+                    duplicates.append(
+                        {
+                            "match_type": "exact_name",
+                            "match_value": name,
+                            "people": [
+                                {
+                                    "id": p.id,
+                                    "name": p.full_name,
+                                    "linkedin": p.linkedin_url,
+                                }
+                                for p in people
+                            ],
+                        }
+                    )
 
         return duplicates[:limit]
 
@@ -407,10 +456,10 @@ class DataQualityService:
         if not name:
             return ""
         # Remove common suffixes
-        name = re.sub(r'\b(jr|sr|ii|iii|iv|phd|md|mba|cpa|esq)\.?\b', '', name.lower())
+        name = re.sub(r"\b(jr|sr|ii|iii|iv|phd|md|mba|cpa|esq)\.?\b", "", name.lower())
         # Remove punctuation and extra spaces
-        name = re.sub(r'[^\w\s]', '', name)
-        name = ' '.join(name.split())
+        name = re.sub(r"[^\w\s]", "", name)
+        name = " ".join(name.split())
         return name.strip()
 
     def merge_duplicates(
@@ -492,17 +541,13 @@ class DataQualityService:
                 or_(Person.linkedin_url.is_(None), Person.linkedin_url == "")
             )
         elif enrichment_type == "email":
-            query = query.filter(
-                or_(Person.email.is_(None), Person.email == "")
-            )
+            query = query.filter(or_(Person.email.is_(None), Person.email == ""))
         elif enrichment_type == "photo":
             query = query.filter(
                 or_(Person.photo_url.is_(None), Person.photo_url == "")
             )
         elif enrichment_type == "bio":
-            query = query.filter(
-                or_(Person.bio.is_(None), Person.bio == "")
-            )
+            query = query.filter(or_(Person.bio.is_(None), Person.bio == ""))
 
         # Prioritize people with current positions
         people = query.limit(limit * 2).all()
@@ -511,10 +556,15 @@ class DataQualityService:
         scored = []
         for person in people:
             # Check if has current role
-            has_current_role = self.db.query(CompanyPerson).filter(
-                CompanyPerson.person_id == person.id,
-                CompanyPerson.is_current == True,
-            ).first() is not None
+            has_current_role = (
+                self.db.query(CompanyPerson)
+                .filter(
+                    CompanyPerson.person_id == person.id,
+                    CompanyPerson.is_current == True,
+                )
+                .first()
+                is not None
+            )
 
             # Priority score (higher = more important to enrich)
             priority = 0
@@ -527,16 +577,18 @@ class DataQualityService:
             if not person.photo_url:
                 priority += 5
 
-            scored.append({
-                "person_id": person.id,
-                "full_name": person.full_name,
-                "linkedin_url": person.linkedin_url,
-                "has_email": bool(person.email),
-                "has_photo": bool(person.photo_url),
-                "has_bio": bool(person.bio),
-                "has_current_role": has_current_role,
-                "priority_score": priority,
-            })
+            scored.append(
+                {
+                    "person_id": person.id,
+                    "full_name": person.full_name,
+                    "linkedin_url": person.linkedin_url,
+                    "has_email": bool(person.email),
+                    "has_photo": bool(person.photo_url),
+                    "has_bio": bool(person.bio),
+                    "has_current_role": has_current_role,
+                    "priority_score": priority,
+                }
+            )
 
         # Sort by priority descending
         scored.sort(key=lambda x: x["priority_score"], reverse=True)

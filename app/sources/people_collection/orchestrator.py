@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DiagnosticInfo:
     """Diagnostic information for debugging collection issues."""
+
     company_id: int
     company_name: str
 
@@ -183,9 +184,11 @@ class PeopleCollectionOrchestrator:
 
         try:
             # Get company
-            company = session.query(IndustrialCompany).filter(
-                IndustrialCompany.id == company_id
-            ).first()
+            company = (
+                session.query(IndustrialCompany)
+                .filter(IndustrialCompany.id == company_id)
+                .first()
+            )
 
             if not company:
                 logger.error(f"Company {company_id} not found in database")
@@ -234,15 +237,21 @@ class PeopleCollectionOrchestrator:
                     people_count = len(website_result.get("people", []))
                     all_people.extend(website_result.get("people", []))
                     result.errors.extend(website_result.get("errors", []))
-                    logger.info(f"WebsiteAgent found {people_count} people for {company.name}")
+                    logger.info(
+                        f"WebsiteAgent found {people_count} people for {company.name}"
+                    )
                     agent_diagnostics["website"] = {
                         "ran": True,
                         "people_found": people_count,
                         "errors": website_result.get("errors", []),
-                        "duration_ms": int((datetime.utcnow() - agent_start).total_seconds() * 1000),
+                        "duration_ms": int(
+                            (datetime.utcnow() - agent_start).total_seconds() * 1000
+                        ),
                     }
                 else:
-                    logger.warning(f"Skipping WebsiteAgent for {company.name} - no website URL")
+                    logger.warning(
+                        f"Skipping WebsiteAgent for {company.name} - no website URL"
+                    )
                     result.warnings.append("No website URL configured")
                     agent_diagnostics["website"] = {
                         "ran": False,
@@ -252,20 +261,26 @@ class PeopleCollectionOrchestrator:
             if "sec" in sources:
                 agent_start = datetime.utcnow()
                 if company.cik:
-                    logger.info(f"Running SECAgent for {company.name} (CIK: {company.cik})")
+                    logger.info(
+                        f"Running SECAgent for {company.name} (CIK: {company.cik})"
+                    )
                     sec_result = await self._collect_from_sec(company, session)
                     people_count = len(sec_result.get("people", []))
                     changes_count = len(sec_result.get("changes", []))
                     all_people.extend(sec_result.get("people", []))
                     all_changes.extend(sec_result.get("changes", []))
                     result.errors.extend(sec_result.get("errors", []))
-                    logger.info(f"SECAgent found {people_count} people, {changes_count} changes for {company.name}")
+                    logger.info(
+                        f"SECAgent found {people_count} people, {changes_count} changes for {company.name}"
+                    )
                     agent_diagnostics["sec"] = {
                         "ran": True,
                         "people_found": people_count,
                         "changes_found": changes_count,
                         "errors": sec_result.get("errors", []),
-                        "duration_ms": int((datetime.utcnow() - agent_start).total_seconds() * 1000),
+                        "duration_ms": int(
+                            (datetime.utcnow() - agent_start).total_seconds() * 1000
+                        ),
                     }
                 else:
                     logger.warning(f"Skipping SECAgent for {company.name} - no CIK")
@@ -283,15 +298,21 @@ class PeopleCollectionOrchestrator:
                     people_count = len(deep_result.get("people", []))
                     all_people.extend(deep_result.get("people", []))
                     result.errors.extend(deep_result.get("errors", []))
-                    logger.info(f"DeepCrawler found {people_count} people for {company.name}")
+                    logger.info(
+                        f"DeepCrawler found {people_count} people for {company.name}"
+                    )
                     agent_diagnostics["deep_crawl"] = {
                         "ran": True,
                         "people_found": people_count,
                         "errors": deep_result.get("errors", []),
-                        "duration_ms": int((datetime.utcnow() - agent_start).total_seconds() * 1000),
+                        "duration_ms": int(
+                            (datetime.utcnow() - agent_start).total_seconds() * 1000
+                        ),
                     }
                 else:
-                    logger.warning(f"Skipping DeepCrawler for {company.name} - no website URL")
+                    logger.warning(
+                        f"Skipping DeepCrawler for {company.name} - no website URL"
+                    )
                     result.warnings.append("No website URL configured for deep crawl")
                     agent_diagnostics["deep_crawl"] = {
                         "ran": False,
@@ -305,12 +326,16 @@ class PeopleCollectionOrchestrator:
                 changes_count = len(news_result.get("changes", []))
                 all_changes.extend(news_result.get("changes", []))
                 result.errors.extend(news_result.get("errors", []))
-                logger.info(f"NewsAgent found {changes_count} changes for {company.name}")
+                logger.info(
+                    f"NewsAgent found {changes_count} changes for {company.name}"
+                )
                 agent_diagnostics["news"] = {
                     "ran": True,
                     "changes_found": changes_count,
                     "errors": news_result.get("errors", []),
-                    "duration_ms": int((datetime.utcnow() - agent_start).total_seconds() * 1000),
+                    "duration_ms": int(
+                        (datetime.utcnow() - agent_start).total_seconds() * 1000
+                    ),
                 }
 
             # Deduplicate and store people
@@ -327,6 +352,7 @@ class PeopleCollectionOrchestrator:
             # Run lightweight company-scoped dedup scan
             try:
                 from app.services.dedup_service import DedupService
+
                 dedup_svc = DedupService(session)
                 dedup_svc.scan_for_duplicates(company_id=company.id, limit=200)
             except Exception as e:
@@ -436,13 +462,15 @@ class PeopleCollectionOrchestrator:
         for result in results:
             if isinstance(result, Exception):
                 batch_result.failed += 1
-                batch_result.results.append(CollectionResult(
-                    company_id=0,
-                    company_name="Unknown",
-                    source="",
-                    success=False,
-                    errors=[str(result)],
-                ))
+                batch_result.results.append(
+                    CollectionResult(
+                        company_id=0,
+                        company_name="Unknown",
+                        source="",
+                        success=False,
+                        errors=[str(result)],
+                    )
+                )
             else:
                 batch_result.results.append(result)
                 if result.success:
@@ -614,7 +642,8 @@ class PeopleCollectionOrchestrator:
         domain_has_mx = True
         try:
             from app.sources.people_collection.email_inferrer import (
-                EmailInferrer, CompanyEmailPatternLearner,
+                EmailInferrer,
+                CompanyEmailPatternLearner,
             )
             from app.sources.people_collection.mx_verifier import MXVerifier
 
@@ -623,13 +652,17 @@ class PeopleCollectionOrchestrator:
             mx_verifier = MXVerifier()
 
             if company.website:
-                company_domain = email_inferrer.extract_domain_from_website(company.website)
+                company_domain = email_inferrer.extract_domain_from_website(
+                    company.website
+                )
 
             if company_domain:
                 mx_result = mx_verifier.verify_domain(company_domain)
                 domain_has_mx = mx_result.has_mx
                 if domain_has_mx:
-                    learned_pattern = pattern_learner.learn_pattern_from_db(company.id, session)
+                    learned_pattern = pattern_learner.learn_pattern_from_db(
+                        company.id, session
+                    )
         except Exception as e:
             logger.debug(f"Email inference setup skipped: {e}")
 
@@ -640,18 +673,25 @@ class PeopleCollectionOrchestrator:
 
                 # First try LinkedIn URL (most reliable)
                 if extracted.linkedin_url:
-                    existing_person = session.query(Person).filter(
-                        Person.linkedin_url == extracted.linkedin_url
-                    ).first()
+                    existing_person = (
+                        session.query(Person)
+                        .filter(Person.linkedin_url == extracted.linkedin_url)
+                        .first()
+                    )
 
                 # If not found, try name match
                 if not existing_person and extracted.full_name:
                     # Check if same person already at this company
-                    existing_cp = session.query(CompanyPerson).join(Person).filter(
-                        Person.full_name == extracted.full_name,
-                        CompanyPerson.company_id == company.id,
-                        CompanyPerson.is_current == True,
-                    ).first()
+                    existing_cp = (
+                        session.query(CompanyPerson)
+                        .join(Person)
+                        .filter(
+                            Person.full_name == extracted.full_name,
+                            CompanyPerson.company_id == company.id,
+                            CompanyPerson.is_current == True,
+                        )
+                        .first()
+                    )
                     if existing_cp:
                         existing_person = session.get(Person, existing_cp.person_id)
 
@@ -669,15 +709,17 @@ class PeopleCollectionOrchestrator:
                     person_id = person.id
 
                 # Create/update company_person relationship
-                await self._store_company_person(
-                    person_id, extracted, company, session
-                )
+                await self._store_company_person(person_id, extracted, company, session)
 
                 # Attempt email inference
                 if company_domain and domain_has_mx:
                     inferred = self._maybe_infer_email(
-                        person_id, extracted, company_domain,
-                        learned_pattern, email_inferrer, session,
+                        person_id,
+                        extracted,
+                        company_domain,
+                        learned_pattern,
+                        email_inferrer,
+                        session,
                     )
                     if inferred:
                         emails_inferred += 1
@@ -685,7 +727,11 @@ class PeopleCollectionOrchestrator:
             except Exception as e:
                 logger.warning(f"Failed to store person {extracted.full_name}: {e}")
 
-        return {"created": created, "updated": updated, "emails_inferred": emails_inferred}
+        return {
+            "created": created,
+            "updated": updated,
+            "emails_inferred": emails_inferred,
+        }
 
     def _maybe_infer_email(
         self,
@@ -709,10 +755,14 @@ class PeopleCollectionOrchestrator:
                 return False
 
             # Check if CompanyPerson already has work_email
-            cp = session.query(CompanyPerson).filter(
-                CompanyPerson.person_id == person_id,
-                CompanyPerson.is_current == True,
-            ).first()
+            cp = (
+                session.query(CompanyPerson)
+                .filter(
+                    CompanyPerson.person_id == person_id,
+                    CompanyPerson.is_current == True,
+                )
+                .first()
+            )
 
             if person.email or (cp and cp.work_email):
                 return False
@@ -776,7 +826,9 @@ class PeopleCollectionOrchestrator:
             bio=bio,
             bio_source="website" if bio else None,
             data_sources=["website"],
-            confidence_score=0.8 if extracted.confidence == ExtractionConfidence.HIGH else 0.6,
+            confidence_score=0.8
+            if extracted.confidence == ExtractionConfidence.HIGH
+            else 0.6,
             last_verified_date=date.today(),
         )
 
@@ -810,11 +862,15 @@ class PeopleCollectionOrchestrator:
     ) -> None:
         """Store or update the company_person relationship."""
         # Check for existing relationship
-        existing = session.query(CompanyPerson).filter(
-            CompanyPerson.person_id == person_id,
-            CompanyPerson.company_id == company.id,
-            CompanyPerson.is_current == True,
-        ).first()
+        existing = (
+            session.query(CompanyPerson)
+            .filter(
+                CompanyPerson.person_id == person_id,
+                CompanyPerson.company_id == company.id,
+                CompanyPerson.is_current == True,
+            )
+            .first()
+        )
 
         if existing:
             # Update if title changed
@@ -823,13 +879,21 @@ class PeopleCollectionOrchestrator:
                 existing.title_normalized = extracted.title_normalized
                 # Handle both enum and string values (use_enum_values=True in Pydantic)
                 title_level = extracted.title_level
-                existing.title_level = title_level.value if hasattr(title_level, 'value') else title_level
+                existing.title_level = (
+                    title_level.value if hasattr(title_level, "value") else title_level
+                )
         else:
             # Handle both enum and string values (use_enum_values=True in Pydantic)
             title_level = extracted.title_level
-            title_level_val = title_level.value if hasattr(title_level, 'value') else title_level
+            title_level_val = (
+                title_level.value if hasattr(title_level, "value") else title_level
+            )
             confidence = extracted.confidence
-            confidence_val = confidence.value if hasattr(confidence, 'value') else (confidence or "medium")
+            confidence_val = (
+                confidence.value
+                if hasattr(confidence, "value")
+                else (confidence or "medium")
+            )
 
             # Create new relationship
             cp = CompanyPerson(
@@ -859,12 +923,16 @@ class PeopleCollectionOrchestrator:
         for change in changes:
             try:
                 # Check for duplicate
-                existing = session.query(LeadershipChangeModel).filter(
-                    LeadershipChangeModel.company_id == company.id,
-                    LeadershipChangeModel.person_name == change.person_name,
-                    LeadershipChangeModel.change_type == change.change_type.value,
-                    LeadershipChangeModel.effective_date == change.effective_date,
-                ).first()
+                existing = (
+                    session.query(LeadershipChangeModel)
+                    .filter(
+                        LeadershipChangeModel.company_id == company.id,
+                        LeadershipChangeModel.person_name == change.person_name,
+                        LeadershipChangeModel.change_type == change.change_type.value,
+                        LeadershipChangeModel.effective_date == change.effective_date,
+                    )
+                    .first()
+                )
 
                 if existing:
                     continue
@@ -922,9 +990,11 @@ class PeopleCollectionOrchestrator:
 
         try:
             # Get company
-            company = session.query(IndustrialCompany).filter(
-                IndustrialCompany.id == company_id
-            ).first()
+            company = (
+                session.query(IndustrialCompany)
+                .filter(IndustrialCompany.id == company_id)
+                .first()
+            )
 
             if not company:
                 diag.failure_reason = f"Company {company_id} not found in database"
@@ -937,8 +1007,12 @@ class PeopleCollectionOrchestrator:
             diag.has_cik = bool(company.cik)
             diag.cik = company.cik
 
-            logger.info(f"[DIAG] Starting collection for {company.name} (id={company_id})")
-            logger.info(f"[DIAG] Company data: website={company.website}, cik={company.cik}")
+            logger.info(
+                f"[DIAG] Starting collection for {company.name} (id={company_id})"
+            )
+            logger.info(
+                f"[DIAG] Company data: website={company.website}, cik={company.cik}"
+            )
             logger.info(f"[DIAG] Sources requested: {sources}")
 
             all_people: List[ExtractedPerson] = []
@@ -956,7 +1030,9 @@ class PeopleCollectionOrchestrator:
                             company, session, diag
                         )
                         all_people.extend(website_result.get("people", []))
-                        diag.website_people_extracted = len(website_result.get("people", []))
+                        diag.website_people_extracted = len(
+                            website_result.get("people", [])
+                        )
                         diag.website_errors = website_result.get("errors", [])
 
                         logger.info(
@@ -974,13 +1050,17 @@ class PeopleCollectionOrchestrator:
                         (datetime.utcnow() - agent_start).total_seconds() * 1000
                     )
                 else:
-                    logger.warning(f"[DIAG] Skipping WebsiteAgent - company has no website URL")
+                    logger.warning(
+                        f"[DIAG] Skipping WebsiteAgent - company has no website URL"
+                    )
                     diag.website_errors.append("Company has no website URL configured")
 
             # SEC collection
             if "sec" in sources:
                 if company.cik:
-                    logger.info(f"[DIAG] Running SECAgent for {company.name} (CIK: {company.cik})")
+                    logger.info(
+                        f"[DIAG] Running SECAgent for {company.name} (CIK: {company.cik})"
+                    )
                     agent_start = datetime.utcnow()
                     diag.sec_agent_ran = True
 
@@ -999,7 +1079,9 @@ class PeopleCollectionOrchestrator:
                         )
 
                     except Exception as e:
-                        error_msg = f"SECAgent exception: {str(e)}\n{traceback.format_exc()}"
+                        error_msg = (
+                            f"SECAgent exception: {str(e)}\n{traceback.format_exc()}"
+                        )
                         diag.sec_errors.append(error_msg)
                         logger.error(f"[DIAG] {error_msg}")
 
@@ -1028,7 +1110,9 @@ class PeopleCollectionOrchestrator:
                     )
 
                 except Exception as e:
-                    error_msg = f"NewsAgent exception: {str(e)}\n{traceback.format_exc()}"
+                    error_msg = (
+                        f"NewsAgent exception: {str(e)}\n{traceback.format_exc()}"
+                    )
                     diag.news_errors.append(error_msg)
                     logger.error(f"[DIAG] {error_msg}")
 
@@ -1037,7 +1121,9 @@ class PeopleCollectionOrchestrator:
                 )
 
             # Store results
-            logger.info(f"[DIAG] Storing {len(all_people)} people, {len(all_changes)} changes")
+            logger.info(
+                f"[DIAG] Storing {len(all_people)} people, {len(all_changes)} changes"
+            )
 
             try:
                 stored = await self._store_people(all_people, company, session)
@@ -1055,6 +1141,7 @@ class PeopleCollectionOrchestrator:
                 # Run lightweight company-scoped dedup scan
                 try:
                     from app.services.dedup_service import DedupService
+
                     dedup_svc = DedupService(session)
                     dedup_svc.scan_for_duplicates(company_id=company.id, limit=200)
                 except Exception as e:
@@ -1072,9 +1159,13 @@ class PeopleCollectionOrchestrator:
 
             if not diag.success:
                 if not diag.has_website and not diag.has_cik:
-                    diag.failure_reason = "Company has neither website nor CIK configured"
+                    diag.failure_reason = (
+                        "Company has neither website nor CIK configured"
+                    )
                 elif diag.website_errors:
-                    diag.failure_reason = f"Website collection failed: {diag.website_errors[0]}"
+                    diag.failure_reason = (
+                        f"Website collection failed: {diag.website_errors[0]}"
+                    )
                 else:
                     diag.failure_reason = "No people found from any source"
 
@@ -1110,13 +1201,13 @@ class PeopleCollectionOrchestrator:
             except Exception:
                 pass
             self._website_agent = None
-        if hasattr(self, '_sec_agent') and self._sec_agent:
+        if hasattr(self, "_sec_agent") and self._sec_agent:
             try:
                 await self._sec_agent.close()
             except Exception:
                 pass
             self._sec_agent = None
-        if hasattr(self, '_news_agent') and self._news_agent:
+        if hasattr(self, "_news_agent") and self._news_agent:
             try:
                 await self._news_agent.close()
             except Exception:
@@ -1145,8 +1236,8 @@ class PeopleCollectionOrchestrator:
             )
 
             # Extract diagnostic info from result
-            diag.website_pages_found = getattr(result, 'pages_checked', 0)
-            if hasattr(result, 'page_urls'):
+            diag.website_pages_found = getattr(result, "pages_checked", 0)
+            if hasattr(result, "page_urls"):
                 diag.website_pages_checked = result.page_urls or []
 
             logger.info(

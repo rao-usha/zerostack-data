@@ -10,6 +10,7 @@ Example matches:
 - "Microsoft Corporation" vs "Microsoft Corp"
 - "Berkshire Hathaway" vs "Berkshire Hathaway Inc"
 """
+
 import logging
 import re
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MatchResult:
     """Result of a fuzzy match operation."""
+
     matched: bool
     similarity: float
     normalized_name1: str
@@ -105,45 +107,45 @@ class CompanyNameMatcher:
 
     # Company suffixes to remove during normalization
     COMPANY_SUFFIXES = [
-        r',?\s*(inc\.?|incorporated)$',
-        r',?\s*(llc|l\.l\.c\.)$',
-        r',?\s*(ltd\.?|limited)$',
-        r',?\s*(corp\.?|corporation)$',
-        r',?\s*(co\.?|company)$',
-        r',?\s*(plc|p\.l\.c\.)$',
-        r',?\s*(s\.a\.?|sa)$',
-        r',?\s*(n\.v\.?|nv)$',
-        r',?\s*(ag)$',
-        r',?\s*(gmbh)$',
-        r',?\s*(lp|l\.p\.)$',
-        r',?\s*(llp|l\.l\.p\.)$',
-        r',?\s*(pllc)$',
-        r',?\s*(the)$',
-        r'^(the)\s+',
+        r",?\s*(inc\.?|incorporated)$",
+        r",?\s*(llc|l\.l\.c\.)$",
+        r",?\s*(ltd\.?|limited)$",
+        r",?\s*(corp\.?|corporation)$",
+        r",?\s*(co\.?|company)$",
+        r",?\s*(plc|p\.l\.c\.)$",
+        r",?\s*(s\.a\.?|sa)$",
+        r",?\s*(n\.v\.?|nv)$",
+        r",?\s*(ag)$",
+        r",?\s*(gmbh)$",
+        r",?\s*(lp|l\.p\.)$",
+        r",?\s*(llp|l\.l\.p\.)$",
+        r",?\s*(pllc)$",
+        r",?\s*(the)$",
+        r"^(the)\s+",
     ]
 
     # Common abbreviations to expand
     ABBREVIATIONS = {
-        'intl': 'international',
-        "int'l": 'international',
-        'corp': 'corporation',
-        'assoc': 'associates',
-        'mgmt': 'management',
-        'svcs': 'services',
-        'tech': 'technology',
-        'sys': 'systems',
-        'grp': 'group',
-        'hldgs': 'holdings',
-        'invt': 'investment',
-        'invts': 'investments',
-        'ptnrs': 'partners',
-        'ptr': 'partners',
+        "intl": "international",
+        "int'l": "international",
+        "corp": "corporation",
+        "assoc": "associates",
+        "mgmt": "management",
+        "svcs": "services",
+        "tech": "technology",
+        "sys": "systems",
+        "grp": "group",
+        "hldgs": "holdings",
+        "invt": "investment",
+        "invts": "investments",
+        "ptnrs": "partners",
+        "ptr": "partners",
     }
 
     def __init__(
         self,
         similarity_threshold: float = 0.85,
-        use_abbreviation_expansion: bool = True
+        use_abbreviation_expansion: bool = True,
     ):
         """
         Initialize the matcher.
@@ -184,25 +186,25 @@ class CompanyNameMatcher:
 
         # Remove company suffixes
         for suffix_pattern in self.COMPANY_SUFFIXES:
-            normalized = re.sub(suffix_pattern, '', normalized, flags=re.IGNORECASE)
+            normalized = re.sub(suffix_pattern, "", normalized, flags=re.IGNORECASE)
 
         # Expand abbreviations
         if self.use_abbreviation_expansion:
             words = normalized.split()
             expanded_words = []
             for word in words:
-                word_clean = re.sub(r'[^\w]', '', word)
+                word_clean = re.sub(r"[^\w]", "", word)
                 if word_clean in self.ABBREVIATIONS:
                     expanded_words.append(self.ABBREVIATIONS[word_clean])
                 else:
                     expanded_words.append(word)
-            normalized = ' '.join(expanded_words)
+            normalized = " ".join(expanded_words)
 
         # Remove punctuation except spaces
-        normalized = re.sub(r'[^\w\s]', '', normalized)
+        normalized = re.sub(r"[^\w\s]", "", normalized)
 
         # Normalize whitespace
-        normalized = ' '.join(normalized.split())
+        normalized = " ".join(normalized.split())
 
         # Cache result
         self._normalization_cache[name] = normalized
@@ -229,7 +231,7 @@ class CompanyNameMatcher:
                 matched=True,
                 similarity=1.0,
                 normalized_name1=norm1,
-                normalized_name2=norm2
+                normalized_name2=norm2,
             )
 
         # Calculate similarity
@@ -239,7 +241,7 @@ class CompanyNameMatcher:
             matched=similarity >= self.similarity_threshold,
             similarity=similarity,
             normalized_name1=norm1,
-            normalized_name2=norm2
+            normalized_name2=norm2,
         )
 
     def is_match(self, name1: str, name2: str) -> bool:
@@ -256,10 +258,7 @@ class CompanyNameMatcher:
         return self.match(name1, name2).matched
 
     def find_matches(
-        self,
-        name: str,
-        candidates: List[str],
-        top_n: Optional[int] = None
+        self, name: str, candidates: List[str], top_n: Optional[int] = None
     ) -> List[Tuple[str, float]]:
         """
         Find matching company names from a list of candidates.
@@ -298,7 +297,7 @@ class CompanyNameMatcher:
         self,
         records: List[Dict[str, Any]],
         name_field: str = "company_name",
-        merge_func: Optional[callable] = None
+        merge_func: Optional[callable] = None,
     ) -> List[Dict[str, Any]]:
         """
         Deduplicate a batch of records using fuzzy matching.
@@ -330,7 +329,10 @@ class CompanyNameMatcher:
             # Check if this matches any existing group
             matched_group = None
             for existing_key in group_keys:
-                if similarity_ratio(norm_name, existing_key) >= self.similarity_threshold:
+                if (
+                    similarity_ratio(norm_name, existing_key)
+                    >= self.similarity_threshold
+                ):
                     matched_group = existing_key
                     break
 

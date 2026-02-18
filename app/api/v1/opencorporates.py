@@ -23,8 +23,12 @@ class IngestRequest(BaseModel):
     company_names: Optional[List[str]] = Field(
         None, description="Companies to search. If empty, uses tracked companies."
     )
-    jurisdiction: Optional[str] = Field(None, description="Jurisdiction filter (e.g., 'us_de')")
-    limit: Optional[int] = Field(None, ge=1, le=500, description="Max companies to process")
+    jurisdiction: Optional[str] = Field(
+        None, description="Jurisdiction filter (e.g., 'us_de')"
+    )
+    limit: Optional[int] = Field(
+        None, ge=1, le=500, description="Max companies to process"
+    )
 
 
 @router.post("/ingest")
@@ -67,7 +71,9 @@ def search_companies(
     """Search OpenCorporates for companies."""
     client = OpenCorporatesClient()
     try:
-        return client.search_companies(q, jurisdiction=jurisdiction, page=page, per_page=per_page)
+        return client.search_companies(
+            q, jurisdiction=jurisdiction, page=page, per_page=per_page
+        )
     finally:
         client.close()
 
@@ -95,7 +101,9 @@ def get_officers(
     """Get officers for a company."""
     client = OpenCorporatesClient()
     try:
-        return client.get_company_officers(jurisdiction, company_number, page=page, per_page=per_page)
+        return client.get_company_officers(
+            jurisdiction, company_number, page=page, per_page=per_page
+        )
     finally:
         client.close()
 
@@ -110,7 +118,9 @@ def get_filings(
     """Get filings for a company."""
     client = OpenCorporatesClient()
     try:
-        return client.get_company_filings(jurisdiction, company_number, page=page, per_page=per_page)
+        return client.get_company_filings(
+            jurisdiction, company_number, page=page, per_page=per_page
+        )
     finally:
         client.close()
 
@@ -125,7 +135,9 @@ def search_officers(
     """Search for officers across companies."""
     client = OpenCorporatesClient()
     try:
-        return client.search_officers(q, jurisdiction=jurisdiction, page=page, per_page=per_page)
+        return client.search_officers(
+            q, jurisdiction=jurisdiction, page=page, per_page=per_page
+        )
     finally:
         client.close()
 

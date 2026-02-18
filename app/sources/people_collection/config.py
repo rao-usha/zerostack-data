@@ -17,8 +17,10 @@ import os
 # RATE LIMITING
 # =============================================================================
 
+
 class RateLimitConfig(BaseModel):
     """Rate limit configuration for a source type."""
+
     requests_per_second: float
     retry_attempts: int = 3
     retry_delay_seconds: float = 2.0
@@ -57,8 +59,10 @@ RATE_LIMITS: Dict[str, RateLimitConfig] = {
 # LLM CONFIGURATION
 # =============================================================================
 
+
 class LLMConfig(BaseModel):
     """Configuration for LLM extraction."""
+
     provider: str = "anthropic"  # anthropic or openai
     model: str = "claude-3-5-sonnet-20241022"
     temperature: float = 0.1  # Low for consistent extraction
@@ -272,7 +276,6 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     "/about/executive-team",
     "/about/management-team",
     "/about/leadership-team",
-
     # About-us variants
     "/about-us/leadership",
     "/about-us/team",
@@ -282,7 +285,6 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     "/about-us/executive-team",
     "/about-us/leadership-team",
     "/about-us/management-team",
-
     # Company section patterns
     "/company/leadership",
     "/company/team",
@@ -293,14 +295,12 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     "/company/about-us/leadership",
     "/company/people",
     "/company/our-team",
-
     # Corporate patterns
     "/corporate/leadership",
     "/corporate/management",
     "/corporate/team",
     "/corporate/about/leadership",
     "/corporate/executive-team",
-
     # Root-level patterns
     "/leadership",
     "/leadership-team",
@@ -316,14 +316,12 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     "/our-people",
     "/meet-the-team",
     "/meet-our-team",
-
     # Who we are patterns
     "/who-we-are/leadership",
     "/who-we-are/team",
     "/who-we-are/our-team",
     "/who-we-are/people",
     "/who-we-are/management",
-
     # Board/governance patterns
     "/about/board",
     "/about/board-of-directors",
@@ -338,7 +336,6 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     "/board",
     "/board-of-directors",
     "/directors",
-
     # International/localized patterns
     "/en/about/team",
     "/en/about/leadership",
@@ -350,18 +347,15 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     "/us/about/team",
     "/us/about/leadership",
     "/en-gb/about/team",
-
     # SaaS/tech company patterns
     "/company",  # Many SaaS sites put team on /company
-    "/about",    # Sometimes team is on main about page
+    "/about",  # Sometimes team is on main about page
     # NOTE: /careers/team and /careers/leadership removed - they match career pages, not leadership team pages
-
     # Founders/partners patterns (for smaller companies)
     "/founders",
     "/partners",
     "/our-founders",
     "/about/founders",
-
     # Additional variants
     "/info/leadership",
     "/info/team",
@@ -370,7 +364,6 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     "/site/leadership",
     "/our-company/leadership",
     "/our-company/team",
-
     # Investor relations patterns (important for public companies)
     "/investors/governance",
     "/investors/leadership",
@@ -387,7 +380,6 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     "/ir/leadership",
     "/ir/management",
     "/ir/corporate-governance",
-
     # Industrial/manufacturing company patterns
     "/about/senior-leadership",
     "/about/officers",
@@ -398,7 +390,6 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     "/corporate/senior-leadership",
     "/company/officers",
     "/company/executive-officers",
-
     # More root-level patterns
     "/senior-leadership",
     "/officers",
@@ -407,13 +398,11 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     "/our-leaders",
     "/meet-our-leaders",
     "/meet-leadership",
-
     # Alternative "about" spellings
     "/aboutus/leadership",
     "/aboutus/team",
     "/about_us/leadership",
     "/about_us/team",
-
     # Governance patterns (common for large corps like ABB)
     "/about/governance",
     "/about/governance/executive-committee",
@@ -427,7 +416,6 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     "/corporate-governance/executive-officers",
     "/executive-committee",
     "/our-management",
-
     # .html suffix patterns (many corporate sites use these)
     "/about/leadership.html",
     "/about/team.html",
@@ -436,7 +424,6 @@ LEADERSHIP_URL_PATTERNS: List[str] = [
     "/company/leadership.html",
     "/leadership.html",
     "/board-of-directors.html",
-
     # .aspx patterns (common for investor relations)
     "/governance/leadership-team/default.aspx",
     "/governance/board-of-directors/default.aspx",
@@ -453,32 +440,27 @@ LEADERSHIP_LINK_PATTERNS: List[str] = [
     r"management team",
     r"management",
     r"executives",
-
     # Team keywords
     r"team",
     r"our team",
     r"the team",
     r"meet the team",
     r"meet our team",
-
     # People keywords
     r"our people",
     r"people",
     r"staff",
     r"our staff",
-
     # About keywords
     r"about us",
     r"about$",  # Just "About" link
     r"who we are",
     r"company",
-
     # Board keywords
     r"board of directors",
     r"board",
     r"directors",
     r"governance",
-
     # Founders/partners
     r"founders",
     r"partners",
@@ -499,7 +481,6 @@ TITLE_NORMALIZATIONS: Dict[str, str] = {
     "president/ceo": "President & CEO",
     "ceo and president": "President & CEO",
     "chief executive": "CEO",
-
     # CFO variants
     "chief financial officer": "CFO",
     "cfo": "CFO",
@@ -508,20 +489,17 @@ TITLE_NORMALIZATIONS: Dict[str, str] = {
     "vice president, finance": "VP Finance",
     "svp finance": "SVP Finance",
     "evp & cfo": "EVP & CFO",
-
     # COO variants
     "chief operating officer": "COO",
     "coo": "COO",
     "president and coo": "President & COO",
     "president & coo": "President & COO",
-
     # CTO variants
     "chief technology officer": "CTO",
     "cto": "CTO",
     "chief information officer": "CIO",
     "cio": "CIO",
     "chief digital officer": "CDO",
-
     # Sales leadership
     "chief revenue officer": "CRO",
     "cro": "CRO",
@@ -535,20 +513,17 @@ TITLE_NORMALIZATIONS: Dict[str, str] = {
     "evp sales": "EVP Sales",
     "head of sales": "Head of Sales",
     "sales director": "Director of Sales",
-
     # Marketing
     "chief marketing officer": "CMO",
     "cmo": "CMO",
     "vp marketing": "VP Marketing",
     "vice president of marketing": "VP Marketing",
-
     # Operations
     "vp operations": "VP Operations",
     "vice president of operations": "VP Operations",
     "vice president, operations": "VP Operations",
     "director of operations": "Director of Operations",
     "svp operations": "SVP Operations",
-
     # HR
     "chief human resources officer": "CHRO",
     "chro": "CHRO",
@@ -558,13 +533,11 @@ TITLE_NORMALIZATIONS: Dict[str, str] = {
     "vp hr": "VP Human Resources",
     "vice president of human resources": "VP Human Resources",
     "head of hr": "Head of HR",
-
     # Legal
     "general counsel": "General Counsel",
     "chief legal officer": "CLO",
     "clo": "CLO",
     "vp legal": "VP Legal",
-
     # Board
     "chairman": "Chairman",
     "chairman of the board": "Chairman",
@@ -577,7 +550,20 @@ TITLE_NORMALIZATIONS: Dict[str, str] = {
 }
 
 TITLE_LEVEL_KEYWORDS: Dict[str, List[str]] = {
-    "c_suite": ["chief", "ceo", "cfo", "coo", "cto", "cmo", "cio", "cro", "chro", "clo", "cpo", "cdo"],
+    "c_suite": [
+        "chief",
+        "ceo",
+        "cfo",
+        "coo",
+        "cto",
+        "cmo",
+        "cio",
+        "cro",
+        "chro",
+        "clo",
+        "cpo",
+        "cdo",
+    ],
     "president": ["president"],
     "evp": ["executive vice president", "evp"],
     "svp": ["senior vice president", "svp"],
@@ -594,7 +580,14 @@ TITLE_LEVEL_KEYWORDS: Dict[str, List[str]] = {
 
 DEPARTMENT_KEYWORDS: Dict[str, List[str]] = {
     "finance": ["finance", "financial", "cfo", "accounting", "treasury", "controller"],
-    "operations": ["operations", "coo", "manufacturing", "production", "supply chain", "logistics"],
+    "operations": [
+        "operations",
+        "coo",
+        "manufacturing",
+        "production",
+        "supply chain",
+        "logistics",
+    ],
     "sales": ["sales", "revenue", "commercial", "cro"],
     "marketing": ["marketing", "cmo", "brand", "communications", "pr"],
     "hr": ["human resources", "hr", "people", "talent", "chro"],
@@ -609,8 +602,10 @@ DEPARTMENT_KEYWORDS: Dict[str, List[str]] = {
 # COLLECTION SETTINGS
 # =============================================================================
 
+
 class CollectionSettings(BaseModel):
     """Global settings for collection jobs."""
+
     max_concurrent_companies: int = 5
     max_pages_per_company: int = 10
     html_max_length: int = 500000  # Max HTML size to send to LLM

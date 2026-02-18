@@ -9,26 +9,27 @@ Provides access to major international economic data sources:
 
 All sources are free, no API key required.
 """
+
 from app.sources.international_econ.client import (
     WorldBankClient,
     IMFClient,
     OECDClient,
-    BISClient
+    BISClient,
 )
 from app.sources.international_econ.ingest import (
     ingest_worldbank_wdi,
     ingest_worldbank_indicators,
     ingest_imf_weo,
-    ingest_imf_ifs
+    ingest_imf_ifs,
 )
 
 __all__ = [
     "WorldBankClient",
-    "IMFClient", 
+    "IMFClient",
     "OECDClient",
     "BISClient",
     "ingest_worldbank_wdi",
     "ingest_worldbank_indicators",
     "ingest_imf_weo",
-    "ingest_imf_ifs"
+    "ingest_imf_ifs",
 ]

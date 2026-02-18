@@ -11,4 +11,3 @@ All sources use official APIs or bulk download endpoints. No web scraping.
 """
 
 __all__ = ["client", "ingest", "metadata"]
-

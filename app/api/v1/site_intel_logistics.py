@@ -11,6 +11,7 @@ Endpoints for:
 - 3PL company directory
 - Warehouse listings
 """
+
 import logging
 import uuid
 from datetime import datetime
@@ -22,10 +23,18 @@ from sqlalchemy import func, desc
 
 from app.core.database import get_db
 from app.core.models_site_intel import (
-    FreightRateIndex, TruckingLaneRate, WarehouseFacility,
-    ContainerFreightIndex, UsdaTruckRate, MotorCarrier, CarrierSafety,
-    PortThroughputMonthly, AirCargoStats, TradeGatewayStats,
-    ThreePLCompany, WarehouseListing,
+    FreightRateIndex,
+    TruckingLaneRate,
+    WarehouseFacility,
+    ContainerFreightIndex,
+    UsdaTruckRate,
+    MotorCarrier,
+    CarrierSafety,
+    PortThroughputMonthly,
+    AirCargoStats,
+    TradeGatewayStats,
+    ThreePLCompany,
+    WarehouseListing,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,9 +46,12 @@ router = APIRouter(prefix="/site-intel/logistics", tags=["Site Intel - Logistics
 # CONTAINER FREIGHT RATE ENDPOINTS
 # =============================================================================
 
+
 @router.get("/container-rates")
 async def search_container_rates(
-    provider: Optional[str] = Query(None, description="Provider: freightos, drewry, scfi"),
+    provider: Optional[str] = Query(
+        None, description="Provider: freightos, drewry, scfi"
+    ),
     index_code: Optional[str] = Query(None),
     origin_region: Optional[str] = Query(None),
     destination_region: Optional[str] = Query(None),
@@ -55,9 +67,15 @@ async def search_container_rates(
     if index_code:
         query = query.filter(ContainerFreightIndex.index_code == index_code)
     if origin_region:
-        query = query.filter(ContainerFreightIndex.route_origin_region.ilike(f"%{origin_region}%"))
+        query = query.filter(
+            ContainerFreightIndex.route_origin_region.ilike(f"%{origin_region}%")
+        )
     if destination_region:
-        query = query.filter(ContainerFreightIndex.route_destination_region.ilike(f"%{destination_region}%"))
+        query = query.filter(
+            ContainerFreightIndex.route_destination_region.ilike(
+                f"%{destination_region}%"
+            )
+        )
     if container_type:
         query = query.filter(ContainerFreightIndex.container_type == container_type)
 
@@ -121,17 +139,25 @@ async def get_container_rate_history(
     db: Session = Depends(get_db),
 ):
     """Get historical rates for a specific container route."""
-    rates = db.query(ContainerFreightIndex).filter(
-        ContainerFreightIndex.index_code == index_code
-    ).order_by(ContainerFreightIndex.rate_date.desc()).limit(weeks).all()
+    rates = (
+        db.query(ContainerFreightIndex)
+        .filter(ContainerFreightIndex.index_code == index_code)
+        .order_by(ContainerFreightIndex.rate_date.desc())
+        .limit(weeks)
+        .all()
+    )
 
     if not rates:
-        raise HTTPException(status_code=404, detail=f"No rates found for index {index_code}")
+        raise HTTPException(
+            status_code=404, detail=f"No rates found for index {index_code}"
+        )
 
     return {
         "index_code": index_code,
         "provider": rates[0].provider if rates else None,
-        "route": f"{rates[0].route_origin_port or rates[0].route_origin_region} → {rates[0].route_destination_port or rates[0].route_destination_region}" if rates else None,
+        "route": f"{rates[0].route_origin_port or rates[0].route_origin_region} → {rates[0].route_destination_port or rates[0].route_destination_region}"
+        if rates
+        else None,
         "history": [
             {
                 "date": r.rate_date.isoformat() if r.rate_date else None,
@@ -139,13 +165,14 @@ async def get_container_rate_history(
                 "change_pct_wow": float(r.change_pct_wow) if r.change_pct_wow else None,
             }
             for r in rates
-        ]
+        ],
     }
 
 
 # =============================================================================
 # TRUCKING RATE ENDPOINTS (USDA Agricultural)
 # =============================================================================
+
 
 @router.get("/truck-rates/agricultural")
 async def search_agricultural_truck_rates(
@@ -162,7 +189,9 @@ async def search_agricultural_truck_rates(
     if origin_state:
         query = query.filter(UsdaTruckRate.origin_state == origin_state.upper())
     if destination_state:
-        query = query.filter(UsdaTruckRate.destination_state == destination_state.upper())
+        query = query.filter(
+            UsdaTruckRate.destination_state == destination_state.upper()
+        )
     if commodity:
         query = query.filter(UsdaTruckRate.commodity.ilike(f"%{commodity}%"))
     if mileage_band:
@@ -181,7 +210,9 @@ async def search_agricultural_truck_rates(
             "commodity": r.commodity,
             "mileage_band": r.mileage_band,
             "rate_per_mile": float(r.rate_per_mile) if r.rate_per_mile else None,
-            "rate_per_truckload": float(r.rate_per_truckload) if r.rate_per_truckload else None,
+            "rate_per_truckload": float(r.rate_per_truckload)
+            if r.rate_per_truckload
+            else None,
             "fuel_price": float(r.fuel_price) if r.fuel_price else None,
             "report_date": r.report_date.isoformat() if r.report_date else None,
         }
@@ -192,17 +223,23 @@ async def search_agricultural_truck_rates(
 @router.get("/truck-rates/commodities")
 async def list_truck_rate_commodities(db: Session = Depends(get_db)):
     """List available commodities with truck rate data."""
-    commodities = db.query(
-        UsdaTruckRate.commodity,
-        func.count(UsdaTruckRate.id).label("record_count"),
-        func.avg(UsdaTruckRate.rate_per_mile).label("avg_rate_per_mile"),
-    ).group_by(UsdaTruckRate.commodity).all()
+    commodities = (
+        db.query(
+            UsdaTruckRate.commodity,
+            func.count(UsdaTruckRate.id).label("record_count"),
+            func.avg(UsdaTruckRate.rate_per_mile).label("avg_rate_per_mile"),
+        )
+        .group_by(UsdaTruckRate.commodity)
+        .all()
+    )
 
     return [
         {
             "commodity": c.commodity,
             "record_count": c.record_count,
-            "avg_rate_per_mile": round(float(c.avg_rate_per_mile), 2) if c.avg_rate_per_mile else None,
+            "avg_rate_per_mile": round(float(c.avg_rate_per_mile), 2)
+            if c.avg_rate_per_mile
+            else None,
         }
         for c in commodities
     ]
@@ -211,6 +248,7 @@ async def list_truck_rate_commodities(db: Session = Depends(get_db)):
 # =============================================================================
 # MOTOR CARRIER ENDPOINTS (FMCSA)
 # =============================================================================
+
 
 @router.get("/carriers")
 async def search_carriers(
@@ -232,8 +270,8 @@ async def search_carriers(
         query = query.filter(MotorCarrier.carrier_operation == carrier_operation)
     if name:
         query = query.filter(
-            (MotorCarrier.legal_name.ilike(f"%{name}%")) |
-            (MotorCarrier.dba_name.ilike(f"%{name}%"))
+            (MotorCarrier.legal_name.ilike(f"%{name}%"))
+            | (MotorCarrier.dba_name.ilike(f"%{name}%"))
         )
 
     query = query.filter(MotorCarrier.is_active == True)
@@ -260,12 +298,14 @@ async def search_carriers(
 @router.get("/carriers/{dot_number}")
 async def get_carrier_details(dot_number: str, db: Session = Depends(get_db)):
     """Get detailed carrier information."""
-    carrier = db.query(MotorCarrier).filter(
-        MotorCarrier.dot_number == dot_number
-    ).first()
+    carrier = (
+        db.query(MotorCarrier).filter(MotorCarrier.dot_number == dot_number).first()
+    )
 
     if not carrier:
-        raise HTTPException(status_code=404, detail=f"Carrier DOT {dot_number} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Carrier DOT {dot_number} not found"
+        )
 
     return {
         "dot_number": carrier.dot_number,
@@ -293,29 +333,52 @@ async def get_carrier_details(dot_number: str, db: Session = Depends(get_db)):
 async def get_carrier_safety(dot_number: str, db: Session = Depends(get_db)):
     """Get carrier safety record and BASIC scores."""
     # Get latest safety record
-    safety = db.query(CarrierSafety).filter(
-        CarrierSafety.dot_number == dot_number
-    ).order_by(CarrierSafety.inspection_date.desc()).first()
+    safety = (
+        db.query(CarrierSafety)
+        .filter(CarrierSafety.dot_number == dot_number)
+        .order_by(CarrierSafety.inspection_date.desc())
+        .first()
+    )
 
     if not safety:
-        raise HTTPException(status_code=404, detail=f"No safety data for DOT {dot_number}")
+        raise HTTPException(
+            status_code=404, detail=f"No safety data for DOT {dot_number}"
+        )
 
     return {
         "dot_number": safety.dot_number,
         "safety_rating": safety.safety_rating,
         "rating_date": safety.rating_date.isoformat() if safety.rating_date else None,
         "basic_scores": {
-            "unsafe_driving": float(safety.unsafe_driving_score) if safety.unsafe_driving_score else None,
-            "hours_of_service": float(safety.hours_of_service_score) if safety.hours_of_service_score else None,
-            "driver_fitness": float(safety.driver_fitness_score) if safety.driver_fitness_score else None,
-            "controlled_substances": float(safety.controlled_substances_score) if safety.controlled_substances_score else None,
-            "vehicle_maintenance": float(safety.vehicle_maintenance_score) if safety.vehicle_maintenance_score else None,
-            "hazmat_compliance": float(safety.hazmat_compliance_score) if safety.hazmat_compliance_score else None,
-            "crash_indicator": float(safety.crash_indicator_score) if safety.crash_indicator_score else None,
+            "unsafe_driving": float(safety.unsafe_driving_score)
+            if safety.unsafe_driving_score
+            else None,
+            "hours_of_service": float(safety.hours_of_service_score)
+            if safety.hours_of_service_score
+            else None,
+            "driver_fitness": float(safety.driver_fitness_score)
+            if safety.driver_fitness_score
+            else None,
+            "controlled_substances": float(safety.controlled_substances_score)
+            if safety.controlled_substances_score
+            else None,
+            "vehicle_maintenance": float(safety.vehicle_maintenance_score)
+            if safety.vehicle_maintenance_score
+            else None,
+            "hazmat_compliance": float(safety.hazmat_compliance_score)
+            if safety.hazmat_compliance_score
+            else None,
+            "crash_indicator": float(safety.crash_indicator_score)
+            if safety.crash_indicator_score
+            else None,
         },
         "inspection_stats": {
-            "vehicle_oos_rate": float(safety.vehicle_oos_rate) if safety.vehicle_oos_rate else None,
-            "driver_oos_rate": float(safety.driver_oos_rate) if safety.driver_oos_rate else None,
+            "vehicle_oos_rate": float(safety.vehicle_oos_rate)
+            if safety.vehicle_oos_rate
+            else None,
+            "driver_oos_rate": float(safety.driver_oos_rate)
+            if safety.driver_oos_rate
+            else None,
             "total_inspections": safety.total_inspections,
             "total_violations": safety.total_violations,
         },
@@ -325,13 +388,16 @@ async def get_carrier_safety(dot_number: str, db: Session = Depends(get_db)):
             "injury_crashes": safety.injury_crashes,
             "tow_crashes": safety.tow_crashes,
         },
-        "inspection_date": safety.inspection_date.isoformat() if safety.inspection_date else None,
+        "inspection_date": safety.inspection_date.isoformat()
+        if safety.inspection_date
+        else None,
     }
 
 
 # =============================================================================
 # PORT THROUGHPUT ENDPOINTS
 # =============================================================================
+
 
 @router.get("/port-throughput")
 async def search_port_throughput(
@@ -353,7 +419,7 @@ async def search_port_throughput(
 
     query = query.order_by(
         PortThroughputMonthly.period_year.desc(),
-        PortThroughputMonthly.period_month.desc()
+        PortThroughputMonthly.period_month.desc(),
     )
     stats = query.limit(limit).all()
 
@@ -366,7 +432,9 @@ async def search_port_throughput(
             "teu_loaded_import": s.teu_loaded_import,
             "teu_loaded_export": s.teu_loaded_export,
             "container_vessel_calls": s.container_vessel_calls,
-            "avg_berthing_hours": float(s.avg_berthing_hours) if s.avg_berthing_hours else None,
+            "avg_berthing_hours": float(s.avg_berthing_hours)
+            if s.avg_berthing_hours
+            else None,
             "tonnage_total": s.tonnage_total,
         }
         for s in stats
@@ -380,12 +448,16 @@ async def get_port_history(
     db: Session = Depends(get_db),
 ):
     """Get historical throughput for a specific port."""
-    stats = db.query(PortThroughputMonthly).filter(
-        PortThroughputMonthly.port_code == port_code.upper()
-    ).order_by(
-        PortThroughputMonthly.period_year.desc(),
-        PortThroughputMonthly.period_month.desc()
-    ).limit(months).all()
+    stats = (
+        db.query(PortThroughputMonthly)
+        .filter(PortThroughputMonthly.port_code == port_code.upper())
+        .order_by(
+            PortThroughputMonthly.period_year.desc(),
+            PortThroughputMonthly.period_month.desc(),
+        )
+        .limit(months)
+        .all()
+    )
 
     if not stats:
         raise HTTPException(status_code=404, detail=f"No data for port {port_code}")
@@ -401,13 +473,14 @@ async def get_port_history(
                 "tonnage_total": s.tonnage_total,
             }
             for s in stats
-        ]
+        ],
     }
 
 
 # =============================================================================
 # AIR CARGO ENDPOINTS
 # =============================================================================
+
 
 @router.get("/air-cargo")
 async def search_air_cargo(
@@ -428,8 +501,7 @@ async def search_air_cargo(
         query = query.filter(AirCargoStats.period_month == month)
 
     query = query.order_by(
-        AirCargoStats.period_year.desc(),
-        AirCargoStats.period_month.desc()
+        AirCargoStats.period_year.desc(), AirCargoStats.period_month.desc()
     )
     stats = query.limit(limit).all()
 
@@ -438,9 +510,15 @@ async def search_air_cargo(
             "airport_code": s.airport_code,
             "airport_name": s.airport_name,
             "period": f"{s.period_year}-{s.period_month:02d}",
-            "freight_tons_total": float(s.freight_tons_total) if s.freight_tons_total else None,
-            "freight_domestic": float(s.freight_domestic) if s.freight_domestic else None,
-            "freight_international": float(s.freight_international) if s.freight_international else None,
+            "freight_tons_total": float(s.freight_tons_total)
+            if s.freight_tons_total
+            else None,
+            "freight_domestic": float(s.freight_domestic)
+            if s.freight_domestic
+            else None,
+            "freight_international": float(s.freight_international)
+            if s.freight_international
+            else None,
             "mail_tons": float(s.mail_tons) if s.mail_tons else None,
         }
         for s in stats
@@ -461,10 +539,7 @@ async def get_top_cargo_airports(
         func.sum(AirCargoStats.freight_tons_total).label("annual_tons"),
         func.sum(AirCargoStats.freight_domestic).label("domestic_tons"),
         func.sum(AirCargoStats.freight_international).label("international_tons"),
-    ).group_by(
-        AirCargoStats.airport_code,
-        AirCargoStats.airport_name
-    )
+    ).group_by(AirCargoStats.airport_code, AirCargoStats.airport_name)
 
     if year:
         query = query.filter(AirCargoStats.period_year == year)
@@ -479,7 +554,9 @@ async def get_top_cargo_airports(
             "airport_name": a.airport_name,
             "annual_tons": float(a.annual_tons) if a.annual_tons else None,
             "domestic_tons": float(a.domestic_tons) if a.domestic_tons else None,
-            "international_tons": float(a.international_tons) if a.international_tons else None,
+            "international_tons": float(a.international_tons)
+            if a.international_tons
+            else None,
         }
         for i, a in enumerate(airports)
     ]
@@ -488,6 +565,7 @@ async def get_top_cargo_airports(
 # =============================================================================
 # TRADE GATEWAY ENDPOINTS
 # =============================================================================
+
 
 @router.get("/trade-gateways")
 async def search_trade_gateways(
@@ -501,15 +579,16 @@ async def search_trade_gateways(
     query = db.query(TradeGatewayStats)
 
     if customs_district:
-        query = query.filter(TradeGatewayStats.customs_district.ilike(f"%{customs_district}%"))
+        query = query.filter(
+            TradeGatewayStats.customs_district.ilike(f"%{customs_district}%")
+        )
     if year:
         query = query.filter(TradeGatewayStats.period_year == year)
     if month:
         query = query.filter(TradeGatewayStats.period_month == month)
 
     query = query.order_by(
-        TradeGatewayStats.period_year.desc(),
-        TradeGatewayStats.period_month.desc()
+        TradeGatewayStats.period_year.desc(), TradeGatewayStats.period_month.desc()
     )
     stats = query.limit(limit).all()
 
@@ -518,9 +597,15 @@ async def search_trade_gateways(
             "customs_district": s.customs_district,
             "port_code": s.port_code,
             "period": f"{s.period_year}-{s.period_month:02d}",
-            "import_value_million": float(s.import_value_million) if s.import_value_million else None,
-            "export_value_million": float(s.export_value_million) if s.export_value_million else None,
-            "trade_balance_million": float(s.trade_balance_million) if s.trade_balance_million else None,
+            "import_value_million": float(s.import_value_million)
+            if s.import_value_million
+            else None,
+            "export_value_million": float(s.export_value_million)
+            if s.export_value_million
+            else None,
+            "trade_balance_million": float(s.trade_balance_million)
+            if s.trade_balance_million
+            else None,
             "mode_breakdown": {
                 "vessel_pct": float(s.vessel_pct) if s.vessel_pct else None,
                 "air_pct": float(s.air_pct) if s.air_pct else None,
@@ -553,9 +638,15 @@ async def get_trade_trends(
     return [
         {
             "customs_district": d.customs_district,
-            "total_imports_million": float(d.total_imports) if d.total_imports else None,
-            "total_exports_million": float(d.total_exports) if d.total_exports else None,
-            "trade_balance_million": round(float(d.total_exports or 0) - float(d.total_imports or 0), 2),
+            "total_imports_million": float(d.total_imports)
+            if d.total_imports
+            else None,
+            "total_exports_million": float(d.total_exports)
+            if d.total_exports
+            else None,
+            "trade_balance_million": round(
+                float(d.total_exports or 0) - float(d.total_imports or 0), 2
+            ),
         }
         for d in districts
     ]
@@ -565,12 +656,17 @@ async def get_trade_trends(
 # 3PL COMPANY ENDPOINTS
 # =============================================================================
 
+
 @router.get("/3pl-companies")
 async def search_3pl_companies(
     state: Optional[str] = Query(None),
-    service: Optional[str] = Query(None, description="Service type (warehousing, transportation, etc.)"),
+    service: Optional[str] = Query(
+        None, description="Service type (warehousing, transportation, etc.)"
+    ),
     has_cold_chain: Optional[bool] = Query(None),
-    min_revenue: Optional[float] = Query(None, description="Minimum annual revenue in millions"),
+    min_revenue: Optional[float] = Query(
+        None, description="Minimum annual revenue in millions"
+    ),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
@@ -592,8 +688,12 @@ async def search_3pl_companies(
             "id": c.id,
             "company_name": c.company_name,
             "parent_company": c.parent_company,
-            "headquarters": f"{c.headquarters_city}, {c.headquarters_state}" if c.headquarters_city else c.headquarters_state,
-            "annual_revenue_million": float(c.annual_revenue_million) if c.annual_revenue_million else None,
+            "headquarters": f"{c.headquarters_city}, {c.headquarters_state}"
+            if c.headquarters_city
+            else c.headquarters_state,
+            "annual_revenue_million": float(c.annual_revenue_million)
+            if c.annual_revenue_million
+            else None,
             "employee_count": c.employee_count,
             "facility_count": c.facility_count,
             "transport_topics_rank": c.transport_topics_rank,
@@ -612,7 +712,9 @@ async def get_3pl_coverage(company_id: int, db: Session = Depends(get_db)):
     company = db.query(ThreePLCompany).filter(ThreePLCompany.id == company_id).first()
 
     if not company:
-        raise HTTPException(status_code=404, detail=f"Company ID {company_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Company ID {company_id} not found"
+        )
 
     return {
         "company_name": company.company_name,
@@ -628,8 +730,10 @@ async def get_3pl_coverage(company_id: int, db: Session = Depends(get_db)):
 # 3PL ENRICHMENT ENDPOINTS
 # =============================================================================
 
+
 class EnrichRequest(BaseModel):
     """Request body for 3PL enrichment trigger."""
+
     phases: List[str] = ["website", "sec", "fmcsa"]
 
 
@@ -646,9 +750,12 @@ PHASE_SOURCE_MAP = {
 async def _run_enrichment(job_id: str, phases: List[str], db: Session):
     """Background task to run enrichment phases sequentially."""
     from app.sources.site_intel.types import (
-        SiteIntelDomain, SiteIntelSource, CollectionConfig
+        SiteIntelDomain,
+        SiteIntelSource,
+        CollectionConfig,
     )
     from app.sources.site_intel.runner import COLLECTOR_REGISTRY
+
     # Ensure enrichment collectors are registered
     import app.sources.site_intel.logistics  # noqa: F401
 
@@ -669,7 +776,10 @@ async def _run_enrichment(job_id: str, phases: List[str], db: Session):
             collector_cls = COLLECTOR_REGISTRY.get(source)
 
             if not collector_cls:
-                results[phase] = {"status": "skipped", "reason": "Collector not registered"}
+                results[phase] = {
+                    "status": "skipped",
+                    "reason": "Collector not registered",
+                }
                 continue
 
             job["current_phase"] = phase
@@ -779,18 +889,30 @@ async def get_3pl_data_quality(db: Session = Depends(get_db)):
     website_count = field_count(ThreePLCompany.website)
     services_count = field_count(ThreePLCompany.services)
     industries_count = field_count(ThreePLCompany.industries_served)
-    cold_chain_true = db.query(func.count(ThreePLCompany.id)).filter(
-        ThreePLCompany.has_cold_chain == True
-    ).scalar() or 0
-    hazmat_true = db.query(func.count(ThreePLCompany.id)).filter(
-        ThreePLCompany.has_hazmat == True
-    ).scalar() or 0
-    ecommerce_true = db.query(func.count(ThreePLCompany.id)).filter(
-        ThreePLCompany.has_ecommerce_fulfillment == True
-    ).scalar() or 0
-    cross_dock_true = db.query(func.count(ThreePLCompany.id)).filter(
-        ThreePLCompany.has_cross_dock == True
-    ).scalar() or 0
+    cold_chain_true = (
+        db.query(func.count(ThreePLCompany.id))
+        .filter(ThreePLCompany.has_cold_chain == True)
+        .scalar()
+        or 0
+    )
+    hazmat_true = (
+        db.query(func.count(ThreePLCompany.id))
+        .filter(ThreePLCompany.has_hazmat == True)
+        .scalar()
+        or 0
+    )
+    ecommerce_true = (
+        db.query(func.count(ThreePLCompany.id))
+        .filter(ThreePLCompany.has_ecommerce_fulfillment == True)
+        .scalar()
+        or 0
+    )
+    cross_dock_true = (
+        db.query(func.count(ThreePLCompany.id))
+        .filter(ThreePLCompany.has_cross_dock == True)
+        .scalar()
+        or 0
+    )
     asset_based_count = field_count(ThreePLCompany.is_asset_based)
     non_asset_count = field_count(ThreePLCompany.is_non_asset)
     rank_count = field_count(ThreePLCompany.transport_topics_rank)
@@ -800,30 +922,68 @@ async def get_3pl_data_quality(db: Session = Depends(get_db)):
         db.query(
             ThreePLCompany.source,
             func.count(ThreePLCompany.id),
-        ).group_by(ThreePLCompany.source).all()
+        )
+        .group_by(ThreePLCompany.source)
+        .all()
     )
 
     return {
         "total": total,
         "sources": source_counts,
         "fields": {
-            "annual_revenue_million": {"count": revenue_count, "pct": field_pct(revenue_count)},
-            "employee_count": {"count": employees_count, "pct": field_pct(employees_count)},
-            "headquarters_city": {"count": hq_city_count, "pct": field_pct(hq_city_count)},
-            "headquarters_state": {"count": hq_state_count, "pct": field_pct(hq_state_count)},
-            "facility_count": {"count": facility_count, "pct": field_pct(facility_count)},
+            "annual_revenue_million": {
+                "count": revenue_count,
+                "pct": field_pct(revenue_count),
+            },
+            "employee_count": {
+                "count": employees_count,
+                "pct": field_pct(employees_count),
+            },
+            "headquarters_city": {
+                "count": hq_city_count,
+                "pct": field_pct(hq_city_count),
+            },
+            "headquarters_state": {
+                "count": hq_state_count,
+                "pct": field_pct(hq_state_count),
+            },
+            "facility_count": {
+                "count": facility_count,
+                "pct": field_pct(facility_count),
+            },
             "website": {"count": website_count, "pct": field_pct(website_count)},
             "services": {"count": services_count, "pct": field_pct(services_count)},
-            "industries_served": {"count": industries_count, "pct": field_pct(industries_count)},
-            "transport_topics_rank": {"count": rank_count, "pct": field_pct(rank_count)},
-            "is_asset_based": {"count": asset_based_count, "pct": field_pct(asset_based_count)},
-            "is_non_asset": {"count": non_asset_count, "pct": field_pct(non_asset_count)},
+            "industries_served": {
+                "count": industries_count,
+                "pct": field_pct(industries_count),
+            },
+            "transport_topics_rank": {
+                "count": rank_count,
+                "pct": field_pct(rank_count),
+            },
+            "is_asset_based": {
+                "count": asset_based_count,
+                "pct": field_pct(asset_based_count),
+            },
+            "is_non_asset": {
+                "count": non_asset_count,
+                "pct": field_pct(non_asset_count),
+            },
         },
         "specializations": {
-            "has_cold_chain": {"true_count": cold_chain_true, "pct": field_pct(cold_chain_true)},
+            "has_cold_chain": {
+                "true_count": cold_chain_true,
+                "pct": field_pct(cold_chain_true),
+            },
             "has_hazmat": {"true_count": hazmat_true, "pct": field_pct(hazmat_true)},
-            "has_ecommerce_fulfillment": {"true_count": ecommerce_true, "pct": field_pct(ecommerce_true)},
-            "has_cross_dock": {"true_count": cross_dock_true, "pct": field_pct(cross_dock_true)},
+            "has_ecommerce_fulfillment": {
+                "true_count": ecommerce_true,
+                "pct": field_pct(ecommerce_true),
+            },
+            "has_cross_dock": {
+                "true_count": cross_dock_true,
+                "pct": field_pct(cross_dock_true),
+            },
         },
     }
 
@@ -831,6 +991,7 @@ async def get_3pl_data_quality(db: Session = Depends(get_db)):
 # =============================================================================
 # WAREHOUSE LISTING ENDPOINTS
 # =============================================================================
+
 
 @router.get("/warehouse-listings")
 async def search_warehouse_listings(
@@ -894,17 +1055,21 @@ async def get_warehouse_market_summary(
     db: Session = Depends(get_db),
 ):
     """Get warehouse market summary with vacancy and rent statistics."""
-    query = db.query(
-        WarehouseListing.state,
-        func.count(WarehouseListing.id).label("listing_count"),
-        func.sum(WarehouseListing.total_sqft).label("total_sqft"),
-        func.sum(WarehouseListing.available_sqft).label("available_sqft"),
-        func.avg(WarehouseListing.asking_rent_psf).label("avg_rent_psf"),
-        func.avg(WarehouseListing.clear_height_ft).label("avg_clear_height"),
-    ).filter(
-        WarehouseListing.is_active == True,
-        WarehouseListing.listing_type == "for_lease"
-    ).group_by(WarehouseListing.state)
+    query = (
+        db.query(
+            WarehouseListing.state,
+            func.count(WarehouseListing.id).label("listing_count"),
+            func.sum(WarehouseListing.total_sqft).label("total_sqft"),
+            func.sum(WarehouseListing.available_sqft).label("available_sqft"),
+            func.avg(WarehouseListing.asking_rent_psf).label("avg_rent_psf"),
+            func.avg(WarehouseListing.clear_height_ft).label("avg_clear_height"),
+        )
+        .filter(
+            WarehouseListing.is_active == True,
+            WarehouseListing.listing_type == "for_lease",
+        )
+        .group_by(WarehouseListing.state)
+    )
 
     if state:
         query = query.filter(WarehouseListing.state == state.upper())
@@ -919,7 +1084,9 @@ async def get_warehouse_market_summary(
             "total_sqft": m.total_sqft,
             "available_sqft": m.available_sqft,
             "avg_rent_psf": round(float(m.avg_rent_psf), 2) if m.avg_rent_psf else None,
-            "avg_clear_height": round(float(m.avg_clear_height), 1) if m.avg_clear_height else None,
+            "avg_clear_height": round(float(m.avg_clear_height), 1)
+            if m.avg_clear_height
+            else None,
         }
         for m in markets
     ]
@@ -928,6 +1095,7 @@ async def get_warehouse_market_summary(
 # =============================================================================
 # LEGACY ENDPOINTS (maintained for backwards compatibility)
 # =============================================================================
+
 
 @router.get("/freight-rates")
 async def search_freight_rates(
@@ -948,7 +1116,9 @@ async def search_freight_rates(
     if route_origin:
         query = query.filter(FreightRateIndex.route_origin.ilike(f"%{route_origin}%"))
     if route_destination:
-        query = query.filter(FreightRateIndex.route_destination.ilike(f"%{route_destination}%"))
+        query = query.filter(
+            FreightRateIndex.route_destination.ilike(f"%{route_destination}%")
+        )
 
     query = query.order_by(FreightRateIndex.rate_date.desc())
     rates = query.limit(limit).all()
@@ -975,7 +1145,9 @@ async def search_freight_rates(
 async def search_trucking_rates(
     origin: Optional[str] = Query(None, description="Origin market"),
     destination: Optional[str] = Query(None, description="Destination market"),
-    equipment_type: Optional[str] = Query(None, description="Type: van, reefer, flatbed"),
+    equipment_type: Optional[str] = Query(
+        None, description="Type: van, reefer, flatbed"
+    ),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
@@ -985,7 +1157,9 @@ async def search_trucking_rates(
     if origin:
         query = query.filter(TruckingLaneRate.origin_market.ilike(f"%{origin}%"))
     if destination:
-        query = query.filter(TruckingLaneRate.destination_market.ilike(f"%{destination}%"))
+        query = query.filter(
+            TruckingLaneRate.destination_market.ilike(f"%{destination}%")
+        )
     if equipment_type:
         query = query.filter(TruckingLaneRate.equipment_type == equipment_type)
 
@@ -1002,7 +1176,9 @@ async def search_trucking_rates(
             "equipment_type": r.equipment_type,
             "rate_date": r.rate_date.isoformat() if r.rate_date else None,
             "rate_per_mile": float(r.rate_per_mile) if r.rate_per_mile else None,
-            "total_rate_per_mile": float(r.total_rate_per_mile) if r.total_rate_per_mile else None,
+            "total_rate_per_mile": float(r.total_rate_per_mile)
+            if r.total_rate_per_mile
+            else None,
             "load_count": r.load_count,
         }
         for r in rates
@@ -1063,25 +1239,38 @@ async def search_warehouses(
 # SUMMARY ENDPOINT
 # =============================================================================
 
+
 @router.get("/summary")
 async def get_logistics_summary(db: Session = Depends(get_db)):
     """Get summary statistics for logistics data."""
     return {
         "domain": "logistics",
         "record_counts": {
-            "container_freight_indices": db.query(func.count(ContainerFreightIndex.id)).scalar() or 0,
+            "container_freight_indices": db.query(
+                func.count(ContainerFreightIndex.id)
+            ).scalar()
+            or 0,
             "usda_truck_rates": db.query(func.count(UsdaTruckRate.id)).scalar() or 0,
             "motor_carriers": db.query(func.count(MotorCarrier.id)).scalar() or 0,
-            "carrier_safety_records": db.query(func.count(CarrierSafety.id)).scalar() or 0,
-            "port_throughput_records": db.query(func.count(PortThroughputMonthly.id)).scalar() or 0,
+            "carrier_safety_records": db.query(func.count(CarrierSafety.id)).scalar()
+            or 0,
+            "port_throughput_records": db.query(
+                func.count(PortThroughputMonthly.id)
+            ).scalar()
+            or 0,
             "air_cargo_records": db.query(func.count(AirCargoStats.id)).scalar() or 0,
-            "trade_gateway_records": db.query(func.count(TradeGatewayStats.id)).scalar() or 0,
+            "trade_gateway_records": db.query(func.count(TradeGatewayStats.id)).scalar()
+            or 0,
             "three_pl_companies": db.query(func.count(ThreePLCompany.id)).scalar() or 0,
-            "warehouse_listings": db.query(func.count(WarehouseListing.id)).scalar() or 0,
+            "warehouse_listings": db.query(func.count(WarehouseListing.id)).scalar()
+            or 0,
             # Legacy tables
-            "freight_rate_indices": db.query(func.count(FreightRateIndex.id)).scalar() or 0,
-            "trucking_lane_rates": db.query(func.count(TruckingLaneRate.id)).scalar() or 0,
-            "warehouse_facilities": db.query(func.count(WarehouseFacility.id)).scalar() or 0,
+            "freight_rate_indices": db.query(func.count(FreightRateIndex.id)).scalar()
+            or 0,
+            "trucking_lane_rates": db.query(func.count(TruckingLaneRate.id)).scalar()
+            or 0,
+            "warehouse_facilities": db.query(func.count(WarehouseFacility.id)).scalar()
+            or 0,
         },
         "available_endpoints": [
             # Container rates
@@ -1118,5 +1307,5 @@ async def get_logistics_summary(db: Session = Depends(get_db)):
             "/site-intel/logistics/freight-rates",
             "/site-intel/logistics/trucking-rates",
             "/site-intel/logistics/warehouses",
-        ]
+        ],
     }

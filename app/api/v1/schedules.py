@@ -3,6 +3,7 @@ Schedule management endpoints.
 
 Provides API for creating, updating, and managing automated ingestion schedules.
 """
+
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -23,8 +24,10 @@ router = APIRouter(prefix="/schedules", tags=["schedules"])
 # Pydantic Schemas
 # =============================================================================
 
+
 class ScheduleCreate(BaseModel):
     """Request schema for creating a schedule."""
+
     name: str = Field(..., min_length=1, max_length=255)
     source: str = Field(..., min_length=1, max_length=50)
     config: dict = Field(default_factory=dict)
@@ -40,6 +43,7 @@ class ScheduleCreate(BaseModel):
 
 class ScheduleUpdate(BaseModel):
     """Request schema for updating a schedule."""
+
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     config: Optional[dict] = None
     frequency: Optional[ScheduleFrequency] = None
@@ -54,6 +58,7 @@ class ScheduleUpdate(BaseModel):
 
 class ScheduleResponse(BaseModel):
     """Response schema for schedule information."""
+
     id: int
     name: str
     source: str
@@ -94,7 +99,7 @@ class ScheduleResponse(BaseModel):
             "created_at": obj.created_at,
             "updated_at": obj.updated_at,
             "description": obj.description,
-            "priority": obj.priority
+            "priority": obj.priority,
         }
         return cls(**data)
 
@@ -102,6 +107,7 @@ class ScheduleResponse(BaseModel):
 # =============================================================================
 # Endpoints
 # =============================================================================
+
 
 @router.get("/status")
 def get_scheduler_status():
@@ -120,10 +126,7 @@ def start_scheduler(db: Session = Depends(get_db)):
     """
     scheduler_service.start_scheduler()
     count = scheduler_service.load_all_schedules(db)
-    return {
-        "message": "Scheduler started",
-        "schedules_loaded": count
-    }
+    return {"message": "Scheduler started", "schedules_loaded": count}
 
 
 @router.post("/stop")
@@ -141,7 +144,7 @@ def stop_scheduler():
 def list_schedules(
     source: Optional[str] = None,
     active_only: bool = False,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> List[ScheduleResponse]:
     """
     List all schedules with optional filtering.
@@ -161,16 +164,17 @@ def list_schedules(
 
 @router.post("", response_model=ScheduleResponse, status_code=201)
 def create_schedule(
-    schedule_request: ScheduleCreate,
-    db: Session = Depends(get_db)
+    schedule_request: ScheduleCreate, db: Session = Depends(get_db)
 ) -> ScheduleResponse:
     """
     Create a new ingestion schedule.
     """
     # Check for duplicate name
-    existing = db.query(IngestionSchedule).filter(
-        IngestionSchedule.name == schedule_request.name
-    ).first()
+    existing = (
+        db.query(IngestionSchedule)
+        .filter(IngestionSchedule.name == schedule_request.name)
+        .first()
+    )
     if existing:
         raise HTTPException(status_code=400, detail="Schedule name already exists")
 
@@ -186,7 +190,7 @@ def create_schedule(
         day_of_month=schedule_request.day_of_month,
         description=schedule_request.description,
         is_active=schedule_request.is_active,
-        priority=schedule_request.priority
+        priority=schedule_request.priority,
     )
 
     return ScheduleResponse.from_orm_with_active(schedule)
@@ -197,9 +201,9 @@ def get_schedule(schedule_id: int, db: Session = Depends(get_db)) -> ScheduleRes
     """
     Get a specific schedule by ID.
     """
-    schedule = db.query(IngestionSchedule).filter(
-        IngestionSchedule.id == schedule_id
-    ).first()
+    schedule = (
+        db.query(IngestionSchedule).filter(IngestionSchedule.id == schedule_id).first()
+    )
 
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -209,9 +213,7 @@ def get_schedule(schedule_id: int, db: Session = Depends(get_db)) -> ScheduleRes
 
 @router.put("/{schedule_id}", response_model=ScheduleResponse)
 def update_schedule(
-    schedule_id: int,
-    schedule_request: ScheduleUpdate,
-    db: Session = Depends(get_db)
+    schedule_id: int, schedule_request: ScheduleUpdate, db: Session = Depends(get_db)
 ) -> ScheduleResponse:
     """
     Update an existing schedule.
@@ -244,7 +246,9 @@ def delete_schedule(schedule_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{schedule_id}/activate", response_model=ScheduleResponse)
-def activate_schedule(schedule_id: int, db: Session = Depends(get_db)) -> ScheduleResponse:
+def activate_schedule(
+    schedule_id: int, db: Session = Depends(get_db)
+) -> ScheduleResponse:
     """
     Activate a paused schedule.
     """
@@ -276,9 +280,9 @@ async def run_schedule_now(schedule_id: int, db: Session = Depends(get_db)):
 
     Creates a new job and executes it, regardless of the schedule's next_run_at.
     """
-    schedule = db.query(IngestionSchedule).filter(
-        IngestionSchedule.id == schedule_id
-    ).first()
+    schedule = (
+        db.query(IngestionSchedule).filter(IngestionSchedule.id == schedule_id).first()
+    )
 
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -291,7 +295,7 @@ async def run_schedule_now(schedule_id: int, db: Session = Depends(get_db)):
 
     return {
         "message": f"Schedule '{schedule.name}' triggered",
-        "job_id": schedule.last_job_id
+        "job_id": schedule.last_job_id,
     }
 
 
@@ -299,14 +303,14 @@ async def run_schedule_now(schedule_id: int, db: Session = Depends(get_db)):
 def get_schedule_history(
     schedule_id: int,
     limit: int = Query(default=10, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get recent job history for a schedule.
     """
-    schedule = db.query(IngestionSchedule).filter(
-        IngestionSchedule.id == schedule_id
-    ).first()
+    schedule = (
+        db.query(IngestionSchedule).filter(IngestionSchedule.id == schedule_id).first()
+    )
 
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -321,12 +325,14 @@ def get_schedule_history(
                 "id": job.id,
                 "status": job.status.value,
                 "created_at": job.created_at.isoformat(),
-                "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+                "completed_at": job.completed_at.isoformat()
+                if job.completed_at
+                else None,
                 "rows_inserted": job.rows_inserted,
-                "error_message": job.error_message[:200] if job.error_message else None
+                "error_message": job.error_message[:200] if job.error_message else None,
             }
             for job in jobs
-        ]
+        ],
     }
 
 
@@ -342,13 +348,14 @@ def create_default_schedules(db: Session = Depends(get_db)):
 
     return {
         "message": f"Created {len(created)} default schedules",
-        "schedules": [s.name for s in created]
+        "schedules": [s.name for s in created],
     }
 
 
 # =============================================================================
 # Stuck Job Cleanup Endpoints
 # =============================================================================
+
 
 @router.post("/cleanup/stuck-jobs")
 async def cleanup_stuck_jobs(timeout_hours: int = 2):
@@ -385,15 +392,17 @@ def get_cleanup_status():
             "enabled": True,
             "job_id": job_id,
             "name": cleanup_job.name,
-            "next_run": cleanup_job.next_run_time.isoformat() if cleanup_job.next_run_time else None,
+            "next_run": cleanup_job.next_run_time.isoformat()
+            if cleanup_job.next_run_time
+            else None,
             "trigger": str(cleanup_job.trigger),
-            "timeout_hours": scheduler_service.STUCK_JOB_TIMEOUT_HOURS
+            "timeout_hours": scheduler_service.STUCK_JOB_TIMEOUT_HOURS,
         }
     else:
         return {
             "enabled": False,
             "job_id": job_id,
-            "message": "Cleanup job is not registered"
+            "message": "Cleanup job is not registered",
         }
 
 
@@ -411,7 +420,7 @@ def enable_cleanup(interval_minutes: int = 30):
         return {
             "message": f"Stuck job cleanup enabled (runs every {interval_minutes} minutes)",
             "interval_minutes": interval_minutes,
-            "timeout_hours": scheduler_service.STUCK_JOB_TIMEOUT_HOURS
+            "timeout_hours": scheduler_service.STUCK_JOB_TIMEOUT_HOURS,
         }
     else:
         raise HTTPException(status_code=500, detail="Failed to enable cleanup job")
@@ -434,6 +443,7 @@ def disable_cleanup():
 # Automatic Retry Endpoints
 # =============================================================================
 
+
 @router.get("/retry/status")
 def get_retry_processor_status():
     """
@@ -451,19 +461,21 @@ def get_retry_processor_status():
             "enabled": True,
             "job_id": job_id,
             "name": retry_job.name,
-            "next_run": retry_job.next_run_time.isoformat() if retry_job.next_run_time else None,
+            "next_run": retry_job.next_run_time.isoformat()
+            if retry_job.next_run_time
+            else None,
             "trigger": str(retry_job.trigger),
             "backoff_settings": {
                 "base_delay_minutes": 5,
                 "max_delay_minutes": 1440,
-                "multiplier": 2
-            }
+                "multiplier": 2,
+            },
         }
     else:
         return {
             "enabled": False,
             "job_id": job_id,
-            "message": "Retry processor is not registered"
+            "message": "Retry processor is not registered",
         }
 
 
@@ -475,12 +487,14 @@ def enable_retry_processor(interval_minutes: int = 5):
     Args:
         interval_minutes: How often to check for jobs ready to retry (default 5 minutes)
     """
-    success = scheduler_service.register_retry_processor(interval_minutes=interval_minutes)
+    success = scheduler_service.register_retry_processor(
+        interval_minutes=interval_minutes
+    )
 
     if success:
         return {
             "message": f"Automatic retry processor enabled (runs every {interval_minutes} minutes)",
-            "interval_minutes": interval_minutes
+            "interval_minutes": interval_minutes,
         }
     else:
         raise HTTPException(status_code=500, detail="Failed to enable retry processor")

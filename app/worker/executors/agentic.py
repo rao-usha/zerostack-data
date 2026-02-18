@@ -1,4 +1,5 @@
 """Agentic research executor for the worker queue."""
+
 import logging
 
 from sqlalchemy.orm import Session
@@ -21,18 +22,23 @@ async def execute(job: JobQueue, db: Session):
 
     if not db_url:
         from app.core.config import get_settings
+
         db_url = get_settings().database_url
 
     job.progress_pct = 5.0
     job.progress_message = "Starting agentic portfolio research"
     db.commit()
 
-    send_job_event(db, "job_progress", {
-        "job_id": job.id,
-        "job_type": "agentic",
-        "progress_pct": 5.0,
-        "progress_message": "Starting agentic research",
-    })
+    send_job_event(
+        db,
+        "job_progress",
+        {
+            "job_id": job.id,
+            "job_type": "agentic",
+            "progress_pct": 5.0,
+            "progress_message": "Starting agentic research",
+        },
+    )
     db.commit()
 
     # Delegate to the existing background task function

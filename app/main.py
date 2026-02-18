@@ -3,6 +3,7 @@ Main FastAPI application.
 
 Source-agnostic entry point that routes to appropriate adapters.
 """
+
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -13,21 +14,134 @@ from fastapi.responses import JSONResponse
 from app.core.config import get_settings
 from app.core.database import create_tables
 from app.api.v1.auth import get_current_user
-from app.api.v1 import jobs, census_geo, census_batch, metadata, fred, eia, sec, realestate, geojson, family_offices, family_office_contacts, cms, kaggle, international_econ, fbi_crime, bts, bea, fema, data_commons, yelp, us_trade, cftc_cot, usda, bls, fcc_broadband, treasury, fdic, irs_soi, agentic_research, foot_traffic, prediction_markets, schedules, webhooks, chains, rate_limits, data_quality, templates, lineage, export, uspto, alerts, search, discover, watchlists, analytics, compare, api_keys, public, network, trends, enrichment, import_portfolio, news, reports, deals, benchmarks, auth, workspaces, form_d, corporate_registry, form_adv, web_traffic, github, scores, entities, glassdoor, app_rankings, predictions, agents, diligence, monitors, competitive, hunter, anomalies, market, reports_gen, lp_collection, fo_collection, pe_firms, pe_companies, pe_people, pe_deals, pe_collection, app_stores, opencorporates, people, companies_leadership, collection_jobs, people_portfolios, peer_sets, people_watchlists, people_analytics, people_reports, people_data_quality, people_dedup, people_jobs, workflows, llm_costs, freshness
+from app.api.v1 import (
+    jobs,
+    census_geo,
+    census_batch,
+    metadata,
+    fred,
+    eia,
+    sec,
+    realestate,
+    geojson,
+    family_offices,
+    family_office_contacts,
+    cms,
+    kaggle,
+    international_econ,
+    fbi_crime,
+    bts,
+    bea,
+    fema,
+    data_commons,
+    yelp,
+    us_trade,
+    cftc_cot,
+    usda,
+    bls,
+    fcc_broadband,
+    treasury,
+    fdic,
+    irs_soi,
+    agentic_research,
+    foot_traffic,
+    prediction_markets,
+    schedules,
+    webhooks,
+    chains,
+    rate_limits,
+    data_quality,
+    templates,
+    lineage,
+    export,
+    uspto,
+    alerts,
+    search,
+    discover,
+    watchlists,
+    analytics,
+    compare,
+    api_keys,
+    public,
+    network,
+    trends,
+    enrichment,
+    import_portfolio,
+    news,
+    reports,
+    deals,
+    benchmarks,
+    auth,
+    workspaces,
+    form_d,
+    corporate_registry,
+    form_adv,
+    web_traffic,
+    github,
+    scores,
+    entities,
+    glassdoor,
+    app_rankings,
+    predictions,
+    agents,
+    diligence,
+    monitors,
+    competitive,
+    hunter,
+    anomalies,
+    market,
+    reports_gen,
+    lp_collection,
+    fo_collection,
+    pe_firms,
+    pe_companies,
+    pe_people,
+    pe_deals,
+    pe_collection,
+    app_stores,
+    opencorporates,
+    people,
+    companies_leadership,
+    collection_jobs,
+    people_portfolios,
+    peer_sets,
+    people_watchlists,
+    people_analytics,
+    people_reports,
+    people_data_quality,
+    people_dedup,
+    people_jobs,
+    workflows,
+    llm_costs,
+    freshness,
+)
+
 # Job Queue Streaming
 from app.api.v1 import job_stream
+
 # Site Intelligence Platform
-from app.api.v1 import site_intel_power, site_intel_telecom, site_intel_transport, site_intel_labor, site_intel_risk, site_intel_incentives, site_intel_logistics, site_intel_water_utilities, site_intel_sites
+from app.api.v1 import (
+    site_intel_power,
+    site_intel_telecom,
+    site_intel_transport,
+    site_intel_labor,
+    site_intel_risk,
+    site_intel_incentives,
+    site_intel_logistics,
+    site_intel_water_utilities,
+    site_intel_sites,
+)
+
 # Collection Management
 from app.api.v1 import source_configs, audit
+
 # Settings
 from app.api.v1 import settings as settings_router
 from app.graphql import graphql_app
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -87,19 +201,27 @@ async def lifespan(app: FastAPI):
 
         # Register people collection schedules
         try:
-            from app.jobs.people_collection_scheduler import register_people_collection_schedules
+            from app.jobs.people_collection_scheduler import (
+                register_people_collection_schedules,
+            )
+
             people_results = register_people_collection_schedules()
             registered_count = sum(1 for v in people_results.values() if v)
-            logger.info(f"People collection schedules registered: {registered_count}/{len(people_results)}")
+            logger.info(
+                f"People collection schedules registered: {registered_count}/{len(people_results)}"
+            )
         except Exception as e:
             logger.warning(f"Failed to register people collection schedules: {e}")
 
         # Register site intel collection schedules
         try:
             from app.jobs.site_intel_scheduler import register_site_intel_schedules
+
             site_intel_results = register_site_intel_schedules()
             registered_count = sum(1 for v in site_intel_results.values() if v)
-            logger.info(f"Site intel schedules registered: {registered_count}/{len(site_intel_results)}")
+            logger.info(
+                f"Site intel schedules registered: {registered_count}/{len(site_intel_results)}"
+            )
         except Exception as e:
             logger.warning(f"Failed to register site intel schedules: {e}")
 
@@ -107,6 +229,7 @@ async def lifespan(app: FastAPI):
         try:
             from app.core.job_queue_service import reset_stale_jobs
             from app.core.scheduler_service import get_scheduler
+
             sched = get_scheduler()
             sched.add_job(
                 reset_stale_jobs,
@@ -126,6 +249,7 @@ async def lifespan(app: FastAPI):
     pg_listener_task = None
     try:
         from app.core.pg_listener import start_pg_listener
+
         pg_listener_task = await start_pg_listener()
         logger.info("PG listener started for job event streaming")
     except Exception as e:
@@ -139,6 +263,7 @@ async def lifespan(app: FastAPI):
     # Stop PG listener
     try:
         from app.core.pg_listener import stop_pg_listener
+
         await stop_pg_listener()
         logger.info("PG listener stopped")
     except Exception as e:
@@ -147,6 +272,7 @@ async def lifespan(app: FastAPI):
     # Stop scheduler
     try:
         from app.core import scheduler_service
+
         scheduler_service.stop_scheduler()
         logger.info("Scheduler stopped")
     except Exception as e:
@@ -621,344 +747,338 @@ Browse the endpoint sections below to see what's available:
     openapi_url="/openapi.json",
     contact={
         "name": "Nexdata External Data Ingestion",
-        "url": "https://github.com/yourusername/nexdata"
+        "url": "https://github.com/yourusername/nexdata",
     },
-    license_info={
-        "name": "MIT",
-        "url": "https://opensource.org/licenses/MIT"
-    },
+    license_info={"name": "MIT", "url": "https://opensource.org/licenses/MIT"},
     openapi_tags=[
-        {
-            "name": "Root",
-            "description": "Service information and health checks"
-        },
+        {"name": "Root", "description": "Service information and health checks"},
         {
             "name": "jobs",
-            "description": "⚙️ **Ingestion Job Management** - Start, monitor, and track data ingestion jobs"
+            "description": "⚙️ **Ingestion Job Management** - Start, monitor, and track data ingestion jobs",
         },
         {
             "name": "census",
-            "description": "📊 **U.S. Census Bureau** - Demographics, housing, and economic data"
+            "description": "📊 **U.S. Census Bureau** - Demographics, housing, and economic data",
         },
         {
             "name": "fred",
-            "description": "💰 **Federal Reserve Economic Data** - 800K+ economic time series"
+            "description": "💰 **Federal Reserve Economic Data** - 800K+ economic time series",
         },
         {
             "name": "eia",
-            "description": "⚡ **Energy Information Administration** - Energy production, prices, and consumption"
+            "description": "⚡ **Energy Information Administration** - Energy production, prices, and consumption",
         },
         {
             "name": "sec",
-            "description": "🏛️ **Securities and Exchange Commission** - Company financials and Form ADV data"
+            "description": "🏛️ **Securities and Exchange Commission** - Company financials and Form ADV data",
         },
         {
             "name": "noaa",
-            "description": "🌦️ **NOAA Weather & Climate** - Weather observations and historical climate data"
+            "description": "🌦️ **NOAA Weather & Climate** - Weather observations and historical climate data",
         },
         {
             "name": "realestate",
-            "description": "🏠 **Real Estate Data** - Zillow home values and rental market data"
+            "description": "🏠 **Real Estate Data** - Zillow home values and rental market data",
         },
         {
             "name": "geojson",
-            "description": "🗺️ **Geographic Boundaries** - GeoJSON boundaries for mapping"
+            "description": "🗺️ **Geographic Boundaries** - GeoJSON boundaries for mapping",
         },
         {
             "name": "family_offices",
-            "description": "💼 **Family Offices** - Investment adviser and family office tracking"
+            "description": "💼 **Family Offices** - Investment adviser and family office tracking",
         },
         {
             "name": "family_office_contacts",
-            "description": "👥 **Family Office Contacts** - Contact research and enrichment for family offices"
+            "description": "👥 **Family Office Contacts** - Contact research and enrichment for family offices",
         },
         {
             "name": "cms",
-            "description": "🏥 **CMS / HHS Healthcare Data** - Medicare utilization, hospital costs, and drug pricing"
+            "description": "🏥 **CMS / HHS Healthcare Data** - Medicare utilization, hospital costs, and drug pricing",
         },
         {
             "name": "kaggle",
-            "description": "🏆 **Kaggle Datasets** - Competition datasets (M5 Forecasting, etc.)"
+            "description": "🏆 **Kaggle Datasets** - Competition datasets (M5 Forecasting, etc.)",
         },
         {
             "name": "international_econ",
-            "description": "🌍 **International Economic Data** - World Bank, IMF, OECD, BIS global economic indicators"
+            "description": "🌍 **International Economic Data** - World Bank, IMF, OECD, BIS global economic indicators",
         },
         {
             "name": "fbi_crime",
-            "description": "🚔 **FBI Crime Data** - UCR crime statistics, NIBRS incident data, hate crimes, and LEOKA"
+            "description": "🚔 **FBI Crime Data** - UCR crime statistics, NIBRS incident data, hate crimes, and LEOKA",
         },
         {
             "name": "bts",
-            "description": "🚚 **Bureau of Transportation Statistics** - Border crossings, freight flows (FAF5), and vehicle miles traveled"
+            "description": "🚚 **Bureau of Transportation Statistics** - Border crossings, freight flows (FAF5), and vehicle miles traveled",
         },
         {
             "name": "bea",
-            "description": "📈 **Bureau of Economic Analysis** - GDP, Personal Income, PCE, Regional economic data, and International transactions"
+            "description": "📈 **Bureau of Economic Analysis** - GDP, Personal Income, PCE, Regional economic data, and International transactions",
         },
         {
             "name": "fema",
-            "description": "🌊 **OpenFEMA** - Disaster declarations, Public Assistance grants, and Hazard Mitigation projects"
+            "description": "🌊 **OpenFEMA** - Disaster declarations, Public Assistance grants, and Hazard Mitigation projects",
         },
         {
             "name": "data_commons",
-            "description": "📊 **Google Data Commons** - Unified public data from 200+ sources (demographics, economy, health, crime, etc.)"
+            "description": "📊 **Google Data Commons** - Unified public data from 200+ sources (demographics, economy, health, crime, etc.)",
         },
         {
             "name": "yelp",
-            "description": "🏪 **Yelp Fusion** - Business listings, reviews, and local business activity (500 calls/day free tier)"
+            "description": "🏪 **Yelp Fusion** - Business listings, reviews, and local business activity (500 calls/day free tier)",
         },
         {
             "name": "us_trade",
-            "description": "🚢 **US International Trade** - Census Bureau trade data: imports/exports by HS code, port, state, and trading partner"
+            "description": "🚢 **US International Trade** - Census Bureau trade data: imports/exports by HS code, port, state, and trading partner",
         },
         {
             "name": "CFTC COT",
-            "description": "📈 **CFTC Commitments of Traders** - Weekly futures positioning data: commercial vs non-commercial, managed money, swap dealers"
+            "description": "📈 **CFTC Commitments of Traders** - Weekly futures positioning data: commercial vs non-commercial, managed money, swap dealers",
         },
         {
             "name": "USDA Agriculture",
-            "description": "🌾 **USDA NASS QuickStats** - Agricultural statistics: crop production, yields, prices, livestock inventory"
+            "description": "🌾 **USDA NASS QuickStats** - Agricultural statistics: crop production, yields, prices, livestock inventory",
         },
         {
             "name": "BLS Labor Statistics",
-            "description": "📊 **Bureau of Labor Statistics** - Employment, unemployment, CPI, PPI, JOLTS job openings and labor turnover"
+            "description": "📊 **Bureau of Labor Statistics** - Employment, unemployment, CPI, PPI, JOLTS job openings and labor turnover",
         },
         {
             "name": "FCC Broadband & Telecom",
-            "description": "📡 **FCC National Broadband Map** - Broadband coverage, ISP availability, technology deployment, digital divide metrics"
+            "description": "📡 **FCC National Broadband Map** - Broadband coverage, ISP availability, technology deployment, digital divide metrics",
         },
         {
             "name": "Treasury FiscalData",
-            "description": "💵 **U.S. Treasury FiscalData** - Federal debt, interest rates, revenue/spending, Treasury auction results"
+            "description": "💵 **U.S. Treasury FiscalData** - Federal debt, interest rates, revenue/spending, Treasury auction results",
         },
         {
             "name": "FDIC BankFind",
-            "description": "🏦 **FDIC BankFind Suite** - Bank financials, demographics, failed banks, and branch-level deposits for 4,000+ U.S. banks"
+            "description": "🏦 **FDIC BankFind Suite** - Bank financials, demographics, failed banks, and branch-level deposits for 4,000+ U.S. banks",
         },
         {
             "name": "irs-soi",
-            "description": "💰 **IRS Statistics of Income (SOI)** - Income/wealth distribution by geography: ZIP code income, county income, migration flows, business income"
+            "description": "💰 **IRS Statistics of Income (SOI)** - Income/wealth distribution by geography: ZIP code income, county income, migration flows, business income",
         },
         {
             "name": "Agentic Portfolio Research",
-            "description": "🤖 **Agentic Portfolio Discovery** - AI-powered portfolio research for LPs and Family Offices using SEC 13F, website scraping, and more"
+            "description": "🤖 **Agentic Portfolio Discovery** - AI-powered portfolio research for LPs and Family Offices using SEC 13F, website scraping, and more",
         },
         {
             "name": "Foot Traffic",
-            "description": "🚶 **Foot Traffic Intelligence** - Location discovery, foot traffic data collection, and competitive benchmarking for retail/hospitality investments"
+            "description": "🚶 **Foot Traffic Intelligence** - Location discovery, foot traffic data collection, and competitive benchmarking for retail/hospitality investments",
         },
         {
             "name": "Prediction Markets",
-            "description": "🎲 **Prediction Market Intelligence** - Monitor Kalshi, Polymarket for market consensus on economic, political, sports, and world events"
+            "description": "🎲 **Prediction Market Intelligence** - Monitor Kalshi, Polymarket for market consensus on economic, political, sports, and world events",
         },
         {
             "name": "schedules",
-            "description": "📅 **Scheduled Ingestion** - Automated data refresh with cron-based scheduling for all data sources"
+            "description": "📅 **Scheduled Ingestion** - Automated data refresh with cron-based scheduling for all data sources",
         },
         {
             "name": "webhooks",
-            "description": "🔔 **Webhook Notifications** - Configure webhooks to receive notifications for job events and monitoring alerts"
+            "description": "🔔 **Webhook Notifications** - Configure webhooks to receive notifications for job events and monitoring alerts",
         },
         {
             "name": "job-chains",
-            "description": "🔗 **Job Dependency Chains** - Create DAG workflows with job dependencies, execute chains, and track progress"
+            "description": "🔗 **Job Dependency Chains** - Create DAG workflows with job dependencies, execute chains, and track progress",
         },
         {
             "name": "rate-limits",
-            "description": "⚡ **Per-Source Rate Limits** - Configure and monitor rate limits for each data source API"
+            "description": "⚡ **Per-Source Rate Limits** - Configure and monitor rate limits for each data source API",
         },
         {
             "name": "data-quality",
-            "description": "✅ **Data Quality Rules Engine** - Define and evaluate data quality rules with range, null, regex, freshness checks"
+            "description": "✅ **Data Quality Rules Engine** - Define and evaluate data quality rules with range, null, regex, freshness checks",
         },
         {
             "name": "templates",
-            "description": "📋 **Bulk Ingestion Templates** - Reusable templates for multi-source data ingestion with variable substitution"
+            "description": "📋 **Bulk Ingestion Templates** - Reusable templates for multi-source data ingestion with variable substitution",
         },
         {
             "name": "lineage",
-            "description": "🔗 **Data Lineage Tracking** - Track data provenance, transformations, dataset versions, and impact analysis"
+            "description": "🔗 **Data Lineage Tracking** - Track data provenance, transformations, dataset versions, and impact analysis",
         },
         {
             "name": "export",
-            "description": "📤 **Data Export** - Export table data to CSV, JSON, or Parquet files"
+            "description": "📤 **Data Export** - Export table data to CSV, JSON, or Parquet files",
         },
         {
             "name": "uspto",
-            "description": "🔬 **USPTO Patent Data** - US patent search, inventors, assignees, and CPC classifications via PatentsView API"
+            "description": "🔬 **USPTO Patent Data** - US patent search, inventors, assignees, and CPC classifications via PatentsView API",
         },
         {
             "name": "Watchlists & Saved Searches",
-            "description": "📌 **Watchlists & Saved Searches** - Create watchlists to track investors/companies, save and re-execute search queries"
+            "description": "📌 **Watchlists & Saved Searches** - Create watchlists to track investors/companies, save and re-execute search queries",
         },
         {
             "name": "Dashboard Analytics",
-            "description": "📊 **Dashboard Analytics** - Pre-computed analytics for frontend dashboards: system overview, investor insights, trends, and industry breakdowns"
+            "description": "📊 **Dashboard Analytics** - Pre-computed analytics for frontend dashboards: system overview, investor insights, trends, and industry breakdowns",
         },
         {
             "name": "Portfolio Comparison",
-            "description": "🔀 **Portfolio Comparison** - Compare investor portfolios side-by-side, track historical changes, and analyze industry allocations"
+            "description": "🔀 **Portfolio Comparison** - Compare investor portfolios side-by-side, track historical changes, and analyze industry allocations",
         },
         {
             "name": "API Keys",
-            "description": "🔑 **API Key Management** - Create, list, update, and revoke API keys for public API access"
+            "description": "🔑 **API Key Management** - Create, list, update, and revoke API keys for public API access",
         },
         {
             "name": "Public API",
-            "description": "🌐 **Public API** - Protected endpoints for external developers with API key authentication and rate limiting"
+            "description": "🌐 **Public API** - Protected endpoints for external developers with API key authentication and rate limiting",
         },
         {
             "name": "Trends",
-            "description": "📈 **Investment Trends** - Sector rotation, emerging themes, geographic shifts, and allocation trends across LP portfolios"
+            "description": "📈 **Investment Trends** - Sector rotation, emerging themes, geographic shifts, and allocation trends across LP portfolios",
         },
         {
             "name": "enrichment",
-            "description": "🔬 **Company Data Enrichment** - Enrich portfolio companies with SEC financials, funding data, employee counts, and industry classification"
+            "description": "🔬 **Company Data Enrichment** - Enrich portfolio companies with SEC financials, funding data, employee counts, and industry classification",
         },
         {
             "name": "import",
-            "description": "📥 **Bulk Portfolio Import** - Upload CSV/Excel files to import portfolio data with validation, preview, and rollback"
+            "description": "📥 **Bulk Portfolio Import** - Upload CSV/Excel files to import portfolio data with validation, preview, and rollback",
         },
         {
             "name": "News",
-            "description": "📰 **News & Events** - Aggregated news from SEC EDGAR, Google News, and press releases for investors and portfolio companies"
+            "description": "📰 **News & Events** - Aggregated news from SEC EDGAR, Google News, and press releases for investors and portfolio companies",
         },
         {
             "name": "Reports",
-            "description": "📊 **Custom Reports** - Generate investor profiles, portfolio summaries, and trend analysis as HTML/Excel reports"
+            "description": "📊 **Custom Reports** - Generate investor profiles, portfolio summaries, and trend analysis as HTML/Excel reports",
         },
         {
             "name": "deals",
-            "description": "💼 **Deal Flow Tracker** - Track investment opportunities through pipeline stages from sourcing to close"
+            "description": "💼 **Deal Flow Tracker** - Track investment opportunities through pipeline stages from sourcing to close",
         },
         {
             "name": "auth",
-            "description": "🔐 **Authentication** - User registration, login, JWT tokens, and password management"
+            "description": "🔐 **Authentication** - User registration, login, JWT tokens, and password management",
         },
         {
             "name": "workspaces",
-            "description": "👥 **Workspaces** - Team collaboration spaces with member management and role-based access"
+            "description": "👥 **Workspaces** - Team collaboration spaces with member management and role-based access",
         },
         {
             "name": "corporate-registry",
-            "description": "🏢 **Corporate Registry** - Global company registry data from OpenCorporates (140+ jurisdictions)"
+            "description": "🏢 **Corporate Registry** - Global company registry data from OpenCorporates (140+ jurisdictions)",
         },
         {
             "name": "form-adv",
-            "description": "📋 **SEC Form ADV** - Investment adviser registrations, AUM, client types, and regulatory information"
+            "description": "📋 **SEC Form ADV** - Investment adviser registrations, AUM, client types, and regulatory information",
         },
         {
             "name": "web-traffic",
-            "description": "📊 **Web Traffic** - Website traffic intelligence from Tranco rankings and SimilarWeb"
+            "description": "📊 **Web Traffic** - Website traffic intelligence from Tranco rankings and SimilarWeb",
         },
         {
             "name": "github",
-            "description": "💻 **GitHub Analytics** - Repository metrics, developer velocity, and contributor trends"
+            "description": "💻 **GitHub Analytics** - Repository metrics, developer velocity, and contributor trends",
         },
         {
             "name": "Company Scores",
-            "description": "📊 **Company Scoring** - ML-based health scores for portfolio companies (0-100 with category breakdowns)"
+            "description": "📊 **Company Scoring** - ML-based health scores for portfolio companies (0-100 with category breakdowns)",
         },
         {
             "name": "Glassdoor",
-            "description": "👥 **Glassdoor Data** - Company reviews, ratings, and salary data for talent intelligence"
+            "description": "👥 **Glassdoor Data** - Company reviews, ratings, and salary data for talent intelligence",
         },
         {
             "name": "App Store Rankings",
-            "description": "📱 **App Store Rankings** - iOS and Android app metrics, ratings, and ranking history"
+            "description": "📱 **App Store Rankings** - iOS and Android app metrics, ratings, and ranking history",
         },
         {
             "name": "Deal Predictions",
-            "description": "🎯 **Predictive Deal Scoring** - Win probability predictions, pipeline insights, and similar deal analysis"
+            "description": "🎯 **Predictive Deal Scoring** - Win probability predictions, pipeline insights, and similar deal analysis",
         },
         {
             "name": "Agentic Intelligence",
-            "description": "🤖 **Autonomous AI Research** - AI agents that autonomously research companies across all data sources"
+            "description": "🤖 **Autonomous AI Research** - AI agents that autonomously research companies across all data sources",
         },
         {
             "name": "Due Diligence",
-            "description": "📋 **Automated Due Diligence** - AI-powered risk analysis and DD report generation"
+            "description": "📋 **Automated Due Diligence** - AI-powered risk analysis and DD report generation",
         },
         {
             "name": "Data Hunter",
-            "description": "🎯 **Autonomous Data Hunter** - AI agent that finds and fills missing data with provenance tracking"
+            "description": "🎯 **Autonomous Data Hunter** - AI agent that finds and fills missing data with provenance tracking",
         },
         {
             "name": "Anomaly Detection",
-            "description": "🚨 **Anomaly Detection** - AI agent that detects unusual patterns and changes across data sources"
+            "description": "🚨 **Anomaly Detection** - AI agent that detects unusual patterns and changes across data sources",
         },
         {
             "name": "Report Generation",
-            "description": "📝 **Report Generation** - AI agent that generates comprehensive natural language reports"
+            "description": "📝 **Report Generation** - AI agent that generates comprehensive natural language reports",
         },
         {
             "name": "LP Collection",
-            "description": "🏦 **LP Data Collection** - Continuous data collection for 100+ institutional investors (pensions, SWFs, endowments)"
+            "description": "🏦 **LP Data Collection** - Continuous data collection for 100+ institutional investors (pensions, SWFs, endowments)",
         },
         {
             "name": "Family Office Collection",
-            "description": "👨‍👩‍👧 **Family Office Data Collection** - Continuous data collection for 300+ family offices worldwide"
+            "description": "👨‍👩‍👧 **Family Office Data Collection** - Continuous data collection for 300+ family offices worldwide",
         },
         {
             "name": "People & Leadership",
-            "description": "👥 **People & Leadership** - Executive search, leadership profiles, and career history"
+            "description": "👥 **People & Leadership** - Executive search, leadership profiles, and career history",
         },
         {
             "name": "Company Leadership",
-            "description": "🏢 **Company Leadership** - Company leadership teams, org charts, and leadership changes"
+            "description": "🏢 **Company Leadership** - Company leadership teams, org charts, and leadership changes",
         },
         {
             "name": "Collection Jobs",
-            "description": "⚙️ **People Collection Jobs** - Manage leadership data collection jobs and batch processing"
+            "description": "⚙️ **People Collection Jobs** - Manage leadership data collection jobs and batch processing",
         },
         {
             "name": "People Portfolios",
-            "description": "📁 **PE Portfolios** - Track leadership across portfolio companies"
+            "description": "📁 **PE Portfolios** - Track leadership across portfolio companies",
         },
         {
             "name": "Peer Sets & Benchmarking",
-            "description": "📊 **Peer Benchmarking** - Compare leadership structures across peer companies"
+            "description": "📊 **Peer Benchmarking** - Compare leadership structures across peer companies",
         },
         {
             "name": "People Watchlists",
-            "description": "👁️ **Executive Watchlists** - Track specific executives and get change alerts"
+            "description": "👁️ **Executive Watchlists** - Track specific executives and get change alerts",
         },
         {
             "name": "People Deduplication",
-            "description": "🔗 **People Deduplication** - Scan, review, and merge duplicate person records"
+            "description": "🔗 **People Deduplication** - Scan, review, and merge duplicate person records",
         },
         {
             "name": "LLM Costs",
-            "description": "💰 **LLM Cost Tracking** - Monitor token usage and costs across all LLM-powered features"
+            "description": "💰 **LLM Cost Tracking** - Monitor token usage and costs across all LLM-powered features",
         },
         {
             "name": "Source Configuration",
-            "description": "Per-source timeouts, retry policies, and rate limits"
+            "description": "Per-source timeouts, retry policies, and rate limits",
         },
         {
             "name": "Audit Trail",
-            "description": "Collection audit trail - who triggered what, when, and how"
+            "description": "Collection audit trail - who triggered what, when, and how",
         },
         {
             "name": "Settings",
-            "description": "Application settings - manage external source API keys"
+            "description": "Application settings - manage external source API keys",
         },
         {
             "name": "Job Queue",
-            "description": "Distributed job queue - live streaming, active jobs, and queue status"
+            "description": "Distributed job queue - live streaming, active jobs, and queue status",
         },
         {
             "name": "freshness",
-            "description": "📊 **Data Freshness** - Monitor source staleness, auto-refresh status, and incremental loading"
-        }
-    ]
+            "description": "📊 **Data Freshness** - Monitor source staleness, auto-refresh status, and incremental loading",
+        },
+    ],
 )
 
 # CORS middleware — restrict to known frontend origins
 _cors_origins = [
-    "http://localhost:3001",   # frontend dev (nginx)
-    "http://localhost:5173",   # frontend dev (vite)
+    "http://localhost:3001",  # frontend dev (nginx)
+    "http://localhost:5173",  # frontend dev (vite)
     "http://127.0.0.1:3001",
     "http://127.0.0.1:5173",
 ]
@@ -981,7 +1101,10 @@ async def _unhandled_exception_handler(request: Request, exc: Exception):
     """Catch-all: log the real error, return a generic message."""
     _main_logger.error(
         "Unhandled exception on %s %s: %s",
-        request.method, request.url.path, exc, exc_info=True
+        request.method,
+        request.url.path,
+        exc,
+        exc_info=True,
     )
     return JSONResponse(
         status_code=500,
@@ -1010,7 +1133,12 @@ app.include_router(eia.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(sec.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(realestate.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(family_offices.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(family_office_contacts.router, prefix="/api/v1", tags=["family_office_contacts"], dependencies=_auth)
+app.include_router(
+    family_office_contacts.router,
+    prefix="/api/v1",
+    tags=["family_office_contacts"],
+    dependencies=_auth,
+)
 app.include_router(cms.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(kaggle.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(international_econ.router, prefix="/api/v1", dependencies=_auth)
@@ -1107,7 +1235,9 @@ app.include_router(site_intel_labor.router, prefix="/api/v1", dependencies=_auth
 app.include_router(site_intel_risk.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(site_intel_incentives.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(site_intel_logistics.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(site_intel_water_utilities.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(
+    site_intel_water_utilities.router, prefix="/api/v1", dependencies=_auth
+)
 app.include_router(site_intel_sites.router, prefix="/api/v1", dependencies=_auth)
 
 # Collection Management
@@ -1134,25 +1264,53 @@ app.include_router(graphql_app, prefix="/graphql", tags=["graphql"])
 def root():
     """
     Service information and quick links.
-    
+
     Use this endpoint to verify the service is running and get links to documentation.
     """
     return {
         "service": "External Data Ingestion Service",
         "version": "0.1.0",
         "status": "running",
-        "sources": ["census", "fred", "eia", "sec", "realestate", "noaa", "cms", "kaggle", "international_econ", "fbi_crime", "bts", "bea", "fema", "data_commons", "yelp", "us_trade", "cftc_cot", "usda", "bls", "fcc_broadband", "treasury", "fdic", "irs_soi", "agentic_portfolio", "foot_traffic", "prediction_markets", "uspto"],
+        "sources": [
+            "census",
+            "fred",
+            "eia",
+            "sec",
+            "realestate",
+            "noaa",
+            "cms",
+            "kaggle",
+            "international_econ",
+            "fbi_crime",
+            "bts",
+            "bea",
+            "fema",
+            "data_commons",
+            "yelp",
+            "us_trade",
+            "cftc_cot",
+            "usda",
+            "bls",
+            "fcc_broadband",
+            "treasury",
+            "fdic",
+            "irs_soi",
+            "agentic_portfolio",
+            "foot_traffic",
+            "prediction_markets",
+            "uspto",
+        ],
         "documentation": {
             "swagger_ui": "/docs",
             "redoc": "/redoc",
-            "openapi_schema": "/openapi.json"
+            "openapi_schema": "/openapi.json",
         },
         "featured_endpoints": {
             "form_adv_query": "/api/v1/sec/form-adv/firms",
             "form_adv_ingest": "/api/v1/sec/form-adv/ingest/family-offices",
             "job_status": "/api/v1/jobs/{job_id}",
-            "health_check": "/health"
-        }
+            "health_check": "/health",
+        },
     }
 
 
@@ -1160,18 +1318,14 @@ def root():
 def health_check():
     """
     Health check endpoint.
-    
+
     Returns status of the service and database connectivity.
     """
     from app.core.database import get_engine
     from sqlalchemy import text
-    
-    health_status = {
-        "status": "healthy",
-        "service": "running",
-        "database": "unknown"
-    }
-    
+
+    health_status = {"status": "healthy", "service": "running", "database": "unknown"}
+
     # Check database connectivity
     try:
         engine = get_engine()
@@ -1182,7 +1336,5 @@ def health_check():
         health_status["status"] = "degraded"
         health_status["database"] = f"error: {str(e)}"
         logger.warning(f"Database health check failed: {e}")
-    
+
     return health_status
-
-

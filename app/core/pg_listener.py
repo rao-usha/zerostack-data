@@ -8,6 +8,7 @@ into the in-memory EventBus so SSE clients get live updates.
 Uses psycopg2 raw connection (not SQLAlchemy) because LISTEN
 requires a persistent, non-pooled connection.
 """
+
 import asyncio
 import json
 import logging

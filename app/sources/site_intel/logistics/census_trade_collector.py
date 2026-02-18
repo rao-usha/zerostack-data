@@ -11,6 +11,7 @@ Data sources:
 
 API key required: Get from https://api.census.gov/data/key_signup.html
 """
+
 import logging
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any
@@ -20,7 +21,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import TradeGatewayStats
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -137,12 +142,23 @@ class CensusTradeCollector(BaseCollector):
                     records,
                     unique_columns=["customs_district", "period_year", "period_month"],
                     update_columns=[
-                        "district_code", "port_code", "port_name",
-                        "import_value_million", "export_value_million", "trade_balance_million",
-                        "top_import_hs_codes", "top_export_hs_codes",
-                        "top_import_countries", "top_export_countries",
-                        "vessel_pct", "air_pct", "truck_pct", "rail_pct", "other_pct",
-                        "source", "collected_at"
+                        "district_code",
+                        "port_code",
+                        "port_name",
+                        "import_value_million",
+                        "export_value_million",
+                        "trade_balance_million",
+                        "top_import_hs_codes",
+                        "top_export_hs_codes",
+                        "top_import_countries",
+                        "top_export_countries",
+                        "vessel_pct",
+                        "air_pct",
+                        "truck_pct",
+                        "rail_pct",
+                        "other_pct",
+                        "source",
+                        "collected_at",
                     ],
                 )
 
@@ -248,10 +264,18 @@ class CensusTradeCollector(BaseCollector):
 
         # Top HS codes
         top_imports_hs = [
-            {"hs_code": "8471", "description": "Computers and components", "value_pct": 12},
+            {
+                "hs_code": "8471",
+                "description": "Computers and components",
+                "value_pct": 12,
+            },
             {"hs_code": "8517", "description": "Telephones and parts", "value_pct": 8},
             {"hs_code": "8703", "description": "Automobiles", "value_pct": 7},
-            {"hs_code": "8542", "description": "Electronic integrated circuits", "value_pct": 6},
+            {
+                "hs_code": "8542",
+                "description": "Electronic integrated circuits",
+                "value_pct": 6,
+            },
             {"hs_code": "2709", "description": "Crude petroleum", "value_pct": 5},
         ]
 
@@ -295,12 +319,20 @@ class CensusTradeCollector(BaseCollector):
                 import random
 
                 # Monthly values with variation
-                monthly_imports = (trade_info["imports"] / 12) * random.uniform(0.85, 1.15)
-                monthly_exports = (trade_info["exports"] / 12) * random.uniform(0.85, 1.15)
+                monthly_imports = (trade_info["imports"] / 12) * random.uniform(
+                    0.85, 1.15
+                )
+                monthly_exports = (trade_info["exports"] / 12) * random.uniform(
+                    0.85, 1.15
+                )
                 trade_balance = monthly_exports - monthly_imports
 
                 # Mode breakdown varies by district
-                if "Laredo" in district_name or "El Paso" in district_name or "Detroit" in district_name:
+                if (
+                    "Laredo" in district_name
+                    or "El Paso" in district_name
+                    or "Detroit" in district_name
+                ):
                     # Land border districts - heavy truck/rail
                     vessel_pct = 0
                     air_pct = round(random.uniform(2, 8), 1)
@@ -329,26 +361,28 @@ class CensusTradeCollector(BaseCollector):
                     truck_pct = round(truck_pct / total * 100, 1)
                     rail_pct = round(100 - vessel_pct - air_pct - truck_pct, 1)
 
-                records.append({
-                    "customs_district": district_name,
-                    "district_code": None,
-                    "port_code": trade_info.get("port"),
-                    "port_name": district_name.split(",")[0],
-                    "period_year": year,
-                    "period_month": month,
-                    "import_value_million": round(monthly_imports, 2),
-                    "export_value_million": round(monthly_exports, 2),
-                    "trade_balance_million": round(trade_balance, 2),
-                    "top_import_hs_codes": top_imports_hs,
-                    "top_export_hs_codes": top_exports_hs,
-                    "top_import_countries": top_import_countries,
-                    "top_export_countries": top_export_countries,
-                    "vessel_pct": vessel_pct,
-                    "air_pct": air_pct,
-                    "truck_pct": truck_pct,
-                    "rail_pct": rail_pct,
-                    "other_pct": other_pct,
-                })
+                records.append(
+                    {
+                        "customs_district": district_name,
+                        "district_code": None,
+                        "port_code": trade_info.get("port"),
+                        "port_name": district_name.split(",")[0],
+                        "period_year": year,
+                        "period_month": month,
+                        "import_value_million": round(monthly_imports, 2),
+                        "export_value_million": round(monthly_exports, 2),
+                        "trade_balance_million": round(trade_balance, 2),
+                        "top_import_hs_codes": top_imports_hs,
+                        "top_export_hs_codes": top_exports_hs,
+                        "top_import_countries": top_import_countries,
+                        "top_export_countries": top_export_countries,
+                        "vessel_pct": vessel_pct,
+                        "air_pct": air_pct,
+                        "truck_pct": truck_pct,
+                        "rail_pct": rail_pct,
+                        "other_pct": other_pct,
+                    }
+                )
 
         return records
 
@@ -359,7 +393,9 @@ class CensusTradeCollector(BaseCollector):
             return None
 
         period_year = self._safe_int(record.get("period_year") or record.get("YEAR"))
-        period_month = self._safe_int(record.get("period_month") or record.get("MONTH") or 12)
+        period_month = self._safe_int(
+            record.get("period_month") or record.get("MONTH") or 12
+        )
 
         if not period_year:
             return None
@@ -371,9 +407,15 @@ class CensusTradeCollector(BaseCollector):
             "port_name": record.get("port_name"),
             "period_year": period_year,
             "period_month": period_month,
-            "import_value_million": self._safe_float(record.get("import_value_million") or record.get("GEN_VAL_MO")),
-            "export_value_million": self._safe_float(record.get("export_value_million") or record.get("CON_VAL_MO")),
-            "trade_balance_million": self._safe_float(record.get("trade_balance_million")),
+            "import_value_million": self._safe_float(
+                record.get("import_value_million") or record.get("GEN_VAL_MO")
+            ),
+            "export_value_million": self._safe_float(
+                record.get("export_value_million") or record.get("CON_VAL_MO")
+            ),
+            "trade_balance_million": self._safe_float(
+                record.get("trade_balance_million")
+            ),
             "top_import_hs_codes": record.get("top_import_hs_codes"),
             "top_export_hs_codes": record.get("top_export_hs_codes"),
             "top_import_countries": record.get("top_import_countries"),

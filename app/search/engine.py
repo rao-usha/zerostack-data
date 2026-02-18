@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class SearchResultType(str, Enum):
     """Types of searchable entities."""
+
     INVESTOR = "investor"
     COMPANY = "company"
     CO_INVESTOR = "co_investor"
@@ -28,6 +29,7 @@ class SearchResultType(str, Enum):
 @dataclass
 class SearchResult:
     """A single search result."""
+
     id: int
     entity_id: int
     result_type: str
@@ -41,6 +43,7 @@ class SearchResult:
 @dataclass
 class SearchSuggestion:
     """An autocomplete suggestion."""
+
     text: str
     type: str
     id: int
@@ -51,6 +54,7 @@ class SearchSuggestion:
 @dataclass
 class SearchFacets:
     """Aggregated facet counts for filtering."""
+
     result_types: Dict[str, int] = field(default_factory=dict)
     industries: Dict[str, int] = field(default_factory=dict)
     investor_types: Dict[str, int] = field(default_factory=dict)
@@ -60,6 +64,7 @@ class SearchFacets:
 @dataclass
 class SearchResponse:
     """Complete search response with results, facets, and metadata."""
+
     results: List[SearchResult]
     facets: SearchFacets
     total: int
@@ -100,7 +105,8 @@ class SearchEngine:
             conn.commit()
 
             # Create search_index table
-            conn.execute(text("""
+            conn.execute(
+                text("""
                 CREATE TABLE IF NOT EXISTS search_index (
                     id SERIAL PRIMARY KEY,
                     entity_type VARCHAR(50) NOT NULL,
@@ -117,7 +123,8 @@ class SearchEngine:
                     updated_at TIMESTAMP DEFAULT NOW(),
                     UNIQUE(entity_type, entity_id)
                 )
-            """))
+            """)
+            )
             conn.commit()
 
             # Create indexes (IF NOT EXISTS for idempotency)
@@ -139,7 +146,8 @@ class SearchEngine:
                     conn.rollback()
 
             # Create trigger function for auto-updating search_vector
-            conn.execute(text("""
+            conn.execute(
+                text("""
                 CREATE OR REPLACE FUNCTION update_search_vector()
                 RETURNS TRIGGER AS $$
                 BEGIN
@@ -152,20 +160,25 @@ class SearchEngine:
                     RETURN NEW;
                 END;
                 $$ LANGUAGE plpgsql
-            """))
+            """)
+            )
             conn.commit()
 
             # Create trigger (drop first to avoid duplicate)
-            conn.execute(text("""
+            conn.execute(
+                text("""
                 DROP TRIGGER IF EXISTS trig_search_vector_update ON search_index
-            """))
+            """)
+            )
             conn.commit()
 
-            conn.execute(text("""
+            conn.execute(
+                text("""
                 CREATE TRIGGER trig_search_vector_update
                 BEFORE INSERT OR UPDATE ON search_index
                 FOR EACH ROW EXECUTE FUNCTION update_search_vector()
-            """))
+            """)
+            )
             conn.commit()
 
             logger.info("Search index schema ensured")
@@ -207,12 +220,11 @@ class SearchEngine:
     def _index_investors(self) -> int:
         """Index all investors from lp_fund table."""
         # Delete existing investor entries
-        self.db.execute(text(
-            "DELETE FROM search_index WHERE entity_type = 'investor'"
-        ))
+        self.db.execute(text("DELETE FROM search_index WHERE entity_type = 'investor'"))
 
         # Insert from lp_fund
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             INSERT INTO search_index (entity_type, entity_id, name, name_normalized, description, investor_type, location, metadata)
             SELECT
                 'investor',
@@ -235,7 +247,8 @@ class SearchEngine:
                 location = EXCLUDED.location,
                 metadata = EXCLUDED.metadata
             RETURNING id
-        """))
+        """)
+        )
 
         self.db.commit()
         return result.rowcount
@@ -243,12 +256,11 @@ class SearchEngine:
     def _index_companies(self) -> int:
         """Index all portfolio companies."""
         # Delete existing company entries
-        self.db.execute(text(
-            "DELETE FROM search_index WHERE entity_type = 'company'"
-        ))
+        self.db.execute(text("DELETE FROM search_index WHERE entity_type = 'company'"))
 
         # Insert from portfolio_companies (deduplicated by company_name)
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             INSERT INTO search_index (entity_type, entity_id, name, name_normalized, description, industry, location, metadata)
             SELECT DISTINCT ON (company_name)
                 'company',
@@ -275,7 +287,8 @@ class SearchEngine:
                 location = EXCLUDED.location,
                 metadata = EXCLUDED.metadata
             RETURNING id
-        """))
+        """)
+        )
 
         self.db.commit()
         return result.rowcount
@@ -283,12 +296,13 @@ class SearchEngine:
     def _index_co_investors(self) -> int:
         """Index all co-investors."""
         # Delete existing co_investor entries
-        self.db.execute(text(
-            "DELETE FROM search_index WHERE entity_type = 'co_investor'"
-        ))
+        self.db.execute(
+            text("DELETE FROM search_index WHERE entity_type = 'co_investor'")
+        )
 
         # Insert from co_investments (deduplicated by co_investor_name)
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             INSERT INTO search_index (entity_type, entity_id, name, name_normalized, description, investor_type, metadata)
             SELECT DISTINCT ON (co_investor_name)
                 'co_investor',
@@ -310,7 +324,8 @@ class SearchEngine:
                 investor_type = EXCLUDED.investor_type,
                 metadata = EXCLUDED.metadata
             RETURNING id
-        """))
+        """)
+        )
 
         self.db.commit()
         return result.rowcount
@@ -324,7 +339,7 @@ class SearchEngine:
         location: Optional[str] = None,
         page: int = 1,
         page_size: int = 20,
-        fuzzy: bool = True
+        fuzzy: bool = True,
     ) -> SearchResponse:
         """
         Execute full-text search with optional filters.
@@ -346,7 +361,7 @@ class SearchEngine:
 
         # Normalize query
         query = query.strip()
-        normalized_query = re.sub(r'[^a-zA-Z0-9 ]', '', query.lower())
+        normalized_query = re.sub(r"[^a-zA-Z0-9 ]", "", query.lower())
 
         # Build WHERE clause
         where_clauses = []
@@ -355,7 +370,7 @@ class SearchEngine:
             "normalized_query": normalized_query,
             "offset": (page - 1) * page_size,
             "limit": page_size,
-            "fuzzy_threshold": self.FUZZY_THRESHOLD
+            "fuzzy_threshold": self.FUZZY_THRESHOLD,
         }
 
         # Type filter
@@ -404,7 +419,9 @@ class SearchEngine:
                     END DESC
                 """
             else:
-                order_sql = "ts_rank_cd(search_vector, plainto_tsquery('english', :query)) DESC"
+                order_sql = (
+                    "ts_rank_cd(search_vector, plainto_tsquery('english', :query)) DESC"
+                )
         else:
             order_sql = "name ASC"
 
@@ -423,7 +440,9 @@ class SearchEngine:
                 END
             """
         elif query:
-            relevance_sql = "ts_rank_cd(search_vector, plainto_tsquery('english', :query))"
+            relevance_sql = (
+                "ts_rank_cd(search_vector, plainto_tsquery('english', :query))"
+            )
         else:
             relevance_sql = "1.0"
 
@@ -449,20 +468,24 @@ class SearchEngine:
 
         results = []
         for row in results_data:
-            results.append(SearchResult(
-                id=row.id,
-                entity_id=row.entity_id,
-                result_type=row.entity_type,
-                name=row.name,
-                description=row.description,
-                relevance_score=float(row.relevance_score) if row.relevance_score else 0.0,
-                metadata={
-                    "industry": row.industry,
-                    "investor_type": row.investor_type,
-                    "location": row.location,
-                    **(row.metadata or {})
-                }
-            ))
+            results.append(
+                SearchResult(
+                    id=row.id,
+                    entity_id=row.entity_id,
+                    result_type=row.entity_type,
+                    name=row.name,
+                    description=row.description,
+                    relevance_score=float(row.relevance_score)
+                    if row.relevance_score
+                    else 0.0,
+                    metadata={
+                        "industry": row.industry,
+                        "investor_type": row.investor_type,
+                        "location": row.location,
+                        **(row.metadata or {}),
+                    },
+                )
+            )
 
         # Get facets (only if we have results or no query)
         facets = self._get_facets(where_sql, params)
@@ -476,7 +499,7 @@ class SearchEngine:
             page=page,
             page_size=page_size,
             query=query,
-            search_time_ms=round(elapsed_ms, 2)
+            search_time_ms=round(elapsed_ms, 2),
         )
 
     def _get_facets(self, where_sql: str, params: dict) -> SearchFacets:
@@ -536,10 +559,7 @@ class SearchEngine:
         return facets
 
     def suggest(
-        self,
-        prefix: str,
-        limit: int = 10,
-        result_types: Optional[List[str]] = None
+        self, prefix: str, limit: int = 10, result_types: Optional[List[str]] = None
     ) -> List[SearchSuggestion]:
         """
         Get autocomplete suggestions for a prefix.
@@ -555,13 +575,13 @@ class SearchEngine:
         if not prefix or len(prefix) < 1:
             return []
 
-        normalized_prefix = re.sub(r'[^a-zA-Z0-9 ]', '', prefix.lower())
+        normalized_prefix = re.sub(r"[^a-zA-Z0-9 ]", "", prefix.lower())
 
         params = {
             "prefix": f"{normalized_prefix}%",
             "normalized_prefix": normalized_prefix,
             "limit": limit,
-            "fuzzy_threshold": self.FUZZY_THRESHOLD
+            "fuzzy_threshold": self.FUZZY_THRESHOLD,
         }
 
         where_clauses = [
@@ -597,40 +617,43 @@ class SearchEngine:
 
         suggestions = []
         for row in results:
-            suggestions.append(SearchSuggestion(
-                text=row.name,
-                type=row.entity_type,
-                id=row.id,
-                entity_id=row.entity_id,
-                score=float(row.score) if row.score else 0.0
-            ))
+            suggestions.append(
+                SearchSuggestion(
+                    text=row.name,
+                    type=row.entity_type,
+                    id=row.id,
+                    entity_id=row.entity_id,
+                    score=float(row.score) if row.score else 0.0,
+                )
+            )
 
         return suggestions
 
     def get_stats(self) -> Dict[str, Any]:
         """Get search index statistics."""
-        stats = {
-            "total_indexed": 0,
-            "by_type": {},
-            "last_updated": None
-        }
+        stats = {"total_indexed": 0, "by_type": {}, "last_updated": None}
 
         # Check if table exists
         try:
-            result = self.db.execute(text("""
+            result = self.db.execute(
+                text("""
                 SELECT
                     entity_type,
                     COUNT(*) as cnt,
                     MAX(updated_at) as last_updated
                 FROM search_index
                 GROUP BY entity_type
-            """))
+            """)
+            )
 
             for row in result:
                 stats["by_type"][row.entity_type] = row.cnt
                 stats["total_indexed"] += row.cnt
                 if row.last_updated:
-                    if stats["last_updated"] is None or row.last_updated > stats["last_updated"]:
+                    if (
+                        stats["last_updated"] is None
+                        or row.last_updated > stats["last_updated"]
+                    ):
                         stats["last_updated"] = row.last_updated
 
             if stats["last_updated"]:

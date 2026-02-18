@@ -9,6 +9,7 @@ Yelp Fusion API provides access to business listings and reviews data:
 Official API: https://docs.developer.yelp.com/docs/fusion-intro
 API Key: Required (free tier: 500 calls/day)
 """
+
 from app.sources.yelp.client import YelpClient
 from app.sources.yelp.ingest import (
     ingest_businesses_by_location,

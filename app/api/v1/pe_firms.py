@@ -20,18 +20,17 @@ from app.core.database import get_db
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(
-    prefix="/pe/firms",
-    tags=["PE Intelligence - Firms"]
-)
+router = APIRouter(prefix="/pe/firms", tags=["PE Intelligence - Firms"])
 
 
 # =============================================================================
 # Request/Response Models
 # =============================================================================
 
+
 class PEFirmCreate(BaseModel):
     """Request model for creating/updating a PE firm."""
+
     name: str = Field(..., description="Firm name", examples=["Blackstone"])
     legal_name: Optional[str] = Field(None, examples=["Blackstone Inc."])
     website: Optional[str] = Field(None, examples=["https://www.blackstone.com"])
@@ -42,8 +41,12 @@ class PEFirmCreate(BaseModel):
 
     firm_type: Optional[str] = Field(None, examples=["PE"])
     primary_strategy: Optional[str] = Field(None, examples=["Buyout"])
-    sector_focus: Optional[List[str]] = Field(None, examples=[["Technology", "Healthcare"]])
-    geography_focus: Optional[List[str]] = Field(None, examples=[["North America", "Europe"]])
+    sector_focus: Optional[List[str]] = Field(
+        None, examples=[["Technology", "Healthcare"]]
+    )
+    geography_focus: Optional[List[str]] = Field(
+        None, examples=[["North America", "Europe"]]
+    )
 
     aum_usd_millions: Optional[float] = Field(None, examples=[1000000])
     employee_count: Optional[int] = Field(None, examples=[5000])
@@ -65,6 +68,7 @@ class PEFirmCreate(BaseModel):
 
 class PEFirmResponse(BaseModel):
     """Response model for PE firm."""
+
     id: int
     name: str
     legal_name: Optional[str] = None
@@ -82,6 +86,7 @@ class PEFirmResponse(BaseModel):
 
 class PEFundCreate(BaseModel):
     """Request model for creating a fund."""
+
     name: str = Field(..., examples=["Blackstone Capital Partners IX"])
     fund_number: Optional[int] = Field(None, examples=[9])
     vintage_year: Optional[int] = Field(None, examples=[2023])
@@ -95,6 +100,7 @@ class PEFundCreate(BaseModel):
 # Firm Endpoints
 # =============================================================================
 
+
 @router.get("/")
 async def list_pe_firms(
     limit: int = Query(100, le=1000),
@@ -103,7 +109,7 @@ async def list_pe_firms(
     strategy: Optional[str] = None,
     status: Optional[str] = None,
     search: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     List all PE/VC firms with filtering and pagination.
@@ -152,25 +158,23 @@ async def list_pe_firms(
 
         firms = []
         for row in rows:
-            firms.append({
-                "id": row[0],
-                "name": row[1],
-                "legal_name": row[2],
-                "website": row[3],
-                "location": {
-                    "city": row[4],
-                    "state": row[5],
-                    "country": row[6]
-                },
-                "firm_type": row[7],
-                "primary_strategy": row[8],
-                "aum_usd_millions": float(row[9]) if row[9] else None,
-                "employee_count": row[10],
-                "founded_year": row[11],
-                "status": row[12],
-                "cik": row[13],
-                "created_at": row[14].isoformat() if row[14] else None
-            })
+            firms.append(
+                {
+                    "id": row[0],
+                    "name": row[1],
+                    "legal_name": row[2],
+                    "website": row[3],
+                    "location": {"city": row[4], "state": row[5], "country": row[6]},
+                    "firm_type": row[7],
+                    "primary_strategy": row[8],
+                    "aum_usd_millions": float(row[9]) if row[9] else None,
+                    "employee_count": row[10],
+                    "founded_year": row[11],
+                    "status": row[12],
+                    "cik": row[13],
+                    "created_at": row[14].isoformat() if row[14] else None,
+                }
+            )
 
         # Get total count
         count_query = "SELECT COUNT(*) FROM pe_firms WHERE 1=1"
@@ -193,7 +197,7 @@ async def list_pe_firms(
             "count": len(firms),
             "limit": limit,
             "offset": offset,
-            "firms": firms
+            "firms": firms,
         }
 
     except Exception as e:
@@ -205,7 +209,7 @@ async def list_pe_firms(
 async def search_pe_firms(
     q: str = Query(..., min_length=2),
     limit: int = Query(20, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Search PE firms by name.
@@ -227,23 +231,23 @@ async def search_pe_firms(
             LIMIT :limit
         """)
 
-        result = db.execute(query, {
-            "search": f"%{q}%",
-            "exact": f"{q}%",
-            "limit": limit
-        })
+        result = db.execute(
+            query, {"search": f"%{q}%", "exact": f"{q}%", "limit": limit}
+        )
         rows = result.fetchall()
 
         firms = []
         for row in rows:
-            firms.append({
-                "id": row[0],
-                "name": row[1],
-                "firm_type": row[2],
-                "strategy": row[3],
-                "aum_usd_millions": float(row[4]) if row[4] else None,
-                "location": f"{row[5]}, {row[6]}" if row[5] else None
-            })
+            firms.append(
+                {
+                    "id": row[0],
+                    "name": row[1],
+                    "firm_type": row[2],
+                    "strategy": row[3],
+                    "aum_usd_millions": float(row[4]) if row[4] else None,
+                    "location": f"{row[5]}, {row[6]}" if row[5] else None,
+                }
+            )
 
         return {"count": len(firms), "results": firms}
 
@@ -253,10 +257,7 @@ async def search_pe_firms(
 
 
 @router.post("/", response_model=PEFirmResponse)
-async def create_pe_firm(
-    firm: PEFirmCreate,
-    db: Session = Depends(get_db)
-):
+async def create_pe_firm(firm: PEFirmCreate, db: Session = Depends(get_db)):
     """
     Create or update a PE firm.
 
@@ -327,7 +328,7 @@ async def create_pe_firm(
             aum_usd_millions=float(row[9]) if row[9] else None,
             founded_year=row[10],
             status=row[11],
-            created_at=row[12].isoformat() if row[12] else None
+            created_at=row[12].isoformat() if row[12] else None,
         )
 
     except Exception as e:
@@ -337,10 +338,7 @@ async def create_pe_firm(
 
 
 @router.get("/{firm_id}")
-async def get_pe_firm(
-    firm_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_pe_firm(firm_id: int, db: Session = Depends(get_db)):
     """
     Get detailed information for a PE firm.
 
@@ -390,7 +388,7 @@ async def get_pe_firm(
                 "target_size_millions": float(f[4]) if f[4] else None,
                 "final_close_millions": float(f[5]) if f[5] else None,
                 "strategy": f[6],
-                "status": f[7]
+                "status": f[7],
             }
             for f in funds_result.fetchall()
         ]
@@ -418,7 +416,7 @@ async def get_pe_firm(
                 "name": t[1],
                 "title": t[2],
                 "seniority": t[3],
-                "is_current": t[4]
+                "is_current": t[4],
             }
             for t in team_result.fetchall()
         ]
@@ -428,21 +426,17 @@ async def get_pe_firm(
             "name": row[1],
             "legal_name": row[2],
             "website": row[3],
-            "headquarters": {
-                "city": row[4],
-                "state": row[5],
-                "country": row[6]
-            },
+            "headquarters": {"city": row[4], "state": row[5], "country": row[6]},
             "classification": {
                 "type": row[7],
                 "strategy": row[8],
                 "sector_focus": row[9],
-                "geography_focus": row[10]
+                "geography_focus": row[10],
             },
             "scale": {
                 "aum_usd_millions": float(row[11]) if row[11] else None,
                 "employee_count": row[12],
-                "office_locations": row[13]
+                "office_locations": row[13],
             },
             "investment_criteria": {
                 "check_size_min_millions": float(row[14]) if row[14] else None,
@@ -450,32 +444,32 @@ async def get_pe_firm(
                 "target_revenue_min_millions": float(row[16]) if row[16] else None,
                 "target_revenue_max_millions": float(row[17]) if row[17] else None,
                 "target_ebitda_min_millions": float(row[18]) if row[18] else None,
-                "target_ebitda_max_millions": float(row[19]) if row[19] else None
+                "target_ebitda_max_millions": float(row[19]) if row[19] else None,
             },
             "sec_registration": {
                 "cik": row[20],
                 "file_number": row[21],
                 "crd_number": row[22],
-                "is_registered": row[23]
+                "is_registered": row[23],
             },
             "founded_year": row[24],
             "status": row[25],
             "social": {
                 "linkedin": row[26],
                 "crunchbase": row[27],
-                "pitchbook": row[28]
+                "pitchbook": row[28],
             },
             "data_quality": {
                 "sources": row[29],
                 "last_verified": row[30].isoformat() if row[30] else None,
-                "confidence": float(row[31]) if row[31] else None
+                "confidence": float(row[31]) if row[31] else None,
             },
             "metadata": {
                 "created_at": row[32].isoformat() if row[32] else None,
-                "updated_at": row[33].isoformat() if row[33] else None
+                "updated_at": row[33].isoformat() if row[33] else None,
             },
             "funds": funds,
-            "team": team
+            "team": team,
         }
 
     except HTTPException:
@@ -490,7 +484,7 @@ async def get_firm_portfolio(
     firm_id: int,
     status: Optional[str] = None,
     limit: int = Query(50, le=500),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get portfolio companies for a PE firm.
@@ -524,33 +518,30 @@ async def get_firm_portfolio(
 
         companies = []
         for row in rows:
-            companies.append({
-                "id": row[0],
-                "name": row[1],
-                "industry": row[2],
-                "location": f"{row[3]}, {row[4]}" if row[3] else None,
-                "investment": {
-                    "date": row[5].isoformat() if row[5] else None,
-                    "type": row[6],
-                    "ownership_pct": float(row[7]) if row[7] else None,
-                    "status": row[8]
-                },
-                "exit": {
-                    "date": row[9].isoformat() if row[9] else None,
-                    "type": row[10],
-                    "multiple": float(row[11]) if row[11] else None
-                } if row[9] else None,
-                "fund": {
-                    "name": row[12],
-                    "vintage_year": row[13]
+            companies.append(
+                {
+                    "id": row[0],
+                    "name": row[1],
+                    "industry": row[2],
+                    "location": f"{row[3]}, {row[4]}" if row[3] else None,
+                    "investment": {
+                        "date": row[5].isoformat() if row[5] else None,
+                        "type": row[6],
+                        "ownership_pct": float(row[7]) if row[7] else None,
+                        "status": row[8],
+                    },
+                    "exit": {
+                        "date": row[9].isoformat() if row[9] else None,
+                        "type": row[10],
+                        "multiple": float(row[11]) if row[11] else None,
+                    }
+                    if row[9]
+                    else None,
+                    "fund": {"name": row[12], "vintage_year": row[13]},
                 }
-            })
+            )
 
-        return {
-            "firm_id": firm_id,
-            "count": len(companies),
-            "portfolio": companies
-        }
+        return {"firm_id": firm_id, "count": len(companies), "portfolio": companies}
 
     except Exception as e:
         logger.error(f"Error fetching portfolio: {e}", exc_info=True)
@@ -558,10 +549,7 @@ async def get_firm_portfolio(
 
 
 @router.get("/{firm_id}/funds")
-async def get_firm_funds(
-    firm_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_firm_funds(firm_id: int, db: Session = Depends(get_db)):
     """
     Get all funds for a PE firm.
     """
@@ -585,37 +573,35 @@ async def get_firm_funds(
 
         funds = []
         for row in rows:
-            funds.append({
-                "id": row[0],
-                "name": row[1],
-                "fund_number": row[2],
-                "vintage_year": row[3],
-                "size": {
-                    "target_millions": float(row[4]) if row[4] else None,
-                    "final_close_millions": float(row[5]) if row[5] else None,
-                    "called_pct": float(row[6]) if row[6] else None
-                },
-                "strategy": row[7],
-                "sector_focus": row[8],
-                "geography_focus": row[9],
-                "terms": {
-                    "management_fee_pct": float(row[10]) if row[10] else None,
-                    "carried_interest_pct": float(row[11]) if row[11] else None,
-                    "preferred_return_pct": float(row[12]) if row[12] else None,
-                    "fund_life_years": row[13],
-                    "investment_period_years": row[14]
-                },
-                "status": row[15],
-                "first_close_date": row[16].isoformat() if row[16] else None,
-                "final_close_date": row[17].isoformat() if row[17] else None,
-                "created_at": row[18].isoformat() if row[18] else None
-            })
+            funds.append(
+                {
+                    "id": row[0],
+                    "name": row[1],
+                    "fund_number": row[2],
+                    "vintage_year": row[3],
+                    "size": {
+                        "target_millions": float(row[4]) if row[4] else None,
+                        "final_close_millions": float(row[5]) if row[5] else None,
+                        "called_pct": float(row[6]) if row[6] else None,
+                    },
+                    "strategy": row[7],
+                    "sector_focus": row[8],
+                    "geography_focus": row[9],
+                    "terms": {
+                        "management_fee_pct": float(row[10]) if row[10] else None,
+                        "carried_interest_pct": float(row[11]) if row[11] else None,
+                        "preferred_return_pct": float(row[12]) if row[12] else None,
+                        "fund_life_years": row[13],
+                        "investment_period_years": row[14],
+                    },
+                    "status": row[15],
+                    "first_close_date": row[16].isoformat() if row[16] else None,
+                    "final_close_date": row[17].isoformat() if row[17] else None,
+                    "created_at": row[18].isoformat() if row[18] else None,
+                }
+            )
 
-        return {
-            "firm_id": firm_id,
-            "count": len(funds),
-            "funds": funds
-        }
+        return {"firm_id": firm_id, "count": len(funds), "funds": funds}
 
     except Exception as e:
         logger.error(f"Error fetching funds: {e}", exc_info=True)
@@ -624,9 +610,7 @@ async def get_firm_funds(
 
 @router.get("/{firm_id}/team")
 async def get_firm_team(
-    firm_id: int,
-    current_only: bool = True,
-    db: Session = Depends(get_db)
+    firm_id: int, current_only: bool = True, db: Session = Depends(get_db)
 ):
     """
     Get team members for a PE firm.
@@ -669,28 +653,26 @@ async def get_firm_team(
 
         team = []
         for row in rows:
-            team.append({
-                "id": row[0],
-                "person_id": row[1],
-                "name": row[2],
-                "linkedin": row[3],
-                "title": row[4],
-                "seniority": row[5],
-                "department": row[6],
-                "sector_focus": row[7],
-                "tenure": {
-                    "start_date": row[8].isoformat() if row[8] else None,
-                    "end_date": row[9].isoformat() if row[9] else None,
-                    "is_current": row[10]
-                },
-                "email": row[11]
-            })
+            team.append(
+                {
+                    "id": row[0],
+                    "person_id": row[1],
+                    "name": row[2],
+                    "linkedin": row[3],
+                    "title": row[4],
+                    "seniority": row[5],
+                    "department": row[6],
+                    "sector_focus": row[7],
+                    "tenure": {
+                        "start_date": row[8].isoformat() if row[8] else None,
+                        "end_date": row[9].isoformat() if row[9] else None,
+                        "is_current": row[10],
+                    },
+                    "email": row[11],
+                }
+            )
 
-        return {
-            "firm_id": firm_id,
-            "count": len(team),
-            "team": team
-        }
+        return {"firm_id": firm_id, "count": len(team), "team": team}
 
     except Exception as e:
         logger.error(f"Error fetching team: {e}", exc_info=True)
@@ -732,24 +714,17 @@ async def get_pe_firms_stats(db: Session = Depends(get_db)):
 
         return {
             "total_firms": row[0],
-            "by_type": {
-                "pe": row[1],
-                "vc": row[2],
-                "growth": row[3]
-            },
+            "by_type": {"pe": row[1], "vc": row[2], "growth": row[3]},
             "active_firms": row[4],
             "aum": {
                 "total_millions": float(row[5]) if row[5] else 0,
-                "average_millions": float(row[6]) if row[6] else 0
+                "average_millions": float(row[6]) if row[6] else 0,
             },
-            "data_completeness": {
-                "with_cik": row[7],
-                "with_website": row[8]
-            },
+            "data_completeness": {"with_cik": row[7], "with_website": row[8]},
             "funds": {
                 "total": fund_row[0],
-                "total_capital_millions": float(fund_row[1]) if fund_row[1] else 0
-            }
+                "total_capital_millions": float(fund_row[1]) if fund_row[1] else 0,
+            },
         }
 
     except Exception as e:
@@ -758,10 +733,7 @@ async def get_pe_firms_stats(db: Session = Depends(get_db)):
 
 
 @router.delete("/{firm_id}")
-async def delete_pe_firm(
-    firm_id: int,
-    db: Session = Depends(get_db)
-):
+async def delete_pe_firm(firm_id: int, db: Session = Depends(get_db)):
     """
     Delete a PE firm record.
     """
@@ -775,10 +747,7 @@ async def delete_pe_firm(
 
         db.commit()
 
-        return {
-            "message": f"PE firm '{row[0]}' deleted successfully",
-            "id": firm_id
-        }
+        return {"message": f"PE firm '{row[0]}' deleted successfully", "id": firm_id}
 
     except HTTPException:
         raise

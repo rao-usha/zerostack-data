@@ -3,6 +3,7 @@ Site Intelligence Platform - Types and Pydantic Models.
 
 Defines enums, configuration models, and result schemas used across all collectors.
 """
+
 from datetime import datetime
 from enum import Enum
 from typing import Optional, List, Dict, Any
@@ -13,8 +14,10 @@ from pydantic import BaseModel, Field
 # ENUMS
 # =============================================================================
 
+
 class SiteIntelDomain(str, Enum):
     """Site intelligence data domains."""
+
     POWER = "power"
     TELECOM = "telecom"
     TRANSPORT = "transport"
@@ -28,6 +31,7 @@ class SiteIntelDomain(str, Enum):
 
 class SiteIntelSource(str, Enum):
     """Data sources for site intelligence."""
+
     # Power
     EIA = "eia"
     NREL = "nrel"
@@ -101,6 +105,7 @@ class SiteIntelSource(str, Enum):
 
 class CollectionStatus(str, Enum):
     """Status of a collection job."""
+
     PENDING = "pending"
     RUNNING = "running"
     SUCCESS = "success"
@@ -110,6 +115,7 @@ class CollectionStatus(str, Enum):
 
 class UseCase(str, Enum):
     """Site selection use cases for scoring."""
+
     DATA_CENTER = "data_center"
     WAREHOUSE = "warehouse"
     MANUFACTURING = "manufacturing"
@@ -121,8 +127,10 @@ class UseCase(str, Enum):
 # CONFIGURATION MODELS
 # =============================================================================
 
+
 class CollectionConfig(BaseModel):
     """Configuration for a collection job."""
+
     domain: SiteIntelDomain
     source: SiteIntelSource
     job_type: str = "full_sync"  # full_sync, incremental, single_item
@@ -136,7 +144,9 @@ class CollectionConfig(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     year: Optional[int] = None
-    since: Optional[datetime] = None  # Watermark: only collect data after this timestamp
+    since: Optional[datetime] = (
+        None  # Watermark: only collect data after this timestamp
+    )
 
     # Pagination
     limit: Optional[int] = None
@@ -148,12 +158,14 @@ class CollectionConfig(BaseModel):
 
 class GeoPoint(BaseModel):
     """Geographic point."""
+
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
 
 
 class BoundingBox(BaseModel):
     """Geographic bounding box."""
+
     min_lat: float = Field(..., ge=-90, le=90)
     max_lat: float = Field(..., ge=-90, le=90)
     min_lng: float = Field(..., ge=-180, le=180)
@@ -162,6 +174,7 @@ class BoundingBox(BaseModel):
 
 class NearbyQuery(BaseModel):
     """Query for nearby features."""
+
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
     radius_miles: float = Field(default=25, gt=0, le=500)
@@ -172,8 +185,10 @@ class NearbyQuery(BaseModel):
 # RESULT MODELS
 # =============================================================================
 
+
 class CollectionResult(BaseModel):
     """Result of a collection job."""
+
     status: CollectionStatus
     domain: SiteIntelDomain
     source: SiteIntelSource
@@ -200,6 +215,7 @@ class CollectionResult(BaseModel):
 
 class CollectionProgress(BaseModel):
     """Progress update during collection."""
+
     job_id: int
     status: CollectionStatus
     processed_items: int
@@ -213,8 +229,10 @@ class CollectionProgress(BaseModel):
 # SITE SCORING MODELS
 # =============================================================================
 
+
 class ScoringFactorWeight(BaseModel):
     """Weight configuration for a scoring factor."""
+
     factor_name: str
     weight: float = Field(..., ge=-1.0, le=1.0)  # Negative for risks
     enabled: bool = True
@@ -222,6 +240,7 @@ class ScoringFactorWeight(BaseModel):
 
 class ScoringConfig(BaseModel):
     """Configuration for site scoring."""
+
     use_case: UseCase
     factor_weights: List[ScoringFactorWeight]
     normalize_scores: bool = True
@@ -229,6 +248,7 @@ class ScoringConfig(BaseModel):
 
 class FactorScore(BaseModel):
     """Individual factor score."""
+
     factor_name: str
     raw_value: Optional[float] = None
     normalized_score: float = Field(..., ge=0, le=100)
@@ -239,6 +259,7 @@ class FactorScore(BaseModel):
 
 class SiteScoreResult(BaseModel):
     """Complete site score result."""
+
     latitude: float
     longitude: float
     use_case: UseCase
@@ -258,6 +279,7 @@ class SiteScoreResult(BaseModel):
 
 class SiteComparisonResult(BaseModel):
     """Result of comparing multiple sites."""
+
     sites: List[SiteScoreResult]
     best_overall: Optional[SiteScoreResult] = None
     best_by_factor: Optional[Dict[str, SiteScoreResult]] = None
@@ -268,8 +290,10 @@ class SiteComparisonResult(BaseModel):
 # API REQUEST/RESPONSE MODELS
 # =============================================================================
 
+
 class SiteScoreRequest(BaseModel):
     """Request to score a site."""
+
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
     use_case: UseCase = UseCase.DATA_CENTER
@@ -279,6 +303,7 @@ class SiteScoreRequest(BaseModel):
 
 class SiteCompareRequest(BaseModel):
     """Request to compare multiple sites."""
+
     locations: List[Dict[str, Any]]  # [{"name": "...", "lat": ..., "lng": ...}]
     use_case: UseCase = UseCase.DATA_CENTER
     factors: Optional[List[str]] = None
@@ -286,9 +311,12 @@ class SiteCompareRequest(BaseModel):
 
 class SiteSearchRequest(BaseModel):
     """Request to search for sites matching criteria."""
+
     use_case: UseCase = UseCase.DATA_CENTER
     region: Optional[Dict[str, Any]] = None  # {"states": [...]} or {"bbox": {...}}
-    requirements: Optional[Dict[str, Any]] = None  # {"min_acreage": 50, "rail_required": true}
+    requirements: Optional[Dict[str, Any]] = (
+        None  # {"min_acreage": 50, "rail_required": true}
+    )
     sort_by: str = "overall_score"
     limit: int = Field(default=20, gt=0, le=100)
 
@@ -297,8 +325,10 @@ class SiteSearchRequest(BaseModel):
 # INFRASTRUCTURE DETAIL MODELS
 # =============================================================================
 
+
 class PowerPlantSummary(BaseModel):
     """Summary of a power plant."""
+
     id: int
     eia_plant_id: Optional[str]
     name: str
@@ -312,6 +342,7 @@ class PowerPlantSummary(BaseModel):
 
 class SubstationSummary(BaseModel):
     """Summary of a substation."""
+
     id: int
     name: Optional[str]
     latitude: float
@@ -323,6 +354,7 @@ class SubstationSummary(BaseModel):
 
 class DataCenterSummary(BaseModel):
     """Summary of a data center facility."""
+
     id: int
     name: str
     operator: Optional[str]
@@ -336,6 +368,7 @@ class DataCenterSummary(BaseModel):
 
 class IntermodalTerminalSummary(BaseModel):
     """Summary of an intermodal terminal."""
+
     id: int
     name: str
     railroad: Optional[str]
@@ -349,6 +382,7 @@ class IntermodalTerminalSummary(BaseModel):
 
 class PortSummary(BaseModel):
     """Summary of a port."""
+
     id: int
     port_code: str
     name: str
@@ -361,6 +395,7 @@ class PortSummary(BaseModel):
 
 class AirportSummary(BaseModel):
     """Summary of an airport."""
+
     id: int
     faa_code: Optional[str]
     name: str

@@ -5,6 +5,7 @@ Eliminates boilerplate across API routers by providing a single function
 to create an IngestionJob, schedule it as a background task via the
 centralized SOURCE_DISPATCH registry, and return a standard response.
 """
+
 import logging
 from typing import Optional
 
@@ -53,6 +54,7 @@ def create_and_dispatch_job(
         db.refresh(job)
 
         from app.api.v1.jobs import run_ingestion_job
+
         background_tasks.add_task(run_ingestion_job, job.id, source, config)
 
         return {

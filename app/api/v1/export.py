@@ -3,6 +3,7 @@ Data Export API endpoints.
 
 Provides REST API for exporting table data to files.
 """
+
 import logging
 from datetime import date, datetime
 from decimal import Decimal
@@ -26,18 +27,27 @@ router = APIRouter(prefix="/export", tags=["export"])
 # Pydantic Schemas
 # =============================================================================
 
+
 class ExportJobCreate(BaseModel):
     """Schema for creating an export job."""
+
     table_name: str = Field(..., min_length=1, max_length=255)
     format: str = Field(..., description="Export format: csv, json, parquet")
-    columns: Optional[List[str]] = Field(default=None, description="Columns to export (null = all)")
-    row_limit: Optional[int] = Field(default=None, ge=1, le=10000000, description="Max rows to export")
-    filters: Optional[Dict[str, Any]] = Field(default=None, description="Filters: {date_from, date_to}")
+    columns: Optional[List[str]] = Field(
+        default=None, description="Columns to export (null = all)"
+    )
+    row_limit: Optional[int] = Field(
+        default=None, ge=1, le=10000000, description="Max rows to export"
+    )
+    filters: Optional[Dict[str, Any]] = Field(
+        default=None, description="Filters: {date_from, date_to}"
+    )
     compress: bool = Field(default=False, description="Compress output with gzip")
 
 
 class ExportJobResponse(BaseModel):
     """Response schema for an export job."""
+
     id: int
     table_name: str
     format: str
@@ -58,6 +68,7 @@ class ExportJobResponse(BaseModel):
 
 class TableInfo(BaseModel):
     """Information about an exportable table."""
+
     table_name: str
     row_count: int
     columns: List[str]
@@ -65,6 +76,7 @@ class TableInfo(BaseModel):
 
 class FormatInfo(BaseModel):
     """Information about an export format."""
+
     format: str
     description: str
     supports_compression: bool
@@ -73,6 +85,7 @@ class FormatInfo(BaseModel):
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
 
 def job_to_response(job: ExportJob) -> ExportJobResponse:
     """Convert ExportJob model to response schema."""
@@ -92,13 +105,14 @@ def job_to_response(job: ExportJob) -> ExportJobResponse:
         created_at=job.created_at.isoformat(),
         started_at=job.started_at.isoformat() if job.started_at else None,
         completed_at=job.completed_at.isoformat() if job.completed_at else None,
-        expires_at=job.expires_at.isoformat() if job.expires_at else None
+        expires_at=job.expires_at.isoformat() if job.expires_at else None,
     )
 
 
 def run_export_job(job_id: int):
     """Background task to run an export job."""
     from app.core.database import get_session_factory
+
     SessionLocal = get_session_factory()
     db = SessionLocal()
     try:
@@ -114,6 +128,7 @@ def run_export_job(job_id: int):
 # Endpoints
 # =============================================================================
 
+
 @router.get("/formats", response_model=List[FormatInfo])
 def list_formats():
     """List supported export formats."""
@@ -121,18 +136,18 @@ def list_formats():
         FormatInfo(
             format="csv",
             description="Comma-separated values with headers",
-            supports_compression=True
+            supports_compression=True,
         ),
         FormatInfo(
             format="json",
             description="JSON array of objects",
-            supports_compression=True
+            supports_compression=True,
         ),
         FormatInfo(
             format="parquet",
             description="Apache Parquet columnar format (efficient for large data)",
-            supports_compression=False  # Parquet has built-in compression
-        )
+            supports_compression=False,  # Parquet has built-in compression
+        ),
     ]
 
 
@@ -145,6 +160,7 @@ def list_tables(
     if refresh:
         from app.core.export_service import _table_cache
         import app.core.export_service as _es
+
         _es._table_cache = []
         _es._table_cache_time = 0
     service = ExportService(db)
@@ -237,7 +253,7 @@ def preview_table(
 def create_export_job(
     request: ExportJobCreate,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Create a new export job.
@@ -253,7 +269,7 @@ def create_export_job(
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid format: {request.format}. Must be one of: csv, json, parquet"
+            detail=f"Invalid format: {request.format}. Must be one of: csv, json, parquet",
         )
 
     try:
@@ -263,7 +279,7 @@ def create_export_job(
             columns=request.columns,
             row_limit=request.row_limit,
             filters=request.filters,
-            compress=request.compress
+            compress=request.compress,
         )
 
         # Run export in background
@@ -280,7 +296,7 @@ def list_export_jobs(
     status: Optional[str] = Query(default=None, description="Filter by status"),
     table_name: Optional[str] = Query(default=None, description="Filter by table"),
     limit: int = Query(default=50, ge=1, le=200),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """List export jobs with optional filtering."""
     service = ExportService(db)
@@ -323,8 +339,7 @@ def download_export(job_id: int, db: Session = Depends(get_db)):
 
     if job.status != ExportStatus.COMPLETED:
         raise HTTPException(
-            status_code=400,
-            detail=f"Export not ready. Status: {job.status.value}"
+            status_code=400, detail=f"Export not ready. Status: {job.status.value}"
         )
 
     file_path = service.get_file_path(job_id)
@@ -343,11 +358,7 @@ def download_export(job_id: int, db: Session = Depends(get_db)):
     if job.compress:
         media_type = "application/gzip"
 
-    return FileResponse(
-        path=file_path,
-        filename=job.file_name,
-        media_type=media_type
-    )
+    return FileResponse(path=file_path, filename=job.file_name, media_type=media_type)
 
 
 @router.delete("/jobs/{job_id}")

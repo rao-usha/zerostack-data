@@ -17,22 +17,41 @@ router = APIRouter(prefix="/deals", tags=["deals"])
 
 # Request/Response Models
 
+
 class CreateDealRequest(BaseModel):
     company_name: str = Field(..., description="Name of the target company")
     company_sector: Optional[str] = Field(None, description="Industry sector")
-    company_stage: Optional[str] = Field(None, description="Company stage (seed, series_a, etc.)")
+    company_stage: Optional[str] = Field(
+        None, description="Company stage (seed, series_a, etc.)"
+    )
     company_location: Optional[str] = Field(None, description="Company headquarters")
     company_website: Optional[str] = Field(None, description="Company website URL")
-    deal_type: Optional[str] = Field(None, description="Deal type (primary, secondary, co-invest)")
-    deal_size_millions: Optional[float] = Field(None, description="Expected deal size in millions")
-    valuation_millions: Optional[float] = Field(None, description="Company valuation in millions")
-    pipeline_stage: Optional[str] = Field("sourced", description="Initial pipeline stage")
-    priority: Optional[int] = Field(3, ge=1, le=5, description="Priority (1=highest, 5=lowest)")
-    fit_score: Optional[float] = Field(None, ge=0, le=100, description="Fit score 0-100")
-    source: Optional[str] = Field(None, description="Deal source (referral, inbound, etc.)")
+    deal_type: Optional[str] = Field(
+        None, description="Deal type (primary, secondary, co-invest)"
+    )
+    deal_size_millions: Optional[float] = Field(
+        None, description="Expected deal size in millions"
+    )
+    valuation_millions: Optional[float] = Field(
+        None, description="Company valuation in millions"
+    )
+    pipeline_stage: Optional[str] = Field(
+        "sourced", description="Initial pipeline stage"
+    )
+    priority: Optional[int] = Field(
+        3, ge=1, le=5, description="Priority (1=highest, 5=lowest)"
+    )
+    fit_score: Optional[float] = Field(
+        None, ge=0, le=100, description="Fit score 0-100"
+    )
+    source: Optional[str] = Field(
+        None, description="Deal source (referral, inbound, etc.)"
+    )
     source_contact: Optional[str] = Field(None, description="Source contact name")
     assigned_to: Optional[str] = Field(None, description="Assigned team member")
-    tags: Optional[List[str]] = Field(default_factory=list, description="Tags for categorization")
+    tags: Optional[List[str]] = Field(
+        default_factory=list, description="Tags for categorization"
+    )
 
 
 class UpdateDealRequest(BaseModel):
@@ -54,15 +73,22 @@ class UpdateDealRequest(BaseModel):
 
 
 class AddActivityRequest(BaseModel):
-    activity_type: str = Field(..., description="Type: note, meeting, call, email, document")
+    activity_type: str = Field(
+        ..., description="Type: note, meeting, call, email, document"
+    )
     title: Optional[str] = Field(None, description="Activity title")
     description: Optional[str] = Field(None, description="Activity details")
-    meeting_date: Optional[datetime] = Field(None, description="Meeting date/time if applicable")
-    attendees: Optional[List[str]] = Field(default_factory=list, description="Meeting attendees")
+    meeting_date: Optional[datetime] = Field(
+        None, description="Meeting date/time if applicable"
+    )
+    attendees: Optional[List[str]] = Field(
+        default_factory=list, description="Meeting attendees"
+    )
     created_by: Optional[str] = Field(None, description="User who created the activity")
 
 
 # Endpoints
+
 
 @router.post("")
 def create_deal(request: CreateDealRequest):
@@ -81,7 +107,9 @@ def create_deal(request: CreateDealRequest):
 @router.get("")
 def list_deals(
     pipeline_stage: Optional[str] = Query(None, description="Filter by pipeline stage"),
-    company_sector: Optional[str] = Query(None, description="Filter by sector (partial match)"),
+    company_sector: Optional[str] = Query(
+        None, description="Filter by sector (partial match)"
+    ),
     assigned_to: Optional[str] = Query(None, description="Filter by assignee"),
     priority: Optional[int] = Query(None, ge=1, le=5, description="Filter by priority"),
     limit: int = Query(50, ge=1, le=200, description="Results per page"),
@@ -119,12 +147,36 @@ def get_pipeline_stages():
     """Get list of valid pipeline stages."""
     return {
         "stages": [
-            {"id": "sourced", "name": "Sourced", "description": "Initial opportunity identified"},
-            {"id": "reviewing", "name": "Reviewing", "description": "Initial review/screening"},
-            {"id": "due_diligence", "name": "Due Diligence", "description": "Active due diligence"},
-            {"id": "negotiation", "name": "Negotiation", "description": "Terms negotiation"},
-            {"id": "closed_won", "name": "Closed Won", "description": "Investment made"},
-            {"id": "closed_lost", "name": "Closed Lost", "description": "Did not invest"},
+            {
+                "id": "sourced",
+                "name": "Sourced",
+                "description": "Initial opportunity identified",
+            },
+            {
+                "id": "reviewing",
+                "name": "Reviewing",
+                "description": "Initial review/screening",
+            },
+            {
+                "id": "due_diligence",
+                "name": "Due Diligence",
+                "description": "Active due diligence",
+            },
+            {
+                "id": "negotiation",
+                "name": "Negotiation",
+                "description": "Terms negotiation",
+            },
+            {
+                "id": "closed_won",
+                "name": "Closed Won",
+                "description": "Investment made",
+            },
+            {
+                "id": "closed_lost",
+                "name": "Closed Lost",
+                "description": "Did not invest",
+            },
             {"id": "passed", "name": "Passed", "description": "Decided not to pursue"},
         ]
     }

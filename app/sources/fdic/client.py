@@ -15,6 +15,7 @@ Rate limits:
 - No documented rate limits, but we use conservative defaults
 - Max 10,000 records per request (pagination required for larger sets)
 """
+
 import logging
 from typing import Dict, List, Optional, Any
 
@@ -43,7 +44,7 @@ class FDICClient(BaseAPIClient):
         self,
         max_concurrency: int = 3,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize FDIC BankFind API client.
@@ -62,14 +63,14 @@ class FDICClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=config.timeout_seconds,
             connect_timeout=config.connect_timeout_seconds,
-            rate_limit_interval=config.get_rate_limit_interval()
+            rate_limit_interval=config.get_rate_limit_interval(),
         )
 
     def _build_headers(self) -> Dict[str, str]:
         """Build request headers."""
         return {
             "User-Agent": "Nexdata External Data Ingestion Service (FDIC BankFind)",
-            "Accept": "application/json"
+            "Accept": "application/json",
         }
 
     async def get_bank_financials(
@@ -84,7 +85,7 @@ class FDICClient(BaseAPIClient):
         agg_by: Optional[str] = None,
         agg_term_fields: Optional[str] = None,
         agg_sum_fields: Optional[str] = None,
-        agg_limit: int = 100
+        agg_limit: int = 100,
     ) -> Dict[str, Any]:
         """
         Fetch bank financial data (balance sheet, income statement).
@@ -110,7 +111,7 @@ class FDICClient(BaseAPIClient):
             "sort_order": sort_order,
             "limit": min(limit, self.MAX_LIMIT),
             "offset": offset,
-            "format": "json"
+            "format": "json",
         }
 
         if cert is not None:
@@ -138,7 +139,7 @@ class FDICClient(BaseAPIClient):
         filters: Optional[str] = None,
         fields: Optional[str] = None,
         sort_by: str = "REPDTE",
-        sort_order: str = "DESC"
+        sort_order: str = "DESC",
     ) -> List[Dict[str, Any]]:
         """Fetch all bank financial data with automatic pagination."""
         all_data = []
@@ -153,7 +154,7 @@ class FDICClient(BaseAPIClient):
                 sort_by=sort_by,
                 sort_order=sort_order,
                 limit=self.MAX_LIMIT,
-                offset=offset
+                offset=offset,
             )
 
             data = response.get("data", [])
@@ -182,7 +183,7 @@ class FDICClient(BaseAPIClient):
         sort_by: str = "NAME",
         sort_order: str = "ASC",
         limit: int = DEFAULT_LIMIT,
-        offset: int = 0
+        offset: int = 0,
     ) -> Dict[str, Any]:
         """
         Fetch bank institution demographics data.
@@ -205,7 +206,7 @@ class FDICClient(BaseAPIClient):
             "sort_order": sort_order,
             "limit": min(limit, self.MAX_LIMIT),
             "offset": offset,
-            "format": "json"
+            "format": "json",
         }
 
         if cert is not None:
@@ -228,7 +229,7 @@ class FDICClient(BaseAPIClient):
         search: Optional[str] = None,
         sort_by: str = "NAME",
         sort_order: str = "ASC",
-        active_only: bool = True
+        active_only: bool = True,
     ) -> List[Dict[str, Any]]:
         """Fetch all bank institutions with automatic pagination."""
         if active_only:
@@ -249,7 +250,7 @@ class FDICClient(BaseAPIClient):
                 sort_by=sort_by,
                 sort_order=sort_order,
                 limit=self.MAX_LIMIT,
-                offset=offset
+                offset=offset,
             )
 
             data = response.get("data", [])
@@ -276,7 +277,7 @@ class FDICClient(BaseAPIClient):
         sort_by: str = "FAILDATE",
         sort_order: str = "DESC",
         limit: int = DEFAULT_LIMIT,
-        offset: int = 0
+        offset: int = 0,
     ) -> Dict[str, Any]:
         """
         Fetch failed banks list.
@@ -297,7 +298,7 @@ class FDICClient(BaseAPIClient):
             "sort_order": sort_order,
             "limit": min(limit, self.MAX_LIMIT),
             "offset": offset,
-            "format": "json"
+            "format": "json",
         }
 
         if filters:
@@ -313,7 +314,7 @@ class FDICClient(BaseAPIClient):
         filters: Optional[str] = None,
         fields: Optional[str] = None,
         sort_by: str = "FAILDATE",
-        sort_order: str = "DESC"
+        sort_order: str = "DESC",
     ) -> List[Dict[str, Any]]:
         """Fetch all failed banks with automatic pagination."""
         all_data = []
@@ -327,7 +328,7 @@ class FDICClient(BaseAPIClient):
                 sort_by=sort_by,
                 sort_order=sort_order,
                 limit=self.MAX_LIMIT,
-                offset=offset
+                offset=offset,
             )
 
             data = response.get("data", [])
@@ -355,7 +356,7 @@ class FDICClient(BaseAPIClient):
         sort_by: str = "YEAR",
         sort_order: str = "DESC",
         limit: int = DEFAULT_LIMIT,
-        offset: int = 0
+        offset: int = 0,
     ) -> Dict[str, Any]:
         """
         Fetch Summary of Deposits (SOD) data - branch level deposit data.
@@ -377,7 +378,7 @@ class FDICClient(BaseAPIClient):
             "sort_order": sort_order,
             "limit": min(limit, self.MAX_LIMIT),
             "offset": offset,
-            "format": "json"
+            "format": "json",
         }
 
         if cert is not None:
@@ -397,7 +398,7 @@ class FDICClient(BaseAPIClient):
         fields: Optional[str] = None,
         year: Optional[int] = None,
         sort_by: str = "YEAR",
-        sort_order: str = "DESC"
+        sort_order: str = "DESC",
     ) -> List[Dict[str, Any]]:
         """Fetch all Summary of Deposits data with automatic pagination."""
         if year:
@@ -419,7 +420,7 @@ class FDICClient(BaseAPIClient):
                 sort_by=sort_by,
                 sort_order=sort_order,
                 limit=self.MAX_LIMIT,
-                offset=offset
+                offset=offset,
             )
 
             data = response.get("data", [])
@@ -440,10 +441,7 @@ class FDICClient(BaseAPIClient):
         return all_data
 
     async def search_banks(
-        self,
-        query: str,
-        active_only: bool = True,
-        limit: int = 100
+        self, query: str, active_only: bool = True, limit: int = 100
     ) -> List[Dict[str, Any]]:
         """
         Search for banks by name, city, or other text.
@@ -459,9 +457,7 @@ class FDICClient(BaseAPIClient):
         filters = "ACTIVE:1" if active_only else None
 
         response = await self.get_institutions(
-            search=query,
-            filters=filters,
-            limit=min(limit, self.MAX_LIMIT)
+            search=query, filters=filters, limit=min(limit, self.MAX_LIMIT)
         )
 
         return response.get("data", [])

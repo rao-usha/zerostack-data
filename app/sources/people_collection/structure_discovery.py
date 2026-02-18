@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DiscoveredUnit:
     """A discovered business unit / subsidiary / division."""
+
     name: str
     description: str = ""
     parent_name: str = ""
@@ -46,17 +47,17 @@ class DiscoveredUnit:
 
 # Shell company / holding company name patterns to skip
 SKIP_PATTERNS = [
-    r'\bholding\b.*\b(corp|co|company|inc|llc)\b',
-    r'\b(trust|trustees?)\b',
-    r'\bfunding\b',
-    r'\bcapital\s*(markets?\s*)?(corp|co|company|inc|llc)\b',
-    r'\bfinancial\s*products?\s*(corp|co|company|inc|llc)\b',
-    r'\b(re)?insurance\s*(corp|co|company|inc|llc)\b',
-    r'\binternational\s*(holdings?)\b',
-    r'\bglobal\s*funding\b',
-    r'\bsecurities\s*(corp|co|company|inc|llc)\b',
-    r'\bassignment\b',
-    r'\bconduit\b',
+    r"\bholding\b.*\b(corp|co|company|inc|llc)\b",
+    r"\b(trust|trustees?)\b",
+    r"\bfunding\b",
+    r"\bcapital\s*(markets?\s*)?(corp|co|company|inc|llc)\b",
+    r"\bfinancial\s*products?\s*(corp|co|company|inc|llc)\b",
+    r"\b(re)?insurance\s*(corp|co|company|inc|llc)\b",
+    r"\binternational\s*(holdings?)\b",
+    r"\bglobal\s*funding\b",
+    r"\bsecurities\s*(corp|co|company|inc|llc)\b",
+    r"\bassignment\b",
+    r"\bconduit\b",
 ]
 
 
@@ -81,6 +82,7 @@ class StructureDiscoveryAgent(BaseCollector):
         """Lazy init filing fetcher."""
         if self._filing_fetcher is None:
             from app.sources.people_collection.filing_fetcher import FilingFetcher
+
             self._filing_fetcher = FilingFetcher()
         return self._filing_fetcher
 
@@ -101,9 +103,11 @@ class StructureDiscoveryAgent(BaseCollector):
         Returns:
             List of discovered business units
         """
-        company = db_session.query(IndustrialCompany).filter(
-            IndustrialCompany.id == company_id
-        ).first()
+        company = (
+            db_session.query(IndustrialCompany)
+            .filter(IndustrialCompany.id == company_id)
+            .first()
+        )
 
         if not company:
             logger.error(f"[StructureDiscovery] Company {company_id} not found")
@@ -119,9 +123,7 @@ class StructureDiscoveryAgent(BaseCollector):
         # Source 1: SEC Exhibit 21
         if company.cik:
             try:
-                exhibit_units = await self._parse_exhibit_21(
-                    company.cik, company.name
-                )
+                exhibit_units = await self._parse_exhibit_21(company.cik, company.name)
                 logger.info(
                     f"[StructureDiscovery] Exhibit 21: found {len(exhibit_units)} units"
                 )
@@ -145,9 +147,7 @@ class StructureDiscoveryAgent(BaseCollector):
         # Source 3: LLM general knowledge
         try:
             llm_units = await self._discover_from_llm(company.name)
-            logger.info(
-                f"[StructureDiscovery] LLM: found {len(llm_units)} units"
-            )
+            logger.info(f"[StructureDiscovery] LLM: found {len(llm_units)} units")
             all_sources.append(llm_units)
         except Exception as e:
             logger.warning(f"[StructureDiscovery] LLM discovery failed: {e}")
@@ -213,7 +213,7 @@ class StructureDiscoveryAgent(BaseCollector):
             f"- description: Brief description based on the name (e.g., 'investment management')\n"
             f"- is_major: true if this appears to be a major operating entity "
             f"(not a shell company, funding vehicle, or holding company)\n\n"
-            f"Return JSON: {{\"subsidiaries\": [...]}}\n\n"
+            f'Return JSON: {{"subsidiaries": [...]}}\n\n'
             f"Exhibit 21 text:\n{exhibit_text[:15000]}\n\n"
             f"Return ONLY valid JSON, no markdown."
         )
@@ -235,15 +235,17 @@ class StructureDiscoveryAgent(BaseCollector):
             if not name or name.lower() == company_name.lower():
                 continue
 
-            units.append(DiscoveredUnit(
-                name=name,
-                description=sub.get("description", ""),
-                parent_name=company_name,
-                jurisdiction=sub.get("jurisdiction"),
-                ownership_pct=sub.get("ownership_pct", 100),
-                unit_type="subsidiary",
-                source="exhibit_21",
-            ))
+            units.append(
+                DiscoveredUnit(
+                    name=name,
+                    description=sub.get("description", ""),
+                    parent_name=company_name,
+                    jurisdiction=sub.get("jurisdiction"),
+                    ownership_pct=sub.get("ownership_pct", 100),
+                    unit_type="subsidiary",
+                    source="exhibit_21",
+                )
+            )
 
         return units
 
@@ -253,10 +255,10 @@ class StructureDiscoveryAgent(BaseCollector):
 
         # Try various markers for Exhibit 21
         markers = [
-            r'exhibit\s*21',
-            r'subsidiaries\s*of\s*(?:the\s*)?(?:registrant|company)',
-            r'list\s*of\s*subsidiaries',
-            r'significant\s*subsidiaries',
+            r"exhibit\s*21",
+            r"subsidiaries\s*of\s*(?:the\s*)?(?:registrant|company)",
+            r"list\s*of\s*subsidiaries",
+            r"significant\s*subsidiaries",
         ]
 
         best_start = None
@@ -274,10 +276,10 @@ class StructureDiscoveryAgent(BaseCollector):
 
         # Find end: next exhibit marker, or limit to reasonable length
         end_markers = [
-            r'exhibit\s*2[2-9]',
-            r'exhibit\s*[3-9]',
-            r'signatures?\s*$',
-            r'pursuant\s*to\s*the\s*requirements',
+            r"exhibit\s*2[2-9]",
+            r"exhibit\s*[3-9]",
+            r"signatures?\s*$",
+            r"pursuant\s*to\s*the\s*requirements",
         ]
 
         end_pos = len(text)
@@ -286,11 +288,11 @@ class StructureDiscoveryAgent(BaseCollector):
             if match and match.start() > 100:  # Don't clip too early
                 end_pos = min(end_pos, match.start())
 
-        text = text[:min(end_pos, 30000)]
+        text = text[: min(end_pos, 30000)]
 
         # Clean HTML tags for readability
-        text = re.sub(r'<[^>]+>', ' ', text)
-        text = re.sub(r'\s+', ' ', text).strip()
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
 
         return text if len(text) > 50 else None
 
@@ -307,7 +309,9 @@ class StructureDiscoveryAgent(BaseCollector):
 
         domain = urlparse(website).netloc
         if not domain:
-            domain = website.replace("https://", "").replace("http://", "").split("/")[0]
+            domain = (
+                website.replace("https://", "").replace("http://", "").split("/")[0]
+            )
 
         # Try both with and without www prefix
         domains_to_try = [domain]
@@ -319,13 +323,15 @@ class StructureDiscoveryAgent(BaseCollector):
         candidate_urls = []
         for d in domains_to_try:
             base = f"https://{d}"
-            candidate_urls.extend([
-                f"{base}/about",
-                f"{base}/about/our-businesses",
-                f"{base}/about/businesses",
-                f"{base}/businesses",
-                f"{base}/our-businesses",
-            ])
+            candidate_urls.extend(
+                [
+                    f"{base}/about",
+                    f"{base}/about/our-businesses",
+                    f"{base}/about/businesses",
+                    f"{base}/businesses",
+                    f"{base}/our-businesses",
+                ]
+            )
 
         all_text = []
         for url in candidate_urls:
@@ -333,10 +339,10 @@ class StructureDiscoveryAgent(BaseCollector):
                 content = await self.fetch_url(url, cache_ttl_seconds=7200)
                 if content and len(content) > 500:
                     # Clean HTML
-                    cleaned = re.sub(r'<script[^>]*>[\s\S]*?</script>', '', content)
-                    cleaned = re.sub(r'<style[^>]*>[\s\S]*?</style>', '', cleaned)
-                    cleaned = re.sub(r'<[^>]+>', ' ', cleaned)
-                    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+                    cleaned = re.sub(r"<script[^>]*>[\s\S]*?</script>", "", content)
+                    cleaned = re.sub(r"<style[^>]*>[\s\S]*?</style>", "", cleaned)
+                    cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+                    cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
                     if len(cleaned) > 200:
                         all_text.append(f"--- Page: {url} ---\n{cleaned[:5000]}")
@@ -363,7 +369,7 @@ class StructureDiscoveryAgent(BaseCollector):
             f"- unit_type: 'division', 'subsidiary', or 'affiliate'\n\n"
             f"Only include substantial operating entities, not products or campaigns.\n\n"
             f"Web content:\n{combined_text[:12000]}\n\n"
-            f"Return JSON: {{\"units\": [...]}}\n"
+            f'Return JSON: {{"units": [...]}}\n'
             f"Return ONLY valid JSON, no markdown."
         )
 
@@ -391,15 +397,17 @@ class StructureDiscoveryAgent(BaseCollector):
                 except Exception:
                     pass
 
-            units.append(DiscoveredUnit(
-                name=name,
-                description=u.get("description", ""),
-                parent_name=company_name,
-                website=unit_website,
-                domains=domains,
-                unit_type=u.get("unit_type", "division"),
-                source="website",
-            ))
+            units.append(
+                DiscoveredUnit(
+                    name=name,
+                    description=u.get("description", ""),
+                    parent_name=company_name,
+                    website=unit_website,
+                    domains=domains,
+                    unit_type=u.get("unit_type", "division"),
+                    source="website",
+                )
+            )
 
         return units
 
@@ -424,7 +432,7 @@ class StructureDiscoveryAgent(BaseCollector):
             f"Focus on major operating entities with their own leadership teams. "
             f"Do not include shell companies, holding companies, or inactive entities.\n"
             f"Include up to 25 entities.\n\n"
-            f"Return JSON: {{\"units\": [...]}}\n"
+            f'Return JSON: {{"units": [...]}}\n'
             f"Return ONLY valid JSON, no markdown."
         )
 
@@ -454,16 +462,18 @@ class StructureDiscoveryAgent(BaseCollector):
                 except Exception:
                     pass
 
-            units.append(DiscoveredUnit(
-                name=name,
-                description=u.get("description", ""),
-                parent_name=u.get("parent_name", company_name),
-                website=unit_website,
-                domains=domains,
-                unit_type=u.get("unit_type", "subsidiary"),
-                is_public=u.get("is_public", False),
-                source="llm",
-            ))
+            units.append(
+                DiscoveredUnit(
+                    name=name,
+                    description=u.get("description", ""),
+                    parent_name=u.get("parent_name", company_name),
+                    website=unit_website,
+                    domains=domains,
+                    unit_type=u.get("unit_type", "subsidiary"),
+                    is_public=u.get("is_public", False),
+                    source="llm",
+                )
+            )
 
         return units
 
@@ -532,9 +542,20 @@ class StructureDiscoveryAgent(BaseCollector):
         name = name.lower().strip()
         # Remove common suffixes
         for suffix in [
-            " inc", " inc.", " llc", " corp", " corporation",
-            " company", " co", " co.", " ltd", " limited",
-            " group", " holdings", ",", "."
+            " inc",
+            " inc.",
+            " llc",
+            " corp",
+            " corporation",
+            " company",
+            " co",
+            " co.",
+            " ltd",
+            " limited",
+            " group",
+            " holdings",
+            ",",
+            ".",
         ]:
             name = name.replace(suffix, "")
         return name.strip()
@@ -582,10 +603,14 @@ class StructureDiscoveryAgent(BaseCollector):
 
         for unit in units:
             # Check if already exists (by name match under same parent)
-            existing = db_session.query(IndustrialCompany).filter(
-                IndustrialCompany.parent_company_id == parent_id,
-                IndustrialCompany.name == unit.name,
-            ).first()
+            existing = (
+                db_session.query(IndustrialCompany)
+                .filter(
+                    IndustrialCompany.parent_company_id == parent_id,
+                    IndustrialCompany.name == unit.name,
+                )
+                .first()
+            )
 
             if existing:
                 # Update fields that may be new
@@ -603,7 +628,9 @@ class StructureDiscoveryAgent(BaseCollector):
                     parent_company_id=parent_id,
                     is_subsidiary=True,
                     ownership_type=unit.unit_type,
-                    industry_segment=unit.description[:200] if unit.description else None,
+                    industry_segment=unit.description[:200]
+                    if unit.description
+                    else None,
                     status="active",
                 )
                 db_session.add(new_company)

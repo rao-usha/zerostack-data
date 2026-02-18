@@ -3,6 +3,7 @@ FRED ingestion orchestration.
 
 High-level functions that coordinate data fetching, table creation, and data loading.
 """
+
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
@@ -46,7 +47,7 @@ class FREDIngestor(BaseSourceIngestor):
         category: str,
         series_ids: Optional[List[str]] = None,
         observation_start: Optional[str] = None,
-        observation_end: Optional[str] = None
+        observation_end: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Ingest FRED category data into Postgres.
@@ -65,7 +66,7 @@ class FREDIngestor(BaseSourceIngestor):
             api_key=self.api_key,
             max_concurrency=self.settings.max_concurrency,
             max_retries=self.settings.max_retries,
-            backoff_factor=self.settings.retry_backoff_factor
+            backoff_factor=self.settings.retry_backoff_factor,
         )
 
         try:
@@ -84,9 +85,13 @@ class FREDIngestor(BaseSourceIngestor):
 
             # Validate date formats
             if not metadata.validate_date_format(observation_start):
-                raise ValueError(f"Invalid start date format: {observation_start}. Use YYYY-MM-DD")
+                raise ValueError(
+                    f"Invalid start date format: {observation_start}. Use YYYY-MM-DD"
+                )
             if not metadata.validate_date_format(observation_end):
-                raise ValueError(f"Invalid end date format: {observation_end}. Use YYYY-MM-DD")
+                raise ValueError(
+                    f"Invalid end date format: {observation_end}. Use YYYY-MM-DD"
+                )
 
             logger.info(
                 f"Ingesting FRED {category}: "
@@ -106,8 +111,8 @@ class FREDIngestor(BaseSourceIngestor):
                 source_metadata={
                     "category": category,
                     "series_ids": series_ids,
-                    "series_count": len(series_ids)
-                }
+                    "series_count": len(series_ids),
+                },
             )
 
             # 4. Fetch data from FRED API
@@ -121,7 +126,7 @@ class FREDIngestor(BaseSourceIngestor):
                     api_response = await client.get_series_observations(
                         series_id=series_id,
                         observation_start=observation_start,
-                        observation_end=observation_end
+                        observation_end=observation_end,
                     )
                     parsed = metadata.parse_observations(api_response, series_id)
                     all_parsed_data[series_id] = parsed
@@ -144,10 +149,16 @@ class FREDIngestor(BaseSourceIngestor):
                     db=self.db,
                     table_name=table_name,
                     rows=rows,
-                    columns=["series_id", "date", "value", "realtime_start", "realtime_end"],
+                    columns=[
+                        "series_id",
+                        "date",
+                        "value",
+                        "realtime_start",
+                        "realtime_end",
+                    ],
                     conflict_columns=["series_id", "date"],
                     update_columns=["value", "realtime_start", "realtime_end"],
-                    batch_size=1000
+                    batch_size=1000,
                 )
                 rows_inserted = result.rows_inserted
 
@@ -159,7 +170,7 @@ class FREDIngestor(BaseSourceIngestor):
                 "category": category,
                 "series_count": len(series_ids),
                 "rows_inserted": rows_inserted,
-                "date_range": f"{observation_start} to {observation_end}"
+                "date_range": f"{observation_start} to {observation_end}",
             }
 
         except Exception as e:
@@ -175,10 +186,9 @@ class FREDIngestor(BaseSourceIngestor):
 # CONVENIENCE FUNCTIONS (backward compatibility)
 # =============================================================================
 
+
 async def prepare_table_for_fred_category(
-    db: Session,
-    category: str,
-    series_ids: List[str]
+    db: Session, category: str, series_ids: List[str]
 ) -> Dict[str, Any]:
     """
     Prepare database table for FRED data ingestion.
@@ -198,8 +208,8 @@ async def prepare_table_for_fred_category(
         source_metadata={
             "category": category,
             "series_ids": series_ids,
-            "series_count": len(series_ids)
-        }
+            "series_count": len(series_ids),
+        },
     )
 
 
@@ -210,7 +220,7 @@ async def ingest_fred_category(
     series_ids: Optional[List[str]] = None,
     observation_start: Optional[str] = None,
     observation_end: Optional[str] = None,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Ingest FRED category data into Postgres.
@@ -223,7 +233,7 @@ async def ingest_fred_category(
         category=category,
         series_ids=series_ids,
         observation_start=observation_start,
-        observation_end=observation_end
+        observation_end=observation_end,
     )
 
 
@@ -232,7 +242,7 @@ async def ingest_all_fred_categories(
     categories: List[str],
     observation_start: Optional[str] = None,
     observation_end: Optional[str] = None,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Ingest multiple FRED categories.
@@ -254,7 +264,7 @@ async def ingest_all_fred_categories(
                 "category": category,
                 "observation_start": observation_start,
                 "observation_end": observation_end,
-            }
+            },
         )
 
         try:
@@ -262,21 +272,13 @@ async def ingest_all_fred_categories(
                 job_id=job.id,
                 category=category,
                 observation_start=observation_start,
-                observation_end=observation_end
+                observation_end=observation_end,
             )
 
-            results[category] = {
-                "status": "success",
-                "job_id": job.id,
-                **result
-            }
+            results[category] = {"status": "success", "job_id": job.id, **result}
 
         except Exception as e:
             logger.error(f"Failed to ingest {category}: {e}")
-            results[category] = {
-                "status": "failed",
-                "job_id": job.id,
-                "error": str(e)
-            }
+            results[category] = {"status": "failed", "job_id": job.id, "error": str(e)}
 
     return results

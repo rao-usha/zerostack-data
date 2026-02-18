@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class RiskLevel(str, Enum):
     """Risk level classifications."""
+
     LOW = "low"
     MODERATE = "moderate"
     HIGH = "high"
@@ -30,6 +31,7 @@ class RiskLevel(str, Enum):
 
 class DDStatus(str, Enum):
     """Due diligence job status."""
+
     PENDING = "pending"
     RESEARCHING = "researching"
     ANALYZING = "analyzing"
@@ -40,6 +42,7 @@ class DDStatus(str, Enum):
 
 class RedFlagCategory(str, Enum):
     """Red flag categories."""
+
     LEGAL = "legal"
     FINANCIAL = "financial"
     TEAM = "team"
@@ -87,11 +90,19 @@ class DueDiligenceAgent:
             (r"product recall|safety issue", "medium", "Product recall"),
             (r"service outage|downtime|disruption", "low", "Service disruption"),
             (r"quality issue|defect|complaint", "low", "Quality concerns"),
-            (r"supply chain (issue|disruption|problem)", "medium", "Supply chain issues"),
+            (
+                r"supply chain (issue|disruption|problem)",
+                "medium",
+                "Supply chain issues",
+            ),
         ],
         RedFlagCategory.COMPETITIVE: [
             (r"market share (loss|decline|drop)", "medium", "Market share loss"),
-            (r"losing to competitor|competitor gains", "medium", "Competitive pressure"),
+            (
+                r"losing to competitor|competitor gains",
+                "medium",
+                "Competitive pressure",
+            ),
             (r"pricing pressure|margin compression", "medium", "Pricing pressure"),
             (r"disrupted by|disruption from", "medium", "Market disruption"),
         ],
@@ -191,7 +202,14 @@ class DueDiligenceAgent:
                 "template_id": "standard",
                 "name": "Standard Due Diligence",
                 "description": "Comprehensive DD covering all major areas",
-                "sections": ["financial", "team", "legal", "competitive", "market", "operational"],
+                "sections": [
+                    "financial",
+                    "team",
+                    "legal",
+                    "competitive",
+                    "market",
+                    "operational",
+                ],
                 "is_default": True,
             },
             {
@@ -205,7 +223,16 @@ class DueDiligenceAgent:
                 "template_id": "deep",
                 "name": "Deep Dive",
                 "description": "Exhaustive analysis for major investments",
-                "sections": ["financial", "team", "legal", "competitive", "market", "operational", "technical", "esg"],
+                "sections": [
+                    "financial",
+                    "team",
+                    "legal",
+                    "competitive",
+                    "market",
+                    "operational",
+                    "technical",
+                    "esg",
+                ],
                 "is_default": False,
             },
         ]
@@ -217,19 +244,23 @@ class DueDiligenceAgent:
                     VALUES (:template_id, :name, :description, :sections, :is_default)
                     ON CONFLICT (template_id) DO NOTHING
                 """)
-                self.db.execute(insert, {
-                    "template_id": t["template_id"],
-                    "name": t["name"],
-                    "description": t["description"],
-                    "sections": json.dumps(t["sections"]),
-                    "is_default": t["is_default"],
-                })
+                self.db.execute(
+                    insert,
+                    {
+                        "template_id": t["template_id"],
+                        "name": t["name"],
+                        "description": t["description"],
+                        "sections": json.dumps(t["sections"]),
+                        "is_default": t["is_default"],
+                    },
+                )
             except Exception:
                 pass
 
     def _generate_job_id(self) -> str:
         """Generate unique DD job ID."""
         import uuid
+
         return f"dd_{uuid.uuid4().hex[:12]}"
 
     def start_diligence(
@@ -237,7 +268,7 @@ class DueDiligenceAgent:
         company_name: str,
         domain: Optional[str] = None,
         template: str = "standard",
-        focus_areas: Optional[List[str]] = None
+        focus_areas: Optional[List[str]] = None,
     ) -> str:
         """
         Start due diligence process for a company.
@@ -259,18 +290,22 @@ class DueDiligenceAgent:
             VALUES (:job_id, :company_name, :template, 'pending')
         """)
 
-        self.db.execute(insert_query, {
-            "job_id": job_id,
-            "company_name": company_name,
-            "template": template,
-        })
+        self.db.execute(
+            insert_query,
+            {
+                "job_id": job_id,
+                "company_name": company_name,
+                "template": template,
+            },
+        )
         self.db.commit()
 
         # Run DD in background thread
         import threading
+
         thread = threading.Thread(
             target=self._run_diligence_sync,
-            args=(job_id, company_name, domain, template, focus_areas)
+            args=(job_id, company_name, domain, template, focus_areas),
         )
         thread.daemon = True
         thread.start()
@@ -283,7 +318,7 @@ class DueDiligenceAgent:
         company_name: str,
         domain: Optional[str],
         template: str,
-        focus_areas: Optional[List[str]]
+        focus_areas: Optional[List[str]],
     ) -> None:
         """Execute DD process synchronously (for threading)."""
         import asyncio
@@ -306,18 +341,23 @@ class DueDiligenceAgent:
             asyncio.set_event_loop(loop)
             try:
                 loop.run_until_complete(
-                    thread_agent._run_diligence(job_id, company_name, domain, template, focus_areas)
+                    thread_agent._run_diligence(
+                        job_id, company_name, domain, template, focus_areas
+                    )
                 )
             finally:
                 loop.close()
         except Exception as e:
             logger.error(f"DD thread failed: {e}")
             try:
-                db.execute(text("""
+                db.execute(
+                    text("""
                     UPDATE diligence_jobs
                     SET status = 'failed', error_message = :error, completed_at = NOW()
                     WHERE job_id = :job_id
-                """), {"job_id": job_id, "error": str(e)})
+                """),
+                    {"job_id": job_id, "error": str(e)},
+                )
                 db.commit()
             except Exception:
                 pass
@@ -330,7 +370,7 @@ class DueDiligenceAgent:
         company_name: str,
         domain: Optional[str],
         template: str,
-        focus_areas: Optional[List[str]]
+        focus_areas: Optional[List[str]],
     ) -> None:
         """Execute the due diligence process."""
         phases_completed = []
@@ -340,14 +380,16 @@ class DueDiligenceAgent:
 
         # Start company research using T41
         research_job_id = self.research_agent.start_research(
-            company_name=company_name,
-            domain=domain
+            company_name=company_name, domain=domain
         )
 
         # Update with research job ID
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             UPDATE diligence_jobs SET research_job_id = :rid WHERE job_id = :jid
-        """), {"rid": research_job_id, "jid": job_id})
+        """),
+            {"rid": research_job_id, "jid": job_id},
+        )
         self.db.commit()
 
         # Wait for research to complete (poll)
@@ -381,7 +423,9 @@ class DueDiligenceAgent:
 
         # Phase 4: Generate memo
         self._update_status(job_id, DDStatus.GENERATING, 0.9, phases_completed)
-        memo = self._generate_memo(company_name, findings, red_flags, risk_score, risk_level)
+        memo = self._generate_memo(
+            company_name, findings, red_flags, risk_score, risk_level
+        )
         phases_completed.append("memo")
 
         # Save results
@@ -399,15 +443,18 @@ class DueDiligenceAgent:
             WHERE job_id = :job_id
         """)
 
-        self.db.execute(final_update, {
-            "job_id": job_id,
-            "phases": json.dumps(phases_completed),
-            "risk_score": risk_score,
-            "risk_level": risk_level,
-            "red_flags": json.dumps(red_flags),
-            "findings": json.dumps(findings),
-            "memo": json.dumps(memo),
-        })
+        self.db.execute(
+            final_update,
+            {
+                "job_id": job_id,
+                "phases": json.dumps(phases_completed),
+                "risk_score": risk_score,
+                "risk_level": risk_level,
+                "red_flags": json.dumps(red_flags),
+                "findings": json.dumps(findings),
+                "memo": json.dumps(memo),
+            },
+        )
         self.db.commit()
 
         # Cache the result
@@ -453,10 +500,7 @@ class DueDiligenceAgent:
         return ["financial", "team", "legal", "competitive", "market", "operational"]
 
     async def _analyze_section(
-        self,
-        section: str,
-        company_name: str,
-        profile: Dict
+        self, section: str, company_name: str, profile: Dict
     ) -> Tuple[Dict, List[Dict]]:
         """Analyze a specific DD section."""
         findings = {
@@ -482,7 +526,9 @@ class DueDiligenceAgent:
 
         return findings, flags
 
-    async def _analyze_financial(self, company_name: str, profile: Dict) -> Tuple[Dict, List]:
+    async def _analyze_financial(
+        self, company_name: str, profile: Dict
+    ) -> Tuple[Dict, List]:
         """Analyze financial health."""
         findings = {
             "score": 50,
@@ -521,20 +567,24 @@ class DueDiligenceAgent:
             growth = health_score.get("growth", 50)
 
             if stability < 40:
-                flags.append({
-                    "category": "financial",
-                    "severity": "medium",
-                    "signal": f"Low stability score ({stability}/100)",
-                    "source": "scoring_model",
-                })
+                flags.append(
+                    {
+                        "category": "financial",
+                        "severity": "medium",
+                        "signal": f"Low stability score ({stability}/100)",
+                        "source": "scoring_model",
+                    }
+                )
 
             if growth < 30:
-                flags.append({
-                    "category": "financial",
-                    "severity": "medium",
-                    "signal": f"Low growth score ({growth}/100)",
-                    "source": "scoring_model",
-                })
+                flags.append(
+                    {
+                        "category": "financial",
+                        "severity": "medium",
+                        "signal": f"Low growth score ({growth}/100)",
+                        "source": "scoring_model",
+                    }
+                )
 
         # Scan news for financial red flags
         news_flags = self._scan_for_red_flags(
@@ -544,7 +594,9 @@ class DueDiligenceAgent:
 
         return findings, flags
 
-    async def _analyze_team(self, company_name: str, profile: Dict) -> Tuple[Dict, List]:
+    async def _analyze_team(
+        self, company_name: str, profile: Dict
+    ) -> Tuple[Dict, List]:
         """Analyze team and leadership."""
         findings = {
             "score": 50,
@@ -569,20 +621,26 @@ class DueDiligenceAgent:
                 score += 15
             elif team.get("employee_growth_yoy") and team["employee_growth_yoy"] < -10:
                 score -= 15
-                flags.append({
-                    "category": "team",
-                    "severity": "medium",
-                    "signal": f"Employee count declined {abs(team['employee_growth_yoy'])}% YoY",
-                    "source": "enrichment",
-                })
+                flags.append(
+                    {
+                        "category": "team",
+                        "severity": "medium",
+                        "signal": f"Employee count declined {abs(team['employee_growth_yoy'])}% YoY",
+                        "source": "enrichment",
+                    }
+                )
 
             findings["score"] = max(min(score, 100), 0)
 
         if employer_brand:
             findings["data_available"] = True
-            findings["details"]["glassdoor_rating"] = employer_brand.get("overall_rating")
+            findings["details"]["glassdoor_rating"] = employer_brand.get(
+                "overall_rating"
+            )
             findings["details"]["ceo_approval"] = employer_brand.get("ceo_approval")
-            findings["details"]["recommend_to_friend"] = employer_brand.get("recommend_to_friend")
+            findings["details"]["recommend_to_friend"] = employer_brand.get(
+                "recommend_to_friend"
+            )
 
             rating = employer_brand.get("overall_rating", 0)
             if rating:
@@ -592,12 +650,14 @@ class DueDiligenceAgent:
                     findings["score"] = max(findings["score"], 60)
                 elif rating < 3.0:
                     findings["score"] = min(findings["score"], 40)
-                    flags.append({
-                        "category": "team",
-                        "severity": "medium",
-                        "signal": f"Low Glassdoor rating ({rating}/5)",
-                        "source": "glassdoor",
-                    })
+                    flags.append(
+                        {
+                            "category": "team",
+                            "severity": "medium",
+                            "signal": f"Low Glassdoor rating ({rating}/5)",
+                            "source": "glassdoor",
+                        }
+                    )
 
             findings["summary"] = self._generate_team_summary(team, employer_brand)
 
@@ -609,7 +669,9 @@ class DueDiligenceAgent:
 
         return findings, flags
 
-    async def _analyze_legal(self, company_name: str, profile: Dict) -> Tuple[Dict, List]:
+    async def _analyze_legal(
+        self, company_name: str, profile: Dict
+    ) -> Tuple[Dict, List]:
         """Analyze legal and regulatory risks."""
         findings = {
             "score": 70,  # Default to good (no news is good news for legal)
@@ -623,7 +685,9 @@ class DueDiligenceAgent:
 
         if sec_filings:
             findings["data_available"] = True
-            findings["details"]["form_d_raised"] = sec_filings.get("form_d_total_raised")
+            findings["details"]["form_d_raised"] = sec_filings.get(
+                "form_d_total_raised"
+            )
             findings["details"]["industry_group"] = sec_filings.get("industry_group")
 
         # Scan news for legal red flags - this is the main source
@@ -642,7 +706,9 @@ class DueDiligenceAgent:
 
         return findings, flags
 
-    async def _analyze_competitive(self, company_name: str, profile: Dict) -> Tuple[Dict, List]:
+    async def _analyze_competitive(
+        self, company_name: str, profile: Dict
+    ) -> Tuple[Dict, List]:
         """Analyze competitive position."""
         findings = {
             "score": 50,
@@ -658,7 +724,9 @@ class DueDiligenceAgent:
         if tech_presence:
             findings["data_available"] = True
             findings["details"]["github_stars"] = tech_presence.get("total_stars")
-            findings["details"]["github_contributors"] = tech_presence.get("contributors")
+            findings["details"]["github_contributors"] = tech_presence.get(
+                "contributors"
+            )
             findings["details"]["velocity_score"] = tech_presence.get("velocity_score")
 
             velocity = tech_presence.get("velocity_score", 0)
@@ -685,7 +753,9 @@ class DueDiligenceAgent:
 
         return findings, flags
 
-    async def _analyze_market(self, company_name: str, profile: Dict) -> Tuple[Dict, List]:
+    async def _analyze_market(
+        self, company_name: str, profile: Dict
+    ) -> Tuple[Dict, List]:
         """Analyze market presence and traction."""
         findings = {
             "score": 50,
@@ -712,12 +782,14 @@ class DueDiligenceAgent:
                     findings["score"] = 55
                 elif avg_rating < 3.0:
                     findings["score"] = 35
-                    flags.append({
-                        "category": "market",
-                        "severity": "medium",
-                        "signal": f"Low app store rating ({avg_rating}/5)",
-                        "source": "app_store",
-                    })
+                    flags.append(
+                        {
+                            "category": "market",
+                            "severity": "medium",
+                            "signal": f"Low app store rating ({avg_rating}/5)",
+                            "source": "app_store",
+                        }
+                    )
 
         # Scan news for market red flags
         news_flags = self._scan_for_red_flags(
@@ -729,7 +801,9 @@ class DueDiligenceAgent:
 
         return findings, flags
 
-    async def _analyze_operational(self, company_name: str, profile: Dict) -> Tuple[Dict, List]:
+    async def _analyze_operational(
+        self, company_name: str, profile: Dict
+    ) -> Tuple[Dict, List]:
         """Analyze operational risks."""
         findings = {
             "score": 65,  # Default to good
@@ -756,10 +830,7 @@ class DueDiligenceAgent:
         return findings, flags
 
     def _scan_for_red_flags(
-        self,
-        company_name: str,
-        news_data: Dict,
-        category: RedFlagCategory
+        self, company_name: str, news_data: Dict, category: RedFlagCategory
     ) -> List[Dict]:
         """Scan news articles for red flags."""
         flags = []
@@ -772,21 +843,21 @@ class DueDiligenceAgent:
 
             for pattern, severity, description in patterns:
                 if re.search(pattern, title, re.IGNORECASE):
-                    flags.append({
-                        "category": category.value,
-                        "severity": severity,
-                        "signal": description,
-                        "source": "news",
-                        "headline": article.get("title"),
-                        "date": article.get("date"),
-                    })
+                    flags.append(
+                        {
+                            "category": category.value,
+                            "severity": severity,
+                            "signal": description,
+                            "source": "news",
+                            "headline": article.get("title"),
+                            "date": article.get("date"),
+                        }
+                    )
 
         return flags
 
     def _calculate_risk_score(
-        self,
-        findings: Dict[str, Dict],
-        red_flags: List[Dict]
+        self, findings: Dict[str, Dict], red_flags: List[Dict]
     ) -> Tuple[float, str]:
         """Calculate overall risk score."""
         # Start with category scores (inverted: high score = low risk)
@@ -837,34 +908,38 @@ class DueDiligenceAgent:
         findings: Dict,
         red_flags: List[Dict],
         risk_score: float,
-        risk_level: str
+        risk_level: str,
     ) -> Dict:
         """Generate structured DD memo."""
         # Identify strengths (categories with score > 65)
         strengths = []
         for cat, data in findings.items():
             if data.get("score", 0) > 65:
-                strengths.append({
-                    "category": cat,
-                    "score": data["score"],
-                    "summary": data.get("summary", "")
-                })
+                strengths.append(
+                    {
+                        "category": cat,
+                        "score": data["score"],
+                        "summary": data.get("summary", ""),
+                    }
+                )
 
         # Identify concerns (categories with score < 45 or flags)
         concerns = []
         for cat, data in findings.items():
             if data.get("score", 100) < 45:
-                concerns.append({
-                    "category": cat,
-                    "score": data["score"],
-                    "summary": data.get("summary", "")
-                })
+                concerns.append(
+                    {
+                        "category": cat,
+                        "score": data["score"],
+                        "summary": data.get("summary", ""),
+                    }
+                )
 
         # Get top red flags
         sorted_flags = sorted(
             red_flags,
             key=lambda x: self.SEVERITY_SCORES.get(x["severity"], 0),
-            reverse=True
+            reverse=True,
         )[:5]
 
         # Generate recommendation
@@ -881,7 +956,12 @@ class DueDiligenceAgent:
             "company": company_name,
             "generated_at": datetime.utcnow().isoformat() + "Z",
             "executive_summary": self._generate_executive_summary(
-                company_name, risk_score, risk_level, len(red_flags), strengths, concerns
+                company_name,
+                risk_score,
+                risk_level,
+                len(red_flags),
+                strengths,
+                concerns,
             ),
             "recommendation": recommendation,
             "risk_assessment": {
@@ -894,12 +974,14 @@ class DueDiligenceAgent:
             "concerns": concerns,
             "red_flags": sorted_flags,
             "category_scores": {
-                cat: {"score": data.get("score", 50), "summary": data.get("summary", "")}
+                cat: {
+                    "score": data.get("score", 50),
+                    "summary": data.get("summary", ""),
+                }
                 for cat, data in findings.items()
             },
             "data_coverage": {
-                cat: data.get("data_available", False)
-                for cat, data in findings.items()
+                cat: data.get("data_available", False) for cat, data in findings.items()
             },
         }
 
@@ -910,14 +992,14 @@ class DueDiligenceAgent:
         risk_level: str,
         flag_count: int,
         strengths: List,
-        concerns: List
+        concerns: List,
     ) -> str:
         """Generate executive summary text."""
         level_desc = {
             "low": "favorable",
             "moderate": "moderate",
             "high": "elevated",
-            "critical": "significant"
+            "critical": "significant",
         }
 
         summary = f"{company_name} presents a {level_desc.get(risk_level, 'moderate')} risk profile "
@@ -944,7 +1026,9 @@ class DueDiligenceAgent:
         if financials.get("funding_total"):
             parts.append(f"Total funding: ${financials['funding_total']:,.0f}")
         if financials.get("net_income"):
-            status = "profitable" if financials["net_income"] > 0 else "not yet profitable"
+            status = (
+                "profitable" if financials["net_income"] > 0 else "not yet profitable"
+            )
             parts.append(f"Company is {status}")
         return "; ".join(parts) if parts else "Limited financial data available"
 
@@ -969,7 +1053,9 @@ class DueDiligenceAgent:
         if details.get("github_stars"):
             parts.append(f"{details['github_stars']:,} GitHub stars")
         if details.get("market_position_score"):
-            parts.append(f"Market position score: {details['market_position_score']}/100")
+            parts.append(
+                f"Market position score: {details['market_position_score']}/100"
+            )
         return "; ".join(parts) if parts else "Limited competitive data available"
 
     def _generate_market_summary(self, findings: Dict) -> str:
@@ -987,7 +1073,7 @@ class DueDiligenceAgent:
         job_id: str,
         status: DDStatus,
         progress: float,
-        phases_completed: List[str]
+        phases_completed: List[str],
     ) -> None:
         """Update job status."""
         query = text("""
@@ -996,12 +1082,15 @@ class DueDiligenceAgent:
                 started_at = COALESCE(started_at, NOW())
             WHERE job_id = :job_id
         """)
-        self.db.execute(query, {
-            "job_id": job_id,
-            "status": status.value,
-            "progress": progress,
-            "phases": json.dumps(phases_completed),
-        })
+        self.db.execute(
+            query,
+            {
+                "job_id": job_id,
+                "status": status.value,
+                "progress": progress,
+                "phases": json.dumps(phases_completed),
+            },
+        )
         self.db.commit()
 
     def _cache_result(
@@ -1010,7 +1099,7 @@ class DueDiligenceAgent:
         job_id: str,
         risk_score: float,
         risk_level: str,
-        memo: Dict
+        memo: Dict,
     ) -> None:
         """Cache DD result."""
         expires = datetime.utcnow() + timedelta(days=30)
@@ -1027,14 +1116,17 @@ class DueDiligenceAgent:
                 expires_at = EXCLUDED.expires_at
         """)
 
-        self.db.execute(query, {
-            "name": company_name,
-            "job_id": job_id,
-            "risk_score": risk_score,
-            "risk_level": risk_level,
-            "memo": json.dumps(memo),
-            "expires": expires,
-        })
+        self.db.execute(
+            query,
+            {
+                "name": company_name,
+                "job_id": job_id,
+                "risk_score": risk_score,
+                "risk_level": risk_level,
+                "memo": json.dumps(memo),
+                "expires": expires,
+            },
+        )
         self.db.commit()
 
     def get_job_status(self, job_id: str) -> Optional[Dict]:
@@ -1054,9 +1146,15 @@ class DueDiligenceAgent:
             "progress": row["progress"],
             "phases_completed": row["phases_completed"] or [],
             "research_job_id": row["research_job_id"],
-            "created_at": row["created_at"].isoformat() + "Z" if row["created_at"] else None,
-            "started_at": row["started_at"].isoformat() + "Z" if row["started_at"] else None,
-            "completed_at": row["completed_at"].isoformat() + "Z" if row["completed_at"] else None,
+            "created_at": row["created_at"].isoformat() + "Z"
+            if row["created_at"]
+            else None,
+            "started_at": row["started_at"].isoformat() + "Z"
+            if row["started_at"]
+            else None,
+            "completed_at": row["completed_at"].isoformat() + "Z"
+            if row["completed_at"]
+            else None,
         }
 
         if row["status"] == "completed":
@@ -1087,7 +1185,9 @@ class DueDiligenceAgent:
                 "risk_score": row["risk_score"],
                 "risk_level": row["risk_level"],
                 "memo": row["memo"],
-                "cached_at": row["created_at"].isoformat() + "Z" if row["created_at"] else None,
+                "cached_at": row["created_at"].isoformat() + "Z"
+                if row["created_at"]
+                else None,
             }
         return None
 
@@ -1119,8 +1219,12 @@ class DueDiligenceAgent:
                 "progress": row["progress"],
                 "risk_score": row["risk_score"],
                 "risk_level": row["risk_level"],
-                "created_at": row["created_at"].isoformat() + "Z" if row["created_at"] else None,
-                "completed_at": row["completed_at"].isoformat() + "Z" if row["completed_at"] else None,
+                "created_at": row["created_at"].isoformat() + "Z"
+                if row["created_at"]
+                else None,
+                "completed_at": row["completed_at"].isoformat() + "Z"
+                if row["completed_at"]
+                else None,
             }
             for row in result.mappings()
         ]
@@ -1134,7 +1238,9 @@ class DueDiligenceAgent:
                 "id": row["template_id"],
                 "name": row["name"],
                 "description": row["description"],
-                "sections": row["sections"] if isinstance(row["sections"], list) else json.loads(row["sections"]),
+                "sections": row["sections"]
+                if isinstance(row["sections"], list)
+                else json.loads(row["sections"]),
                 "is_default": row["is_default"],
             }
             for row in result.mappings()
@@ -1169,10 +1275,14 @@ class DueDiligenceAgent:
                 "completed": stats["completed"],
                 "failed": stats["failed"],
                 "in_progress": stats["in_progress"],
-                "avg_duration_seconds": round(stats["avg_duration"], 2) if stats["avg_duration"] else None,
+                "avg_duration_seconds": round(stats["avg_duration"], 2)
+                if stats["avg_duration"]
+                else None,
             },
             "risk_analysis": {
-                "avg_risk_score": round(stats["avg_risk_score"], 1) if stats["avg_risk_score"] else None,
+                "avg_risk_score": round(stats["avg_risk_score"], 1)
+                if stats["avg_risk_score"]
+                else None,
                 "distribution": {r["risk_level"]: r["count"] for r in risk_dist},
             },
             "templates": len(self.get_templates()),

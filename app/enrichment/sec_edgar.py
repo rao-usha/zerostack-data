@@ -3,6 +3,7 @@ SEC EDGAR API client for company financials.
 
 Fetches public company filings (10-K, 10-Q) from SEC EDGAR.
 """
+
 import logging
 import httpx
 from typing import Dict, Optional
@@ -81,7 +82,9 @@ class SECEdgarClient:
                 if response.status_code == 200:
                     return response.json()
                 else:
-                    logger.warning(f"SEC EDGAR returned {response.status_code} for CIK {cik}")
+                    logger.warning(
+                        f"SEC EDGAR returned {response.status_code} for CIK {cik}"
+                    )
                     return None
         except Exception as e:
             logger.error(f"SEC EDGAR filings error for CIK {cik}: {e}")
@@ -107,7 +110,9 @@ class SECEdgarClient:
                 if response.status_code == 200:
                     return response.json()
                 else:
-                    logger.warning(f"SEC EDGAR facts returned {response.status_code} for CIK {cik}")
+                    logger.warning(
+                        f"SEC EDGAR facts returned {response.status_code} for CIK {cik}"
+                    )
                     return None
         except Exception as e:
             logger.error(f"SEC EDGAR facts error for CIK {cik}: {e}")
@@ -136,7 +141,11 @@ class SECEdgarClient:
         us_gaap = facts.get("facts", {}).get("us-gaap", {})
 
         # Extract revenue (multiple possible labels)
-        revenue_labels = ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet"]
+        revenue_labels = [
+            "Revenues",
+            "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "SalesRevenueNet",
+        ]
         for label in revenue_labels:
             if label in us_gaap:
                 units = us_gaap[label].get("units", {}).get("USD", [])

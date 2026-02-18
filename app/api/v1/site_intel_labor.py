@@ -3,6 +3,7 @@ Site Intelligence Platform - Labor Market API.
 
 Endpoints for wages, employment, commuting patterns, and education data.
 """
+
 import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, Query
@@ -12,8 +13,11 @@ from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.models_site_intel import (
-    LaborMarketArea, OccupationalWage, IndustryEmployment,
-    CommuteFlow, EducationalAttainment,
+    LaborMarketArea,
+    OccupationalWage,
+    IndustryEmployment,
+    CommuteFlow,
+    EducationalAttainment,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,6 +28,7 @@ router = APIRouter(prefix="/site-intel/labor", tags=["Site Intel - Labor"])
 # =============================================================================
 # ENDPOINTS
 # =============================================================================
+
 
 @router.get("/areas")
 async def list_labor_market_areas(
@@ -40,7 +45,11 @@ async def list_labor_market_areas(
     if area_type:
         query = query.filter(LaborMarketArea.area_type == area_type)
 
-    areas = query.order_by(LaborMarketArea.labor_force.desc().nullslast()).limit(limit).all()
+    areas = (
+        query.order_by(LaborMarketArea.labor_force.desc().nullslast())
+        .limit(limit)
+        .all()
+    )
 
     return [
         {
@@ -51,7 +60,9 @@ async def list_labor_market_areas(
             "state": a.state,
             "population": a.population,
             "labor_force": a.labor_force,
-            "unemployment_rate": float(a.unemployment_rate) if a.unemployment_rate else None,
+            "unemployment_rate": float(a.unemployment_rate)
+            if a.unemployment_rate
+            else None,
         }
         for a in areas
     ]
@@ -61,7 +72,9 @@ async def list_labor_market_areas(
 async def search_occupational_wages(
     area_code: Optional[str] = Query(None, description="Area code (FIPS or CBSA)"),
     occupation_code: Optional[str] = Query(None, description="SOC occupation code"),
-    occupation_search: Optional[str] = Query(None, description="Search occupation title"),
+    occupation_search: Optional[str] = Query(
+        None, description="Search occupation title"
+    ),
     year: Optional[int] = Query(None),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -78,7 +91,9 @@ async def search_occupational_wages(
     if occupation_code:
         query = query.filter(OccupationalWage.occupation_code == occupation_code)
     if occupation_search:
-        query = query.filter(OccupationalWage.occupation_title.ilike(f"%{occupation_search}%"))
+        query = query.filter(
+            OccupationalWage.occupation_title.ilike(f"%{occupation_search}%")
+        )
     if year:
         query = query.filter(OccupationalWage.period_year == year)
 
@@ -92,9 +107,15 @@ async def search_occupational_wages(
             "occupation_code": w.occupation_code,
             "occupation_title": w.occupation_title,
             "employment": w.employment,
-            "mean_hourly_wage": float(w.mean_hourly_wage) if w.mean_hourly_wage else None,
-            "median_hourly_wage": float(w.median_hourly_wage) if w.median_hourly_wage else None,
-            "median_annual_wage": float(w.median_annual_wage) if w.median_annual_wage else None,
+            "mean_hourly_wage": float(w.mean_hourly_wage)
+            if w.mean_hourly_wage
+            else None,
+            "median_hourly_wage": float(w.median_hourly_wage)
+            if w.median_hourly_wage
+            else None,
+            "median_annual_wage": float(w.median_annual_wage)
+            if w.median_annual_wage
+            else None,
             "year": w.period_year,
         }
         for w in wages
@@ -114,10 +135,15 @@ async def compare_wages_across_areas(
     """
     codes = [c.strip() for c in area_codes.split(",")]
 
-    wages = db.query(OccupationalWage).filter(
-        OccupationalWage.occupation_code == occupation_code,
-        OccupationalWage.area_code.in_(codes),
-    ).order_by(OccupationalWage.period_year.desc()).all()
+    wages = (
+        db.query(OccupationalWage)
+        .filter(
+            OccupationalWage.occupation_code == occupation_code,
+            OccupationalWage.area_code.in_(codes),
+        )
+        .order_by(OccupationalWage.period_year.desc())
+        .all()
+    )
 
     # Get latest for each area
     latest_by_area = {}
@@ -126,8 +152,12 @@ async def compare_wages_across_areas(
             latest_by_area[w.area_code] = {
                 "area_code": w.area_code,
                 "area_name": w.area_name,
-                "median_hourly_wage": float(w.median_hourly_wage) if w.median_hourly_wage else None,
-                "median_annual_wage": float(w.median_annual_wage) if w.median_annual_wage else None,
+                "median_hourly_wage": float(w.median_hourly_wage)
+                if w.median_hourly_wage
+                else None,
+                "median_annual_wage": float(w.median_annual_wage)
+                if w.median_annual_wage
+                else None,
                 "employment": w.employment,
                 "year": w.period_year,
             }
@@ -135,9 +165,8 @@ async def compare_wages_across_areas(
     return {
         "occupation_code": occupation_code,
         "comparison": sorted(
-            latest_by_area.values(),
-            key=lambda x: x["median_hourly_wage"] or 999
-        )
+            latest_by_area.values(), key=lambda x: x["median_hourly_wage"] or 999
+        ),
     }
 
 
@@ -197,10 +226,16 @@ async def get_commute_shed(
 
     Shows where workers commute from - useful for labor availability analysis.
     """
-    flows = db.query(CommuteFlow).filter(
-        CommuteFlow.work_county_fips == work_county_fips,
-        CommuteFlow.worker_count >= min_workers,
-    ).order_by(CommuteFlow.worker_count.desc()).limit(limit).all()
+    flows = (
+        db.query(CommuteFlow)
+        .filter(
+            CommuteFlow.work_county_fips == work_county_fips,
+            CommuteFlow.worker_count >= min_workers,
+        )
+        .order_by(CommuteFlow.worker_count.desc())
+        .limit(limit)
+        .all()
+    )
 
     total_workers = sum(f.worker_count for f in flows)
 
@@ -213,11 +248,13 @@ async def get_commute_shed(
                 "home_county_name": f.home_county_name,
                 "home_state": f.home_state,
                 "worker_count": f.worker_count,
-                "pct_of_total": round(f.worker_count / total_workers * 100, 1) if total_workers > 0 else 0,
+                "pct_of_total": round(f.worker_count / total_workers * 100, 1)
+                if total_workers > 0
+                else 0,
                 "avg_earnings": float(f.avg_earnings) if f.avg_earnings else None,
             }
             for f in flows
-        ]
+        ],
     }
 
 
@@ -267,17 +304,23 @@ async def get_workforce_score(
 
     Factors in labor force size, education, wages, and unemployment.
     """
-    area = db.query(LaborMarketArea).filter(LaborMarketArea.area_code == area_code).first()
-    education = db.query(EducationalAttainment).filter(
-        EducationalAttainment.area_fips == area_code
-    ).first()
+    area = (
+        db.query(LaborMarketArea).filter(LaborMarketArea.area_code == area_code).first()
+    )
+    education = (
+        db.query(EducationalAttainment)
+        .filter(EducationalAttainment.area_fips == area_code)
+        .first()
+    )
 
     if not area:
         return {"error": "Area not found", "area_code": area_code}
 
     # Simple scoring algorithm
     labor_score = min((area.labor_force or 0) / 10000, 30)  # Max 30
-    education_score = (float(education.pct_bachelors or 0) / 100) * 30 if education else 0  # Max 30
+    education_score = (
+        (float(education.pct_bachelors or 0) / 100) * 30 if education else 0
+    )  # Max 30
     unemployment_score = max(0, 20 - (float(area.unemployment_rate or 5) * 2))  # Max 20
 
     total = labor_score + education_score + unemployment_score
@@ -287,10 +330,21 @@ async def get_workforce_score(
         "area_name": area.area_name,
         "workforce_score": round(min(total, 100), 1),
         "factors": {
-            "labor_force_size": {"value": area.labor_force, "score": round(labor_score, 1)},
-            "education": {"pct_bachelors": float(education.pct_bachelors) if education else None, "score": round(education_score, 1)},
-            "unemployment": {"rate": float(area.unemployment_rate) if area.unemployment_rate else None, "score": round(unemployment_score, 1)},
-        }
+            "labor_force_size": {
+                "value": area.labor_force,
+                "score": round(labor_score, 1),
+            },
+            "education": {
+                "pct_bachelors": float(education.pct_bachelors) if education else None,
+                "score": round(education_score, 1),
+            },
+            "unemployment": {
+                "rate": float(area.unemployment_rate)
+                if area.unemployment_rate
+                else None,
+                "score": round(unemployment_score, 1),
+            },
+        },
     }
 
 
@@ -304,7 +358,9 @@ async def get_labor_summary(db: Session = Depends(get_db)):
             "occupational_wages": db.query(func.count(OccupationalWage.id)).scalar(),
             "industry_employment": db.query(func.count(IndustryEmployment.id)).scalar(),
             "commute_flows": db.query(func.count(CommuteFlow.id)).scalar(),
-            "education_records": db.query(func.count(EducationalAttainment.id)).scalar(),
+            "education_records": db.query(
+                func.count(EducationalAttainment.id)
+            ).scalar(),
         },
         "available_endpoints": [
             "/site-intel/labor/areas",
@@ -314,5 +370,5 @@ async def get_labor_summary(db: Session = Depends(get_db)):
             "/site-intel/labor/commute-shed",
             "/site-intel/labor/education",
             "/site-intel/labor/workforce-score",
-        ]
+        ],
     }

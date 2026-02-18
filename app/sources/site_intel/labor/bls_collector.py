@@ -11,6 +11,7 @@ Rate limits: 25 req/day without key, 500 req/day with key.
 
 Requires BLS_API_KEY environment variable for higher limits.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -21,7 +22,11 @@ from app.core.config import get_settings
 from app.core.models_site_intel import LaborMarketArea, OccupationalWage
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -35,16 +40,56 @@ logger = logging.getLogger(__name__)
 
 # State FIPS codes for BLS area codes
 STATE_FIPS = {
-    "AL": "01", "AK": "02", "AZ": "04", "AR": "05", "CA": "06",
-    "CO": "08", "CT": "09", "DE": "10", "DC": "11", "FL": "12",
-    "GA": "13", "HI": "15", "ID": "16", "IL": "17", "IN": "18",
-    "IA": "19", "KS": "20", "KY": "21", "LA": "22", "ME": "23",
-    "MD": "24", "MA": "25", "MI": "26", "MN": "27", "MS": "28",
-    "MO": "29", "MT": "30", "NE": "31", "NV": "32", "NH": "33",
-    "NJ": "34", "NM": "35", "NY": "36", "NC": "37", "ND": "38",
-    "OH": "39", "OK": "40", "OR": "41", "PA": "42", "RI": "44",
-    "SC": "45", "SD": "46", "TN": "47", "TX": "48", "UT": "49",
-    "VT": "50", "VA": "51", "WA": "53", "WV": "54", "WI": "55",
+    "AL": "01",
+    "AK": "02",
+    "AZ": "04",
+    "AR": "05",
+    "CA": "06",
+    "CO": "08",
+    "CT": "09",
+    "DE": "10",
+    "DC": "11",
+    "FL": "12",
+    "GA": "13",
+    "HI": "15",
+    "ID": "16",
+    "IL": "17",
+    "IN": "18",
+    "IA": "19",
+    "KS": "20",
+    "KY": "21",
+    "LA": "22",
+    "ME": "23",
+    "MD": "24",
+    "MA": "25",
+    "MI": "26",
+    "MN": "27",
+    "MS": "28",
+    "MO": "29",
+    "MT": "30",
+    "NE": "31",
+    "NV": "32",
+    "NH": "33",
+    "NJ": "34",
+    "NM": "35",
+    "NY": "36",
+    "NC": "37",
+    "ND": "38",
+    "OH": "39",
+    "OK": "40",
+    "OR": "41",
+    "PA": "42",
+    "RI": "44",
+    "SC": "45",
+    "SD": "46",
+    "TN": "47",
+    "TX": "48",
+    "UT": "49",
+    "VT": "50",
+    "VA": "51",
+    "WA": "53",
+    "WV": "54",
+    "WI": "55",
     "WY": "56",
 }
 
@@ -70,7 +115,7 @@ class BLSLaborCollector(BaseCollector):
         super().__init__(db, api_key, **kwargs)
         if not self.api_key:
             settings = get_settings()
-            self.api_key = getattr(settings, 'bls_api_key', None)
+            self.api_key = getattr(settings, "bls_api_key", None)
 
     def get_default_base_url(self) -> str:
         return "https://api.bls.gov/publicAPI/v2"
@@ -98,7 +143,9 @@ class BLSLaborCollector(BaseCollector):
             total_inserted += lma_result.get("inserted", 0)
             total_processed += lma_result.get("processed", 0)
             if lma_result.get("error"):
-                errors.append({"source": "labor_market_areas", "error": lma_result["error"]})
+                errors.append(
+                    {"source": "labor_market_areas", "error": lma_result["error"]}
+                )
 
             # Collect occupational wages
             logger.info("Collecting BLS occupational wage data...")
@@ -106,9 +153,13 @@ class BLSLaborCollector(BaseCollector):
             total_inserted += wage_result.get("inserted", 0)
             total_processed += wage_result.get("processed", 0)
             if wage_result.get("error"):
-                errors.append({"source": "occupational_wages", "error": wage_result["error"]})
+                errors.append(
+                    {"source": "occupational_wages", "error": wage_result["error"]}
+                )
 
-            status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            status = (
+                CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            )
 
             return self.create_result(
                 status=status,
@@ -125,7 +176,9 @@ class BLSLaborCollector(BaseCollector):
                 error_message=str(e),
             )
 
-    async def _collect_labor_market_areas(self, config: CollectionConfig) -> Dict[str, Any]:
+    async def _collect_labor_market_areas(
+        self, config: CollectionConfig
+    ) -> Dict[str, Any]:
         """
         Collect labor market area unemployment data from LAUS.
 
@@ -155,7 +208,7 @@ class BLSLaborCollector(BaseCollector):
             current_year = datetime.now().year
 
             for i in range(0, len(series_ids), 50):
-                batch = series_ids[i:i+50]
+                batch = series_ids[i : i + 50]
                 response = await self._fetch_bls_timeseries(
                     batch,
                     start_year=current_year - 2,
@@ -168,11 +221,13 @@ class BLSLaborCollector(BaseCollector):
                     state = state_map.get(series_id)
                     if state:
                         for data_point in series.get("data", []):
-                            all_data.append({
-                                "series_id": series_id,
-                                "state": state,
-                                "data": data_point,
-                            })
+                            all_data.append(
+                                {
+                                    "series_id": series_id,
+                                    "state": state,
+                                    "data": data_point,
+                                }
+                            )
 
             logger.info(f"Fetched {len(all_data)} labor market data points")
 
@@ -200,8 +255,12 @@ class BLSLaborCollector(BaseCollector):
                     records,
                     unique_columns=["area_type", "area_code"],
                     update_columns=[
-                        "area_name", "state", "unemployment_rate",
-                        "labor_force", "employment", "collected_at"
+                        "area_name",
+                        "state",
+                        "unemployment_rate",
+                        "labor_force",
+                        "employment",
+                        "collected_at",
                     ],
                 )
                 return {"processed": len(all_data), "inserted": inserted}
@@ -212,7 +271,9 @@ class BLSLaborCollector(BaseCollector):
             logger.error(f"Failed to collect labor market areas: {e}", exc_info=True)
             return {"processed": 0, "inserted": 0, "error": str(e)}
 
-    def _transform_labor_market_area(self, state: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _transform_labor_market_area(
+        self, state: str, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Transform BLS LAUS data to database format."""
         fips = STATE_FIPS.get(state, "00")
 
@@ -228,7 +289,9 @@ class BLSLaborCollector(BaseCollector):
             "collected_at": datetime.utcnow(),
         }
 
-    async def _collect_occupational_wages(self, config: CollectionConfig) -> Dict[str, Any]:
+    async def _collect_occupational_wages(
+        self, config: CollectionConfig
+    ) -> Dict[str, Any]:
         """
         Collect occupational employment and wage data (OES).
 
@@ -267,7 +330,9 @@ class BLSLaborCollector(BaseCollector):
                 for occ_code, occ_name in key_occupations:
                     # Mean annual wage series
                     clean_code = occ_code.replace("-", "")
-                    series_id = f"OEUS{fips}000000{clean_code}04"  # 04 = annual mean wage
+                    series_id = (
+                        f"OEUS{fips}000000{clean_code}04"  # 04 = annual mean wage
+                    )
                     series_ids.append(series_id)
                     occ_map[series_id] = (occ_code, occ_name)
 
@@ -316,8 +381,12 @@ class BLSLaborCollector(BaseCollector):
                     records,
                     unique_columns=["area_code", "occupation_code", "period_year"],
                     update_columns=[
-                        "area_type", "area_name", "occupation_title",
-                        "employment", "mean_annual_wage", "collected_at"
+                        "area_type",
+                        "area_name",
+                        "occupation_title",
+                        "employment",
+                        "mean_annual_wage",
+                        "collected_at",
                     ],
                 )
                 return {"processed": len(all_records), "inserted": inserted}

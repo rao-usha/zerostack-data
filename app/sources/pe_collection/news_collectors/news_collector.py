@@ -25,8 +25,12 @@ logger = logging.getLogger(__name__)
 
 # RSS feed URLs (free, no API key required)
 BING_NEWS_RSS = "https://www.bing.com/news/search?q={query}&format=rss"
-YAHOO_FINANCE_RSS = "https://feeds.finance.yahoo.com/rss/2.0/headline?s={ticker}&region=US&lang=en-US"
-GOOGLE_NEWS_RSS = "https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
+YAHOO_FINANCE_RSS = (
+    "https://feeds.finance.yahoo.com/rss/2.0/headline?s={ticker}&region=US&lang=en-US"
+)
+GOOGLE_NEWS_RSS = (
+    "https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
+)
 
 # Maximum articles to process per entity
 MAX_ARTICLES_TO_FETCH = 15
@@ -83,6 +87,7 @@ class PENewsCollector(BasePECollector):
         """Lazily initialize LLM client."""
         if self._llm_client is None:
             from app.agentic.llm_client import get_llm_client
+
             self._llm_client = get_llm_client(model="gpt-4o-mini")
         return self._llm_client
 
@@ -135,7 +140,9 @@ class PENewsCollector(BasePECollector):
                     llm_client, articles[:MAX_ARTICLES_TO_CLASSIFY], entity_name
                 )
             else:
-                warnings.append("LLM not available — returning unclassified news metadata")
+                warnings.append(
+                    "LLM not available — returning unclassified news metadata"
+                )
                 classified = None
 
             # Build items
@@ -159,12 +166,14 @@ class PENewsCollector(BasePECollector):
                 }
 
                 if classification:
-                    item_data.update({
-                        "news_type": classification.get("news_type", "Other"),
-                        "sentiment": classification.get("sentiment", "Neutral"),
-                        "relevance_score": classification.get("relevance_score"),
-                        "summary": classification.get("summary"),
-                    })
+                    item_data.update(
+                        {
+                            "news_type": classification.get("news_type", "Other"),
+                            "sentiment": classification.get("sentiment", "Neutral"),
+                            "relevance_score": classification.get("relevance_score"),
+                            "summary": classification.get("summary"),
+                        }
+                    )
 
                 confidence = "llm_extracted" if classification else "low"
                 items.append(
@@ -176,9 +185,7 @@ class PENewsCollector(BasePECollector):
                     )
                 )
 
-            logger.info(
-                f"Collected {len(items)} news items for {entity_name}"
-            )
+            logger.info(f"Collected {len(items)} news items for {entity_name}")
 
             return self._create_result(
                 entity_id=entity_id,
@@ -241,9 +248,7 @@ class PENewsCollector(BasePECollector):
 
         return all_articles
 
-    async def _fetch_rss(
-        self, url: str, source_name: str
-    ) -> List[Dict[str, Any]]:
+    async def _fetch_rss(self, url: str, source_name: str) -> List[Dict[str, Any]]:
         """Fetch and parse an RSS feed."""
         response = await self._fetch_url(
             url,
@@ -273,8 +278,16 @@ class PENewsCollector(BasePECollector):
             desc_elem = item.find("description")
             pub_date_elem = item.find("pubDate")
 
-            title = title_elem.text.strip() if title_elem is not None and title_elem.text else None
-            link = link_elem.text.strip() if link_elem is not None and link_elem.text else None
+            title = (
+                title_elem.text.strip()
+                if title_elem is not None and title_elem.text
+                else None
+            )
+            link = (
+                link_elem.text.strip()
+                if link_elem is not None and link_elem.text
+                else None
+            )
 
             if not title or not link:
                 continue
@@ -290,13 +303,15 @@ class PENewsCollector(BasePECollector):
             if pub_date_elem is not None and pub_date_elem.text:
                 pub_date = pub_date_elem.text.strip()
 
-            articles.append({
-                "title": title,
-                "url": link,
-                "description": description,
-                "published_date": pub_date,
-                "source": source_name,
-            })
+            articles.append(
+                {
+                    "title": title,
+                    "url": link,
+                    "description": description,
+                    "published_date": pub_date,
+                    "source": source_name,
+                }
+            )
 
             if len(articles) >= MAX_ARTICLES_TO_FETCH:
                 break

@@ -7,6 +7,7 @@ Provides reusable retry logic for all agentic strategies:
 - Circuit breaker for persistent failures
 - Special handling for HTTP 429 (rate limit)
 """
+
 import asyncio
 import functools
 import logging
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RetryConfig:
     """Configuration for retry behavior."""
+
     max_retries: int = 3
     base_delay: float = 1.0  # Initial delay in seconds
     max_delay: float = 60.0  # Maximum delay between retries
@@ -37,6 +39,7 @@ class RetryConfig:
 @dataclass
 class CircuitBreakerState:
     """State tracking for circuit breaker pattern."""
+
     failure_count: int = 0
     last_failure_time: float = 0.0
     is_open: bool = False
@@ -56,11 +59,7 @@ class CircuitBreaker:
     - HALF-OPEN: Testing if service recovered
     """
 
-    def __init__(
-        self,
-        failure_threshold: int = 5,
-        reset_timeout: float = 60.0
-    ):
+    def __init__(self, failure_threshold: int = 5, reset_timeout: float = 60.0):
         self.failure_threshold = failure_threshold
         self.reset_timeout = reset_timeout
         self._states: Dict[str, CircuitBreakerState] = {}
@@ -70,7 +69,7 @@ class CircuitBreaker:
         if key not in self._states:
             self._states[key] = CircuitBreakerState(
                 failure_threshold=self.failure_threshold,
-                reset_timeout=self.reset_timeout
+                reset_timeout=self.reset_timeout,
             )
         return self._states[key]
 
@@ -134,10 +133,7 @@ class RetryError(Exception):
     """Raised when all retries are exhausted."""
 
     def __init__(
-        self,
-        message: str,
-        attempts: int,
-        last_exception: Optional[Exception] = None
+        self, message: str, attempts: int, last_exception: Optional[Exception] = None
     ):
         super().__init__(message)
         self.attempts = attempts
@@ -152,10 +148,7 @@ class CircuitOpenError(Exception):
         self.key = key
 
 
-def calculate_delay(
-    attempt: int,
-    config: RetryConfig
-) -> float:
+def calculate_delay(attempt: int, config: RetryConfig) -> float:
     """
     Calculate delay before next retry using exponential backoff with jitter.
 
@@ -167,7 +160,7 @@ def calculate_delay(
         Delay in seconds
     """
     # Exponential backoff
-    delay = config.base_delay * (config.exponential_base ** attempt)
+    delay = config.base_delay * (config.exponential_base**attempt)
 
     # Apply maximum cap
     delay = min(delay, config.max_delay)
@@ -180,8 +173,7 @@ def calculate_delay(
 
 
 def with_retry(
-    config: Optional[RetryConfig] = None,
-    circuit_breaker_key: Optional[str] = None
+    config: Optional[RetryConfig] = None, circuit_breaker_key: Optional[str] = None
 ):
     """
     Decorator to add retry logic with exponential backoff.
@@ -254,10 +246,11 @@ def with_retry(
             raise RetryError(
                 f"All {config.max_retries + 1} retry attempts failed",
                 attempts=config.max_retries + 1,
-                last_exception=last_exception
+                last_exception=last_exception,
             )
 
         return wrapper
+
     return decorator
 
 
@@ -268,18 +261,18 @@ def _extract_retry_after(exception: Exception) -> Optional[float]:
     Handles HTTP 429 responses that include Retry-After header.
     """
     # Check if exception has response attribute (httpx, requests)
-    response = getattr(exception, 'response', None)
+    response = getattr(exception, "response", None)
     if response is None:
         return None
 
     # Check status code
-    status_code = getattr(response, 'status_code', None)
+    status_code = getattr(response, "status_code", None)
     if status_code != 429:
         return None
 
     # Try to get Retry-After header
-    headers = getattr(response, 'headers', {})
-    retry_after = headers.get('Retry-After') or headers.get('retry-after')
+    headers = getattr(response, "headers", {})
+    retry_after = headers.get("Retry-After") or headers.get("retry-after")
 
     if retry_after:
         try:
@@ -296,7 +289,7 @@ async def retry_async(
     *args,
     config: Optional[RetryConfig] = None,
     circuit_breaker_key: Optional[str] = None,
-    **kwargs
+    **kwargs,
 ) -> Any:
     """
     Functional alternative to decorator for one-off retries.

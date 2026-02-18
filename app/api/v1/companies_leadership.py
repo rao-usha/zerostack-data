@@ -31,8 +31,10 @@ router = APIRouter(prefix="/companies", tags=["Company Leadership"])
 # Response Models
 # =============================================================================
 
+
 class LeadershipMember(BaseModel):
     """A member of the leadership team."""
+
     person_id: int
     full_name: str
     title: str
@@ -54,6 +56,7 @@ class LeadershipMember(BaseModel):
 
 class CompanyLeadershipResponse(BaseModel):
     """Company leadership team."""
+
     company_id: int
     company_name: str
     executives: List[LeadershipMember] = []
@@ -64,6 +67,7 @@ class CompanyLeadershipResponse(BaseModel):
 
 class LeadershipChangeItem(BaseModel):
     """Leadership change for a company."""
+
     id: int
     person_name: str
     change_type: str
@@ -81,6 +85,7 @@ class LeadershipChangeItem(BaseModel):
 
 class LeadershipHistoryResponse(BaseModel):
     """Leadership change history for a company."""
+
     company_id: int
     company_name: str
     changes: List[LeadershipChangeItem] = []
@@ -89,6 +94,7 @@ class LeadershipHistoryResponse(BaseModel):
 
 class LeadershipComparisonItem(BaseModel):
     """Leadership comparison for a single company."""
+
     company_id: int
     company_name: str
     ceo_name: Optional[str] = None
@@ -102,11 +108,13 @@ class LeadershipComparisonItem(BaseModel):
 
 class LeadershipComparisonResponse(BaseModel):
     """Leadership comparison across companies."""
+
     companies: List[LeadershipComparisonItem]
 
 
 class CollectionTriggerResponse(BaseModel):
     """Response when triggering data collection."""
+
     job_id: int
     status: str
     message: str
@@ -115,6 +123,7 @@ class CollectionTriggerResponse(BaseModel):
 # =============================================================================
 # Endpoints
 # =============================================================================
+
 
 @router.get("/{company_id}/leadership", response_model=CompanyLeadershipResponse)
 async def get_company_leadership(
@@ -127,19 +136,21 @@ async def get_company_leadership(
 
     Returns executives and optionally board members with their details.
     """
-    company = db.query(IndustrialCompany).filter(
-        IndustrialCompany.id == company_id
-    ).first()
+    company = (
+        db.query(IndustrialCompany).filter(IndustrialCompany.id == company_id).first()
+    )
 
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
     # Get current leadership
-    query = db.query(CompanyPerson, Person).join(
-        Person, CompanyPerson.person_id == Person.id
-    ).filter(
-        CompanyPerson.company_id == company_id,
-        CompanyPerson.is_current == True,
+    query = (
+        db.query(CompanyPerson, Person)
+        .join(Person, CompanyPerson.person_id == Person.id)
+        .filter(
+            CompanyPerson.company_id == company_id,
+            CompanyPerson.is_current == True,
+        )
     )
 
     results = query.all()
@@ -157,7 +168,8 @@ async def get_company_leadership(
             department=cp.department,
             is_board_member=cp.is_board_member,
             is_board_chair=cp.is_board_chair,
-            is_executive=not cp.is_board_member or cp.title_level in ['c_suite', 'president'],
+            is_executive=not cp.is_board_member
+            or cp.title_level in ["c_suite", "president"],
             linkedin_url=person.linkedin_url,
             photo_url=person.photo_url,
             bio=person.bio[:200] if person.bio else None,
@@ -172,8 +184,15 @@ async def get_company_leadership(
             executives.append(member)
 
     # Sort executives by title level
-    level_order = {'c_suite': 0, 'president': 1, 'evp': 2, 'svp': 3, 'vp': 4, 'director': 5}
-    executives.sort(key=lambda x: level_order.get(x.title_level or '', 99))
+    level_order = {
+        "c_suite": 0,
+        "president": 1,
+        "evp": 2,
+        "svp": 3,
+        "vp": 4,
+        "director": 5,
+    }
+    executives.sort(key=lambda x: level_order.get(x.title_level or "", 99))
 
     return CompanyLeadershipResponse(
         company_id=company.id,
@@ -185,7 +204,9 @@ async def get_company_leadership(
     )
 
 
-@router.get("/{company_id}/leadership/history", response_model=LeadershipHistoryResponse)
+@router.get(
+    "/{company_id}/leadership/history", response_model=LeadershipHistoryResponse
+)
 async def get_leadership_history(
     company_id: int,
     since_date: Optional[date] = Query(None, description="Changes since date"),
@@ -197,21 +218,19 @@ async def get_leadership_history(
 
     Shows all recorded leadership changes ordered by date.
     """
-    company = db.query(IndustrialCompany).filter(
-        IndustrialCompany.id == company_id
-    ).first()
+    company = (
+        db.query(IndustrialCompany).filter(IndustrialCompany.id == company_id).first()
+    )
 
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    query = db.query(LeadershipChange).filter(
-        LeadershipChange.company_id == company_id
-    )
+    query = db.query(LeadershipChange).filter(LeadershipChange.company_id == company_id)
 
     if since_date:
         query = query.filter(
-            (LeadershipChange.announced_date >= since_date) |
-            (LeadershipChange.effective_date >= since_date)
+            (LeadershipChange.announced_date >= since_date)
+            | (LeadershipChange.effective_date >= since_date)
         )
 
     query = query.order_by(
@@ -246,7 +265,9 @@ async def get_leadership_history(
     )
 
 
-@router.get("/{company_id}/leadership/compare", response_model=LeadershipComparisonResponse)
+@router.get(
+    "/{company_id}/leadership/compare", response_model=LeadershipComparisonResponse
+)
 async def compare_leadership(
     company_id: int,
     compare_with: List[int] = Query(..., description="Company IDs to compare with"),
@@ -260,9 +281,11 @@ async def compare_leadership(
     # Include the main company in comparison
     all_company_ids = [company_id] + compare_with
 
-    companies = db.query(IndustrialCompany).filter(
-        IndustrialCompany.id.in_(all_company_ids)
-    ).all()
+    companies = (
+        db.query(IndustrialCompany)
+        .filter(IndustrialCompany.id.in_(all_company_ids))
+        .all()
+    )
 
     if not companies:
         raise HTTPException(status_code=404, detail="No companies found")
@@ -270,12 +293,15 @@ async def compare_leadership(
     results = []
     for company in companies:
         # Get leadership stats
-        leadership = db.query(CompanyPerson, Person).join(
-            Person, CompanyPerson.person_id == Person.id
-        ).filter(
-            CompanyPerson.company_id == company.id,
-            CompanyPerson.is_current == True,
-        ).all()
+        leadership = (
+            db.query(CompanyPerson, Person)
+            .join(Person, CompanyPerson.person_id == Person.id)
+            .filter(
+                CompanyPerson.company_id == company.id,
+                CompanyPerson.is_current == True,
+            )
+            .all()
+        )
 
         ceo = None
         cfo = None
@@ -287,41 +313,50 @@ async def compare_leadership(
             if cp.is_board_member:
                 board_size += 1
 
-            if cp.title_level == 'c_suite':
+            if cp.title_level == "c_suite":
                 c_suite_count += 1
                 executive_count += 1
 
-                title_lower = (cp.title or '').lower()
-                if 'ceo' in title_lower or 'chief executive' in title_lower:
+                title_lower = (cp.title or "").lower()
+                if "ceo" in title_lower or "chief executive" in title_lower:
                     ceo = person.full_name
-                elif 'cfo' in title_lower or 'chief financial' in title_lower:
+                elif "cfo" in title_lower or "chief financial" in title_lower:
                     cfo = person.full_name
-            elif cp.title_level in ['president', 'evp', 'svp', 'vp']:
+            elif cp.title_level in ["president", "evp", "svp", "vp"]:
                 executive_count += 1
 
         # Count recent changes (last 12 months)
         from datetime import timedelta
-        one_year_ago = date.today() - timedelta(days=365)
-        recent_changes = db.query(LeadershipChange).filter(
-            LeadershipChange.company_id == company.id,
-            LeadershipChange.announced_date >= one_year_ago,
-        ).count()
 
-        results.append(LeadershipComparisonItem(
-            company_id=company.id,
-            company_name=company.name,
-            ceo_name=ceo,
-            cfo_name=cfo,
-            executive_count=executive_count,
-            board_size=board_size,
-            c_suite_count=c_suite_count,
-            recent_changes_count=recent_changes,
-        ))
+        one_year_ago = date.today() - timedelta(days=365)
+        recent_changes = (
+            db.query(LeadershipChange)
+            .filter(
+                LeadershipChange.company_id == company.id,
+                LeadershipChange.announced_date >= one_year_ago,
+            )
+            .count()
+        )
+
+        results.append(
+            LeadershipComparisonItem(
+                company_id=company.id,
+                company_name=company.name,
+                ceo_name=ceo,
+                cfo_name=cfo,
+                executive_count=executive_count,
+                board_size=board_size,
+                c_suite_count=c_suite_count,
+                recent_changes_count=recent_changes,
+            )
+        )
 
     return LeadershipComparisonResponse(companies=results)
 
 
-@router.post("/{company_id}/leadership/refresh", response_model=CollectionTriggerResponse)
+@router.post(
+    "/{company_id}/leadership/refresh", response_model=CollectionTriggerResponse
+)
 async def refresh_leadership(
     company_id: int,
     sources: List[str] = Query(["website"], description="Sources to collect from"),
@@ -333,9 +368,9 @@ async def refresh_leadership(
 
     Runs collection in the background and returns a job ID for tracking.
     """
-    company = db.query(IndustrialCompany).filter(
-        IndustrialCompany.id == company_id
-    ).first()
+    company = (
+        db.query(IndustrialCompany).filter(IndustrialCompany.id == company_id).first()
+    )
 
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
@@ -374,39 +409,55 @@ async def get_leadership_stats(
     total_people = db.query(Person).count()
 
     # Active leadership positions
-    active_positions = db.query(CompanyPerson).filter(
-        CompanyPerson.is_current == True
-    ).count()
+    active_positions = (
+        db.query(CompanyPerson).filter(CompanyPerson.is_current == True).count()
+    )
 
     # Companies with leadership data
-    companies_with_data = db.query(
-        func.count(func.distinct(CompanyPerson.company_id))
-    ).filter(CompanyPerson.is_current == True).scalar()
+    companies_with_data = (
+        db.query(func.count(func.distinct(CompanyPerson.company_id)))
+        .filter(CompanyPerson.is_current == True)
+        .scalar()
+    )
 
     # C-suite count
-    c_suite_count = db.query(CompanyPerson).filter(
-        CompanyPerson.is_current == True,
-        CompanyPerson.title_level == 'c_suite',
-    ).count()
+    c_suite_count = (
+        db.query(CompanyPerson)
+        .filter(
+            CompanyPerson.is_current == True,
+            CompanyPerson.title_level == "c_suite",
+        )
+        .count()
+    )
 
     # Board members
-    board_count = db.query(CompanyPerson).filter(
-        CompanyPerson.is_current == True,
-        CompanyPerson.is_board_member == True,
-    ).count()
+    board_count = (
+        db.query(CompanyPerson)
+        .filter(
+            CompanyPerson.is_current == True,
+            CompanyPerson.is_board_member == True,
+        )
+        .count()
+    )
 
     # Recent changes (last 30 days)
     from datetime import timedelta
+
     thirty_days_ago = date.today() - timedelta(days=30)
-    recent_changes = db.query(LeadershipChange).filter(
-        LeadershipChange.announced_date >= thirty_days_ago,
-    ).count()
+    recent_changes = (
+        db.query(LeadershipChange)
+        .filter(
+            LeadershipChange.announced_date >= thirty_days_ago,
+        )
+        .count()
+    )
 
     # Changes by type
-    change_counts = db.query(
-        LeadershipChange.change_type,
-        func.count(LeadershipChange.id)
-    ).group_by(LeadershipChange.change_type).all()
+    change_counts = (
+        db.query(LeadershipChange.change_type, func.count(LeadershipChange.id))
+        .group_by(LeadershipChange.change_type)
+        .all()
+    )
 
     changes_by_type = {ct: count for ct, count in change_counts}
 

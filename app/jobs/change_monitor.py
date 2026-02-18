@@ -78,9 +78,11 @@ class ChangeMonitor:
         Returns changes for any person on the watchlist.
         """
         # Get person IDs from watchlist
-        watchlist_people = self.db.query(PeopleWatchlistPerson).filter(
-            PeopleWatchlistPerson.watchlist_id == watchlist_id
-        ).all()
+        watchlist_people = (
+            self.db.query(PeopleWatchlistPerson)
+            .filter(PeopleWatchlistPerson.watchlist_id == watchlist_id)
+            .all()
+        )
 
         person_ids = [wp.person_id for wp in watchlist_people]
         if not person_ids:
@@ -88,28 +90,39 @@ class ChangeMonitor:
 
         # Get changes for these people
         cutoff = date.today() - timedelta(days=days)
-        changes = self.db.query(LeadershipChange).filter(
-            LeadershipChange.person_id.in_(person_ids),
-            LeadershipChange.detected_date >= cutoff,
-        ).order_by(LeadershipChange.detected_date.desc()).all()
+        changes = (
+            self.db.query(LeadershipChange)
+            .filter(
+                LeadershipChange.person_id.in_(person_ids),
+                LeadershipChange.detected_date >= cutoff,
+            )
+            .order_by(LeadershipChange.detected_date.desc())
+            .all()
+        )
 
         alerts = []
         for change in changes:
             company = self.db.get(IndustrialCompany, change.company_id)
-            alerts.append({
-                "change_id": change.id,
-                "person_id": change.person_id,
-                "person_name": change.person_name,
-                "company_id": change.company_id,
-                "company_name": company.name if company else "Unknown",
-                "change_type": change.change_type,
-                "old_title": change.old_title,
-                "new_title": change.new_title,
-                "announced_date": change.announced_date.isoformat() if change.announced_date else None,
-                "detected_date": change.detected_date.isoformat() if change.detected_date else None,
-                "is_c_suite": change.is_c_suite,
-                "significance_score": change.significance_score,
-            })
+            alerts.append(
+                {
+                    "change_id": change.id,
+                    "person_id": change.person_id,
+                    "person_name": change.person_name,
+                    "company_id": change.company_id,
+                    "company_name": company.name if company else "Unknown",
+                    "change_type": change.change_type,
+                    "old_title": change.old_title,
+                    "new_title": change.new_title,
+                    "announced_date": change.announced_date.isoformat()
+                    if change.announced_date
+                    else None,
+                    "detected_date": change.detected_date.isoformat()
+                    if change.detected_date
+                    else None,
+                    "is_c_suite": change.is_c_suite,
+                    "significance_score": change.significance_score,
+                }
+            )
 
         return alerts
 
@@ -123,10 +136,14 @@ class ChangeMonitor:
         Get alerts for all companies in a portfolio.
         """
         # Get company IDs from portfolio
-        portfolio_companies = self.db.query(PeoplePortfolioCompany).filter(
-            PeoplePortfolioCompany.portfolio_id == portfolio_id,
-            PeoplePortfolioCompany.is_active == True,
-        ).all()
+        portfolio_companies = (
+            self.db.query(PeoplePortfolioCompany)
+            .filter(
+                PeoplePortfolioCompany.portfolio_id == portfolio_id,
+                PeoplePortfolioCompany.is_active == True,
+            )
+            .all()
+        )
 
         company_ids = [pc.company_id for pc in portfolio_companies]
         if not company_ids:
@@ -141,19 +158,23 @@ class ChangeMonitor:
         alerts = []
         for change in changes:
             company = self.db.get(IndustrialCompany, change.company_id)
-            alerts.append({
-                "change_id": change.id,
-                "person_name": change.person_name,
-                "company_id": change.company_id,
-                "company_name": company.name if company else "Unknown",
-                "change_type": change.change_type,
-                "old_title": change.old_title,
-                "new_title": change.new_title,
-                "announced_date": change.announced_date.isoformat() if change.announced_date else None,
-                "is_c_suite": change.is_c_suite,
-                "is_board": change.is_board,
-                "significance_score": change.significance_score,
-            })
+            alerts.append(
+                {
+                    "change_id": change.id,
+                    "person_name": change.person_name,
+                    "company_id": change.company_id,
+                    "company_name": company.name if company else "Unknown",
+                    "change_type": change.change_type,
+                    "old_title": change.old_title,
+                    "new_title": change.new_title,
+                    "announced_date": change.announced_date.isoformat()
+                    if change.announced_date
+                    else None,
+                    "is_c_suite": change.is_c_suite,
+                    "is_board": change.is_board,
+                    "significance_score": change.significance_score,
+                }
+            )
 
         return alerts
 
@@ -167,9 +188,11 @@ class ChangeMonitor:
         Get alerts for all companies in an industry.
         """
         # Get company IDs for industry
-        companies = self.db.query(IndustrialCompany).filter(
-            IndustrialCompany.industry_segment == industry
-        ).all()
+        companies = (
+            self.db.query(IndustrialCompany)
+            .filter(IndustrialCompany.industry_segment == industry)
+            .all()
+        )
 
         company_ids = [c.id for c in companies]
         company_names = {c.id: c.name for c in companies}
@@ -185,18 +208,22 @@ class ChangeMonitor:
 
         alerts = []
         for change in changes:
-            alerts.append({
-                "change_id": change.id,
-                "person_name": change.person_name,
-                "company_id": change.company_id,
-                "company_name": company_names.get(change.company_id, "Unknown"),
-                "change_type": change.change_type,
-                "old_title": change.old_title,
-                "new_title": change.new_title,
-                "announced_date": change.announced_date.isoformat() if change.announced_date else None,
-                "is_c_suite": change.is_c_suite,
-                "significance_score": change.significance_score,
-            })
+            alerts.append(
+                {
+                    "change_id": change.id,
+                    "person_name": change.person_name,
+                    "company_id": change.company_id,
+                    "company_name": company_names.get(change.company_id, "Unknown"),
+                    "change_type": change.change_type,
+                    "old_title": change.old_title,
+                    "new_title": change.new_title,
+                    "announced_date": change.announced_date.isoformat()
+                    if change.announced_date
+                    else None,
+                    "is_c_suite": change.is_c_suite,
+                    "significance_score": change.significance_score,
+                }
+            )
 
         return alerts
 
@@ -209,9 +236,11 @@ class ChangeMonitor:
         """
         cutoff = date.today() - timedelta(days=days)
 
-        changes = self.db.query(LeadershipChange).filter(
-            LeadershipChange.detected_date >= cutoff
-        ).all()
+        changes = (
+            self.db.query(LeadershipChange)
+            .filter(LeadershipChange.detected_date >= cutoff)
+            .all()
+        )
 
         summary = {
             "period_days": days,
@@ -225,7 +254,9 @@ class ChangeMonitor:
 
         for change in changes:
             # By type
-            summary["by_type"][change.change_type] = summary["by_type"].get(change.change_type, 0) + 1
+            summary["by_type"][change.change_type] = (
+                summary["by_type"].get(change.change_type, 0) + 1
+            )
 
             # C-suite and board
             if change.is_c_suite:
@@ -289,17 +320,19 @@ class AlertDigestGenerator:
             alerts = []
             for change in changes:
                 company = self.db.get(IndustrialCompany, change.company_id)
-                alerts.append({
-                    "change_id": change.id,
-                    "person_name": change.person_name,
-                    "company_id": change.company_id,
-                    "company_name": company.name if company else "Unknown",
-                    "change_type": change.change_type,
-                    "old_title": change.old_title,
-                    "new_title": change.new_title,
-                    "is_c_suite": change.is_c_suite,
-                    "significance_score": change.significance_score,
-                })
+                alerts.append(
+                    {
+                        "change_id": change.id,
+                        "person_name": change.person_name,
+                        "company_id": change.company_id,
+                        "company_name": company.name if company else "Unknown",
+                        "change_type": change.change_type,
+                        "old_title": change.old_title,
+                        "new_title": change.new_title,
+                        "is_c_suite": change.is_c_suite,
+                        "significance_score": change.significance_score,
+                    }
+                )
 
         # Summary stats
         summary = self.monitor.get_change_summary(days=days)
@@ -307,7 +340,8 @@ class AlertDigestGenerator:
 
         # Highlights (high significance changes)
         digest["highlights"] = [
-            a for a in alerts
+            a
+            for a in alerts
             if a.get("significance_score", 0) >= 7 or a.get("is_c_suite")
         ][:10]
 

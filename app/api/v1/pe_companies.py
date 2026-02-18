@@ -21,8 +21,7 @@ from app.core.database import get_db
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
-    prefix="/pe/companies",
-    tags=["PE Intelligence - Portfolio Companies"]
+    prefix="/pe/companies", tags=["PE Intelligence - Portfolio Companies"]
 )
 
 
@@ -30,8 +29,10 @@ router = APIRouter(
 # Request/Response Models
 # =============================================================================
 
+
 class PortfolioCompanyCreate(BaseModel):
     """Request model for creating a portfolio company."""
+
     name: str = Field(..., examples=["ServiceTitan"])
     legal_name: Optional[str] = Field(None)
     website: Optional[str] = Field(None, examples=["https://www.servicetitan.com"])
@@ -59,6 +60,7 @@ class PortfolioCompanyCreate(BaseModel):
 # Endpoints
 # =============================================================================
 
+
 @router.get("/")
 async def list_portfolio_companies(
     limit: int = Query(100, le=1000),
@@ -67,7 +69,7 @@ async def list_portfolio_companies(
     ownership_status: Optional[str] = None,
     pe_owner: Optional[str] = None,
     search: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     List portfolio companies with filtering.
@@ -115,32 +117,30 @@ async def list_portfolio_companies(
 
         companies = []
         for row in rows:
-            companies.append({
-                "id": row[0],
-                "name": row[1],
-                "website": row[2],
-                "description": row[3][:200] if row[3] else None,
-                "location": {
-                    "city": row[4],
-                    "state": row[5],
-                    "country": row[6]
-                },
-                "industry": row[7],
-                "sub_industry": row[8],
-                "sector": row[9],
-                "founded_year": row[10],
-                "employee_count": row[11],
-                "ownership_status": row[12],
-                "current_pe_owner": row[13],
-                "status": row[14],
-                "created_at": row[15].isoformat() if row[15] else None
-            })
+            companies.append(
+                {
+                    "id": row[0],
+                    "name": row[1],
+                    "website": row[2],
+                    "description": row[3][:200] if row[3] else None,
+                    "location": {"city": row[4], "state": row[5], "country": row[6]},
+                    "industry": row[7],
+                    "sub_industry": row[8],
+                    "sector": row[9],
+                    "founded_year": row[10],
+                    "employee_count": row[11],
+                    "ownership_status": row[12],
+                    "current_pe_owner": row[13],
+                    "status": row[14],
+                    "created_at": row[15].isoformat() if row[15] else None,
+                }
+            )
 
         return {
             "count": len(companies),
             "limit": limit,
             "offset": offset,
-            "companies": companies
+            "companies": companies,
         }
 
     except Exception as e:
@@ -152,7 +152,7 @@ async def list_portfolio_companies(
 async def search_companies(
     q: str = Query(..., min_length=2),
     limit: int = Query(20, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Search portfolio companies by name.
@@ -169,23 +169,23 @@ async def search_companies(
             LIMIT :limit
         """)
 
-        result = db.execute(query, {
-            "search": f"%{q}%",
-            "exact": f"{q}%",
-            "limit": limit
-        })
+        result = db.execute(
+            query, {"search": f"%{q}%", "exact": f"{q}%", "limit": limit}
+        )
         rows = result.fetchall()
 
         companies = []
         for row in rows:
-            companies.append({
-                "id": row[0],
-                "name": row[1],
-                "industry": row[2],
-                "pe_owner": row[3],
-                "ownership_status": row[4],
-                "location": f"{row[5]}, {row[6]}" if row[5] else None
-            })
+            companies.append(
+                {
+                    "id": row[0],
+                    "name": row[1],
+                    "industry": row[2],
+                    "pe_owner": row[3],
+                    "ownership_status": row[4],
+                    "location": f"{row[5]}, {row[6]}" if row[5] else None,
+                }
+            )
 
         return {"count": len(companies), "results": companies}
 
@@ -196,8 +196,7 @@ async def search_companies(
 
 @router.post("/")
 async def create_portfolio_company(
-    company: PortfolioCompanyCreate,
-    db: Session = Depends(get_db)
+    company: PortfolioCompanyCreate, db: Session = Depends(get_db)
 ):
     """
     Create or update a portfolio company.
@@ -247,7 +246,7 @@ async def create_portfolio_company(
             "id": row[0],
             "name": row[1],
             "created_at": row[2].isoformat() if row[2] else None,
-            "message": "Company created/updated successfully"
+            "message": "Company created/updated successfully",
         }
 
     except Exception as e:
@@ -257,10 +256,7 @@ async def create_portfolio_company(
 
 
 @router.get("/{company_id}")
-async def get_portfolio_company(
-    company_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_portfolio_company(company_id: int, db: Session = Depends(get_db)):
     """
     Get detailed information for a portfolio company.
     """
@@ -282,7 +278,9 @@ async def get_portfolio_company(
         row = result.fetchone()
 
         if not row:
-            raise HTTPException(status_code=404, detail=f"Company {company_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Company {company_id} not found"
+            )
 
         # Get investments
         investments_query = text("""
@@ -314,7 +312,7 @@ async def get_portfolio_company(
                 "status": i[10],
                 "exit_date": i[11].isoformat() if i[11] else None,
                 "exit_type": i[12],
-                "exit_multiple": float(i[13]) if i[13] else None
+                "exit_multiple": float(i[13]) if i[13] else None,
             }
             for i in inv_result.fetchall()
         ]
@@ -325,40 +323,36 @@ async def get_portfolio_company(
             "legal_name": row[2],
             "website": row[3],
             "description": row[4],
-            "headquarters": {
-                "city": row[5],
-                "state": row[6],
-                "country": row[7]
-            },
+            "headquarters": {"city": row[5], "state": row[6], "country": row[7]},
             "classification": {
                 "industry": row[8],
                 "sub_industry": row[9],
                 "naics_code": row[10],
                 "sic_code": row[11],
-                "sector": row[12]
+                "sector": row[12],
             },
             "company_info": {
                 "founded_year": row[13],
                 "employee_count": row[14],
-                "employee_range": row[15]
+                "employee_range": row[15],
             },
             "ownership": {
                 "status": row[16],
                 "current_pe_owner": row[17],
-                "is_platform_company": row[18]
+                "is_platform_company": row[18],
             },
             "external_links": {
                 "linkedin": row[19],
                 "crunchbase": row[20],
                 "ticker": row[21],
-                "ein": row[22]
+                "ein": row[22],
             },
             "status": row[23],
             "metadata": {
                 "created_at": row[24].isoformat() if row[24] else None,
-                "updated_at": row[25].isoformat() if row[25] else None
+                "updated_at": row[25].isoformat() if row[25] else None,
             },
-            "investments": investments
+            "investments": investments,
         }
 
     except HTTPException:
@@ -370,9 +364,7 @@ async def get_portfolio_company(
 
 @router.get("/{company_id}/leadership")
 async def get_company_leadership(
-    company_id: int,
-    current_only: bool = True,
-    db: Session = Depends(get_db)
+    company_id: int, current_only: bool = True, db: Session = Depends(get_db)
 ):
     """
     Get leadership team for a portfolio company.
@@ -411,34 +403,36 @@ async def get_company_leadership(
 
         leadership = []
         for row in rows:
-            leadership.append({
-                "id": row[0],
-                "person_id": row[1],
-                "name": row[2],
-                "linkedin": row[3],
-                "title": row[4],
-                "role_category": row[5],
-                "flags": {
-                    "is_ceo": row[6],
-                    "is_cfo": row[7],
-                    "is_board_member": row[8],
-                    "is_board_chair": row[9]
-                },
-                "tenure": {
-                    "start_date": row[10].isoformat() if row[10] else None,
-                    "end_date": row[11].isoformat() if row[11] else None,
-                    "is_current": row[12]
-                },
-                "pe_relationship": {
-                    "appointed_by_pe": row[13],
-                    "firm_affiliation": row[14]
+            leadership.append(
+                {
+                    "id": row[0],
+                    "person_id": row[1],
+                    "name": row[2],
+                    "linkedin": row[3],
+                    "title": row[4],
+                    "role_category": row[5],
+                    "flags": {
+                        "is_ceo": row[6],
+                        "is_cfo": row[7],
+                        "is_board_member": row[8],
+                        "is_board_chair": row[9],
+                    },
+                    "tenure": {
+                        "start_date": row[10].isoformat() if row[10] else None,
+                        "end_date": row[11].isoformat() if row[11] else None,
+                        "is_current": row[12],
+                    },
+                    "pe_relationship": {
+                        "appointed_by_pe": row[13],
+                        "firm_affiliation": row[14],
+                    },
                 }
-            })
+            )
 
         return {
             "company_id": company_id,
             "count": len(leadership),
-            "leadership": leadership
+            "leadership": leadership,
         }
 
     except Exception as e:
@@ -448,9 +442,7 @@ async def get_company_leadership(
 
 @router.get("/{company_id}/financials")
 async def get_company_financials(
-    company_id: int,
-    limit: int = Query(10, le=50),
-    db: Session = Depends(get_db)
+    company_id: int, limit: int = Query(10, le=50), db: Session = Depends(get_db)
 ):
     """
     Get financial history for a portfolio company.
@@ -478,50 +470,52 @@ async def get_company_financials(
 
         financials = []
         for row in rows:
-            financials.append({
-                "id": row[0],
-                "period": {
-                    "fiscal_year": row[1],
-                    "fiscal_period": row[2],
-                    "end_date": row[3].isoformat() if row[3] else None
-                },
-                "income_statement": {
-                    "revenue_usd": float(row[4]) if row[4] else None,
-                    "revenue_growth_pct": float(row[5]) if row[5] else None,
-                    "gross_profit_usd": float(row[6]) if row[6] else None,
-                    "gross_margin_pct": float(row[7]) if row[7] else None,
-                    "ebitda_usd": float(row[8]) if row[8] else None,
-                    "ebitda_margin_pct": float(row[9]) if row[9] else None,
-                    "ebit_usd": float(row[10]) if row[10] else None,
-                    "net_income_usd": float(row[11]) if row[11] else None
-                },
-                "balance_sheet": {
-                    "total_assets_usd": float(row[12]) if row[12] else None,
-                    "total_debt_usd": float(row[13]) if row[13] else None,
-                    "cash_usd": float(row[14]) if row[14] else None,
-                    "net_debt_usd": float(row[15]) if row[15] else None
-                },
-                "cash_flow": {
-                    "operating_cash_flow_usd": float(row[16]) if row[16] else None,
-                    "capex_usd": float(row[17]) if row[17] else None,
-                    "free_cash_flow_usd": float(row[18]) if row[18] else None
-                },
-                "ratios": {
-                    "debt_to_ebitda": float(row[19]) if row[19] else None,
-                    "interest_coverage": float(row[20]) if row[20] else None
-                },
-                "data_quality": {
-                    "is_audited": row[21],
-                    "is_estimated": row[22],
-                    "source": row[23],
-                    "confidence": row[24]
+            financials.append(
+                {
+                    "id": row[0],
+                    "period": {
+                        "fiscal_year": row[1],
+                        "fiscal_period": row[2],
+                        "end_date": row[3].isoformat() if row[3] else None,
+                    },
+                    "income_statement": {
+                        "revenue_usd": float(row[4]) if row[4] else None,
+                        "revenue_growth_pct": float(row[5]) if row[5] else None,
+                        "gross_profit_usd": float(row[6]) if row[6] else None,
+                        "gross_margin_pct": float(row[7]) if row[7] else None,
+                        "ebitda_usd": float(row[8]) if row[8] else None,
+                        "ebitda_margin_pct": float(row[9]) if row[9] else None,
+                        "ebit_usd": float(row[10]) if row[10] else None,
+                        "net_income_usd": float(row[11]) if row[11] else None,
+                    },
+                    "balance_sheet": {
+                        "total_assets_usd": float(row[12]) if row[12] else None,
+                        "total_debt_usd": float(row[13]) if row[13] else None,
+                        "cash_usd": float(row[14]) if row[14] else None,
+                        "net_debt_usd": float(row[15]) if row[15] else None,
+                    },
+                    "cash_flow": {
+                        "operating_cash_flow_usd": float(row[16]) if row[16] else None,
+                        "capex_usd": float(row[17]) if row[17] else None,
+                        "free_cash_flow_usd": float(row[18]) if row[18] else None,
+                    },
+                    "ratios": {
+                        "debt_to_ebitda": float(row[19]) if row[19] else None,
+                        "interest_coverage": float(row[20]) if row[20] else None,
+                    },
+                    "data_quality": {
+                        "is_audited": row[21],
+                        "is_estimated": row[22],
+                        "source": row[23],
+                        "confidence": row[24],
+                    },
                 }
-            })
+            )
 
         return {
             "company_id": company_id,
             "count": len(financials),
-            "financials": financials
+            "financials": financials,
         }
 
     except Exception as e:
@@ -531,9 +525,7 @@ async def get_company_financials(
 
 @router.get("/{company_id}/valuations")
 async def get_company_valuations(
-    company_id: int,
-    limit: int = Query(10, le=50),
-    db: Session = Depends(get_db)
+    company_id: int, limit: int = Query(10, le=50), db: Session = Depends(get_db)
 ):
     """
     Get valuation history for a portfolio company.
@@ -558,36 +550,34 @@ async def get_company_valuations(
 
         valuations = []
         for row in rows:
-            valuations.append({
-                "id": row[0],
-                "date": row[1].isoformat() if row[1] else None,
-                "values": {
-                    "enterprise_value_usd": float(row[2]) if row[2] else None,
-                    "equity_value_usd": float(row[3]) if row[3] else None,
-                    "net_debt_usd": float(row[4]) if row[4] else None
-                },
-                "multiples": {
-                    "ev_revenue": float(row[5]) if row[5] else None,
-                    "ev_ebitda": float(row[6]) if row[6] else None,
-                    "ev_ebit": float(row[7]) if row[7] else None,
-                    "pe": float(row[8]) if row[8] else None
-                },
-                "context": {
-                    "type": row[9],
-                    "methodology": row[10],
-                    "event": row[11]
-                },
-                "source": {
-                    "name": row[12],
-                    "url": row[13],
-                    "confidence": row[14]
+            valuations.append(
+                {
+                    "id": row[0],
+                    "date": row[1].isoformat() if row[1] else None,
+                    "values": {
+                        "enterprise_value_usd": float(row[2]) if row[2] else None,
+                        "equity_value_usd": float(row[3]) if row[3] else None,
+                        "net_debt_usd": float(row[4]) if row[4] else None,
+                    },
+                    "multiples": {
+                        "ev_revenue": float(row[5]) if row[5] else None,
+                        "ev_ebitda": float(row[6]) if row[6] else None,
+                        "ev_ebit": float(row[7]) if row[7] else None,
+                        "pe": float(row[8]) if row[8] else None,
+                    },
+                    "context": {
+                        "type": row[9],
+                        "methodology": row[10],
+                        "event": row[11],
+                    },
+                    "source": {"name": row[12], "url": row[13], "confidence": row[14]},
                 }
-            })
+            )
 
         return {
             "company_id": company_id,
             "count": len(valuations),
-            "valuations": valuations
+            "valuations": valuations,
         }
 
     except Exception as e:
@@ -596,10 +586,7 @@ async def get_company_valuations(
 
 
 @router.get("/{company_id}/competitors")
-async def get_company_competitors(
-    company_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_company_competitors(company_id: int, db: Session = Depends(get_db)):
     """
     Get competitors for a portfolio company.
     """
@@ -625,30 +612,26 @@ async def get_company_competitors(
 
         competitors = []
         for row in rows:
-            competitors.append({
-                "id": row[0],
-                "name": row[1],
-                "linked_company_id": row[2],
-                "public_info": {
-                    "is_public": row[3],
-                    "ticker": row[4]
-                },
-                "pe_info": {
-                    "is_pe_backed": row[5],
-                    "pe_owner": row[6]
-                },
-                "competitive_position": {
-                    "type": row[7],
-                    "relative_size": row[8],
-                    "market_position": row[9]
-                },
-                "notes": row[10]
-            })
+            competitors.append(
+                {
+                    "id": row[0],
+                    "name": row[1],
+                    "linked_company_id": row[2],
+                    "public_info": {"is_public": row[3], "ticker": row[4]},
+                    "pe_info": {"is_pe_backed": row[5], "pe_owner": row[6]},
+                    "competitive_position": {
+                        "type": row[7],
+                        "relative_size": row[8],
+                        "market_position": row[9],
+                    },
+                    "notes": row[10],
+                }
+            )
 
         return {
             "company_id": company_id,
             "count": len(competitors),
-            "competitors": competitors
+            "competitors": competitors,
         }
 
     except Exception as e:
@@ -661,7 +644,7 @@ async def get_company_news(
     company_id: int,
     limit: int = Query(20, le=100),
     news_type: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get news for a portfolio company.
@@ -689,32 +672,26 @@ async def get_company_news(
 
         news = []
         for row in rows:
-            news.append({
-                "id": row[0],
-                "title": row[1],
-                "source": {
-                    "name": row[2],
-                    "url": row[3],
-                    "author": row[4]
-                },
-                "summary": row[5],
-                "published_date": row[6].isoformat() if row[6] else None,
-                "classification": {
-                    "type": row[7],
-                    "sentiment": row[8],
-                    "sentiment_score": float(row[9]) if row[9] else None
-                },
-                "relevance": {
-                    "score": float(row[10]) if row[10] else None,
-                    "is_primary": row[11]
+            news.append(
+                {
+                    "id": row[0],
+                    "title": row[1],
+                    "source": {"name": row[2], "url": row[3], "author": row[4]},
+                    "summary": row[5],
+                    "published_date": row[6].isoformat() if row[6] else None,
+                    "classification": {
+                        "type": row[7],
+                        "sentiment": row[8],
+                        "sentiment_score": float(row[9]) if row[9] else None,
+                    },
+                    "relevance": {
+                        "score": float(row[10]) if row[10] else None,
+                        "is_primary": row[11],
+                    },
                 }
-            })
+            )
 
-        return {
-            "company_id": company_id,
-            "count": len(news),
-            "news": news
-        }
+        return {"company_id": company_id, "count": len(news), "news": news}
 
     except Exception as e:
         logger.error(f"Error fetching news: {e}", exc_info=True)

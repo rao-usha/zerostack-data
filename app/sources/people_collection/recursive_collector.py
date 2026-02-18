@@ -57,6 +57,7 @@ class RecursiveCollectConfig:
 @dataclass
 class RecursiveCollectResult:
     """Result of a recursive collection run."""
+
     company_id: int
     company_name: str
     success: bool = False
@@ -124,9 +125,7 @@ class RecursiveCollectResult:
             },
             "timing": {
                 "total_seconds": round(self.duration_seconds, 1),
-                "phases": {
-                    k: round(v, 1) for k, v in self.phase_durations.items()
-                },
+                "phases": {k: round(v, 1) for k, v in self.phase_durations.items()},
             },
             "errors": self.errors,
             "warnings": self.warnings,
@@ -177,9 +176,11 @@ class RecursiveCollector:
         session = self._get_session()
         started_at = datetime.utcnow()
 
-        company = session.query(IndustrialCompany).filter(
-            IndustrialCompany.id == company_id
-        ).first()
+        company = (
+            session.query(IndustrialCompany)
+            .filter(IndustrialCompany.id == company_id)
+            .first()
+        )
 
         if not company:
             return RecursiveCollectResult(
@@ -229,6 +230,7 @@ class RecursiveCollector:
                 from app.sources.people_collection.structure_discovery import (
                     StructureDiscoveryAgent,
                 )
+
                 discovery_agent = StructureDiscoveryAgent()
 
                 try:
@@ -245,9 +247,7 @@ class RecursiveCollector:
                         f"{len(units)} business units discovered"
                     )
                 except Exception as e:
-                    logger.error(
-                        f"[RecursiveCollector] Phase 1 error: {e}"
-                    )
+                    logger.error(f"[RecursiveCollector] Phase 1 error: {e}")
                     result.errors.append(f"Structure discovery: {str(e)}")
                 finally:
                     await discovery_agent.close()
@@ -257,10 +257,14 @@ class RecursiveCollector:
                 ).total_seconds()
 
             # Get all subsidiary IDs (whether just discovered or pre-existing)
-            subsidiaries = session.query(IndustrialCompany).filter(
-                IndustrialCompany.parent_company_id == company_id,
-                IndustrialCompany.status == "active",
-            ).all()
+            subsidiaries = (
+                session.query(IndustrialCompany)
+                .filter(
+                    IndustrialCompany.parent_company_id == company_id,
+                    IndustrialCompany.status == "active",
+                )
+                .all()
+            )
             subsidiary_ids = [s.id for s in subsidiaries]
 
             logger.info(
@@ -275,9 +279,7 @@ class RecursiveCollector:
             logger.info("[RecursiveCollector] Phase 2: Per-unit collection")
 
             # Collect for parent company first
-            parent_result = await self._collect_for_unit(
-                company, config, session
-            )
+            parent_result = await self._collect_for_unit(company, config, session)
             result.per_unit_results[company.name] = parent_result
             result.total_people_found += parent_result.get("people_found", 0)
             result.total_people_created += parent_result.get("people_created", 0)
@@ -288,9 +290,7 @@ class RecursiveCollector:
             # Then collect for each subsidiary
             for sub in subsidiaries:
                 try:
-                    sub_result = await self._collect_for_unit(
-                        sub, config, session
-                    )
+                    sub_result = await self._collect_for_unit(sub, config, session)
                     result.per_unit_results[sub.name] = sub_result
                     result.total_people_found += sub_result.get("people_found", 0)
                     result.total_people_created += sub_result.get("people_created", 0)
@@ -303,9 +303,7 @@ class RecursiveCollector:
                         f"[RecursiveCollector] Collection failed for "
                         f"{sub.name}: {e}"
                     )
-                    result.errors.append(
-                        f"Collection for {sub.name}: {str(e)}"
-                    )
+                    result.errors.append(f"Collection for {sub.name}: {str(e)}")
                     result.per_unit_results[sub.name] = {"error": str(e)}
 
             result.phase_durations["per_unit_collection"] = (
@@ -352,6 +350,7 @@ class RecursiveCollector:
                 from app.sources.people_collection.functional_org_mapper import (
                     FunctionalOrgMapper,
                 )
+
                 mapper = FunctionalOrgMapper()
 
                 try:
@@ -395,6 +394,7 @@ class RecursiveCollector:
                 from app.sources.people_collection.org_chart_builder import (
                     OrgChartBuilder,
                 )
+
                 builder = OrgChartBuilder()
 
                 try:
@@ -412,9 +412,7 @@ class RecursiveCollector:
                     result.master_org_chart_depth = chart_result.get("max_depth", 0)
 
                 except Exception as e:
-                    logger.error(
-                        f"[RecursiveCollector] Master org chart failed: {e}"
-                    )
+                    logger.error(f"[RecursiveCollector] Master org chart failed: {e}")
                     result.errors.append(f"Master org chart: {str(e)}")
 
                 result.phase_durations["master_org_chart"] = (
@@ -450,9 +448,7 @@ class RecursiveCollector:
             if not self._provided_session:
                 session.close()
 
-        result.duration_seconds = (
-            datetime.utcnow() - started_at
-        ).total_seconds()
+        result.duration_seconds = (datetime.utcnow() - started_at).total_seconds()
 
         logger.info(
             f"[RecursiveCollector] Recursive collection complete for "
@@ -556,6 +552,7 @@ class RecursiveCollector:
                 from app.sources.people_collection.orchestrator import (
                     PeopleCollectionOrchestrator,
                 )
+
                 orchestrator = PeopleCollectionOrchestrator(db_session=session)
                 await orchestrator._store_people(
                     general_people, parent_company, session
@@ -576,6 +573,7 @@ class RecursiveCollector:
                     from app.sources.people_collection.orchestrator import (
                         PeopleCollectionOrchestrator,
                     )
+
                     orchestrator = PeopleCollectionOrchestrator(db_session=session)
                     await orchestrator._store_people(
                         tech_people, parent_company, session
@@ -583,9 +581,7 @@ class RecursiveCollector:
                     all_people.extend(tech_people)
 
         except Exception as e:
-            logger.error(
-                f"[RecursiveCollector] LinkedIn discovery error: {e}"
-            )
+            logger.error(f"[RecursiveCollector] LinkedIn discovery error: {e}")
         finally:
             await discovery.close()
 

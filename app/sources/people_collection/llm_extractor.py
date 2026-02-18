@@ -52,9 +52,11 @@ class LLMExtractor:
         if self._client is None:
             if self.config.provider == "anthropic":
                 import anthropic
+
                 self._client = anthropic.Anthropic()
             else:
                 import openai
+
                 self._client = openai.OpenAI()
         return self._client
 
@@ -90,7 +92,9 @@ class LLMExtractor:
                     )
                     result = response.content[0].text
                     input_tokens = response.usage.input_tokens if response.usage else 0
-                    output_tokens = response.usage.output_tokens if response.usage else 0
+                    output_tokens = (
+                        response.usage.output_tokens if response.usage else 0
+                    )
                 else:
                     # OpenAI
                     response = await asyncio.to_thread(
@@ -102,11 +106,14 @@ class LLMExtractor:
                     )
                     result = response.choices[0].message.content
                     input_tokens = response.usage.prompt_tokens if response.usage else 0
-                    output_tokens = response.usage.completion_tokens if response.usage else 0
+                    output_tokens = (
+                        response.usage.completion_tokens if response.usage else 0
+                    )
 
                 # Track LLM cost
                 try:
                     from app.core.llm_cost_tracker import get_cost_tracker
+
                     tracker = get_cost_tracker()
                     await tracker.record(
                         model=self.config.model,
@@ -118,20 +125,31 @@ class LLMExtractor:
                 except Exception as track_err:
                     logger.debug(f"[LLMExtractor] Cost tracking failed: {track_err}")
 
-                logger.info(f"[LLMExtractor] LLM response received: {len(result) if result else 0} chars")
-                logger.debug(f"[LLMExtractor] Response preview: {result[:500] if result else 'None'}...")
+                logger.info(
+                    f"[LLMExtractor] LLM response received: {len(result) if result else 0} chars"
+                )
+                logger.debug(
+                    f"[LLMExtractor] Response preview: {result[:500] if result else 'None'}..."
+                )
                 return result
 
             except Exception as e:
-                logger.warning(f"[LLMExtractor] LLM call attempt {attempt + 1}/{max_retries} failed: {e}")
+                logger.warning(
+                    f"[LLMExtractor] LLM call attempt {attempt + 1}/{max_retries} failed: {e}"
+                )
                 import traceback
-                logger.debug(f"[LLMExtractor] Error traceback: {traceback.format_exc()}")
+
+                logger.debug(
+                    f"[LLMExtractor] Error traceback: {traceback.format_exc()}"
+                )
                 if attempt < max_retries - 1:
-                    wait_time = self.config.retry_delay_seconds * (2 ** attempt)
+                    wait_time = self.config.retry_delay_seconds * (2**attempt)
                     logger.info(f"[LLMExtractor] Retrying in {wait_time}s...")
                     await asyncio.sleep(wait_time)
                 else:
-                    logger.error(f"[LLMExtractor] LLM call failed after {max_retries} attempts: {e}")
+                    logger.error(
+                        f"[LLMExtractor] LLM call failed after {max_retries} attempts: {e}"
+                    )
                     return None
 
         return None
@@ -143,7 +161,7 @@ class LLMExtractor:
 
         # Try to find JSON in the response
         # Sometimes LLMs wrap JSON in markdown code blocks
-        json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', response)
+        json_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", response)
         if json_match:
             response = json_match.group(1)
 
@@ -154,7 +172,7 @@ class LLMExtractor:
             pass
 
         # Try to find JSON object in response
-        json_match = re.search(r'\{[\s\S]*\}', response)
+        json_match = re.search(r"\{[\s\S]*\}", response)
         if json_match:
             try:
                 return json.loads(json_match.group())
@@ -206,24 +224,28 @@ class LLMExtractor:
         """
         from bs4 import BeautifulSoup
 
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, "html.parser")
 
         # Remove script and style elements
-        for element in soup.find_all(['script', 'style', 'noscript', 'iframe']):
+        for element in soup.find_all(["script", "style", "noscript", "iframe"]):
             element.decompose()
 
         # Remove navigation and footer (often noisy)
-        for element in soup.find_all(['nav', 'footer', 'header']):
+        for element in soup.find_all(["nav", "footer", "header"]):
             # Keep if it might contain leadership info
             text = element.get_text().lower()
-            if 'leadership' not in text and 'team' not in text and 'management' not in text:
+            if (
+                "leadership" not in text
+                and "team" not in text
+                and "management" not in text
+            ):
                 element.decompose()
 
         # Get text with some structure preserved
-        text = soup.get_text(separator='\n', strip=True)
+        text = soup.get_text(separator="\n", strip=True)
 
         # Collapse multiple newlines
-        text = re.sub(r'\n{3,}', '\n\n', text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
 
         # Truncate if too long
         if len(text) > max_length:
@@ -302,7 +324,7 @@ class LLMExtractor:
             f"confidence={data.get('extraction_confidence')}, "
             f"page_type={data.get('page_type')}"
         )
-        if data.get('notes'):
+        if data.get("notes"):
             logger.info(f"[LLMExtractor] LLM notes: {data.get('notes')}")
 
         # Parse people
@@ -319,7 +341,9 @@ class LLMExtractor:
             page_url=page_url,
             page_type=data.get("page_type", "leadership"),
             people=people,
-            extraction_confidence=ExtractionConfidence(data.get("extraction_confidence", "medium")),
+            extraction_confidence=ExtractionConfidence(
+                data.get("extraction_confidence", "medium")
+            ),
             extraction_notes=data.get("notes"),
         )
 
@@ -333,13 +357,17 @@ class LLMExtractor:
         raw_people = data.get("people", [])
         skipped_count = 0
 
-        logger.debug(f"[LLMExtractor] Parsing {len(raw_people)} raw people from response")
+        logger.debug(
+            f"[LLMExtractor] Parsing {len(raw_people)} raw people from response"
+        )
 
         for i, p in enumerate(raw_people):
             try:
                 # Normalize and enhance
                 title = p.get("title", "")
-                title_normalized = p.get("title_normalized") or self._normalize_title(title)
+                title_normalized = p.get("title_normalized") or self._normalize_title(
+                    title
+                )
                 title_level = p.get("title_level", "unknown")
 
                 if title_level == "unknown":
@@ -349,7 +377,9 @@ class LLMExtractor:
 
                 # Skip invalid names
                 if not full_name or len(full_name) < 3:
-                    logger.debug(f"[LLMExtractor] Skipping person {i}: invalid name '{full_name}'")
+                    logger.debug(
+                        f"[LLMExtractor] Skipping person {i}: invalid name '{full_name}'"
+                    )
                     skipped_count += 1
                     continue
 
@@ -357,7 +387,9 @@ class LLMExtractor:
                     full_name=full_name,
                     title=title,
                     title_normalized=title_normalized,
-                    title_level=TitleLevel(title_level) if title_level else TitleLevel.UNKNOWN,
+                    title_level=TitleLevel(title_level)
+                    if title_level
+                    else TitleLevel.UNKNOWN,
                     department=p.get("department"),
                     bio=p.get("bio"),
                     linkedin_url=p.get("linkedin_url"),
@@ -366,13 +398,17 @@ class LLMExtractor:
                     reports_to=p.get("reports_to"),
                     is_board_member=p.get("is_board_member", False),
                     is_executive=p.get("is_executive", True),
-                    confidence=ExtractionConfidence(data.get("extraction_confidence", "medium")),
+                    confidence=ExtractionConfidence(
+                        data.get("extraction_confidence", "medium")
+                    ),
                     source_url=page_url,
                 )
                 people.append(person)
                 logger.debug(f"[LLMExtractor] Parsed person: {full_name} - {title}")
             except Exception as e:
-                logger.warning(f"[LLMExtractor] Failed to parse person {i}: {e}, data: {p}")
+                logger.warning(
+                    f"[LLMExtractor] Failed to parse person {i}: {e}, data: {p}"
+                )
                 skipped_count += 1
 
         logger.info(
@@ -422,14 +458,16 @@ Text:
             title = p.get("title", "").strip()
 
             if full_name and len(full_name) >= 3 and title:
-                people.append(ExtractedPerson(
-                    full_name=full_name,
-                    title=title,
-                    title_level=self._infer_title_level(title),
-                    confidence=ExtractionConfidence.LOW,
-                    source_url=page_url,
-                    extraction_notes="Extracted via simplified fallback prompt",
-                ))
+                people.append(
+                    ExtractedPerson(
+                        full_name=full_name,
+                        title=title,
+                        title_level=self._infer_title_level(title),
+                        confidence=ExtractionConfidence.LOW,
+                        source_url=page_url,
+                        extraction_notes="Extracted via simplified fallback prompt",
+                    )
+                )
 
         logger.info(f"[LLMExtractor] Simplified extraction found {len(people)} people")
         return people
@@ -476,6 +514,7 @@ Text:
                 if c.get("effective_date"):
                     try:
                         from datetime import date
+
                         effective_date = date.fromisoformat(c["effective_date"])
                     except ValueError:
                         pass
@@ -493,7 +532,9 @@ Text:
                     is_c_suite=c.get("is_c_suite", False),
                     is_board=c.get("is_board", False),
                     source_type="press_release",
-                    confidence=ExtractionConfidence(data.get("extraction_confidence", "medium")),
+                    confidence=ExtractionConfidence(
+                        data.get("extraction_confidence", "medium")
+                    ),
                 )
                 changes.append(change)
             except Exception as e:
@@ -530,31 +571,38 @@ Text:
         if not data:
             return ParsedBio()
 
-        from app.sources.people_collection.types import ExtractedExperience, ExtractedEducation
+        from app.sources.people_collection.types import (
+            ExtractedExperience,
+            ExtractedEducation,
+        )
 
         experience = []
         for exp in data.get("experience", []):
             try:
-                experience.append(ExtractedExperience(
-                    company_name=exp.get("company", ""),
-                    title=exp.get("title", ""),
-                    start_year=exp.get("start_year"),
-                    end_year=exp.get("end_year"),
-                    is_current=exp.get("is_current", False),
-                    description=exp.get("description"),
-                ))
+                experience.append(
+                    ExtractedExperience(
+                        company_name=exp.get("company", ""),
+                        title=exp.get("title", ""),
+                        start_year=exp.get("start_year"),
+                        end_year=exp.get("end_year"),
+                        is_current=exp.get("is_current", False),
+                        description=exp.get("description"),
+                    )
+                )
             except Exception:
                 pass
 
         education = []
         for edu in data.get("education", []):
             try:
-                education.append(ExtractedEducation(
-                    institution=edu.get("institution", ""),
-                    degree=edu.get("degree"),
-                    field_of_study=edu.get("field"),
-                    graduation_year=edu.get("graduation_year"),
-                ))
+                education.append(
+                    ExtractedEducation(
+                        institution=edu.get("institution", ""),
+                        degree=edu.get("degree"),
+                        field_of_study=edu.get("field"),
+                        graduation_year=edu.get("graduation_year"),
+                    )
+                )
             except Exception:
                 pass
 
@@ -611,7 +659,9 @@ Text:
             end = min(len(filing_text), first_bio + 50000)
             section = filing_text[start:end]
             sections.append(f"--- Section: DIRECTOR BIOGRAPHIES ---\n{section}")
-            logger.info(f"[LLMExtractor] Found {len(director_since_positions)} director bios starting at {first_bio}")
+            logger.info(
+                f"[LLMExtractor] Found {len(director_since_positions)} director bios starting at {first_bio}"
+            )
 
         # Strategy 2: Find multiple "AGE:" markers (indicates bio section even in complex HTML)
         if not sections:
@@ -633,22 +683,32 @@ Text:
                 start = max(0, first_age - 3000)
                 end = min(len(filing_text), first_age + 60000)
                 section = filing_text[start:end]
-                sections.append(f"--- Section: DIRECTOR BIOGRAPHIES (AGE MARKERS) ---\n{section}")
-                logger.info(f"[LLMExtractor] Found {len(age_positions)} AGE markers, extracting bio section from {first_age}")
+                sections.append(
+                    f"--- Section: DIRECTOR BIOGRAPHIES (AGE MARKERS) ---\n{section}"
+                )
+                logger.info(
+                    f"[LLMExtractor] Found {len(age_positions)} AGE markers, extracting bio section from {first_age}"
+                )
 
         # Also look for executive officer sections using "Age:" pattern after exec keywords
-        exec_keywords = ["named executive officers", "executive officers", "our executive officers"]
+        exec_keywords = [
+            "named executive officers",
+            "executive officers",
+            "our executive officers",
+        ]
         for keyword in exec_keywords:
             idx = filing_text_lower.find(keyword)
             if idx >= 0:
                 # Check if this section has actual content (look for "Age:" within 5000 chars)
-                section_preview = filing_text_lower[idx:idx+5000]
+                section_preview = filing_text_lower[idx : idx + 5000]
                 if "age:" in section_preview or "age " in section_preview:
                     start = max(0, idx - 200)
                     end = min(len(filing_text), idx + 30000)
                     section = filing_text[start:end]
                     sections.append(f"--- Section: {keyword.upper()} ---\n{section}")
-                    logger.info(f"[LLMExtractor] Found executive section '{keyword}' at {idx} with bio content")
+                    logger.info(
+                        f"[LLMExtractor] Found executive section '{keyword}' at {idx} with bio content"
+                    )
                     break  # Only need one exec section
 
         # Fallback: try original keywords but skip early TOC positions
@@ -666,16 +726,22 @@ Text:
                     end = min(len(filing_text), idx + section_len)
                     section = filing_text[start:end]
                     sections.append(f"--- Section: {keyword.upper()} ---\n{section}")
-                    logger.debug(f"[LLMExtractor] Found section '{keyword}' at position {idx}")
+                    logger.debug(
+                        f"[LLMExtractor] Found section '{keyword}' at position {idx}"
+                    )
 
         if sections:
             # Use the extracted sections
             filing_text = "\n\n".join(sections[:4])  # Use top 4 sections
-            logger.info(f"[LLMExtractor] Extracted {len(sections)} relevant sections for {company_name}")
+            logger.info(
+                f"[LLMExtractor] Extracted {len(sections)} relevant sections for {company_name}"
+            )
         else:
             # Fallback: use first portion of text
             filing_text = filing_text[:50000]
-            logger.warning(f"[LLMExtractor] No sections found for {company_name}, using first 50k chars")
+            logger.warning(
+                f"[LLMExtractor] No sections found for {company_name}, using first 50k chars"
+            )
 
         prompt = SEC_PROXY_EXTRACTION_PROMPT.format(
             company_name=company_name,
@@ -683,7 +749,9 @@ Text:
             filing_text=filing_text,
         )
 
-        logger.info(f"[LLMExtractor] Extracting from SEC proxy for {company_name} ({len(filing_text)} chars)")
+        logger.info(
+            f"[LLMExtractor] Extracting from SEC proxy for {company_name} ({len(filing_text)} chars)"
+        )
 
         response = await self._call_llm(prompt)
 
@@ -706,7 +774,11 @@ Text:
             data = await self._try_simple_sec_extraction(filing_text, company_name)
 
         if not data:
-            return {"executives": [], "board_members": [], "extraction_confidence": "low"}
+            return {
+                "executives": [],
+                "board_members": [],
+                "extraction_confidence": "low",
+            }
 
         return data
 

@@ -18,6 +18,7 @@ router = APIRouter(prefix="/reports", tags=["Reports"])
 
 class GenerateReportRequest(BaseModel):
     """Request model for report generation."""
+
     template: str
     format: str = "excel"
     params: dict
@@ -75,7 +76,9 @@ def generate_report(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Report generation failed: {str(e)}"
+        )
 
 
 @router.get("/{report_id}")
@@ -114,7 +117,9 @@ def download_report(
         raise HTTPException(status_code=404, detail="Report not found")
 
     if report["status"] != "complete":
-        raise HTTPException(status_code=400, detail=f"Report is not ready: {report['status']}")
+        raise HTTPException(
+            status_code=400, detail=f"Report is not ready: {report['status']}"
+        )
 
     file_path = builder.get_download_path(report_id)
     if not file_path:

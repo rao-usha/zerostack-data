@@ -10,6 +10,7 @@ Features:
 - Similar deal identification
 - Risk alerts and recommendations
 """
+
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -63,6 +64,7 @@ STAGE_BENCHMARKS = {
 @dataclass
 class DealPrediction:
     """Prediction result for a deal."""
+
     deal_id: int
     company_name: str
     win_probability: float
@@ -83,6 +85,7 @@ class DealPrediction:
 @dataclass
 class PipelineInsights:
     """Aggregate insights for the pipeline."""
+
     total_active_deals: int
     total_pipeline_value: float
     expected_value: float
@@ -198,9 +201,7 @@ class DealScorer:
             return None
 
     def _get_historical_deals(
-        self,
-        sector: Optional[str] = None,
-        limit: int = 100
+        self, sector: Optional[str] = None, limit: int = 100
     ) -> List[Dict]:
         """Get historical closed deals for pattern analysis."""
         query = text("""
@@ -240,9 +241,7 @@ class DealScorer:
     # -------------------------------------------------------------------------
 
     def _calculate_company_score(
-        self,
-        deal: Dict,
-        company_score: Optional[Dict]
+        self, deal: Dict, company_score: Optional[Dict]
     ) -> Tuple[float, List[str], List[str]]:
         """
         Calculate company quality score (0-100).
@@ -258,11 +257,17 @@ class DealScorer:
             tier = company_score.get("tier", "C")
 
             if score >= 70:
-                strengths.append(f"Strong company health score ({score:.0f}/100, Tier {tier})")
+                strengths.append(
+                    f"Strong company health score ({score:.0f}/100, Tier {tier})"
+                )
             elif score >= 50:
-                strengths.append(f"Moderate company health score ({score:.0f}/100, Tier {tier})")
+                strengths.append(
+                    f"Moderate company health score ({score:.0f}/100, Tier {tier})"
+                )
             else:
-                risks.append(f"Below-average company health score ({score:.0f}/100, Tier {tier})")
+                risks.append(
+                    f"Below-average company health score ({score:.0f}/100, Tier {tier})"
+                )
 
             # Check category scores
             growth = company_score.get("growth_score")
@@ -312,13 +317,17 @@ class DealScorer:
         if deal_size:
             if sweet_spot[0] <= deal_size <= sweet_spot[1]:
                 score += 20
-                strengths.append(f"Deal size (${deal_size}M) in sweet spot for {sector}")
+                strengths.append(
+                    f"Deal size (${deal_size}M) in sweet spot for {sector}"
+                )
             elif deal_size < sweet_spot[0]:
                 score += 10
                 risks.append(f"Deal size (${deal_size}M) below typical range")
             else:
                 score -= 10
-                risks.append(f"Deal size (${deal_size}M) above typical range - concentration risk")
+                risks.append(
+                    f"Deal size (${deal_size}M) above typical range - concentration risk"
+                )
 
         # Valuation analysis
         valuation = deal.get("valuation_millions")
@@ -353,7 +362,9 @@ class DealScorer:
 
         return max(0, min(100, score)), strengths, risks
 
-    def _calculate_pipeline_score(self, deal: Dict) -> Tuple[float, List[str], List[str]]:
+    def _calculate_pipeline_score(
+        self, deal: Dict
+    ) -> Tuple[float, List[str], List[str]]:
         """
         Calculate pipeline signals score (0-100).
 
@@ -370,9 +381,11 @@ class DealScorer:
 
         if stage and created_at:
             if isinstance(created_at, str):
-                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
 
-            days_in_pipeline = (datetime.utcnow() - created_at.replace(tzinfo=None)).days
+            days_in_pipeline = (
+                datetime.utcnow() - created_at.replace(tzinfo=None)
+            ).days
 
             benchmark = STAGE_BENCHMARKS.get(stage, 21)
             if days_in_pipeline <= benchmark:
@@ -400,9 +413,13 @@ class DealScorer:
         # Recent activity
         if last_activity:
             if isinstance(last_activity, str):
-                last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+                last_activity = datetime.fromisoformat(
+                    last_activity.replace("Z", "+00:00")
+                )
 
-            days_since_activity = (datetime.utcnow() - last_activity.replace(tzinfo=None)).days
+            days_since_activity = (
+                datetime.utcnow() - last_activity.replace(tzinfo=None)
+            ).days
             if days_since_activity <= 7:
                 score += 10
                 strengths.append("Recent activity this week")
@@ -422,9 +439,7 @@ class DealScorer:
         return max(0, min(100, score)), strengths, risks
 
     def _calculate_pattern_score(
-        self,
-        deal: Dict,
-        historical_deals: List[Dict]
+        self, deal: Dict, historical_deals: List[Dict]
     ) -> Tuple[float, List[str], List[str], List[Dict]]:
         """
         Calculate historical pattern score (0-100).
@@ -471,15 +486,17 @@ class DealScorer:
                 factors.append("same_stage")
 
             if similarity >= 0.4:
-                similar_deals.append({
-                    "id": hist.get("id"),
-                    "company_name": hist.get("company_name"),
-                    "sector": hist.get("company_sector"),
-                    "deal_size_millions": hist_size,
-                    "outcome": hist.get("pipeline_stage"),
-                    "similarity_score": similarity,
-                    "similarity_factors": factors,
-                })
+                similar_deals.append(
+                    {
+                        "id": hist.get("id"),
+                        "company_name": hist.get("company_name"),
+                        "sector": hist.get("company_sector"),
+                        "deal_size_millions": hist_size,
+                        "outcome": hist.get("pipeline_stage"),
+                        "similarity_score": similarity,
+                        "similarity_factors": factors,
+                    }
+                )
 
         # Sort by similarity
         similar_deals.sort(key=lambda x: x["similarity_score"], reverse=True)
@@ -503,10 +520,14 @@ class DealScorer:
         if source:
             source_deals = [d for d in historical_deals if d.get("source") == source]
             if len(source_deals) >= 3:
-                source_wins = sum(1 for d in source_deals if d.get("pipeline_stage") == "closed_won")
+                source_wins = sum(
+                    1 for d in source_deals if d.get("pipeline_stage") == "closed_won"
+                )
                 source_rate = source_wins / len(source_deals)
                 if source_rate >= 0.5:
-                    strengths.append(f"Strong source track record ({source_rate:.0%} win rate)")
+                    strengths.append(
+                        f"Strong source track record ({source_rate:.0%} win rate)"
+                    )
                     score += 10
 
         return max(0, min(100, score)), strengths, risks, similar_deals
@@ -515,7 +536,9 @@ class DealScorer:
     # MAIN SCORING
     # -------------------------------------------------------------------------
 
-    def score_deal(self, deal_id: int, use_cache: bool = True) -> Optional[DealPrediction]:
+    def score_deal(
+        self, deal_id: int, use_cache: bool = True
+    ) -> Optional[DealPrediction]:
         """
         Score a single deal with full breakdown.
 
@@ -552,17 +575,23 @@ class DealScorer:
         historical = self._get_historical_deals(deal.get("company_sector"))
 
         # Calculate category scores
-        company_pts, company_strengths, company_risks = self._calculate_company_score(deal, company_score)
+        company_pts, company_strengths, company_risks = self._calculate_company_score(
+            deal, company_score
+        )
         deal_pts, deal_strengths, deal_risks = self._calculate_deal_score(deal)
-        pipeline_pts, pipeline_strengths, pipeline_risks = self._calculate_pipeline_score(deal)
-        pattern_pts, pattern_strengths, pattern_risks, similar = self._calculate_pattern_score(deal, historical)
+        pipeline_pts, pipeline_strengths, pipeline_risks = (
+            self._calculate_pipeline_score(deal)
+        )
+        pattern_pts, pattern_strengths, pattern_risks, similar = (
+            self._calculate_pattern_score(deal, historical)
+        )
 
         # Combine scores with weights
         win_probability = (
-            company_pts * WEIGHTS["company"] +
-            deal_pts * WEIGHTS["deal"] +
-            pipeline_pts * WEIGHTS["pipeline"] +
-            pattern_pts * WEIGHTS["pattern"]
+            company_pts * WEIGHTS["company"]
+            + deal_pts * WEIGHTS["deal"]
+            + pipeline_pts * WEIGHTS["pipeline"]
+            + pattern_pts * WEIGHTS["pattern"]
         ) / 100  # Convert to 0-1 scale
 
         # Determine confidence
@@ -586,7 +615,9 @@ class DealScorer:
             tier = "F"
 
         # Combine insights
-        strengths = company_strengths + deal_strengths + pipeline_strengths + pattern_strengths
+        strengths = (
+            company_strengths + deal_strengths + pipeline_strengths + pattern_strengths
+        )
         risks = company_risks + deal_risks + pipeline_risks + pattern_risks
 
         # Generate recommendations
@@ -619,10 +650,7 @@ class DealScorer:
         return prediction
 
     def _generate_recommendations(
-        self,
-        deal: Dict,
-        probability: float,
-        risks: List[str]
+        self, deal: Dict, probability: float, risks: List[str]
     ) -> List[str]:
         """Generate actionable recommendations based on risks."""
         recommendations = []
@@ -649,7 +677,9 @@ class DealScorer:
             elif "activity" in risk.lower():
                 recommendations.append("Schedule follow-up meeting this week")
             elif "valuation" in risk.lower():
-                recommendations.append("Request updated cap table and comparable analysis")
+                recommendations.append(
+                    "Request updated cap table and comparable analysis"
+                )
 
         # High probability optimization
         if probability >= 0.7:
@@ -658,9 +688,7 @@ class DealScorer:
         return recommendations
 
     def _estimate_timing(
-        self,
-        deal: Dict,
-        similar_deals: List[Dict]
+        self, deal: Dict, similar_deals: List[Dict]
     ) -> Tuple[str, int]:
         """Estimate optimal close window and days to decision."""
         stage = deal.get("pipeline_stage")
@@ -710,7 +738,9 @@ class DealScorer:
               AND dp.predicted_at > NOW() - INTERVAL '24 hours'
         """)
         try:
-            result = self.db.execute(query, {"deal_id": deal_id, "version": MODEL_VERSION})
+            result = self.db.execute(
+                query, {"deal_id": deal_id, "version": MODEL_VERSION}
+            )
             row = result.mappings().fetchone()
             if row:
                 return DealPrediction(
@@ -768,24 +798,30 @@ class DealScorer:
         """)
 
         import json
+
         try:
-            self.db.execute(query, {
-                "deal_id": prediction.deal_id,
-                "win_probability": prediction.win_probability,
-                "confidence": prediction.confidence,
-                "tier": prediction.tier,
-                "company_score": prediction.company_score,
-                "deal_score": prediction.deal_score,
-                "pipeline_score": prediction.pipeline_score,
-                "pattern_score": prediction.pattern_score,
-                "strengths": json.dumps(prediction.strengths),
-                "risks": json.dumps(prediction.risks),
-                "recommendations": json.dumps(prediction.recommendations),
-                "similar_deal_ids": [d["id"] for d in prediction.similar_deals if d.get("id")],
-                "optimal_close_window": prediction.optimal_close_window,
-                "days_to_decision": prediction.days_to_decision,
-                "model_version": MODEL_VERSION,
-            })
+            self.db.execute(
+                query,
+                {
+                    "deal_id": prediction.deal_id,
+                    "win_probability": prediction.win_probability,
+                    "confidence": prediction.confidence,
+                    "tier": prediction.tier,
+                    "company_score": prediction.company_score,
+                    "deal_score": prediction.deal_score,
+                    "pipeline_score": prediction.pipeline_score,
+                    "pattern_score": prediction.pattern_score,
+                    "strengths": json.dumps(prediction.strengths),
+                    "risks": json.dumps(prediction.risks),
+                    "recommendations": json.dumps(prediction.recommendations),
+                    "similar_deal_ids": [
+                        d["id"] for d in prediction.similar_deals if d.get("id")
+                    ],
+                    "optimal_close_window": prediction.optimal_close_window,
+                    "days_to_decision": prediction.days_to_decision,
+                    "model_version": MODEL_VERSION,
+                },
+            )
             self.db.commit()
         except Exception as e:
             logger.warning(f"Cache write error: {e}")
@@ -796,9 +832,7 @@ class DealScorer:
     # -------------------------------------------------------------------------
 
     def score_pipeline(
-        self,
-        min_probability: float = 0.0,
-        limit: int = 50
+        self, min_probability: float = 0.0, limit: int = 50
     ) -> List[Dict]:
         """Score all active deals in pipeline."""
         deals = self._get_active_deals()
@@ -812,20 +846,28 @@ class DealScorer:
                 days_in_stage = 0
                 if created_at:
                     if isinstance(created_at, str):
-                        created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                    days_in_stage = (datetime.utcnow() - created_at.replace(tzinfo=None)).days
+                        created_at = datetime.fromisoformat(
+                            created_at.replace("Z", "+00:00")
+                        )
+                    days_in_stage = (
+                        datetime.utcnow() - created_at.replace(tzinfo=None)
+                    ).days
 
-                scored.append({
-                    "deal_id": prediction.deal_id,
-                    "company_name": prediction.company_name,
-                    "pipeline_stage": deal.get("pipeline_stage"),
-                    "win_probability": prediction.win_probability,
-                    "confidence": prediction.confidence,
-                    "tier": prediction.tier,
-                    "priority": deal.get("priority"),
-                    "days_in_stage": days_in_stage,
-                    "next_action": prediction.recommendations[0] if prediction.recommendations else None,
-                })
+                scored.append(
+                    {
+                        "deal_id": prediction.deal_id,
+                        "company_name": prediction.company_name,
+                        "pipeline_stage": deal.get("pipeline_stage"),
+                        "win_probability": prediction.win_probability,
+                        "confidence": prediction.confidence,
+                        "tier": prediction.tier,
+                        "priority": deal.get("priority"),
+                        "days_in_stage": days_in_stage,
+                        "next_action": prediction.recommendations[0]
+                        if prediction.recommendations
+                        else None,
+                    }
+                )
 
         # Sort by probability descending
         scored.sort(key=lambda x: x["win_probability"], reverse=True)
@@ -863,7 +905,9 @@ class DealScorer:
             created_at = deal.get("created_at")
             if created_at:
                 if isinstance(created_at, str):
-                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    created_at = datetime.fromisoformat(
+                        created_at.replace("Z", "+00:00")
+                    )
                 days = (datetime.utcnow() - created_at.replace(tzinfo=None)).days
                 stage_stats[stage]["days"].append(days)
 
@@ -871,12 +915,17 @@ class DealScorer:
         for stage in ACTIVE_STAGES:
             if stage in stage_stats:
                 stats = stage_stats[stage]
-                stage_analysis.append({
-                    "stage": stage,
-                    "count": stats["count"],
-                    "avg_probability": sum(stats["probabilities"]) / len(stats["probabilities"]),
-                    "avg_days": sum(stats["days"]) / len(stats["days"]) if stats["days"] else 0,
-                })
+                stage_analysis.append(
+                    {
+                        "stage": stage,
+                        "count": stats["count"],
+                        "avg_probability": sum(stats["probabilities"])
+                        / len(stats["probabilities"]),
+                        "avg_days": sum(stats["days"]) / len(stats["days"])
+                        if stats["days"]
+                        else 0,
+                    }
+                )
 
         # Risk alerts
         risk_alerts = []
@@ -885,29 +934,37 @@ class DealScorer:
             created_at = deal.get("created_at")
             if created_at:
                 if isinstance(created_at, str):
-                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    created_at = datetime.fromisoformat(
+                        created_at.replace("Z", "+00:00")
+                    )
                 days = (datetime.utcnow() - created_at.replace(tzinfo=None)).days
 
                 stage = deal.get("pipeline_stage")
                 benchmark = STAGE_BENCHMARKS.get(stage, 21) * 1.5
 
                 if days > benchmark:
-                    risk_alerts.append({
-                        "deal_id": deal["id"],
-                        "company_name": deal.get("company_name"),
-                        "alert": f"Stalled in {stage} for {days} days",
-                        "recommendation": "Re-engage or pass",
-                    })
+                    risk_alerts.append(
+                        {
+                            "deal_id": deal["id"],
+                            "company_name": deal.get("company_name"),
+                            "alert": f"Stalled in {stage} for {days} days",
+                            "recommendation": "Re-engage or pass",
+                        }
+                    )
 
         # Opportunities
         opportunities = []
-        for deal, pred in sorted(predictions, key=lambda x: x[1].win_probability, reverse=True)[:5]:
+        for deal, pred in sorted(
+            predictions, key=lambda x: x[1].win_probability, reverse=True
+        )[:5]:
             if pred.win_probability >= 0.6:
-                opportunities.append({
-                    "deal_id": deal["id"],
-                    "company_name": deal.get("company_name"),
-                    "insight": f"High-probability deal ({pred.win_probability:.0%}) - {pred.recommendations[0] if pred.recommendations else 'ready for advancement'}",
-                })
+                opportunities.append(
+                    {
+                        "deal_id": deal["id"],
+                        "company_name": deal.get("company_name"),
+                        "insight": f"High-probability deal ({pred.win_probability:.0%}) - {pred.recommendations[0] if pred.recommendations else 'ready for advancement'}",
+                    }
+                )
 
         # Sector performance
         sector_stats = {}
@@ -921,7 +978,8 @@ class DealScorer:
         sector_performance = {
             sector: {
                 "deals": stats["deals"],
-                "avg_probability": sum(stats["probabilities"]) / len(stats["probabilities"]),
+                "avg_probability": sum(stats["probabilities"])
+                / len(stats["probabilities"]),
             }
             for sector, stats in sector_stats.items()
         }
@@ -942,10 +1000,7 @@ class DealScorer:
     # -------------------------------------------------------------------------
 
     def find_similar_deals(
-        self,
-        deal_id: int,
-        limit: int = 5,
-        include_lost: bool = True
+        self, deal_id: int, limit: int = 5, include_lost: bool = True
     ) -> Dict:
         """Find similar historical deals."""
         deal = self._get_deal(deal_id)
@@ -953,7 +1008,9 @@ class DealScorer:
             return {"deal_id": deal_id, "similar_deals": [], "pattern_insights": {}}
 
         # Get historical deals
-        stages = ["closed_won", "closed_lost", "passed"] if include_lost else ["closed_won"]
+        stages = (
+            ["closed_won", "closed_lost", "passed"] if include_lost else ["closed_won"]
+        )
         query = text("""
             SELECT * FROM deals
             WHERE pipeline_stage = ANY(:stages)
@@ -1014,11 +1071,13 @@ class DealScorer:
         for deal_id in deal_ids:
             pred = self.score_deal(deal_id)
             if pred:
-                results.append({
-                    "deal_id": pred.deal_id,
-                    "company_name": pred.company_name,
-                    "win_probability": pred.win_probability,
-                    "confidence": pred.confidence,
-                    "tier": pred.tier,
-                })
+                results.append(
+                    {
+                        "deal_id": pred.deal_id,
+                        "company_name": pred.company_name,
+                        "win_probability": pred.win_probability,
+                        "confidence": pred.confidence,
+                        "tier": pred.tier,
+                    }
+                )
         return results

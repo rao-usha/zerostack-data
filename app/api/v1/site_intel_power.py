@@ -3,6 +3,7 @@ Site Intelligence Platform - Power Infrastructure API.
 
 Endpoints for power plants, substations, utilities, and grid data.
 """
+
 import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,8 +13,12 @@ from pydantic import BaseModel, Field
 
 from app.core.database import get_db
 from app.core.models_site_intel import (
-    PowerPlant, Substation, UtilityTerritory,
-    InterconnectionQueue, ElectricityPrice, RenewableResource,
+    PowerPlant,
+    Substation,
+    UtilityTerritory,
+    InterconnectionQueue,
+    ElectricityPrice,
+    RenewableResource,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,6 +29,7 @@ router = APIRouter(prefix="/site-intel/power", tags=["Site Intel - Power"])
 # =============================================================================
 # RESPONSE MODELS
 # =============================================================================
+
 
 class PowerPlantResponse(BaseModel):
     id: int
@@ -93,12 +99,20 @@ class InterconnectionQueueResponse(BaseModel):
 # POWER PLANT ENDPOINTS
 # =============================================================================
 
+
 @router.get("/plants", response_model=List[PowerPlantResponse])
 async def search_power_plants(
     state: Optional[str] = Query(None, description="Filter by state code (e.g., 'TX')"),
-    fuel: Optional[str] = Query(None, description="Filter by primary fuel (natural_gas, coal, solar, wind, nuclear)"),
-    min_capacity_mw: Optional[float] = Query(None, description="Minimum nameplate capacity in MW"),
-    grid_region: Optional[str] = Query(None, description="Filter by grid region (PJM, ERCOT, CAISO, etc.)"),
+    fuel: Optional[str] = Query(
+        None,
+        description="Filter by primary fuel (natural_gas, coal, solar, wind, nuclear)",
+    ),
+    min_capacity_mw: Optional[float] = Query(
+        None, description="Minimum nameplate capacity in MW"
+    ),
+    grid_region: Optional[str] = Query(
+        None, description="Filter by grid region (PJM, ERCOT, CAISO, etc.)"
+    ),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -131,7 +145,9 @@ async def find_nearby_power_plants(
     lng: float = Query(..., description="Longitude", ge=-180, le=180),
     radius_miles: float = Query(25, description="Search radius in miles", gt=0, le=500),
     fuel: Optional[str] = Query(None, description="Filter by primary fuel"),
-    min_capacity_mw: Optional[float] = Query(None, description="Minimum capacity in MW"),
+    min_capacity_mw: Optional[float] = Query(
+        None, description="Minimum capacity in MW"
+    ),
     limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
@@ -143,14 +159,14 @@ async def find_nearby_power_plants(
     # Haversine distance calculation in SQL (approximate for performance)
     # 3959 = Earth's radius in miles
     distance_expr = (
-        3959 * func.acos(
-            func.cos(func.radians(lat)) *
-            func.cos(func.radians(PowerPlant.latitude)) *
-            func.cos(func.radians(PowerPlant.longitude) - func.radians(lng)) +
-            func.sin(func.radians(lat)) *
-            func.sin(func.radians(PowerPlant.latitude))
+        3959
+        * func.acos(
+            func.cos(func.radians(lat))
+            * func.cos(func.radians(PowerPlant.latitude))
+            * func.cos(func.radians(PowerPlant.longitude) - func.radians(lng))
+            + func.sin(func.radians(lat)) * func.sin(func.radians(PowerPlant.latitude))
         )
-    ).label('distance_miles')
+    ).label("distance_miles")
 
     query = db.query(PowerPlant, distance_expr).filter(
         PowerPlant.latitude.isnot(None),
@@ -168,10 +184,12 @@ async def find_nearby_power_plants(
 
     query = query.filter(
         PowerPlant.latitude.between(lat - lat_range, lat + lat_range),
-        PowerPlant.longitude.between(lng - float(radius_miles/50), lng + float(radius_miles/50)),
+        PowerPlant.longitude.between(
+            lng - float(radius_miles / 50), lng + float(radius_miles / 50)
+        ),
     )
 
-    results = query.order_by('distance_miles').limit(limit * 2).all()
+    results = query.order_by("distance_miles").limit(limit * 2).all()
 
     # Filter by exact distance and limit
     plants = []
@@ -202,11 +220,14 @@ async def get_power_plant(
 # SUBSTATION ENDPOINTS
 # =============================================================================
 
+
 @router.get("/substations", response_model=List[SubstationResponse])
 async def search_substations(
     state: Optional[str] = Query(None, description="Filter by state code"),
     min_voltage_kv: Optional[float] = Query(None, description="Minimum voltage in kV"),
-    substation_type: Optional[str] = Query(None, description="Type: transmission or distribution"),
+    substation_type: Optional[str] = Query(
+        None, description="Type: transmission or distribution"
+    ),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -236,7 +257,9 @@ async def find_nearby_substations(
     lat: float = Query(..., ge=-90, le=90),
     lng: float = Query(..., ge=-180, le=180),
     radius_miles: float = Query(25, gt=0, le=500),
-    min_voltage_kv: float = Query(None, description="Minimum voltage in kV (115+ for large loads)"),
+    min_voltage_kv: float = Query(
+        None, description="Minimum voltage in kV (115+ for large loads)"
+    ),
     limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
@@ -246,14 +269,14 @@ async def find_nearby_substations(
     For data centers, look for 115kV+ substations within 10-25 miles.
     """
     distance_expr = (
-        3959 * func.acos(
-            func.cos(func.radians(lat)) *
-            func.cos(func.radians(Substation.latitude)) *
-            func.cos(func.radians(Substation.longitude) - func.radians(lng)) +
-            func.sin(func.radians(lat)) *
-            func.sin(func.radians(Substation.latitude))
+        3959
+        * func.acos(
+            func.cos(func.radians(lat))
+            * func.cos(func.radians(Substation.latitude))
+            * func.cos(func.radians(Substation.longitude) - func.radians(lng))
+            + func.sin(func.radians(lat)) * func.sin(func.radians(Substation.latitude))
         )
-    ).label('distance_miles')
+    ).label("distance_miles")
 
     query = db.query(Substation, distance_expr).filter(
         Substation.latitude.isnot(None),
@@ -267,10 +290,10 @@ async def find_nearby_substations(
     lat_range = radius_miles / 69.0
     query = query.filter(
         Substation.latitude.between(lat - lat_range, lat + lat_range),
-        Substation.longitude.between(lng - radius_miles/50, lng + radius_miles/50),
+        Substation.longitude.between(lng - radius_miles / 50, lng + radius_miles / 50),
     )
 
-    results = query.order_by('distance_miles').limit(limit * 2).all()
+    results = query.order_by("distance_miles").limit(limit * 2).all()
 
     substations = []
     for sub, distance in results:
@@ -288,11 +311,16 @@ async def find_nearby_substations(
 # UTILITY ENDPOINTS
 # =============================================================================
 
+
 @router.get("/utilities", response_model=List[UtilityResponse])
 async def search_utilities(
     state: Optional[str] = Query(None, description="Filter by state"),
-    utility_type: Optional[str] = Query(None, description="Type: investor_owned, municipal, coop"),
-    max_industrial_rate: Optional[float] = Query(None, description="Maximum industrial rate ($/kWh)"),
+    utility_type: Optional[str] = Query(
+        None, description="Type: investor_owned, municipal, coop"
+    ),
+    max_industrial_rate: Optional[float] = Query(
+        None, description="Maximum industrial rate ($/kWh)"
+    ),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
@@ -308,7 +336,9 @@ async def search_utilities(
     if utility_type:
         query = query.filter(UtilityTerritory.utility_type == utility_type)
     if max_industrial_rate:
-        query = query.filter(UtilityTerritory.avg_rate_industrial <= max_industrial_rate)
+        query = query.filter(
+            UtilityTerritory.avg_rate_industrial <= max_industrial_rate
+        )
 
     query = query.order_by(UtilityTerritory.avg_rate_industrial.asc().nullslast())
     utilities = query.limit(limit).all()
@@ -331,7 +361,7 @@ async def get_utility_at_location(
     # For now, return utilities in the same state as a placeholder
     return {
         "message": "Spatial lookup requires PostGIS. Use /utilities endpoint with state filter.",
-        "location": {"latitude": lat, "longitude": lng}
+        "location": {"latitude": lat, "longitude": lng},
     }
 
 
@@ -339,10 +369,13 @@ async def get_utility_at_location(
 # ELECTRICITY PRICE ENDPOINTS
 # =============================================================================
 
+
 @router.get("/prices")
 async def get_electricity_prices(
     state: Optional[str] = Query(None, description="Filter by state"),
-    sector: str = Query("industrial", description="Sector: residential, commercial, industrial"),
+    sector: str = Query(
+        "industrial", description="Sector: residential, commercial, industrial"
+    ),
     year: Optional[int] = Query(None, description="Filter by year"),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -352,9 +385,7 @@ async def get_electricity_prices(
 
     Returns average prices in cents per kWh.
     """
-    query = db.query(ElectricityPrice).filter(
-        ElectricityPrice.sector == sector
-    )
+    query = db.query(ElectricityPrice).filter(ElectricityPrice.sector == sector)
 
     if state:
         query = query.filter(ElectricityPrice.geography_id == state.upper())
@@ -362,8 +393,7 @@ async def get_electricity_prices(
         query = query.filter(ElectricityPrice.period_year == year)
 
     query = query.order_by(
-        ElectricityPrice.period_year.desc(),
-        ElectricityPrice.avg_price_cents_kwh.asc()
+        ElectricityPrice.period_year.desc(), ElectricityPrice.avg_price_cents_kwh.asc()
     )
     prices = query.limit(limit).all()
 
@@ -374,7 +404,9 @@ async def get_electricity_prices(
             "year": p.period_year,
             "month": p.period_month,
             "sector": p.sector,
-            "price_cents_kwh": float(p.avg_price_cents_kwh) if p.avg_price_cents_kwh else None,
+            "price_cents_kwh": float(p.avg_price_cents_kwh)
+            if p.avg_price_cents_kwh
+            else None,
         }
         for p in prices
     ]
@@ -382,7 +414,9 @@ async def get_electricity_prices(
 
 @router.get("/prices/comparison")
 async def compare_electricity_prices(
-    states: str = Query(..., description="Comma-separated state codes (e.g., 'TX,VA,OH')"),
+    states: str = Query(
+        ..., description="Comma-separated state codes (e.g., 'TX,VA,OH')"
+    ),
     sector: str = Query("industrial", description="Sector to compare"),
     db: Session = Depends(get_db),
 ):
@@ -393,14 +427,19 @@ async def compare_electricity_prices(
     """
     state_list = [s.strip().upper() for s in states.split(",")]
 
-    prices = db.query(ElectricityPrice).filter(
-        ElectricityPrice.geography_type == "state",
-        ElectricityPrice.geography_id.in_(state_list),
-        ElectricityPrice.sector == sector,
-    ).order_by(
-        ElectricityPrice.period_year.desc(),
-        ElectricityPrice.period_month.desc().nullslast(),
-    ).all()
+    prices = (
+        db.query(ElectricityPrice)
+        .filter(
+            ElectricityPrice.geography_type == "state",
+            ElectricityPrice.geography_id.in_(state_list),
+            ElectricityPrice.sector == sector,
+        )
+        .order_by(
+            ElectricityPrice.period_year.desc(),
+            ElectricityPrice.period_month.desc().nullslast(),
+        )
+        .all()
+    )
 
     # Group by state, get latest
     latest_by_state = {}
@@ -408,7 +447,9 @@ async def compare_electricity_prices(
         if p.geography_id not in latest_by_state:
             latest_by_state[p.geography_id] = {
                 "state": p.geography_id,
-                "price_cents_kwh": float(p.avg_price_cents_kwh) if p.avg_price_cents_kwh else None,
+                "price_cents_kwh": float(p.avg_price_cents_kwh)
+                if p.avg_price_cents_kwh
+                else None,
                 "year": p.period_year,
                 "month": p.period_month,
             }
@@ -416,9 +457,8 @@ async def compare_electricity_prices(
     return {
         "sector": sector,
         "comparison": sorted(
-            latest_by_state.values(),
-            key=lambda x: x["price_cents_kwh"] or 999
-        )
+            latest_by_state.values(), key=lambda x: x["price_cents_kwh"] or 999
+        ),
     }
 
 
@@ -426,12 +466,17 @@ async def compare_electricity_prices(
 # INTERCONNECTION QUEUE ENDPOINTS
 # =============================================================================
 
+
 @router.get("/interconnection-queue", response_model=List[InterconnectionQueueResponse])
 async def search_interconnection_queue(
-    iso_region: Optional[str] = Query(None, description="ISO/RTO region (PJM, CAISO, ERCOT, etc.)"),
+    iso_region: Optional[str] = Query(
+        None, description="ISO/RTO region (PJM, CAISO, ERCOT, etc.)"
+    ),
     state: Optional[str] = Query(None, description="Filter by state"),
     fuel_type: Optional[str] = Query(None, description="Filter by fuel type"),
-    status: Optional[str] = Query(None, description="Filter by status (active, withdrawn, completed)"),
+    status: Optional[str] = Query(
+        None, description="Filter by status (active, withdrawn, completed)"
+    ),
     min_capacity_mw: Optional[float] = Query(None, description="Minimum capacity"),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -478,6 +523,7 @@ async def search_interconnection_queue(
 # RENEWABLE RESOURCE ENDPOINTS
 # =============================================================================
 
+
 @router.get("/renewable-potential")
 async def get_renewable_potential(
     lat: float = Query(..., ge=-90, le=90),
@@ -491,43 +537,67 @@ async def get_renewable_potential(
     """
     # Find nearest resource data points
     distance_expr = (
-        3959 * func.acos(
-            func.cos(func.radians(lat)) *
-            func.cos(func.radians(RenewableResource.latitude)) *
-            func.cos(func.radians(RenewableResource.longitude) - func.radians(lng)) +
-            func.sin(func.radians(lat)) *
-            func.sin(func.radians(RenewableResource.latitude))
+        3959
+        * func.acos(
+            func.cos(func.radians(lat))
+            * func.cos(func.radians(RenewableResource.latitude))
+            * func.cos(func.radians(RenewableResource.longitude) - func.radians(lng))
+            + func.sin(func.radians(lat))
+            * func.sin(func.radians(RenewableResource.latitude))
         )
-    ).label('distance_miles')
+    ).label("distance_miles")
 
-    solar = db.query(RenewableResource, distance_expr).filter(
-        RenewableResource.resource_type == 'solar',
-        RenewableResource.latitude.isnot(None),
-    ).order_by('distance_miles').first()
+    solar = (
+        db.query(RenewableResource, distance_expr)
+        .filter(
+            RenewableResource.resource_type == "solar",
+            RenewableResource.latitude.isnot(None),
+        )
+        .order_by("distance_miles")
+        .first()
+    )
 
-    wind = db.query(RenewableResource, distance_expr).filter(
-        RenewableResource.resource_type == 'wind',
-        RenewableResource.latitude.isnot(None),
-    ).order_by('distance_miles').first()
+    wind = (
+        db.query(RenewableResource, distance_expr)
+        .filter(
+            RenewableResource.resource_type == "wind",
+            RenewableResource.latitude.isnot(None),
+        )
+        .order_by("distance_miles")
+        .first()
+    )
 
     return {
         "location": {"latitude": lat, "longitude": lng},
         "solar": {
-            "ghi_kwh_m2_day": float(solar[0].ghi_kwh_m2_day) if solar and solar[0].ghi_kwh_m2_day else None,
-            "dni_kwh_m2_day": float(solar[0].dni_kwh_m2_day) if solar and solar[0].dni_kwh_m2_day else None,
+            "ghi_kwh_m2_day": float(solar[0].ghi_kwh_m2_day)
+            if solar and solar[0].ghi_kwh_m2_day
+            else None,
+            "dni_kwh_m2_day": float(solar[0].dni_kwh_m2_day)
+            if solar and solar[0].dni_kwh_m2_day
+            else None,
             "distance_miles": round(solar[1], 2) if solar else None,
-        } if solar else None,
+        }
+        if solar
+        else None,
         "wind": {
-            "wind_speed_100m_ms": float(wind[0].wind_speed_100m_ms) if wind and wind[0].wind_speed_100m_ms else None,
-            "capacity_factor_pct": float(wind[0].capacity_factor_pct) if wind and wind[0].capacity_factor_pct else None,
+            "wind_speed_100m_ms": float(wind[0].wind_speed_100m_ms)
+            if wind and wind[0].wind_speed_100m_ms
+            else None,
+            "capacity_factor_pct": float(wind[0].capacity_factor_pct)
+            if wind and wind[0].capacity_factor_pct
+            else None,
             "distance_miles": round(wind[1], 2) if wind else None,
-        } if wind else None,
+        }
+        if wind
+        else None,
     }
 
 
 # =============================================================================
 # SUMMARY ENDPOINT
 # =============================================================================
+
 
 @router.get("/summary")
 async def get_power_summary(db: Session = Depends(get_db)):
@@ -556,5 +626,5 @@ async def get_power_summary(db: Session = Depends(get_db)):
             "/site-intel/power/prices",
             "/site-intel/power/interconnection-queue",
             "/site-intel/power/renewable-potential",
-        ]
+        ],
     }

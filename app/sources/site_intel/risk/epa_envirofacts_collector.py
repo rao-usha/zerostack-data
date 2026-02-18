@@ -13,6 +13,7 @@ TRI is preferred over FRS (Facility Registry Service) because:
 - TRI targets active industrial facilities relevant to environmental due diligence
 - Manageable volume (~2-5K facilities per major state)
 """
+
 import logging
 from datetime import datetime
 from typing import Optional, Dict, Any
@@ -22,18 +23,67 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import EnvironmentalFacility
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
 logger = logging.getLogger(__name__)
 
 US_STATES = [
-    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
-    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
-    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+    "AL",
+    "AK",
+    "AZ",
+    "AR",
+    "CA",
+    "CO",
+    "CT",
+    "DE",
+    "FL",
+    "GA",
+    "HI",
+    "ID",
+    "IL",
+    "IN",
+    "IA",
+    "KS",
+    "KY",
+    "LA",
+    "ME",
+    "MD",
+    "MA",
+    "MI",
+    "MN",
+    "MS",
+    "MO",
+    "MT",
+    "NE",
+    "NV",
+    "NH",
+    "NJ",
+    "NM",
+    "NY",
+    "NC",
+    "ND",
+    "OH",
+    "OK",
+    "OR",
+    "PA",
+    "RI",
+    "SC",
+    "SD",
+    "TN",
+    "TX",
+    "UT",
+    "VT",
+    "VA",
+    "WA",
+    "WV",
+    "WI",
+    "WY",
 ]
 
 
@@ -82,7 +132,9 @@ class EPAEnvirofactsCollector(BaseCollector):
             if result.get("error"):
                 errors.append({"source": "tri_facilities", "error": result["error"]})
 
-            status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            status = (
+                CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            )
 
             return self.create_result(
                 status=status,
@@ -173,12 +225,24 @@ class EPAEnvirofactsCollector(BaseCollector):
                     records,
                     unique_columns=["epa_id"],
                     update_columns=[
-                        "facility_name", "facility_type", "address", "city",
-                        "state", "zip", "latitude", "longitude", "permits",
-                        "is_superfund", "is_brownfield", "source", "collected_at",
+                        "facility_name",
+                        "facility_type",
+                        "address",
+                        "city",
+                        "state",
+                        "zip",
+                        "latitude",
+                        "longitude",
+                        "permits",
+                        "is_superfund",
+                        "is_brownfield",
+                        "source",
+                        "collected_at",
                     ],
                 )
-                logger.info(f"Inserted/updated {inserted} environmental facilities from TRI")
+                logger.info(
+                    f"Inserted/updated {inserted} environmental facilities from TRI"
+                )
                 return {"processed": len(all_facilities), "inserted": inserted}
 
             return {"processed": len(all_facilities), "inserted": 0}
@@ -191,7 +255,9 @@ class EPAEnvirofactsCollector(BaseCollector):
                 pass
             return {"processed": 0, "inserted": 0, "error": str(e)}
 
-    def _transform_tri_facility(self, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _transform_tri_facility(
+        self, record: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """Transform a TRI_FACILITY record to environmental_facility schema."""
         # API returns lowercase field names
         facility_id = record.get("tri_facility_id")

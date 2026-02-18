@@ -37,13 +37,24 @@ CONFIDENCE_ORDER = {"high": 4, "medium": 3, "llm_extracted": 2, "low": 1}
 
 # Phase 1 item types create entities; Phase 2 item types reference them
 PHASE_1_TYPES = {
-    "firm_update", "form_adv_filing", "portfolio_company",
-    "team_member", "person", "related_person", "company_update",
+    "firm_update",
+    "form_adv_filing",
+    "portfolio_company",
+    "team_member",
+    "person",
+    "related_person",
+    "company_update",
 }
 PHASE_2_TYPES = {
-    "13f_holding", "13d_stake", "form_d_filing", "deal_8k_filing",
-    "deal_press_release", "deal", "firm_news",
-    "company_financial", "company_valuation",
+    "13f_holding",
+    "13d_stake",
+    "form_d_filing",
+    "deal_8k_filing",
+    "deal_press_release",
+    "deal",
+    "firm_news",
+    "company_financial",
+    "company_valuation",
 }
 
 
@@ -68,10 +79,10 @@ class PEPersister:
             "errors": [],
         }
         # In-memory caches for FK resolution
-        self._firm_cache: Dict[str, int] = {}       # lowercase name -> id
-        self._company_cache: Dict[str, int] = {}     # lowercase name -> id
-        self._person_cache: Dict[str, int] = {}      # lowercase name or linkedin_url -> id
-        self._fund_cache: Dict[int, int] = {}         # firm_id -> synthetic holdings fund id
+        self._firm_cache: Dict[str, int] = {}  # lowercase name -> id
+        self._company_cache: Dict[str, int] = {}  # lowercase name -> id
+        self._person_cache: Dict[str, int] = {}  # lowercase name or linkedin_url -> id
+        self._fund_cache: Dict[int, int] = {}  # firm_id -> synthetic holdings fund id
 
     # ------------------------------------------------------------------
     # Main entry point
@@ -196,7 +207,9 @@ class PEPersister:
         for co in self.db.query(PEPortfolioCompany.id, PEPortfolioCompany.name).all():
             self._company_cache[co.name.lower()] = co.id
 
-        for p in self.db.query(PEPerson.id, PEPerson.full_name, PEPerson.linkedin_url).all():
+        for p in self.db.query(
+            PEPerson.id, PEPerson.full_name, PEPerson.linkedin_url
+        ).all():
             self._person_cache[p.full_name.lower()] = p.id
             if p.linkedin_url:
                 self._person_cache[p.linkedin_url] = p.id
@@ -309,7 +322,9 @@ class PEPersister:
         self._fund_cache[firm_id] = fund.id
         return fund.id
 
-    def _should_update(self, new_confidence: str, existing_confidence: Optional[str]) -> bool:
+    def _should_update(
+        self, new_confidence: str, existing_confidence: Optional[str]
+    ) -> bool:
         """Return True if new confidence is >= existing."""
         new_rank = CONFIDENCE_ORDER.get(new_confidence, 1)
         existing_rank = CONFIDENCE_ORDER.get(existing_confidence, 0)
@@ -425,7 +440,9 @@ class PEPersister:
                 valid_fields[k] = v
 
         changed = self._null_preserving_update(
-            firm, valid_fields, item.confidence,
+            firm,
+            valid_fields,
+            item.confidence,
             existing_confidence=firm.confidence_score and "medium",
         )
 
@@ -593,12 +610,14 @@ class PEPersister:
                 .first()
             )
             if not exists:
-                self.db.add(PEPersonEducation(
-                    person_id=person_id,
-                    institution=institution,
-                    degree=edu.get("degree"),
-                    field_of_study=edu.get("field"),
-                ))
+                self.db.add(
+                    PEPersonEducation(
+                        person_id=person_id,
+                        institution=institution,
+                        degree=edu.get("degree"),
+                        field_of_study=edu.get("field"),
+                    )
+                )
 
         # Experience entries
         for exp in data.get("experience", []):
@@ -616,11 +635,13 @@ class PEPersister:
                 .first()
             )
             if not exists:
-                self.db.add(PEPersonExperience(
-                    person_id=person_id,
-                    company=company,
-                    title=title,
-                ))
+                self.db.add(
+                    PEPersonExperience(
+                        person_id=person_id,
+                        company=company,
+                        title=title,
+                    )
+                )
 
         # Firm link
         firm_id = data.get("firm_id") or entity_id
@@ -633,12 +654,14 @@ class PEPersister:
             .first()
         )
         if not existing_link:
-            self.db.add(PEFirmPeople(
-                firm_id=firm_id,
-                person_id=person_id,
-                title=data.get("title", "Team Member"),
-                is_current=True,
-            ))
+            self.db.add(
+                PEFirmPeople(
+                    firm_id=firm_id,
+                    person_id=person_id,
+                    title=data.get("title", "Team Member"),
+                    is_current=True,
+                )
+            )
 
         self.stats["persisted"] += 1
 
@@ -664,12 +687,14 @@ class PEPersister:
             .first()
         )
         if not existing_link:
-            self.db.add(PEFirmPeople(
-                firm_id=entity_id,
-                person_id=person_id,
-                title=data.get("relationship", "Related Person"),
-                is_current=True,
-            ))
+            self.db.add(
+                PEFirmPeople(
+                    firm_id=entity_id,
+                    person_id=person_id,
+                    title=data.get("relationship", "Related Person"),
+                    is_current=True,
+                )
+            )
             self.stats["persisted"] += 1
         else:
             self.stats["skipped"] += 1
@@ -827,9 +852,7 @@ class PEPersister:
         # Dedup by source_url
         if source_url:
             existing = (
-                self.db.query(PEDeal)
-                .filter(PEDeal.source_url == source_url)
-                .first()
+                self.db.query(PEDeal).filter(PEDeal.source_url == source_url).first()
             )
             if existing:
                 self.stats["skipped"] += 1
@@ -870,9 +893,7 @@ class PEPersister:
 
         if source_url:
             existing = (
-                self.db.query(PEDeal)
-                .filter(PEDeal.source_url == source_url)
-                .first()
+                self.db.query(PEDeal).filter(PEDeal.source_url == source_url).first()
             )
             if existing:
                 self.stats["skipped"] += 1
@@ -905,9 +926,7 @@ class PEPersister:
             return
 
         existing = (
-            self.db.query(PEDeal)
-            .filter(PEDeal.press_release_url == source_url)
-            .first()
+            self.db.query(PEDeal).filter(PEDeal.press_release_url == source_url).first()
         )
         if existing:
             self.stats["skipped"] += 1
@@ -915,9 +934,7 @@ class PEPersister:
 
         # Also check source_url
         existing2 = (
-            self.db.query(PEDeal)
-            .filter(PEDeal.source_url == source_url)
-            .first()
+            self.db.query(PEDeal).filter(PEDeal.source_url == source_url).first()
         )
         if existing2:
             self.stats["skipped"] += 1
@@ -954,9 +971,7 @@ class PEPersister:
         # Dedup by source_url
         if source_url:
             existing = (
-                self.db.query(PEDeal)
-                .filter(PEDeal.source_url == source_url)
-                .first()
+                self.db.query(PEDeal).filter(PEDeal.source_url == source_url).first()
             )
             if existing:
                 # Update with richer LLM data
@@ -1002,14 +1017,16 @@ class PEPersister:
         self.db.flush()
 
         # Lead participant
-        self.db.add(PEDealParticipant(
-            deal_id=deal.id,
-            firm_id=entity_id,
-            participant_name=data.get("firm_name") or entity_name,
-            participant_type="PE Firm",
-            role="Lead Sponsor",
-            is_lead=True,
-        ))
+        self.db.add(
+            PEDealParticipant(
+                deal_id=deal.id,
+                firm_id=entity_id,
+                participant_name=data.get("firm_name") or entity_name,
+                participant_type="PE Firm",
+                role="Lead Sponsor",
+                is_lead=True,
+            )
+        )
 
         # Co-investors
         for co_name in data.get("co_investors", []):
@@ -1017,14 +1034,16 @@ class PEPersister:
                 continue
             # Try to resolve firm_id
             co_firm_id = self._firm_cache.get(co_name.strip().lower())
-            self.db.add(PEDealParticipant(
-                deal_id=deal.id,
-                firm_id=co_firm_id,
-                participant_name=co_name.strip(),
-                participant_type="Co-Investor",
-                role="Co-Investor",
-                is_lead=False,
-            ))
+            self.db.add(
+                PEDealParticipant(
+                    deal_id=deal.id,
+                    firm_id=co_firm_id,
+                    participant_name=co_name.strip(),
+                    participant_type="Co-Investor",
+                    role="Co-Investor",
+                    is_lead=False,
+                )
+            )
 
         self.stats["persisted"] += 1
 
@@ -1176,16 +1195,13 @@ class PEPersister:
                         or data.get("estimated_enterprise_value_usd")
                     ),
                     "equity_value_usd": self._to_decimal(
-                        data.get("market_cap")
-                        or data.get("estimated_equity_value_usd")
+                        data.get("market_cap") or data.get("estimated_equity_value_usd")
                     ),
                     "ev_revenue_multiple": self._to_decimal(
-                        data.get("ev_to_revenue")
-                        or data.get("ev_to_revenue_multiple")
+                        data.get("ev_to_revenue") or data.get("ev_to_revenue_multiple")
                     ),
                     "ev_ebitda_multiple": self._to_decimal(
-                        data.get("ev_to_ebitda")
-                        or data.get("ev_to_ebitda_multiple")
+                        data.get("ev_to_ebitda") or data.get("ev_to_ebitda_multiple")
                     ),
                     "price_earnings_multiple": self._to_decimal(
                         data.get("trailing_pe")
@@ -1208,19 +1224,18 @@ class PEPersister:
                 or data.get("estimated_enterprise_value_usd")
             ),
             equity_value_usd=self._to_decimal(
-                data.get("market_cap")
-                or data.get("estimated_equity_value_usd")
+                data.get("market_cap") or data.get("estimated_equity_value_usd")
             ),
             ev_revenue_multiple=self._to_decimal(
-                data.get("ev_to_revenue")
-                or data.get("ev_to_revenue_multiple")
+                data.get("ev_to_revenue") or data.get("ev_to_revenue_multiple")
             ),
             ev_ebitda_multiple=self._to_decimal(
-                data.get("ev_to_ebitda")
-                or data.get("ev_to_ebitda_multiple")
+                data.get("ev_to_ebitda") or data.get("ev_to_ebitda_multiple")
             ),
             price_earnings_multiple=self._to_decimal(data.get("trailing_pe")),
-            valuation_type="Market Data" if data_source == "Yahoo Finance" else "Third-Party",
+            valuation_type="Market Data"
+            if data_source == "Yahoo Finance"
+            else "Third-Party",
             methodology=methodology,
             data_source=data_source,
             source_url=item.source_url,

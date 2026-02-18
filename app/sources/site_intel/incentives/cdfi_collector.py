@@ -11,6 +11,7 @@ Census tract data via CDFI open data APIs.
 
 No API key required - public data.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -20,7 +21,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import OpportunityZone
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -29,17 +34,59 @@ logger = logging.getLogger(__name__)
 
 # State FIPS to abbreviation mapping
 FIPS_TO_STATE = {
-    "01": "AL", "02": "AK", "04": "AZ", "05": "AR", "06": "CA",
-    "08": "CO", "09": "CT", "10": "DE", "11": "DC", "12": "FL",
-    "13": "GA", "15": "HI", "16": "ID", "17": "IL", "18": "IN",
-    "19": "IA", "20": "KS", "21": "KY", "22": "LA", "23": "ME",
-    "24": "MD", "25": "MA", "26": "MI", "27": "MN", "28": "MS",
-    "29": "MO", "30": "MT", "31": "NE", "32": "NV", "33": "NH",
-    "34": "NJ", "35": "NM", "36": "NY", "37": "NC", "38": "ND",
-    "39": "OH", "40": "OK", "41": "OR", "42": "PA", "44": "RI",
-    "45": "SC", "46": "SD", "47": "TN", "48": "TX", "49": "UT",
-    "50": "VT", "51": "VA", "53": "WA", "54": "WV", "55": "WI",
-    "56": "WY", "72": "PR", "78": "VI",
+    "01": "AL",
+    "02": "AK",
+    "04": "AZ",
+    "05": "AR",
+    "06": "CA",
+    "08": "CO",
+    "09": "CT",
+    "10": "DE",
+    "11": "DC",
+    "12": "FL",
+    "13": "GA",
+    "15": "HI",
+    "16": "ID",
+    "17": "IL",
+    "18": "IN",
+    "19": "IA",
+    "20": "KS",
+    "21": "KY",
+    "22": "LA",
+    "23": "ME",
+    "24": "MD",
+    "25": "MA",
+    "26": "MI",
+    "27": "MN",
+    "28": "MS",
+    "29": "MO",
+    "30": "MT",
+    "31": "NE",
+    "32": "NV",
+    "33": "NH",
+    "34": "NJ",
+    "35": "NM",
+    "36": "NY",
+    "37": "NC",
+    "38": "ND",
+    "39": "OH",
+    "40": "OK",
+    "41": "OR",
+    "42": "PA",
+    "44": "RI",
+    "45": "SC",
+    "46": "SD",
+    "47": "TN",
+    "48": "TX",
+    "49": "UT",
+    "50": "VT",
+    "51": "VA",
+    "53": "WA",
+    "54": "WV",
+    "55": "WI",
+    "56": "WY",
+    "72": "PR",
+    "78": "VI",
 }
 
 STATE_TO_FIPS = {v: k for k, v in FIPS_TO_STATE.items()}
@@ -94,9 +141,13 @@ class CDFIOpportunityZoneCollector(BaseCollector):
             total_inserted += oz_result.get("inserted", 0)
             total_processed += oz_result.get("processed", 0)
             if oz_result.get("error"):
-                errors.append({"source": "opportunity_zones", "error": oz_result["error"]})
+                errors.append(
+                    {"source": "opportunity_zones", "error": oz_result["error"]}
+                )
 
-            status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            status = (
+                CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            )
 
             return self.create_result(
                 status=status,
@@ -113,7 +164,9 @@ class CDFIOpportunityZoneCollector(BaseCollector):
                 error_message=str(e),
             )
 
-    async def _collect_opportunity_zones(self, config: CollectionConfig) -> Dict[str, Any]:
+    async def _collect_opportunity_zones(
+        self, config: CollectionConfig
+    ) -> Dict[str, Any]:
         """
         Collect Opportunity Zone census tracts.
         """
@@ -146,7 +199,9 @@ class CDFIOpportunityZoneCollector(BaseCollector):
                     break
 
                 all_zones.extend(features)
-                logger.info(f"Fetched {len(features)} OZ records (total: {len(all_zones)})")
+                logger.info(
+                    f"Fetched {len(features)} OZ records (total: {len(all_zones)})"
+                )
 
                 if len(features) < page_size:
                     break
@@ -167,8 +222,14 @@ class CDFIOpportunityZoneCollector(BaseCollector):
                     records,
                     unique_columns=["tract_geoid"],
                     update_columns=[
-                        "state", "county", "tract_name", "is_low_income",
-                        "is_contiguous", "designation_date", "source", "collected_at"
+                        "state",
+                        "county",
+                        "tract_name",
+                        "is_low_income",
+                        "is_contiguous",
+                        "designation_date",
+                        "source",
+                        "collected_at",
                     ],
                 )
                 logger.info(f"Inserted/updated {inserted} Opportunity Zone records")
@@ -204,13 +265,21 @@ class CDFIOpportunityZoneCollector(BaseCollector):
             county_name = f"County {county_fips}" if county_fips else None
 
         # Get tract info
-        tract = attrs.get("TRACT") or (str(geoid)[5:] if len(str(geoid)) >= 11 else None)
-        tract_name = attrs.get("NAME") or attrs.get("TRACT_NAME") or f"Tract {tract}" if tract else None
+        tract = attrs.get("TRACT") or (
+            str(geoid)[5:] if len(str(geoid)) >= 11 else None
+        )
+        tract_name = (
+            attrs.get("NAME") or attrs.get("TRACT_NAME") or f"Tract {tract}"
+            if tract
+            else None
+        )
 
         # HUD designated OZ data - all tracts in this layer are designated OZs
         # Low-income status is implied by designation (all OZs are either LIC or contiguous)
         lic_type = attrs.get("LIC_TYPE") or attrs.get("TYPE") or ""
-        is_low_income = "LIC" in lic_type.upper() if lic_type else True  # Default True for designated OZs
+        is_low_income = (
+            "LIC" in lic_type.upper() if lic_type else True
+        )  # Default True for designated OZs
         is_contiguous = "CONTIGUOUS" in lic_type.upper() if lic_type else False
 
         return {
@@ -220,7 +289,9 @@ class CDFIOpportunityZoneCollector(BaseCollector):
             "tract_name": tract_name,
             "is_low_income": is_low_income,
             "is_contiguous": is_contiguous,
-            "designation_date": self._parse_date(attrs.get("DESIGNATED") or attrs.get("DESIGNATION_DATE")),
+            "designation_date": self._parse_date(
+                attrs.get("DESIGNATED") or attrs.get("DESIGNATION_DATE")
+            ),
             "source": "hud_oz",
             "collected_at": datetime.utcnow(),
         }

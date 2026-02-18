@@ -31,9 +31,15 @@ class PortfolioDetailTemplate:
             "generated_at": datetime.utcnow().isoformat(),
             "investor": self._get_investor(db, investor_id, investor_type),
             "holdings": self._get_all_holdings(db, investor_id, investor_type),
-            "sector_breakdown": self._get_sector_breakdown(db, investor_id, investor_type),
-            "stage_breakdown": self._get_stage_breakdown(db, investor_id, investor_type),
-            "location_breakdown": self._get_location_breakdown(db, investor_id, investor_type),
+            "sector_breakdown": self._get_sector_breakdown(
+                db, investor_id, investor_type
+            ),
+            "stage_breakdown": self._get_stage_breakdown(
+                db, investor_id, investor_type
+            ),
+            "location_breakdown": self._get_location_breakdown(
+                db, investor_id, investor_type
+            ),
         }
 
         return data
@@ -41,10 +47,13 @@ class PortfolioDetailTemplate:
     def _get_investor(self, db: Session, investor_id: int, investor_type: str) -> Dict:
         """Get investor details."""
         if investor_type == "lp":
-            result = db.execute(text("""
+            result = db.execute(
+                text("""
                 SELECT id, name, lp_type, jurisdiction
                 FROM lp_fund WHERE id = :id
-            """), {"id": investor_id})
+            """),
+                {"id": investor_id},
+            )
             row = result.fetchone()
             if row:
                 return {
@@ -54,10 +63,13 @@ class PortfolioDetailTemplate:
                     "jurisdiction": row[3],
                 }
         else:
-            result = db.execute(text("""
+            result = db.execute(
+                text("""
                 SELECT id, name, 'family_office' as lp_type, location as jurisdiction
                 FROM family_offices WHERE id = :id
-            """), {"id": investor_id})
+            """),
+                {"id": investor_id},
+            )
             row = result.fetchone()
             if row:
                 return {
@@ -69,9 +81,12 @@ class PortfolioDetailTemplate:
 
         return {"id": investor_id, "name": "Unknown", "type": investor_type}
 
-    def _get_all_holdings(self, db: Session, investor_id: int, investor_type: str) -> List[Dict]:
+    def _get_all_holdings(
+        self, db: Session, investor_id: int, investor_type: str
+    ) -> List[Dict]:
         """Get all portfolio holdings."""
-        result = db.execute(text("""
+        result = db.execute(
+            text("""
             SELECT
                 company_name,
                 company_industry,
@@ -82,7 +97,9 @@ class PortfolioDetailTemplate:
             FROM portfolio_companies
             WHERE investor_id = :investor_id AND investor_type = :investor_type
             ORDER BY current_holding DESC, company_name
-        """), {"investor_id": investor_id, "investor_type": investor_type})
+        """),
+            {"investor_id": investor_id, "investor_type": investor_type},
+        )
 
         return [
             {
@@ -96,9 +113,12 @@ class PortfolioDetailTemplate:
             for row in result.fetchall()
         ]
 
-    def _get_sector_breakdown(self, db: Session, investor_id: int, investor_type: str) -> List[Dict]:
+    def _get_sector_breakdown(
+        self, db: Session, investor_id: int, investor_type: str
+    ) -> List[Dict]:
         """Get sector breakdown."""
-        result = db.execute(text("""
+        result = db.execute(
+            text("""
             SELECT
                 COALESCE(company_industry, 'Unknown') as sector,
                 COUNT(*) as total,
@@ -107,7 +127,9 @@ class PortfolioDetailTemplate:
             WHERE investor_id = :investor_id AND investor_type = :investor_type
             GROUP BY company_industry
             ORDER BY total DESC
-        """), {"investor_id": investor_id, "investor_type": investor_type})
+        """),
+            {"investor_id": investor_id, "investor_type": investor_type},
+        )
 
         rows = result.fetchall()
         total = sum(r[1] for r in rows)
@@ -122,9 +144,12 @@ class PortfolioDetailTemplate:
             for row in rows
         ]
 
-    def _get_stage_breakdown(self, db: Session, investor_id: int, investor_type: str) -> List[Dict]:
+    def _get_stage_breakdown(
+        self, db: Session, investor_id: int, investor_type: str
+    ) -> List[Dict]:
         """Get stage breakdown."""
-        result = db.execute(text("""
+        result = db.execute(
+            text("""
             SELECT
                 COALESCE(company_stage, 'Unknown') as stage,
                 COUNT(*) as total,
@@ -133,7 +158,9 @@ class PortfolioDetailTemplate:
             WHERE investor_id = :investor_id AND investor_type = :investor_type
             GROUP BY company_stage
             ORDER BY total DESC
-        """), {"investor_id": investor_id, "investor_type": investor_type})
+        """),
+            {"investor_id": investor_id, "investor_type": investor_type},
+        )
 
         rows = result.fetchall()
         total = sum(r[1] for r in rows)
@@ -148,9 +175,12 @@ class PortfolioDetailTemplate:
             for row in rows
         ]
 
-    def _get_location_breakdown(self, db: Session, investor_id: int, investor_type: str) -> List[Dict]:
+    def _get_location_breakdown(
+        self, db: Session, investor_id: int, investor_type: str
+    ) -> List[Dict]:
         """Get location breakdown."""
-        result = db.execute(text("""
+        result = db.execute(
+            text("""
             SELECT
                 COALESCE(company_location, 'Unknown') as location,
                 COUNT(*) as total
@@ -159,7 +189,9 @@ class PortfolioDetailTemplate:
             GROUP BY company_location
             ORDER BY total DESC
             LIMIT 15
-        """), {"investor_id": investor_id, "investor_type": investor_type})
+        """),
+            {"investor_id": investor_id, "investor_type": investor_type},
+        )
 
         rows = result.fetchall()
         total = sum(r[1] for r in rows)
@@ -314,7 +346,9 @@ class PortfolioDetailTemplate:
 
         wb = Workbook()
 
-        header_fill = PatternFill(start_color="27AE60", end_color="27AE60", fill_type="solid")
+        header_fill = PatternFill(
+            start_color="27AE60", end_color="27AE60", fill_type="solid"
+        )
         header_font = Font(bold=True, color="FFFFFF")
 
         investor = data.get("investor", {})
@@ -336,7 +370,9 @@ class PortfolioDetailTemplate:
             ws.cell(row=row, column=2, value=h.get("industry"))
             ws.cell(row=row, column=3, value=h.get("location"))
             ws.cell(row=row, column=4, value=h.get("stage"))
-            ws.cell(row=row, column=5, value="Current" if h.get("current") else "Exited")
+            ws.cell(
+                row=row, column=5, value="Current" if h.get("current") else "Exited"
+            )
 
         for col in ["A", "B", "C", "D", "E"]:
             ws.column_dimensions[col].width = 20
@@ -364,7 +400,9 @@ class PortfolioDetailTemplate:
         stages = data.get("stage_breakdown", [])
 
         for col, header in enumerate(headers, 1):
-            cell = ws_stages.cell(row=1, column=col, value=header.replace("Sector", "Stage"))
+            cell = ws_stages.cell(
+                row=1, column=col, value=header.replace("Sector", "Stage")
+            )
             cell.font = header_font
             cell.fill = header_fill
 

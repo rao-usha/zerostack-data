@@ -19,6 +19,7 @@ Rate limits:
 API Key:
 Required. Get at: https://www.yelp.com/developers/v3/manage_app
 """
+
 import logging
 from typing import Dict, List, Optional, Any
 
@@ -45,7 +46,7 @@ class YelpClient(BaseAPIClient):
         api_key: str,
         max_concurrency: int = 2,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize Yelp Fusion API client.
@@ -71,17 +72,14 @@ class YelpClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=config.timeout_seconds,
             connect_timeout=config.connect_timeout_seconds,
-            rate_limit_interval=0.5  # Conservative due to daily limits
+            rate_limit_interval=0.5,  # Conservative due to daily limits
         )
 
         self._daily_requests = 0
 
     def _build_headers(self) -> Dict[str, str]:
         """Build request headers with Bearer token."""
-        return {
-            "Authorization": f"Bearer {self.api_key}",
-            "Accept": "application/json"
-        }
+        return {"Authorization": f"Bearer {self.api_key}", "Accept": "application/json"}
 
     def _check_daily_limit(self):
         """Check if daily limit is approaching."""
@@ -102,7 +100,7 @@ class YelpClient(BaseAPIClient):
         limit: int = 50,
         offset: int = 0,
         sort_by: str = "best_match",
-        price: Optional[str] = None
+        price: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Search for businesses.
@@ -150,7 +148,7 @@ class YelpClient(BaseAPIClient):
         result = await self.get(
             "businesses/search",
             params=params,
-            resource_id=f"BusinessSearch:{location or f'{latitude},{longitude}'}"
+            resource_id=f"BusinessSearch:{location or f'{latitude},{longitude}'}",
         )
 
         self._daily_requests += 1
@@ -160,18 +158,13 @@ class YelpClient(BaseAPIClient):
         """Get detailed information about a specific business."""
         self._check_daily_limit()
         result = await self.get(
-            f"businesses/{business_id}",
-            resource_id=f"BusinessDetails:{business_id}"
+            f"businesses/{business_id}", resource_id=f"BusinessDetails:{business_id}"
         )
         self._daily_requests += 1
         return result
 
     async def get_business_reviews(
-        self,
-        business_id: str,
-        locale: str = "en_US",
-        offset: int = 0,
-        limit: int = 3
+        self, business_id: str, locale: str = "en_US", offset: int = 0, limit: int = 3
     ) -> Dict[str, Any]:
         """Get reviews for a business (limited to 3 reviews on free tier)."""
         self._check_daily_limit()
@@ -185,7 +178,7 @@ class YelpClient(BaseAPIClient):
         result = await self.get(
             f"businesses/{business_id}/reviews",
             params=params,
-            resource_id=f"BusinessReviews:{business_id}"
+            resource_id=f"BusinessReviews:{business_id}",
         )
 
         self._daily_requests += 1
@@ -195,9 +188,7 @@ class YelpClient(BaseAPIClient):
         """Get all Yelp business categories."""
         self._check_daily_limit()
         result = await self.get(
-            "categories",
-            params={"locale": locale},
-            resource_id="AllCategories"
+            "categories", params={"locale": locale}, resource_id="AllCategories"
         )
         self._daily_requests += 1
         return result
@@ -207,7 +198,7 @@ class YelpClient(BaseAPIClient):
         text: str,
         latitude: Optional[float] = None,
         longitude: Optional[float] = None,
-        locale: str = "en_US"
+        locale: str = "en_US",
     ) -> Dict[str, Any]:
         """Get autocomplete suggestions."""
         self._check_daily_limit()
@@ -219,9 +210,7 @@ class YelpClient(BaseAPIClient):
             params["longitude"] = longitude
 
         result = await self.get(
-            "autocomplete",
-            params=params,
-            resource_id=f"Autocomplete:{text}"
+            "autocomplete", params=params, resource_id=f"Autocomplete:{text}"
         )
 
         self._daily_requests += 1
@@ -233,7 +222,7 @@ class YelpClient(BaseAPIClient):
         result = await self.get(
             "businesses/search/phone",
             params={"phone": phone},
-            resource_id=f"PhoneSearch:{phone}"
+            resource_id=f"PhoneSearch:{phone}",
         )
         self._daily_requests += 1
         return result

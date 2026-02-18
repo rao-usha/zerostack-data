@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 # CONSTANTS
 # =============================================================================
 
+
 class MarketPosition(str, Enum):
     LEADER = "leader"
     CHALLENGER = "challenger"
@@ -62,6 +63,7 @@ ANALYSIS_CACHE_HOURS = 24
 # =============================================================================
 # COMPETITIVE INTEL AGENT
 # =============================================================================
+
 
 class CompetitiveIntelAgent:
     """
@@ -190,7 +192,11 @@ class CompetitiveIntelAgent:
             if profile:
                 domain = profile.get("domain") or profile.get("website")
                 if domain:
-                    domain = domain.replace("https://", "").replace("http://", "").split("/")[0]
+                    domain = (
+                        domain.replace("https://", "")
+                        .replace("http://", "")
+                        .split("/")[0]
+                    )
 
             if not domain:
                 return None
@@ -202,10 +208,9 @@ class CompetitiveIntelAgent:
                 ORDER BY fetched_at DESC
                 LIMIT 1
             """)
-            result = self.db.execute(query, {
-                "domain": domain,
-                "domain_pattern": f"%{domain}%"
-            })
+            result = self.db.execute(
+                query, {"domain": domain, "domain_pattern": f"%{domain}%"}
+            )
             row = result.mappings().fetchone()
             return dict(row) if row else None
         except Exception as e:
@@ -266,11 +271,7 @@ class CompetitiveIntelAgent:
     # COMPETITOR DISCOVERY
     # -------------------------------------------------------------------------
 
-    def find_competitors(
-        self,
-        company_name: str,
-        max_results: int = 10
-    ) -> List[Dict]:
+    def find_competitors(self, company_name: str, max_results: int = 10) -> List[Dict]:
         """
         Find competitors using multiple signals.
 
@@ -309,23 +310,23 @@ class CompetitiveIntelAgent:
                     target, candidate
                 )
 
-                scored.append({
-                    "name": cand_name,
-                    "similarity_score": round(similarity, 2),
-                    "relationship": relationship,
-                    "signals": signals,
-                    "strengths": strengths,
-                    "weaknesses": weaknesses,
-                })
+                scored.append(
+                    {
+                        "name": cand_name,
+                        "similarity_score": round(similarity, 2),
+                        "relationship": relationship,
+                        "signals": signals,
+                        "strengths": strengths,
+                        "weaknesses": weaknesses,
+                    }
+                )
 
         # Sort by similarity and return top N
         scored.sort(key=lambda x: x["similarity_score"], reverse=True)
         return scored[:max_results]
 
     def _query_sector_companies(
-        self,
-        sector: Optional[str],
-        limit: int = 100
+        self, sector: Optional[str], limit: int = 100
     ) -> List[Dict]:
         """Query companies in the same sector."""
         if not sector:
@@ -347,11 +348,7 @@ class CompetitiveIntelAgent:
             self.db.rollback()
             return []
 
-    def _score_similarity(
-        self,
-        target: Dict,
-        candidate: Dict
-    ) -> Tuple[float, Dict]:
+    def _score_similarity(self, target: Dict, candidate: Dict) -> Tuple[float, Dict]:
         """
         Score similarity between target and candidate.
 
@@ -380,7 +377,7 @@ class CompetitiveIntelAgent:
                 signals["employee_size"] = {
                     "target": target_emp,
                     "candidate": cand_emp,
-                    "ratio": round(ratio, 2)
+                    "ratio": round(ratio, 2),
                 }
                 total_score += SIMILARITY_WEIGHTS["employee_size"] * ratio
 
@@ -396,20 +393,17 @@ class CompetitiveIntelAgent:
                 signals["funding_stage"] = {
                     "target": target_funding,
                     "candidate": cand_funding,
-                    "score": round(ratio, 2)
+                    "score": round(ratio, 2),
                 }
                 total_score += SIMILARITY_WEIGHTS["funding_stage"] * ratio
 
         # Shared investors (check portfolio overlap)
-        shared = self._find_shared_investors(
-            target.get("name"),
-            candidate.get("name")
-        )
+        shared = self._find_shared_investors(target.get("name"), candidate.get("name"))
         if shared:
             investor_score = min(len(shared) / 3, 1.0)  # Cap at 3 shared
             signals["shared_investors"] = {
                 "count": len(shared),
-                "investors": shared[:5]
+                "investors": shared[:5],
             }
             total_score += SIMILARITY_WEIGHTS["shared_investors"] * investor_score
 
@@ -427,16 +421,14 @@ class CompetitiveIntelAgent:
                     if jaccard > 0.2:
                         signals["tech_stack"] = {
                             "shared_languages": list(target_langs & cand_langs),
-                            "jaccard": round(jaccard, 2)
+                            "jaccard": round(jaccard, 2),
                         }
                         total_score += SIMILARITY_WEIGHTS["tech_stack"] * jaccard
 
         return total_score, signals
 
     def _find_shared_investors(
-        self,
-        company1: Optional[str],
-        company2: Optional[str]
+        self, company1: Optional[str], company2: Optional[str]
     ) -> List[str]:
         """Find investors that have invested in both companies."""
         if not company1 or not company2:
@@ -452,10 +444,9 @@ class CompetitiveIntelAgent:
             LIMIT 10
         """)
         try:
-            result = self.db.execute(query, {
-                "c1": f"%{company1}%",
-                "c2": f"%{company2}%"
-            })
+            result = self.db.execute(
+                query, {"c1": f"%{company1}%", "c2": f"%{company2}%"}
+            )
             return [row[0] for row in result if row[0]]
         except Exception:
             return []
@@ -484,9 +475,7 @@ class CompetitiveIntelAgent:
         return "indirect"
 
     def _analyze_strengths_weaknesses(
-        self,
-        target: Dict,
-        competitor: Dict
+        self, target: Dict, competitor: Dict
     ) -> Tuple[List[str], List[str]]:
         """Analyze competitor's strengths and weaknesses relative to target."""
         strengths = []
@@ -512,14 +501,22 @@ class CompetitiveIntelAgent:
         target_score = self._get_company_score(target.get("name", ""))
         comp_score = self._get_company_score(competitor.get("name", ""))
         if target_score and comp_score:
-            if (comp_score.get("tech_score") or 0) > (target_score.get("tech_score") or 0) + 10:
+            if (comp_score.get("tech_score") or 0) > (
+                target_score.get("tech_score") or 0
+            ) + 10:
                 strengths.append("stronger tech")
-            elif (target_score.get("tech_score") or 0) > (comp_score.get("tech_score") or 0) + 10:
+            elif (target_score.get("tech_score") or 0) > (
+                comp_score.get("tech_score") or 0
+            ) + 10:
                 weaknesses.append("weaker tech")
 
-            if (comp_score.get("growth_score") or 0) > (target_score.get("growth_score") or 0) + 10:
+            if (comp_score.get("growth_score") or 0) > (
+                target_score.get("growth_score") or 0
+            ) + 10:
                 strengths.append("faster growth")
-            elif (target_score.get("growth_score") or 0) > (comp_score.get("growth_score") or 0) + 10:
+            elif (target_score.get("growth_score") or 0) > (
+                comp_score.get("growth_score") or 0
+            ) + 10:
                 weaknesses.append("slower growth")
 
         # Traffic comparison
@@ -546,9 +543,14 @@ class CompetitiveIntelAgent:
         Returns metrics table with normalized values.
         """
         metrics = [
-            "health_score", "growth_score", "stability_score",
-            "employees", "funding", "traffic_rank",
-            "github_stars", "glassdoor_rating"
+            "health_score",
+            "growth_score",
+            "stability_score",
+            "employees",
+            "funding",
+            "traffic_rank",
+            "github_stars",
+            "glassdoor_rating",
         ]
 
         data = {}
@@ -558,7 +560,7 @@ class CompetitiveIntelAgent:
         return {
             "metrics": metrics,
             "data": data,
-            "rankings": self._compute_rankings(data, metrics)
+            "rankings": self._compute_rankings(data, metrics),
         }
 
     def _get_company_metrics(self, company_name: str) -> Dict:
@@ -575,7 +577,9 @@ class CompetitiveIntelAgent:
         # Profile data
         profile = self._get_company_profile(company_name)
         if profile:
-            metrics["employees"] = profile.get("employees") or profile.get("employee_count")
+            metrics["employees"] = profile.get("employees") or profile.get(
+                "employee_count"
+            )
             metrics["funding"] = profile.get("total_funding")
 
         # Traffic
@@ -625,11 +629,7 @@ class CompetitiveIntelAgent:
     # MOAT ASSESSMENT
     # -------------------------------------------------------------------------
 
-    def assess_moat(
-        self,
-        company_name: str,
-        competitors: List[str]
-    ) -> Dict:
+    def assess_moat(self, company_name: str, competitors: List[str]) -> Dict:
         """
         Assess competitive moat for a company.
 
@@ -655,10 +655,7 @@ class CompetitiveIntelAgent:
         }
 
         # Compute overall moat score
-        overall = sum(
-            scores[cat] * MOAT_WEIGHTS[cat]
-            for cat in scores
-        )
+        overall = sum(scores[cat] * MOAT_WEIGHTS[cat] for cat in scores)
 
         # Determine moat strength
         if overall >= 75:
@@ -681,9 +678,7 @@ class CompetitiveIntelAgent:
         }
 
     def _score_network_effects(
-        self,
-        profile: Optional[Dict],
-        traffic: Optional[Dict]
+        self, profile: Optional[Dict], traffic: Optional[Dict]
     ) -> float:
         """Score network effects based on user base and integrations."""
         score = 50.0  # Base score
@@ -712,7 +707,9 @@ class CompetitiveIntelAgent:
         if profile:
             sector = (profile.get("sector") or "").lower()
             # High switching cost sectors
-            if any(s in sector for s in ["enterprise", "saas", "fintech", "healthcare"]):
+            if any(
+                s in sector for s in ["enterprise", "saas", "fintech", "healthcare"]
+            ):
                 score += 30
 
             # Large customer base suggests integration depth
@@ -724,11 +721,7 @@ class CompetitiveIntelAgent:
 
         return min(100, score)
 
-    def _score_brand(
-        self,
-        profile: Optional[Dict],
-        traffic: Optional[Dict]
-    ) -> float:
+    def _score_brand(self, profile: Optional[Dict], traffic: Optional[Dict]) -> float:
         """Score brand recognition."""
         score = 30.0  # Base score
 
@@ -751,9 +744,7 @@ class CompetitiveIntelAgent:
         return min(100, score)
 
     def _score_cost_advantages(
-        self,
-        profile: Optional[Dict],
-        score_data: Optional[Dict]
+        self, profile: Optional[Dict], score_data: Optional[Dict]
     ) -> float:
         """Score cost advantages."""
         score = 40.0  # Base score
@@ -779,9 +770,7 @@ class CompetitiveIntelAgent:
         return min(100, score)
 
     def _score_technology(
-        self,
-        github: Optional[Dict],
-        score_data: Optional[Dict]
+        self, github: Optional[Dict], score_data: Optional[Dict]
     ) -> float:
         """Score technology lead."""
         score = 40.0  # Base score
@@ -809,10 +798,7 @@ class CompetitiveIntelAgent:
         return min(100, score)
 
     def _generate_moat_summary(
-        self,
-        company_name: str,
-        scores: Dict[str, float],
-        strength: str
+        self, company_name: str, scores: Dict[str, float], strength: str
     ) -> str:
         """Generate text summary of moat assessment."""
         # Find top strengths
@@ -820,9 +806,7 @@ class CompetitiveIntelAgent:
         top_strengths = [s for s, v in sorted_scores[:2] if v >= 60]
         weaknesses = [s for s, v in sorted_scores if v < 40]
 
-        summary_parts = [
-            f"{company_name} has a {strength} competitive moat."
-        ]
+        summary_parts = [f"{company_name} has a {strength} competitive moat."]
 
         if top_strengths:
             strength_names = {
@@ -854,11 +838,7 @@ class CompetitiveIntelAgent:
     # MOVEMENT TRACKING
     # -------------------------------------------------------------------------
 
-    def detect_movements(
-        self,
-        company_name: str,
-        days: int = 30
-    ) -> List[Dict]:
+    def detect_movements(self, company_name: str, days: int = 30) -> List[Dict]:
         """Detect recent competitive movements for a company."""
         movements = []
 
@@ -874,22 +854,24 @@ class CompetitiveIntelAgent:
         """)
 
         try:
-            result = self.db.execute(query, {
-                "pattern": f"%{company_name}%",
-                "days": days
-            })
+            result = self.db.execute(
+                query, {"pattern": f"%{company_name}%", "days": days}
+            )
             for row in result.mappings():
                 movement_type = self._classify_movement(
-                    row.get("event_type"),
-                    row.get("news_title", "")
+                    row.get("event_type"), row.get("news_title", "")
                 )
-                movements.append({
-                    "company": company_name,
-                    "type": movement_type,
-                    "description": row["news_title"],
-                    "impact_score": row.get("impact_score") or 0.5,
-                    "detected_at": row["created_at"].isoformat() if row.get("created_at") else None,
-                })
+                movements.append(
+                    {
+                        "company": company_name,
+                        "type": movement_type,
+                        "description": row["news_title"],
+                        "impact_score": row.get("impact_score") or 0.5,
+                        "detected_at": row["created_at"].isoformat()
+                        if row.get("created_at")
+                        else None,
+                    }
+                )
         except Exception as e:
             logger.warning(f"Error detecting movements: {e}")
 
@@ -903,19 +885,22 @@ class CompetitiveIntelAgent:
                 ORDER BY date_of_first_sale DESC
                 LIMIT 5
             """)
-            result = self.db.execute(query, {
-                "pattern": f"%{company_name}%",
-                "days": days
-            })
+            result = self.db.execute(
+                query, {"pattern": f"%{company_name}%", "days": days}
+            )
             for row in result.mappings():
                 amount = row.get("total_amount_sold") or 0
-                movements.append({
-                    "company": company_name,
-                    "type": MovementType.FUNDING.value,
-                    "description": f"SEC Form D filing: ${amount:,.0f} raised",
-                    "impact_score": 0.8 if amount > 10_000_000 else 0.6,
-                    "detected_at": row["date_of_first_sale"].isoformat() if row.get("date_of_first_sale") else None,
-                })
+                movements.append(
+                    {
+                        "company": company_name,
+                        "type": MovementType.FUNDING.value,
+                        "description": f"SEC Form D filing: ${amount:,.0f} raised",
+                        "impact_score": 0.8 if amount > 10_000_000 else 0.6,
+                        "detected_at": row["date_of_first_sale"].isoformat()
+                        if row.get("date_of_first_sale")
+                        else None,
+                    }
+                )
         except Exception as e:
             logger.debug("Failed to fetch Form D movements for %s: %s", company_name, e)
 
@@ -925,13 +910,29 @@ class CompetitiveIntelAgent:
         """Classify movement type from event type and title."""
         title_lower = title.lower()
 
-        if event_type == "funding" or "funding" in title_lower or "raises" in title_lower:
+        if (
+            event_type == "funding"
+            or "funding" in title_lower
+            or "raises" in title_lower
+        ):
             return MovementType.FUNDING.value
-        if event_type == "acquisition" or "acquires" in title_lower or "merger" in title_lower:
+        if (
+            event_type == "acquisition"
+            or "acquires" in title_lower
+            or "merger" in title_lower
+        ):
             return MovementType.ACQUISITION.value
-        if "hires" in title_lower or "appoints" in title_lower or "joins" in title_lower:
+        if (
+            "hires" in title_lower
+            or "appoints" in title_lower
+            or "joins" in title_lower
+        ):
             return MovementType.HIRING.value
-        if "launches" in title_lower or "announces" in title_lower or "product" in title_lower:
+        if (
+            "launches" in title_lower
+            or "announces" in title_lower
+            or "product" in title_lower
+        ):
             return MovementType.PRODUCT.value
         if "partnership" in title_lower or "partners" in title_lower:
             return MovementType.PARTNERSHIP.value
@@ -940,11 +941,7 @@ class CompetitiveIntelAgent:
 
         return "news"
 
-    def track_competitor_movements(
-        self,
-        companies: List[str],
-        days: int = 30
-    ) -> Dict:
+    def track_competitor_movements(self, companies: List[str], days: int = 30) -> Dict:
         """Track movements for a list of competitors."""
         all_movements = []
         summary = {
@@ -972,7 +969,7 @@ class CompetitiveIntelAgent:
         # Sort by impact and date
         all_movements.sort(
             key=lambda x: (x.get("impact_score", 0), x.get("detected_at", "")),
-            reverse=True
+            reverse=True,
         )
 
         return {
@@ -988,7 +985,7 @@ class CompetitiveIntelAgent:
         self,
         company_name: str,
         max_competitors: int = 10,
-        include_movements: bool = True
+        include_movements: bool = True,
     ) -> Dict:
         """
         Run full competitive analysis for a company.
@@ -1012,18 +1009,13 @@ class CompetitiveIntelAgent:
 
         # Determine market position
         position = self._determine_market_position(
-            company_name,
-            competitor_names,
-            comparison
+            company_name, competitor_names, comparison
         )
 
         # Track movements if requested
         movements = None
         if include_movements and competitor_names:
-            movements = self.track_competitor_movements(
-                all_companies,
-                days=30
-            )
+            movements = self.track_competitor_movements(all_companies, days=30)
 
         # Calculate confidence
         data_sources = []
@@ -1059,10 +1051,7 @@ class CompetitiveIntelAgent:
         return result
 
     def _determine_market_position(
-        self,
-        company_name: str,
-        competitors: List[str],
-        comparison: Dict
+        self, company_name: str, competitors: List[str], comparison: Dict
     ) -> str:
         """Determine market position relative to competitors."""
         rankings = comparison.get("rankings", {})
@@ -1071,7 +1060,9 @@ class CompetitiveIntelAgent:
         if not overall:
             return MarketPosition.NICHE.value
 
-        position = overall.index(company_name) if company_name in overall else len(overall)
+        position = (
+            overall.index(company_name) if company_name in overall else len(overall)
+        )
         total = len(overall)
 
         if position == 0:
@@ -1109,17 +1100,20 @@ class CompetitiveIntelAgent:
         """)
 
         try:
-            self.db.execute(query, {
-                "name": company_name,
-                "sector": result.get("sector"),
-                "competitors": json.dumps(result.get("competitors", [])),
-                "matrix": json.dumps(result.get("comparison_matrix", {})),
-                "moat": json.dumps(result.get("moat_assessment", {})),
-                "position": result.get("market_position"),
-                "confidence": result.get("confidence"),
-                "sources": json.dumps(result.get("data_sources", [])),
-                "expires": expires,
-            })
+            self.db.execute(
+                query,
+                {
+                    "name": company_name,
+                    "sector": result.get("sector"),
+                    "competitors": json.dumps(result.get("competitors", [])),
+                    "matrix": json.dumps(result.get("comparison_matrix", {})),
+                    "moat": json.dumps(result.get("moat_assessment", {})),
+                    "position": result.get("market_position"),
+                    "confidence": result.get("confidence"),
+                    "sources": json.dumps(result.get("data_sources", [])),
+                    "expires": expires,
+                },
+            )
             self.db.commit()
         except Exception as e:
             logger.warning(f"Failed to cache analysis: {e}")
@@ -1146,7 +1140,9 @@ class CompetitiveIntelAgent:
                 "moat_assessment": row["moat_assessment"] or {},
                 "confidence": row["confidence"],
                 "data_sources": row["data_sources"] or [],
-                "analyzed_at": row["analyzed_at"].isoformat() + "Z" if row["analyzed_at"] else None,
+                "analyzed_at": row["analyzed_at"].isoformat() + "Z"
+                if row["analyzed_at"]
+                else None,
                 "cached": True,
             }
 

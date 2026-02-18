@@ -9,6 +9,7 @@ Provides HTTP endpoints for ingesting FCC broadband data:
 
 No API key required - public FCC data.
 """
+
 import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -26,6 +27,7 @@ router = APIRouter(tags=["FCC Broadband & Telecom"])
 
 
 # ========== Enums for validation ==========
+
 
 class SpeedTier(str, Enum):
     SUB_BROADBAND = "sub_broadband"
@@ -46,50 +48,53 @@ class TechnologyType(str, Enum):
 
 # ========== Request Models ==========
 
+
 class StateIngestRequest(BaseModel):
     """Request model for state-level broadband ingestion."""
+
     state_codes: List[str] = Field(
         ...,
         description="List of 2-letter state codes (e.g., ['CA', 'NY', 'TX'])",
         examples=[["CA", "NY", "TX"]],
         min_length=1,
-        max_length=52
+        max_length=52,
     )
     include_summary: bool = Field(
         default=True,
-        description="Generate summary statistics (provider counts, coverage %)"
+        description="Generate summary statistics (provider counts, coverage %)",
     )
 
 
 class AllStatesIngestRequest(BaseModel):
     """Request model for all-states ingestion."""
+
     include_summary: bool = Field(
-        default=True,
-        description="Generate summary statistics for each state"
+        default=True, description="Generate summary statistics for each state"
     )
 
 
 class CountyIngestRequest(BaseModel):
     """Request model for county-level broadband ingestion."""
+
     county_fips_codes: List[str] = Field(
         ...,
         description="List of 5-digit county FIPS codes (e.g., ['06001', '36061'])",
         examples=[["06001", "36061"]],
-        min_length=1
+        min_length=1,
     )
     include_summary: bool = Field(
-        default=True,
-        description="Generate summary statistics"
+        default=True, description="Generate summary statistics"
     )
 
 
 # ========== Endpoints ==========
 
+
 @router.post("/fcc-broadband/state/ingest")
 async def ingest_state_broadband(
     request: StateIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest FCC broadband coverage data for specific states.
@@ -120,11 +125,13 @@ async def ingest_state_broadband(
     if invalid_states:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid state codes: {invalid_states}. Use 2-letter codes like CA, NY, TX."
+            detail=f"Invalid state codes: {invalid_states}. Use 2-letter codes like CA, NY, TX.",
         )
 
     return create_and_dispatch_job(
-        db, background_tasks, source="fcc_broadband",
+        db,
+        background_tasks,
+        source="fcc_broadband",
         config={
             "dataset": "broadband_coverage",
             "state_codes": [s.upper() for s in request.state_codes],
@@ -139,7 +146,7 @@ async def ingest_state_broadband(
 async def ingest_all_states_broadband(
     request: AllStatesIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest FCC broadband coverage for ALL 50 states + DC.
@@ -159,7 +166,9 @@ async def ingest_all_states_broadband(
     - 51 state-level summary records
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="fcc_broadband",
+        db,
+        background_tasks,
+        source="fcc_broadband",
         config={
             "dataset": "broadband_coverage",
             "scope": "all_states",
@@ -174,7 +183,7 @@ async def ingest_all_states_broadband(
 async def ingest_county_broadband(
     request: CountyIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest FCC broadband coverage for specific counties.
@@ -191,15 +200,19 @@ async def ingest_county_broadband(
     **No API key required** - FCC public data
     """
     # Validate FIPS codes format
-    invalid_fips = [f for f in request.county_fips_codes if len(f) != 5 or not f.isdigit()]
+    invalid_fips = [
+        f for f in request.county_fips_codes if len(f) != 5 or not f.isdigit()
+    ]
     if invalid_fips:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid county FIPS codes: {invalid_fips}. Must be 5 digits."
+            detail=f"Invalid county FIPS codes: {invalid_fips}. Must be 5 digits.",
         )
 
     return create_and_dispatch_job(
-        db, background_tasks, source="fcc_broadband",
+        db,
+        background_tasks,
+        source="fcc_broadband",
         config={
             "dataset": "broadband_coverage",
             "geography": "county",
@@ -212,6 +225,7 @@ async def ingest_county_broadband(
 
 # ========== Reference Endpoints ==========
 
+
 @router.get("/fcc-broadband/reference/states")
 async def get_state_codes():
     """
@@ -223,17 +237,11 @@ async def get_state_codes():
     for code in US_STATES:
         fips = STATE_FIPS.get(code, "")
         from app.sources.fcc_broadband.metadata import STATE_NAMES
-        name = STATE_NAMES.get(fips, code)
-        state_info.append({
-            "code": code,
-            "fips": fips,
-            "name": name
-        })
 
-    return {
-        "count": len(state_info),
-        "states": state_info
-    }
+        name = STATE_NAMES.get(fips, code)
+        state_info.append({"code": code, "fips": fips, "name": name})
+
+    return {"count": len(state_info), "states": state_info}
 
 
 @router.get("/fcc-broadband/reference/technologies")
@@ -246,21 +254,17 @@ async def get_technology_types():
     """
     return {
         "technologies": [
-            {"code": code, "name": name}
-            for code, name in TECHNOLOGY_CODES.items()
+            {"code": code, "name": name} for code, name in TECHNOLOGY_CODES.items()
         ],
         "categories": {
             "wireline": {
                 "dsl": ["10", "11", "12", "20"],
                 "cable": ["40", "41", "42"],
                 "fiber": ["50"],
-                "other_copper": ["30"]
+                "other_copper": ["30"],
             },
-            "wireless": {
-                "fixed_wireless": ["70", "71", "72"],
-                "satellite": ["60"]
-            }
-        }
+            "wireless": {"fixed_wireless": ["70", "71", "72"], "satellite": ["60"]},
+        },
     }
 
 
@@ -275,34 +279,34 @@ async def get_speed_tiers():
         "fcc_broadband_definition": {
             "download_mbps": 25,
             "upload_mbps": 3,
-            "note": "FCC minimum broadband threshold (2024)"
+            "note": "FCC minimum broadband threshold (2024)",
         },
         "speed_tiers": [
             {
                 "tier": "sub_broadband",
                 "download_range": "< 25 Mbps",
-                "description": "Below FCC broadband definition"
+                "description": "Below FCC broadband definition",
             },
             {
                 "tier": "basic_broadband",
                 "download_range": "25 - 100 Mbps",
-                "description": "Meets FCC minimum"
+                "description": "Meets FCC minimum",
             },
             {
                 "tier": "high_speed",
                 "download_range": "100 - 1000 Mbps",
-                "description": "High-speed broadband"
+                "description": "High-speed broadband",
             },
             {
                 "tier": "gigabit",
                 "download_range": "1000+ Mbps",
-                "description": "Gigabit fiber-class speeds"
-            }
+                "description": "Gigabit fiber-class speeds",
+            },
         ],
         "proposed_update": {
             "note": "FCC proposed updating definition to 100/20 Mbps",
-            "status": "Under consideration"
-        }
+            "status": "Under consideration",
+        },
     }
 
 
@@ -319,27 +323,27 @@ async def list_fcc_datasets():
                 "description": "Detailed provider availability with technology and speeds",
                 "endpoint": "/fcc-broadband/state/ingest",
                 "geography_levels": ["state", "county"],
-                "source": "FCC National Broadband Map"
+                "source": "FCC National Broadband Map",
             },
             {
                 "id": "broadband_summary",
                 "name": "Broadband Summary Statistics",
                 "description": "Aggregated stats: provider count, coverage %, technology availability",
                 "generated_from": "broadband_coverage",
-                "use_cases": ["Digital divide analysis", "Policy research"]
-            }
+                "use_cases": ["Digital divide analysis", "Policy research"],
+            },
         ],
         "use_cases": [
             "Digital divide analysis (which areas lack broadband?)",
             "ISP competition analysis (monopoly vs competitive markets)",
             "Real estate investment (broadband = property value)",
             "Policy analysis (universal broadband initiatives)",
-            "Network infrastructure planning"
+            "Network infrastructure planning",
         ],
         "api_info": {
             "api_key_required": False,
             "documentation": "https://broadbandmap.fcc.gov",
             "rate_limit": "Be respectful (~60 req/min recommended)",
-            "data_license": "Public domain (U.S. government)"
-        }
+            "data_license": "Public domain (U.S. government)",
+        },
     }

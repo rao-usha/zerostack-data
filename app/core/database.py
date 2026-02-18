@@ -1,20 +1,26 @@
 """
 Database connection and session management.
 """
+
 from typing import Generator
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
 from app.core.config import get_settings
 from app.core.models import Base
+
 # Import SEC models so they're registered with SQLAlchemy
 from app.sources.sec import models as sec_models
+
 # Import PE models for PE Intelligence Platform
 from app.core import pe_models
+
 # Import People & Org Chart models
 from app.core import people_models
+
 # Import Site Intelligence Platform models
 from app.core import models_site_intel
+
 # Import Job Queue model for distributed workers
 from app.core import models_queue
 import logging
@@ -44,7 +50,7 @@ def get_engine():
             pool_size=5,
             max_overflow=10,
             pool_pre_ping=True,  # Verify connections before using
-            echo=False  # Set to True for SQL debugging
+            echo=False,  # Set to True for SQL debugging
         )
     return _engine
 
@@ -106,7 +112,3 @@ def execute_raw_sql(sql: str, params: dict = None) -> None:
         else:
             conn.execute(text(sql))
         conn.commit()
-
-
-
-

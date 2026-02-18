@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DeepCollectionConfig:
     """Configuration for deep collection pipeline."""
+
     # Phase toggles
     run_sec: bool = True
     run_website: bool = True
@@ -66,6 +67,7 @@ class DeepCollectionConfig:
 @dataclass
 class DeepCollectionResult:
     """Result of a deep collection run."""
+
     company_id: int
     company_name: str
     success: bool = False
@@ -172,9 +174,11 @@ class DeepCollectionOrchestrator:
         started_at = datetime.utcnow()
 
         # Get company
-        company = session.query(IndustrialCompany).filter(
-            IndustrialCompany.id == company_id
-        ).first()
+        company = (
+            session.query(IndustrialCompany)
+            .filter(IndustrialCompany.id == company_id)
+            .first()
+        )
 
         if not company:
             return DeepCollectionResult(
@@ -226,7 +230,9 @@ class DeepCollectionOrchestrator:
                 result.sec_changes = len(sec_result.get("changes", []))
                 result.errors.extend(sec_result.get("errors", []))
 
-                result.phase_durations["sec"] = (datetime.utcnow() - phase_start).total_seconds()
+                result.phase_durations["sec"] = (
+                    datetime.utcnow() - phase_start
+                ).total_seconds()
                 logger.info(
                     f"[DeepCollect] Phase 1 complete: {result.sec_people} people, "
                     f"{result.sec_changes} changes"
@@ -244,8 +250,12 @@ class DeepCollectionOrchestrator:
                 result.website_people = len(website_result.get("people", []))
                 result.errors.extend(website_result.get("errors", []))
 
-                result.phase_durations["website"] = (datetime.utcnow() - phase_start).total_seconds()
-                logger.info(f"[DeepCollect] Phase 2 complete: {result.website_people} people")
+                result.phase_durations["website"] = (
+                    datetime.utcnow() - phase_start
+                ).total_seconds()
+                logger.info(
+                    f"[DeepCollect] Phase 2 complete: {result.website_people} people"
+                )
 
             # Phase 3: News deep scan
             if config.run_news:
@@ -257,14 +267,21 @@ class DeepCollectionOrchestrator:
                 result.news_changes = len(news_result.get("changes", []))
                 result.errors.extend(news_result.get("errors", []))
 
-                result.phase_durations["news"] = (datetime.utcnow() - phase_start).total_seconds()
-                logger.info(f"[DeepCollect] Phase 3 complete: {result.news_changes} changes")
+                result.phase_durations["news"] = (
+                    datetime.utcnow() - phase_start
+                ).total_seconds()
+                logger.info(
+                    f"[DeepCollect] Phase 3 complete: {result.news_changes} changes"
+                )
 
             # Store people and changes
             logger.info(
                 f"[DeepCollect] Storing {len(all_people)} people, {len(all_changes)} changes"
             )
-            from app.sources.people_collection.orchestrator import PeopleCollectionOrchestrator
+            from app.sources.people_collection.orchestrator import (
+                PeopleCollectionOrchestrator,
+            )
+
             base_orchestrator = PeopleCollectionOrchestrator(db_session=session)
             stored = await base_orchestrator._store_people(all_people, company, session)
             result.total_people_created = stored["created"]
@@ -280,7 +297,10 @@ class DeepCollectionOrchestrator:
             session.commit()
 
             # Phase 4: Org chart construction
-            if config.build_org_chart and (result.total_people_created + result.total_people_updated) > 0:
+            if (
+                config.build_org_chart
+                and (result.total_people_created + result.total_people_updated) > 0
+            ):
                 phase_start = datetime.utcnow()
                 logger.info("[DeepCollect] Phase 4: Org chart construction")
 
@@ -291,7 +311,9 @@ class DeepCollectionOrchestrator:
                 result.org_chart_depth = org_result.get("max_depth", 0)
                 result.org_chart_departments = org_result.get("departments", [])
 
-                result.phase_durations["org_chart"] = (datetime.utcnow() - phase_start).total_seconds()
+                result.phase_durations["org_chart"] = (
+                    datetime.utcnow() - phase_start
+                ).total_seconds()
                 logger.info(
                     f"[DeepCollect] Phase 4 complete: depth={result.org_chart_depth}, "
                     f"departments={len(result.org_chart_departments)}"
@@ -381,13 +403,18 @@ class DeepCollectionOrchestrator:
             # Auto-generate from company website if not provided
             if not seed_urls and company.website:
                 from urllib.parse import urlparse
+
                 website = company.website
                 if not website.startswith("http"):
                     website = "https://" + website
 
                 domain = urlparse(website).netloc
                 if not domain:
-                    domain = website.replace("https://", "").replace("http://", "").split("/")[0]
+                    domain = (
+                        website.replace("https://", "")
+                        .replace("http://", "")
+                        .split("/")[0]
+                    )
 
                 # Ensure www. prefix for domains that need it
                 www_domain = domain if domain.startswith("www.") else f"www.{domain}"

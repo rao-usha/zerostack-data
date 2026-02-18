@@ -5,6 +5,7 @@ Workers call send_job_event() after updating job_queue rows.
 The API process receives these via pg_listener.py and republishes
 them into the in-memory EventBus for SSE streaming.
 """
+
 import json
 import logging
 
@@ -41,24 +42,38 @@ def send_job_event(
         trimmed = {
             "event": event_type,
             "data": {
-                k: v for k, v in data.items()
-                if k in ("job_id", "job_type", "worker_id", "progress_pct",
-                         "progress_message", "status", "error_message")
+                k: v
+                for k, v in data.items()
+                if k
+                in (
+                    "job_id",
+                    "job_type",
+                    "worker_id",
+                    "progress_pct",
+                    "progress_message",
+                    "status",
+                    "error_message",
+                )
             },
             "_truncated": True,
         }
         payload = json.dumps(trimmed, default=str)
         if len(payload.encode("utf-8")) > _MAX_PAYLOAD:
             # Last resort: just the basics
-            payload = json.dumps({
-                "event": event_type,
-                "data": {"job_id": data.get("job_id")},
-                "_truncated": True,
-            })
+            payload = json.dumps(
+                {
+                    "event": event_type,
+                    "data": {"job_id": data.get("job_id")},
+                    "_truncated": True,
+                }
+            )
 
-    db.execute(text(f"SELECT pg_notify(:channel, :payload)"), {
-        "channel": CHANNEL,
-        "payload": payload,
-    })
+    db.execute(
+        text(f"SELECT pg_notify(:channel, :payload)"),
+        {
+            "channel": CHANNEL,
+            "payload": payload,
+        },
+    )
     # Flush so the NOTIFY goes out even if caller hasn't committed yet
     db.flush()

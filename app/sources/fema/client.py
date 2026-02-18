@@ -14,6 +14,7 @@ Rate limits:
 - No official limit, but be respectful (~60 req/min recommended)
 - No API key required (free public API)
 """
+
 import logging
 from typing import Dict, List, Optional, Any
 
@@ -47,7 +48,7 @@ class FEMAClient(BaseAPIClient):
         self,
         max_concurrency: int = 3,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize OpenFEMA client.
@@ -66,7 +67,7 @@ class FEMAClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=config.timeout_seconds,
             connect_timeout=config.connect_timeout_seconds,
-            rate_limit_interval=config.get_rate_limit_interval()
+            rate_limit_interval=config.get_rate_limit_interval(),
         )
 
     async def get_disaster_declarations(
@@ -76,7 +77,7 @@ class FEMAClient(BaseAPIClient):
         state: Optional[str] = None,
         year: Optional[int] = None,
         disaster_type: Optional[str] = None,
-        order_by: str = "declarationDate desc"
+        order_by: str = "declarationDate desc",
     ) -> Dict[str, Any]:
         """
         Fetch disaster declarations from OpenFEMA.
@@ -93,7 +94,7 @@ class FEMAClient(BaseAPIClient):
             "$skip": skip,
             "$top": min(top, 1000),
             "$orderby": order_by,
-            "$inlinecount": "allpages"
+            "$inlinecount": "allpages",
         }
 
         filters = []
@@ -110,7 +111,7 @@ class FEMAClient(BaseAPIClient):
         return await self.get(
             "DisasterDeclarationsSummaries",
             params=params,
-            resource_id="DisasterDeclarations"
+            resource_id="DisasterDeclarations",
         )
 
     async def get_all_disaster_declarations(
@@ -118,7 +119,7 @@ class FEMAClient(BaseAPIClient):
         state: Optional[str] = None,
         year: Optional[int] = None,
         disaster_type: Optional[str] = None,
-        max_records: int = 50000
+        max_records: int = 50000,
     ) -> List[Dict[str, Any]]:
         """Fetch all disaster declarations with automatic pagination."""
         all_records = []
@@ -127,11 +128,7 @@ class FEMAClient(BaseAPIClient):
 
         while len(all_records) < max_records:
             response = await self.get_disaster_declarations(
-                skip=skip,
-                top=top,
-                state=state,
-                year=year,
-                disaster_type=disaster_type
+                skip=skip, top=top, state=state, year=year, disaster_type=disaster_type
             )
 
             records = response.get("DisasterDeclarationsSummaries", [])
@@ -139,7 +136,9 @@ class FEMAClient(BaseAPIClient):
                 break
 
             all_records.extend(records)
-            logger.info(f"Fetched {len(records)} disaster records (total: {len(all_records)})")
+            logger.info(
+                f"Fetched {len(records)} disaster records (total: {len(all_records)})"
+            )
 
             metadata = response.get("metadata", {})
             total_count = metadata.get("count", 0)
@@ -156,14 +155,10 @@ class FEMAClient(BaseAPIClient):
         skip: int = 0,
         top: int = 1000,
         state: Optional[str] = None,
-        disaster_number: Optional[int] = None
+        disaster_number: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Fetch Public Assistance funded project details."""
-        params = {
-            "$skip": skip,
-            "$top": min(top, 1000),
-            "$inlinecount": "allpages"
-        }
+        params = {"$skip": skip, "$top": min(top, 1000), "$inlinecount": "allpages"}
 
         filters = []
         if state:
@@ -177,7 +172,7 @@ class FEMAClient(BaseAPIClient):
         return await self.get(
             "PublicAssistanceFundedProjectsDetails",
             params=params,
-            resource_id="PublicAssistance"
+            resource_id="PublicAssistance",
         )
 
     async def get_hazard_mitigation_projects(
@@ -185,17 +180,13 @@ class FEMAClient(BaseAPIClient):
         skip: int = 0,
         top: int = 1000,
         state: Optional[str] = None,
-        program_area: Optional[str] = None
+        program_area: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Fetch Hazard Mitigation Assistance projects."""
         # HMA Projects is available in v4
         url = "https://www.fema.gov/api/open/v4/HazardMitigationAssistanceProjects"
 
-        params = {
-            "$skip": skip,
-            "$top": min(top, 1000),
-            "$inlinecount": "allpages"
-        }
+        params = {"$skip": skip, "$top": min(top, 1000), "$inlinecount": "allpages"}
 
         filters = []
         if state:
@@ -209,36 +200,27 @@ class FEMAClient(BaseAPIClient):
         return await self.get(url, params=params, resource_id="HazardMitigation")
 
     async def get_nfip_policies(
-        self,
-        skip: int = 0,
-        top: int = 1000,
-        state: Optional[str] = None
+        self, skip: int = 0, top: int = 1000, state: Optional[str] = None
     ) -> Dict[str, Any]:
         """Fetch NFIP flood insurance policies."""
-        params = {
-            "$skip": skip,
-            "$top": min(top, 1000),
-            "$inlinecount": "allpages"
-        }
+        params = {"$skip": skip, "$top": min(top, 1000), "$inlinecount": "allpages"}
 
         if state:
             params["$filter"] = f"propertyState eq '{state}'"
 
-        return await self.get("FimaNfipPolicies", params=params, resource_id="NFIPPolicies")
+        return await self.get(
+            "FimaNfipPolicies", params=params, resource_id="NFIPPolicies"
+        )
 
     async def get_nfip_claims(
         self,
         skip: int = 0,
         top: int = 1000,
         state: Optional[str] = None,
-        year_of_loss: Optional[int] = None
+        year_of_loss: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Fetch NFIP flood insurance claims."""
-        params = {
-            "$skip": skip,
-            "$top": min(top, 1000),
-            "$inlinecount": "allpages"
-        }
+        params = {"$skip": skip, "$top": min(top, 1000), "$inlinecount": "allpages"}
 
         filters = []
         if state:
@@ -252,21 +234,19 @@ class FEMAClient(BaseAPIClient):
         return await self.get("FimaNfipClaims", params=params, resource_id="NFIPClaims")
 
     async def get_web_disaster_summaries(
-        self,
-        skip: int = 0,
-        top: int = 1000
+        self, skip: int = 0, top: int = 1000
     ) -> Dict[str, Any]:
         """Fetch web-friendly disaster summaries."""
         params = {
             "$skip": skip,
             "$top": min(top, 1000),
             "$inlinecount": "allpages",
-            "$orderby": "declarationDate desc"
+            "$orderby": "declarationDate desc",
         }
         return await self.get(
             "FemaWebDisasterSummaries",
             params=params,
-            resource_id="WebDisasterSummaries"
+            resource_id="WebDisasterSummaries",
         )
 
 
@@ -288,10 +268,60 @@ HMA_PROGRAMS = {
 
 # US State codes
 US_STATES = [
-    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
-    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
-    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
-    "DC", "PR", "VI", "GU", "AS", "MP"
+    "AL",
+    "AK",
+    "AZ",
+    "AR",
+    "CA",
+    "CO",
+    "CT",
+    "DE",
+    "FL",
+    "GA",
+    "HI",
+    "ID",
+    "IL",
+    "IN",
+    "IA",
+    "KS",
+    "KY",
+    "LA",
+    "ME",
+    "MD",
+    "MA",
+    "MI",
+    "MN",
+    "MS",
+    "MO",
+    "MT",
+    "NE",
+    "NV",
+    "NH",
+    "NJ",
+    "NM",
+    "NY",
+    "NC",
+    "ND",
+    "OH",
+    "OK",
+    "OR",
+    "PA",
+    "RI",
+    "SC",
+    "SD",
+    "TN",
+    "TX",
+    "UT",
+    "VT",
+    "VA",
+    "WA",
+    "WV",
+    "WI",
+    "WY",
+    "DC",
+    "PR",
+    "VI",
+    "GU",
+    "AS",
+    "MP",
 ]

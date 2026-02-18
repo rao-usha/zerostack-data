@@ -3,6 +3,7 @@ Predictive Deal Scoring API Endpoints (T40)
 
 Provides win probability predictions and pipeline insights for deals.
 """
+
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -19,8 +20,10 @@ router = APIRouter(prefix="/predictions", tags=["Deal Predictions"])
 # SCHEMAS
 # =============================================================================
 
+
 class ScoreBreakdown(BaseModel):
     """Category score breakdown."""
+
     company_score: float = Field(..., description="Company quality score (0-100)")
     deal_score: float = Field(..., description="Deal characteristics score (0-100)")
     pipeline_score: float = Field(..., description="Pipeline signals score (0-100)")
@@ -29,6 +32,7 @@ class ScoreBreakdown(BaseModel):
 
 class SimilarDeal(BaseModel):
     """A similar historical deal."""
+
     id: int
     company_name: str
     sector: Optional[str] = None
@@ -40,6 +44,7 @@ class SimilarDeal(BaseModel):
 
 class DealPredictionResponse(BaseModel):
     """Full prediction for a single deal."""
+
     deal_id: int
     company_name: str
     win_probability: float = Field(..., description="Win probability (0-1)")
@@ -56,6 +61,7 @@ class DealPredictionResponse(BaseModel):
 
 class PipelineDeal(BaseModel):
     """Deal in scored pipeline."""
+
     deal_id: int
     company_name: str
     pipeline_stage: str
@@ -69,6 +75,7 @@ class PipelineDeal(BaseModel):
 
 class PipelineSummary(BaseModel):
     """Pipeline summary statistics."""
+
     total_deals: int
     avg_probability: float
     high_confidence_count: int
@@ -77,12 +84,14 @@ class PipelineSummary(BaseModel):
 
 class ScoredPipelineResponse(BaseModel):
     """Scored pipeline with summary."""
+
     deals: List[PipelineDeal]
     summary: PipelineSummary
 
 
 class StageAnalysis(BaseModel):
     """Stage-level analysis."""
+
     stage: str
     count: int
     avg_probability: float
@@ -91,6 +100,7 @@ class StageAnalysis(BaseModel):
 
 class RiskAlert(BaseModel):
     """Risk alert for a deal."""
+
     deal_id: int
     company_name: str
     alert: str
@@ -99,6 +109,7 @@ class RiskAlert(BaseModel):
 
 class Opportunity(BaseModel):
     """High-probability opportunity."""
+
     deal_id: int
     company_name: str
     insight: str
@@ -106,6 +117,7 @@ class Opportunity(BaseModel):
 
 class PipelineHealth(BaseModel):
     """Pipeline health metrics."""
+
     total_active_deals: int
     total_pipeline_value_millions: float
     expected_value_millions: float
@@ -114,12 +126,14 @@ class PipelineHealth(BaseModel):
 
 class SectorPerformance(BaseModel):
     """Sector performance stats."""
+
     deals: int
     avg_probability: float
 
 
 class PipelineInsightsResponse(BaseModel):
     """Aggregate pipeline insights."""
+
     pipeline_health: PipelineHealth
     stage_analysis: List[StageAnalysis]
     risk_alerts: List[RiskAlert]
@@ -129,6 +143,7 @@ class PipelineInsightsResponse(BaseModel):
 
 class PatternInsights(BaseModel):
     """Pattern insights from similar deals."""
+
     similar_deal_count: int
     win_rate: float
     common_success_factors: List[str]
@@ -136,6 +151,7 @@ class PatternInsights(BaseModel):
 
 class SimilarDealsResponse(BaseModel):
     """Similar deals response."""
+
     deal_id: int
     similar_deals: List[SimilarDeal]
     pattern_insights: PatternInsights
@@ -143,11 +159,13 @@ class SimilarDealsResponse(BaseModel):
 
 class BatchScoreRequest(BaseModel):
     """Request to score multiple deals."""
+
     deal_ids: List[int] = Field(..., description="Deal IDs to score")
 
 
 class BatchScoreResult(BaseModel):
     """Result for a single deal in batch."""
+
     deal_id: int
     company_name: str
     win_probability: float
@@ -157,6 +175,7 @@ class BatchScoreResult(BaseModel):
 
 class BatchScoreResponse(BaseModel):
     """Batch scoring response."""
+
     results: List[BatchScoreResult]
     scored_count: int
     failed_count: int
@@ -165,6 +184,7 @@ class BatchScoreResponse(BaseModel):
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
+
 
 def prediction_to_response(pred: DealPrediction) -> DealPredictionResponse:
     """Convert DealPrediction to response model."""
@@ -249,11 +269,12 @@ def insights_to_response(insights: PipelineInsights) -> PipelineInsightsResponse
 # ENDPOINTS
 # =============================================================================
 
+
 @router.get("/deal/{deal_id}", response_model=DealPredictionResponse)
 async def score_deal(
     deal_id: int,
     use_cache: bool = Query(True, description="Use cached prediction if available"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Score a single deal with full breakdown.
@@ -266,8 +287,7 @@ async def score_deal(
 
     if not prediction:
         raise HTTPException(
-            status_code=404,
-            detail=f"Deal {deal_id} not found or is already closed"
+            status_code=404, detail=f"Deal {deal_id} not found or is already closed"
         )
 
     return prediction_to_response(prediction)
@@ -276,9 +296,11 @@ async def score_deal(
 @router.get("/pipeline", response_model=ScoredPipelineResponse)
 async def get_scored_pipeline(
     pipeline_stage: Optional[str] = Query(None, description="Filter by stage"),
-    min_probability: float = Query(0.0, description="Minimum win probability", ge=0, le=1),
+    min_probability: float = Query(
+        0.0, description="Minimum win probability", ge=0, le=1
+    ),
     limit: int = Query(50, description="Maximum results", le=200),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get all active deals with scores, sorted by win probability.
@@ -290,7 +312,9 @@ async def get_scored_pipeline(
 
     # Filter by stage if specified
     if pipeline_stage:
-        scored_deals = [d for d in scored_deals if d.get("pipeline_stage") == pipeline_stage]
+        scored_deals = [
+            d for d in scored_deals if d.get("pipeline_stage") == pipeline_stage
+        ]
 
     # Build response
     deals = [
@@ -328,7 +352,7 @@ async def get_similar_deals(
     deal_id: int,
     limit: int = Query(5, description="Maximum similar deals", le=20),
     include_lost: bool = Query(True, description="Include closed_lost deals"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Find similar historical deals to guide strategy.
@@ -338,9 +362,7 @@ async def get_similar_deals(
     """
     scorer = DealScorer(db)
     result = scorer.find_similar_deals(
-        deal_id=deal_id,
-        limit=limit,
-        include_lost=include_lost
+        deal_id=deal_id, limit=limit, include_lost=include_lost
     )
 
     if not result.get("similar_deals") and result.get("deal_id") == deal_id:
@@ -374,9 +396,7 @@ async def get_similar_deals(
 
 
 @router.get("/insights", response_model=PipelineInsightsResponse)
-async def get_pipeline_insights(
-    db: Session = Depends(get_db)
-):
+async def get_pipeline_insights(db: Session = Depends(get_db)):
     """
     Get aggregate insights across the pipeline.
 
@@ -390,10 +410,7 @@ async def get_pipeline_insights(
 
 
 @router.post("/batch", response_model=BatchScoreResponse)
-async def score_batch(
-    request: BatchScoreRequest,
-    db: Session = Depends(get_db)
-):
+async def score_batch(request: BatchScoreRequest, db: Session = Depends(get_db)):
     """
     Score multiple deals at once.
 
@@ -438,43 +455,47 @@ async def get_methodology():
             "company_quality": {
                 "weight": 0.40,
                 "description": "Company health from T36 scoring (growth, stability, market position, tech velocity)",
-                "signals": ["composite_score", "tier", "growth_trajectory"]
+                "signals": ["composite_score", "tier", "growth_trajectory"],
             },
             "deal_characteristics": {
                 "weight": 0.30,
                 "description": "Deal size, valuation, and sector fit analysis",
-                "signals": ["size_in_sweet_spot", "valuation_reasonableness", "thesis_fit"]
+                "signals": [
+                    "size_in_sweet_spot",
+                    "valuation_reasonableness",
+                    "thesis_fit",
+                ],
             },
             "pipeline_signals": {
                 "weight": 0.20,
                 "description": "Pipeline velocity, activity frequency, and priority",
-                "signals": ["days_in_stage", "activity_count", "recency", "priority"]
+                "signals": ["days_in_stage", "activity_count", "recency", "priority"],
             },
             "historical_patterns": {
                 "weight": 0.10,
                 "description": "Win rates for similar deals by sector, size, and source",
-                "signals": ["similar_deal_win_rate", "source_track_record"]
-            }
+                "signals": ["similar_deal_win_rate", "source_track_record"],
+            },
         },
         "confidence_thresholds": {
             "high": "70%+ win probability",
             "medium": "40-70% win probability",
-            "low": "<40% win probability"
+            "low": "<40% win probability",
         },
         "tiers": {
             "A": "80-100% probability",
             "B": "60-79% probability",
             "C": "40-59% probability",
             "D": "20-39% probability",
-            "F": "0-19% probability"
+            "F": "0-19% probability",
         },
         "sector_sweet_spots": {
             "fintech": "$5-50M",
             "healthtech": "$10-75M",
             "saas": "$5-40M",
             "ai": "$10-100M",
-            "climate": "$15-80M"
+            "climate": "$15-80M",
         },
         "cache_duration": "24 hours",
-        "update_triggers": ["deal_update", "manual_refresh"]
+        "update_triggers": ["deal_update", "manual_refresh"],
     }

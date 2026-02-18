@@ -47,12 +47,12 @@ TITLE_LEVEL_MAP = {
 
 # CEO-specific titles that go to level 1
 CEO_PATTERNS = [
-    r'\bchief executive officer\b',
-    r'\bceo\b',
-    r'\bchairman.*ceo\b',
-    r'\bceo.*chairman\b',
-    r'\bpresident.*ceo\b',
-    r'\bceo.*president\b',
+    r"\bchief executive officer\b",
+    r"\bceo\b",
+    r"\bchairman.*ceo\b",
+    r"\bceo.*chairman\b",
+    r"\bpresident.*ceo\b",
+    r"\bceo.*president\b",
 ]
 
 
@@ -74,6 +74,7 @@ class OrgChartBuilder:
         """Get or create OpenAI client for org chart inference."""
         if self._llm_client is None:
             import openai
+
             self._llm_client = openai.OpenAI()
         return self._llm_client
 
@@ -97,21 +98,30 @@ class OrgChartBuilder:
         Returns:
             Dict with org chart data and stats
         """
-        logger.info(f"[OrgChartBuilder] Building org chart for {company_name} (id={company_id})")
+        logger.info(
+            f"[OrgChartBuilder] Building org chart for {company_name} (id={company_id})"
+        )
 
         # Load all current people for this company
-        company_people = db_session.query(CompanyPerson, Person).join(
-            Person, CompanyPerson.person_id == Person.id
-        ).filter(
-            CompanyPerson.company_id == company_id,
-            CompanyPerson.is_current == True,
-        ).all()
+        company_people = (
+            db_session.query(CompanyPerson, Person)
+            .join(Person, CompanyPerson.person_id == Person.id)
+            .filter(
+                CompanyPerson.company_id == company_id,
+                CompanyPerson.is_current == True,
+            )
+            .all()
+        )
 
         if not company_people:
-            logger.warning(f"[OrgChartBuilder] No people found for company {company_id}")
+            logger.warning(
+                f"[OrgChartBuilder] No people found for company {company_id}"
+            )
             return {"error": "No people found", "total_people": 0}
 
-        logger.info(f"[OrgChartBuilder] Found {len(company_people)} people for {company_name}")
+        logger.info(
+            f"[OrgChartBuilder] Found {len(company_people)} people for {company_name}"
+        )
 
         # Pass 1: Title-based hierarchy
         people_data = self._pass1_title_hierarchy(company_people)
@@ -124,9 +134,7 @@ class OrgChartBuilder:
 
         # Pass 3: Reporting chain inference (LLM)
         if len(people_data) >= 3:
-            people_data = await self._pass3_reporting_chains(
-                people_data, company_name
-            )
+            people_data = await self._pass3_reporting_chains(people_data, company_name)
 
         # Pass 4: Store results
         chart_data = self._pass4_store(
@@ -177,25 +185,27 @@ class OrgChartBuilder:
 
             # Refine based on specific title patterns
             if management_level > 2:
-                if 'chairman' in title_lower and 'vice' not in title_lower:
+                if "chairman" in title_lower and "vice" not in title_lower:
                     management_level = 1
-                elif 'president' in title_lower and 'vice' not in title_lower:
+                elif "president" in title_lower and "vice" not in title_lower:
                     # President of a division = level 3, president of company = level 2
                     management_level = min(management_level, 2)
 
-            people_data.append({
-                "company_person_id": cp.id,
-                "person_id": person.id,
-                "name": person.full_name,
-                "title": title,
-                "title_level": cp.title_level,
-                "management_level": management_level,
-                "is_board_member": cp.is_board_member,
-                "department": cp.department,
-                "division": None,  # To be set in Pass 2
-                "reports_to_id": None,  # To be set in Pass 3
-                "reports_to_name": None,
-            })
+            people_data.append(
+                {
+                    "company_person_id": cp.id,
+                    "person_id": person.id,
+                    "name": person.full_name,
+                    "title": title,
+                    "title_level": cp.title_level,
+                    "management_level": management_level,
+                    "is_board_member": cp.is_board_member,
+                    "department": cp.department,
+                    "division": None,  # To be set in Pass 2
+                    "reports_to_id": None,  # To be set in Pass 3
+                    "reports_to_name": None,
+                }
+            )
 
         # Sort by management level
         people_data.sort(key=lambda p: p["management_level"])
@@ -247,6 +257,7 @@ class OrgChartBuilder:
 
         try:
             import asyncio
+
             client = self._get_llm_client()
 
             response = await asyncio.get_running_loop().run_in_executor(
@@ -256,12 +267,13 @@ class OrgChartBuilder:
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=4000,
                     temperature=0.1,
-                )
+                ),
             )
 
             # Track LLM cost
             try:
                 from app.core.llm_cost_tracker import get_cost_tracker
+
                 tracker = get_cost_tracker()
                 in_tok = response.usage.prompt_tokens if response.usage else 0
                 out_tok = response.usage.completion_tokens if response.usage else 0
@@ -280,8 +292,8 @@ class OrgChartBuilder:
             # Parse JSON
             # Remove markdown code fences if present
             if text.startswith("```"):
-                text = re.sub(r'^```(?:json)?\n?', '', text)
-                text = re.sub(r'\n?```$', '', text)
+                text = re.sub(r"^```(?:json)?\n?", "", text)
+                text = re.sub(r"\n?```$", "", text)
 
             divisions = json.loads(text)
 
@@ -338,7 +350,10 @@ class OrgChartBuilder:
         # For level 2 people, they report to CEO
         if ceo:
             for p in people_data:
-                if p["management_level"] == 2 and p["company_person_id"] != ceo["company_person_id"]:
+                if (
+                    p["management_level"] == 2
+                    and p["company_person_id"] != ceo["company_person_id"]
+                ):
                     p["reports_to_id"] = ceo["company_person_id"]
                     p["reports_to_name"] = ceo["name"]
 
@@ -348,12 +363,15 @@ class OrgChartBuilder:
                 continue
 
             # Find the division head (lowest management_level in this division)
-            division_people_sorted = sorted(division_people, key=lambda p: p["management_level"])
+            division_people_sorted = sorted(
+                division_people, key=lambda p: p["management_level"]
+            )
             division_head = division_people_sorted[0]
 
             # People at levels 3+ need reporting relationships
             subordinates = [
-                p for p in division_people_sorted
+                p
+                for p in division_people_sorted
                 if p["management_level"] > division_head["management_level"]
             ]
 
@@ -379,6 +397,7 @@ class OrgChartBuilder:
 
             try:
                 import asyncio
+
                 client = self._get_llm_client()
 
                 response = await asyncio.get_running_loop().run_in_executor(
@@ -388,12 +407,13 @@ class OrgChartBuilder:
                         messages=[{"role": "user", "content": prompt}],
                         max_tokens=2000,
                         temperature=0.1,
-                    )
+                    ),
                 )
 
                 # Track LLM cost
                 try:
                     from app.core.llm_cost_tracker import get_cost_tracker
+
                     tracker = get_cost_tracker()
                     in_tok = response.usage.prompt_tokens if response.usage else 0
                     out_tok = response.usage.completion_tokens if response.usage else 0
@@ -411,8 +431,8 @@ class OrgChartBuilder:
 
                 # Parse JSON
                 if text.startswith("```"):
-                    text = re.sub(r'^```(?:json)?\n?', '', text)
-                    text = re.sub(r'\n?```$', '', text)
+                    text = re.sub(r"^```(?:json)?\n?", "", text)
+                    text = re.sub(r"\n?```$", "", text)
 
                 reporting_data = json.loads(text)
 
@@ -477,26 +497,36 @@ class OrgChartBuilder:
                         cp.department = p["division"]
                     updated += 1
             except Exception as e:
-                logger.warning(f"[OrgChartBuilder] Failed to update CP {p['company_person_id']}: {e}")
+                logger.warning(
+                    f"[OrgChartBuilder] Failed to update CP {p['company_person_id']}: {e}"
+                )
 
         # Build hierarchical chart data
         chart_data = self._build_chart_json(people_data)
 
         # Determine departments/divisions
-        departments = list(set(
-            p.get("division") or p.get("department") or "Unknown"
-            for p in people_data
-        ))
+        departments = list(
+            set(
+                p.get("division") or p.get("department") or "Unknown"
+                for p in people_data
+            )
+        )
 
         # Calculate max depth
-        max_depth = max(p["management_level"] for p in people_data) if people_data else 0
+        max_depth = (
+            max(p["management_level"] for p in people_data) if people_data else 0
+        )
 
         # Create or update snapshot
         today = date.today()
-        existing_snapshot = db_session.query(OrgChartSnapshot).filter(
-            OrgChartSnapshot.company_id == company_id,
-            OrgChartSnapshot.snapshot_date == today,
-        ).first()
+        existing_snapshot = (
+            db_session.query(OrgChartSnapshot)
+            .filter(
+                OrgChartSnapshot.company_id == company_id,
+                OrgChartSnapshot.snapshot_date == today,
+            )
+            .first()
+        )
 
         if existing_snapshot:
             existing_snapshot.chart_data = chart_data
@@ -587,7 +617,10 @@ class OrgChartBuilder:
                     "name": "Organization",
                     "title": "Top Level",
                     "management_level": 0,
-                    "children": [build_node(r) for r in sorted(roots, key=lambda r: r["management_level"])],
+                    "children": [
+                        build_node(r)
+                        for r in sorted(roots, key=lambda r: r["management_level"])
+                    ],
                 }
             }
 

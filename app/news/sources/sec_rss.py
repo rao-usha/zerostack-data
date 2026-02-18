@@ -75,9 +75,10 @@ class SECEdgarSource:
         items = []
 
         try:
-            response = await self.client.get(url, headers={
-                "User-Agent": "Nexdata/1.0 (Investment Research Platform)"
-            })
+            response = await self.client.get(
+                url,
+                headers={"User-Agent": "Nexdata/1.0 (Investment Research Platform)"},
+            )
             response.raise_for_status()
 
             # Parse Atom feed
@@ -125,7 +126,9 @@ class SECEdgarSource:
                     date_str = updated_elem.text.strip()
                     if date_str.endswith("Z"):
                         date_str = date_str[:-1] + "+00:00"
-                    published_at = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                    published_at = datetime.fromisoformat(
+                        date_str.replace("Z", "+00:00")
+                    )
                 except ValueError:
                     published_at = datetime.utcnow()
 
@@ -199,7 +202,12 @@ class SECEdgarSource:
         if match:
             name = match.group(1).strip()
             # Remove form type prefix if present
-            name = re.sub(r"^(13F-HR|13F|13D|13G|8-K|10-K|10-Q|Form D|S-1)\s*[-:]\s*", "", name, flags=re.I)
+            name = re.sub(
+                r"^(13F-HR|13F|13D|13G|8-K|10-K|10-Q|Form D|S-1)\s*[-:]\s*",
+                "",
+                name,
+                flags=re.I,
+            )
             if name and len(name) > 2:
                 return name
 

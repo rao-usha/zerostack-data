@@ -122,11 +122,7 @@ class AppStoreClient:
             self.db.rollback()
 
     async def search_ios_apps(
-        self,
-        query: str,
-        country: str = "us",
-        limit: int = 25,
-        entity: str = "software"
+        self, query: str, country: str = "us", limit: int = 25, entity: str = "software"
     ) -> List[Dict[str, Any]]:
         """
         Search iOS App Store using iTunes API.
@@ -166,9 +162,7 @@ class AppStoreClient:
                 return []
 
     async def lookup_ios_app(
-        self,
-        app_id: str,
-        country: str = "us"
+        self, app_id: str, country: str = "us"
     ) -> Optional[Dict[str, Any]]:
         """
         Look up iOS app by ID using iTunes API.
@@ -219,15 +213,20 @@ class AppStoreClient:
             "current_rating": data.get("averageUserRating"),
             "rating_count": data.get("userRatingCount"),
             "current_version": data.get("version", ""),
-            "release_date": data.get("releaseDate", "")[:10] if data.get("releaseDate") else None,
-            "last_updated": data.get("currentVersionReleaseDate", "")[:10] if data.get("currentVersionReleaseDate") else None,
+            "release_date": data.get("releaseDate", "")[:10]
+            if data.get("releaseDate")
+            else None,
+            "last_updated": data.get("currentVersionReleaseDate", "")[:10]
+            if data.get("currentVersionReleaseDate")
+            else None,
             "minimum_os_version": data.get("minimumOsVersion", ""),
             "content_rating": data.get("contentAdvisoryRating", ""),
             "app_icon_url": data.get("artworkUrl512") or data.get("artworkUrl100", ""),
             "app_url": data.get("trackViewUrl", ""),
             "screenshots": data.get("screenshotUrls", []),
             "languages": data.get("languageCodesISO2A", []),
-            "in_app_purchases": bool(data.get("isGameCenterEnabled")) or "In-App Purchases" in str(data.get("features", [])),
+            "in_app_purchases": bool(data.get("isGameCenterEnabled"))
+            or "In-App Purchases" in str(data.get("features", [])),
             "file_size_bytes": data.get("fileSizeBytes"),
             "store": "ios",
         }
@@ -271,42 +270,49 @@ class AppStoreClient:
             release_date = None
             if app_data.get("release_date"):
                 try:
-                    release_date = datetime.strptime(app_data["release_date"], "%Y-%m-%d").date()
+                    release_date = datetime.strptime(
+                        app_data["release_date"], "%Y-%m-%d"
+                    ).date()
                 except (ValueError, TypeError):
                     pass
 
             last_updated = None
             if app_data.get("last_updated"):
                 try:
-                    last_updated = datetime.strptime(app_data["last_updated"], "%Y-%m-%d").date()
+                    last_updated = datetime.strptime(
+                        app_data["last_updated"], "%Y-%m-%d"
+                    ).date()
                 except (ValueError, TypeError):
                     pass
 
-            self.db.execute(query, {
-                "app_id": app_data["app_id"],
-                "store": store,
-                "app_name": app_data["app_name"],
-                "bundle_id": app_data.get("bundle_id"),
-                "developer_name": app_data.get("developer_name"),
-                "developer_id": app_data.get("developer_id"),
-                "description": app_data.get("description"),
-                "category": app_data.get("category"),
-                "price": app_data.get("price", 0),
-                "currency": app_data.get("currency", "USD"),
-                "current_rating": app_data.get("current_rating"),
-                "rating_count": app_data.get("rating_count"),
-                "current_version": app_data.get("current_version"),
-                "release_date": release_date,
-                "last_updated": last_updated,
-                "minimum_os_version": app_data.get("minimum_os_version"),
-                "content_rating": app_data.get("content_rating"),
-                "app_icon_url": app_data.get("app_icon_url"),
-                "app_url": app_data.get("app_url"),
-                "screenshots": json.dumps(app_data.get("screenshots", [])),
-                "languages": json.dumps(app_data.get("languages", [])),
-                "in_app_purchases": app_data.get("in_app_purchases", False),
-                "file_size_bytes": app_data.get("file_size_bytes"),
-            })
+            self.db.execute(
+                query,
+                {
+                    "app_id": app_data["app_id"],
+                    "store": store,
+                    "app_name": app_data["app_name"],
+                    "bundle_id": app_data.get("bundle_id"),
+                    "developer_name": app_data.get("developer_name"),
+                    "developer_id": app_data.get("developer_id"),
+                    "description": app_data.get("description"),
+                    "category": app_data.get("category"),
+                    "price": app_data.get("price", 0),
+                    "currency": app_data.get("currency", "USD"),
+                    "current_rating": app_data.get("current_rating"),
+                    "rating_count": app_data.get("rating_count"),
+                    "current_version": app_data.get("current_version"),
+                    "release_date": release_date,
+                    "last_updated": last_updated,
+                    "minimum_os_version": app_data.get("minimum_os_version"),
+                    "content_rating": app_data.get("content_rating"),
+                    "app_icon_url": app_data.get("app_icon_url"),
+                    "app_url": app_data.get("app_url"),
+                    "screenshots": json.dumps(app_data.get("screenshots", [])),
+                    "languages": json.dumps(app_data.get("languages", [])),
+                    "in_app_purchases": app_data.get("in_app_purchases", False),
+                    "file_size_bytes": app_data.get("file_size_bytes"),
+                },
+            )
 
             # Record rating history
             if app_data.get("current_rating"):
@@ -314,7 +320,7 @@ class AppStoreClient:
                     app_data["app_id"],
                     store,
                     app_data["current_rating"],
-                    app_data.get("rating_count")
+                    app_data.get("rating_count"),
                 )
 
             self.db.commit()
@@ -323,23 +329,22 @@ class AppStoreClient:
             self.db.rollback()
 
     def _record_rating(
-        self,
-        app_id: str,
-        store: str,
-        rating: float,
-        rating_count: Optional[int]
+        self, app_id: str, store: str, rating: float, rating_count: Optional[int]
     ) -> None:
         """Record rating history entry."""
         query = text("""
             INSERT INTO app_store_rating_history (app_id, store, rating, rating_count)
             VALUES (:app_id, :store, :rating, :rating_count)
         """)
-        self.db.execute(query, {
-            "app_id": app_id,
-            "store": store,
-            "rating": rating,
-            "rating_count": rating_count,
-        })
+        self.db.execute(
+            query,
+            {
+                "app_id": app_id,
+                "store": store,
+                "rating": rating,
+                "rating_count": rating_count,
+            },
+        )
 
     def get_app(self, app_id: str, store: str = "ios") -> Optional[Dict[str, Any]]:
         """
@@ -385,8 +390,12 @@ class AppStoreClient:
             },
             "version": {
                 "current": row["current_version"],
-                "release_date": row["release_date"].isoformat() if row["release_date"] else None,
-                "last_updated": row["last_updated"].isoformat() if row["last_updated"] else None,
+                "release_date": row["release_date"].isoformat()
+                if row["release_date"]
+                else None,
+                "last_updated": row["last_updated"].isoformat()
+                if row["last_updated"]
+                else None,
                 "minimum_os": row["minimum_os_version"],
             },
             "content_rating": row["content_rating"],
@@ -397,14 +406,13 @@ class AppStoreClient:
             },
             "languages": row["languages"],
             "file_size_bytes": row["file_size_bytes"],
-            "retrieved_at": row["retrieved_at"].isoformat() + "Z" if row["retrieved_at"] else None,
+            "retrieved_at": row["retrieved_at"].isoformat() + "Z"
+            if row["retrieved_at"]
+            else None,
         }
 
     def get_rating_history(
-        self,
-        app_id: str,
-        store: str = "ios",
-        limit: int = 30
+        self, app_id: str, store: str = "ios", limit: int = 30
     ) -> List[Dict[str, Any]]:
         """
         Get rating history for an app.
@@ -425,17 +433,22 @@ class AppStoreClient:
             LIMIT :limit
         """)
 
-        result = self.db.execute(query, {
-            "app_id": app_id,
-            "store": store,
-            "limit": limit,
-        })
+        result = self.db.execute(
+            query,
+            {
+                "app_id": app_id,
+                "store": store,
+                "limit": limit,
+            },
+        )
 
         return [
             {
                 "rating": row["rating"],
                 "rating_count": row["rating_count"],
-                "recorded_at": row["recorded_at"].isoformat() + "Z" if row["recorded_at"] else None,
+                "recorded_at": row["recorded_at"].isoformat() + "Z"
+                if row["recorded_at"]
+                else None,
             }
             for row in result.mappings()
         ]
@@ -447,7 +460,7 @@ class AppStoreClient:
         rank_position: int,
         rank_type: str = "top_free",
         category: Optional[str] = None,
-        country: str = "us"
+        country: str = "us",
     ) -> None:
         """
         Record app ranking position.
@@ -468,14 +481,17 @@ class AppStoreClient:
             )
         """)
 
-        self.db.execute(query, {
-            "app_id": app_id,
-            "store": store,
-            "country": country,
-            "category": category,
-            "rank_type": rank_type,
-            "rank_position": rank_position,
-        })
+        self.db.execute(
+            query,
+            {
+                "app_id": app_id,
+                "store": store,
+                "country": country,
+                "category": category,
+                "rank_type": rank_type,
+                "rank_position": rank_position,
+            },
+        )
         self.db.commit()
 
     def get_ranking_history(
@@ -483,7 +499,7 @@ class AppStoreClient:
         app_id: str,
         store: str = "ios",
         rank_type: Optional[str] = None,
-        limit: int = 30
+        limit: int = 30,
     ) -> List[Dict[str, Any]]:
         """
         Get ranking history for an app.
@@ -522,7 +538,9 @@ class AppStoreClient:
                 "category": row["category"],
                 "rank_type": row["rank_type"],
                 "rank_position": row["rank_position"],
-                "recorded_at": row["recorded_at"].isoformat() + "Z" if row["recorded_at"] else None,
+                "recorded_at": row["recorded_at"].isoformat() + "Z"
+                if row["recorded_at"]
+                else None,
             }
             for row in result.mappings()
         ]
@@ -532,7 +550,7 @@ class AppStoreClient:
         company_name: str,
         app_id: str,
         store: str = "ios",
-        relationship: str = "owner"
+        relationship: str = "owner",
     ) -> Dict[str, Any]:
         """
         Link an app to a company.
@@ -553,12 +571,15 @@ class AppStoreClient:
                 relationship = EXCLUDED.relationship
         """)
 
-        self.db.execute(query, {
-            "company_name": company_name,
-            "app_id": app_id,
-            "store": store,
-            "relationship": relationship,
-        })
+        self.db.execute(
+            query,
+            {
+                "company_name": company_name,
+                "app_id": app_id,
+                "store": store,
+                "relationship": relationship,
+            },
+        )
         self.db.commit()
 
         return {
@@ -593,17 +614,19 @@ class AppStoreClient:
 
         apps = []
         for row in rows:
-            apps.append({
-                "app_id": row["app_id"],
-                "store": row["store"],
-                "relationship": row["relationship"],
-                "app_name": row["app_name"],
-                "category": row["category"],
-                "rating": row["current_rating"],
-                "rating_count": row["rating_count"],
-                "price": row["price"],
-                "icon_url": row["app_icon_url"],
-            })
+            apps.append(
+                {
+                    "app_id": row["app_id"],
+                    "store": row["store"],
+                    "relationship": row["relationship"],
+                    "app_name": row["app_name"],
+                    "category": row["category"],
+                    "rating": row["current_rating"],
+                    "rating_count": row["rating_count"],
+                    "price": row["price"],
+                    "icon_url": row["app_icon_url"],
+                }
+            )
 
         return {
             "company_name": company_name,
@@ -650,7 +673,7 @@ class AppStoreClient:
         store: str = "ios",
         category: Optional[str] = None,
         sort_by: str = "rating_count",
-        limit: int = 20
+        limit: int = 20,
     ) -> List[Dict[str, Any]]:
         """
         Get top apps from database.
@@ -731,23 +754,27 @@ class AppStoreClient:
         for app_ref in app_ids:
             app = self.get_app(app_ref["app_id"], app_ref.get("store", "ios"))
             if app:
-                comparison.append({
-                    "app_id": app["app_id"],
-                    "store": app["store"],
-                    "app_name": app["app_name"],
-                    "developer": app["developer"]["name"],
-                    "category": app["category"],
-                    "rating": app["ratings"]["current"],
-                    "rating_count": app["ratings"]["count"],
-                    "price": app["pricing"]["price"],
-                    "last_updated": app["version"]["last_updated"],
-                })
+                comparison.append(
+                    {
+                        "app_id": app["app_id"],
+                        "store": app["store"],
+                        "app_name": app["app_name"],
+                        "developer": app["developer"]["name"],
+                        "category": app["category"],
+                        "rating": app["ratings"]["current"],
+                        "rating_count": app["ratings"]["count"],
+                        "price": app["pricing"]["price"],
+                        "last_updated": app["version"]["last_updated"],
+                    }
+                )
             else:
-                comparison.append({
-                    "app_id": app_ref["app_id"],
-                    "store": app_ref.get("store", "ios"),
-                    "error": "Not found",
-                })
+                comparison.append(
+                    {
+                        "app_id": app_ref["app_id"],
+                        "store": app_ref.get("store", "ios"),
+                        "error": "Not found",
+                    }
+                )
 
         # Sort by rating count
         comparison.sort(key=lambda x: x.get("rating_count") or 0, reverse=True)

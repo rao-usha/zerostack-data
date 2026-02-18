@@ -3,6 +3,7 @@ Company and Investor Data Enrichment API endpoints.
 
 Provides endpoints for enriching portfolio company and investor data.
 """
+
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel, Field
@@ -18,8 +19,10 @@ router = APIRouter(prefix="/enrichment", tags=["enrichment"])
 
 # Request/Response Models
 
+
 class EnrichmentTriggerResponse(BaseModel):
     """Response when enrichment is triggered."""
+
     job_id: int
     company_name: str
     status: str
@@ -28,6 +31,7 @@ class EnrichmentTriggerResponse(BaseModel):
 
 class JobStatusResponse(BaseModel):
     """Enrichment job status."""
+
     job_id: int
     job_type: str
     company_name: str
@@ -40,6 +44,7 @@ class JobStatusResponse(BaseModel):
 
 class FinancialsResponse(BaseModel):
     """Financial data from SEC."""
+
     sec_cik: Optional[str] = None
     ticker: Optional[str] = None
     revenue: Optional[int] = None
@@ -50,6 +55,7 @@ class FinancialsResponse(BaseModel):
 
 class FundingResponse(BaseModel):
     """Funding data."""
+
     total_funding: Optional[int] = None
     last_amount: Optional[int] = None
     last_date: Optional[str] = None
@@ -58,6 +64,7 @@ class FundingResponse(BaseModel):
 
 class EmployeesResponse(BaseModel):
     """Employee data."""
+
     count: Optional[int] = None
     date: Optional[str] = None
     growth_yoy: Optional[float] = None
@@ -65,6 +72,7 @@ class EmployeesResponse(BaseModel):
 
 class ClassificationResponse(BaseModel):
     """Industry classification."""
+
     industry: Optional[str] = None
     sector: Optional[str] = None
     sic_code: Optional[str] = None
@@ -73,6 +81,7 @@ class ClassificationResponse(BaseModel):
 
 class StatusResponse(BaseModel):
     """Company status."""
+
     current: Optional[str] = None
     acquirer: Optional[str] = None
     ipo_date: Optional[str] = None
@@ -81,6 +90,7 @@ class StatusResponse(BaseModel):
 
 class EnrichedCompanyResponse(BaseModel):
     """Full enriched company data."""
+
     company_name: str
     financials: FinancialsResponse
     funding: FundingResponse
@@ -93,6 +103,7 @@ class EnrichedCompanyResponse(BaseModel):
 
 class EnrichedCompanyListItem(BaseModel):
     """Summary of enriched company."""
+
     company_name: str
     industry: Optional[str] = None
     sector: Optional[str] = None
@@ -103,11 +114,13 @@ class EnrichedCompanyListItem(BaseModel):
 
 class BatchEnrichmentRequest(BaseModel):
     """Request for batch enrichment."""
+
     companies: List[str] = Field(..., min_length=1, max_length=50)
 
 
 class BatchEnrichmentResponse(BaseModel):
     """Response for batch enrichment."""
+
     total: int
     completed: int
     failed: int
@@ -116,8 +129,10 @@ class BatchEnrichmentResponse(BaseModel):
 
 # Investor Enrichment Models
 
+
 class InvestorContactResponse(BaseModel):
     """Investor contact information."""
+
     name: str
     title: Optional[str] = None
     email: Optional[str] = None
@@ -130,6 +145,7 @@ class InvestorContactResponse(BaseModel):
 
 class InvestorContactsResponse(BaseModel):
     """List of investor contacts."""
+
     investor_id: int
     investor_type: str
     investor_name: Optional[str] = None
@@ -138,6 +154,7 @@ class InvestorContactsResponse(BaseModel):
 
 class AumHistoryItem(BaseModel):
     """Single AUM history entry."""
+
     date: str
     aum_usd: Optional[int] = None
     source: Optional[str] = None
@@ -145,6 +162,7 @@ class AumHistoryItem(BaseModel):
 
 class InvestorAumHistoryResponse(BaseModel):
     """Investor AUM history."""
+
     investor_id: int
     investor_type: str
     current_aum_usd: Optional[int] = None
@@ -154,6 +172,7 @@ class InvestorAumHistoryResponse(BaseModel):
 
 class SectorPreference(BaseModel):
     """Sector preference."""
+
     sector: str
     weight: float
     company_count: int = 0
@@ -161,6 +180,7 @@ class SectorPreference(BaseModel):
 
 class StagePreference(BaseModel):
     """Stage preference."""
+
     stage: str
     weight: float
     company_count: int = 0
@@ -168,6 +188,7 @@ class StagePreference(BaseModel):
 
 class RegionPreference(BaseModel):
     """Region preference."""
+
     region: str
     weight: float
     company_count: int = 0
@@ -175,6 +196,7 @@ class RegionPreference(BaseModel):
 
 class CommitmentPace(BaseModel):
     """Investment commitment pace."""
+
     investments_per_year: Optional[float] = None
     last_investment_date: Optional[str] = None
     avg_days_between_investments: Optional[int] = None
@@ -182,6 +204,7 @@ class CommitmentPace(BaseModel):
 
 class InvestorPreferencesResponse(BaseModel):
     """Investor investment preferences."""
+
     investor_id: int
     investor_type: str
     sectors: List[SectorPreference]
@@ -193,6 +216,7 @@ class InvestorPreferencesResponse(BaseModel):
 
 class InvestorEnrichmentTriggerResponse(BaseModel):
     """Response when investor enrichment is triggered."""
+
     investor_id: int
     investor_type: str
     investor_name: Optional[str] = None
@@ -211,6 +235,7 @@ async def run_enrichment(company_name: str, db: Session):
 
 
 # Endpoints
+
 
 @router.post(
     "/company/{company_name}",
@@ -265,8 +290,7 @@ def get_enrichment_status(
 
     if not status:
         raise HTTPException(
-            status_code=404,
-            detail=f"No enrichment job found for {company_name}"
+            status_code=404, detail=f"No enrichment job found for {company_name}"
         )
 
     return status
@@ -289,7 +313,7 @@ def get_enriched_company(
     if not data:
         raise HTTPException(
             status_code=404,
-            detail=f"No enriched data found for {company_name}. Trigger enrichment first."
+            detail=f"No enriched data found for {company_name}. Trigger enrichment first.",
         )
 
     return data
@@ -339,6 +363,7 @@ async def batch_enrich(
 # =============================================================================
 # Investor Enrichment Endpoints
 # =============================================================================
+
 
 @router.post(
     "/investor/{investor_id}",
@@ -513,7 +538,9 @@ def get_investor_preferences(
         commitment_pace = {
             "investments_per_year": pace_data.get("investments_per_year"),
             "last_investment_date": pace_data.get("last_investment_date"),
-            "avg_days_between_investments": pace_data.get("avg_days_between_investments"),
+            "avg_days_between_investments": pace_data.get(
+                "avg_days_between_investments"
+            ),
         }
 
     return {

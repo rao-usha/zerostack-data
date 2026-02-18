@@ -19,6 +19,7 @@ router = APIRouter(prefix="/glassdoor", tags=["Glassdoor"])
 # Request/Response Models
 class CompanyData(BaseModel):
     """Company data for creation/update."""
+
     company_name: str
     glassdoor_id: Optional[str] = None
     logo_url: Optional[str] = None
@@ -45,6 +46,7 @@ class CompanyData(BaseModel):
 
 class SalaryData(BaseModel):
     """Salary data for bulk import."""
+
     job_title: str
     location: Optional[str] = None
     base_salary_min: Optional[int] = None
@@ -59,12 +61,14 @@ class SalaryData(BaseModel):
 
 class SalaryBulkRequest(BaseModel):
     """Request for bulk salary import."""
+
     company_name: str
     salaries: List[SalaryData]
 
 
 class ReviewSummaryRequest(BaseModel):
     """Request for adding review summary."""
+
     company_name: str
     period: str = Field(..., description="Period string, e.g., '2025-Q4'")
     avg_rating: float = Field(..., ge=1.0, le=5.0)
@@ -108,7 +112,7 @@ def get_company_salaries(
     job_title: Optional[str] = Query(None, description="Filter by job title"),
     location: Optional[str] = Query(None, description="Filter by location"),
     limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get salary data for a company.
@@ -116,7 +120,9 @@ def get_company_salaries(
     Returns salary ranges by job title with optional filters.
     """
     client = GlassdoorClient(db)
-    result = client.get_salaries(name, job_title=job_title, location=location, limit=limit)
+    result = client.get_salaries(
+        name, job_title=job_title, location=location, limit=limit
+    )
 
     return result
 
@@ -174,7 +180,7 @@ def add_review_summary(request: ReviewSummaryRequest, db: Session = Depends(get_
 @router.get("/compare")
 def compare_companies(
     companies: str = Query(..., description="Comma-separated company names"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Compare multiple companies side by side.
@@ -185,14 +191,12 @@ def compare_companies(
 
     if len(company_list) < 2:
         raise HTTPException(
-            status_code=400,
-            detail="At least 2 companies required for comparison"
+            status_code=400, detail="At least 2 companies required for comparison"
         )
 
     if len(company_list) > 10:
         raise HTTPException(
-            status_code=400,
-            detail="Maximum 10 companies per comparison"
+            status_code=400, detail="Maximum 10 companies per comparison"
         )
 
     client = GlassdoorClient(db)
@@ -205,10 +209,12 @@ def compare_companies(
 def search_companies(
     q: Optional[str] = Query(None, description="Search query"),
     industry: Optional[str] = Query(None, description="Filter by industry"),
-    min_rating: Optional[float] = Query(None, ge=1.0, le=5.0, description="Minimum rating"),
+    min_rating: Optional[float] = Query(
+        None, ge=1.0, le=5.0, description="Minimum rating"
+    ),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Search companies in the database.
@@ -232,11 +238,11 @@ def get_rankings(
     metric: str = Query(
         "overall",
         description="Metric to rank by",
-        pattern="^(overall|compensation|culture|career|work_life_balance|management|ceo_approval)$"
+        pattern="^(overall|compensation|culture|career|work_life_balance|management|ceo_approval)$",
     ),
     industry: Optional[str] = Query(None, description="Filter by industry"),
     limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get top-rated companies by metric.
@@ -267,7 +273,9 @@ async def import_csv(
     - **salaries**: Salary data by job title (requires company_name and job_title columns)
     """
     if data_type not in ("companies", "salaries"):
-        raise HTTPException(status_code=400, detail="data_type must be 'companies' or 'salaries'")
+        raise HTTPException(
+            status_code=400, detail="data_type must be 'companies' or 'salaries'"
+        )
 
     content = await file.read()
     csv_content = content.decode("utf-8-sig")

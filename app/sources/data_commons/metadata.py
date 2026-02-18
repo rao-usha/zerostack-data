@@ -7,6 +7,7 @@ Handles:
 - Data parsing and transformation
 - Schema definitions for various data types
 """
+
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -59,14 +60,14 @@ TIME_SERIES_COLUMNS = {
 def generate_table_name(dataset: str, variable_id: Optional[str] = None) -> str:
     """
     Generate PostgreSQL table name for Data Commons data.
-    
+
     Args:
         dataset: Dataset identifier (observations, place_stats, time_series)
         variable_id: Optional specific variable identifier
-        
+
     Returns:
         PostgreSQL table name
-        
+
     Examples:
         >>> generate_table_name("observations")
         'data_commons_observations'
@@ -74,7 +75,7 @@ def generate_table_name(dataset: str, variable_id: Optional[str] = None) -> str:
         'data_commons_place_stats_population'
     """
     dataset_clean = dataset.lower().replace("-", "_").replace(" ", "_")
-    
+
     if variable_id:
         var_clean = variable_id.lower().replace("-", "_").replace(" ", "_")[:50]
         return f"data_commons_{dataset_clean}_{var_clean}"
@@ -85,11 +86,11 @@ def generate_table_name(dataset: str, variable_id: Optional[str] = None) -> str:
 def generate_create_table_sql(table_name: str, dataset: str) -> str:
     """
     Generate CREATE TABLE SQL for Data Commons data.
-    
+
     Args:
         table_name: PostgreSQL table name
         dataset: Dataset type to determine schema
-        
+
     Returns:
         CREATE TABLE SQL statement
     """
@@ -121,18 +122,18 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
         ]
     else:
         raise ValueError(f"Unknown Data Commons dataset: {dataset}")
-    
+
     # Build column definitions
     column_defs = []
     column_defs.append("id SERIAL PRIMARY KEY")
-    
+
     for col_name, (col_type, _) in columns.items():
         column_defs.append(f"{col_name} {col_type}")
-    
+
     column_defs.append("ingested_at TIMESTAMP DEFAULT NOW()")
-    
+
     columns_sql = ",\n        ".join(column_defs)
-    
+
     # Build indexes
     index_sql_parts = []
     for idx_name, idx_cols in indexes:
@@ -140,9 +141,9 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
             f"CREATE INDEX IF NOT EXISTS idx_{table_name}_{idx_name} "
             f"ON {table_name} ({idx_cols});"
         )
-    
+
     indexes_sql = "\n    ".join(index_sql_parts)
-    
+
     sql = f"""
     CREATE TABLE IF NOT EXISTS {table_name} (
         {columns_sql},
@@ -151,49 +152,47 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
     
     {indexes_sql}
     """
-    
+
     return sql
 
 
 def parse_observation_response(
-    response: Dict[str, Any],
-    variable_dcid: str,
-    variable_name: str
+    response: Dict[str, Any], variable_dcid: str, variable_name: str
 ) -> List[Dict[str, Any]]:
     """
     Parse observation data from Data Commons API response.
-    
+
     Args:
         response: Raw API response
         variable_dcid: Statistical variable DCID
         variable_name: Human-readable variable name
-        
+
     Returns:
         List of parsed records ready for insertion
     """
     parsed_records = []
-    
+
     try:
         # Handle V2 API response format
         data = response.get("byVariable", {}).get(variable_dcid, {})
-        
+
         if not data:
             # Try alternative format
             data = response.get("data", {}).get(variable_dcid, {})
-        
+
         if not data:
             logger.warning("No observation data in response")
             return []
-        
+
         by_entity = data.get("byEntity", {})
-        
+
         for entity_dcid, entity_data in by_entity.items():
             ordered_facets = entity_data.get("orderedFacets", [])
-            
+
             for facet in ordered_facets:
                 facet_id = facet.get("facetId", "")
                 observations = facet.get("observations", [])
-                
+
                 for obs in observations:
                     try:
                         parsed = {
@@ -207,44 +206,45 @@ def parse_observation_response(
                             "measurement_method": facet_id,
                             "provenance_url": facet.get("provenanceUrl", ""),
                         }
-                        
-                        if parsed["observation_date"] and parsed["observation_value"] is not None:
+
+                        if (
+                            parsed["observation_date"]
+                            and parsed["observation_value"] is not None
+                        ):
                             parsed_records.append(parsed)
-                    
+
                     except Exception as e:
                         logger.warning(f"Failed to parse observation: {e}")
-        
+
         logger.info(f"Parsed {len(parsed_records)} observation records")
         return parsed_records
-    
+
     except Exception as e:
         logger.error(f"Failed to parse observation response: {e}")
         return []
 
 
-def parse_places_response(
-    response: Dict[str, Any]
-) -> List[Dict[str, Any]]:
+def parse_places_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Parse places data from Data Commons API response.
-    
+
     Args:
         response: Raw API response
-        
+
     Returns:
         List of place records with dcid and name
     """
     places = []
-    
+
     try:
         data = response.get("data", {})
-        
+
         for node_id, node_data in data.items():
             arcs = node_data.get("arcs", {})
-            
+
             for arc_name, arc_data in arcs.items():
                 nodes = arc_data.get("nodes", [])
-                
+
                 for node in nodes:
                     place = {
                         "dcid": node.get("dcid", ""),
@@ -253,9 +253,9 @@ def parse_places_response(
                     }
                     if place["dcid"]:
                         places.append(place)
-        
+
         return places
-    
+
     except Exception as e:
         logger.error(f"Failed to parse places response: {e}")
         return []
@@ -288,7 +288,9 @@ def get_dataset_display_name(dataset: str) -> str:
         "place_stats": "Data Commons Place Statistics Summary",
         "time_series": "Data Commons Time Series Data",
     }
-    return display_names.get(dataset, f"Data Commons {dataset.replace('_', ' ').title()}")
+    return display_names.get(
+        dataset, f"Data Commons {dataset.replace('_', ' ').title()}"
+    )
 
 
 def get_dataset_description(dataset: str) -> str:
@@ -309,8 +311,7 @@ def get_dataset_description(dataset: str) -> str:
         ),
     }
     return descriptions.get(
-        dataset,
-        "Public data from Google Data Commons knowledge graph"
+        dataset, "Public data from Google Data Commons knowledge graph"
     )
 
 

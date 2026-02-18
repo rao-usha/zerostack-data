@@ -4,6 +4,7 @@ Webhook notification service.
 Sends HTTP POST notifications to configured webhook endpoints when events occur.
 Supports Slack, Discord, and generic webhook formats.
 """
+
 import logging
 import hashlib
 import hmac
@@ -23,9 +24,7 @@ WEBHOOK_TIMEOUT = 10.0  # seconds
 
 
 def get_active_webhooks(
-    db: Session,
-    event_type: WebhookEventType,
-    source: Optional[str] = None
+    db: Session, event_type: WebhookEventType, source: Optional[str] = None
 ) -> List[Webhook]:
     """
     Get all active webhooks that should receive a given event type.
@@ -58,9 +57,7 @@ def get_active_webhooks(
 
 
 def format_payload(
-    event_type: WebhookEventType,
-    event_data: Dict[str, Any],
-    webhook: Webhook
+    event_type: WebhookEventType, event_data: Dict[str, Any], webhook: Webhook
 ) -> Dict[str, Any]:
     """
     Format the webhook payload.
@@ -87,13 +84,12 @@ def format_payload(
     return {
         "event_type": event_type.value,
         "timestamp": datetime.utcnow().isoformat(),
-        "data": event_data
+        "data": event_data,
     }
 
 
 def format_slack_payload(
-    event_type: WebhookEventType,
-    event_data: Dict[str, Any]
+    event_type: WebhookEventType, event_data: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Format payload for Slack webhook."""
     # Choose emoji and color based on event type
@@ -133,11 +129,13 @@ def format_slack_payload(
     fields = []
     for key, value in event_data.items():
         if key not in ["timestamp", "created_at"]:
-            fields.append({
-                "title": key.replace("_", " ").title(),
-                "value": str(value)[:200],
-                "short": len(str(value)) < 40
-            })
+            fields.append(
+                {
+                    "title": key.replace("_", " ").title(),
+                    "value": str(value)[:200],
+                    "short": len(str(value)) < 40,
+                }
+            )
 
     return {
         "attachments": [
@@ -147,15 +145,14 @@ def format_slack_payload(
                 "title": title,
                 "fields": fields[:10],  # Slack limits fields
                 "footer": "Nexdata Monitoring",
-                "ts": int(datetime.utcnow().timestamp())
+                "ts": int(datetime.utcnow().timestamp()),
             }
         ]
     }
 
 
 def format_discord_payload(
-    event_type: WebhookEventType,
-    event_data: Dict[str, Any]
+    event_type: WebhookEventType, event_data: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Format payload for Discord webhook."""
     color_map = {
@@ -178,11 +175,13 @@ def format_discord_payload(
     fields = []
     for key, value in event_data.items():
         if key not in ["timestamp", "created_at"]:
-            fields.append({
-                "name": key.replace("_", " ").title(),
-                "value": str(value)[:1024],
-                "inline": len(str(value)) < 40
-            })
+            fields.append(
+                {
+                    "name": key.replace("_", " ").title(),
+                    "value": str(value)[:1024],
+                    "inline": len(str(value)) < 40,
+                }
+            )
 
     return {
         "embeds": [
@@ -191,7 +190,7 @@ def format_discord_payload(
                 "color": color,
                 "fields": fields[:25],  # Discord limits to 25 fields
                 "footer": {"text": "Nexdata Monitoring"},
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
         ]
     }
@@ -200,16 +199,12 @@ def format_discord_payload(
 def compute_signature(payload: str, secret: str) -> str:
     """Compute HMAC-SHA256 signature for payload."""
     return hmac.new(
-        secret.encode('utf-8'),
-        payload.encode('utf-8'),
-        hashlib.sha256
+        secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256
     ).hexdigest()
 
 
 async def send_webhook(
-    webhook: Webhook,
-    event_type: WebhookEventType,
-    event_data: Dict[str, Any]
+    webhook: Webhook, event_type: WebhookEventType, event_data: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
     Send a webhook notification.
@@ -227,10 +222,7 @@ async def send_webhook(
     payload_str = json.dumps(payload)
 
     # Build headers
-    headers = {
-        "Content-Type": "application/json",
-        "User-Agent": "Nexdata-Webhook/1.0"
-    }
+    headers = {"Content-Type": "application/json", "User-Agent": "Nexdata-Webhook/1.0"}
 
     # Add custom headers
     if webhook.headers:
@@ -245,16 +237,14 @@ async def send_webhook(
     try:
         async with httpx.AsyncClient(timeout=WEBHOOK_TIMEOUT) as client:
             response = await client.post(
-                webhook.url,
-                content=payload_str,
-                headers=headers
+                webhook.url, content=payload_str, headers=headers
             )
 
             return {
                 "success": response.status_code < 400,
                 "status_code": response.status_code,
                 "response_body": response.text[:500] if response.text else None,
-                "error": None
+                "error": None,
             }
 
     except httpx.TimeoutException:
@@ -262,21 +252,21 @@ async def send_webhook(
             "success": False,
             "status_code": None,
             "response_body": None,
-            "error": "Request timed out"
+            "error": "Request timed out",
         }
     except Exception as e:
         return {
             "success": False,
             "status_code": None,
             "response_body": None,
-            "error": str(e)
+            "error": str(e),
         }
 
 
 async def trigger_webhooks(
     event_type: WebhookEventType,
     event_data: Dict[str, Any],
-    source: Optional[str] = None
+    source: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Trigger all webhooks for an event.
@@ -297,7 +287,7 @@ async def trigger_webhooks(
         "webhooks_triggered": 0,
         "successful": 0,
         "failed": 0,
-        "deliveries": []
+        "deliveries": [],
     }
 
     try:
@@ -317,7 +307,7 @@ async def trigger_webhooks(
                 webhook_id=webhook.id,
                 event_type=event_type.value,
                 event_data=event_data,
-                status="pending"
+                status="pending",
             )
             db.add(delivery)
             db.commit()
@@ -346,13 +336,15 @@ async def trigger_webhooks(
 
             db.commit()
 
-            results["deliveries"].append({
-                "webhook_id": webhook.id,
-                "webhook_name": webhook.name,
-                "success": result["success"],
-                "status_code": result["status_code"],
-                "error": result["error"]
-            })
+            results["deliveries"].append(
+                {
+                    "webhook_id": webhook.id,
+                    "webhook_name": webhook.name,
+                    "success": result["success"],
+                    "status_code": result["status_code"],
+                    "error": result["error"],
+                }
+            )
 
             logger.info(
                 f"Webhook {webhook.name}: {event_type.value} - "
@@ -373,11 +365,12 @@ async def trigger_webhooks(
 # Convenience Functions for Common Events
 # =============================================================================
 
+
 async def notify_job_failed(
     job_id: int,
     source: str,
     error_message: str,
-    config: Optional[Dict[str, Any]] = None
+    config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Send notification for a failed job."""
     return await trigger_webhooks(
@@ -386,9 +379,9 @@ async def notify_job_failed(
             "job_id": job_id,
             "source": source,
             "error_message": error_message[:500],
-            "config": config
+            "config": config,
         },
-        source=source
+        source=source,
     )
 
 
@@ -396,7 +389,7 @@ async def notify_job_success(
     job_id: int,
     source: str,
     rows_inserted: int,
-    config: Optional[Dict[str, Any]] = None
+    config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Send notification for a successful job."""
     return await trigger_webhooks(
@@ -405,17 +398,14 @@ async def notify_job_success(
             "job_id": job_id,
             "source": source,
             "rows_inserted": rows_inserted,
-            "config": config
+            "config": config,
         },
-        source=source
+        source=source,
     )
 
 
 async def notify_alert(
-    alert_type: str,
-    source: str,
-    message: str,
-    details: Optional[Dict[str, Any]] = None
+    alert_type: str, source: str, message: str, details: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """Send notification for a monitoring alert."""
     # Map alert type to event type
@@ -425,26 +415,24 @@ async def notify_alert(
         "data_staleness": WebhookEventType.ALERT_DATA_STALENESS,
     }
 
-    event_type = event_type_map.get(alert_type, WebhookEventType.ALERT_HIGH_FAILURE_RATE)
+    event_type = event_type_map.get(
+        alert_type, WebhookEventType.ALERT_HIGH_FAILURE_RATE
+    )
 
     event_data = {
         "alert_type": alert_type,
         "source": source,
         "message": message,
-        **(details or {})
+        **(details or {}),
     }
 
     return await trigger_webhooks(
-        event_type=event_type,
-        event_data=event_data,
-        source=source
+        event_type=event_type, event_data=event_data, source=source
     )
 
 
 async def notify_cleanup_completed(
-    cleaned_up: int,
-    jobs: List[Dict[str, Any]],
-    timeout_hours: int
+    cleaned_up: int, jobs: List[Dict[str, Any]], timeout_hours: int
 ) -> Dict[str, Any]:
     """Send notification when stuck job cleanup completes."""
     if cleaned_up == 0:
@@ -456,14 +444,15 @@ async def notify_cleanup_completed(
             "cleaned_up": cleaned_up,
             "timeout_hours": timeout_hours,
             "sources_affected": list(set(j["source"] for j in jobs)),
-            "job_ids": [j["job_id"] for j in jobs]
-        }
+            "job_ids": [j["job_id"] for j in jobs],
+        },
     )
 
 
 # =============================================================================
 # Webhook Management Functions
 # =============================================================================
+
 
 def create_webhook(
     db: Session,
@@ -473,7 +462,7 @@ def create_webhook(
     source_filter: Optional[str] = None,
     secret: Optional[str] = None,
     headers: Optional[Dict[str, str]] = None,
-    is_active: bool = True
+    is_active: bool = True,
 ) -> Webhook:
     """Create a new webhook configuration."""
     webhook = Webhook(
@@ -483,7 +472,7 @@ def create_webhook(
         source_filter=source_filter,
         secret=secret,
         headers=headers,
-        is_active=1 if is_active else 0
+        is_active=1 if is_active else 0,
     )
 
     db.add(webhook)
@@ -494,11 +483,7 @@ def create_webhook(
     return webhook
 
 
-def update_webhook(
-    db: Session,
-    webhook_id: int,
-    **kwargs
-) -> Optional[Webhook]:
+def update_webhook(db: Session, webhook_id: int, **kwargs) -> Optional[Webhook]:
     """Update an existing webhook."""
     webhook = db.query(Webhook).filter(Webhook.id == webhook_id).first()
 
@@ -507,7 +492,7 @@ def update_webhook(
 
     for key, value in kwargs.items():
         if hasattr(webhook, key):
-            if key == 'is_active':
+            if key == "is_active":
                 value = 1 if value else 0
             setattr(webhook, key, value)
 
@@ -533,16 +518,16 @@ def delete_webhook(db: Session, webhook_id: int) -> bool:
 
 
 def get_webhook_deliveries(
-    db: Session,
-    webhook_id: int,
-    limit: int = 50
+    db: Session, webhook_id: int, limit: int = 50
 ) -> List[WebhookDelivery]:
     """Get recent deliveries for a webhook."""
-    return db.query(WebhookDelivery).filter(
-        WebhookDelivery.webhook_id == webhook_id
-    ).order_by(
-        WebhookDelivery.created_at.desc()
-    ).limit(limit).all()
+    return (
+        db.query(WebhookDelivery)
+        .filter(WebhookDelivery.webhook_id == webhook_id)
+        .order_by(WebhookDelivery.created_at.desc())
+        .limit(limit)
+        .all()
+    )
 
 
 async def notify_site_intel_result(
@@ -596,19 +581,15 @@ async def test_webhook(webhook: Webhook) -> Dict[str, Any]:
     test_data = {
         "test": True,
         "message": "This is a test notification from Nexdata",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
-    result = await send_webhook(
-        webhook,
-        WebhookEventType.JOB_SUCCESS,
-        test_data
-    )
+    result = await send_webhook(webhook, WebhookEventType.JOB_SUCCESS, test_data)
 
     return {
         "webhook_id": webhook.id,
         "webhook_name": webhook.name,
         "test_successful": result["success"],
         "status_code": result["status_code"],
-        "error": result["error"]
+        "error": result["error"],
     }

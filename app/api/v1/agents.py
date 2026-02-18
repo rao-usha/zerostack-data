@@ -19,18 +19,20 @@ router = APIRouter(prefix="/agents", tags=["Agentic Intelligence"])
 # Request/Response Models
 class CompanyResearchRequest(BaseModel):
     """Request to start company research."""
+
     company_name: str = Field(..., description="Company name to research")
     domain: Optional[str] = Field(None, description="Company domain for enrichment")
     ticker: Optional[str] = Field(None, description="Stock ticker if public")
     priority_sources: Optional[List[str]] = Field(
         None,
-        description="Priority data sources: enrichment, github, glassdoor, app_store, web_traffic, news, sec_filings, corporate_registry, scoring"
+        description="Priority data sources: enrichment, github, glassdoor, app_store, web_traffic, news, sec_filings, corporate_registry, scoring",
     )
     force_refresh: bool = Field(False, description="Force new research even if cached")
 
 
 class ResearchJobResponse(BaseModel):
     """Response for research job status."""
+
     job_id: str
     company_name: str
     status: str
@@ -46,6 +48,7 @@ class ResearchJobResponse(BaseModel):
 
 class DeepResearchRequest(BaseModel):
     """Request for deep multi-turn research."""
+
     company_name: str = Field(..., description="Company name to deeply research")
     include_follow_ups: bool = Field(True, description="Run follow-up analysis prompts")
 
@@ -54,10 +57,10 @@ class DeepResearchRequest(BaseModel):
 # DEEP RESEARCH ENDPOINTS (Multi-turn LLM Analysis)
 # ============================================================================
 
+
 @router.post("/deep-research")
 async def start_deep_research(
-    request: DeepResearchRequest,
-    db: Session = Depends(get_db)
+    request: DeepResearchRequest, db: Session = Depends(get_db)
 ):
     """
     Start deep multi-turn research on a company.
@@ -75,8 +78,7 @@ async def start_deep_research(
     agent = DeepResearchAgent(db)
 
     job_id = await agent.start_deep_research(
-        company_name=request.company_name,
-        include_follow_ups=request.include_follow_ups
+        company_name=request.company_name, include_follow_ups=request.include_follow_ups
     )
 
     return {
@@ -85,15 +87,12 @@ async def start_deep_research(
         "company_name": request.company_name,
         "message": "Deep research started. Poll GET /agents/deep-research/{job_id} for status.",
         "phases": ["collecting", "analyzing", "synthesizing", "complete"],
-        "include_follow_ups": request.include_follow_ups
+        "include_follow_ups": request.include_follow_ups,
     }
 
 
 @router.get("/deep-research/{job_id}")
-def get_deep_research_status(
-    job_id: str,
-    db: Session = Depends(get_db)
-):
+def get_deep_research_status(job_id: str, db: Session = Depends(get_db)):
     """
     Get status and results of a deep research job.
 
@@ -108,7 +107,9 @@ def get_deep_research_status(
     result = agent.get_job_status(job_id)
 
     if not result:
-        raise HTTPException(status_code=404, detail=f"Deep research job {job_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Deep research job {job_id} not found"
+        )
 
     return result
 
@@ -116,6 +117,7 @@ def get_deep_research_status(
 # ============================================================================
 # STANDARD RESEARCH ENDPOINTS
 # ============================================================================
+
 
 @router.get("/sources")
 def list_available_sources(db: Session = Depends(get_db)):
@@ -132,7 +134,7 @@ def list_available_sources(db: Session = Depends(get_db)):
 async def start_company_research(
     request: CompanyResearchRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Start autonomous company research across all data sources.
@@ -157,7 +159,7 @@ async def start_company_research(
                 "company_name": request.company_name,
                 "message": "Found cached research",
                 "cache_age_hours": cached.get("cache_age_hours"),
-                "result": cached
+                "result": cached,
             }
 
     # Start new research job
@@ -165,7 +167,7 @@ async def start_company_research(
         company_name=request.company_name,
         domain=request.domain,
         ticker=request.ticker,
-        priority_sources=request.priority_sources
+        priority_sources=request.priority_sources,
     )
 
     return {
@@ -173,14 +175,13 @@ async def start_company_research(
         "job_id": job_id,
         "company_name": request.company_name,
         "message": "Research job started. Poll GET /agents/research/{job_id} for status.",
-        "estimated_sources": 9
+        "estimated_sources": 9,
     }
 
 
 @router.post("/research/batch")
 async def start_batch_research(
-    companies: List[CompanyResearchRequest],
-    db: Session = Depends(get_db)
+    companies: List[CompanyResearchRequest], db: Session = Depends(get_db)
 ):
     """
     Start research for multiple companies.
@@ -201,11 +202,13 @@ async def start_batch_research(
         if not company.force_refresh:
             cached = agent.get_cached_research(company.company_name)
             if cached:
-                results.append({
-                    "company_name": company.company_name,
-                    "status": "cached",
-                    "job_id": None
-                })
+                results.append(
+                    {
+                        "company_name": company.company_name,
+                        "status": "cached",
+                        "job_id": None,
+                    }
+                )
                 continue
 
         # Start new research
@@ -213,19 +216,21 @@ async def start_batch_research(
             company_name=company.company_name,
             domain=company.domain,
             ticker=company.ticker,
-            priority_sources=company.priority_sources
+            priority_sources=company.priority_sources,
         )
-        results.append({
-            "company_name": company.company_name,
-            "status": "started",
-            "job_id": job_id
-        })
+        results.append(
+            {
+                "company_name": company.company_name,
+                "status": "started",
+                "job_id": job_id,
+            }
+        )
 
     return {
         "batch_size": len(companies),
         "started": sum(1 for r in results if r["status"] == "started"),
         "cached": sum(1 for r in results if r["status"] == "cached"),
-        "results": results
+        "results": results,
     }
 
 
@@ -234,7 +239,7 @@ async def start_batch_research(
 def list_research_jobs(
     status: Optional[str] = Query(None, description="Filter by status"),
     limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     List recent research jobs.
@@ -244,10 +249,7 @@ def list_research_jobs(
     agent = CompanyResearchAgent(db)
     jobs = agent.list_jobs(status=status, limit=limit)
 
-    return {
-        "count": len(jobs),
-        "jobs": jobs
-    }
+    return {"count": len(jobs), "jobs": jobs}
 
 
 @router.get("/research/stats")
@@ -264,8 +266,10 @@ def get_research_stats(db: Session = Depends(get_db)):
 @router.get("/research/company/{company_name}")
 def get_company_research(
     company_name: str,
-    max_age_hours: int = Query(168, description="Max cache age in hours (default 7 days)"),
-    db: Session = Depends(get_db)
+    max_age_hours: int = Query(
+        168, description="Max cache age in hours (default 7 days)"
+    ),
+    db: Session = Depends(get_db),
 ):
     """
     Get cached research for a company.
@@ -279,7 +283,7 @@ def get_company_research(
     if not result:
         raise HTTPException(
             status_code=404,
-            detail=f"No cached research for '{company_name}'. Use POST /agents/research/company to start research."
+            detail=f"No cached research for '{company_name}'. Use POST /agents/research/company to start research.",
         )
 
     return result
@@ -287,10 +291,7 @@ def get_company_research(
 
 # Parameterized route MUST come after specific routes
 @router.get("/research/{job_id}")
-def get_research_status(
-    job_id: str,
-    db: Session = Depends(get_db)
-):
+def get_research_status(job_id: str, db: Session = Depends(get_db)):
     """
     Get status and results of a research job.
 
@@ -310,10 +311,7 @@ def get_research_status(
 
 
 @router.delete("/research/{job_id}")
-def cancel_research_job(
-    job_id: str,
-    db: Session = Depends(get_db)
-):
+def cancel_research_job(job_id: str, db: Session = Depends(get_db)):
     """
     Cancel a pending or running research job.
     """
@@ -321,6 +319,9 @@ def cancel_research_job(
     result = agent.cancel_job(job_id)
 
     if not result:
-        raise HTTPException(status_code=404, detail=f"Research job {job_id} not found or already completed")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Research job {job_id} not found or already completed",
+        )
 
     return {"status": "cancelled", "job_id": job_id}

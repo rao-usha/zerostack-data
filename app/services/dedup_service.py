@@ -123,28 +123,38 @@ class DedupService:
                     has_shared = len(shared_companies) > 0
 
                     classification = self.matcher.classify_match(
-                        result.similarity, has_shared,
+                        result.similarity,
+                        has_shared,
                     )
 
                     if classification == "auto_merge":
                         try:
                             self._auto_merge(
-                                id_a, id_b, result, shared_companies,
+                                id_a,
+                                id_b,
+                                result,
+                                shared_companies,
                             )
                             stats["auto_merged"] += 1
                         except Exception as e:
-                            logger.warning(
-                                f"Auto-merge failed for {id_a}/{id_b}: {e}"
-                            )
+                            logger.warning(f"Auto-merge failed for {id_a}/{id_b}: {e}")
                             # Fall through to queue for review
                             self._create_candidate(
-                                id_a, id_b, result, shared_companies, "pending",
+                                id_a,
+                                id_b,
+                                result,
+                                shared_companies,
+                                "pending",
                             )
                             stats["review_queued"] += 1
 
                     elif classification == "review":
                         self._create_candidate(
-                            id_a, id_b, result, shared_companies, "pending",
+                            id_a,
+                            id_b,
+                            result,
+                            shared_companies,
+                            "pending",
                         )
                         stats["review_queued"] += 1
 
@@ -161,16 +171,22 @@ class DedupService:
     def _get_shared_companies(self, person_id_1: int, person_id_2: int) -> List[int]:
         """Find company IDs where both people have current roles."""
         companies_1 = set(
-            row[0] for row in self.session.query(CompanyPerson.company_id).filter(
+            row[0]
+            for row in self.session.query(CompanyPerson.company_id)
+            .filter(
                 CompanyPerson.person_id == person_id_1,
                 CompanyPerson.is_current == True,
-            ).all()
+            )
+            .all()
         )
         companies_2 = set(
-            row[0] for row in self.session.query(CompanyPerson.company_id).filter(
+            row[0]
+            for row in self.session.query(CompanyPerson.company_id)
+            .filter(
                 CompanyPerson.person_id == person_id_2,
                 CompanyPerson.is_current == True,
-            ).all()
+            )
+            .all()
         )
         return list(companies_1 & companies_2)
 
@@ -230,7 +246,10 @@ class DedupService:
 
         # Record in merge candidates
         self._create_candidate(
-            id_a, id_b, match_result, shared_companies,
+            id_a,
+            id_b,
+            match_result,
+            shared_companies,
             status="auto_merged",
             canonical_id=canonical.id,
         )
@@ -241,10 +260,15 @@ class DedupService:
 
         Prefers: more CompanyPerson records > has LinkedIn > has email > lower ID.
         """
+
         def score(p: Person) -> tuple:
-            cp_count = self.session.query(CompanyPerson).filter(
-                CompanyPerson.person_id == p.id,
-            ).count()
+            cp_count = (
+                self.session.query(CompanyPerson)
+                .filter(
+                    CompanyPerson.person_id == p.id,
+                )
+                .count()
+            )
             return (
                 cp_count,
                 1 if p.linkedin_url else 0,
@@ -308,18 +332,26 @@ class DedupService:
         Handles unique constraint conflicts by skipping duplicate relationships.
         """
         # Reassign CompanyPerson records
-        dup_cps = self.session.query(CompanyPerson).filter(
-            CompanyPerson.person_id == duplicate_id,
-        ).all()
+        dup_cps = (
+            self.session.query(CompanyPerson)
+            .filter(
+                CompanyPerson.person_id == duplicate_id,
+            )
+            .all()
+        )
 
         for cp in dup_cps:
             # Check if canonical already has this role at this company
-            existing = self.session.query(CompanyPerson).filter(
-                CompanyPerson.person_id == canonical_id,
-                CompanyPerson.company_id == cp.company_id,
-                CompanyPerson.title == cp.title,
-                CompanyPerson.is_current == cp.is_current,
-            ).first()
+            existing = (
+                self.session.query(CompanyPerson)
+                .filter(
+                    CompanyPerson.person_id == canonical_id,
+                    CompanyPerson.company_id == cp.company_id,
+                    CompanyPerson.title == cp.title,
+                    CompanyPerson.is_current == cp.is_current,
+                )
+                .first()
+            )
 
             if existing:
                 # Merge work_email if canonical's CP lacks it
@@ -330,17 +362,25 @@ class DedupService:
                 cp.person_id = canonical_id
 
         # Reassign PersonExperience records
-        dup_exps = self.session.query(PersonExperience).filter(
-            PersonExperience.person_id == duplicate_id,
-        ).all()
+        dup_exps = (
+            self.session.query(PersonExperience)
+            .filter(
+                PersonExperience.person_id == duplicate_id,
+            )
+            .all()
+        )
 
         for exp in dup_exps:
-            existing = self.session.query(PersonExperience).filter(
-                PersonExperience.person_id == canonical_id,
-                PersonExperience.company_name == exp.company_name,
-                PersonExperience.title == exp.title,
-                PersonExperience.start_year == exp.start_year,
-            ).first()
+            existing = (
+                self.session.query(PersonExperience)
+                .filter(
+                    PersonExperience.person_id == canonical_id,
+                    PersonExperience.company_name == exp.company_name,
+                    PersonExperience.title == exp.title,
+                    PersonExperience.start_year == exp.start_year,
+                )
+                .first()
+            )
 
             if existing:
                 self.session.delete(exp)
@@ -348,16 +388,24 @@ class DedupService:
                 exp.person_id = canonical_id
 
         # Reassign PersonEducation records
-        dup_edus = self.session.query(PersonEducation).filter(
-            PersonEducation.person_id == duplicate_id,
-        ).all()
+        dup_edus = (
+            self.session.query(PersonEducation)
+            .filter(
+                PersonEducation.person_id == duplicate_id,
+            )
+            .all()
+        )
 
         for edu in dup_edus:
-            existing = self.session.query(PersonEducation).filter(
-                PersonEducation.person_id == canonical_id,
-                PersonEducation.institution == edu.institution,
-                PersonEducation.degree == edu.degree,
-            ).first()
+            existing = (
+                self.session.query(PersonEducation)
+                .filter(
+                    PersonEducation.person_id == canonical_id,
+                    PersonEducation.institution == edu.institution,
+                    PersonEducation.degree == edu.degree,
+                )
+                .first()
+            )
 
             if existing:
                 self.session.delete(edu)
@@ -465,17 +513,21 @@ class DedupService:
             if not person_a or not person_b:
                 continue
 
-            results.append({
-                "id": c.id,
-                "person_a": self._person_summary(person_a),
-                "person_b": self._person_summary(person_b),
-                "match_type": c.match_type,
-                "similarity_score": float(c.similarity_score) if c.similarity_score else None,
-                "shared_company_ids": c.shared_company_ids,
-                "evidence_notes": c.evidence_notes,
-                "status": c.status,
-                "created_at": c.created_at.isoformat() if c.created_at else None,
-            })
+            results.append(
+                {
+                    "id": c.id,
+                    "person_a": self._person_summary(person_a),
+                    "person_b": self._person_summary(person_b),
+                    "match_type": c.match_type,
+                    "similarity_score": float(c.similarity_score)
+                    if c.similarity_score
+                    else None,
+                    "shared_company_ids": c.shared_company_ids,
+                    "evidence_notes": c.evidence_notes,
+                    "status": c.status,
+                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                }
+            )
 
         return results
 
@@ -499,8 +551,7 @@ class DedupService:
             )
 
         candidates = (
-            query
-            .order_by(PeopleMergeCandidate.reviewed_at.desc())
+            query.order_by(PeopleMergeCandidate.reviewed_at.desc())
             .offset(offset)
             .limit(limit)
             .all()
@@ -511,24 +562,32 @@ class DedupService:
             person_a = self.session.get(Person, c.person_id_a)
             person_b = self.session.get(Person, c.person_id_b)
 
-            results.append({
-                "id": c.id,
-                "person_a": self._person_summary(person_a) if person_a else None,
-                "person_b": self._person_summary(person_b) if person_b else None,
-                "match_type": c.match_type,
-                "similarity_score": float(c.similarity_score) if c.similarity_score else None,
-                "status": c.status,
-                "canonical_person_id": c.canonical_person_id,
-                "reviewed_at": c.reviewed_at.isoformat() if c.reviewed_at else None,
-            })
+            results.append(
+                {
+                    "id": c.id,
+                    "person_a": self._person_summary(person_a) if person_a else None,
+                    "person_b": self._person_summary(person_b) if person_b else None,
+                    "match_type": c.match_type,
+                    "similarity_score": float(c.similarity_score)
+                    if c.similarity_score
+                    else None,
+                    "status": c.status,
+                    "canonical_person_id": c.canonical_person_id,
+                    "reviewed_at": c.reviewed_at.isoformat() if c.reviewed_at else None,
+                }
+            )
 
         return results
 
     def _person_summary(self, person: Person) -> Dict[str, Any]:
         """Build a summary dict for a person record."""
-        cp_count = self.session.query(CompanyPerson).filter(
-            CompanyPerson.person_id == person.id,
-        ).count()
+        cp_count = (
+            self.session.query(CompanyPerson)
+            .filter(
+                CompanyPerson.person_id == person.id,
+            )
+            .count()
+        )
 
         current_roles = (
             self.session.query(CompanyPerson)

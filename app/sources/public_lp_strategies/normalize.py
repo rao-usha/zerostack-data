@@ -10,6 +10,7 @@ Approach:
 - LLM (via app.agentic.llm_client) for complex extraction (summaries, managers, projections)
 - Graceful degradation: returns partial results if LLM is unavailable
 """
+
 import asyncio
 import logging
 import re
@@ -105,46 +106,100 @@ def _normalize_asset_class(name: str) -> Optional[str]:
 
 _THEME_KEYWORDS: Dict[str, List[str]] = {
     "ai": [
-        "artificial intelligence", "machine learning", "deep learning",
-        "generative ai", "large language model", "neural network",
-        "ai-driven", "ai-powered", "data science", "automation",
+        "artificial intelligence",
+        "machine learning",
+        "deep learning",
+        "generative ai",
+        "large language model",
+        "neural network",
+        "ai-driven",
+        "ai-powered",
+        "data science",
+        "automation",
     ],
     "energy_transition": [
-        "energy transition", "renewable energy", "clean energy",
-        "solar", "wind power", "decarbonization", "net zero",
-        "green energy", "electrification", "hydrogen",
-        "carbon neutral", "emissions reduction",
+        "energy transition",
+        "renewable energy",
+        "clean energy",
+        "solar",
+        "wind power",
+        "decarbonization",
+        "net zero",
+        "green energy",
+        "electrification",
+        "hydrogen",
+        "carbon neutral",
+        "emissions reduction",
     ],
     "climate_resilience": [
-        "climate resilience", "climate risk", "climate adaptation",
-        "climate change", "esg", "environmental", "sustainability",
-        "sustainable investing", "impact investing", "responsible investment",
+        "climate resilience",
+        "climate risk",
+        "climate adaptation",
+        "climate change",
+        "esg",
+        "environmental",
+        "sustainability",
+        "sustainable investing",
+        "impact investing",
+        "responsible investment",
     ],
     "reshoring": [
-        "reshoring", "nearshoring", "onshoring", "supply chain resilience",
-        "domestic manufacturing", "friend-shoring", "de-globalization",
+        "reshoring",
+        "nearshoring",
+        "onshoring",
+        "supply chain resilience",
+        "domestic manufacturing",
+        "friend-shoring",
+        "de-globalization",
         "supply chain diversification",
     ],
     "healthcare": [
-        "healthcare", "health care", "biotech", "biotechnology",
-        "pharmaceutical", "life sciences", "medical device",
-        "digital health", "genomics", "precision medicine",
+        "healthcare",
+        "health care",
+        "biotech",
+        "biotechnology",
+        "pharmaceutical",
+        "life sciences",
+        "medical device",
+        "digital health",
+        "genomics",
+        "precision medicine",
     ],
     "technology": [
-        "technology", "digital infrastructure", "cybersecurity",
-        "cloud computing", "saas", "fintech", "software",
-        "semiconductor", "data center", "5g", "digital transformation",
+        "technology",
+        "digital infrastructure",
+        "cybersecurity",
+        "cloud computing",
+        "saas",
+        "fintech",
+        "software",
+        "semiconductor",
+        "data center",
+        "5g",
+        "digital transformation",
     ],
     "sustainability": [
-        "sustainability", "sustainable", "esg integration",
-        "social responsibility", "governance", "dei",
-        "diversity", "inclusion", "stakeholder",
+        "sustainability",
+        "sustainable",
+        "esg integration",
+        "social responsibility",
+        "governance",
+        "dei",
+        "diversity",
+        "inclusion",
+        "stakeholder",
     ],
     "infrastructure": [
-        "infrastructure investment", "core infrastructure",
-        "transportation infrastructure", "utilities",
-        "public-private partnership", "p3", "toll road",
-        "airport", "port", "water infrastructure",
+        "infrastructure investment",
+        "core infrastructure",
+        "transportation infrastructure",
+        "utilities",
+        "public-private partnership",
+        "p3",
+        "toll road",
+        "airport",
+        "port",
+        "water infrastructure",
     ],
 }
 
@@ -153,28 +208,49 @@ _THEME_KEYWORDS: Dict[str, List[str]] = {
 # =============================================================================
 
 _RISK_ON_KEYWORDS = [
-    "overweight equities", "increasing equity allocation",
-    "risk-on", "aggressive positioning", "overweight risk assets",
-    "increasing private equity", "adding to growth",
-    "tilting toward equities", "pro-cyclical",
-    "increasing exposure", "overweight",
-    "adding risk", "above target",
+    "overweight equities",
+    "increasing equity allocation",
+    "risk-on",
+    "aggressive positioning",
+    "overweight risk assets",
+    "increasing private equity",
+    "adding to growth",
+    "tilting toward equities",
+    "pro-cyclical",
+    "increasing exposure",
+    "overweight",
+    "adding risk",
+    "above target",
 ]
 
 _RISK_OFF_KEYWORDS = [
-    "underweight equities", "defensive posture", "risk-off",
-    "de-risking", "reducing equity", "increasing fixed income",
-    "increasing cash", "flight to quality", "capital preservation",
-    "reducing risk", "below target equity",
-    "underweight risk assets", "protective positioning",
-    "hedging", "downside protection",
+    "underweight equities",
+    "defensive posture",
+    "risk-off",
+    "de-risking",
+    "reducing equity",
+    "increasing fixed income",
+    "increasing cash",
+    "flight to quality",
+    "capital preservation",
+    "reducing risk",
+    "below target equity",
+    "underweight risk assets",
+    "protective positioning",
+    "hedging",
+    "downside protection",
 ]
 
 _NEUTRAL_KEYWORDS = [
-    "balanced positioning", "neutral stance", "at target",
-    "benchmark weight", "strategic allocation",
-    "maintaining current", "no significant changes",
-    "stable allocation", "within range",
+    "balanced positioning",
+    "neutral stance",
+    "at target",
+    "benchmark weight",
+    "strategic allocation",
+    "maintaining current",
+    "no significant changes",
+    "stable allocation",
+    "within range",
 ]
 
 # =============================================================================
@@ -182,16 +258,28 @@ _NEUTRAL_KEYWORDS = [
 # =============================================================================
 
 _HIGH_LIQUIDITY_KEYWORDS = [
-    "high liquidity", "ample liquidity", "liquid portfolio",
-    "increasing cash", "cash reserves", "above target cash",
-    "strong liquidity position", "excess liquidity",
+    "high liquidity",
+    "ample liquidity",
+    "liquid portfolio",
+    "increasing cash",
+    "cash reserves",
+    "above target cash",
+    "strong liquidity position",
+    "excess liquidity",
 ]
 
 _LOW_LIQUIDITY_KEYWORDS = [
-    "illiquid", "illiquidity", "liquidity constraints",
-    "liquidity risk", "over-committed", "capital calls",
-    "denominator effect", "locked up", "limited redemption",
-    "long lock-up", "liquidity challenge",
+    "illiquid",
+    "illiquidity",
+    "liquidity constraints",
+    "liquidity risk",
+    "over-committed",
+    "capital calls",
+    "denominator effect",
+    "locked up",
+    "limited redemption",
+    "long lock-up",
+    "liquidity challenge",
 ]
 
 
@@ -203,15 +291,15 @@ _LOW_LIQUIDITY_KEYWORDS = [
 def parse_percentage(text: str) -> Optional[float]:
     """Parse percentage from text (e.g., '35%', '35.5 percent', '0.35')."""
     # Pattern: "35%", "35.5%", "35 %"
-    match = re.search(r'(\d+\.?\d*)\s*%', text)
+    match = re.search(r"(\d+\.?\d*)\s*%", text)
     if match:
         return float(match.group(1))
     # Pattern: "35 percent", "35.5 percent"
-    match = re.search(r'(\d+\.?\d*)\s*percent', text, re.IGNORECASE)
+    match = re.search(r"(\d+\.?\d*)\s*percent", text, re.IGNORECASE)
     if match:
         return float(match.group(1))
     # Pattern: "0.35" (decimal, only if looks like a weight)
-    match = re.search(r'\b0\.(\d{2,})\b', text)
+    match = re.search(r"\b0\.(\d{2,})\b", text)
     if match:
         return float(f"0.{match.group(1)}") * 100
     return None
@@ -219,7 +307,7 @@ def parse_percentage(text: str) -> Optional[float]:
 
 def parse_percentage_range(text: str) -> tuple[Optional[float], Optional[float]]:
     """Parse a percentage range like '30-40%' or '30% - 40%'."""
-    match = re.search(r'(\d+\.?\d*)\s*%?\s*[-–—to]+\s*(\d+\.?\d*)\s*%', text)
+    match = re.search(r"(\d+\.?\d*)\s*%?\s*[-–—to]+\s*(\d+\.?\d*)\s*%", text)
     if match:
         return float(match.group(1)), float(match.group(2))
     return None, None
@@ -228,24 +316,32 @@ def parse_percentage_range(text: str) -> tuple[Optional[float], Optional[float]]
 def parse_currency_amount(text: str) -> Optional[float]:
     """Parse currency amount from text (e.g., '$5B', '5 billion', '$5,000,000')."""
     multipliers = {
-        'T': 1_000_000_000_000, 'TRILLION': 1_000_000_000_000,
-        'B': 1_000_000_000, 'BN': 1_000_000_000, 'BILLION': 1_000_000_000,
-        'M': 1_000_000, 'MM': 1_000_000, 'MN': 1_000_000, 'MILLION': 1_000_000,
-        'K': 1_000, 'THOUSAND': 1_000,
+        "T": 1_000_000_000_000,
+        "TRILLION": 1_000_000_000_000,
+        "B": 1_000_000_000,
+        "BN": 1_000_000_000,
+        "BILLION": 1_000_000_000,
+        "M": 1_000_000,
+        "MM": 1_000_000,
+        "MN": 1_000_000,
+        "MILLION": 1_000_000,
+        "K": 1_000,
+        "THOUSAND": 1_000,
     }
     # Pattern: "$5B", "$5.2B", "$5.2 billion"
     match = re.search(
-        r'\$\s*([\d,]+\.?\d*)\s*(trillion|billion|million|thousand|[TBMK]N?)',
-        text, re.IGNORECASE,
+        r"\$\s*([\d,]+\.?\d*)\s*(trillion|billion|million|thousand|[TBMK]N?)",
+        text,
+        re.IGNORECASE,
     )
     if match:
-        value = float(match.group(1).replace(',', ''))
-        unit = match.group(2).upper().rstrip('S')
+        value = float(match.group(1).replace(",", ""))
+        unit = match.group(2).upper().rstrip("S")
         return value * multipliers.get(unit, 1)
     # Pattern: "$5,000,000" (raw number)
-    match = re.search(r'\$\s*([\d,]+\.?\d*)', text)
+    match = re.search(r"\$\s*([\d,]+\.?\d*)", text)
     if match:
-        value = float(match.group(1).replace(',', ''))
+        value = float(match.group(1).replace(",", ""))
         if value >= 1000:
             return value
     return None
@@ -257,8 +353,7 @@ def parse_currency_amount(text: str) -> Optional[float]:
 
 
 def extract_asset_class_allocations(
-    text: str,
-    section_id: Optional[int] = None
+    text: str, section_id: Optional[int] = None
 ) -> List[AssetClassAllocationInput]:
     """
     Extract asset class allocation table from text using regex pattern matching.
@@ -269,7 +364,7 @@ def extract_asset_class_allocations(
     - Tabular rows with asset class name followed by percentages
     """
     allocations = []
-    lines = text.split('\n')
+    lines = text.split("\n")
 
     for line in lines:
         line_stripped = line.strip()
@@ -290,7 +385,7 @@ def extract_asset_class_allocations(
             continue
 
         # Extract all percentages from the line
-        pct_matches = re.findall(r'(\d+\.?\d*)\s*%', line_stripped)
+        pct_matches = re.findall(r"(\d+\.?\d*)\s*%", line_stripped)
         if not pct_matches:
             continue
 
@@ -309,9 +404,11 @@ def extract_asset_class_allocations(
         lower_line = line_stripped.lower()
 
         # Try labeled values first: "target 35%", "current 37%"
-        target_match = re.search(r'target\s*:?\s*(\d+\.?\d*)\s*%', lower_line)
-        current_match = re.search(r'(?:current|actual)\s*:?\s*(\d+\.?\d*)\s*%', lower_line)
-        benchmark_match = re.search(r'benchmark\s*:?\s*(\d+\.?\d*)\s*%', lower_line)
+        target_match = re.search(r"target\s*:?\s*(\d+\.?\d*)\s*%", lower_line)
+        current_match = re.search(
+            r"(?:current|actual)\s*:?\s*(\d+\.?\d*)\s*%", lower_line
+        )
+        benchmark_match = re.search(r"benchmark\s*:?\s*(\d+\.?\d*)\s*%", lower_line)
 
         if target_match:
             target = float(target_match.group(1))
@@ -335,15 +432,17 @@ def extract_asset_class_allocations(
         if any(a.asset_class == matched_class for a in allocations):
             continue
 
-        allocations.append(AssetClassAllocationInput(
-            asset_class=matched_class,
-            target_weight_pct=target,
-            current_weight_pct=current,
-            min_weight_pct=min_w,
-            max_weight_pct=max_w,
-            benchmark_weight_pct=benchmark,
-            source_section_id=section_id,
-        ))
+        allocations.append(
+            AssetClassAllocationInput(
+                asset_class=matched_class,
+                target_weight_pct=target,
+                current_weight_pct=current,
+                min_weight_pct=min_w,
+                max_weight_pct=max_w,
+                benchmark_weight_pct=benchmark,
+                source_section_id=section_id,
+            )
+        )
 
     if allocations:
         logger.info(f"Extracted {len(allocations)} asset class allocations from text")
@@ -352,8 +451,7 @@ def extract_asset_class_allocations(
 
 
 def extract_asset_class_projections(
-    text: str,
-    section_id: Optional[int] = None
+    text: str, section_id: Optional[int] = None
 ) -> List[AssetClassProjectionInput]:
     """
     Extract asset class projections/pacing plans from text.
@@ -365,7 +463,7 @@ def extract_asset_class_projections(
     - Horizons: "3-year", "5-year", "10-year"
     """
     projections = []
-    lines = text.split('\n')
+    lines = text.split("\n")
 
     for line in lines:
         line_stripped = line.strip()
@@ -387,7 +485,7 @@ def extract_asset_class_projections(
 
         # Detect horizon
         horizon = None
-        horizon_match = re.search(r'(\d+)\s*[-–]?\s*year', lower_line)
+        horizon_match = re.search(r"(\d+)\s*[-–]?\s*year", lower_line)
         if horizon_match:
             years = int(horizon_match.group(1))
             horizon_map = {1: "1_year", 3: "3_year", 5: "5_year", 10: "10_year"}
@@ -398,7 +496,7 @@ def extract_asset_class_projections(
         # Extract expected return
         expected_return = None
         ret_match = re.search(
-            r'(?:expected|projected|target|forecast)\s*(?:return|yield)\s*:?\s*(\d+\.?\d*)\s*%',
+            r"(?:expected|projected|target|forecast)\s*(?:return|yield)\s*:?\s*(\d+\.?\d*)\s*%",
             lower_line,
         )
         if ret_match:
@@ -407,7 +505,7 @@ def extract_asset_class_projections(
         # Extract volatility
         volatility = None
         vol_match = re.search(
-            r'(?:volatility|risk|std dev|standard deviation)\s*:?\s*(\d+\.?\d*)\s*%',
+            r"(?:volatility|risk|std dev|standard deviation)\s*:?\s*(\d+\.?\d*)\s*%",
             lower_line,
         )
         if vol_match:
@@ -416,7 +514,7 @@ def extract_asset_class_projections(
         # Extract commitment amount
         commitment = None
         commit_match = re.search(
-            r'(?:commitment?|commit|pacing|deploy|allocat)\w*\s*:?\s*\$?\s*([\d,.]+)\s*(billion|million|[BM])',
+            r"(?:commitment?|commit|pacing|deploy|allocat)\w*\s*:?\s*\$?\s*([\d,.]+)\s*(billion|million|[BM])",
             lower_line,
         )
         if commit_match:
@@ -427,7 +525,7 @@ def extract_asset_class_projections(
         # Extract net flow
         net_flow = None
         flow_match = re.search(
-            r'(?:net flow|net cash flow|distribution)\s*:?\s*\$?\s*([\d,.]+)\s*(billion|million|[BM])',
+            r"(?:net flow|net cash flow|distribution)\s*:?\s*\$?\s*([\d,.]+)\s*(billion|million|[BM])",
             lower_line,
         )
         if flow_match:
@@ -435,7 +533,12 @@ def extract_asset_class_projections(
                 f"${flow_match.group(1)} {flow_match.group(2)}"
             )
 
-        if expected_return is None and volatility is None and commitment is None and net_flow is None:
+        if (
+            expected_return is None
+            and volatility is None
+            and commitment is None
+            and net_flow is None
+        ):
             continue
 
         # Skip duplicates
@@ -445,15 +548,17 @@ def extract_asset_class_projections(
         ):
             continue
 
-        projections.append(AssetClassProjectionInput(
-            asset_class=matched_class,
-            projection_horizon=horizon,
-            expected_return_pct=expected_return,
-            expected_volatility_pct=volatility,
-            commitment_plan_amount=commitment,
-            net_flow_projection_amount=net_flow,
-            source_section_id=section_id,
-        ))
+        projections.append(
+            AssetClassProjectionInput(
+                asset_class=matched_class,
+                projection_horizon=horizon,
+                expected_return_pct=expected_return,
+                expected_volatility_pct=volatility,
+                commitment_plan_amount=commitment,
+                net_flow_projection_amount=net_flow,
+                source_section_id=section_id,
+            )
+        )
 
     if projections:
         logger.info(f"Extracted {len(projections)} asset class projections from text")
@@ -462,8 +567,7 @@ def extract_asset_class_projections(
 
 
 def extract_thematic_tags(
-    text: str,
-    section_id: Optional[int] = None
+    text: str, section_id: Optional[int] = None
 ) -> List[ThematicTagInput]:
     """
     Extract thematic investment tags from text using keyword matching.
@@ -473,7 +577,7 @@ def extract_thematic_tags(
     """
     text_lower = text.lower()
     word_count = max(len(text_lower.split()), 1)
-    first_third = text_lower[:len(text_lower) // 3]
+    first_third = text_lower[: len(text_lower) // 3]
     tags = []
 
     for theme, keywords in _THEME_KEYWORDS.items():
@@ -499,11 +603,13 @@ def extract_thematic_tags(
         if relevance < 0.05:
             continue
 
-        tags.append(ThematicTagInput(
-            theme=theme,
-            relevance_score=relevance,
-            source_section_id=section_id,
-        ))
+        tags.append(
+            ThematicTagInput(
+                theme=theme,
+                relevance_score=relevance,
+                source_section_id=section_id,
+            )
+        )
 
     # Sort by relevance descending
     tags.sort(key=lambda t: t.relevance_score or 0, reverse=True)
@@ -616,6 +722,7 @@ async def generate_strategy_summary(
 
     try:
         from app.agentic.llm_client import get_llm_client
+
         client = get_llm_client()
         if client is None:
             logger.info("No LLM client available, falling back to heuristic summary")
@@ -647,26 +754,25 @@ def _heuristic_summary(sections: List[DocumentTextSectionInput]) -> Optional[str
                 summary = text[:500]
                 if len(text) > 500:
                     # Cut at last sentence boundary
-                    last_period = summary.rfind('.')
+                    last_period = summary.rfind(".")
                     if last_period > 100:
-                        summary = summary[:last_period + 1]
+                        summary = summary[: last_period + 1]
                 return summary
 
     # Fallback: first section with enough text
     for section in sections:
         if len(section.text.strip()) > 100:
             text = section.text.strip()[:300]
-            last_period = text.rfind('.')
+            last_period = text.rfind(".")
             if last_period > 50:
-                text = text[:last_period + 1]
+                text = text[: last_period + 1]
             return text
 
     return None
 
 
 async def extract_manager_exposures(
-    text: str,
-    section_id: Optional[int] = None
+    text: str, section_id: Optional[int] = None
 ) -> List[Dict[str, Any]]:
     """
     Extract manager/vehicle exposure information from text using LLM.
@@ -681,6 +787,7 @@ async def extract_manager_exposures(
 
     try:
         from app.agentic.llm_client import get_llm_client
+
         client = get_llm_client(model="gpt-4o-mini")
         if client is None:
             return _regex_manager_extraction(text)
@@ -707,8 +814,8 @@ def _regex_manager_extraction(text: str) -> List[Dict[str, Any]]:
     managers = []
     # Pattern: "Firm Name Fund IX" or "Firm Name Capital"
     patterns = [
-        r'([A-Z][a-zA-Z&\s]{2,30}(?:Capital|Partners|Group|Management|Advisors|Investment[s]?))\s+(?:Fund\s+[IVX\d]+|LP)',
-        r'(?:committed?|allocated?|invested?)\s+(?:to|in|with)\s+([A-Z][a-zA-Z&\s]{2,40})',
+        r"([A-Z][a-zA-Z&\s]{2,30}(?:Capital|Partners|Group|Management|Advisors|Investment[s]?))\s+(?:Fund\s+[IVX\d]+|LP)",
+        r"(?:committed?|allocated?|invested?)\s+(?:to|in|with)\s+([A-Z][a-zA-Z&\s]{2,40})",
     ]
     seen = set()
     for pattern in patterns:
@@ -716,13 +823,15 @@ def _regex_manager_extraction(text: str) -> List[Dict[str, Any]]:
             name = match.group(1).strip()
             if name not in seen and len(name) > 3:
                 seen.add(name)
-                managers.append({
-                    "manager_name": name,
-                    "vehicle_name": None,
-                    "asset_class": "other",
-                    "commitment_amount": None,
-                    "status": "existing",
-                })
+                managers.append(
+                    {
+                        "manager_name": name,
+                        "vehicle_name": None,
+                        "asset_class": "other",
+                        "commitment_amount": None,
+                        "status": "existing",
+                    }
+                )
     return managers
 
 
@@ -799,9 +908,13 @@ async def extract_strategy_from_text_sections(
     tag_map: Dict[str, ThematicTagInput] = {}
     for t in all_tags:
         existing = tag_map.get(t.theme)
-        if existing is None or (t.relevance_score or 0) > (existing.relevance_score or 0):
+        if existing is None or (t.relevance_score or 0) > (
+            existing.relevance_score or 0
+        ):
             tag_map[t.theme] = t
-    all_tags = sorted(tag_map.values(), key=lambda t: t.relevance_score or 0, reverse=True)
+    all_tags = sorted(
+        tag_map.values(), key=lambda t: t.relevance_score or 0, reverse=True
+    )
 
     # Risk and liquidity from combined text
     risk_positioning = detect_risk_positioning(combined_text)
@@ -846,7 +959,14 @@ def _find_manager_sections(
     fallback_text: str,
 ) -> str:
     """Find sections most likely to contain manager/vehicle info."""
-    manager_keywords = ["manager", "holding", "commitment", "vehicle", "fund", "exposure"]
+    manager_keywords = [
+        "manager",
+        "holding",
+        "commitment",
+        "vehicle",
+        "fund",
+        "exposure",
+    ]
     for section in sections:
         name = (section.section_name or "").lower()
         if any(kw in name for kw in manager_keywords):
@@ -857,7 +977,10 @@ def _find_manager_sections(
 
 
 def _empty_result(
-    lp_id: int, program: str, fiscal_year: int, fiscal_quarter: str,
+    lp_id: int,
+    program: str,
+    fiscal_year: int,
+    fiscal_quarter: str,
 ) -> StrategyExtractionResult:
     """Return an empty extraction result."""
     return StrategyExtractionResult(

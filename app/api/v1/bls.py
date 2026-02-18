@@ -13,6 +13,7 @@ API Key: Optional but recommended for higher rate limits
 - With key: 500 queries/day, 20 years per query
 Get free key at: https://data.bls.gov/registrationEngine/
 """
+
 import logging
 from datetime import datetime
 from typing import List, Optional
@@ -41,8 +42,10 @@ router = APIRouter(prefix="/bls", tags=["BLS Labor Statistics"])
 # ENUMS AND REQUEST MODELS
 # =============================================================================
 
+
 class BLSDataset(str, Enum):
     """Available BLS datasets."""
+
     CES = "ces"  # Current Employment Statistics
     CPS = "cps"  # Current Population Survey
     JOLTS = "jolts"  # Job Openings and Labor Turnover Survey
@@ -53,68 +56,58 @@ class BLSDataset(str, Enum):
 
 class BLSDatasetIngestRequest(BaseModel):
     """Request model for dataset ingestion."""
+
     start_year: Optional[int] = Field(
         default=None,
-        description="Start year (defaults based on API key: 10 years without, 20 with)"
+        description="Start year (defaults based on API key: 10 years without, 20 with)",
     )
     end_year: Optional[int] = Field(
-        default=None,
-        description="End year (defaults to current year)"
+        default=None, description="End year (defaults to current year)"
     )
     series_ids: Optional[List[str]] = Field(
         default=None,
-        description="Specific series IDs to ingest (defaults to common series for the dataset)"
+        description="Specific series IDs to ingest (defaults to common series for the dataset)",
     )
 
 
 class BLSSeriesIngestRequest(BaseModel):
     """Request model for custom series ingestion."""
+
     series_ids: List[str] = Field(
-        ...,
-        description="List of BLS series IDs to ingest",
-        min_length=1
+        ..., description="List of BLS series IDs to ingest", min_length=1
     )
     start_year: int = Field(
         default_factory=lambda: datetime.now().year - 10,
         description="Start year",
-        ge=1900
+        ge=1900,
     )
     end_year: int = Field(
-        default_factory=lambda: datetime.now().year,
-        description="End year"
+        default_factory=lambda: datetime.now().year, description="End year"
     )
-    dataset: BLSDataset = Field(
-        ...,
-        description="Target dataset/table for storage"
-    )
+    dataset: BLSDataset = Field(..., description="Target dataset/table for storage")
 
 
 class BLSAllDatasetsIngestRequest(BaseModel):
     """Request model for ingesting all BLS datasets."""
+
     datasets: Optional[List[BLSDataset]] = Field(
-        default=None,
-        description="List of datasets to ingest (defaults to all)"
+        default=None, description="List of datasets to ingest (defaults to all)"
     )
-    start_year: Optional[int] = Field(
-        default=None,
-        description="Start year"
-    )
-    end_year: Optional[int] = Field(
-        default=None,
-        description="End year"
-    )
+    start_year: Optional[int] = Field(default=None, description="Start year")
+    end_year: Optional[int] = Field(default=None, description="End year")
 
 
 # =============================================================================
 # INGESTION ENDPOINTS
 # =============================================================================
 
+
 @router.post("/{dataset}/ingest")
 async def ingest_bls_dataset_endpoint(
     dataset: BLSDataset,
     request: BLSDatasetIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest BLS data for a specific dataset.
@@ -159,7 +152,9 @@ async def ingest_bls_dataset_endpoint(
             series_ids = get_series_for_dataset(dataset.value)
 
         return create_and_dispatch_job(
-            db, background_tasks, source="bls",
+            db,
+            background_tasks,
+            source="bls",
             config={
                 "dataset": dataset.value,
                 "start_year": start_year,
@@ -184,7 +179,7 @@ async def ingest_bls_dataset_endpoint(
 async def ingest_custom_series(
     request: BLSSeriesIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest specific BLS series by ID.
@@ -210,7 +205,9 @@ async def ingest_custom_series(
         api_key_present = settings.get_bls_api_key() is not None
 
         return create_and_dispatch_job(
-            db, background_tasks, source="bls",
+            db,
+            background_tasks,
+            source="bls",
             config={
                 "dataset": request.dataset.value,
                 "start_year": request.start_year,
@@ -235,7 +232,7 @@ async def ingest_custom_series(
 async def ingest_all_datasets(
     request: BLSAllDatasetsIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest multiple BLS datasets at once.
@@ -277,7 +274,9 @@ async def ingest_all_datasets(
             series_ids = get_series_for_dataset(dataset)
 
             result = create_and_dispatch_job(
-                db, background_tasks, source="bls",
+                db,
+                background_tasks,
+                source="bls",
                 config={
                     "dataset": dataset,
                     "start_year": start_year,
@@ -289,11 +288,13 @@ async def ingest_all_datasets(
                 message=f"BLS {dataset.upper()} ingestion job created",
             )
 
-            jobs.append({
-                "job_id": result["job_id"],
-                "dataset": dataset,
-                "series_count": len(series_ids),
-            })
+            jobs.append(
+                {
+                    "job_id": result["job_id"],
+                    "dataset": dataset,
+                    "series_count": len(series_ids),
+                }
+            )
 
         return {
             "status": "pending",
@@ -315,6 +316,7 @@ async def ingest_all_datasets(
 # =============================================================================
 # REFERENCE ENDPOINTS
 # =============================================================================
+
 
 @router.get("/reference/datasets")
 async def get_available_datasets():
@@ -398,5 +400,5 @@ async def get_quick_reference():
             "register_url": "https://data.bls.gov/registrationEngine/",
             "without_key": "25 queries/day, 10 years, 25 series per query",
             "with_key": "500 queries/day, 20 years, 50 series per query",
-        }
+        },
     }

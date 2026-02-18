@@ -19,18 +19,17 @@ from app.core.database import get_db
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(
-    prefix="/pe/people",
-    tags=["PE Intelligence - People"]
-)
+router = APIRouter(prefix="/pe/people", tags=["PE Intelligence - People"])
 
 
 # =============================================================================
 # Request/Response Models
 # =============================================================================
 
+
 class PersonCreate(BaseModel):
     """Request model for creating a person."""
+
     full_name: str = Field(..., examples=["John Smith"])
     first_name: Optional[str] = Field(None, examples=["John"])
     last_name: Optional[str] = Field(None, examples=["Smith"])
@@ -54,13 +53,14 @@ class PersonCreate(BaseModel):
 # Endpoints
 # =============================================================================
 
+
 @router.get("/")
 async def list_people(
     limit: int = Query(100, le=1000),
     offset: int = 0,
     search: Optional[str] = None,
     current_company: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     List people with filtering.
@@ -92,28 +92,26 @@ async def list_people(
 
         people = []
         for row in rows:
-            people.append({
-                "id": row[0],
-                "full_name": row[1],
-                "first_name": row[2],
-                "last_name": row[3],
-                "location": {
-                    "city": row[4],
-                    "state": row[5],
-                    "country": row[6]
-                },
-                "current_title": row[7],
-                "current_company": row[8],
-                "linkedin": row[9],
-                "is_active": row[10],
-                "created_at": row[11].isoformat() if row[11] else None
-            })
+            people.append(
+                {
+                    "id": row[0],
+                    "full_name": row[1],
+                    "first_name": row[2],
+                    "last_name": row[3],
+                    "location": {"city": row[4], "state": row[5], "country": row[6]},
+                    "current_title": row[7],
+                    "current_company": row[8],
+                    "linkedin": row[9],
+                    "is_active": row[10],
+                    "created_at": row[11].isoformat() if row[11] else None,
+                }
+            )
 
         return {
             "count": len(people),
             "limit": limit,
             "offset": offset,
-            "people": people
+            "people": people,
         }
 
     except Exception as e:
@@ -125,7 +123,7 @@ async def list_people(
 async def search_people(
     q: str = Query(..., min_length=2),
     limit: int = Query(20, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Search people by name.
@@ -141,22 +139,22 @@ async def search_people(
             LIMIT :limit
         """)
 
-        result = db.execute(query, {
-            "search": f"%{q}%",
-            "exact": f"{q}%",
-            "limit": limit
-        })
+        result = db.execute(
+            query, {"search": f"%{q}%", "exact": f"{q}%", "limit": limit}
+        )
         rows = result.fetchall()
 
         people = []
         for row in rows:
-            people.append({
-                "id": row[0],
-                "name": row[1],
-                "title": row[2],
-                "company": row[3],
-                "linkedin": row[4]
-            })
+            people.append(
+                {
+                    "id": row[0],
+                    "name": row[1],
+                    "title": row[2],
+                    "company": row[3],
+                    "linkedin": row[4],
+                }
+            )
 
         return {"count": len(people), "results": people}
 
@@ -166,10 +164,7 @@ async def search_people(
 
 
 @router.post("/")
-async def create_person(
-    person: PersonCreate,
-    db: Session = Depends(get_db)
-):
+async def create_person(person: PersonCreate, db: Session = Depends(get_db)):
     """
     Create a person record.
     """
@@ -199,7 +194,7 @@ async def create_person(
             "id": row[0],
             "name": row[1],
             "created_at": row[2].isoformat() if row[2] else None,
-            "message": "Person created successfully"
+            "message": "Person created successfully",
         }
 
     except Exception as e:
@@ -209,10 +204,7 @@ async def create_person(
 
 
 @router.get("/{person_id}")
-async def get_person(
-    person_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_person(person_id: int, db: Session = Depends(get_db)):
     """
     Get detailed information for a person.
     """
@@ -254,7 +246,7 @@ async def get_person(
                 "field": e[4],
                 "start_year": e[5],
                 "graduation_year": e[6],
-                "honors": e[7]
+                "honors": e[7],
             }
             for e in edu_result.fetchall()
         ]
@@ -282,7 +274,7 @@ async def get_person(
                 "end_date": e[6].isoformat() if e[6] else None,
                 "is_current": e[7],
                 "description": e[8],
-                "location": e[9]
+                "location": e[9],
             }
             for e in exp_result.fetchall()
         ]
@@ -308,7 +300,7 @@ async def get_person(
                 "department": f[5],
                 "start_date": f[6].isoformat() if f[6] else None,
                 "end_date": f[7].isoformat() if f[7] else None,
-                "is_current": f[8]
+                "is_current": f[8],
             }
             for f in firm_result.fetchall()
         ]
@@ -320,39 +312,25 @@ async def get_person(
                 "first": row[2],
                 "last": row[3],
                 "middle": row[4],
-                "suffix": row[5]
+                "suffix": row[5],
             },
-            "contact": {
-                "email": row[6],
-                "phone": row[7]
-            },
-            "location": {
-                "city": row[8],
-                "state": row[9],
-                "country": row[10]
-            },
-            "current_position": {
-                "title": row[11],
-                "company": row[12]
-            },
+            "contact": {"email": row[6], "phone": row[7]},
+            "location": {"city": row[8], "state": row[9], "country": row[10]},
+            "current_position": {"title": row[11], "company": row[12]},
             "bio": row[13],
-            "social": {
-                "linkedin": row[14],
-                "twitter": row[15],
-                "website": row[16]
-            },
+            "social": {"linkedin": row[14], "twitter": row[15], "website": row[16]},
             "is_active": row[17],
             "data_quality": {
                 "sources": row[18],
-                "last_verified": row[19].isoformat() if row[19] else None
+                "last_verified": row[19].isoformat() if row[19] else None,
             },
             "metadata": {
                 "created_at": row[20].isoformat() if row[20] else None,
-                "updated_at": row[21].isoformat() if row[21] else None
+                "updated_at": row[21].isoformat() if row[21] else None,
             },
             "education": education,
             "experience": experience,
-            "firm_affiliations": firm_affiliations
+            "firm_affiliations": firm_affiliations,
         }
 
     except HTTPException:
@@ -363,10 +341,7 @@ async def get_person(
 
 
 @router.get("/{person_id}/education")
-async def get_person_education(
-    person_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_person_education(person_id: int, db: Session = Depends(get_db)):
     """
     Get education history for a person.
     """
@@ -384,25 +359,20 @@ async def get_person_education(
 
         education = []
         for row in rows:
-            education.append({
-                "id": row[0],
-                "institution": row[1],
-                "type": row[2],
-                "degree": row[3],
-                "field_of_study": row[4],
-                "years": {
-                    "start": row[5],
-                    "graduation": row[6]
-                },
-                "honors": row[7],
-                "activities": row[8]
-            })
+            education.append(
+                {
+                    "id": row[0],
+                    "institution": row[1],
+                    "type": row[2],
+                    "degree": row[3],
+                    "field_of_study": row[4],
+                    "years": {"start": row[5], "graduation": row[6]},
+                    "honors": row[7],
+                    "activities": row[8],
+                }
+            )
 
-        return {
-            "person_id": person_id,
-            "count": len(education),
-            "education": education
-        }
+        return {"person_id": person_id, "count": len(education), "education": education}
 
     except Exception as e:
         logger.error(f"Error fetching education: {e}", exc_info=True)
@@ -410,10 +380,7 @@ async def get_person_education(
 
 
 @router.get("/{person_id}/experience")
-async def get_person_experience(
-    person_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_person_experience(person_id: int, db: Session = Depends(get_db)):
     """
     Get work experience for a person.
     """
@@ -434,25 +401,27 @@ async def get_person_experience(
 
         experience = []
         for row in rows:
-            experience.append({
-                "id": row[0],
-                "company": row[1],
-                "company_id": row[2],
-                "title": row[3],
-                "level": row[4],
-                "tenure": {
-                    "start_date": row[5].isoformat() if row[5] else None,
-                    "end_date": row[6].isoformat() if row[6] else None,
-                    "is_current": row[7]
-                },
-                "description": row[8],
-                "location": row[9]
-            })
+            experience.append(
+                {
+                    "id": row[0],
+                    "company": row[1],
+                    "company_id": row[2],
+                    "title": row[3],
+                    "level": row[4],
+                    "tenure": {
+                        "start_date": row[5].isoformat() if row[5] else None,
+                        "end_date": row[6].isoformat() if row[6] else None,
+                        "is_current": row[7],
+                    },
+                    "description": row[8],
+                    "location": row[9],
+                }
+            )
 
         return {
             "person_id": person_id,
             "count": len(experience),
-            "experience": experience
+            "experience": experience,
         }
 
     except Exception as e:
@@ -461,10 +430,7 @@ async def get_person_experience(
 
 
 @router.get("/{person_id}/deals")
-async def get_person_deals(
-    person_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_person_deals(person_id: int, db: Session = Depends(get_db)):
     """
     Get deals a person was involved in.
     """
@@ -489,32 +455,23 @@ async def get_person_deals(
 
         deals = []
         for row in rows:
-            deals.append({
-                "id": row[0],
-                "deal_id": row[1],
-                "deal_name": row[2],
-                "deal_type": row[3],
-                "company": {
-                    "name": row[4],
-                    "id": row[5]
-                },
-                "dates": {
-                    "announced": row[6].isoformat() if row[6] else None,
-                    "closed": row[7].isoformat() if row[7] else None
-                },
-                "enterprise_value_usd": float(row[8]) if row[8] else None,
-                "involvement": {
-                    "role": row[9],
-                    "side": row[10],
-                    "firm": row[11]
+            deals.append(
+                {
+                    "id": row[0],
+                    "deal_id": row[1],
+                    "deal_name": row[2],
+                    "deal_type": row[3],
+                    "company": {"name": row[4], "id": row[5]},
+                    "dates": {
+                        "announced": row[6].isoformat() if row[6] else None,
+                        "closed": row[7].isoformat() if row[7] else None,
+                    },
+                    "enterprise_value_usd": float(row[8]) if row[8] else None,
+                    "involvement": {"role": row[9], "side": row[10], "firm": row[11]},
                 }
-            })
+            )
 
-        return {
-            "person_id": person_id,
-            "count": len(deals),
-            "deals": deals
-        }
+        return {"person_id": person_id, "count": len(deals), "deals": deals}
 
     except Exception as e:
         logger.error(f"Error fetching deals: {e}", exc_info=True)

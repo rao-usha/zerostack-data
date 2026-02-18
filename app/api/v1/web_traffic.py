@@ -33,7 +33,9 @@ def get_domain_traffic(domain: str):
             result = client.get_domain_traffic(domain)
             return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching traffic data: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching traffic data: {str(e)}"
+        )
 
 
 @router.get("/domain/{domain}/history")
@@ -55,12 +57,16 @@ def get_traffic_history(
             result = client.get_traffic_history(domain, months=months)
             return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching traffic history: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching traffic history: {str(e)}"
+        )
 
 
 @router.get("/compare")
 def compare_domains(
-    domains: List[str] = Query(..., min_length=2, max_length=10, description="Domains to compare"),
+    domains: List[str] = Query(
+        ..., min_length=2, max_length=10, description="Domains to compare"
+    ),
 ):
     """
     Compare traffic across multiple domains.
@@ -72,14 +78,18 @@ def compare_domains(
     Example: `/compare?domains=stripe.com&domains=square.com&domains=paypal.com`
     """
     if len(domains) < 2:
-        raise HTTPException(status_code=400, detail="At least 2 domains required for comparison")
+        raise HTTPException(
+            status_code=400, detail="At least 2 domains required for comparison"
+        )
 
     try:
         with get_client() as client:
             result = client.compare_domains(domains)
             return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error comparing domains: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error comparing domains: {str(e)}"
+        )
 
 
 @router.get("/rankings")
@@ -103,12 +113,16 @@ def get_rankings(
             result = client.get_rankings(limit=limit, offset=offset)
             return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching rankings: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching rankings: {str(e)}"
+        )
 
 
 @router.get("/search")
 def search_domains(
-    keyword: str = Query(..., min_length=2, description="Keyword to search for in domain names"),
+    keyword: str = Query(
+        ..., min_length=2, description="Keyword to search for in domain names"
+    ),
     limit: int = Query(50, ge=1, le=200, description="Maximum results to return"),
 ):
     """
@@ -126,7 +140,9 @@ def search_domains(
             result = client.search_domains(keyword=keyword, limit=limit)
             return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error searching domains: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error searching domains: {str(e)}"
+        )
 
 
 @router.get("/providers")
@@ -147,4 +163,6 @@ def list_providers():
                 "count": len(providers),
             }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing providers: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error listing providers: {str(e)}"
+        )

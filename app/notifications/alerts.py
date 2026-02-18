@@ -9,6 +9,7 @@ Features:
 - Alert lifecycle: pending -> delivered -> acknowledged/expired
 - Snapshot management: stores portfolio state for comparison
 """
+
 import json
 import logging
 from datetime import datetime, timedelta
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 class ChangeType(str, Enum):
     """Types of portfolio changes that can trigger alerts."""
+
     NEW_HOLDING = "new_holding"
     REMOVED_HOLDING = "removed_holding"
     VALUE_CHANGE = "value_change"
@@ -32,6 +34,7 @@ class ChangeType(str, Enum):
 
 class AlertStatus(str, Enum):
     """Alert lifecycle status."""
+
     PENDING = "pending"
     DELIVERED = "delivered"
     ACKNOWLEDGED = "acknowledged"
@@ -41,6 +44,7 @@ class AlertStatus(str, Enum):
 @dataclass
 class PortfolioChange:
     """Represents a detected change in portfolio."""
+
     change_type: ChangeType
     company_name: str
     details: Dict[str, Any]
@@ -168,7 +172,7 @@ class AlertEngine:
         investor_type: str,
         old_snapshot: List[Dict],
         new_snapshot: List[Dict],
-        value_threshold_pct: float = 10.0
+        value_threshold_pct: float = 10.0,
     ) -> List[PortfolioChange]:
         """
         Detect changes between two portfolio snapshots.
@@ -197,29 +201,33 @@ class AlertEngine:
             if not name:
                 continue
             holding = new_by_name[name]
-            changes.append(PortfolioChange(
-                change_type=ChangeType.NEW_HOLDING,
-                company_name=holding.get("company_name", name),
-                details={
-                    "market_value_usd": holding.get("market_value_usd"),
-                    "shares_held": holding.get("shares_held"),
-                    "source_type": holding.get("source_type"),
-                }
-            ))
+            changes.append(
+                PortfolioChange(
+                    change_type=ChangeType.NEW_HOLDING,
+                    company_name=holding.get("company_name", name),
+                    details={
+                        "market_value_usd": holding.get("market_value_usd"),
+                        "shares_held": holding.get("shares_held"),
+                        "source_type": holding.get("source_type"),
+                    },
+                )
+            )
 
         # Detect removed holdings
         for name in old_names - new_names:
             if not name:
                 continue
             holding = old_by_name[name]
-            changes.append(PortfolioChange(
-                change_type=ChangeType.REMOVED_HOLDING,
-                company_name=holding.get("company_name", name),
-                details={
-                    "last_market_value_usd": holding.get("market_value_usd"),
-                    "last_shares_held": holding.get("shares_held"),
-                }
-            ))
+            changes.append(
+                PortfolioChange(
+                    change_type=ChangeType.REMOVED_HOLDING,
+                    company_name=holding.get("company_name", name),
+                    details={
+                        "last_market_value_usd": holding.get("market_value_usd"),
+                        "last_shares_held": holding.get("shares_held"),
+                    },
+                )
+            )
 
         # Detect value/share changes for existing holdings
         for name in old_names & new_names:
@@ -235,15 +243,17 @@ class AlertEngine:
             if old_value > 0 and new_value > 0:
                 value_change_pct = ((new_value - old_value) / old_value) * 100
                 if abs(value_change_pct) >= value_threshold_pct:
-                    changes.append(PortfolioChange(
-                        change_type=ChangeType.VALUE_CHANGE,
-                        company_name=new_h.get("company_name", name),
-                        details={
-                            "old_value": old_value,
-                            "new_value": new_value,
-                            "change_pct": round(value_change_pct, 2),
-                        }
-                    ))
+                    changes.append(
+                        PortfolioChange(
+                            change_type=ChangeType.VALUE_CHANGE,
+                            company_name=new_h.get("company_name", name),
+                            details={
+                                "old_value": old_value,
+                                "new_value": new_value,
+                                "change_pct": round(value_change_pct, 2),
+                            },
+                        )
+                    )
 
             # Shares change
             old_shares = old_h.get("shares_held") or 0
@@ -252,23 +262,25 @@ class AlertEngine:
             if old_shares > 0 and new_shares > 0:
                 shares_change_pct = ((new_shares - old_shares) / old_shares) * 100
                 if abs(shares_change_pct) >= value_threshold_pct:
-                    changes.append(PortfolioChange(
-                        change_type=ChangeType.SHARES_CHANGE,
-                        company_name=new_h.get("company_name", name),
-                        details={
-                            "old_shares": old_shares,
-                            "new_shares": new_shares,
-                            "change_pct": round(shares_change_pct, 2),
-                        }
-                    ))
+                    changes.append(
+                        PortfolioChange(
+                            change_type=ChangeType.SHARES_CHANGE,
+                            company_name=new_h.get("company_name", name),
+                            details={
+                                "old_shares": old_shares,
+                                "new_shares": new_shares,
+                                "change_pct": round(shares_change_pct, 2),
+                            },
+                        )
+                    )
 
-        logger.info(f"Detected {len(changes)} changes for {investor_type} {investor_id}")
+        logger.info(
+            f"Detected {len(changes)} changes for {investor_type} {investor_id}"
+        )
         return changes
 
     async def get_subscriptions_for_investor(
-        self,
-        investor_id: int,
-        investor_type: str
+        self, investor_id: int, investor_type: str
     ) -> List[Dict]:
         """Get all active subscriptions for an investor."""
         await self.initialize()
@@ -281,16 +293,20 @@ class AlertEngine:
                     AND investor_type = :investor_type
                     AND is_active = TRUE
             """),
-            {"investor_id": investor_id, "investor_type": investor_type}
+            {"investor_id": investor_id, "investor_type": investor_type},
         ).fetchall()
 
         return [
             {
                 "id": row[0],
                 "user_id": row[1],
-                "change_types": row[2] if isinstance(row[2], list) else json.loads(row[2] or "[]"),
+                "change_types": row[2]
+                if isinstance(row[2], list)
+                else json.loads(row[2] or "[]"),
                 "value_threshold_pct": row[3],
-                "delivery_channels": row[4] if isinstance(row[4], list) else json.loads(row[4] or "[]"),
+                "delivery_channels": row[4]
+                if isinstance(row[4], list)
+                else json.loads(row[4] or "[]"),
             }
             for row in result
         ]
@@ -300,7 +316,7 @@ class AlertEngine:
         investor_id: int,
         investor_type: str,
         investor_name: str,
-        changes: List[PortfolioChange]
+        changes: List[PortfolioChange],
     ) -> List[int]:
         """
         Create alerts for detected changes, matched to subscriptions.
@@ -313,7 +329,9 @@ class AlertEngine:
         await self.initialize()
 
         # Get subscriptions for this investor
-        subscriptions = await self.get_subscriptions_for_investor(investor_id, investor_type)
+        subscriptions = await self.get_subscriptions_for_investor(
+            investor_id, investor_type
+        )
 
         if not subscriptions:
             logger.debug(f"No subscriptions for {investor_type} {investor_id}")
@@ -330,7 +348,10 @@ class AlertEngine:
                     continue
 
                 # For value/share changes, check threshold
-                if change.change_type in (ChangeType.VALUE_CHANGE, ChangeType.SHARES_CHANGE):
+                if change.change_type in (
+                    ChangeType.VALUE_CHANGE,
+                    ChangeType.SHARES_CHANGE,
+                ):
                     change_pct = abs(change.details.get("change_pct", 0))
                     if change_pct < sub["value_threshold_pct"]:
                         continue
@@ -356,13 +377,15 @@ class AlertEngine:
                         "company_name": change.company_name,
                         "summary": change.summary,
                         "details": json.dumps(change.details),
-                    }
+                    },
                 )
                 alert_id = result.fetchone()[0]
                 alert_ids.append(alert_id)
 
         self.db.commit()
-        logger.info(f"Created {len(alert_ids)} alerts for {investor_type} {investor_id}")
+        logger.info(
+            f"Created {len(alert_ids)} alerts for {investor_type} {investor_id}"
+        )
         return alert_ids
 
     async def create_subscription(
@@ -372,7 +395,7 @@ class AlertEngine:
         user_id: str,
         change_types: Optional[List[str]] = None,
         value_threshold_pct: float = 10.0,
-        delivery_channels: Optional[List[str]] = None
+        delivery_channels: Optional[List[str]] = None,
     ) -> Dict:
         """Create or update an alert subscription."""
         await self.initialize()
@@ -408,7 +431,7 @@ class AlertEngine:
                 "change_types": json.dumps(change_types),
                 "value_threshold_pct": value_threshold_pct,
                 "delivery_channels": json.dumps(delivery_channels),
-            }
+            },
         )
         row = result.fetchone()
         self.db.commit()
@@ -427,9 +450,7 @@ class AlertEngine:
         }
 
     async def get_user_subscriptions(
-        self,
-        user_id: str,
-        include_inactive: bool = False
+        self, user_id: str, include_inactive: bool = False
     ) -> List[Dict]:
         """Get all subscriptions for a user."""
         await self.initialize()
@@ -462,9 +483,13 @@ class AlertEngine:
                 "investor_id": row[1],
                 "investor_type": row[2],
                 "user_id": row[3],
-                "change_types": row[4] if isinstance(row[4], list) else json.loads(row[4] or "[]"),
+                "change_types": row[4]
+                if isinstance(row[4], list)
+                else json.loads(row[4] or "[]"),
                 "value_threshold_pct": row[5],
-                "delivery_channels": row[6] if isinstance(row[6], list) else json.loads(row[6] or "[]"),
+                "delivery_channels": row[6]
+                if isinstance(row[6], list)
+                else json.loads(row[6] or "[]"),
                 "is_active": row[7],
                 "created_at": row[8].isoformat() if row[8] else None,
                 "updated_at": row[9].isoformat() if row[9] else None,
@@ -483,7 +508,7 @@ class AlertEngine:
                 SET is_active = FALSE, updated_at = NOW()
                 WHERE id = :id AND user_id = :user_id
             """),
-            {"id": subscription_id, "user_id": user_id}
+            {"id": subscription_id, "user_id": user_id},
         )
         self.db.commit()
         return result.rowcount > 0
@@ -494,7 +519,7 @@ class AlertEngine:
         user_id: str,
         change_types: Optional[List[str]] = None,
         value_threshold_pct: Optional[float] = None,
-        is_active: Optional[bool] = None
+        is_active: Optional[bool] = None,
     ) -> Optional[Dict]:
         """Update subscription settings."""
         await self.initialize()
@@ -527,7 +552,7 @@ class AlertEngine:
                 RETURNING id, investor_id, investor_type, change_types,
                           value_threshold_pct, is_active, updated_at
             """),
-            params
+            params,
         )
         row = result.fetchone()
         self.db.commit()
@@ -539,17 +564,16 @@ class AlertEngine:
             "id": row[0],
             "investor_id": row[1],
             "investor_type": row[2],
-            "change_types": row[3] if isinstance(row[3], list) else json.loads(row[3] or "[]"),
+            "change_types": row[3]
+            if isinstance(row[3], list)
+            else json.loads(row[3] or "[]"),
             "value_threshold_pct": row[4],
             "is_active": row[5],
             "updated_at": row[6].isoformat() if row[6] else None,
         }
 
     async def get_pending_alerts(
-        self,
-        user_id: str,
-        limit: int = 50,
-        offset: int = 0
+        self, user_id: str, limit: int = 50, offset: int = 0
     ) -> Tuple[List[Dict], int]:
         """Get pending alerts for a user."""
         await self.initialize()
@@ -567,7 +591,7 @@ class AlertEngine:
                 ORDER BY a.created_at DESC
                 LIMIT :limit OFFSET :offset
             """),
-            {"user_id": user_id, "limit": limit, "offset": offset}
+            {"user_id": user_id, "limit": limit, "offset": offset},
         ).fetchall()
 
         alerts = [
@@ -579,7 +603,9 @@ class AlertEngine:
                 "change_type": row[4],
                 "company_name": row[5],
                 "summary": row[6],
-                "details": row[7] if isinstance(row[7], dict) else json.loads(row[7] or "{}"),
+                "details": row[7]
+                if isinstance(row[7], dict)
+                else json.loads(row[7] or "{}"),
                 "status": row[8],
                 "created_at": row[9].isoformat() if row[9] else None,
             }
@@ -594,7 +620,7 @@ class AlertEngine:
                 JOIN alert_subscriptions s ON a.subscription_id = s.id
                 WHERE s.user_id = :user_id AND a.status = 'pending'
             """),
-            {"user_id": user_id}
+            {"user_id": user_id},
         ).fetchone()
 
         return alerts, count_result[0]
@@ -605,7 +631,7 @@ class AlertEngine:
         limit: int = 100,
         offset: int = 0,
         investor_id: Optional[int] = None,
-        investor_type: Optional[str] = None
+        investor_type: Optional[str] = None,
     ) -> Tuple[List[Dict], int]:
         """Get alert history for a user."""
         await self.initialize()
@@ -642,7 +668,9 @@ class AlertEngine:
                 "change_type": row[4],
                 "company_name": row[5],
                 "summary": row[6],
-                "details": row[7] if isinstance(row[7], dict) else json.loads(row[7] or "{}"),
+                "details": row[7]
+                if isinstance(row[7], dict)
+                else json.loads(row[7] or "{}"),
                 "status": row[8],
                 "created_at": row[9].isoformat() if row[9] else None,
                 "acknowledged_at": row[10].isoformat() if row[10] else None,
@@ -685,7 +713,7 @@ class AlertEngine:
                     AND s.user_id = :user_id
                     AND a.status = 'pending'
             """),
-            {"alert_id": alert_id, "user_id": user_id}
+            {"alert_id": alert_id, "user_id": user_id},
         )
         self.db.commit()
         return result.rowcount > 0
@@ -703,24 +731,18 @@ class AlertEngine:
                     AND s.user_id = :user_id
                     AND a.status = 'pending'
             """),
-            {"user_id": user_id}
+            {"user_id": user_id},
         )
         self.db.commit()
         return result.rowcount
 
     async def save_snapshot(
-        self,
-        investor_id: int,
-        investor_type: str,
-        portfolio_data: List[Dict]
+        self, investor_id: int, investor_type: str, portfolio_data: List[Dict]
     ) -> int:
         """Save a portfolio snapshot for change detection."""
         await self.initialize()
 
-        total_value = sum(
-            h.get("market_value_usd", 0) or 0
-            for h in portfolio_data
-        )
+        total_value = sum(h.get("market_value_usd", 0) or 0 for h in portfolio_data)
 
         result = self.db.execute(
             text("""
@@ -739,16 +761,14 @@ class AlertEngine:
                 "snapshot_data": json.dumps(portfolio_data),
                 "company_count": len(portfolio_data),
                 "total_value_usd": total_value,
-            }
+            },
         )
         snapshot_id = result.fetchone()[0]
         self.db.commit()
         return snapshot_id
 
     async def get_latest_snapshot(
-        self,
-        investor_id: int,
-        investor_type: str
+        self, investor_id: int, investor_type: str
     ) -> Optional[List[Dict]]:
         """Get the most recent snapshot for an investor."""
         await self.initialize()
@@ -761,7 +781,7 @@ class AlertEngine:
                 ORDER BY snapshot_date DESC
                 LIMIT 1
             """),
-            {"investor_id": investor_id, "investor_type": investor_type}
+            {"investor_id": investor_id, "investor_type": investor_type},
         ).fetchone()
 
         if not result:
@@ -784,7 +804,7 @@ class AlertEngine:
                 SET status = 'expired'
                 WHERE status = 'pending' AND created_at < :cutoff
             """),
-            {"cutoff": cutoff}
+            {"cutoff": cutoff},
         )
         self.db.commit()
         return result.rowcount

@@ -16,7 +16,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import RailLine
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -24,16 +28,56 @@ logger = logging.getLogger(__name__)
 
 # State FIPS for filtering
 STATE_FIPS = {
-    "AL": "01", "AK": "02", "AZ": "04", "AR": "05", "CA": "06",
-    "CO": "08", "CT": "09", "DE": "10", "DC": "11", "FL": "12",
-    "GA": "13", "HI": "15", "ID": "16", "IL": "17", "IN": "18",
-    "IA": "19", "KS": "20", "KY": "21", "LA": "22", "ME": "23",
-    "MD": "24", "MA": "25", "MI": "26", "MN": "27", "MS": "28",
-    "MO": "29", "MT": "30", "NE": "31", "NV": "32", "NH": "33",
-    "NJ": "34", "NM": "35", "NY": "36", "NC": "37", "ND": "38",
-    "OH": "39", "OK": "40", "OR": "41", "PA": "42", "RI": "44",
-    "SC": "45", "SD": "46", "TN": "47", "TX": "48", "UT": "49",
-    "VT": "50", "VA": "51", "WA": "53", "WV": "54", "WI": "55",
+    "AL": "01",
+    "AK": "02",
+    "AZ": "04",
+    "AR": "05",
+    "CA": "06",
+    "CO": "08",
+    "CT": "09",
+    "DE": "10",
+    "DC": "11",
+    "FL": "12",
+    "GA": "13",
+    "HI": "15",
+    "ID": "16",
+    "IL": "17",
+    "IN": "18",
+    "IA": "19",
+    "KS": "20",
+    "KY": "21",
+    "LA": "22",
+    "ME": "23",
+    "MD": "24",
+    "MA": "25",
+    "MI": "26",
+    "MN": "27",
+    "MS": "28",
+    "MO": "29",
+    "MT": "30",
+    "NE": "31",
+    "NV": "32",
+    "NH": "33",
+    "NJ": "34",
+    "NM": "35",
+    "NY": "36",
+    "NC": "37",
+    "ND": "38",
+    "OH": "39",
+    "OK": "40",
+    "OR": "41",
+    "PA": "42",
+    "RI": "44",
+    "SC": "45",
+    "SD": "46",
+    "TN": "47",
+    "TX": "48",
+    "UT": "49",
+    "VT": "50",
+    "VA": "51",
+    "WA": "53",
+    "WV": "54",
+    "WI": "55",
     "WY": "56",
 }
 
@@ -101,14 +145,22 @@ class FRARailCollector(BaseCollector):
                 all_records,
                 unique_columns=["fra_line_id"],
                 update_columns=[
-                    "railroad", "track_type", "track_class",
-                    "max_speed_mph", "annual_tonnage_million",
-                    "state", "county", "geometry_geojson", "collected_at",
+                    "railroad",
+                    "track_type",
+                    "track_class",
+                    "max_speed_mph",
+                    "annual_tonnage_million",
+                    "state",
+                    "county",
+                    "geometry_geojson",
+                    "collected_at",
                 ],
             )
 
         result = self.create_result(
-            status=CollectionStatus.SUCCESS if inserted > 0 else CollectionStatus.PARTIAL,
+            status=CollectionStatus.SUCCESS
+            if inserted > 0
+            else CollectionStatus.PARTIAL,
             total=len(all_records),
             processed=len(all_records),
             inserted=inserted,
@@ -148,16 +200,32 @@ class FRARailCollector(BaseCollector):
                 geom = feature.get("geometry")
 
                 # Build unique ID from railroad + segment (lowercase field names in new API)
-                rrowner = attrs.get("rrowner1") or attrs.get("RROWNER1") or attrs.get("RROWNER") or ""
-                objectid = attrs.get("objectid") or attrs.get("OBJECTID") or attrs.get("FID") or ""
-                fra_id = f"{rrowner}_{state}_{objectid}" if rrowner else f"NTAD_{state}_{objectid}"
+                rrowner = (
+                    attrs.get("rrowner1")
+                    or attrs.get("RROWNER1")
+                    or attrs.get("RROWNER")
+                    or ""
+                )
+                objectid = (
+                    attrs.get("objectid")
+                    or attrs.get("OBJECTID")
+                    or attrs.get("FID")
+                    or ""
+                )
+                fra_id = (
+                    f"{rrowner}_{state}_{objectid}"
+                    if rrowner
+                    else f"NTAD_{state}_{objectid}"
+                )
 
                 record = {
                     "fra_line_id": fra_id[:50],
                     "railroad": (rrowner or "")[:100],
                     "track_type": self._classify_track(attrs),
                     "track_class": self._safe_int(
-                        attrs.get("tracks") or attrs.get("TRACKS") or attrs.get("TRKCLASS")
+                        attrs.get("tracks")
+                        or attrs.get("TRACKS")
+                        or attrs.get("TRKCLASS")
                     ),
                     "max_speed_mph": None,
                     "annual_tonnage_million": None,

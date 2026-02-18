@@ -1,4 +1,5 @@
 """PE collection executor for the worker queue."""
+
 import logging
 
 from sqlalchemy.orm import Session
@@ -32,12 +33,16 @@ async def execute(job: JobQueue, db: Session):
     try:
         orchestrator = PECollectionOrchestrator(db_session=work_db)
 
-        send_job_event(db, "job_progress", {
-            "job_id": job.id,
-            "job_type": "pe",
-            "progress_pct": 10.0,
-            "progress_message": "Running PE collection",
-        })
+        send_job_event(
+            db,
+            "job_progress",
+            {
+                "job_id": job.id,
+                "job_type": "pe",
+                "progress_pct": 10.0,
+                "progress_message": "Running PE collection",
+            },
+        )
         db.commit()
 
         results = await orchestrator.run_collection(config)

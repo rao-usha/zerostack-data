@@ -19,6 +19,7 @@ Rate limits:
 
 API key signup: https://patentsview-support.atlassian.net/servicedesk/customer/portal/1
 """
+
 import logging
 import json
 from typing import Dict, List, Optional, Any
@@ -45,7 +46,7 @@ class USPTOClient(BaseAPIClient):
         api_key: Optional[str] = None,
         max_concurrency: int = 2,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize PatentsView API client.
@@ -65,7 +66,7 @@ class USPTOClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=config.timeout_seconds,
             connect_timeout=config.connect_timeout_seconds,
-            rate_limit_interval=config.get_rate_limit_interval()
+            rate_limit_interval=config.get_rate_limit_interval(),
         )
 
         if not api_key:
@@ -76,18 +77,13 @@ class USPTOClient(BaseAPIClient):
 
     def _build_headers(self) -> Dict[str, str]:
         """Build request headers with API key."""
-        headers = {
-            "Accept": "application/json",
-            "User-Agent": "Nexdata/uspto-client"
-        }
+        headers = {"Accept": "application/json", "User-Agent": "Nexdata/uspto-client"}
         if self.api_key:
             headers["X-Api-Key"] = self.api_key
         return headers
 
     def _check_api_error(
-        self,
-        data: Dict[str, Any],
-        resource_id: str
+        self, data: Dict[str, Any], resource_id: str
     ) -> Optional[Exception]:
         """Check for PatentsView-specific API errors."""
         # PatentsView returns {"error": true, "message": "..."} on errors
@@ -97,7 +93,7 @@ class USPTOClient(BaseAPIClient):
             return FatalError(
                 message=f"PatentsView API error: {error_message}",
                 source=self.SOURCE_NAME,
-                response_data=data
+                response_data=data,
             )
         return None
 
@@ -105,7 +101,7 @@ class USPTOClient(BaseAPIClient):
         self,
         filters: Optional[Dict[str, Any]] = None,
         text_search: Optional[str] = None,
-        text_fields: Optional[List[str]] = None
+        text_fields: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Build PatentsView query object.
@@ -145,7 +141,7 @@ class USPTOClient(BaseAPIClient):
         fields: Optional[List[str]] = None,
         sort: Optional[List[Dict[str, str]]] = None,
         size: int = 100,
-        after: Optional[str] = None
+        after: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Search patents using PatentsView API.
@@ -176,16 +172,10 @@ class USPTOClient(BaseAPIClient):
             options["after"] = after
         params["o"] = json.dumps(options)
 
-        return await self.get(
-            "patent/",
-            params=params,
-            resource_id="patent_search"
-        )
+        return await self.get("patent/", params=params, resource_id="patent_search")
 
     async def get_patent(
-        self,
-        patent_id: str,
-        fields: Optional[List[str]] = None
+        self, patent_id: str, fields: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Get a single patent by ID.
@@ -204,9 +194,7 @@ class USPTOClient(BaseAPIClient):
             params["f"] = json.dumps(fields)
 
         return await self.get(
-            "patent/",
-            params=params,
-            resource_id=f"patent:{patent_id}"
+            "patent/", params=params, resource_id=f"patent:{patent_id}"
         )
 
     async def search_inventors(
@@ -214,7 +202,7 @@ class USPTOClient(BaseAPIClient):
         query: Optional[Dict[str, Any]] = None,
         fields: Optional[List[str]] = None,
         size: int = 100,
-        after: Optional[str] = None
+        after: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Search inventors.
@@ -241,16 +229,10 @@ class USPTOClient(BaseAPIClient):
             options["after"] = after
         params["o"] = json.dumps(options)
 
-        return await self.get(
-            "inventor/",
-            params=params,
-            resource_id="inventor_search"
-        )
+        return await self.get("inventor/", params=params, resource_id="inventor_search")
 
     async def get_inventor(
-        self,
-        inventor_id: str,
-        fields: Optional[List[str]] = None
+        self, inventor_id: str, fields: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Get a single inventor by ID.
@@ -269,9 +251,7 @@ class USPTOClient(BaseAPIClient):
             params["f"] = json.dumps(fields)
 
         return await self.get(
-            "inventor/",
-            params=params,
-            resource_id=f"inventor:{inventor_id}"
+            "inventor/", params=params, resource_id=f"inventor:{inventor_id}"
         )
 
     async def search_assignees(
@@ -279,7 +259,7 @@ class USPTOClient(BaseAPIClient):
         query: Optional[Dict[str, Any]] = None,
         fields: Optional[List[str]] = None,
         size: int = 100,
-        after: Optional[str] = None
+        after: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Search assignees (companies/organizations).
@@ -306,16 +286,10 @@ class USPTOClient(BaseAPIClient):
             options["after"] = after
         params["o"] = json.dumps(options)
 
-        return await self.get(
-            "assignee/",
-            params=params,
-            resource_id="assignee_search"
-        )
+        return await self.get("assignee/", params=params, resource_id="assignee_search")
 
     async def get_assignee(
-        self,
-        assignee_id: str,
-        fields: Optional[List[str]] = None
+        self, assignee_id: str, fields: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         Get a single assignee by ID.
@@ -334,9 +308,7 @@ class USPTOClient(BaseAPIClient):
             params["f"] = json.dumps(fields)
 
         return await self.get(
-            "assignee/",
-            params=params,
-            resource_id=f"assignee:{assignee_id}"
+            "assignee/", params=params, resource_id=f"assignee:{assignee_id}"
         )
 
     async def search_patents_by_assignee(
@@ -345,7 +317,7 @@ class USPTOClient(BaseAPIClient):
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
         size: int = 100,
-        after: Optional[str] = None
+        after: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Search patents by assignee name.
@@ -360,9 +332,7 @@ class USPTOClient(BaseAPIClient):
         Returns:
             Dict containing patents
         """
-        conditions = [
-            {"assignees.assignee_organization": {"_text_any": assignee_name}}
-        ]
+        conditions = [{"assignees.assignee_organization": {"_text_any": assignee_name}}]
 
         if date_from:
             conditions.append({"patent_date": {"_gte": date_from}})
@@ -371,11 +341,7 @@ class USPTOClient(BaseAPIClient):
 
         query = {"_and": conditions} if len(conditions) > 1 else conditions[0]
 
-        return await self.search_patents(
-            query=query,
-            size=size,
-            after=after
-        )
+        return await self.search_patents(query=query, size=size, after=after)
 
     async def search_patents_by_cpc(
         self,
@@ -383,7 +349,7 @@ class USPTOClient(BaseAPIClient):
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
         size: int = 100,
-        after: Optional[str] = None
+        after: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Search patents by CPC classification code.
@@ -398,9 +364,7 @@ class USPTOClient(BaseAPIClient):
         Returns:
             Dict containing patents
         """
-        conditions = [
-            {"cpc_current.cpc_group_id": {"_begins": cpc_code}}
-        ]
+        conditions = [{"cpc_current.cpc_group_id": {"_begins": cpc_code}}]
 
         if date_from:
             conditions.append({"patent_date": {"_gte": date_from}})
@@ -409,16 +373,10 @@ class USPTOClient(BaseAPIClient):
 
         query = {"_and": conditions} if len(conditions) > 1 else conditions[0]
 
-        return await self.search_patents(
-            query=query,
-            size=size,
-            after=after
-        )
+        return await self.search_patents(query=query, size=size, after=after)
 
     async def get_patent_citations(
-        self,
-        patent_id: str,
-        size: int = 100
+        self, patent_id: str, size: int = 100
     ) -> Dict[str, Any]:
         """
         Get citations for a patent.
@@ -431,15 +389,12 @@ class USPTOClient(BaseAPIClient):
             Dict containing citation data
         """
         query = {"patent_id": patent_id}
-        params = {
-            "q": json.dumps(query),
-            "o": json.dumps({"size": min(size, 1000)})
-        }
+        params = {"q": json.dumps(query), "o": json.dumps({"size": min(size, 1000)})}
 
         return await self.get(
             "patent/us_patent_citation/",
             params=params,
-            resource_id=f"citations:{patent_id}"
+            resource_id=f"citations:{patent_id}",
         )
 
 

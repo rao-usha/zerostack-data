@@ -12,20 +12,22 @@ from enum import Enum
 
 class EmailPattern(Enum):
     """Common corporate email patterns."""
-    FIRST_LAST = "first.last"           # john.smith@company.com
-    FIRST_L = "first.l"                 # john.s@company.com
-    F_LAST = "f.last"                   # j.smith@company.com
-    FIRST = "first"                     # john@company.com
-    LAST = "last"                       # smith@company.com
-    FIRST_LAST_NO_DOT = "firstlast"     # johnsmith@company.com
-    LAST_FIRST = "last.first"           # smith.john@company.com
-    FIRST_INITIAL = "first_l"           # john_s@company.com
-    F_LAST_NO_DOT = "flast"             # jsmith@company.com
+
+    FIRST_LAST = "first.last"  # john.smith@company.com
+    FIRST_L = "first.l"  # john.s@company.com
+    F_LAST = "f.last"  # j.smith@company.com
+    FIRST = "first"  # john@company.com
+    LAST = "last"  # smith@company.com
+    FIRST_LAST_NO_DOT = "firstlast"  # johnsmith@company.com
+    LAST_FIRST = "last.first"  # smith.john@company.com
+    FIRST_INITIAL = "first_l"  # john_s@company.com
+    F_LAST_NO_DOT = "flast"  # jsmith@company.com
 
 
 @dataclass
 class InferredEmail:
     """An inferred email address with confidence."""
+
     email: str
     pattern: EmailPattern
     confidence: str  # high, medium, low
@@ -79,26 +81,30 @@ class EmailInferrer:
         # If we know the pattern for this company
         if known_pattern:
             email = self._generate_email(first, last, domain, known_pattern)
-            results.append(InferredEmail(
-                email=email,
-                pattern=known_pattern,
-                confidence="high",
-                notes="Known company pattern",
-            ))
+            results.append(
+                InferredEmail(
+                    email=email,
+                    pattern=known_pattern,
+                    confidence="high",
+                    notes="Known company pattern",
+                )
+            )
         elif domain in self.KNOWN_PATTERNS:
             pattern = self.KNOWN_PATTERNS[domain]
             email = self._generate_email(first, last, domain, pattern)
-            results.append(InferredEmail(
-                email=email,
-                pattern=pattern,
-                confidence="high",
-                notes="Known company pattern",
-            ))
+            results.append(
+                InferredEmail(
+                    email=email,
+                    pattern=pattern,
+                    confidence="high",
+                    notes="Known company pattern",
+                )
+            )
 
         # Generate candidates for common patterns
         patterns_to_try = [
-            (EmailPattern.FIRST_LAST, "medium"),      # Most common
-            (EmailPattern.F_LAST, "medium"),           # Second most common
+            (EmailPattern.FIRST_LAST, "medium"),  # Most common
+            (EmailPattern.F_LAST, "medium"),  # Second most common
             (EmailPattern.FIRST_L, "low"),
             (EmailPattern.FIRST, "low"),
             (EmailPattern.FIRST_LAST_NO_DOT, "low"),
@@ -111,11 +117,13 @@ class EmailInferrer:
                 continue
 
             email = self._generate_email(first, last, domain, pattern)
-            results.append(InferredEmail(
-                email=email,
-                pattern=pattern,
-                confidence=confidence,
-            ))
+            results.append(
+                InferredEmail(
+                    email=email,
+                    pattern=pattern,
+                    confidence=confidence,
+                )
+            )
 
         return results
 
@@ -126,9 +134,9 @@ class EmailInferrer:
         # Remove accents and special characters
         name = name.lower().strip()
         # Remove common suffixes
-        name = re.sub(r'\s+(jr|sr|ii|iii|iv)\.?$', '', name)
+        name = re.sub(r"\s+(jr|sr|ii|iii|iv)\.?$", "", name)
         # Keep only alphanumeric
-        name = re.sub(r'[^a-z]', '', name)
+        name = re.sub(r"[^a-z]", "", name)
         return name
 
     def _generate_email(
@@ -207,7 +215,7 @@ class EmailInferrer:
             return False
 
         # Basic email regex
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         return bool(re.match(pattern, email))
 
     def extract_domain_from_website(self, website: str) -> Optional[str]:
@@ -218,15 +226,15 @@ class EmailInferrer:
             return None
 
         # Remove protocol
-        domain = re.sub(r'^https?://', '', website.lower())
+        domain = re.sub(r"^https?://", "", website.lower())
         # Remove www
-        domain = re.sub(r'^www\.', '', domain)
+        domain = re.sub(r"^www\.", "", domain)
         # Remove path
-        domain = domain.split('/')[0]
+        domain = domain.split("/")[0]
         # Remove port
-        domain = domain.split(':')[0]
+        domain = domain.split(":")[0]
 
-        return domain if '.' in domain else None
+        return domain if "." in domain else None
 
 
 class CompanyEmailPatternLearner:
@@ -287,6 +295,7 @@ class CompanyEmailPatternLearner:
 
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).warning(
                 f"Failed to learn email pattern from DB for company {company_id}: {e}"
             )
@@ -340,17 +349,19 @@ class CompanyEmailPatternLearner:
             candidates = self.email_inferrer.infer_email(
                 first_name, last_name, company_domain, pattern
             )
-            results.append({
-                "first_name": first_name,
-                "last_name": last_name,
-                "candidates": [
-                    {
-                        "email": c.email,
-                        "pattern": c.pattern.value,
-                        "confidence": c.confidence,
-                    }
-                    for c in candidates[:3]  # Top 3 candidates
-                ],
-            })
+            results.append(
+                {
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "candidates": [
+                        {
+                            "email": c.email,
+                            "pattern": c.pattern.value,
+                            "confidence": c.confidence,
+                        }
+                        for c in candidates[:3]  # Top 3 candidates
+                    ],
+                }
+            )
 
         return results

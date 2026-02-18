@@ -7,6 +7,7 @@ Provides:
 - Optional filtering by source type, date range, etc.
 - Streaming support for large datasets
 """
+
 import csv
 import io
 import logging
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class ExportFormat(str, Enum):
     """Supported export formats."""
+
     CSV = "csv"
     EXCEL = "xlsx"
 
@@ -27,6 +29,7 @@ class ExportFormat(str, Enum):
 @dataclass
 class ExportFilter:
     """Filters for portfolio export."""
+
     source_type: Optional[str] = None
     min_confidence: Optional[float] = None
     industry: Optional[str] = None
@@ -38,6 +41,7 @@ class ExportFilter:
 @dataclass
 class PortfolioCompany:
     """Portfolio company data for export."""
+
     id: int
     company_name: str
     company_industry: Optional[str]
@@ -63,7 +67,9 @@ class PortfolioCompany:
             "Industry": self.company_industry or "",
             "Stage": self.company_stage or "",
             "Investment Type": self.investment_type or "",
-            "Investment Date": self.investment_date.isoformat() if self.investment_date else "",
+            "Investment Date": self.investment_date.isoformat()
+            if self.investment_date
+            else "",
             "Market Value (USD)": self.market_value_usd or "",
             "Shares Held": self.shares_held or "",
             "Ownership %": self.ownership_percentage or "",
@@ -72,7 +78,9 @@ class PortfolioCompany:
             "Source": self.source_type,
             "Confidence": f"{self.confidence_level:.0%}",
             "Source URL": self.source_url or "",
-            "Collected Date": self.collected_date.isoformat() if self.collected_date else "",
+            "Collected Date": self.collected_date.isoformat()
+            if self.collected_date
+            else "",
             "Description": self.company_description or "",
         }
 
@@ -212,8 +220,12 @@ class PortfolioExporter:
 
         # Define styles
         header_font = Font(bold=True, color="FFFFFF")
-        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-        header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        header_fill = PatternFill(
+            start_color="4472C4", end_color="4472C4", fill_type="solid"
+        )
+        header_alignment = Alignment(
+            horizontal="center", vertical="center", wrap_text=True
+        )
         thin_border = Border(
             left=Side(style="thin"),
             right=Side(style="thin"),
@@ -248,7 +260,9 @@ class PortfolioExporter:
 
         # Add auto-filter
         if self.companies:
-            ws.auto_filter.ref = f"A1:{get_column_letter(len(self.COLUMNS))}{len(self.companies) + 1}"
+            ws.auto_filter.ref = (
+                f"A1:{get_column_letter(len(self.COLUMNS))}{len(self.companies) + 1}"
+            )
 
     def _write_summary_sheet(self, ws) -> None:
         """Write the summary statistics sheet."""
@@ -257,17 +271,27 @@ class PortfolioExporter:
 
         title_font = Font(bold=True, size=14)
         header_font = Font(bold=True)
-        header_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+        header_fill = PatternFill(
+            start_color="E2EFDA", end_color="E2EFDA", fill_type="solid"
+        )
 
         # Title
-        ws.cell(row=1, column=1, value=f"Portfolio Summary: {self.investor_name}").font = title_font
+        ws.cell(
+            row=1, column=1, value=f"Portfolio Summary: {self.investor_name}"
+        ).font = title_font
         ws.cell(row=2, column=1, value=f"Investor Type: {self.investor_type}")
-        ws.cell(row=3, column=1, value=f"Generated: {self._export_time.strftime('%Y-%m-%d %H:%M UTC')}")
+        ws.cell(
+            row=3,
+            column=1,
+            value=f"Generated: {self._export_time.strftime('%Y-%m-%d %H:%M UTC')}",
+        )
 
         # Statistics
         total_companies = len(self.companies)
         total_value = sum(c.market_value_usd or 0 for c in self.companies)
-        avg_confidence = sum(c.confidence_level for c in self.companies) / max(1, total_companies)
+        avg_confidence = sum(c.confidence_level for c in self.companies) / max(
+            1, total_companies
+        )
 
         # Industry breakdown
         industries: Dict[str, int] = {}
@@ -306,7 +330,9 @@ class PortfolioExporter:
         ws.merge_cells(f"A{row}:B{row}")
 
         row += 1
-        sorted_industries = sorted(industries.items(), key=lambda x: x[1], reverse=True)[:10]
+        sorted_industries = sorted(
+            industries.items(), key=lambda x: x[1], reverse=True
+        )[:10]
         for industry, count in sorted_industries:
             ws.cell(row=row, column=1, value=industry)
             ws.cell(row=row, column=2, value=count)
@@ -322,7 +348,9 @@ class PortfolioExporter:
         from openpyxl.utils import get_column_letter
 
         header_font = Font(bold=True, color="FFFFFF")
-        header_fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
+        header_fill = PatternFill(
+            start_color="70AD47", end_color="70AD47", fill_type="solid"
+        )
         thin_border = Border(
             left=Side(style="thin"),
             right=Side(style="thin"),
@@ -331,7 +359,13 @@ class PortfolioExporter:
         )
 
         # Headers
-        headers = ["Source Type", "Companies", "Avg Confidence", "Total Value", "% of Portfolio"]
+        headers = [
+            "Source Type",
+            "Companies",
+            "Avg Confidence",
+            "Total Value",
+            "% of Portfolio",
+        ]
         for col_idx, header in enumerate(headers, start=1):
             cell = ws.cell(row=1, column=col_idx, value=header)
             cell.font = header_font
@@ -356,7 +390,9 @@ class PortfolioExporter:
 
         # Write data
         row = 2
-        for source, stats in sorted(source_stats.items(), key=lambda x: x[1]["count"], reverse=True):
+        for source, stats in sorted(
+            source_stats.items(), key=lambda x: x[1]["count"], reverse=True
+        ):
             count = stats["count"]
             avg_conf = stats["confidence_sum"] / count if count > 0 else 0
             total_val = stats["value_sum"]
@@ -365,7 +401,9 @@ class PortfolioExporter:
             ws.cell(row=row, column=1, value=source).border = thin_border
             ws.cell(row=row, column=2, value=count).border = thin_border
             ws.cell(row=row, column=3, value=f"{avg_conf:.0%}").border = thin_border
-            cell_value = ws.cell(row=row, column=4, value=total_val if total_val else "N/A")
+            cell_value = ws.cell(
+                row=row, column=4, value=total_val if total_val else "N/A"
+            )
             cell_value.border = thin_border
             if total_val:
                 cell_value.number_format = '"$"#,##0.00'
@@ -468,7 +506,9 @@ def export_portfolio(
     if format == ExportFormat.EXCEL:
         content = exporter.to_excel()
         filename = f"portfolio_{safe_name}_{timestamp}.xlsx"
-        content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        content_type = (
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
     else:
         content = exporter.to_csv()
         filename = f"portfolio_{safe_name}_{timestamp}.csv"

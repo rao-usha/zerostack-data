@@ -7,6 +7,7 @@ National Incident-Based Reporting System (NIBRS) data.
 API Documentation: https://cde.ucr.cjis.gov/LATEST/webapp/#/pages/docApi
 API Key: Free from https://api.data.gov/signup/
 """
+
 from app.sources.fbi_crime.client import FBICrimeClient
 from app.sources.fbi_crime.ingest import (
     ingest_fbi_crime_estimates,

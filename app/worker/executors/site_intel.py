@@ -1,4 +1,5 @@
 """Site Intel collection executor for the worker queue."""
+
 import logging
 from typing import List, Optional
 
@@ -18,14 +19,14 @@ async def execute(job: JobQueue, db: Session):
     from app.sources.site_intel.types import SiteIntelDomain, SiteIntelSource
 
     # Import all collectors so they register
-    import app.sources.site_intel.power           # noqa: F401
-    import app.sources.site_intel.telecom         # noqa: F401
-    import app.sources.site_intel.transport       # noqa: F401
-    import app.sources.site_intel.labor           # noqa: F401
-    import app.sources.site_intel.risk            # noqa: F401
-    import app.sources.site_intel.incentives      # noqa: F401
-    import app.sources.site_intel.logistics       # noqa: F401
-    import app.sources.site_intel.water_utilities # noqa: F401
+    import app.sources.site_intel.power  # noqa: F401
+    import app.sources.site_intel.telecom  # noqa: F401
+    import app.sources.site_intel.transport  # noqa: F401
+    import app.sources.site_intel.labor  # noqa: F401
+    import app.sources.site_intel.risk  # noqa: F401
+    import app.sources.site_intel.incentives  # noqa: F401
+    import app.sources.site_intel.logistics  # noqa: F401
+    import app.sources.site_intel.water_utilities  # noqa: F401
 
     payload = job.payload or {}
     domains: Optional[List[str]] = payload.get("domains")
@@ -111,10 +112,14 @@ def _progress(db: Session, job: JobQueue, pct: float, msg: str):
     job.progress_pct = pct
     job.progress_message = msg
     db.commit()
-    send_job_event(db, "job_progress", {
-        "job_id": job.id,
-        "job_type": "site_intel",
-        "progress_pct": pct,
-        "progress_message": msg,
-    })
+    send_job_event(
+        db,
+        "job_progress",
+        {
+            "job_id": job.id,
+            "job_type": "site_intel",
+            "progress_pct": pct,
+            "progress_message": msg,
+        },
+    )
     db.commit()

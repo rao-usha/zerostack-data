@@ -27,9 +27,9 @@ from app.sources.site_intel.types import (
 from app.sources.site_intel.base_collector import BaseCollector
 
 __all__ = [
-    'SiteIntelDomain',
-    'SiteIntelSource',
-    'CollectionConfig',
-    'CollectionResult',
-    'BaseCollector',
+    "SiteIntelDomain",
+    "SiteIntelSource",
+    "CollectionConfig",
+    "CollectionResult",
+    "BaseCollector",
 ]

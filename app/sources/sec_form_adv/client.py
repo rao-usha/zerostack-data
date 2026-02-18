@@ -44,7 +44,7 @@ class FormADVClient:
         """Get request headers."""
         return {
             "User-Agent": self.USER_AGENT,
-            "Accept": "application/json, text/csv, */*"
+            "Accept": "application/json, text/csv, */*",
         }
 
     async def search_advisers(
@@ -53,7 +53,7 @@ class FormADVClient:
         crd: Optional[str] = None,
         state: Optional[str] = None,
         page: int = 1,
-        page_size: int = 50
+        page_size: int = 50,
     ) -> Dict[str, Any]:
         """
         Search for investment advisers via IAPD API.
@@ -88,10 +88,7 @@ class FormADVClient:
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(
-                    url,
-                    params=params,
-                    headers=self._get_headers(),
-                    timeout=30
+                    url, params=params, headers=self._get_headers(), timeout=30
                 )
                 if response.status_code == 200:
                     return response.json()
@@ -119,9 +116,7 @@ class FormADVClient:
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(
-                    url,
-                    headers=self._get_headers(),
-                    timeout=30
+                    url, headers=self._get_headers(), timeout=30
                 )
                 if response.status_code == 200:
                     return response.json()

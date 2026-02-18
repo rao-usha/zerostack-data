@@ -4,6 +4,7 @@ Watermark service for incremental collection tracking.
 Tracks last-collected timestamps per domain/source/state so collectors
 can perform incremental updates instead of full re-syncs.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -33,11 +34,15 @@ def get_watermark(
     Returns:
         Last collected datetime, or None if no watermark exists (= full sync)
     """
-    row = db.query(CollectionWatermark).filter(
-        CollectionWatermark.domain == domain,
-        CollectionWatermark.source == source,
-        CollectionWatermark.state == state,
-    ).first()
+    row = (
+        db.query(CollectionWatermark)
+        .filter(
+            CollectionWatermark.domain == domain,
+            CollectionWatermark.source == source,
+            CollectionWatermark.state == state,
+        )
+        .first()
+    )
 
     return row.last_collected_at if row else None
 
@@ -66,11 +71,15 @@ def update_watermark(
     Returns:
         The watermark row
     """
-    row = db.query(CollectionWatermark).filter(
-        CollectionWatermark.domain == domain,
-        CollectionWatermark.source == source,
-        CollectionWatermark.state == state,
-    ).first()
+    row = (
+        db.query(CollectionWatermark)
+        .filter(
+            CollectionWatermark.domain == domain,
+            CollectionWatermark.source == source,
+            CollectionWatermark.state == state,
+        )
+        .first()
+    )
 
     if row is None:
         row = CollectionWatermark(
@@ -92,7 +101,9 @@ def update_watermark(
     db.commit()
     db.refresh(row)
 
-    logger.debug(f"Updated watermark {domain}/{source}/{state or 'national'} -> {last_collected_at}")
+    logger.debug(
+        f"Updated watermark {domain}/{source}/{state or 'national'} -> {last_collected_at}"
+    )
     return row
 
 
@@ -121,7 +132,9 @@ def get_all_watermarks(
             "domain": row.domain,
             "source": row.source,
             "state": row.state,
-            "last_collected_at": row.last_collected_at.isoformat() if row.last_collected_at else None,
+            "last_collected_at": row.last_collected_at.isoformat()
+            if row.last_collected_at
+            else None,
             "last_job_id": row.last_job_id,
             "records_collected": row.records_collected,
             "created_at": row.created_at.isoformat() if row.created_at else None,
@@ -143,16 +156,22 @@ def clear_watermark(
     Returns:
         True if cleared, False if not found
     """
-    row = db.query(CollectionWatermark).filter(
-        CollectionWatermark.domain == domain,
-        CollectionWatermark.source == source,
-        CollectionWatermark.state == state,
-    ).first()
+    row = (
+        db.query(CollectionWatermark)
+        .filter(
+            CollectionWatermark.domain == domain,
+            CollectionWatermark.source == source,
+            CollectionWatermark.state == state,
+        )
+        .first()
+    )
 
     if row is None:
         return False
 
     db.delete(row)
     db.commit()
-    logger.info(f"Cleared watermark {domain}/{source}/{state or 'national'} — next run will be full sync")
+    logger.info(
+        f"Cleared watermark {domain}/{source}/{state or 'national'} — next run will be full sync"
+    )
     return True

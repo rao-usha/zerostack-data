@@ -3,6 +3,7 @@ Scheduler service for automated data ingestion.
 
 Uses APScheduler to run ingestion jobs on configurable schedules.
 """
+
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
@@ -13,6 +14,7 @@ try:
     from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
     from apscheduler.triggers.cron import CronTrigger
     from apscheduler.triggers.interval import IntervalTrigger
+
     APSCHEDULER_AVAILABLE = True
 except ImportError:
     AsyncIOScheduler = None
@@ -21,7 +23,12 @@ except ImportError:
     IntervalTrigger = None
     APSCHEDULER_AVAILABLE = False
 
-from app.core.models import IngestionSchedule, IngestionJob, JobStatus, ScheduleFrequency
+from app.core.models import (
+    IngestionSchedule,
+    IngestionJob,
+    JobStatus,
+    ScheduleFrequency,
+)
 from app.core.config import get_settings
 from app.core.database import get_session_factory
 
@@ -35,14 +42,14 @@ logger = logging.getLogger(__name__)
 # the formatter converts last_run_at into the source-specific start param.
 
 INCREMENTAL_PARAM_MAP = {
-    "fred":     ("observation_start", lambda dt: dt.strftime("%Y-%m-%d")),
-    "bls":      ("start_year",        lambda dt: dt.year),
-    "eia":      ("start",             lambda dt: dt.strftime("%Y-%m-%d")),
-    "sec":      ("start_date",        lambda dt: dt.strftime("%Y-%m-%d")),
-    "treasury": ("start_date",        lambda dt: dt.strftime("%Y-%m-%d")),
-    "bts":      ("start_date",        lambda dt: dt.strftime("%Y-%m-%d")),
-    "census":   ("year",              lambda dt: dt.year),
-    "bea":      ("year",              lambda dt: str(dt.year)),
+    "fred": ("observation_start", lambda dt: dt.strftime("%Y-%m-%d")),
+    "bls": ("start_year", lambda dt: dt.year),
+    "eia": ("start", lambda dt: dt.strftime("%Y-%m-%d")),
+    "sec": ("start_date", lambda dt: dt.strftime("%Y-%m-%d")),
+    "treasury": ("start_date", lambda dt: dt.strftime("%Y-%m-%d")),
+    "bts": ("start_date", lambda dt: dt.strftime("%Y-%m-%d")),
+    "census": ("year", lambda dt: dt.year),
+    "bea": ("year", lambda dt: str(dt.year)),
 }
 
 
@@ -67,7 +74,9 @@ def _inject_incremental_params(
 
     mapping = INCREMENTAL_PARAM_MAP.get(source)
     if mapping is None:
-        logger.warning(f"Incremental enabled for {source} but no param mapping — full load")
+        logger.warning(
+            f"Incremental enabled for {source} but no param mapping — full load"
+        )
         return config
 
     param_name, formatter = mapping
@@ -77,6 +86,7 @@ def _inject_incremental_params(
         f"Incremental injection for {source}: {param_name}={effective[param_name]}"
     )
     return effective
+
 
 # Global scheduler instance
 _scheduler: Optional["AsyncIOScheduler"] = None
@@ -109,9 +119,11 @@ async def run_scheduled_job(schedule_id: int):
 
     try:
         # Get the schedule
-        schedule = db.query(IngestionSchedule).filter(
-            IngestionSchedule.id == schedule_id
-        ).first()
+        schedule = (
+            db.query(IngestionSchedule)
+            .filter(IngestionSchedule.id == schedule_id)
+            .first()
+        )
 
         if not schedule:
             logger.error(f"Schedule {schedule_id} not found")
@@ -121,7 +133,9 @@ async def run_scheduled_job(schedule_id: int):
             logger.info(f"Schedule {schedule.name} is paused, skipping")
             return
 
-        logger.info(f"Running scheduled job: {schedule.name} (source={schedule.source})")
+        logger.info(
+            f"Running scheduled job: {schedule.name} (source={schedule.source})"
+        )
 
         # Inject incremental start params if configured
         effective_config = _inject_incremental_params(
@@ -151,6 +165,7 @@ async def run_scheduled_job(schedule_id: int):
         # Audit trail
         try:
             from app.core import audit_service
+
             audit_service.log_collection(
                 db,
                 trigger_type="schedule",
@@ -192,10 +207,7 @@ def _calculate_next_run(schedule: IngestionSchedule) -> datetime:
 
     elif schedule.frequency == ScheduleFrequency.DAILY:
         next_run = now.replace(
-            hour=schedule.hour or 6,
-            minute=0,
-            second=0,
-            microsecond=0
+            hour=schedule.hour or 6, minute=0, second=0, microsecond=0
         )
         if next_run <= now:
             next_run += timedelta(days=1)
@@ -207,10 +219,7 @@ def _calculate_next_run(schedule: IngestionSchedule) -> datetime:
             days_ahead += 7
         next_run = now + timedelta(days=days_ahead)
         next_run = next_run.replace(
-            hour=schedule.hour or 6,
-            minute=0,
-            second=0,
-            microsecond=0
+            hour=schedule.hour or 6, minute=0, second=0, microsecond=0
         )
         return next_run
 
@@ -221,7 +230,7 @@ def _calculate_next_run(schedule: IngestionSchedule) -> datetime:
             hour=schedule.hour or 6,
             minute=0,
             second=0,
-            microsecond=0
+            microsecond=0,
         )
         if next_run <= now:
             # Move to next month
@@ -242,7 +251,7 @@ def _calculate_next_run(schedule: IngestionSchedule) -> datetime:
                 hour=schedule.hour or 6,
                 minute=0,
                 second=0,
-                microsecond=0
+                microsecond=0,
             )
             if next_run > now:
                 return next_run
@@ -254,7 +263,7 @@ def _calculate_next_run(schedule: IngestionSchedule) -> datetime:
             hour=schedule.hour or 6,
             minute=0,
             second=0,
-            microsecond=0
+            microsecond=0,
         )
 
     else:
@@ -275,24 +284,20 @@ def _get_trigger_for_schedule(schedule: IngestionSchedule):
 
     elif schedule.frequency == ScheduleFrequency.WEEKLY:
         return CronTrigger(
-            day_of_week=schedule.day_of_week or 0,
-            hour=schedule.hour or 6,
-            minute=0
+            day_of_week=schedule.day_of_week or 0, hour=schedule.hour or 6, minute=0
         )
 
     elif schedule.frequency == ScheduleFrequency.MONTHLY:
         return CronTrigger(
-            day=schedule.day_of_month or 1,
-            hour=schedule.hour or 6,
-            minute=0
+            day=schedule.day_of_month or 1, hour=schedule.hour or 6, minute=0
         )
 
     elif schedule.frequency == ScheduleFrequency.QUARTERLY:
         return CronTrigger(
-            month='1,4,7,10',
+            month="1,4,7,10",
             day=schedule.day_of_month or 2,
             hour=schedule.hour or 6,
-            minute=0
+            minute=0,
         )
 
     else:
@@ -333,10 +338,12 @@ def register_schedule(schedule: IngestionSchedule) -> bool:
             id=job_id,
             args=[schedule.id],
             name=schedule.name,
-            replace_existing=True
+            replace_existing=True,
         )
 
-        logger.info(f"Registered schedule: {schedule.name} ({schedule.frequency.value})")
+        logger.info(
+            f"Registered schedule: {schedule.name} ({schedule.frequency.value})"
+        )
         return True
 
     except Exception as e:
@@ -366,9 +373,9 @@ def load_all_schedules(db: Session) -> int:
 
     Returns number of schedules loaded.
     """
-    schedules = db.query(IngestionSchedule).filter(
-        IngestionSchedule.is_active == 1
-    ).all()
+    schedules = (
+        db.query(IngestionSchedule).filter(IngestionSchedule.is_active == 1).all()
+    )
 
     count = 0
     for schedule in schedules:
@@ -401,23 +408,24 @@ def get_scheduler_status() -> Dict[str, Any]:
 
     jobs = []
     for job in scheduler.get_jobs():
-        jobs.append({
-            "id": job.id,
-            "name": job.name,
-            "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
-            "trigger": str(job.trigger)
-        })
+        jobs.append(
+            {
+                "id": job.id,
+                "name": job.name,
+                "next_run": job.next_run_time.isoformat()
+                if job.next_run_time
+                else None,
+                "trigger": str(job.trigger),
+            }
+        )
 
-    return {
-        "running": scheduler.running,
-        "job_count": len(jobs),
-        "jobs": jobs
-    }
+    return {"running": scheduler.running, "job_count": len(jobs), "jobs": jobs}
 
 
 # =============================================================================
 # Schedule Management Functions
 # =============================================================================
+
 
 def create_schedule(
     db: Session,
@@ -431,7 +439,7 @@ def create_schedule(
     day_of_month: Optional[int] = None,
     description: Optional[str] = None,
     is_active: bool = True,
-    priority: int = 5
+    priority: int = 5,
 ) -> IngestionSchedule:
     """
     Create a new ingestion schedule.
@@ -465,12 +473,14 @@ def create_schedule(
         description=description,
         is_active=1 if is_active else 0,
         priority=priority,
-        next_run_at=_calculate_next_run(IngestionSchedule(
-            frequency=frequency,
-            hour=hour,
-            day_of_week=day_of_week,
-            day_of_month=day_of_month
-        ))
+        next_run_at=_calculate_next_run(
+            IngestionSchedule(
+                frequency=frequency,
+                hour=hour,
+                day_of_week=day_of_week,
+                day_of_month=day_of_month,
+            )
+        ),
     )
 
     db.add(schedule)
@@ -486,14 +496,12 @@ def create_schedule(
 
 
 def update_schedule(
-    db: Session,
-    schedule_id: int,
-    **kwargs
+    db: Session, schedule_id: int, **kwargs
 ) -> Optional[IngestionSchedule]:
     """Update an existing schedule."""
-    schedule = db.query(IngestionSchedule).filter(
-        IngestionSchedule.id == schedule_id
-    ).first()
+    schedule = (
+        db.query(IngestionSchedule).filter(IngestionSchedule.id == schedule_id).first()
+    )
 
     if not schedule:
         return None
@@ -501,7 +509,7 @@ def update_schedule(
     # Update fields
     for key, value in kwargs.items():
         if hasattr(schedule, key):
-            if key == 'is_active':
+            if key == "is_active":
                 value = 1 if value else 0
             setattr(schedule, key, value)
 
@@ -523,9 +531,9 @@ def update_schedule(
 
 def delete_schedule(db: Session, schedule_id: int) -> bool:
     """Delete a schedule."""
-    schedule = db.query(IngestionSchedule).filter(
-        IngestionSchedule.id == schedule_id
-    ).first()
+    schedule = (
+        db.query(IngestionSchedule).filter(IngestionSchedule.id == schedule_id).first()
+    )
 
     if not schedule:
         return False
@@ -542,24 +550,26 @@ def delete_schedule(db: Session, schedule_id: int) -> bool:
 
 
 def get_schedule_history(
-    db: Session,
-    schedule_id: int,
-    limit: int = 10
+    db: Session, schedule_id: int, limit: int = 10
 ) -> List[IngestionJob]:
     """Get recent jobs for a schedule."""
-    schedule = db.query(IngestionSchedule).filter(
-        IngestionSchedule.id == schedule_id
-    ).first()
+    schedule = (
+        db.query(IngestionSchedule).filter(IngestionSchedule.id == schedule_id).first()
+    )
 
     if not schedule:
         return []
 
-    return db.query(IngestionJob).filter(
-        IngestionJob.source == schedule.source,
-        IngestionJob.config == schedule.config
-    ).order_by(
-        IngestionJob.created_at.desc()
-    ).limit(limit).all()
+    return (
+        db.query(IngestionJob)
+        .filter(
+            IngestionJob.source == schedule.source,
+            IngestionJob.config == schedule.config,
+        )
+        .order_by(IngestionJob.created_at.desc())
+        .limit(limit)
+        .all()
+    )
 
 
 # =============================================================================
@@ -597,7 +607,6 @@ DEFAULT_SCHEDULES = [
         "description": "Daily prediction market odds snapshot",
         "priority": 4,
     },
-
     # =========================================================================
     # TIER 2 — Weekly (Mon-Wed early AM)
     # =========================================================================
@@ -614,7 +623,11 @@ DEFAULT_SCHEDULES = [
     {
         "name": "EIA Petroleum Weekly",
         "source": "eia",
-        "config": {"dataset": "petroleum_weekly", "subcategory": "consumption", "frequency": "weekly"},
+        "config": {
+            "dataset": "petroleum_weekly",
+            "subcategory": "consumption",
+            "frequency": "weekly",
+        },
         "frequency": ScheduleFrequency.WEEKLY,
         "hour": 11,
         "day_of_week": 0,  # Monday
@@ -661,7 +674,6 @@ DEFAULT_SCHEDULES = [
         "description": "Weekly weather observations refresh",
         "priority": 5,
     },
-
     # =========================================================================
     # TIER 3 — Monthly (spread across days 1-15)
     # =========================================================================
@@ -845,7 +857,6 @@ DEFAULT_SCHEDULES = [
         "description": "Monthly FCC broadband coverage data",
         "priority": 5,
     },
-
     # =========================================================================
     # TIER 4 — Quarterly (Jan/Apr/Jul/Oct, staggered across first 2 weeks)
     # =========================================================================
@@ -968,9 +979,11 @@ def create_default_schedules(db: Session) -> List[IngestionSchedule]:
 
     for template in DEFAULT_SCHEDULES:
         # Check if schedule already exists
-        existing = db.query(IngestionSchedule).filter(
-            IngestionSchedule.name == template["name"]
-        ).first()
+        existing = (
+            db.query(IngestionSchedule)
+            .filter(IngestionSchedule.name == template["name"])
+            .first()
+        )
 
         if not existing:
             schedule = create_schedule(
@@ -984,7 +997,7 @@ def create_default_schedules(db: Session) -> List[IngestionSchedule]:
                 day_of_month=template.get("day_of_month"),
                 description=template.get("description"),
                 is_active=False,  # Start paused by default
-                priority=template.get("priority", 5)
+                priority=template.get("priority", 5),
             )
             created.append(schedule)
             logger.info(f"Created default schedule: {template['name']}")
@@ -1002,7 +1015,9 @@ def create_default_schedules(db: Session) -> List[IngestionSchedule]:
 STUCK_JOB_TIMEOUT_HOURS = 6
 
 
-async def cleanup_stuck_jobs(timeout_hours: int = STUCK_JOB_TIMEOUT_HOURS) -> Dict[str, Any]:
+async def cleanup_stuck_jobs(
+    timeout_hours: int = STUCK_JOB_TIMEOUT_HOURS,
+) -> Dict[str, Any]:
     """
     Find and mark stuck jobs as failed.
 
@@ -1024,24 +1039,26 @@ async def cleanup_stuck_jobs(timeout_hours: int = STUCK_JOB_TIMEOUT_HOURS) -> Di
 
     try:
         # Get ALL running jobs (we check per-source timeout individually)
-        running_jobs = db.query(IngestionJob).filter(
-            IngestionJob.status == JobStatus.RUNNING,
-            IngestionJob.started_at.isnot(None),
-        ).all()
+        running_jobs = (
+            db.query(IngestionJob)
+            .filter(
+                IngestionJob.status == JobStatus.RUNNING,
+                IngestionJob.started_at.isnot(None),
+            )
+            .all()
+        )
 
         if not running_jobs:
             logger.info("No running jobs found during cleanup")
-            return {
-                "cleaned_up": 0,
-                "jobs": [],
-                "timeout_hours": timeout_hours
-            }
+            return {"cleaned_up": 0, "jobs": [], "timeout_hours": timeout_hours}
 
         # Mark stuck jobs as failed (check per-source timeout)
         cleaned_jobs = []
         for job in running_jobs:
             # Get per-source timeout, fall back to global
-            source_timeout_secs = source_config_service.get_timeout_seconds(db, job.source)
+            source_timeout_secs = source_config_service.get_timeout_seconds(
+                db, job.source
+            )
             running_seconds = (datetime.utcnow() - job.started_at).total_seconds()
 
             if running_seconds < source_timeout_secs:
@@ -1054,13 +1071,15 @@ async def cleanup_stuck_jobs(timeout_hours: int = STUCK_JOB_TIMEOUT_HOURS) -> Di
             job.error_message = f"Job timed out after {running_hours:.1f} hours (threshold: {threshold_hours:.1f}h) - automatically marked as failed"
             job.completed_at = datetime.utcnow()
 
-            cleaned_jobs.append({
-                "job_id": job.id,
-                "source": job.source,
-                "running_hours": round(running_hours, 2),
-                "started_at": job.started_at.isoformat(),
-                "timeout_hours": round(threshold_hours, 2),
-            })
+            cleaned_jobs.append(
+                {
+                    "job_id": job.id,
+                    "source": job.source,
+                    "running_hours": round(running_hours, 2),
+                    "started_at": job.started_at.isoformat(),
+                    "timeout_hours": round(threshold_hours, 2),
+                }
+            )
 
             logger.warning(
                 f"Marked stuck job {job.id} ({job.source}) as failed - "
@@ -1069,11 +1088,7 @@ async def cleanup_stuck_jobs(timeout_hours: int = STUCK_JOB_TIMEOUT_HOURS) -> Di
 
         if not cleaned_jobs:
             logger.info("No stuck jobs found during cleanup")
-            return {
-                "cleaned_up": 0,
-                "jobs": [],
-                "timeout_hours": timeout_hours
-            }
+            return {"cleaned_up": 0, "jobs": [], "timeout_hours": timeout_hours}
 
         db.commit()
 
@@ -1084,7 +1099,7 @@ async def cleanup_stuck_jobs(timeout_hours: int = STUCK_JOB_TIMEOUT_HOURS) -> Di
             await webhook_service.notify_cleanup_completed(
                 cleaned_up=len(cleaned_jobs),
                 jobs=cleaned_jobs,
-                timeout_hours=timeout_hours
+                timeout_hours=timeout_hours,
             )
         except Exception as e:
             logger.warning(f"Failed to send cleanup webhook notification: {e}")
@@ -1093,17 +1108,13 @@ async def cleanup_stuck_jobs(timeout_hours: int = STUCK_JOB_TIMEOUT_HOURS) -> Di
             "cleaned_up": len(cleaned_jobs),
             "jobs": cleaned_jobs,
             "timeout_hours": timeout_hours,
-            "cleanup_time": datetime.utcnow().isoformat()
+            "cleanup_time": datetime.utcnow().isoformat(),
         }
 
     except Exception as e:
         logger.error(f"Error during stuck job cleanup: {e}", exc_info=True)
         db.rollback()
-        return {
-            "cleaned_up": 0,
-            "error": str(e),
-            "timeout_hours": timeout_hours
-        }
+        return {"cleaned_up": 0, "error": str(e), "timeout_hours": timeout_hours}
 
     finally:
         db.close()
@@ -1134,10 +1145,12 @@ def register_cleanup_job(interval_minutes: int = 30) -> bool:
             trigger=IntervalTrigger(minutes=interval_minutes),
             id=job_id,
             name="Stuck Job Cleanup",
-            replace_existing=True
+            replace_existing=True,
         )
 
-        logger.info(f"Registered stuck job cleanup to run every {interval_minutes} minutes")
+        logger.info(
+            f"Registered stuck job cleanup to run every {interval_minutes} minutes"
+        )
         return True
 
     except Exception as e:
@@ -1164,6 +1177,7 @@ def unregister_cleanup_job() -> bool:
 # =============================================================================
 # Automatic Retry Processing
 # =============================================================================
+
 
 def register_retry_processor(interval_minutes: int = 5) -> bool:
     """
@@ -1194,10 +1208,12 @@ def register_retry_processor(interval_minutes: int = 5) -> bool:
             trigger=IntervalTrigger(minutes=interval_minutes),
             id=job_id,
             name="Automatic Retry Processor",
-            replace_existing=True
+            replace_existing=True,
         )
 
-        logger.info(f"Registered automatic retry processor to run every {interval_minutes} minutes")
+        logger.info(
+            f"Registered automatic retry processor to run every {interval_minutes} minutes"
+        )
         return True
 
     except Exception as e:
@@ -1251,7 +1267,9 @@ def register_consecutive_failure_checker(interval_minutes: int = 30) -> bool:
             replace_existing=True,
         )
 
-        logger.info(f"Registered consecutive failure checker to run every {interval_minutes} minutes")
+        logger.info(
+            f"Registered consecutive failure checker to run every {interval_minutes} minutes"
+        )
         return True
 
     except Exception as e:
@@ -1262,6 +1280,7 @@ def register_consecutive_failure_checker(interval_minutes: int = 30) -> bool:
 # =============================================================================
 # Auto-Refresh Stale Datasets
 # =============================================================================
+
 
 async def check_and_refresh_stale_datasets():
     """
@@ -1334,7 +1353,9 @@ async def check_and_refresh_stale_datasets():
                 .first()
             )
             if active_job:
-                logger.debug(f"Auto-refresh: {source} already has active job {active_job.id}, skipping")
+                logger.debug(
+                    f"Auto-refresh: {source} already has active job {active_job.id}, skipping"
+                )
                 continue
 
             # Create a new job with incremental params
@@ -1394,7 +1415,9 @@ def register_freshness_checker(interval_minutes: int = 60) -> bool:
             replace_existing=True,
         )
 
-        logger.info(f"Registered freshness checker to run every {interval_minutes} minutes")
+        logger.info(
+            f"Registered freshness checker to run every {interval_minutes} minutes"
+        )
         return True
 
     except Exception as e:

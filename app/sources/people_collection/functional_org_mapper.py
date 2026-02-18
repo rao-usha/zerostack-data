@@ -40,48 +40,79 @@ logger = logging.getLogger(__name__)
 FUNCTION_KEYWORDS = {
     "technology": {
         "title_patterns": [
-            r'\bcto\b', r'\bcio\b', r'\bciso\b', r'\bcdo\b',
-            r'\bchief\s+technology\b', r'\bchief\s+information\b',
-            r'\bchief\s+data\b', r'\bchief\s+digital\b',
-            r'\bchief\s+security\b',
-            r'\bvp\b.*\bengineering\b', r'\bvp\b.*\btechnology\b',
-            r'\bvp\b.*\binfrastructure\b', r'\bvp\b.*\bdata\b',
-            r'\bvp\b.*\bplatform\b', r'\bvp\b.*\bsecurity\b',
-            r'\bvp\b.*\bit\b',
-            r'\bvice\s+president\b.*\bengineering\b',
-            r'\bvice\s+president\b.*\btechnology\b',
-            r'\bdirector\b.*\bengineering\b', r'\bdirector\b.*\btechnology\b',
-            r'\bdirector\b.*\bit\b', r'\bdirector\b.*\bdevops\b',
-            r'\bdirector\b.*\binfrastructure\b',
-            r'\bhead\s+of\s+(?:engineering|technology|it)\b',
-            r'\bchief\s+architect\b',
+            r"\bcto\b",
+            r"\bcio\b",
+            r"\bciso\b",
+            r"\bcdo\b",
+            r"\bchief\s+technology\b",
+            r"\bchief\s+information\b",
+            r"\bchief\s+data\b",
+            r"\bchief\s+digital\b",
+            r"\bchief\s+security\b",
+            r"\bvp\b.*\bengineering\b",
+            r"\bvp\b.*\btechnology\b",
+            r"\bvp\b.*\binfrastructure\b",
+            r"\bvp\b.*\bdata\b",
+            r"\bvp\b.*\bplatform\b",
+            r"\bvp\b.*\bsecurity\b",
+            r"\bvp\b.*\bit\b",
+            r"\bvice\s+president\b.*\bengineering\b",
+            r"\bvice\s+president\b.*\btechnology\b",
+            r"\bdirector\b.*\bengineering\b",
+            r"\bdirector\b.*\btechnology\b",
+            r"\bdirector\b.*\bit\b",
+            r"\bdirector\b.*\bdevops\b",
+            r"\bdirector\b.*\binfrastructure\b",
+            r"\bhead\s+of\s+(?:engineering|technology|it)\b",
+            r"\bchief\s+architect\b",
         ],
         "department_keywords": [
-            "technology", "engineering", "it", "infrastructure",
-            "data", "platform", "security", "devops", "software",
+            "technology",
+            "engineering",
+            "it",
+            "infrastructure",
+            "data",
+            "platform",
+            "security",
+            "devops",
+            "software",
             "information technology",
         ],
     },
     "finance": {
         "title_patterns": [
-            r'\bcfo\b', r'\bchief\s+financial\b', r'\bchief\s+accounting\b',
-            r'\bcontroller\b', r'\btreasurer\b',
-            r'\bvp\b.*\bfinance\b', r'\bvp\b.*\baccounting\b',
-            r'\bdirector\b.*\bfinance\b', r'\bhead\s+of\s+finance\b',
+            r"\bcfo\b",
+            r"\bchief\s+financial\b",
+            r"\bchief\s+accounting\b",
+            r"\bcontroller\b",
+            r"\btreasurer\b",
+            r"\bvp\b.*\bfinance\b",
+            r"\bvp\b.*\baccounting\b",
+            r"\bdirector\b.*\bfinance\b",
+            r"\bhead\s+of\s+finance\b",
         ],
         "department_keywords": [
-            "finance", "accounting", "treasury", "financial",
+            "finance",
+            "accounting",
+            "treasury",
+            "financial",
         ],
     },
     "legal": {
         "title_patterns": [
-            r'\bgeneral\s+counsel\b', r'\bclo\b', r'\bchief\s+legal\b',
-            r'\bchief\s+compliance\b',
-            r'\bvp\b.*\blegal\b', r'\bdeputy\s+general\s+counsel\b',
-            r'\bdirector\b.*\blegal\b', r'\bhead\s+of\s+legal\b',
+            r"\bgeneral\s+counsel\b",
+            r"\bclo\b",
+            r"\bchief\s+legal\b",
+            r"\bchief\s+compliance\b",
+            r"\bvp\b.*\blegal\b",
+            r"\bdeputy\s+general\s+counsel\b",
+            r"\bdirector\b.*\blegal\b",
+            r"\bhead\s+of\s+legal\b",
         ],
         "department_keywords": [
-            "legal", "compliance", "regulatory",
+            "legal",
+            "compliance",
+            "regulatory",
         ],
     },
 }
@@ -100,7 +131,10 @@ class FunctionalOrgMapper:
     def _get_linkedin_discovery(self):
         """Lazy init LinkedIn discovery."""
         if self._linkedin_discovery is None:
-            from app.sources.people_collection.linkedin_discovery import LinkedInDiscovery
+            from app.sources.people_collection.linkedin_discovery import (
+                LinkedInDiscovery,
+            )
+
             self._linkedin_discovery = LinkedInDiscovery()
         return self._linkedin_discovery
 
@@ -136,9 +170,11 @@ class FunctionalOrgMapper:
             )
             return {"error": f"Unknown function: {function_name}"}
 
-        company = db_session.query(IndustrialCompany).filter(
-            IndustrialCompany.id == company_id
-        ).first()
+        company = (
+            db_session.query(IndustrialCompany)
+            .filter(IndustrialCompany.id == company_id)
+            .first()
+        )
 
         if not company:
             return {"error": f"Company {company_id} not found"}
@@ -155,10 +191,14 @@ class FunctionalOrgMapper:
         company_names = {company_id: company.name}
 
         if include_subsidiaries:
-            subsidiaries = db_session.query(IndustrialCompany).filter(
-                IndustrialCompany.parent_company_id == company_id,
-                IndustrialCompany.status == "active",
-            ).all()
+            subsidiaries = (
+                db_session.query(IndustrialCompany)
+                .filter(
+                    IndustrialCompany.parent_company_id == company_id,
+                    IndustrialCompany.status == "active",
+                )
+                .all()
+            )
 
             for sub in subsidiaries:
                 company_ids.append(sub.id)
@@ -180,28 +220,29 @@ class FunctionalOrgMapper:
         for cid in company_ids:
             leaders = leaders_by_company.get(cid, [])
             has_c_level = any(
-                self._is_c_level_tech(p["title"], func_config)
-                for p in leaders
+                self._is_c_level_tech(p["title"], func_config) for p in leaders
             )
 
             if not has_c_level:
-                gaps.append({
-                    "company_id": cid,
-                    "company_name": company_names.get(cid, "Unknown"),
-                    "missing": "c_level",
-                    "existing_count": len(leaders),
-                })
+                gaps.append(
+                    {
+                        "company_id": cid,
+                        "company_name": company_names.get(cid, "Unknown"),
+                        "missing": "c_level",
+                        "existing_count": len(leaders),
+                    }
+                )
             elif len(leaders) < 3 and depth >= 2:
-                gaps.append({
-                    "company_id": cid,
-                    "company_name": company_names.get(cid, "Unknown"),
-                    "missing": "vp_level",
-                    "existing_count": len(leaders),
-                })
+                gaps.append(
+                    {
+                        "company_id": cid,
+                        "company_name": company_names.get(cid, "Unknown"),
+                        "missing": "vp_level",
+                        "existing_count": len(leaders),
+                    }
+                )
 
-        logger.info(
-            f"[FunctionalOrgMapper] Found {len(gaps)} companies with gaps"
-        )
+        logger.info(f"[FunctionalOrgMapper] Found {len(gaps)} companies with gaps")
 
         # Step 3: Fill gaps via LinkedIn
         linkedin_people = []
@@ -212,16 +253,23 @@ class FunctionalOrgMapper:
 
             # Store LinkedIn-discovered people
             if linkedin_people:
-                from app.sources.people_collection.orchestrator import PeopleCollectionOrchestrator
+                from app.sources.people_collection.orchestrator import (
+                    PeopleCollectionOrchestrator,
+                )
+
                 orchestrator = PeopleCollectionOrchestrator(db_session=db_session)
 
                 for gap in gaps:
                     gap_people = [
-                        p for p in linkedin_people
-                        if p.extraction_notes and gap["company_name"] in (p.extraction_notes or "")
+                        p
+                        for p in linkedin_people
+                        if p.extraction_notes
+                        and gap["company_name"] in (p.extraction_notes or "")
                     ]
                     if gap_people:
-                        gap_company = db_session.get(IndustrialCompany, gap["company_id"])
+                        gap_company = db_session.get(
+                            IndustrialCompany, gap["company_id"]
+                        )
                         if gap_company:
                             await orchestrator._store_people(
                                 gap_people, gap_company, db_session
@@ -242,9 +290,7 @@ class FunctionalOrgMapper:
         for leaders in leaders_by_company.values():
             all_leaders.extend(leaders)
 
-        chart = self._build_functional_chart(
-            all_leaders, company_names, function_name
-        )
+        chart = self._build_functional_chart(all_leaders, company_names, function_name)
 
         result = {
             "function": function_name,
@@ -280,12 +326,15 @@ class FunctionalOrgMapper:
         results: Dict[int, List[Dict]] = {}
 
         # Query all current people for these companies
-        people = db_session.query(CompanyPerson, Person).join(
-            Person, CompanyPerson.person_id == Person.id
-        ).filter(
-            CompanyPerson.company_id.in_(company_ids),
-            CompanyPerson.is_current == True,
-        ).all()
+        people = (
+            db_session.query(CompanyPerson, Person)
+            .join(Person, CompanyPerson.person_id == Person.id)
+            .filter(
+                CompanyPerson.company_id.in_(company_ids),
+                CompanyPerson.is_current == True,
+            )
+            .all()
+        )
 
         for cp, person in people:
             title = (cp.title or "").lower()
@@ -311,17 +360,19 @@ class FunctionalOrgMapper:
                 if cp.company_id not in results:
                     results[cp.company_id] = []
 
-                results[cp.company_id].append({
-                    "company_person_id": cp.id,
-                    "person_id": person.id,
-                    "company_id": cp.company_id,
-                    "name": person.full_name,
-                    "title": cp.title or "",
-                    "title_level": cp.title_level,
-                    "management_level": cp.management_level,
-                    "reports_to_id": cp.reports_to_id,
-                    "department": cp.department,
-                })
+                results[cp.company_id].append(
+                    {
+                        "company_person_id": cp.id,
+                        "person_id": person.id,
+                        "company_id": cp.company_id,
+                        "name": person.full_name,
+                        "title": cp.title or "",
+                        "title_level": cp.title_level,
+                        "management_level": cp.management_level,
+                        "reports_to_id": cp.reports_to_id,
+                        "department": cp.department,
+                    }
+                )
 
         return results
 
@@ -330,8 +381,21 @@ class FunctionalOrgMapper:
         title_lower = (title or "").lower()
 
         c_level_patterns = [
-            p for p in func_config["title_patterns"]
-            if any(k in p for k in ['chief', 'cto', 'cio', 'cfo', 'ciso', 'cdo', 'clo', 'general counsel'])
+            p
+            for p in func_config["title_patterns"]
+            if any(
+                k in p
+                for k in [
+                    "chief",
+                    "cto",
+                    "cio",
+                    "cfo",
+                    "ciso",
+                    "cdo",
+                    "clo",
+                    "general counsel",
+                ]
+            )
         ]
 
         for pattern in c_level_patterns:
@@ -443,16 +507,19 @@ class FunctionalOrgMapper:
                 cp = db_session.get(CompanyPerson, sub_top["company_person_id"])
                 if cp:
                     cp.reports_to_id = parent_c_level["company_person_id"]
-                    updates.append((sub_top["company_person_id"], parent_c_level["company_person_id"]))
+                    updates.append(
+                        (
+                            sub_top["company_person_id"],
+                            parent_c_level["company_person_id"],
+                        )
+                    )
 
                     logger.debug(
                         f"[FunctionalOrgMapper] Linked {sub_top['name']} "
                         f"({company_names.get(cid)}) -> {parent_c_level['name']}"
                     )
             except Exception as e:
-                logger.warning(
-                    f"[FunctionalOrgMapper] Failed to link reporting: {e}"
-                )
+                logger.warning(f"[FunctionalOrgMapper] Failed to link reporting: {e}")
 
         if updates:
             db_session.commit()

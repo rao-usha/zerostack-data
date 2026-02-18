@@ -59,7 +59,9 @@ class PageFinder(BaseCollector):
             return path
         return urljoin(base_url, path)
 
-    def _is_same_domain(self, url1: str, url2: str, allow_subdomains: bool = True) -> bool:
+    def _is_same_domain(
+        self, url1: str, url2: str, allow_subdomains: bool = True
+    ) -> bool:
         """
         Check if two URLs are on the same domain.
 
@@ -82,12 +84,12 @@ class PageFinder(BaseCollector):
         # Allow subdomain matching (e.g., ir.lincolnelectric.com matches lincolnelectric.com)
         if allow_subdomains:
             # Extract root domain (last 2 parts)
-            parts1 = domain1.split('.')
-            parts2 = domain2.split('.')
+            parts1 = domain1.split(".")
+            parts2 = domain2.split(".")
 
             # Get root domain (e.g., lincolnelectric.com)
-            root1 = '.'.join(parts1[-2:]) if len(parts1) >= 2 else domain1
-            root2 = '.'.join(parts2[-2:]) if len(parts2) >= 2 else domain2
+            root1 = ".".join(parts1[-2:]) if len(parts1) >= 2 else domain1
+            root2 = ".".join(parts2[-2:]) if len(parts2) >= 2 else domain2
 
             return root1 == root2
 
@@ -117,15 +119,15 @@ class PageFinder(BaseCollector):
 
         Returns list of (url, text) tuples.
         """
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, "html.parser")
         links = []
 
-        for a in soup.find_all('a', href=True):
-            href = a['href']
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
             text = a.get_text(strip=True).lower()
 
             # Skip empty or javascript links
-            if not href or href.startswith(('#', 'javascript:', 'mailto:', 'tel:')):
+            if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
                 continue
 
             # Normalize URL
@@ -166,7 +168,13 @@ class PageFinder(BaseCollector):
         text_lower = link_text.lower()
 
         # High-value keywords in URL
-        high_value = ["leadership", "executive", "management-team", "our-team", "leadership-team"]
+        high_value = [
+            "leadership",
+            "executive",
+            "management-team",
+            "our-team",
+            "leadership-team",
+        ]
         for keyword in high_value:
             if keyword in url_lower:
                 score += 10
@@ -178,13 +186,26 @@ class PageFinder(BaseCollector):
                 score += 5
 
         # Investor relations governance pages (often have leadership)
-        ir_patterns = ["governance", "corporate-governance", "executive-officers", "corporate-officers"]
+        ir_patterns = [
+            "governance",
+            "corporate-governance",
+            "executive-officers",
+            "corporate-officers",
+        ]
         for pattern in ir_patterns:
             if pattern in url_lower:
                 score += 8
 
         # Link text bonuses
-        text_keywords = ["leadership", "team", "executive", "management", "meet the", "our people", "officers"]
+        text_keywords = [
+            "leadership",
+            "team",
+            "executive",
+            "management",
+            "meet the",
+            "our people",
+            "officers",
+        ]
         for keyword in text_keywords:
             if keyword in text_lower:
                 score += 8
@@ -194,19 +215,46 @@ class PageFinder(BaseCollector):
             score += 7
 
         # Penalize clearly wrong pages
-        wrong_patterns = ["career", "job", "news", "press", "blog", "contact", "login", "signup", "product", "service", "shop", "store", "support"]
+        wrong_patterns = [
+            "career",
+            "job",
+            "news",
+            "press",
+            "blog",
+            "contact",
+            "login",
+            "signup",
+            "product",
+            "service",
+            "shop",
+            "store",
+            "support",
+        ]
         for pattern in wrong_patterns:
             if pattern in url_lower:
                 score -= 10
 
         # Heavily penalize ESG/sustainability pages (these rarely have leadership)
-        esg_patterns = ["esg", "sustainability", "environmental", "social-responsibility", "csr", "diversity", "inclusion", "empowering"]
+        esg_patterns = [
+            "esg",
+            "sustainability",
+            "environmental",
+            "social-responsibility",
+            "csr",
+            "diversity",
+            "inclusion",
+            "empowering",
+        ]
         for pattern in esg_patterns:
             if pattern in url_lower:
                 score -= 15
 
         # Penalize generic investor pages (but not governance)
-        if "investor" in url_lower and "governance" not in url_lower and "leadership" not in url_lower:
+        if (
+            "investor" in url_lower
+            and "governance" not in url_lower
+            and "leadership" not in url_lower
+        ):
             score -= 5
 
         # About page without specifics should score lower
@@ -248,7 +296,9 @@ class PageFinder(BaseCollector):
         logger.info(f"[PageFinder] Finding leadership pages for {base_url}")
 
         # Strategy 1: Try common URL patterns directly
-        logger.debug(f"[PageFinder] Strategy 1: Trying {len(LEADERSHIP_URL_PATTERNS)} URL patterns")
+        logger.debug(
+            f"[PageFinder] Strategy 1: Trying {len(LEADERSHIP_URL_PATTERNS)} URL patterns"
+        )
         pattern_pages = await self._try_url_patterns(base_url)
         found_pages.extend(pattern_pages)
         logger.info(f"[PageFinder] URL patterns found {len(pattern_pages)} pages")
@@ -274,23 +324,27 @@ class PageFinder(BaseCollector):
                         if exists:
                             page_type = self._infer_page_type(url)
                             score = self._score_leadership_url(url)
-                            found_pages.append({
-                                'url': url,
-                                'page_type': page_type,
-                                'score': score + 5,  # Bonus for IR pages
-                                'source': 'ir_subdomain',
-                            })
+                            found_pages.append(
+                                {
+                                    "url": url,
+                                    "page_type": page_type,
+                                    "score": score + 5,  # Bonus for IR pages
+                                    "source": "ir_subdomain",
+                                }
+                            )
                             logger.info(f"[PageFinder] IR subdomain found: {url}")
-            logger.info(f"[PageFinder] IR subdomain strategy found {len([p for p in found_pages if p.get('source') == 'ir_subdomain'])} pages")
+            logger.info(
+                f"[PageFinder] IR subdomain strategy found {len([p for p in found_pages if p.get('source') == 'ir_subdomain'])} pages"
+            )
 
         # Early exit: if we already have enough high-quality pages, skip fallback strategies
-        high_quality_pages = [p for p in found_pages if p.get('score', 0) >= 8]
+        high_quality_pages = [p for p in found_pages if p.get("score", 0) >= 8]
         if len(high_quality_pages) >= 3:
             logger.info(
                 f"[PageFinder] Found {len(high_quality_pages)} high-quality pages (score>=8), "
                 f"skipping fallback strategies (homepage crawl, sitemap, search)"
             )
-            found_pages.sort(key=lambda x: x['score'], reverse=True)
+            found_pages.sort(key=lambda x: x["score"], reverse=True)
             return found_pages[:max_pages]
 
         # Strategy 2: Crawl homepage for links
@@ -299,10 +353,12 @@ class PageFinder(BaseCollector):
             homepage_pages = await self._crawl_homepage(base_url)
             new_count = 0
             for page in homepage_pages:
-                if page['url'] not in [p['url'] for p in found_pages]:
+                if page["url"] not in [p["url"] for p in found_pages]:
                     found_pages.append(page)
                     new_count += 1
-            logger.info(f"[PageFinder] Homepage crawl found {new_count} additional pages")
+            logger.info(
+                f"[PageFinder] Homepage crawl found {new_count} additional pages"
+            )
 
         # Strategy 3: Check sitemap
         if len(found_pages) < max_pages:
@@ -310,7 +366,7 @@ class PageFinder(BaseCollector):
             sitemap_pages = await self._check_sitemap(base_url)
             new_count = 0
             for page in sitemap_pages:
-                if page['url'] not in [p['url'] for p in found_pages]:
+                if page["url"] not in [p["url"] for p in found_pages]:
                     found_pages.append(page)
                     new_count += 1
             logger.info(f"[PageFinder] Sitemap found {new_count} additional pages")
@@ -323,16 +379,22 @@ class PageFinder(BaseCollector):
             found_pages.extend(google_pages)
             logger.info(f"[PageFinder] Google search found {len(google_pages)} pages")
         elif len(found_pages) < 2:
-            logger.info(f"[PageFinder] Strategy 4: Skipping search fallback (no Google API key, DuckDuckGo blocked in Docker)")
+            logger.info(
+                f"[PageFinder] Strategy 4: Skipping search fallback (no Google API key, DuckDuckGo blocked in Docker)"
+            )
 
         # Sort by score and limit
-        found_pages.sort(key=lambda x: x['score'], reverse=True)
+        found_pages.sort(key=lambda x: x["score"], reverse=True)
         result = found_pages[:max_pages]
 
         if result:
-            logger.info(f"[PageFinder] Found {len(result)} leadership pages for {base_url}")
+            logger.info(
+                f"[PageFinder] Found {len(result)} leadership pages for {base_url}"
+            )
             for page in result:
-                logger.debug(f"[PageFinder] - {page['url']} (score={page['score']}, type={page['page_type']})")
+                logger.debug(
+                    f"[PageFinder] - {page['url']} (score={page['score']}, type={page['page_type']})"
+                )
         else:
             logger.warning(
                 f"[PageFinder] No leadership pages found for {base_url}. "
@@ -407,13 +469,15 @@ class PageFinder(BaseCollector):
 
                         if score > 0:
                             page_type = self._infer_page_type(url)
-                            found.append({
-                                'url': url,
-                                'page_type': page_type,
-                                'score': score,
-                                'source': 'google_search',
-                                'title': item.get("title"),
-                            })
+                            found.append(
+                                {
+                                    "url": url,
+                                    "page_type": page_type,
+                                    "score": score,
+                                    "source": "google_search",
+                                    "title": item.get("title"),
+                                }
+                            )
 
                 # If we found pages, don't need more queries
                 if found:
@@ -451,22 +515,23 @@ class PageFinder(BaseCollector):
                 logger.warning("[PageFinder] DuckDuckGo returned empty response")
                 return found
 
-            soup = BeautifulSoup(html, 'html.parser')
-            all_links = soup.select('.result__a')
+            soup = BeautifulSoup(html, "html.parser")
+            all_links = soup.select(".result__a")
             logger.info(f"[PageFinder] DuckDuckGo found {len(all_links)} raw results")
 
             # DuckDuckGo HTML results are in .result__a links
             for link in all_links:
-                href = link.get('href', '')
+                href = link.get("href", "")
 
                 # DuckDuckGo wraps URLs, need to extract
-                if 'uddg=' in href:
+                if "uddg=" in href:
                     # URL is encoded in uddg parameter
                     import urllib.parse
+
                     parsed_href = urllib.parse.urlparse(href)
                     params = urllib.parse.parse_qs(parsed_href.query)
-                    if 'uddg' in params:
-                        href = params['uddg'][0]
+                    if "uddg" in params:
+                        href = params["uddg"][0]
 
                 # Only include same domain
                 if not self._is_same_domain(base_url, href):
@@ -481,13 +546,15 @@ class PageFinder(BaseCollector):
 
                 if score > 0:
                     page_type = self._infer_page_type(href)
-                    found.append({
-                        'url': href,
-                        'page_type': page_type,
-                        'score': score,
-                        'source': 'duckduckgo_search',
-                        'title': title,
-                    })
+                    found.append(
+                        {
+                            "url": href,
+                            "page_type": page_type,
+                            "score": score,
+                            "source": "duckduckgo_search",
+                            "title": title,
+                        }
+                    )
 
                 if len(found) >= 5:
                     break
@@ -507,7 +574,7 @@ class PageFinder(BaseCollector):
             # Stop early if we already have enough pages
             if len(found) >= max_pages:
                 break
-            batch = LEADERSHIP_URL_PATTERNS[i:i + batch_size]
+            batch = LEADERSHIP_URL_PATTERNS[i : i + batch_size]
 
             tasks = []
             for pattern in batch:
@@ -525,14 +592,18 @@ class PageFinder(BaseCollector):
                         page_type = self._infer_page_type(url)
                         score = self._score_leadership_url(url)
                         if score <= 0:
-                            logger.debug(f"[PageFinder] Skipping low-score URL pattern: {url} (score={score})")
+                            logger.debug(
+                                f"[PageFinder] Skipping low-score URL pattern: {url} (score={score})"
+                            )
                             continue
-                        found.append({
-                            'url': url,
-                            'page_type': page_type,
-                            'score': score,
-                            'source': 'url_pattern',
-                        })
+                        found.append(
+                            {
+                                "url": url,
+                                "page_type": page_type,
+                                "score": score,
+                                "source": "url_pattern",
+                            }
+                        )
 
         return found
 
@@ -542,8 +613,12 @@ class PageFinder(BaseCollector):
             await self.rate_limiter.acquire(url, self.source_type)
             session = await self._get_session()
             headers = self._get_headers(url)
-            fast_timeout = aiohttp.ClientTimeout(total=10)  # 10s instead of 30s for existence checks
-            async with session.head(url, headers=headers, allow_redirects=True, timeout=fast_timeout) as response:
+            fast_timeout = aiohttp.ClientTimeout(
+                total=10
+            )  # 10s instead of 30s for existence checks
+            async with session.head(
+                url, headers=headers, allow_redirects=True, timeout=fast_timeout
+            ) as response:
                 return response.status == 200
         except Exception:
             return False
@@ -582,13 +657,15 @@ class PageFinder(BaseCollector):
 
                 if exists:
                     page_type = self._infer_page_type(url)
-                    found.append({
-                        'url': url,
-                        'page_type': page_type,
-                        'score': score,
-                        'source': 'homepage_link',
-                        'link_text': text,
-                    })
+                    found.append(
+                        {
+                            "url": url,
+                            "page_type": page_type,
+                            "score": score,
+                            "source": "homepage_link",
+                            "link_text": text,
+                        }
+                    )
 
         except Exception as e:
             logger.warning(f"Error crawling homepage {base_url}: {e}")
@@ -612,8 +689,8 @@ class PageFinder(BaseCollector):
                     continue
 
                 # Parse sitemap XML
-                soup = BeautifulSoup(content, 'xml')
-                urls = soup.find_all('loc')
+                soup = BeautifulSoup(content, "xml")
+                urls = soup.find_all("loc")
 
                 for loc in urls:
                     url = loc.get_text(strip=True)
@@ -625,12 +702,14 @@ class PageFinder(BaseCollector):
                     if score > 5:
                         self._visited_urls.add(url)
                         page_type = self._infer_page_type(url)
-                        found.append({
-                            'url': url,
-                            'page_type': page_type,
-                            'score': score,
-                            'source': 'sitemap',
-                        })
+                        found.append(
+                            {
+                                "url": url,
+                                "page_type": page_type,
+                                "score": score,
+                                "source": "sitemap",
+                            }
+                        )
 
                 # Only need one working sitemap
                 if found:
@@ -680,6 +759,6 @@ async def find_company_leadership_pages(
 
         # Add company name to results
         for page in pages:
-            page['company_name'] = company_name
+            page["company_name"] = company_name
 
         return pages

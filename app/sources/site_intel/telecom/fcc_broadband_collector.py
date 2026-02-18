@@ -16,7 +16,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import BroadbandAvailability
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -24,17 +28,61 @@ logger = logging.getLogger(__name__)
 
 # All 50 states + DC + territories
 STATE_FIPS = {
-    "AL": "01", "AK": "02", "AZ": "04", "AR": "05", "CA": "06",
-    "CO": "08", "CT": "09", "DE": "10", "DC": "11", "FL": "12",
-    "GA": "13", "HI": "15", "ID": "16", "IL": "17", "IN": "18",
-    "IA": "19", "KS": "20", "KY": "21", "LA": "22", "ME": "23",
-    "MD": "24", "MA": "25", "MI": "26", "MN": "27", "MS": "28",
-    "MO": "29", "MT": "30", "NE": "31", "NV": "32", "NH": "33",
-    "NJ": "34", "NM": "35", "NY": "36", "NC": "37", "ND": "38",
-    "OH": "39", "OK": "40", "OR": "41", "PA": "42", "RI": "44",
-    "SC": "45", "SD": "46", "TN": "47", "TX": "48", "UT": "49",
-    "VT": "50", "VA": "51", "WA": "53", "WV": "54", "WI": "55",
-    "WY": "56", "PR": "72", "GU": "66", "VI": "78", "AS": "60",
+    "AL": "01",
+    "AK": "02",
+    "AZ": "04",
+    "AR": "05",
+    "CA": "06",
+    "CO": "08",
+    "CT": "09",
+    "DE": "10",
+    "DC": "11",
+    "FL": "12",
+    "GA": "13",
+    "HI": "15",
+    "ID": "16",
+    "IL": "17",
+    "IN": "18",
+    "IA": "19",
+    "KS": "20",
+    "KY": "21",
+    "LA": "22",
+    "ME": "23",
+    "MD": "24",
+    "MA": "25",
+    "MI": "26",
+    "MN": "27",
+    "MS": "28",
+    "MO": "29",
+    "MT": "30",
+    "NE": "31",
+    "NV": "32",
+    "NH": "33",
+    "NJ": "34",
+    "NM": "35",
+    "NY": "36",
+    "NC": "37",
+    "ND": "38",
+    "OH": "39",
+    "OK": "40",
+    "OR": "41",
+    "PA": "42",
+    "RI": "44",
+    "SC": "45",
+    "SD": "46",
+    "TN": "47",
+    "TX": "48",
+    "UT": "49",
+    "VT": "50",
+    "VA": "51",
+    "WA": "53",
+    "WV": "54",
+    "WI": "55",
+    "WY": "56",
+    "PR": "72",
+    "GU": "66",
+    "VI": "78",
+    "AS": "60",
 }
 
 
@@ -99,14 +147,21 @@ class FCCBroadbandCollector(BaseCollector):
                 all_records,
                 unique_columns=["block_geoid", "provider_name", "technology"],
                 update_columns=[
-                    "state", "county", "latitude", "longitude",
-                    "max_download_mbps", "max_upload_mbps",
-                    "is_business_service", "collected_at",
+                    "state",
+                    "county",
+                    "latitude",
+                    "longitude",
+                    "max_download_mbps",
+                    "max_upload_mbps",
+                    "is_business_service",
+                    "collected_at",
                 ],
             )
 
         result = self.create_result(
-            status=CollectionStatus.SUCCESS if inserted > 0 else CollectionStatus.PARTIAL,
+            status=CollectionStatus.SUCCESS
+            if inserted > 0
+            else CollectionStatus.PARTIAL,
             total=len(all_records),
             processed=len(all_records),
             inserted=inserted,
@@ -142,11 +197,14 @@ class FCCBroadbandCollector(BaseCollector):
                     "county": provider.get("county_name", ""),
                     "latitude": provider.get("latitude"),
                     "longitude": provider.get("longitude"),
-                    "provider_name": provider.get("provider_name", provider.get("holding_company_name", "")),
+                    "provider_name": provider.get(
+                        "provider_name", provider.get("holding_company_name", "")
+                    ),
                     "technology": self._map_tech_code(provider.get("tech_code")),
                     "max_download_mbps": provider.get("max_download_speed"),
                     "max_upload_mbps": provider.get("max_upload_speed"),
-                    "is_business_service": provider.get("business_residential_code") == "B",
+                    "is_business_service": provider.get("business_residential_code")
+                    == "B",
                     "source": "fcc",
                     "collected_at": datetime.utcnow(),
                 }

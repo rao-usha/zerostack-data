@@ -4,6 +4,7 @@ DataLoaders for efficient batch data fetching.
 Prevents N+1 query problems by batching database requests.
 Uses synchronous database access to match existing codebase patterns.
 """
+
 from typing import List, Dict, Tuple, Any, Callable
 from collections import defaultdict
 from sqlalchemy import text
@@ -13,9 +14,7 @@ from app.graphql.types import PortfolioCompanyType, CoInvestorType
 
 
 def load_portfolio_companies(
-    db: Session,
-    investor_id: int,
-    investor_type: str
+    db: Session, investor_id: int, investor_type: str
 ) -> List[PortfolioCompanyType]:
     """Load portfolio companies for an investor."""
     query = text("""
@@ -28,7 +27,9 @@ def load_portfolio_companies(
         WHERE investor_id = :investor_id AND investor_type = :investor_type
         ORDER BY company_name
     """)
-    result = db.execute(query, {"investor_id": investor_id, "investor_type": investor_type})
+    result = db.execute(
+        query, {"investor_id": investor_id, "investor_type": investor_type}
+    )
 
     companies = []
     for row in result.mappings():
@@ -38,9 +39,7 @@ def load_portfolio_companies(
 
 
 def load_coinvestors(
-    db: Session,
-    investor_id: int,
-    investor_type: str
+    db: Session, investor_id: int, investor_type: str
 ) -> List[CoInvestorType]:
     """Load co-investors for an investor."""
     query = text("""
@@ -51,7 +50,9 @@ def load_coinvestors(
         WHERE primary_investor_id = :investor_id AND primary_investor_type = :investor_type
         ORDER BY co_investor_name
     """)
-    result = db.execute(query, {"investor_id": investor_id, "investor_type": investor_type})
+    result = db.execute(
+        query, {"investor_id": investor_id, "investor_type": investor_type}
+    )
 
     coinvestors = []
     for row in result.mappings():

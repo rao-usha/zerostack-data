@@ -3,6 +3,7 @@ Fetch GeoJSON boundaries from Census TIGERweb services.
 
 Uses the Census Bureau's TIGERweb REST API for geographic boundaries.
 """
+
 import logging
 from typing import Dict, Any, List, Optional
 import httpx
@@ -14,10 +15,10 @@ logger = logging.getLogger(__name__)
 class GeoJSONFetcher:
     """
     Fetch GeoJSON boundaries from Census TIGERweb services.
-    
+
     TIGERweb REST API: https://tigerweb.geo.census.gov/arcgis/rest/services/
     """
-    
+
     # TIGERweb base URLs for different vintages
     BASE_URL = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb"
 
@@ -26,7 +27,7 @@ class GeoJSONFetcher:
         "state": "State_2020",
         "county": "County_2020",
         "tract": "Census_Tracts_2020",
-        "zip code tabulation area": "ZCTA_2020"
+        "zip code tabulation area": "ZCTA_2020",
     }
 
     # Map geo levels to TIGERweb MapServer layer IDs
@@ -49,33 +50,33 @@ class GeoJSONFetcher:
         "county": "COUNTY",
         "tract": "COUNTY",
     }
-    
+
     def __init__(self, year: int = 2020):
         """
         Initialize GeoJSON fetcher.
-        
+
         Args:
             year: Vintage year for boundaries (default: 2020)
         """
         self.year = year
-    
+
     def _build_geojson_url(
         self,
         geo_level: str,
         state_fips: Optional[str] = None,
-        county_fips: Optional[str] = None
+        county_fips: Optional[str] = None,
     ) -> str:
         """
         Build TIGERweb URL for GeoJSON fetch.
-        
+
         Note: For now using simplified/smaller GeoJSON sources.
         Production would use full TIGER/Line shapefiles.
-        
+
         Args:
             geo_level: Geographic level (state, county, tract, zip code tabulation area)
             state_fips: State FIPS code for filtering
             county_fips: County FIPS code for filtering
-            
+
         Returns:
             Full URL for GeoJSON fetch
         """
@@ -105,26 +106,26 @@ class GeoJSONFetcher:
             f"&resultRecordCount=1000"
         )
         return url
-    
+
     async def fetch_geojson(
         self,
         geo_level: str,
         state_fips: Optional[str] = None,
         county_fips: Optional[str] = None,
-        max_retries: int = 3
+        max_retries: int = 3,
     ) -> Dict[str, Any]:
         """
         Fetch GeoJSON for a geographic level.
-        
+
         Args:
             geo_level: Geographic level (state, county, tract, zip code tabulation area)
             state_fips: Optional state FIPS filter
             county_fips: Optional county FIPS filter
             max_retries: Maximum retry attempts
-            
+
         Returns:
             GeoJSON FeatureCollection
-            
+
         Raises:
             httpx.HTTPError: On fetch errors
         """
@@ -148,18 +149,24 @@ class GeoJSONFetcher:
                         break
                     except (httpx.HTTPError, httpx.TimeoutException) as e:
                         if attempt < max_retries - 1:
-                            wait_time = 2 ** attempt
-                            logger.warning(f"GeoJSON fetch failed, retrying in {wait_time}s: {e}")
+                            wait_time = 2**attempt
+                            logger.warning(
+                                f"GeoJSON fetch failed, retrying in {wait_time}s: {e}"
+                            )
                             await asyncio.sleep(wait_time)
                         else:
-                            logger.error(f"Failed to fetch GeoJSON after {max_retries} attempts: {e}")
+                            logger.error(
+                                f"Failed to fetch GeoJSON after {max_retries} attempts: {e}"
+                            )
                             raise
                 else:
                     raise Exception("Failed to fetch GeoJSON")
 
                 features = page.get("features", [])
                 all_features.extend(features)
-                logger.info(f"Fetched {len(features)} features (offset={offset}, total={len(all_features)})")
+                logger.info(
+                    f"Fetched {len(features)} features (offset={offset}, total={len(all_features)})"
+                )
 
                 if len(features) < page_size:
                     break
@@ -172,34 +179,33 @@ class GeoJSONFetcher:
         }
         logger.info(f"Fetched GeoJSON with {len(all_features)} total features")
         return geojson
-    
+
     async def fetch_simplified_geojson(
         self,
         geo_level: str,
         state_fips: Optional[str] = None,
         county_fips: Optional[str] = None,
-        simplification_tolerance: float = 0.001
+        simplification_tolerance: float = 0.001,
     ) -> Dict[str, Any]:
         """
         Fetch simplified GeoJSON (smaller file size, less detail).
-        
+
         Useful for large geographic areas (many tracts, counties, etc).
-        
+
         Args:
             geo_level: Geographic level
             state_fips: Optional state FIPS filter
             county_fips: Optional county FIPS filter
             simplification_tolerance: Simplification tolerance (higher = simpler)
-            
+
         Returns:
             Simplified GeoJSON FeatureCollection
         """
         # For now, just fetch regular GeoJSON
         # Future: implement simplification algorithm or use generalized boundaries
         geojson = await self.fetch_geojson(geo_level, state_fips, county_fips)
-        
+
         # Note: For production, consider using mapshaper or similar for simplification
         # Or use Census generalized boundaries
-        
-        return geojson
 
+        return geojson

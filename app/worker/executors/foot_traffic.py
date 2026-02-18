@@ -1,4 +1,5 @@
 """Foot traffic executor for the worker queue."""
+
 import logging
 
 from sqlalchemy.orm import Session
@@ -31,12 +32,16 @@ async def execute(job: JobQueue, db: Session):
             state = payload.get("state")
             limit = payload.get("limit", 50)
 
-            send_job_event(db, "job_progress", {
-                "job_id": job.id,
-                "job_type": "foot_traffic",
-                "progress_pct": 10.0,
-                "progress_message": f"Discovering locations for {brand_name}",
-            })
+            send_job_event(
+                db,
+                "job_progress",
+                {
+                    "job_id": job.id,
+                    "job_type": "foot_traffic",
+                    "progress_pct": 10.0,
+                    "progress_message": f"Discovering locations for {brand_name}",
+                },
+            )
             db.commit()
 
             result = await discover_brand_locations(
@@ -50,12 +55,16 @@ async def execute(job: JobQueue, db: Session):
         elif action == "collect":
             location_id = payload.get("location_id")
 
-            send_job_event(db, "job_progress", {
-                "job_id": job.id,
-                "job_type": "foot_traffic",
-                "progress_pct": 10.0,
-                "progress_message": f"Collecting traffic for location {location_id}",
-            })
+            send_job_event(
+                db,
+                "job_progress",
+                {
+                    "job_id": job.id,
+                    "job_type": "foot_traffic",
+                    "progress_pct": 10.0,
+                    "progress_message": f"Collecting traffic for location {location_id}",
+                },
+            )
             db.commit()
 
             await collect_traffic_for_location(work_db, location_id)

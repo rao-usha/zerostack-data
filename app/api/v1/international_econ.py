@@ -9,6 +9,7 @@ Provides HTTP endpoints for ingesting data from:
 
 All sources are free, no API key required.
 """
+
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, BackgroundTasks
@@ -21,7 +22,7 @@ from app.sources.international_econ.client import (
     COMMON_WDI_INDICATORS,
     MAJOR_ECONOMIES,
     G7_COUNTRIES,
-    G20_COUNTRIES
+    G20_COUNTRIES,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,193 +34,156 @@ router = APIRouter(tags=["international_econ"])
 # Request Models
 # ============================================================================
 
+
 class WorldBankWDIIngestRequest(BaseModel):
     """Request model for World Bank WDI ingestion."""
+
     indicators: List[str] = Field(
         default=["NY.GDP.MKTP.CD", "NY.GDP.MKTP.KD.ZG", "SP.POP.TOTL"],
         description="List of WDI indicator codes (e.g., NY.GDP.MKTP.CD for GDP)",
-        examples=[["NY.GDP.MKTP.CD", "NY.GDP.PCAP.CD", "SP.POP.TOTL"]]
+        examples=[["NY.GDP.MKTP.CD", "NY.GDP.PCAP.CD", "SP.POP.TOTL"]],
     )
     countries: Optional[List[str]] = Field(
         None,
         description="List of country codes (None for all countries). Use ISO3 codes like USA, GBR, JPN",
-        examples=[["USA", "GBR", "JPN", "DEU", "FRA"]]
+        examples=[["USA", "GBR", "JPN", "DEU", "FRA"]],
     )
     start_year: int = Field(
-        default=2015,
-        description="Start year for data",
-        ge=1960,
-        le=2025
+        default=2015, description="Start year for data", ge=1960, le=2025
     )
     end_year: Optional[int] = Field(
-        None,
-        description="End year for data (None for current year)",
-        ge=1960,
-        le=2025
+        None, description="End year for data (None for current year)", ge=1960, le=2025
     )
 
 
 class WorldBankCountriesIngestRequest(BaseModel):
     """Request model for World Bank countries metadata ingestion."""
+
     pass  # No parameters needed
 
 
 class WorldBankIndicatorsIngestRequest(BaseModel):
     """Request model for World Bank indicators metadata ingestion."""
+
     search: Optional[str] = Field(
-        None,
-        description="Optional search term to filter indicators"
+        None, description="Optional search term to filter indicators"
     )
     max_results: int = Field(
-        default=1000,
-        description="Maximum number of indicators to fetch",
-        ge=1,
-        le=5000
+        default=1000, description="Maximum number of indicators to fetch", ge=1, le=5000
     )
 
 
 class IMFIFSIngestRequest(BaseModel):
     """Request model for IMF IFS data ingestion."""
-    indicator: str = Field(
-        default="NGDP_R_XDC",
-        description="IFS indicator code"
-    )
+
+    indicator: str = Field(default="NGDP_R_XDC", description="IFS indicator code")
     countries: Optional[List[str]] = Field(
-        None,
-        description="List of country codes (None for all)"
+        None, description="List of country codes (None for all)"
     )
-    start_year: str = Field(
-        default="2015",
-        description="Start year"
-    )
+    start_year: str = Field(default="2015", description="Start year")
     end_year: Optional[str] = Field(
-        None,
-        description="End year (None for current year)"
+        None, description="End year (None for current year)"
     )
 
 
 class BISEERIngestRequest(BaseModel):
     """Request model for BIS Effective Exchange Rate data ingestion."""
+
     countries: Optional[List[str]] = Field(
-        None,
-        description="List of country codes (None for all)"
+        None, description="List of country codes (None for all)"
     )
     eer_type: str = Field(
-        default="R",
-        description="Exchange rate type: R (Real) or N (Nominal)"
+        default="R", description="Exchange rate type: R (Real) or N (Nominal)"
     )
-    start_period: str = Field(
-        default="2015",
-        description="Start period (year)"
-    )
+    start_period: str = Field(default="2015", description="Start period (year)")
     end_period: Optional[str] = Field(
-        None,
-        description="End period (year, None for current)"
+        None, description="End period (year, None for current)"
     )
 
 
 class BISPropertyIngestRequest(BaseModel):
     """Request model for BIS property price data ingestion."""
+
     countries: Optional[List[str]] = Field(
-        None,
-        description="List of country codes (None for all)"
+        None, description="List of country codes (None for all)"
     )
-    start_period: str = Field(
-        default="2015",
-        description="Start period (year)"
-    )
+    start_period: str = Field(default="2015", description="Start period (year)")
     end_period: Optional[str] = Field(
-        None,
-        description="End period (year, None for current)"
+        None, description="End period (year, None for current)"
     )
 
 
 class OECDMEIIngestRequest(BaseModel):
     """Request model for OECD Main Economic Indicators ingestion."""
+
     countries: Optional[List[str]] = Field(
         default=["USA", "GBR", "DEU", "FRA", "JPN"],
         description="List of OECD country codes. Common: USA, GBR, DEU, FRA, JPN, CAN, ITA, AUS",
-        examples=[["USA", "GBR", "DEU", "FRA", "JPN"]]
+        examples=[["USA", "GBR", "DEU", "FRA", "JPN"]],
     )
     subjects: Optional[List[str]] = Field(
         None,
-        description="List of subject codes (economic indicators). None for all available."
+        description="List of subject codes (economic indicators). None for all available.",
     )
-    start_period: str = Field(
-        default="2015",
-        description="Start period (year)"
-    )
+    start_period: str = Field(default="2015", description="Start period (year)")
     end_period: Optional[str] = Field(
-        None,
-        description="End period (year, None for current)"
+        None, description="End period (year, None for current)"
     )
 
 
 class OECDKEIIngestRequest(BaseModel):
     """Request model for OECD Key Economic Indicators ingestion."""
+
     countries: Optional[List[str]] = Field(
         default=["USA", "GBR", "DEU", "FRA", "JPN"],
         description="List of OECD country codes",
-        examples=[["USA", "GBR", "DEU", "FRA", "JPN"]]
+        examples=[["USA", "GBR", "DEU", "FRA", "JPN"]],
     )
-    start_period: str = Field(
-        default="2015",
-        description="Start period (year)"
-    )
+    start_period: str = Field(default="2015", description="Start period (year)")
     end_period: Optional[str] = Field(
-        None,
-        description="End period (year, None for current)"
+        None, description="End period (year, None for current)"
     )
 
 
 class OECDLaborIngestRequest(BaseModel):
     """Request model for OECD Labour Force Statistics ingestion."""
+
     countries: Optional[List[str]] = Field(
         default=["USA", "GBR", "DEU", "FRA", "JPN"],
         description="List of OECD country codes",
-        examples=[["USA", "GBR", "DEU", "FRA", "JPN"]]
+        examples=[["USA", "GBR", "DEU", "FRA", "JPN"]],
     )
-    start_period: str = Field(
-        default="2015",
-        description="Start period (year)"
-    )
+    start_period: str = Field(default="2015", description="Start period (year)")
     end_period: Optional[str] = Field(
-        None,
-        description="End period (year, None for current)"
+        None, description="End period (year, None for current)"
     )
 
 
 class OECDTradeIngestRequest(BaseModel):
     """Request model for OECD Trade in Services ingestion."""
+
     countries: Optional[List[str]] = Field(
         default=["USA", "GBR", "DEU", "FRA", "JPN"],
         description="List of reporter country codes",
-        examples=[["USA", "GBR", "DEU", "FRA", "JPN"]]
+        examples=[["USA", "GBR", "DEU", "FRA", "JPN"]],
     )
-    start_period: str = Field(
-        default="2015",
-        description="Start period (year)"
-    )
+    start_period: str = Field(default="2015", description="Start period (year)")
     end_period: Optional[str] = Field(
-        None,
-        description="End period (year, None for current)"
+        None, description="End period (year, None for current)"
     )
 
 
 class OECDTaxIngestRequest(BaseModel):
     """Request model for OECD Tax Revenue Statistics ingestion."""
+
     countries: Optional[List[str]] = Field(
         default=["USA", "GBR", "DEU", "FRA", "JPN"],
         description="List of OECD country codes",
-        examples=[["USA", "GBR", "DEU", "FRA", "JPN"]]
+        examples=[["USA", "GBR", "DEU", "FRA", "JPN"]],
     )
-    start_period: str = Field(
-        default="2000",
-        description="Start period (year)"
-    )
+    start_period: str = Field(default="2000", description="Start period (year)")
     end_period: Optional[str] = Field(
-        None,
-        description="End period (year, None for current)"
+        None, description="End period (year, None for current)"
     )
 
 
@@ -227,11 +191,12 @@ class OECDTaxIngestRequest(BaseModel):
 # World Bank Endpoints
 # ============================================================================
 
+
 @router.post("/international/worldbank/wdi/ingest")
 async def ingest_worldbank_wdi_data(
     request: WorldBankWDIIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest World Bank World Development Indicators (WDI) data.
@@ -266,7 +231,9 @@ async def ingest_worldbank_wdi_data(
     ```
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="international_econ_worldbank",
+        db,
+        background_tasks,
+        source="international_econ_worldbank",
         config={
             "source": "worldbank",
             "dataset": "wdi",
@@ -281,8 +248,7 @@ async def ingest_worldbank_wdi_data(
 
 @router.post("/international/worldbank/countries/ingest")
 async def ingest_worldbank_countries_data(
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ):
     """
     Ingest World Bank countries metadata.
@@ -298,7 +264,9 @@ async def ingest_worldbank_countries_data(
     This is useful as reference data for joining with WDI indicator data.
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="international_econ_worldbank",
+        db,
+        background_tasks,
+        source="international_econ_worldbank",
         config={
             "source": "worldbank",
             "dataset": "countries",
@@ -311,7 +279,7 @@ async def ingest_worldbank_countries_data(
 async def ingest_worldbank_indicators_metadata(
     request: WorldBankIndicatorsIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest World Bank indicators metadata.
@@ -326,7 +294,9 @@ async def ingest_worldbank_indicators_metadata(
     Use the `search` parameter to filter indicators (e.g., "GDP", "population").
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="international_econ_worldbank",
+        db,
+        background_tasks,
+        source="international_econ_worldbank",
         config={
             "source": "worldbank",
             "dataset": "indicators",
@@ -362,8 +332,8 @@ async def get_common_wdi_indicators():
         "country_groups": {
             "major_economies": MAJOR_ECONOMIES,
             "g7": G7_COUNTRIES,
-            "g20": G20_COUNTRIES
-        }
+            "g20": G20_COUNTRIES,
+        },
     }
 
 
@@ -371,11 +341,12 @@ async def get_common_wdi_indicators():
 # IMF Endpoints
 # ============================================================================
 
+
 @router.post("/international/imf/ifs/ingest")
 async def ingest_imf_ifs_data(
     request: IMFIFSIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest IMF International Financial Statistics (IFS) data.
@@ -393,7 +364,9 @@ async def ingest_imf_ifs_data(
     Results may vary based on data availability.
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="international_econ_imf",
+        db,
+        background_tasks,
+        source="international_econ_imf",
         config={
             "source": "imf",
             "dataset": "ifs",
@@ -410,11 +383,12 @@ async def ingest_imf_ifs_data(
 # OECD Endpoints
 # ============================================================================
 
+
 @router.post("/international/oecd/mei/ingest")
 async def ingest_oecd_mei_data(
     request: OECDMEIIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest OECD Main Economic Indicators (MEI) data.
@@ -445,7 +419,9 @@ async def ingest_oecd_mei_data(
     ```
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="international_econ_oecd",
+        db,
+        background_tasks,
+        source="international_econ_oecd",
         config={
             "source": "oecd",
             "dataset": "mei",
@@ -462,7 +438,7 @@ async def ingest_oecd_mei_data(
 async def ingest_oecd_kei_data(
     request: OECDKEIIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest OECD Key Economic Indicators (KEI) data.
@@ -477,7 +453,9 @@ async def ingest_oecd_kei_data(
     **No API key required.**
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="international_econ_oecd",
+        db,
+        background_tasks,
+        source="international_econ_oecd",
         config={
             "source": "oecd",
             "dataset": "kei",
@@ -493,7 +471,7 @@ async def ingest_oecd_kei_data(
 async def ingest_oecd_labor_data(
     request: OECDLaborIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest OECD Annual Labour Force Statistics (ALFS) data.
@@ -507,7 +485,9 @@ async def ingest_oecd_labor_data(
     **No API key required.**
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="international_econ_oecd",
+        db,
+        background_tasks,
+        source="international_econ_oecd",
         config={
             "source": "oecd",
             "dataset": "alfs",
@@ -523,7 +503,7 @@ async def ingest_oecd_labor_data(
 async def ingest_oecd_trade_data(
     request: OECDTradeIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest OECD Balanced Trade in Services (BATIS) data.
@@ -536,7 +516,9 @@ async def ingest_oecd_trade_data(
     **No API key required.**
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="international_econ_oecd",
+        db,
+        background_tasks,
+        source="international_econ_oecd",
         config={
             "source": "oecd",
             "dataset": "batis",
@@ -552,7 +534,7 @@ async def ingest_oecd_trade_data(
 async def ingest_oecd_tax_data(
     request: OECDTaxIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest OECD Tax Revenue Statistics data.
@@ -567,7 +549,9 @@ async def ingest_oecd_tax_data(
     **No API key required.**
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="international_econ_oecd",
+        db,
+        background_tasks,
+        source="international_econ_oecd",
         config={
             "source": "oecd",
             "dataset": "tax",
@@ -583,11 +567,12 @@ async def ingest_oecd_tax_data(
 # BIS Endpoints
 # ============================================================================
 
+
 @router.post("/international/bis/eer/ingest")
 async def ingest_bis_eer_data(
     request: BISEERIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest BIS Effective Exchange Rate data.
@@ -605,7 +590,9 @@ async def ingest_bis_eer_data(
     - `N` - Nominal Effective Exchange Rate
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="international_econ_bis",
+        db,
+        background_tasks,
+        source="international_econ_bis",
         config={
             "source": "bis",
             "dataset": "eer",
@@ -622,7 +609,7 @@ async def ingest_bis_eer_data(
 async def ingest_bis_property_data(
     request: BISPropertyIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest BIS residential property price data.
@@ -641,7 +628,9 @@ async def ingest_bis_property_data(
     - Financial stability monitoring
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="international_econ_bis",
+        db,
+        background_tasks,
+        source="international_econ_bis",
         config={
             "source": "bis",
             "dataset": "property",

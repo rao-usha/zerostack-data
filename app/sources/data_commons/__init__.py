@@ -7,6 +7,7 @@ covering demographics, economics, education, environment, energy, health, and ho
 Official API: https://docs.datacommons.org/api/rest/v2
 API Key: Optional (higher rate limits with API key)
 """
+
 from app.sources.data_commons.client import DataCommonsClient
 from app.sources.data_commons.ingest import (
     ingest_statistical_variable,

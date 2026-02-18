@@ -4,6 +4,7 @@ Co-investor Network Analysis Engine.
 Builds and analyzes network graphs showing investor relationships
 based on shared portfolio investments and co-investment records.
 """
+
 import logging
 from typing import Dict, List, Optional, Tuple, Set
 from collections import defaultdict
@@ -62,7 +63,9 @@ class NetworkEngine:
         self._calculate_node_metrics()
 
         self._built = True
-        logger.info(f"Network built: {len(self._nodes)} nodes, {len(self._edges)} edges")
+        logger.info(
+            f"Network built: {len(self._nodes)} nodes, {len(self._edges)} edges"
+        )
 
     def _load_investors(self) -> None:
         """Load all investors as nodes."""
@@ -123,7 +126,9 @@ class NetworkEngine:
         result = self.db.execute(query)
 
         for row in result.mappings():
-            source_id = self._node_id(row["primary_investor_id"], row["primary_investor_type"])
+            source_id = self._node_id(
+                row["primary_investor_id"], row["primary_investor_type"]
+            )
 
             # Co-investor might not be in our database - create external node
             co_name = row["co_investor_name"]
@@ -235,7 +240,9 @@ class NetworkEngine:
         # Calculate simple centrality (normalized degree)
         max_degree = max((n["degree"] for n in self._nodes.values()), default=1)
         for node in self._nodes.values():
-            node["centrality"] = round(node["degree"] / max_degree, 3) if max_degree > 0 else 0
+            node["centrality"] = (
+                round(node["degree"] / max_degree, 3) if max_degree > 0 else 0
+            )
 
     def get_network_graph(
         self,
@@ -254,10 +261,7 @@ class NetworkEngine:
         self.build_network()
 
         # Filter edges
-        filtered_edges = [
-            e for e in self._edges.values()
-            if e["weight"] >= min_weight
-        ]
+        filtered_edges = [e for e in self._edges.values() if e["weight"] >= min_weight]
 
         # Sort by weight descending
         filtered_edges.sort(key=lambda x: x["weight"], reverse=True)
@@ -282,9 +286,15 @@ class NetworkEngine:
 
         # Calculate stats
         total_weight = sum(e["weight"] for e in filtered_edges)
-        avg_degree = sum(n["degree"] for n in filtered_nodes) / len(filtered_nodes) if filtered_nodes else 0
+        avg_degree = (
+            sum(n["degree"] for n in filtered_nodes) / len(filtered_nodes)
+            if filtered_nodes
+            else 0
+        )
         max_possible_edges = len(filtered_nodes) * (len(filtered_nodes) - 1) / 2
-        density = len(filtered_edges) / max_possible_edges if max_possible_edges > 0 else 0
+        density = (
+            len(filtered_edges) / max_possible_edges if max_possible_edges > 0 else 0
+        )
 
         return {
             "nodes": filtered_nodes,
@@ -295,7 +305,7 @@ class NetworkEngine:
                 "total_weight": total_weight,
                 "avg_degree": round(avg_degree, 2),
                 "density": round(density, 3),
-            }
+            },
         }
 
     def get_investor_network(
@@ -318,7 +328,11 @@ class NetworkEngine:
 
         center_id = self._node_id(investor_id, investor_type)
         if center_id not in self._nodes:
-            return {"nodes": [], "edges": [], "stats": {"total_nodes": 0, "total_edges": 0}}
+            return {
+                "nodes": [],
+                "edges": [],
+                "stats": {"total_nodes": 0, "total_edges": 0},
+            }
 
         # BFS to find connected nodes up to depth
         visited: Set[str] = {center_id}
@@ -340,13 +354,16 @@ class NetworkEngine:
         # Collect nodes and edges
         nodes = [self._nodes[nid] for nid in visited if nid in self._nodes]
         edges = [
-            e for e in self._edges.values()
-            if e["source"] in visited and e["target"] in visited and e["weight"] >= min_weight
+            e
+            for e in self._edges.values()
+            if e["source"] in visited
+            and e["target"] in visited
+            and e["weight"] >= min_weight
         ]
 
         # Mark the center node
         for node in nodes:
-            node["is_center"] = (node["id"] == center_id)
+            node["is_center"] = node["id"] == center_id
 
         return {
             "center": self._nodes.get(center_id),
@@ -355,8 +372,10 @@ class NetworkEngine:
             "stats": {
                 "total_nodes": len(nodes),
                 "total_edges": len(edges),
-                "direct_connections": sum(1 for n in nodes if n.get("is_center") is False),
-            }
+                "direct_connections": sum(
+                    1 for n in nodes if n.get("is_center") is False
+                ),
+            },
         }
 
     def get_central_investors(self, limit: int = 20) -> List[Dict]:
@@ -369,10 +388,13 @@ class NetworkEngine:
 
         # Filter out external nodes and sort by weighted degree
         internal_nodes = [
-            n for n in self._nodes.values()
+            n
+            for n in self._nodes.values()
             if n["type"] != "external" and n["degree"] > 0
         ]
-        internal_nodes.sort(key=lambda x: (x["weighted_degree"], x["degree"]), reverse=True)
+        internal_nodes.sort(
+            key=lambda x: (x["weighted_degree"], x["degree"]), reverse=True
+        )
 
         return internal_nodes[:limit]
 
@@ -428,17 +450,21 @@ class NetworkEngine:
             # Find common sectors/industries
             member_nodes = [self._nodes[m] for m in members if m in self._nodes]
 
-            result.append({
-                "id": cluster_id,
-                "size": len(members),
-                "members": [
-                    {"id": n["id"], "name": n["name"], "type": n["type"]}
-                    for n in member_nodes
-                ],
-                "avg_degree": round(
-                    sum(n["degree"] for n in member_nodes) / len(member_nodes), 2
-                ) if member_nodes else 0,
-            })
+            result.append(
+                {
+                    "id": cluster_id,
+                    "size": len(members),
+                    "members": [
+                        {"id": n["id"], "name": n["name"], "type": n["type"]}
+                        for n in member_nodes
+                    ],
+                    "avg_degree": round(
+                        sum(n["degree"] for n in member_nodes) / len(member_nodes), 2
+                    )
+                    if member_nodes
+                    else 0,
+                }
+            )
 
         # Sort by size descending
         result.sort(key=lambda x: x["size"], reverse=True)

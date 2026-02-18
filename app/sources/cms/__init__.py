@@ -8,4 +8,3 @@ This module provides ingestion functions for:
 """
 
 __all__ = ["ingest", "client", "metadata"]
-

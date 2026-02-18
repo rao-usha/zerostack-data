@@ -18,7 +18,7 @@ from app.auth.api_keys import (
     APIKeyUpdate,
     APIKeyResponse,
     APIKeyCreatedResponse,
-    UsageStatsResponse
+    UsageStatsResponse,
 )
 
 router = APIRouter(prefix="/api-keys", tags=["API Keys"])
@@ -29,11 +29,10 @@ def get_service(db: Session = Depends(get_db)) -> APIKeyService:
     return APIKeyService(db)
 
 
-@router.post("", response_model=APIKeyCreatedResponse, status_code=status.HTTP_201_CREATED)
-def create_api_key(
-    data: APIKeyCreate,
-    service: APIKeyService = Depends(get_service)
-):
+@router.post(
+    "", response_model=APIKeyCreatedResponse, status_code=status.HTTP_201_CREATED
+)
+def create_api_key(data: APIKeyCreate, service: APIKeyService = Depends(get_service)):
     """
     Create a new API key.
 
@@ -50,8 +49,7 @@ def create_api_key(
 
 @router.get("", response_model=List[APIKeyResponse])
 def list_api_keys(
-    owner_email: Optional[str] = None,
-    service: APIKeyService = Depends(get_service)
+    owner_email: Optional[str] = None, service: APIKeyService = Depends(get_service)
 ):
     """
     List API keys.
@@ -63,10 +61,7 @@ def list_api_keys(
 
 
 @router.get("/{key_id}", response_model=APIKeyResponse)
-def get_api_key(
-    key_id: int,
-    service: APIKeyService = Depends(get_service)
-):
+def get_api_key(key_id: int, service: APIKeyService = Depends(get_service)):
     """
     Get details of a specific API key.
 
@@ -75,17 +70,14 @@ def get_api_key(
     key = service.get_key(key_id)
     if not key:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="API key not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="API key not found"
         )
     return key
 
 
 @router.patch("/{key_id}", response_model=APIKeyResponse)
 def update_api_key(
-    key_id: int,
-    data: APIKeyUpdate,
-    service: APIKeyService = Depends(get_service)
+    key_id: int, data: APIKeyUpdate, service: APIKeyService = Depends(get_service)
 ):
     """
     Update an API key.
@@ -95,8 +87,7 @@ def update_api_key(
     existing = service.get_key(key_id)
     if not existing:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="API key not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="API key not found"
         )
 
     updated = service.update_key(key_id, data)
@@ -104,10 +95,7 @@ def update_api_key(
 
 
 @router.delete("/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
-def revoke_api_key(
-    key_id: int,
-    service: APIKeyService = Depends(get_service)
-):
+def revoke_api_key(key_id: int, service: APIKeyService = Depends(get_service)):
     """
     Revoke an API key.
 
@@ -117,17 +105,13 @@ def revoke_api_key(
     success = service.revoke_key(key_id)
     if not success:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="API key not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="API key not found"
         )
     return None
 
 
 @router.get("/{key_id}/usage", response_model=UsageStatsResponse)
-def get_api_key_usage(
-    key_id: int,
-    service: APIKeyService = Depends(get_service)
-):
+def get_api_key_usage(key_id: int, service: APIKeyService = Depends(get_service)):
     """
     Get usage statistics for an API key.
 
@@ -140,7 +124,6 @@ def get_api_key_usage(
     usage = service.get_usage(key_id)
     if not usage:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="API key not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="API key not found"
         )
     return usage

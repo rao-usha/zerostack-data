@@ -18,8 +18,10 @@ router = APIRouter(prefix="/github", tags=["github"])
 
 # Response Models
 
+
 class OrgMetrics(BaseModel):
     """Organization metrics."""
+
     total_stars: int
     total_forks: int
     repo_count: Optional[int] = None
@@ -29,6 +31,7 @@ class OrgMetrics(BaseModel):
 
 class OrganizationResponse(BaseModel):
     """Organization overview response."""
+
     login: str
     name: Optional[str] = None
     description: Optional[str] = None
@@ -46,6 +49,7 @@ class OrganizationResponse(BaseModel):
 
 class RepositorySummary(BaseModel):
     """Repository summary."""
+
     name: str
     full_name: str
     description: Optional[str] = None
@@ -62,6 +66,7 @@ class RepositorySummary(BaseModel):
 
 class ReposResponse(BaseModel):
     """Repository list response."""
+
     org: str
     total: int
     limit: int
@@ -71,6 +76,7 @@ class ReposResponse(BaseModel):
 
 class WeeklyActivity(BaseModel):
     """Weekly activity data."""
+
     week: str
     commits: int
     repos_active: Optional[int] = None
@@ -78,12 +84,14 @@ class WeeklyActivity(BaseModel):
 
 class ActivityTrends(BaseModel):
     """Activity trends."""
+
     commit_trend: str
     total_commits: Optional[int] = None
 
 
 class ActivityResponse(BaseModel):
     """Activity trends response."""
+
     org: str
     period: str
     weekly_activity: List[WeeklyActivity]
@@ -93,6 +101,7 @@ class ActivityResponse(BaseModel):
 
 class ContributorSummary(BaseModel):
     """Contributor summary."""
+
     username: str
     avatar_url: Optional[str] = None
     total_contributions: int
@@ -101,6 +110,7 @@ class ContributorSummary(BaseModel):
 
 class ContributorsResponse(BaseModel):
     """Contributors response."""
+
     org: str
     total_contributors: int
     contributors: List[ContributorSummary]
@@ -108,6 +118,7 @@ class ContributorsResponse(BaseModel):
 
 class VelocityBreakdown(BaseModel):
     """Velocity score breakdown."""
+
     commit_frequency: int
     pr_velocity: int
     issue_resolution: int
@@ -117,6 +128,7 @@ class VelocityBreakdown(BaseModel):
 
 class VelocityResponse(BaseModel):
     """Velocity score response."""
+
     org: str
     velocity_score: int
     breakdown: VelocityBreakdown
@@ -126,6 +138,7 @@ class VelocityResponse(BaseModel):
 
 class RepositoryDetail(BaseModel):
     """Full repository details."""
+
     name: str
     full_name: str
     description: Optional[str] = None
@@ -149,6 +162,7 @@ class RepositoryDetail(BaseModel):
 
 class LanguageStat(BaseModel):
     """Language statistics."""
+
     language: str
     count: int
     stars: int
@@ -156,6 +170,7 @@ class LanguageStat(BaseModel):
 
 class StatsResponse(BaseModel):
     """Aggregate statistics response."""
+
     total_organizations: int
     total_repositories: int
     total_stars: Optional[int] = None
@@ -166,12 +181,14 @@ class StatsResponse(BaseModel):
 
 class FetchResponse(BaseModel):
     """Fetch result response."""
+
     status: str
     org: str
     message: str
 
 
 # Endpoints
+
 
 @router.get(
     "/org/{org}",
@@ -194,7 +211,7 @@ def get_organization(
     if not result:
         raise HTTPException(
             status_code=404,
-            detail=f"Organization '{org}' not found. Use POST /github/org/{org}/fetch to fetch data."
+            detail=f"Organization '{org}' not found. Use POST /github/org/{org}/fetch to fetch data.",
         )
 
     return result
@@ -221,8 +238,7 @@ async def fetch_organization(
 
     if not result:
         raise HTTPException(
-            status_code=404,
-            detail=f"Organization '{org}' not found on GitHub"
+            status_code=404, detail=f"Organization '{org}' not found on GitHub"
         )
 
     return result
@@ -307,8 +323,7 @@ def get_velocity_score(
 
     if not result:
         raise HTTPException(
-            status_code=404,
-            detail=f"Organization '{org}' not found. Fetch data first."
+            status_code=404, detail=f"Organization '{org}' not found. Fetch data first."
         )
 
     return result

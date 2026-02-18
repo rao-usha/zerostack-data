@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class HoldingSummary:
     """Summary of a portfolio holding."""
+
     company_id: int
     company_name: str
     industry: Optional[str] = None
@@ -34,6 +35,7 @@ class HoldingSummary:
 @dataclass
 class InvestorSummary:
     """Summary of an investor."""
+
     id: int
     name: str
     investor_type: str
@@ -44,6 +46,7 @@ class InvestorSummary:
 @dataclass
 class IndustryAllocation:
     """Industry allocation comparison."""
+
     industry: str
     count_a: int
     count_b: int
@@ -54,6 +57,7 @@ class IndustryAllocation:
 @dataclass
 class PortfolioComparison:
     """Complete portfolio comparison result."""
+
     investor_a: InvestorSummary
     investor_b: InvestorSummary
 
@@ -83,6 +87,7 @@ class PortfolioComparison:
 @dataclass
 class HistoricalDiff:
     """Historical portfolio diff result."""
+
     investor_id: int
     investor_name: str
     period_start: str
@@ -118,7 +123,7 @@ class PortfolioComparisonService:
                 FROM lp_fund
                 WHERE id = :id
             """),
-            {"id": investor_id}
+            {"id": investor_id},
         )
         row = result.fetchone()
 
@@ -132,15 +137,12 @@ class PortfolioComparisonService:
                 FROM portfolio_companies
                 WHERE investor_id = :id
             """),
-            {"id": investor_id}
+            {"id": investor_id},
         )
         holdings_count = count_result.scalar() or 0
 
         return InvestorSummary(
-            id=row[0],
-            name=row[1],
-            investor_type=row[2],
-            total_holdings=holdings_count
+            id=row[0], name=row[1], investor_type=row[2], total_holdings=holdings_count
         )
 
     def get_holdings(self, investor_id: int) -> List[HoldingSummary]:
@@ -152,7 +154,7 @@ class PortfolioComparisonService:
                 WHERE investor_id = :investor_id
                 ORDER BY company_name
             """),
-            {"investor_id": investor_id}
+            {"investor_id": investor_id},
         )
 
         return [
@@ -161,12 +163,14 @@ class PortfolioComparisonService:
                 company_name=row[1],
                 industry=row[2],
                 market_value_usd=row[3],
-                shares_held=row[4]
+                shares_held=row[4],
             )
             for row in result.fetchall()
         ]
 
-    def get_top_holdings(self, investor_id: int, limit: int = 10) -> List[HoldingSummary]:
+    def get_top_holdings(
+        self, investor_id: int, limit: int = 10
+    ) -> List[HoldingSummary]:
         """Get top holdings by market value (or alphabetically if no values)."""
         result = self.db.execute(
             text("""
@@ -181,7 +185,7 @@ class PortfolioComparisonService:
                     company_name ASC
                 LIMIT :limit
             """),
-            {"investor_id": investor_id, "limit": limit}
+            {"investor_id": investor_id, "limit": limit},
         )
 
         return [
@@ -190,16 +194,13 @@ class PortfolioComparisonService:
                 company_name=row[1],
                 industry=row[2],
                 market_value_usd=row[3],
-                shares_held=row[4]
+                shares_held=row[4],
             )
             for row in result.fetchall()
         ]
 
     def compare_portfolios(
-        self,
-        investor_a_id: int,
-        investor_b_id: int,
-        top_holdings: int = 10
+        self, investor_a_id: int, investor_b_id: int, top_holdings: int = 10
     ) -> Optional[PortfolioComparison]:
         """Compare two investors' current portfolios."""
 
@@ -263,13 +264,11 @@ class PortfolioComparisonService:
             top_holdings_a=top_a,
             top_holdings_b=top_b,
             industry_comparison=industry_comparison,
-            comparison_date=datetime.utcnow().isoformat()
+            comparison_date=datetime.utcnow().isoformat(),
         )
 
     def _compare_industries(
-        self,
-        holdings_a: List[HoldingSummary],
-        holdings_b: List[HoldingSummary]
+        self, holdings_a: List[HoldingSummary], holdings_b: List[HoldingSummary]
     ) -> List[IndustryAllocation]:
         """Compare industry allocations between two sets of holdings."""
 
@@ -298,13 +297,15 @@ class PortfolioComparisonService:
             count_a = industry_counts_a.get(industry, 0)
             count_b = industry_counts_b.get(industry, 0)
 
-            comparisons.append(IndustryAllocation(
-                industry=industry,
-                count_a=count_a,
-                count_b=count_b,
-                percentage_a=round((count_a / total_a * 100) if total_a else 0, 2),
-                percentage_b=round((count_b / total_b * 100) if total_b else 0, 2)
-            ))
+            comparisons.append(
+                IndustryAllocation(
+                    industry=industry,
+                    count_a=count_a,
+                    count_b=count_b,
+                    percentage_a=round((count_a / total_a * 100) if total_a else 0, 2),
+                    percentage_b=round((count_b / total_b * 100) if total_b else 0, 2),
+                )
+            )
 
         # Sort by total count descending
         comparisons.sort(key=lambda x: x.count_a + x.count_b, reverse=True)
@@ -315,7 +316,7 @@ class PortfolioComparisonService:
         self,
         investor_id: int,
         start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None
+        end_date: Optional[datetime] = None,
     ) -> Optional[HistoricalDiff]:
         """Compare an investor's portfolio over time."""
 
@@ -331,7 +332,7 @@ class PortfolioComparisonService:
                 WHERE investor_id = :investor_id
                 ORDER BY cdate
             """),
-            {"investor_id": investor_id}
+            {"investor_id": investor_id},
         )
         dates = [row[0] for row in dates_result.fetchall()]
 
@@ -347,7 +348,7 @@ class PortfolioComparisonService:
                 unchanged_count=investor.total_holdings,
                 holdings_start=investor.total_holdings,
                 holdings_end=investor.total_holdings,
-                net_change=0
+                net_change=0,
             )
 
         # Use provided dates or default to first and last
@@ -366,7 +367,7 @@ class PortfolioComparisonService:
                 WHERE investor_id = :investor_id
                 AND DATE(collected_date) <= :start_date
             """),
-            {"investor_id": investor_id, "start_date": period_start}
+            {"investor_id": investor_id, "start_date": period_start},
         )
         start_names = {row[0].lower().strip(): row for row in start_holdings.fetchall()}
 
@@ -378,7 +379,7 @@ class PortfolioComparisonService:
                 WHERE investor_id = :investor_id
                 AND DATE(collected_date) <= :end_date
             """),
-            {"investor_id": investor_id, "end_date": period_end}
+            {"investor_id": investor_id, "end_date": period_end},
         )
         end_names = {row[0].lower().strip(): row for row in end_holdings.fetchall()}
 
@@ -394,7 +395,7 @@ class PortfolioComparisonService:
             HoldingSummary(
                 company_id=end_names[name][2],
                 company_name=end_names[name][0],
-                industry=end_names[name][1]
+                industry=end_names[name][1],
             )
             for name in sorted(added_names)
         ]
@@ -403,7 +404,7 @@ class PortfolioComparisonService:
             HoldingSummary(
                 company_id=0,  # Don't have ID for removed
                 company_name=start_names[name][0],
-                industry=start_names[name][1]
+                industry=start_names[name][1],
             )
             for name in sorted(removed_names)
         ]
@@ -418,13 +419,11 @@ class PortfolioComparisonService:
             unchanged_count=len(unchanged_names),
             holdings_start=len(start_set),
             holdings_end=len(end_set),
-            net_change=len(end_set) - len(start_set)
+            net_change=len(end_set) - len(start_set),
         )
 
     def get_industry_comparison(
-        self,
-        investor_a_id: int,
-        investor_b_id: int
+        self, investor_a_id: int, investor_b_id: int
     ) -> Optional[List[IndustryAllocation]]:
         """Get industry allocation comparison between two investors."""
 

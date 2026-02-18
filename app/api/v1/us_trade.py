@@ -8,6 +8,7 @@ Provides HTTP endpoints for ingesting US Census Bureau International Trade data:
 - Port/district-level trade
 - Trade summaries by country
 """
+
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, BackgroundTasks
@@ -26,6 +27,7 @@ router = APIRouter(tags=["us_trade"])
 
 # ========== Enums for validation ==========
 
+
 class TradeType(str, Enum):
     EXPORT = "export"
     IMPORT = "import"
@@ -33,145 +35,113 @@ class TradeType(str, Enum):
 
 # ========== Request Models ==========
 
+
 class ExportsHSIngestRequest(BaseModel):
     """Request model for US exports by HS code ingestion."""
+
     year: int = Field(
-        ...,
-        description="Data year (2013 to present)",
-        ge=2013,
-        examples=[2024]
+        ..., description="Data year (2013 to present)", ge=2013, examples=[2024]
     )
     month: Optional[int] = Field(
         None,
         description="Month (1-12). Leave empty for annual totals.",
         ge=1,
         le=12,
-        examples=[6]
+        examples=[6],
     )
     hs_code: Optional[str] = Field(
         None,
         description="HS code filter (2, 4, 6, or 10 digit). Example: '84' for machinery.",
-        examples=["84"]
+        examples=["84"],
     )
     country: Optional[str] = Field(
         None,
         description="Census country code filter. Example: '5700' for China.",
-        examples=["5700"]
+        examples=["5700"],
     )
 
 
 class ImportsHSIngestRequest(BaseModel):
     """Request model for US imports by HS code ingestion."""
+
     year: int = Field(
-        ...,
-        description="Data year (2013 to present)",
-        ge=2013,
-        examples=[2024]
+        ..., description="Data year (2013 to present)", ge=2013, examples=[2024]
     )
     month: Optional[int] = Field(
         None,
         description="Month (1-12). Leave empty for annual totals.",
         ge=1,
         le=12,
-        examples=[6]
+        examples=[6],
     )
     hs_code: Optional[str] = Field(
         None,
         description="HS code filter (2, 4, 6, or 10 digit). Example: '85' for electronics.",
-        examples=["85"]
+        examples=["85"],
     )
     country: Optional[str] = Field(
         None,
         description="Census country code filter. Example: '5700' for China.",
-        examples=["5700"]
+        examples=["5700"],
     )
 
 
 class StateExportsIngestRequest(BaseModel):
     """Request model for US state-level exports ingestion."""
+
     year: int = Field(
-        ...,
-        description="Data year (2013 to present)",
-        ge=2013,
-        examples=[2024]
+        ..., description="Data year (2013 to present)", ge=2013, examples=[2024]
     )
     month: Optional[int] = Field(
-        None,
-        description="Month (1-12). Leave empty for annual totals.",
-        ge=1,
-        le=12
+        None, description="Month (1-12). Leave empty for annual totals.", ge=1, le=12
     )
     state: Optional[str] = Field(
-        None,
-        description="State FIPS code. Example: '48' for Texas.",
-        examples=["48"]
+        None, description="State FIPS code. Example: '48' for Texas.", examples=["48"]
     )
     hs_code: Optional[str] = Field(
-        None,
-        description="HS code filter. Example: '27' for mineral fuels."
+        None, description="HS code filter. Example: '27' for mineral fuels."
     )
-    country: Optional[str] = Field(
-        None,
-        description="Census country code filter."
-    )
+    country: Optional[str] = Field(None, description="Census country code filter.")
 
 
 class PortTradeIngestRequest(BaseModel):
     """Request model for US port-level trade ingestion."""
+
     year: int = Field(
-        ...,
-        description="Data year (2013 to present)",
-        ge=2013,
-        examples=[2024]
+        ..., description="Data year (2013 to present)", ge=2013, examples=[2024]
     )
-    trade_type: TradeType = Field(
-        ...,
-        description="Export or import"
-    )
+    trade_type: TradeType = Field(..., description="Export or import")
     month: Optional[int] = Field(
-        None,
-        description="Month (1-12). Leave empty for annual totals.",
-        ge=1,
-        le=12
+        None, description="Month (1-12). Leave empty for annual totals.", ge=1, le=12
     )
     district: Optional[str] = Field(
         None,
         description="Customs district code. Example: '55' for Houston.",
-        examples=["55"]
+        examples=["55"],
     )
-    hs_code: Optional[str] = Field(
-        None,
-        description="HS code filter."
-    )
-    country: Optional[str] = Field(
-        None,
-        description="Census country code filter."
-    )
+    hs_code: Optional[str] = Field(None, description="HS code filter.")
+    country: Optional[str] = Field(None, description="Census country code filter.")
 
 
 class TradeSummaryIngestRequest(BaseModel):
     """Request model for US trade summary ingestion."""
+
     year: int = Field(
-        ...,
-        description="Data year (2013 to present)",
-        ge=2013,
-        examples=[2024]
+        ..., description="Data year (2013 to present)", ge=2013, examples=[2024]
     )
     month: Optional[int] = Field(
-        None,
-        description="Month (1-12). Leave empty for annual totals.",
-        ge=1,
-        le=12
+        None, description="Month (1-12). Leave empty for annual totals.", ge=1, le=12
     )
 
 
 # ========== Endpoints ==========
 
+
 @router.post("/us-trade/exports/hs/ingest")
 async def ingest_exports_by_hs(
     request: ExportsHSIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest US export data by HS code (Harmonized System).
@@ -201,9 +171,11 @@ async def ingest_exports_by_hs(
     - '4280': Germany
     """
     settings = get_settings()
-    api_key = getattr(settings, 'census_survey_api_key', None)
+    api_key = getattr(settings, "census_survey_api_key", None)
     return create_and_dispatch_job(
-        db, background_tasks, source="us_trade",
+        db,
+        background_tasks,
+        source="us_trade",
         config={
             "dataset": "exports_hs",
             "year": request.year,
@@ -220,7 +192,7 @@ async def ingest_exports_by_hs(
 async def ingest_imports_by_hs(
     request: ImportsHSIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest US import data by HS code (Harmonized System).
@@ -235,9 +207,11 @@ async def ingest_imports_by_hs(
     **No API key required** (Census Bureau public API)
     """
     settings = get_settings()
-    api_key = getattr(settings, 'census_survey_api_key', None)
+    api_key = getattr(settings, "census_survey_api_key", None)
     return create_and_dispatch_job(
-        db, background_tasks, source="us_trade",
+        db,
+        background_tasks,
+        source="us_trade",
         config={
             "dataset": "imports_hs",
             "year": request.year,
@@ -254,7 +228,7 @@ async def ingest_imports_by_hs(
 async def ingest_state_exports(
     request: StateExportsIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest US state-level export data.
@@ -275,9 +249,11 @@ async def ingest_state_exports(
     **No API key required** (Census Bureau public API)
     """
     settings = get_settings()
-    api_key = getattr(settings, 'census_survey_api_key', None)
+    api_key = getattr(settings, "census_survey_api_key", None)
     return create_and_dispatch_job(
-        db, background_tasks, source="us_trade",
+        db,
+        background_tasks,
+        source="us_trade",
         config={
             "dataset": "state_exports",
             "year": request.year,
@@ -295,7 +271,7 @@ async def ingest_state_exports(
 async def ingest_port_trade(
     request: PortTradeIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest US trade data by customs district (port of entry).
@@ -313,9 +289,11 @@ async def ingest_port_trade(
     **No API key required** (Census Bureau public API)
     """
     settings = get_settings()
-    api_key = getattr(settings, 'census_survey_api_key', None)
+    api_key = getattr(settings, "census_survey_api_key", None)
     return create_and_dispatch_job(
-        db, background_tasks, source="us_trade",
+        db,
+        background_tasks,
+        source="us_trade",
         config={
             "dataset": "port_trade",
             "year": request.year,
@@ -334,7 +312,7 @@ async def ingest_port_trade(
 async def ingest_trade_summary(
     request: TradeSummaryIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest aggregated US trade summary by country.
@@ -356,9 +334,11 @@ async def ingest_trade_summary(
     **No API key required** (Census Bureau public API)
     """
     settings = get_settings()
-    api_key = getattr(settings, 'census_survey_api_key', None)
+    api_key = getattr(settings, "census_survey_api_key", None)
     return create_and_dispatch_job(
-        db, background_tasks, source="us_trade",
+        db,
+        background_tasks,
+        source="us_trade",
         config={
             "dataset": "summary",
             "year": request.year,
@@ -382,7 +362,7 @@ async def list_us_trade_datasets():
                 "description": "Export values by Harmonized System commodity code",
                 "endpoint": "/us-trade/exports/hs/ingest",
                 "source": "Census Bureau International Trade API",
-                "filters": ["year", "month", "hs_code", "country"]
+                "filters": ["year", "month", "hs_code", "country"],
             },
             {
                 "id": "imports_hs",
@@ -390,7 +370,7 @@ async def list_us_trade_datasets():
                 "description": "Import values with duty breakdown by HS code",
                 "endpoint": "/us-trade/imports/hs/ingest",
                 "source": "Census Bureau International Trade API",
-                "filters": ["year", "month", "hs_code", "country"]
+                "filters": ["year", "month", "hs_code", "country"],
             },
             {
                 "id": "exports_state",
@@ -398,7 +378,7 @@ async def list_us_trade_datasets():
                 "description": "State-level exports by commodity and destination",
                 "endpoint": "/us-trade/exports/state/ingest",
                 "source": "Census Bureau International Trade API",
-                "filters": ["year", "month", "state", "hs_code", "country"]
+                "filters": ["year", "month", "state", "hs_code", "country"],
             },
             {
                 "id": "port_trade",
@@ -406,7 +386,14 @@ async def list_us_trade_datasets():
                 "description": "Trade by customs district (port of entry)",
                 "endpoint": "/us-trade/port/ingest",
                 "source": "Census Bureau International Trade API",
-                "filters": ["year", "month", "trade_type", "district", "hs_code", "country"]
+                "filters": [
+                    "year",
+                    "month",
+                    "trade_type",
+                    "district",
+                    "hs_code",
+                    "country",
+                ],
             },
             {
                 "id": "trade_summary",
@@ -414,8 +401,8 @@ async def list_us_trade_datasets():
                 "description": "Aggregated exports, imports, and balance by country",
                 "endpoint": "/us-trade/summary/ingest",
                 "source": "Census Bureau International Trade API",
-                "filters": ["year", "month"]
-            }
+                "filters": ["year", "month"],
+            },
         ],
         "reference_codes": {
             "hs_chapters": {
@@ -426,7 +413,7 @@ async def list_us_trade_datasets():
                 "30": "Pharmaceutical products",
                 "90": "Optical, measuring instruments",
                 "39": "Plastics",
-                "29": "Organic chemicals"
+                "29": "Organic chemicals",
             },
             "top_countries": {
                 "5700": "China",
@@ -436,7 +423,7 @@ async def list_us_trade_datasets():
                 "4280": "Germany",
                 "5800": "South Korea",
                 "5830": "Taiwan",
-                "4120": "United Kingdom"
+                "4120": "United Kingdom",
             },
             "top_districts": {
                 "55": "Houston, TX",
@@ -444,10 +431,10 @@ async def list_us_trade_datasets():
                 "10": "New York, NY",
                 "60": "Seattle, WA",
                 "39": "Miami, FL",
-                "57": "Laredo, TX"
-            }
+                "57": "Laredo, TX",
+            },
         },
-        "note": "No API key required. Data available from 2013 to present."
+        "note": "No API key required. Data available from 2013 to present.",
     }
 
 
@@ -457,12 +444,13 @@ async def get_hs_chapters():
     Get list of HS (Harmonized System) commodity chapters (2-digit codes).
     """
     from app.sources.us_trade.client import HS_CHAPTERS
+
     return {
         "hs_chapters": [
             {"code": code, "description": desc}
             for code, desc in sorted(HS_CHAPTERS.items())
         ],
-        "note": "Use 2-digit code as hs_code filter for chapter-level data"
+        "note": "Use 2-digit code as hs_code filter for chapter-level data",
     }
 
 
@@ -472,12 +460,13 @@ async def get_trading_partners():
     Get list of Census country codes for major US trading partners.
     """
     from app.sources.us_trade.client import TOP_TRADING_PARTNERS
+
     return {
         "countries": [
             {"code": code, "name": name}
             for code, name in sorted(TOP_TRADING_PARTNERS.items(), key=lambda x: x[1])
         ],
-        "note": "Use country code as country filter"
+        "note": "Use country code as country filter",
     }
 
 
@@ -487,12 +476,13 @@ async def get_customs_districts():
     Get list of US Customs Districts (port codes).
     """
     from app.sources.us_trade.client import CUSTOMS_DISTRICTS
+
     return {
         "districts": [
             {"code": code, "name": name}
             for code, name in sorted(CUSTOMS_DISTRICTS.items())
         ],
-        "note": "Use district code as district filter in port trade queries"
+        "note": "Use district code as district filter in port trade queries",
     }
 
 
@@ -502,10 +492,11 @@ async def get_state_codes():
     Get list of state FIPS codes for state export queries.
     """
     from app.sources.us_trade.client import STATE_FIPS
+
     return {
         "states": [
             {"fips_code": code, "name": name}
             for code, name in sorted(STATE_FIPS.items(), key=lambda x: x[1])
         ],
-        "note": "Use FIPS code as state filter in state export queries"
+        "note": "Use FIPS code as state filter in state export queries",
     }

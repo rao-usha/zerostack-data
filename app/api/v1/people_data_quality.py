@@ -16,7 +16,10 @@ from pydantic import BaseModel, Field
 
 from app.core.database import get_db
 from app.services.data_quality_service import DataQualityService
-from app.sources.people_collection.email_inferrer import EmailInferrer, CompanyEmailPatternLearner
+from app.sources.people_collection.email_inferrer import (
+    EmailInferrer,
+    CompanyEmailPatternLearner,
+)
 from app.sources.people_collection.mx_verifier import MXVerifier
 
 
@@ -27,8 +30,10 @@ router = APIRouter(prefix="/people-data-quality", tags=["People Data Quality"])
 # Response Models
 # =============================================================================
 
+
 class CoverageStats(BaseModel):
     """Coverage percentage stats."""
+
     linkedin: float
     photo: float
     email: float
@@ -39,6 +44,7 @@ class CoverageStats(BaseModel):
 
 class CountStats(BaseModel):
     """Absolute count stats."""
+
     with_linkedin: int
     with_photo: int
     with_email: int
@@ -49,6 +55,7 @@ class CountStats(BaseModel):
 
 class OverallStatsResponse(BaseModel):
     """Overall data quality statistics."""
+
     total_people: int
     total_companies: int
     total_active_positions: int
@@ -62,6 +69,7 @@ class OverallStatsResponse(BaseModel):
 
 class FreshnessBuckets(BaseModel):
     """Data freshness buckets."""
+
     zero_to_7_days: int = Field(alias="0-7_days")
     eight_to_30_days: int = Field(alias="8-30_days")
     thirty_one_to_90_days: int = Field(alias="31-90_days")
@@ -76,6 +84,7 @@ class FreshnessBuckets(BaseModel):
 
 class FreshnessStatsResponse(BaseModel):
     """Data freshness statistics."""
+
     total_people: int
     freshness_buckets: dict
     median_age_days: Optional[int] = None
@@ -85,6 +94,7 @@ class FreshnessStatsResponse(BaseModel):
 
 class QualityComponents(BaseModel):
     """Quality score components."""
+
     identity: int
     contact: int
     professional: int
@@ -94,6 +104,7 @@ class QualityComponents(BaseModel):
 
 class PersonQualityResponse(BaseModel):
     """Quality score for a single person."""
+
     person_id: int
     person_name: str
     quality_score: int
@@ -103,6 +114,7 @@ class PersonQualityResponse(BaseModel):
 
 class DuplicatePerson(BaseModel):
     """Person in a duplicate group."""
+
     id: int
     name: str
     linkedin: Optional[str] = None
@@ -110,6 +122,7 @@ class DuplicatePerson(BaseModel):
 
 class DuplicateGroup(BaseModel):
     """Group of potential duplicates."""
+
     match_type: str
     match_value: str
     people: List[DuplicatePerson]
@@ -117,6 +130,7 @@ class DuplicateGroup(BaseModel):
 
 class EnrichmentQueueItem(BaseModel):
     """Item in enrichment queue."""
+
     person_id: int
     full_name: str
     linkedin_url: Optional[str] = None
@@ -129,12 +143,16 @@ class EnrichmentQueueItem(BaseModel):
 
 class MergeRequest(BaseModel):
     """Request to merge duplicate records."""
+
     canonical_id: int = Field(..., description="ID of the master record to keep")
-    duplicate_ids: List[int] = Field(..., description="IDs of duplicate records to merge")
+    duplicate_ids: List[int] = Field(
+        ..., description="IDs of duplicate records to merge"
+    )
 
 
 class MergeResponse(BaseModel):
     """Result of merge operation."""
+
     canonical_id: int
     merged_count: int
     status: str
@@ -142,6 +160,7 @@ class MergeResponse(BaseModel):
 
 class EmailCandidate(BaseModel):
     """Inferred email candidate."""
+
     email: str
     pattern: str
     confidence: str
@@ -149,6 +168,7 @@ class EmailCandidate(BaseModel):
 
 class EmailInferenceRequest(BaseModel):
     """Request to infer email addresses."""
+
     first_name: str
     last_name: str
     company_domain: str
@@ -156,6 +176,7 @@ class EmailInferenceRequest(BaseModel):
 
 class EmailInferenceResponse(BaseModel):
     """Inferred email candidates."""
+
     first_name: str
     last_name: str
     company_domain: str
@@ -164,23 +185,30 @@ class EmailInferenceResponse(BaseModel):
 
 class BulkEmailInferenceRequest(BaseModel):
     """Request to infer emails for multiple people."""
+
     company_domain: str
     people: List[dict] = Field(..., description="List of {first_name, last_name}")
     known_emails: Optional[List[dict]] = Field(
         None,
-        description="Known emails to learn pattern: [{email, first_name, last_name}]"
+        description="Known emails to learn pattern: [{email, first_name, last_name}]",
     )
 
 
 class BackfillEmailsRequest(BaseModel):
     """Request to backfill inferred emails."""
-    company_id: Optional[int] = Field(None, description="Specific company ID, or null for all")
-    dry_run: bool = Field(True, description="If true, report what would be done without saving")
+
+    company_id: Optional[int] = Field(
+        None, description="Specific company ID, or null for all"
+    )
+    dry_run: bool = Field(
+        True, description="If true, report what would be done without saving"
+    )
 
 
 # =============================================================================
 # Endpoints
 # =============================================================================
+
 
 @router.get("/stats", response_model=OverallStatsResponse)
 async def get_data_quality_stats(
@@ -320,8 +348,7 @@ async def merge_duplicates(
 @router.get("/enrichment-queue", response_model=List[EnrichmentQueueItem])
 async def get_enrichment_queue(
     enrichment_type: str = Query(
-        "all",
-        description="Type: all, linkedin, email, photo, bio"
+        "all", description="Type: all, linkedin, email, photo, bio"
     ),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -335,8 +362,7 @@ async def get_enrichment_queue(
     valid_types = {"all", "linkedin", "email", "photo", "bio"}
     if enrichment_type not in valid_types:
         raise HTTPException(
-            status_code=400,
-            detail=f"enrichment_type must be one of: {valid_types}"
+            status_code=400, detail=f"enrichment_type must be one of: {valid_types}"
         )
 
     service = DataQualityService(db)
@@ -393,14 +419,10 @@ async def infer_emails_bulk(
     known = None
     if request.known_emails:
         known = [
-            (e["email"], e["first_name"], e["last_name"])
-            for e in request.known_emails
+            (e["email"], e["first_name"], e["last_name"]) for e in request.known_emails
         ]
 
-    people = [
-        (p["first_name"], p["last_name"])
-        for p in request.people
-    ]
+    people = [(p["first_name"], p["last_name"]) for p in request.people]
 
     results = learner.infer_company_emails(
         company_domain=request.company_domain,
@@ -410,7 +432,9 @@ async def infer_emails_bulk(
 
     return {
         "company_domain": request.company_domain,
-        "learned_pattern": learner.learn_from_known_emails(known).value if known else None,
+        "learned_pattern": learner.learn_from_known_emails(known).value
+        if known
+        else None,
         "results": results,
     }
 
@@ -548,10 +572,14 @@ async def get_company_data_coverage(
         raise HTTPException(status_code=404, detail="Company not found")
 
     # Get current leadership
-    positions = db.query(CompanyPerson).filter(
-        CompanyPerson.company_id == company_id,
-        CompanyPerson.is_current == True,
-    ).all()
+    positions = (
+        db.query(CompanyPerson)
+        .filter(
+            CompanyPerson.company_id == company_id,
+            CompanyPerson.is_current == True,
+        )
+        .all()
+    )
 
     if not positions:
         return {
@@ -563,7 +591,9 @@ async def get_company_data_coverage(
 
     # Get associated people
     person_ids = [p.person_id for p in positions if p.person_id]
-    people = db.query(Person).filter(Person.id.in_(person_ids)).all() if person_ids else []
+    people = (
+        db.query(Person).filter(Person.id.in_(person_ids)).all() if person_ids else []
+    )
 
     total = len(people) if people else 1  # Avoid division by zero
 

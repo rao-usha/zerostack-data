@@ -3,6 +3,7 @@ Treasury FiscalData API endpoints.
 
 Provides HTTP endpoints for ingesting Treasury fiscal data.
 """
+
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -13,7 +14,11 @@ from app.core.database import get_db
 from app.core.models import IngestionJob, JobStatus
 from app.core.job_helpers import create_and_dispatch_job
 from app.sources.treasury import metadata
-from app.sources.treasury.client import TREASURY_DATASETS, SECURITY_TYPES, AUCTION_SECURITY_TYPES
+from app.sources.treasury.client import (
+    TREASURY_DATASETS,
+    SECURITY_TYPES,
+    AUCTION_SECURITY_TYPES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,42 +27,44 @@ router = APIRouter(tags=["Treasury FiscalData"])
 
 class TreasuryIngestRequest(BaseModel):
     """Request model for Treasury ingestion."""
+
     start_date: Optional[str] = Field(
-        None,
-        description="Start date in YYYY-MM-DD format (defaults to 5 years ago)"
+        None, description="Start date in YYYY-MM-DD format (defaults to 5 years ago)"
     )
     end_date: Optional[str] = Field(
-        None,
-        description="End date in YYYY-MM-DD format (defaults to today)"
+        None, description="End date in YYYY-MM-DD format (defaults to today)"
     )
 
 
 class TreasuryInterestRatesRequest(TreasuryIngestRequest):
     """Request model for interest rates ingestion."""
+
     security_type: Optional[str] = Field(
         None,
-        description="Filter by security type (e.g., 'Treasury Bills', 'Treasury Notes')"
+        description="Filter by security type (e.g., 'Treasury Bills', 'Treasury Notes')",
     )
 
 
 class TreasuryMonthlyStatementRequest(TreasuryIngestRequest):
     """Request model for monthly statement ingestion."""
+
     classification: Optional[str] = Field(
-        None,
-        description="Filter by classification (e.g., 'Receipts', 'Outlays')"
+        None, description="Filter by classification (e.g., 'Receipts', 'Outlays')"
     )
 
 
 class TreasuryAuctionsRequest(TreasuryIngestRequest):
     """Request model for auctions ingestion."""
+
     security_type: Optional[str] = Field(
         None,
-        description="Filter by security type (e.g., 'Bill', 'Note', 'Bond', 'TIPS')"
+        description="Filter by security type (e.g., 'Bill', 'Note', 'Bond', 'TIPS')",
     )
 
 
 class TreasuryDatasetsResponse(BaseModel):
     """Response model for available datasets."""
+
     datasets: list
 
 
@@ -65,7 +72,7 @@ class TreasuryDatasetsResponse(BaseModel):
 async def ingest_debt_data(
     request: TreasuryIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest Federal Debt Outstanding data.
@@ -86,17 +93,17 @@ async def ingest_debt_data(
     # Validate date formats if provided
     if request.start_date and not metadata.validate_date_format(request.start_date):
         raise HTTPException(
-            status_code=400,
-            detail="Invalid start_date format. Use YYYY-MM-DD"
+            status_code=400, detail="Invalid start_date format. Use YYYY-MM-DD"
         )
     if request.end_date and not metadata.validate_date_format(request.end_date):
         raise HTTPException(
-            status_code=400,
-            detail="Invalid end_date format. Use YYYY-MM-DD"
+            status_code=400, detail="Invalid end_date format. Use YYYY-MM-DD"
         )
 
     return create_and_dispatch_job(
-        db, background_tasks, source="treasury",
+        db,
+        background_tasks,
+        source="treasury",
         config={
             "dataset": "debt_outstanding",
             "start_date": request.start_date,
@@ -110,7 +117,7 @@ async def ingest_debt_data(
 async def ingest_interest_rates_data(
     request: TreasuryInterestRatesRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest Treasury Interest Rates data.
@@ -138,24 +145,24 @@ async def ingest_interest_rates_data(
     # Validate date formats
     if request.start_date and not metadata.validate_date_format(request.start_date):
         raise HTTPException(
-            status_code=400,
-            detail="Invalid start_date format. Use YYYY-MM-DD"
+            status_code=400, detail="Invalid start_date format. Use YYYY-MM-DD"
         )
     if request.end_date and not metadata.validate_date_format(request.end_date):
         raise HTTPException(
-            status_code=400,
-            detail="Invalid end_date format. Use YYYY-MM-DD"
+            status_code=400, detail="Invalid end_date format. Use YYYY-MM-DD"
         )
 
     # Validate security type if provided
     if request.security_type and request.security_type not in SECURITY_TYPES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid security_type. Must be one of: {', '.join(SECURITY_TYPES)}"
+            detail=f"Invalid security_type. Must be one of: {', '.join(SECURITY_TYPES)}",
         )
 
     return create_and_dispatch_job(
-        db, background_tasks, source="treasury",
+        db,
+        background_tasks,
+        source="treasury",
         config={
             "dataset": "interest_rates",
             "start_date": request.start_date,
@@ -170,7 +177,7 @@ async def ingest_interest_rates_data(
 async def ingest_revenue_spending_data(
     request: TreasuryMonthlyStatementRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest Monthly Treasury Statement (Revenue & Spending) data.
@@ -191,17 +198,17 @@ async def ingest_revenue_spending_data(
     # Validate date formats
     if request.start_date and not metadata.validate_date_format(request.start_date):
         raise HTTPException(
-            status_code=400,
-            detail="Invalid start_date format. Use YYYY-MM-DD"
+            status_code=400, detail="Invalid start_date format. Use YYYY-MM-DD"
         )
     if request.end_date and not metadata.validate_date_format(request.end_date):
         raise HTTPException(
-            status_code=400,
-            detail="Invalid end_date format. Use YYYY-MM-DD"
+            status_code=400, detail="Invalid end_date format. Use YYYY-MM-DD"
         )
 
     return create_and_dispatch_job(
-        db, background_tasks, source="treasury",
+        db,
+        background_tasks,
+        source="treasury",
         config={
             "dataset": "monthly_statement",
             "start_date": request.start_date,
@@ -216,7 +223,7 @@ async def ingest_revenue_spending_data(
 async def ingest_auctions_data(
     request: TreasuryAuctionsRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest Treasury Auction Results data.
@@ -246,24 +253,24 @@ async def ingest_auctions_data(
     # Validate date formats
     if request.start_date and not metadata.validate_date_format(request.start_date):
         raise HTTPException(
-            status_code=400,
-            detail="Invalid start_date format. Use YYYY-MM-DD"
+            status_code=400, detail="Invalid start_date format. Use YYYY-MM-DD"
         )
     if request.end_date and not metadata.validate_date_format(request.end_date):
         raise HTTPException(
-            status_code=400,
-            detail="Invalid end_date format. Use YYYY-MM-DD"
+            status_code=400, detail="Invalid end_date format. Use YYYY-MM-DD"
         )
 
     # Validate security type if provided
     if request.security_type and request.security_type not in AUCTION_SECURITY_TYPES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid security_type. Must be one of: {', '.join(AUCTION_SECURITY_TYPES)}"
+            detail=f"Invalid security_type. Must be one of: {', '.join(AUCTION_SECURITY_TYPES)}",
         )
 
     return create_and_dispatch_job(
-        db, background_tasks, source="treasury",
+        db,
+        background_tasks,
+        source="treasury",
         config={
             "dataset": "auctions",
             "start_date": request.start_date,
@@ -278,7 +285,7 @@ async def ingest_auctions_data(
 async def ingest_all_treasury_data(
     request: TreasuryIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest ALL Treasury FiscalData datasets at once.
@@ -298,17 +305,21 @@ async def ingest_all_treasury_data(
         # Validate date formats
         if request.start_date and not metadata.validate_date_format(request.start_date):
             raise HTTPException(
-                status_code=400,
-                detail="Invalid start_date format. Use YYYY-MM-DD"
+                status_code=400, detail="Invalid start_date format. Use YYYY-MM-DD"
             )
         if request.end_date and not metadata.validate_date_format(request.end_date):
             raise HTTPException(
-                status_code=400,
-                detail="Invalid end_date format. Use YYYY-MM-DD"
+                status_code=400, detail="Invalid end_date format. Use YYYY-MM-DD"
             )
 
         # Create jobs for each dataset
-        datasets = ["debt_outstanding", "interest_rates", "monthly_statement", "auctions", "daily_balance"]
+        datasets = [
+            "debt_outstanding",
+            "interest_rates",
+            "monthly_statement",
+            "auctions",
+            "daily_balance",
+        ]
         job_ids = []
 
         for dataset in datasets:
@@ -316,13 +327,11 @@ async def ingest_all_treasury_data(
                 "dataset": dataset,
                 "start_date": request.start_date,
                 "end_date": request.end_date,
-                "batch": True
+                "batch": True,
             }
 
             job = IngestionJob(
-                source="treasury",
-                status=JobStatus.PENDING,
-                config=job_config
+                source="treasury", status=JobStatus.PENDING, config=job_config
             )
             db.add(job)
             db.commit()
@@ -331,16 +340,14 @@ async def ingest_all_treasury_data(
 
         # Run batch ingestion in background
         background_tasks.add_task(
-            _run_all_treasury_ingestion,
-            request.start_date,
-            request.end_date
+            _run_all_treasury_ingestion, request.start_date, request.end_date
         )
 
         return {
             "job_ids": job_ids,
             "status": "pending",
             "message": f"Created {len(job_ids)} Treasury ingestion jobs",
-            "datasets": datasets
+            "datasets": datasets,
         }
 
     except HTTPException:
@@ -360,17 +367,17 @@ async def get_available_datasets():
     try:
         datasets_info = []
         for dataset_name, dataset_info in TREASURY_DATASETS.items():
-            datasets_info.append({
-                "name": dataset_name,
-                "table_name": dataset_info["table_name"],
-                "description": dataset_info["description"],
-                "endpoint": dataset_info["endpoint"],
-                "date_field": dataset_info["date_field"]
-            })
+            datasets_info.append(
+                {
+                    "name": dataset_name,
+                    "table_name": dataset_info["table_name"],
+                    "description": dataset_info["description"],
+                    "endpoint": dataset_info["endpoint"],
+                    "date_field": dataset_info["date_field"],
+                }
+            )
 
-        return {
-            "datasets": datasets_info
-        }
+        return {"datasets": datasets_info}
 
     except Exception as e:
         logger.error(f"Failed to get Treasury datasets: {e}")
@@ -388,15 +395,15 @@ async def get_security_types():
     """
     return {
         "interest_rate_security_types": SECURITY_TYPES,
-        "auction_security_types": AUCTION_SECURITY_TYPES
+        "auction_security_types": AUCTION_SECURITY_TYPES,
     }
 
 
 # Background task functions (kept: _run_all has no job_id, not convertible)
 
+
 async def _run_all_treasury_ingestion(
-    start_date: Optional[str],
-    end_date: Optional[str]
+    start_date: Optional[str], end_date: Optional[str]
 ):
     """Run all Treasury ingestion in background."""
     from app.core.database import get_session_factory
@@ -406,9 +413,7 @@ async def _run_all_treasury_ingestion(
     db = SessionLocal()
     try:
         await ingest.ingest_all_treasury_data(
-            db=db,
-            start_date=start_date,
-            end_date=end_date
+            db=db, start_date=start_date, end_date=end_date
         )
     except Exception as e:
         logger.error(f"Background batch Treasury ingestion failed: {e}", exc_info=True)

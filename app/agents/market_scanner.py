@@ -23,8 +23,10 @@ logger = logging.getLogger(__name__)
 # ENUMS & CONSTANTS
 # =============================================================================
 
+
 class SignalType(str, Enum):
     """Types of market signals."""
+
     SECTOR_MOMENTUM = "sector_momentum"
     GEOGRAPHIC_SHIFT = "geographic_shift"
     TALENT_FLOW = "talent_flow"
@@ -35,6 +37,7 @@ class SignalType(str, Enum):
 
 class SignalDirection(str, Enum):
     """Signal direction indicators."""
+
     ACCELERATING = "accelerating"
     DECELERATING = "decelerating"
     STABLE = "stable"
@@ -43,6 +46,7 @@ class SignalDirection(str, Enum):
 
 class TrendStage(str, Enum):
     """Stages of market trends."""
+
     EARLY = "early"
     EMERGING = "emerging"
     MAINSTREAM = "mainstream"
@@ -51,6 +55,7 @@ class TrendStage(str, Enum):
 
 class ScanStatus(str, Enum):
     """Scan job status."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -61,7 +66,13 @@ class ScanStatus(str, Enum):
 SECTOR_CATEGORIES = {
     "fintech": ["fintech", "financial", "payments", "banking", "insurance"],
     "healthcare": ["healthcare", "health", "medical", "biotech", "pharma"],
-    "ai_ml": ["ai", "artificial intelligence", "machine learning", "ml", "deep learning"],
+    "ai_ml": [
+        "ai",
+        "artificial intelligence",
+        "machine learning",
+        "ml",
+        "deep learning",
+    ],
     "enterprise": ["enterprise", "saas", "b2b", "software"],
     "consumer": ["consumer", "retail", "ecommerce", "marketplace"],
     "climate": ["climate", "cleantech", "energy", "sustainability", "green"],
@@ -73,13 +84,28 @@ SECTOR_CATEGORIES = {
 
 # Region mapping
 REGION_MAPPING = {
-    "CA": "US West", "WA": "US West", "OR": "US West", "NV": "US West",
-    "NY": "US Northeast", "MA": "US Northeast", "CT": "US Northeast", "NJ": "US Northeast",
-    "TX": "US South", "FL": "US South", "GA": "US South",
-    "IL": "US Midwest", "OH": "US Midwest", "MI": "US Midwest",
-    "UK": "Europe", "Germany": "Europe", "France": "Europe",
-    "China": "Asia Pacific", "Japan": "Asia Pacific", "Singapore": "Asia Pacific",
-    "India": "Asia Pacific", "Australia": "Asia Pacific",
+    "CA": "US West",
+    "WA": "US West",
+    "OR": "US West",
+    "NV": "US West",
+    "NY": "US Northeast",
+    "MA": "US Northeast",
+    "CT": "US Northeast",
+    "NJ": "US Northeast",
+    "TX": "US South",
+    "FL": "US South",
+    "GA": "US South",
+    "IL": "US Midwest",
+    "OH": "US Midwest",
+    "MI": "US Midwest",
+    "UK": "Europe",
+    "Germany": "Europe",
+    "France": "Europe",
+    "China": "Asia Pacific",
+    "Japan": "Asia Pacific",
+    "Singapore": "Asia Pacific",
+    "India": "Asia Pacific",
+    "Australia": "Asia Pacific",
 }
 
 
@@ -87,9 +113,11 @@ REGION_MAPPING = {
 # DATA CLASSES
 # =============================================================================
 
+
 @dataclass
 class MarketSignal:
     """A detected market signal."""
+
     signal_id: str
     signal_type: str
     category: str
@@ -105,6 +133,7 @@ class MarketSignal:
 @dataclass
 class MarketTrend:
     """An identified market trend."""
+
     trend_id: str
     name: str
     sectors: List[str]
@@ -118,6 +147,7 @@ class MarketTrend:
 @dataclass
 class MarketOpportunity:
     """A spotted investment opportunity."""
+
     opportunity_id: str
     opportunity_type: str
     title: str
@@ -130,6 +160,7 @@ class MarketOpportunity:
 @dataclass
 class MarketBrief:
     """Weekly market intelligence brief."""
+
     brief_id: str
     period_start: date
     period_end: date
@@ -144,6 +175,7 @@ class MarketBrief:
 # =============================================================================
 # MARKET SCANNER AGENT
 # =============================================================================
+
 
 class MarketScannerAgent:
     """
@@ -296,7 +328,7 @@ class MarketScannerAgent:
                 "scan_id": scan_id,
                 "status": "completed",
                 "scan_timestamp": datetime.utcnow().isoformat() + "Z",
-                **results
+                **results,
             }
 
         except Exception as e:
@@ -314,7 +346,7 @@ class MarketScannerAgent:
             return {
                 "scan_timestamp": recent_scan.get("completed_at"),
                 "cached": True,
-                **recent_scan.get("results", {})
+                **recent_scan.get("results", {}),
             }
 
         # Run new scan if no recent results
@@ -358,7 +390,9 @@ class MarketScannerAgent:
                     "stage": stage,
                     "signal_count": len(sector_sigs),
                     "supporting_signals": [s.get("signal_id") for s in sector_sigs[:5]],
-                    "description": self._generate_trend_description(sector, sector_sigs, avg_strength)
+                    "description": self._generate_trend_description(
+                        sector, sector_sigs, avg_strength
+                    ),
                 }
                 trends.append(trend)
 
@@ -369,7 +403,7 @@ class MarketScannerAgent:
             "period": f"{period_days}d",
             "trends": trends[:20],
             "total_trends": len(trends),
-            "analysis_timestamp": datetime.utcnow().isoformat() + "Z"
+            "analysis_timestamp": datetime.utcnow().isoformat() + "Z",
         }
 
     def get_opportunities(self) -> Dict[str, Any]:
@@ -398,7 +432,7 @@ class MarketScannerAgent:
         return {
             "opportunities": opportunities[:15],
             "total_found": len(opportunities),
-            "generated_at": datetime.utcnow().isoformat() + "Z"
+            "generated_at": datetime.utcnow().isoformat() + "Z",
         }
 
     def generate_brief(self, period_type: str = "weekly") -> Dict[str, Any]:
@@ -425,25 +459,36 @@ class MarketScannerAgent:
         signals = self._get_signals_for_period(days)
 
         # Build sections
-        top_signals = sorted(signals, key=lambda x: x.get("strength", 0), reverse=True)[:10]
+        top_signals = sorted(signals, key=lambda x: x.get("strength", 0), reverse=True)[
+            :10
+        ]
 
-        emerging = [s for s in signals if s.get("strength", 0) > 0.5 and s.get("direction") == "accelerating"]
+        emerging = [
+            s
+            for s in signals
+            if s.get("strength", 0) > 0.5 and s.get("direction") == "accelerating"
+        ]
 
         sector_data = self._build_sector_spotlight(signals)
 
-        geo_shifts = [s for s in signals if s.get("signal_type") == SignalType.GEOGRAPHIC_SHIFT.value]
+        geo_shifts = [
+            s
+            for s in signals
+            if s.get("signal_type") == SignalType.GEOGRAPHIC_SHIFT.value
+        ]
 
-        early_warnings = [s for s in signals if s.get("direction") == "decelerating" and s.get("strength", 0) > 0.3]
+        early_warnings = [
+            s
+            for s in signals
+            if s.get("direction") == "decelerating" and s.get("strength", 0) > 0.3
+        ]
 
         # Generate summary
         summary = self._generate_brief_summary(signals, period_type)
 
         brief = {
             "brief_id": brief_id,
-            "period": {
-                "start": period_start.isoformat(),
-                "end": today.isoformat()
-            },
+            "period": {"start": period_start.isoformat(), "end": today.isoformat()},
             "brief_type": period_type,
             "summary": summary,
             "sections": {
@@ -451,14 +496,18 @@ class MarketScannerAgent:
                 "emerging_patterns": [self._signal_summary(s) for s in emerging[:5]],
                 "sector_spotlight": sector_data,
                 "geographic_shifts": [self._signal_summary(s) for s in geo_shifts[:5]],
-                "early_warnings": [self._signal_summary(s) for s in early_warnings[:5]]
+                "early_warnings": [self._signal_summary(s) for s in early_warnings[:5]],
             },
             "stats": {
                 "total_signals": len(signals),
-                "accelerating": len([s for s in signals if s.get("direction") == "accelerating"]),
-                "decelerating": len([s for s in signals if s.get("direction") == "decelerating"])
+                "accelerating": len(
+                    [s for s in signals if s.get("direction") == "accelerating"]
+                ),
+                "decelerating": len(
+                    [s for s in signals if s.get("direction") == "decelerating"]
+                ),
             },
-            "generated_at": datetime.utcnow().isoformat() + "Z"
+            "generated_at": datetime.utcnow().isoformat() + "Z",
         }
 
         # Save brief
@@ -476,7 +525,7 @@ class MarketScannerAgent:
             "scans": scans,
             "briefs": briefs,
             "total_scans": len(scans),
-            "total_briefs": len(briefs)
+            "total_briefs": len(briefs),
         }
 
     def get_stats(self) -> Dict[str, Any]:
@@ -501,7 +550,7 @@ class MarketScannerAgent:
                 "total_signals": result[2] or 0,
                 "active_signals": result[3] or 0,
                 "total_briefs": result[4] or 0,
-                "last_scan": result[5].isoformat() if result[5] else None
+                "last_scan": result[5].isoformat() if result[5] else None,
             }
         except Exception as e:
             logger.error(f"Error getting stats: {e}")
@@ -562,7 +611,11 @@ class MarketScannerAgent:
                 # Detect significant momentum
                 if abs(change_pct) >= 0.2:
                     category = self._map_industry_to_category(industry)
-                    direction = SignalDirection.ACCELERATING.value if change_pct > 0 else SignalDirection.DECELERATING.value
+                    direction = (
+                        SignalDirection.ACCELERATING.value
+                        if change_pct > 0
+                        else SignalDirection.DECELERATING.value
+                    )
                     strength = min(abs(change_pct), 1.0)
 
                     signal = MarketSignal(
@@ -573,13 +626,15 @@ class MarketScannerAgent:
                         strength=round(strength, 2),
                         confidence=0.7 if current_count >= 5 else 0.5,
                         description=f"{industry}: {int(change_pct*100)}% change in Form D filings ({current_count} filings, ${total_amount/1e6:.1f}M total)",
-                        data_points=[{
-                            "industry": industry,
-                            "current_count": current_count,
-                            "previous_count": prev_count,
-                            "change_pct": round(change_pct * 100, 1),
-                            "total_amount": total_amount
-                        }]
+                        data_points=[
+                            {
+                                "industry": industry,
+                                "current_count": current_count,
+                                "previous_count": prev_count,
+                                "change_pct": round(change_pct * 100, 1),
+                                "total_amount": total_amount,
+                            }
+                        ],
                     )
                     signals.append(signal)
 
@@ -638,7 +693,11 @@ class MarketScannerAgent:
                 # Detect significant shifts
                 if abs(change_pct) >= 0.3 and current_count >= 3:
                     region = REGION_MAPPING.get(state, "Other")
-                    direction = SignalDirection.ACCELERATING.value if change_pct > 0 else SignalDirection.DECELERATING.value
+                    direction = (
+                        SignalDirection.ACCELERATING.value
+                        if change_pct > 0
+                        else SignalDirection.DECELERATING.value
+                    )
 
                     signal = MarketSignal(
                         signal_id=f"sig_{uuid.uuid4().hex[:12]}",
@@ -648,13 +707,15 @@ class MarketScannerAgent:
                         strength=round(min(abs(change_pct), 1.0), 2),
                         confidence=0.65,
                         description=f"{state} ({region}): {int(change_pct*100)}% change in investment activity",
-                        data_points=[{
-                            "state": state,
-                            "region": region,
-                            "current_count": current_count,
-                            "previous_count": prev_count,
-                            "change_pct": round(change_pct * 100, 1)
-                        }]
+                        data_points=[
+                            {
+                                "state": state,
+                                "region": region,
+                                "current_count": current_count,
+                                "previous_count": prev_count,
+                                "change_pct": round(change_pct * 100, 1),
+                            }
+                        ],
                     )
                     signals.append(signal)
 
@@ -698,11 +759,10 @@ class MarketScannerAgent:
                     strength=0.6,
                     confidence=0.7,
                     description=f"{len(high_rated)} companies with 4.0+ Glassdoor rating - strong talent magnets",
-                    data_points=[{
-                        "company": r[0],
-                        "rating": r[1],
-                        "ceo_approval": r[2]
-                    } for r in high_rated[:10]]
+                    data_points=[
+                        {"company": r[0], "rating": r[1], "ceo_approval": r[2]}
+                        for r in high_rated[:10]
+                    ],
                 )
                 signals.append(signal)
 
@@ -715,10 +775,9 @@ class MarketScannerAgent:
                     strength=0.5,
                     confidence=0.6,
                     description=f"{len(low_rated)} companies with sub-3.0 rating - potential talent exodus",
-                    data_points=[{
-                        "company": r[0],
-                        "rating": r[1]
-                    } for r in low_rated[:5]]
+                    data_points=[
+                        {"company": r[0], "rating": r[1]} for r in low_rated[:5]
+                    ],
                 )
                 signals.append(signal)
 
@@ -765,11 +824,13 @@ class MarketScannerAgent:
                     strength=min(deal_count / 10, 1.0),
                     confidence=0.75,
                     description=f"{industry}: {deal_count} large deals (>${10}M) with ${avg_amount/1e6:.1f}M average",
-                    data_points=[{
-                        "industry": industry,
-                        "large_deal_count": deal_count,
-                        "avg_amount": avg_amount
-                    }]
+                    data_points=[
+                        {
+                            "industry": industry,
+                            "large_deal_count": deal_count,
+                            "avg_amount": avg_amount,
+                        }
+                    ],
                 )
                 signals.append(signal)
 
@@ -810,11 +871,10 @@ class MarketScannerAgent:
                     strength=0.7,
                     confidence=0.8,
                     description=f"{len(result)} organizations with high developer velocity (70+ score)",
-                    data_points=[{
-                        "org": r[0],
-                        "stars": r[1],
-                        "velocity": r[4]
-                    } for r in result[:5]]
+                    data_points=[
+                        {"org": r[0], "stars": r[1], "velocity": r[4]}
+                        for r in result[:5]
+                    ],
                 )
                 signals.append(signal)
 
@@ -848,12 +908,10 @@ class MarketScannerAgent:
                     strength=0.6,
                     confidence=0.7,
                     description=f"{len(result)} highly-rated apps with strong user engagement",
-                    data_points=[{
-                        "app": r[0],
-                        "developer": r[1],
-                        "rating": r[2],
-                        "count": r[3]
-                    } for r in result[:5]]
+                    data_points=[
+                        {"app": r[0], "developer": r[1], "rating": r[2], "count": r[3]}
+                        for r in result[:5]
+                    ],
                 )
                 signals.append(signal)
 
@@ -893,8 +951,8 @@ class MarketScannerAgent:
                     "recommended_actions": [
                         f"Monitor {sector} Form D filings",
                         "Track company score changes",
-                        "Watch for funding announcements"
-                    ]
+                        "Watch for funding announcements",
+                    ],
                 }
                 opportunities.append(opp)
 
@@ -904,7 +962,11 @@ class MarketScannerAgent:
         """Find contrarian opportunities in declining areas."""
         opportunities = []
 
-        declining = [s for s in signals if s.get("direction") == "decelerating" and s.get("strength", 0) > 0.3]
+        declining = [
+            s
+            for s in signals
+            if s.get("direction") == "decelerating" and s.get("strength", 0) > 0.3
+        ]
 
         for s in declining[:3]:
             opp = {
@@ -917,8 +979,8 @@ class MarketScannerAgent:
                 "recommended_actions": [
                     "Investigate fundamentals",
                     "Check for structural vs cyclical decline",
-                    "Monitor for reversal signals"
-                ]
+                    "Monitor for reversal signals",
+                ],
             }
             opportunities.append(opp)
 
@@ -928,7 +990,11 @@ class MarketScannerAgent:
         """Find momentum opportunities in accelerating areas."""
         opportunities = []
 
-        accelerating = [s for s in signals if s.get("direction") == "accelerating" and s.get("strength", 0) > 0.5]
+        accelerating = [
+            s
+            for s in signals
+            if s.get("direction") == "accelerating" and s.get("strength", 0) > 0.5
+        ]
 
         for s in accelerating[:5]:
             opp = {
@@ -941,8 +1007,8 @@ class MarketScannerAgent:
                 "recommended_actions": [
                     "Increase monitoring frequency",
                     "Identify leading companies",
-                    "Watch for overheating signals"
-                ]
+                    "Watch for overheating signals",
+                ],
             }
             opportunities.append(opp)
 
@@ -976,7 +1042,7 @@ class MarketScannerAgent:
             "confidence": signal.confidence,
             "description": signal.description,
             "data_points": signal.data_points,
-            "trend": signal.trend
+            "trend": signal.trend,
         }
 
     def _signal_summary(self, signal: Dict) -> Dict:
@@ -986,7 +1052,7 @@ class MarketScannerAgent:
             "type": signal.get("signal_type"),
             "category": signal.get("category"),
             "strength": signal.get("strength"),
-            "description": signal.get("description", "")[:200]
+            "description": signal.get("description", "")[:200],
         }
 
     def _group_signals_by_type(self, signals: List[MarketSignal]) -> Dict[str, int]:
@@ -1004,7 +1070,9 @@ class MarketScannerAgent:
                 groups[s.category] += 1
         return dict(groups)
 
-    def _generate_trend_description(self, sector: str, signals: List, strength: float) -> str:
+    def _generate_trend_description(
+        self, sector: str, signals: List, strength: float
+    ) -> str:
         """Generate description for a trend."""
         direction = "accelerating" if strength > 0.5 else "stable"
         return f"{sector.replace('_', ' ').title()} showing {direction} activity with {len(signals)} supporting signals"
@@ -1015,11 +1083,19 @@ class MarketScannerAgent:
         accelerating = len([s for s in signals if s.get("direction") == "accelerating"])
         decelerating = len([s for s in signals if s.get("direction") == "decelerating"])
 
-        sentiment = "bullish" if accelerating > decelerating else "cautious" if decelerating > accelerating else "mixed"
+        sentiment = (
+            "bullish"
+            if accelerating > decelerating
+            else "cautious"
+            if decelerating > accelerating
+            else "mixed"
+        )
 
-        return f"Market scan detected {total} signals this {period_type.replace('ly', '')}. " \
-               f"{accelerating} accelerating vs {decelerating} decelerating signals suggest {sentiment} sentiment. " \
-               f"Key themes include sector momentum shifts and geographic activity changes."
+        return (
+            f"Market scan detected {total} signals this {period_type.replace('ly', '')}. "
+            f"{accelerating} accelerating vs {decelerating} decelerating signals suggest {sentiment} sentiment. "
+            f"Key themes include sector momentum shifts and geographic activity changes."
+        )
 
     def _build_sector_spotlight(self, signals: List[Dict]) -> Dict:
         """Build sector spotlight section."""
@@ -1037,8 +1113,10 @@ class MarketScannerAgent:
         return {
             "sector": hottest[0],
             "signal_count": len(hottest[1]),
-            "avg_strength": round(sum(s.get("strength", 0) for s in hottest[1]) / len(hottest[1]), 2),
-            "key_signals": [self._signal_summary(s) for s in hottest[1][:3]]
+            "avg_strength": round(
+                sum(s.get("strength", 0) for s in hottest[1]) / len(hottest[1]), 2
+            ),
+            "key_signals": [self._signal_summary(s) for s in hottest[1][:3]],
         }
 
     # -------------------------------------------------------------------------
@@ -1058,10 +1136,13 @@ class MarketScannerAgent:
             logger.error(f"Error creating scan record: {e}")
             self.db.rollback()
 
-    def _complete_scan(self, scan_id: str, sources: List[str], signal_count: int, results: Dict) -> None:
+    def _complete_scan(
+        self, scan_id: str, sources: List[str], signal_count: int, results: Dict
+    ) -> None:
         """Mark scan as complete."""
         try:
             import json
+
             query = text("""
                 UPDATE market_scans
                 SET status = 'completed',
@@ -1071,12 +1152,15 @@ class MarketScannerAgent:
                     results = :results
                 WHERE scan_id = :scan_id
             """)
-            self.db.execute(query, {
-                "scan_id": scan_id,
-                "sources": json.dumps(sources),
-                "count": signal_count,
-                "results": json.dumps(results)
-            })
+            self.db.execute(
+                query,
+                {
+                    "scan_id": scan_id,
+                    "sources": json.dumps(sources),
+                    "count": signal_count,
+                    "results": json.dumps(results),
+                },
+            )
             self.db.commit()
         except Exception as e:
             logger.error(f"Error completing scan: {e}")
@@ -1100,6 +1184,7 @@ class MarketScannerAgent:
         """Save a signal to the database."""
         try:
             import json
+
             query = text("""
                 INSERT INTO market_signals
                 (signal_id, signal_type, category, direction, strength, confidence, description, data_points, first_detected, scan_id)
@@ -1109,17 +1194,20 @@ class MarketScannerAgent:
                     direction = EXCLUDED.direction,
                     last_updated = NOW()
             """)
-            self.db.execute(query, {
-                "signal_id": signal.signal_id,
-                "signal_type": signal.signal_type,
-                "category": signal.category,
-                "direction": signal.direction,
-                "strength": signal.strength,
-                "confidence": signal.confidence,
-                "description": signal.description,
-                "data_points": json.dumps(signal.data_points),
-                "scan_id": scan_id
-            })
+            self.db.execute(
+                query,
+                {
+                    "signal_id": signal.signal_id,
+                    "signal_type": signal.signal_type,
+                    "category": signal.category,
+                    "direction": signal.direction,
+                    "strength": signal.strength,
+                    "confidence": signal.confidence,
+                    "description": signal.description,
+                    "data_points": json.dumps(signal.data_points),
+                    "scan_id": scan_id,
+                },
+            )
             self.db.commit()
         except Exception as e:
             logger.error(f"Error saving signal: {e}")
@@ -1129,6 +1217,7 @@ class MarketScannerAgent:
         """Save a brief to the database."""
         try:
             import json
+
             query = text("""
                 INSERT INTO market_briefs
                 (brief_id, period_start, period_end, brief_type, summary, sections, signals_included)
@@ -1138,15 +1227,18 @@ class MarketScannerAgent:
                     sections = EXCLUDED.sections,
                     generated_at = NOW()
             """)
-            self.db.execute(query, {
-                "brief_id": brief["brief_id"],
-                "period_start": brief["period"]["start"],
-                "period_end": brief["period"]["end"],
-                "brief_type": brief["brief_type"],
-                "summary": brief["summary"],
-                "sections": json.dumps(brief["sections"]),
-                "signals_included": json.dumps([])
-            })
+            self.db.execute(
+                query,
+                {
+                    "brief_id": brief["brief_id"],
+                    "period_start": brief["period"]["start"],
+                    "period_end": brief["period"]["end"],
+                    "brief_type": brief["brief_type"],
+                    "summary": brief["summary"],
+                    "sections": json.dumps(brief["sections"]),
+                    "signals_included": json.dumps([]),
+                },
+            )
             self.db.commit()
         except Exception as e:
             logger.error(f"Error saving brief: {e}")
@@ -1169,7 +1261,7 @@ class MarketScannerAgent:
                 return {
                     "scan_id": result[0],
                     "completed_at": result[1].isoformat() if result[1] else None,
-                    "results": result[2]
+                    "results": result[2],
                 }
             return None
         except Exception as e:
@@ -1180,26 +1272,31 @@ class MarketScannerAgent:
     def _get_signals_for_period(self, days: int) -> List[Dict]:
         """Get signals for a time period."""
         try:
-            query = text("""
+            query = text(
+                """
                 SELECT signal_id, signal_type, category, direction, strength, confidence, description, data_points
                 FROM market_signals
                 WHERE first_detected >= NOW() - INTERVAL ':days days'
                 OR last_updated >= NOW() - INTERVAL ':days days'
                 ORDER BY strength DESC
-            """.replace(":days", str(days)))
+            """.replace(":days", str(days))
+            )
 
             result = self.db.execute(query).fetchall()
 
-            return [{
-                "signal_id": r[0],
-                "signal_type": r[1],
-                "category": r[2],
-                "direction": r[3],
-                "strength": r[4],
-                "confidence": r[5],
-                "description": r[6],
-                "data_points": r[7]
-            } for r in result]
+            return [
+                {
+                    "signal_id": r[0],
+                    "signal_type": r[1],
+                    "category": r[2],
+                    "direction": r[3],
+                    "strength": r[4],
+                    "confidence": r[5],
+                    "description": r[6],
+                    "data_points": r[7],
+                }
+                for r in result
+            ]
         except Exception as e:
             logger.warning(f"Error getting signals: {e}")
             self.db.rollback()
@@ -1223,7 +1320,7 @@ class MarketScannerAgent:
                     "summary": result[4],
                     "sections": result[5],
                     "generated_at": result[6].isoformat() if result[6] else None,
-                    "cached": True
+                    "cached": True,
                 }
             return None
         except Exception as e:
@@ -1242,14 +1339,17 @@ class MarketScannerAgent:
             """)
             result = self.db.execute(query, {"limit": limit}).fetchall()
 
-            return [{
-                "scan_id": r[0],
-                "scan_type": r[1],
-                "started_at": r[2].isoformat() if r[2] else None,
-                "completed_at": r[3].isoformat() if r[3] else None,
-                "status": r[4],
-                "signals_detected": r[5]
-            } for r in result]
+            return [
+                {
+                    "scan_id": r[0],
+                    "scan_type": r[1],
+                    "started_at": r[2].isoformat() if r[2] else None,
+                    "completed_at": r[3].isoformat() if r[3] else None,
+                    "status": r[4],
+                    "signals_detected": r[5],
+                }
+                for r in result
+            ]
         except Exception as e:
             logger.error(f"Error getting scans: {e}")
             self.db.rollback()
@@ -1266,13 +1366,16 @@ class MarketScannerAgent:
             """)
             result = self.db.execute(query, {"limit": limit}).fetchall()
 
-            return [{
-                "brief_id": r[0],
-                "period_start": str(r[1]),
-                "period_end": str(r[2]),
-                "brief_type": r[3],
-                "generated_at": r[4].isoformat() if r[4] else None
-            } for r in result]
+            return [
+                {
+                    "brief_id": r[0],
+                    "period_start": str(r[1]),
+                    "period_end": str(r[2]),
+                    "brief_type": r[3],
+                    "generated_at": r[4].isoformat() if r[4] else None,
+                }
+                for r in result
+            ]
         except Exception as e:
             logger.error(f"Error getting briefs: {e}")
             self.db.rollback()

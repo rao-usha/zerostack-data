@@ -37,7 +37,7 @@ class GitHubClient:
         """Get request headers with authentication."""
         headers = {
             "Accept": "application/vnd.github.v3+json",
-            "User-Agent": "Nexdata-GitHub-Analytics/1.0"
+            "User-Agent": "Nexdata-GitHub-Analytics/1.0",
         }
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
@@ -51,7 +51,9 @@ class GitHubClient:
             await asyncio.sleep(self.RATE_LIMIT_DELAY - elapsed)
         self._last_request_time = asyncio.get_running_loop().time()
 
-    async def _request(self, endpoint: str, params: Optional[Dict] = None) -> Optional[Dict]:
+    async def _request(
+        self, endpoint: str, params: Optional[Dict] = None
+    ) -> Optional[Dict]:
         """Make an authenticated request to GitHub API."""
         await self._rate_limit()
 
@@ -60,14 +62,13 @@ class GitHubClient:
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(
-                    url,
-                    headers=self._get_headers(),
-                    params=params,
-                    timeout=30
+                    url, headers=self._get_headers(), params=params, timeout=30
                 )
 
                 # Track rate limits
-                self._rate_limit_remaining = int(response.headers.get("X-RateLimit-Remaining", 5000))
+                self._rate_limit_remaining = int(
+                    response.headers.get("X-RateLimit-Remaining", 5000)
+                )
                 reset_ts = int(response.headers.get("X-RateLimit-Reset", 0))
                 if reset_ts:
                     self._rate_limit_reset = datetime.fromtimestamp(reset_ts)
@@ -75,13 +76,17 @@ class GitHubClient:
                 if response.status_code == 200:
                     return response.json()
                 elif response.status_code == 403 and self._rate_limit_remaining == 0:
-                    logger.warning(f"GitHub rate limit exceeded. Resets at {self._rate_limit_reset}")
+                    logger.warning(
+                        f"GitHub rate limit exceeded. Resets at {self._rate_limit_reset}"
+                    )
                     return None
                 elif response.status_code == 404:
                     logger.warning(f"GitHub resource not found: {endpoint}")
                     return None
                 else:
-                    logger.warning(f"GitHub API error {response.status_code}: {response.text[:200]}")
+                    logger.warning(
+                        f"GitHub API error {response.status_code}: {response.text[:200]}"
+                    )
                     return None
 
             except Exception as e:
@@ -101,11 +106,7 @@ class GitHubClient:
         return await self._request(f"/orgs/{org}")
 
     async def get_org_repos(
-        self,
-        org: str,
-        page: int = 1,
-        per_page: int = 100,
-        sort: str = "updated"
+        self, org: str, page: int = 1, per_page: int = 100, sort: str = "updated"
     ) -> List[Dict]:
         """
         Get repositories for an organization.
@@ -121,7 +122,7 @@ class GitHubClient:
         """
         result = await self._request(
             f"/orgs/{org}/repos",
-            params={"page": page, "per_page": per_page, "sort": sort}
+            params={"page": page, "per_page": per_page, "sort": sort},
         )
         return result if result else []
 
@@ -153,11 +154,7 @@ class GitHubClient:
         return result if result else {}
 
     async def get_repo_contributors(
-        self,
-        owner: str,
-        repo: str,
-        page: int = 1,
-        per_page: int = 100
+        self, owner: str, repo: str, page: int = 1, per_page: int = 100
     ) -> List[Dict]:
         """
         Get contributors for a repository.
@@ -173,7 +170,7 @@ class GitHubClient:
         """
         result = await self._request(
             f"/repos/{owner}/{repo}/contributors",
-            params={"page": page, "per_page": per_page}
+            params={"page": page, "per_page": per_page},
         )
         return result if result else []
 
@@ -205,10 +202,7 @@ class GitHubClient:
         return await self._request(f"/repos/{owner}/{repo}/stats/participation")
 
     async def get_repo_releases(
-        self,
-        owner: str,
-        repo: str,
-        per_page: int = 30
+        self, owner: str, repo: str, per_page: int = 30
     ) -> List[Dict]:
         """
         Get releases for a repository.
@@ -222,17 +216,12 @@ class GitHubClient:
             List of releases
         """
         result = await self._request(
-            f"/repos/{owner}/{repo}/releases",
-            params={"per_page": per_page}
+            f"/repos/{owner}/{repo}/releases", params={"per_page": per_page}
         )
         return result if result else []
 
     async def search_repos(
-        self,
-        query: str,
-        sort: str = "stars",
-        order: str = "desc",
-        per_page: int = 30
+        self, query: str, sort: str = "stars", order: str = "desc", per_page: int = 30
     ) -> Dict[str, Any]:
         """
         Search for repositories.
@@ -248,7 +237,7 @@ class GitHubClient:
         """
         result = await self._request(
             "/search/repositories",
-            params={"q": query, "sort": sort, "order": order, "per_page": per_page}
+            params={"q": query, "sort": sort, "order": order, "per_page": per_page},
         )
         return result if result else {"total_count": 0, "items": []}
 
@@ -256,6 +245,8 @@ class GitHubClient:
         """Get current rate limit status."""
         return {
             "remaining": self._rate_limit_remaining,
-            "reset_at": self._rate_limit_reset.isoformat() if self._rate_limit_reset else None,
-            "authenticated": bool(self.token)
+            "reset_at": self._rate_limit_reset.isoformat()
+            if self._rate_limit_reset
+            else None,
+            "authenticated": bool(self.token),
         }

@@ -3,6 +3,7 @@ Data quality validation module.
 
 Provides post-ingestion validation to ensure data quality standards are met.
 """
+
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -23,7 +24,7 @@ class DataQualityResult:
         passed: bool,
         message: str,
         severity: str = "warning",
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         self.check_name = check_name
         self.passed = passed
@@ -39,7 +40,7 @@ class DataQualityResult:
             "message": self.message,
             "severity": self.severity,
             "details": self.details,
-            "timestamp": self.timestamp.isoformat()
+            "timestamp": self.timestamp.isoformat(),
         }
 
 
@@ -66,7 +67,7 @@ class DataQualityValidator:
         expected_min_rows: int = 1,
         required_columns: Optional[List[str]] = None,
         unique_columns: Optional[List[str]] = None,
-        numeric_ranges: Optional[Dict[str, tuple]] = None
+        numeric_ranges: Optional[Dict[str, tuple]] = None,
     ) -> Dict[str, Any]:
         """
         Run all validation checks for a completed ingestion job.
@@ -91,7 +92,7 @@ class DataQualityValidator:
                 "job_id": job_id,
                 "status": "error",
                 "message": "Job not found",
-                "checks": []
+                "checks": [],
             }
 
         # Run checks
@@ -107,8 +108,12 @@ class DataQualityValidator:
             self._check_numeric_ranges(table_name, numeric_ranges)
 
         # Determine overall status
-        failed_errors = [r for r in self.results if not r.passed and r.severity == "error"]
-        failed_warnings = [r for r in self.results if not r.passed and r.severity == "warning"]
+        failed_errors = [
+            r for r in self.results if not r.passed and r.severity == "error"
+        ]
+        failed_warnings = [
+            r for r in self.results if not r.passed and r.severity == "warning"
+        ]
 
         if failed_errors:
             overall_status = "failed"
@@ -124,14 +129,11 @@ class DataQualityValidator:
             "total_checks": len(self.results),
             "passed_checks": len([r for r in self.results if r.passed]),
             "failed_checks": len([r for r in self.results if not r.passed]),
-            "checks": [r.to_dict() for r in self.results]
+            "checks": [r.to_dict() for r in self.results],
         }
 
     def _check_row_count(
-        self,
-        table_name: str,
-        expected_min: int,
-        actual_rows: Optional[int]
+        self, table_name: str, expected_min: int, actual_rows: Optional[int]
     ) -> None:
         """Check if row count meets minimum expectation."""
         if actual_rows is None:
@@ -142,22 +144,17 @@ class DataQualityValidator:
 
         passed = actual_rows >= expected_min
 
-        self.results.append(DataQualityResult(
-            check_name="row_count",
-            passed=passed,
-            message=f"Row count: {actual_rows} (expected >= {expected_min})",
-            severity="error" if not passed else "info",
-            details={
-                "actual_rows": actual_rows,
-                "expected_min_rows": expected_min
-            }
-        ))
+        self.results.append(
+            DataQualityResult(
+                check_name="row_count",
+                passed=passed,
+                message=f"Row count: {actual_rows} (expected >= {expected_min})",
+                severity="error" if not passed else "info",
+                details={"actual_rows": actual_rows, "expected_min_rows": expected_min},
+            )
+        )
 
-    def _check_null_values(
-        self,
-        table_name: str,
-        required_columns: List[str]
-    ) -> None:
+    def _check_null_values(self, table_name: str, required_columns: List[str]) -> None:
         """Check for null values in required columns."""
         for column in required_columns:
             try:
@@ -168,30 +165,27 @@ class DataQualityValidator:
 
                 passed = null_count == 0
 
-                self.results.append(DataQualityResult(
-                    check_name=f"null_check_{column}",
-                    passed=passed,
-                    message=f"Column '{column}': {null_count} null values",
-                    severity="warning" if not passed else "info",
-                    details={
-                        "column": column,
-                        "null_count": null_count
-                    }
-                ))
+                self.results.append(
+                    DataQualityResult(
+                        check_name=f"null_check_{column}",
+                        passed=passed,
+                        message=f"Column '{column}': {null_count} null values",
+                        severity="warning" if not passed else "info",
+                        details={"column": column, "null_count": null_count},
+                    )
+                )
             except Exception as e:
-                self.results.append(DataQualityResult(
-                    check_name=f"null_check_{column}",
-                    passed=False,
-                    message=f"Error checking column '{column}': {str(e)}",
-                    severity="error",
-                    details={"column": column, "error": str(e)}
-                ))
+                self.results.append(
+                    DataQualityResult(
+                        check_name=f"null_check_{column}",
+                        passed=False,
+                        message=f"Error checking column '{column}': {str(e)}",
+                        severity="error",
+                        details={"column": column, "error": str(e)},
+                    )
+                )
 
-    def _check_duplicates(
-        self,
-        table_name: str,
-        unique_columns: List[str]
-    ) -> None:
+    def _check_duplicates(self, table_name: str, unique_columns: List[str]) -> None:
         """Check for duplicate records based on unique columns."""
         columns_str = ", ".join(unique_columns)
 
@@ -209,29 +203,31 @@ class DataQualityValidator:
 
             passed = dup_groups == 0
 
-            self.results.append(DataQualityResult(
-                check_name="duplicate_check",
-                passed=passed,
-                message=f"Duplicate groups on ({columns_str}): {dup_groups}",
-                severity="warning" if not passed else "info",
-                details={
-                    "unique_columns": unique_columns,
-                    "duplicate_groups": dup_groups
-                }
-            ))
+            self.results.append(
+                DataQualityResult(
+                    check_name="duplicate_check",
+                    passed=passed,
+                    message=f"Duplicate groups on ({columns_str}): {dup_groups}",
+                    severity="warning" if not passed else "info",
+                    details={
+                        "unique_columns": unique_columns,
+                        "duplicate_groups": dup_groups,
+                    },
+                )
+            )
         except Exception as e:
-            self.results.append(DataQualityResult(
-                check_name="duplicate_check",
-                passed=False,
-                message=f"Error checking duplicates: {str(e)}",
-                severity="error",
-                details={"unique_columns": unique_columns, "error": str(e)}
-            ))
+            self.results.append(
+                DataQualityResult(
+                    check_name="duplicate_check",
+                    passed=False,
+                    message=f"Error checking duplicates: {str(e)}",
+                    severity="error",
+                    details={"unique_columns": unique_columns, "error": str(e)},
+                )
+            )
 
     def _check_numeric_ranges(
-        self,
-        table_name: str,
-        numeric_ranges: Dict[str, tuple]
+        self, table_name: str, numeric_ranges: Dict[str, tuple]
     ) -> None:
         """Check if numeric values fall within expected ranges."""
         for column, (min_val, max_val) in numeric_ranges.items():
@@ -254,34 +250,38 @@ class DataQualityValidator:
 
                 passed = out_of_range == 0
 
-                self.results.append(DataQualityResult(
-                    check_name=f"range_check_{column}",
-                    passed=passed,
-                    message=f"Column '{column}': {out_of_range}/{total} values out of range [{min_val}, {max_val}]",
-                    severity="warning" if not passed else "info",
-                    details={
-                        "column": column,
-                        "expected_range": [min_val, max_val],
-                        "actual_range": [actual_min, actual_max],
-                        "out_of_range_count": out_of_range,
-                        "total_count": total
-                    }
-                ))
+                self.results.append(
+                    DataQualityResult(
+                        check_name=f"range_check_{column}",
+                        passed=passed,
+                        message=f"Column '{column}': {out_of_range}/{total} values out of range [{min_val}, {max_val}]",
+                        severity="warning" if not passed else "info",
+                        details={
+                            "column": column,
+                            "expected_range": [min_val, max_val],
+                            "actual_range": [actual_min, actual_max],
+                            "out_of_range_count": out_of_range,
+                            "total_count": total,
+                        },
+                    )
+                )
             except Exception as e:
-                self.results.append(DataQualityResult(
-                    check_name=f"range_check_{column}",
-                    passed=False,
-                    message=f"Error checking range for '{column}': {str(e)}",
-                    severity="error",
-                    details={"column": column, "error": str(e)}
-                ))
+                self.results.append(
+                    DataQualityResult(
+                        check_name=f"range_check_{column}",
+                        passed=False,
+                        message=f"Error checking range for '{column}': {str(e)}",
+                        severity="error",
+                        details={"column": column, "error": str(e)},
+                    )
+                )
 
 
 def validate_ingestion_job(
     db: Session,
     job_id: int,
     table_name: str,
-    validation_config: Optional[Dict[str, Any]] = None
+    validation_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Convenience function to validate an ingestion job.
@@ -308,7 +308,7 @@ def validate_ingestion_job(
         expected_min_rows=config.get("expected_min_rows", 1),
         required_columns=config.get("required_columns"),
         unique_columns=config.get("unique_columns"),
-        numeric_ranges=config.get("numeric_ranges")
+        numeric_ranges=config.get("numeric_ranges"),
     )
 
 
@@ -329,7 +329,7 @@ DEFAULT_VALIDATION_CONFIGS = {
             "expected_min_rows": 1,
             "required_columns": ["cert", "faildate"],
             "unique_columns": ["cert"],
-        }
+        },
     },
     "census": {
         "expected_min_rows": 1,
@@ -342,11 +342,13 @@ DEFAULT_VALIDATION_CONFIGS = {
     "bls": {
         "expected_min_rows": 1,
         "required_columns": ["series_id", "year", "period"],
-    }
+    },
 }
 
 
-def get_default_validation_config(source: str, dataset: Optional[str] = None) -> Dict[str, Any]:
+def get_default_validation_config(
+    source: str, dataset: Optional[str] = None
+) -> Dict[str, Any]:
     """Get default validation config for a source."""
     config = DEFAULT_VALIDATION_CONFIGS.get(source, {})
 

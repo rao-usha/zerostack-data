@@ -3,6 +3,7 @@ Monitoring and alerting module.
 
 Provides job monitoring, metrics collection, and alerting capabilities.
 """
+
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
@@ -24,9 +25,7 @@ class JobMonitor:
         self.db = db
 
     def get_job_metrics(
-        self,
-        hours: int = 24,
-        source: Optional[str] = None
+        self, hours: int = 24, source: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get job metrics for the specified time window.
@@ -57,15 +56,21 @@ class JobMonitor:
             status_counts[status.value] = count
 
         # Calculate rates
-        success_rate = (status_counts.get("success", 0) / total_jobs * 100) if total_jobs > 0 else 0
-        failure_rate = (status_counts.get("failed", 0) / total_jobs * 100) if total_jobs > 0 else 0
+        success_rate = (
+            (status_counts.get("success", 0) / total_jobs * 100)
+            if total_jobs > 0
+            else 0
+        )
+        failure_rate = (
+            (status_counts.get("failed", 0) / total_jobs * 100) if total_jobs > 0 else 0
+        )
 
         # Average duration for completed jobs
         completed_jobs = base_query.filter(
             and_(
                 IngestionJob.status == JobStatus.SUCCESS,
                 IngestionJob.started_at.isnot(None),
-                IngestionJob.completed_at.isnot(None)
+                IngestionJob.completed_at.isnot(None),
             )
         ).all()
 
@@ -78,14 +83,20 @@ class JobMonitor:
         avg_duration = sum(durations) / len(durations) if durations else 0
 
         # Get total rows inserted
-        total_rows = base_query.filter(
-            IngestionJob.rows_inserted.isnot(None)
-        ).with_entities(func.sum(IngestionJob.rows_inserted)).scalar() or 0
+        total_rows = (
+            base_query.filter(IngestionJob.rows_inserted.isnot(None))
+            .with_entities(func.sum(IngestionJob.rows_inserted))
+            .scalar()
+            or 0
+        )
 
         # Recent failures
-        recent_failures = base_query.filter(
-            IngestionJob.status == JobStatus.FAILED
-        ).order_by(IngestionJob.created_at.desc()).limit(5).all()
+        recent_failures = (
+            base_query.filter(IngestionJob.status == JobStatus.FAILED)
+            .order_by(IngestionJob.created_at.desc())
+            .limit(5)
+            .all()
+        )
 
         return {
             "time_window_hours": hours,
@@ -100,14 +111,16 @@ class JobMonitor:
                 {
                     "job_id": job.id,
                     "source": job.source,
-                    "error_message": job.error_message[:200] if job.error_message else None,
+                    "error_message": job.error_message[:200]
+                    if job.error_message
+                    else None,
                     "created_at": job.created_at.isoformat(),
                     "retry_count": job.retry_count,
-                    "can_retry": job.can_retry
+                    "can_retry": job.can_retry,
                 }
                 for job in recent_failures
             ],
-            "collected_at": datetime.utcnow().isoformat()
+            "collected_at": datetime.utcnow().isoformat(),
         }
 
     def get_source_health(self) -> Dict[str, Any]:
@@ -124,12 +137,15 @@ class JobMonitor:
 
         health_report = {}
         for source in sources:
-            recent_jobs = self.db.query(IngestionJob).filter(
-                and_(
-                    IngestionJob.source == source,
-                    IngestionJob.created_at >= cutoff
+            recent_jobs = (
+                self.db.query(IngestionJob)
+                .filter(
+                    and_(
+                        IngestionJob.source == source, IngestionJob.created_at >= cutoff
+                    )
                 )
-            ).all()
+                .all()
+            )
 
             total = len(recent_jobs)
             success = len([j for j in recent_jobs if j.status == JobStatus.SUCCESS])
@@ -152,19 +168,29 @@ class JobMonitor:
                 health_score = round((success / total) * 100)
 
             # Get last successful and failed jobs
-            last_success = self.db.query(IngestionJob).filter(
-                and_(
-                    IngestionJob.source == source,
-                    IngestionJob.status == JobStatus.SUCCESS
+            last_success = (
+                self.db.query(IngestionJob)
+                .filter(
+                    and_(
+                        IngestionJob.source == source,
+                        IngestionJob.status == JobStatus.SUCCESS,
+                    )
                 )
-            ).order_by(IngestionJob.completed_at.desc()).first()
+                .order_by(IngestionJob.completed_at.desc())
+                .first()
+            )
 
-            last_failure = self.db.query(IngestionJob).filter(
-                and_(
-                    IngestionJob.source == source,
-                    IngestionJob.status == JobStatus.FAILED
+            last_failure = (
+                self.db.query(IngestionJob)
+                .filter(
+                    and_(
+                        IngestionJob.source == source,
+                        IngestionJob.status == JobStatus.FAILED,
+                    )
                 )
-            ).order_by(IngestionJob.created_at.desc()).first()
+                .order_by(IngestionJob.created_at.desc())
+                .first()
+            )
 
             health_report[source] = {
                 "status": health_status,
@@ -172,15 +198,21 @@ class JobMonitor:
                 "jobs_24h": total,
                 "success_24h": success,
                 "failed_24h": failed,
-                "last_success_at": last_success.completed_at.isoformat() if last_success and last_success.completed_at else None,
-                "last_failure_at": last_failure.created_at.isoformat() if last_failure else None,
-                "last_failure_message": last_failure.error_message[:200] if last_failure and last_failure.error_message else None
+                "last_success_at": last_success.completed_at.isoformat()
+                if last_success and last_success.completed_at
+                else None,
+                "last_failure_at": last_failure.created_at.isoformat()
+                if last_failure
+                else None,
+                "last_failure_message": last_failure.error_message[:200]
+                if last_failure and last_failure.error_message
+                else None,
             }
 
         return {
             "sources": health_report,
             "overall_health": self._calculate_overall_health(health_report),
-            "collected_at": datetime.utcnow().isoformat()
+            "collected_at": datetime.utcnow().isoformat(),
         }
 
     def _calculate_overall_health(self, health_report: Dict[str, Any]) -> str:
@@ -202,9 +234,7 @@ class JobMonitor:
             return "unknown"
 
     def check_alerts(
-        self,
-        failure_threshold: int = 3,
-        time_window_hours: int = 1
+        self, failure_threshold: int = 3, time_window_hours: int = 1
     ) -> List[Dict[str, Any]]:
         """
         Check for alert conditions.
@@ -224,67 +254,88 @@ class JobMonitor:
         sources = [s[0] for s in sources]
 
         for source in sources:
-            recent_failures = self.db.query(IngestionJob).filter(
-                and_(
-                    IngestionJob.source == source,
-                    IngestionJob.status == JobStatus.FAILED,
-                    IngestionJob.created_at >= cutoff
+            recent_failures = (
+                self.db.query(IngestionJob)
+                .filter(
+                    and_(
+                        IngestionJob.source == source,
+                        IngestionJob.status == JobStatus.FAILED,
+                        IngestionJob.created_at >= cutoff,
+                    )
                 )
-            ).count()
+                .count()
+            )
 
             if recent_failures >= failure_threshold:
-                alerts.append({
-                    "alert_type": "high_failure_rate",
-                    "source": source,
-                    "severity": "critical" if recent_failures >= failure_threshold * 2 else "warning",
-                    "message": f"Source '{source}' has {recent_failures} failures in the last {time_window_hours} hour(s)",
-                    "failure_count": recent_failures,
-                    "threshold": failure_threshold,
-                    "time_window_hours": time_window_hours,
-                    "created_at": datetime.utcnow().isoformat()
-                })
+                alerts.append(
+                    {
+                        "alert_type": "high_failure_rate",
+                        "source": source,
+                        "severity": "critical"
+                        if recent_failures >= failure_threshold * 2
+                        else "warning",
+                        "message": f"Source '{source}' has {recent_failures} failures in the last {time_window_hours} hour(s)",
+                        "failure_count": recent_failures,
+                        "threshold": failure_threshold,
+                        "time_window_hours": time_window_hours,
+                        "created_at": datetime.utcnow().isoformat(),
+                    }
+                )
 
         # Check for jobs stuck in running state
         stuck_threshold = timedelta(hours=2)
-        stuck_jobs = self.db.query(IngestionJob).filter(
-            and_(
-                IngestionJob.status == JobStatus.RUNNING,
-                IngestionJob.started_at < datetime.utcnow() - stuck_threshold
+        stuck_jobs = (
+            self.db.query(IngestionJob)
+            .filter(
+                and_(
+                    IngestionJob.status == JobStatus.RUNNING,
+                    IngestionJob.started_at < datetime.utcnow() - stuck_threshold,
+                )
             )
-        ).all()
+            .all()
+        )
 
         for job in stuck_jobs:
             running_time = datetime.utcnow() - job.started_at
-            alerts.append({
-                "alert_type": "stuck_job",
-                "source": job.source,
-                "severity": "warning",
-                "message": f"Job {job.id} has been running for {running_time.total_seconds() / 3600:.1f} hours",
-                "job_id": job.id,
-                "started_at": job.started_at.isoformat(),
-                "running_hours": round(running_time.total_seconds() / 3600, 2),
-                "created_at": datetime.utcnow().isoformat()
-            })
+            alerts.append(
+                {
+                    "alert_type": "stuck_job",
+                    "source": job.source,
+                    "severity": "warning",
+                    "message": f"Job {job.id} has been running for {running_time.total_seconds() / 3600:.1f} hours",
+                    "job_id": job.id,
+                    "started_at": job.started_at.isoformat(),
+                    "running_hours": round(running_time.total_seconds() / 3600, 2),
+                    "created_at": datetime.utcnow().isoformat(),
+                }
+            )
 
         # Check for no recent jobs (data staleness)
         for source in sources:
-            last_job = self.db.query(IngestionJob).filter(
-                IngestionJob.source == source
-            ).order_by(IngestionJob.created_at.desc()).first()
+            last_job = (
+                self.db.query(IngestionJob)
+                .filter(IngestionJob.source == source)
+                .order_by(IngestionJob.created_at.desc())
+                .first()
+            )
 
             if last_job:
                 time_since_last = datetime.utcnow() - last_job.created_at
                 # Alert if no jobs in 24 hours
                 if time_since_last > timedelta(hours=24):
-                    alerts.append({
-                        "alert_type": "data_staleness",
-                        "source": source,
-                        "severity": "info",
-                        "message": f"No jobs for source '{source}' in {time_since_last.days} days, {time_since_last.seconds // 3600} hours",
-                        "last_job_at": last_job.created_at.isoformat(),
-                        "hours_since_last": round(time_since_last.total_seconds() / 3600, 2),
-                        "created_at": datetime.utcnow().isoformat()
-                    })
+                    alerts.append(
+                        {
+                            "alert_type": "data_staleness",
+                            "source": source,
+                            "severity": "info",
+                            "message": f"No jobs for source '{source}' in {time_since_last.days} days, {time_since_last.seconds // 3600} hours",
+                            "last_job_at": last_job.created_at.isoformat(),
+                            "hours_since_last": round(
+                                time_since_last.total_seconds() / 3600, 2
+                            ),
+                            "created_at": datetime.utcnow().isoformat(),
+                        }
+                    )
 
         return alerts
 
@@ -302,14 +353,12 @@ def get_monitoring_dashboard(db: Session) -> Dict[str, Any]:
         "metrics_1h": monitor.get_job_metrics(hours=1),
         "source_health": monitor.get_source_health(),
         "alerts": monitor.check_alerts(),
-        "dashboard_generated_at": datetime.utcnow().isoformat()
+        "dashboard_generated_at": datetime.utcnow().isoformat(),
     }
 
 
 async def check_and_notify_alerts(
-    db: Session,
-    failure_threshold: int = 3,
-    time_window_hours: int = 1
+    db: Session, failure_threshold: int = 3, time_window_hours: int = 1
 ) -> Dict[str, Any]:
     """
     Check for alerts and send webhook notifications.
@@ -324,16 +373,11 @@ async def check_and_notify_alerts(
     """
     monitor = JobMonitor(db)
     alerts = monitor.check_alerts(
-        failure_threshold=failure_threshold,
-        time_window_hours=time_window_hours
+        failure_threshold=failure_threshold, time_window_hours=time_window_hours
     )
 
     if not alerts:
-        return {
-            "alerts_found": 0,
-            "notifications_sent": 0,
-            "alerts": []
-        }
+        return {"alerts_found": 0, "notifications_sent": 0, "alerts": []}
 
     notifications_sent = 0
     for alert in alerts:
@@ -342,7 +386,7 @@ async def check_and_notify_alerts(
                 alert_type=alert["alert_type"],
                 source=alert["source"],
                 message=alert["message"],
-                details=alert
+                details=alert,
             )
             if result.get("successful", 0) > 0:
                 notifications_sent += 1
@@ -352,7 +396,7 @@ async def check_and_notify_alerts(
     return {
         "alerts_found": len(alerts),
         "notifications_sent": notifications_sent,
-        "alerts": alerts
+        "alerts": alerts,
     }
 
 
@@ -375,10 +419,14 @@ async def check_consecutive_failures(
     from app.core.models_site_intel import SiteIntelCollectionJob
 
     # Get distinct domain/source pairs
-    pairs = db.query(
-        SiteIntelCollectionJob.domain,
-        SiteIntelCollectionJob.source,
-    ).distinct().all()
+    pairs = (
+        db.query(
+            SiteIntelCollectionJob.domain,
+            SiteIntelCollectionJob.source,
+        )
+        .distinct()
+        .all()
+    )
 
     alerts = []
     for domain_val, source_val in pairs:
@@ -399,13 +447,19 @@ async def check_consecutive_failures(
 
         # Check if all are failed
         if all(j.status == "failed" for j in recent_jobs):
-            alerts.append({
-                "domain": domain_val,
-                "source": source_val,
-                "consecutive_failures": len(recent_jobs),
-                "last_error": recent_jobs[0].error_message[:200] if recent_jobs[0].error_message else None,
-                "last_failure_at": recent_jobs[0].created_at.isoformat() if recent_jobs[0].created_at else None,
-            })
+            alerts.append(
+                {
+                    "domain": domain_val,
+                    "source": source_val,
+                    "consecutive_failures": len(recent_jobs),
+                    "last_error": recent_jobs[0].error_message[:200]
+                    if recent_jobs[0].error_message
+                    else None,
+                    "last_failure_at": recent_jobs[0].created_at.isoformat()
+                    if recent_jobs[0].created_at
+                    else None,
+                }
+            )
 
     return alerts
 
@@ -462,7 +516,7 @@ async def notify_job_completion(
     status: JobStatus,
     rows_inserted: int = 0,
     error_message: Optional[str] = None,
-    config: Optional[Dict[str, Any]] = None
+    config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Send webhook notification for job completion.
@@ -481,17 +535,14 @@ async def notify_job_completion(
     try:
         if status == JobStatus.SUCCESS:
             return await webhook_service.notify_job_success(
-                job_id=job_id,
-                source=source,
-                rows_inserted=rows_inserted,
-                config=config
+                job_id=job_id, source=source, rows_inserted=rows_inserted, config=config
             )
         elif status == JobStatus.FAILED:
             return await webhook_service.notify_job_failed(
                 job_id=job_id,
                 source=source,
                 error_message=error_message or "Unknown error",
-                config=config
+                config=config,
             )
         else:
             return {"webhooks_triggered": 0}

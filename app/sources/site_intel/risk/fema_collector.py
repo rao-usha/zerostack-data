@@ -11,6 +11,7 @@ Data sources:
 
 No API key required - public data.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -20,7 +21,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import FloodZone, NationalRiskIndex
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -29,16 +34,56 @@ logger = logging.getLogger(__name__)
 
 # State FIPS codes
 STATE_FIPS = {
-    "AL": "01", "AK": "02", "AZ": "04", "AR": "05", "CA": "06",
-    "CO": "08", "CT": "09", "DE": "10", "DC": "11", "FL": "12",
-    "GA": "13", "HI": "15", "ID": "16", "IL": "17", "IN": "18",
-    "IA": "19", "KS": "20", "KY": "21", "LA": "22", "ME": "23",
-    "MD": "24", "MA": "25", "MI": "26", "MN": "27", "MS": "28",
-    "MO": "29", "MT": "30", "NE": "31", "NV": "32", "NH": "33",
-    "NJ": "34", "NM": "35", "NY": "36", "NC": "37", "ND": "38",
-    "OH": "39", "OK": "40", "OR": "41", "PA": "42", "RI": "44",
-    "SC": "45", "SD": "46", "TN": "47", "TX": "48", "UT": "49",
-    "VT": "50", "VA": "51", "WA": "53", "WV": "54", "WI": "55",
+    "AL": "01",
+    "AK": "02",
+    "AZ": "04",
+    "AR": "05",
+    "CA": "06",
+    "CO": "08",
+    "CT": "09",
+    "DE": "10",
+    "DC": "11",
+    "FL": "12",
+    "GA": "13",
+    "HI": "15",
+    "ID": "16",
+    "IL": "17",
+    "IN": "18",
+    "IA": "19",
+    "KS": "20",
+    "KY": "21",
+    "LA": "22",
+    "ME": "23",
+    "MD": "24",
+    "MA": "25",
+    "MI": "26",
+    "MN": "27",
+    "MS": "28",
+    "MO": "29",
+    "MT": "30",
+    "NE": "31",
+    "NV": "32",
+    "NH": "33",
+    "NJ": "34",
+    "NM": "35",
+    "NY": "36",
+    "NC": "37",
+    "ND": "38",
+    "OH": "39",
+    "OK": "40",
+    "OR": "41",
+    "PA": "42",
+    "RI": "44",
+    "SC": "45",
+    "SD": "46",
+    "TN": "47",
+    "TX": "48",
+    "UT": "49",
+    "VT": "50",
+    "VA": "51",
+    "WA": "53",
+    "WV": "54",
+    "WI": "55",
     "WY": "56",
 }
 
@@ -97,7 +142,9 @@ class FEMARiskCollector(BaseCollector):
             if nri_result.get("error"):
                 errors.append({"source": "nri", "error": nri_result["error"]})
 
-            status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            status = (
+                CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            )
 
             return self.create_result(
                 status=status,
@@ -153,7 +200,9 @@ class FEMARiskCollector(BaseCollector):
                     break
 
                 all_counties.extend(features)
-                logger.info(f"Fetched {len(features)} NRI county records (total: {len(all_counties)})")
+                logger.info(
+                    f"Fetched {len(features)} NRI county records (total: {len(all_counties)})"
+                )
 
                 if len(features) < page_size:
                     break
@@ -176,11 +225,20 @@ class FEMARiskCollector(BaseCollector):
                     records,
                     unique_columns=["county_fips"],
                     update_columns=[
-                        "county_name", "state", "risk_score", "risk_rating",
-                        "hazard_scores", "earthquake_score", "flood_score",
-                        "tornado_score", "hurricane_score", "wildfire_score",
-                        "social_vulnerability", "community_resilience",
-                        "expected_annual_loss", "collected_at"
+                        "county_name",
+                        "state",
+                        "risk_score",
+                        "risk_rating",
+                        "hazard_scores",
+                        "earthquake_score",
+                        "flood_score",
+                        "tornado_score",
+                        "hurricane_score",
+                        "wildfire_score",
+                        "social_vulnerability",
+                        "community_resilience",
+                        "expected_annual_loss",
+                        "collected_at",
                     ],
                 )
                 return {"processed": len(all_counties), "inserted": inserted}
@@ -195,7 +253,9 @@ class FEMARiskCollector(BaseCollector):
                 pass
             return {"processed": 0, "inserted": 0, "error": str(e)}
 
-    def _transform_nri_record(self, feature: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _transform_nri_record(
+        self, feature: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """Transform FEMA NRI feature to database format."""
         attrs = feature.get("attributes", {})
 

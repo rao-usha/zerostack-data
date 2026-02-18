@@ -7,6 +7,7 @@ Provides HTTP endpoints for ingesting real estate data from:
 - Redfin Housing Market Data
 - OpenStreetMap Building Footprints
 """
+
 import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -18,78 +19,60 @@ from app.core.job_helpers import create_and_dispatch_job
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(
-    prefix="/realestate",
-    tags=["Real Estate / Housing"]
-)
+router = APIRouter(prefix="/realestate", tags=["Real Estate / Housing"])
 
 
 # Request models
 class FHFAIngestRequest(BaseModel):
     """Request model for FHFA House Price Index ingestion."""
+
     geography_type: Optional[str] = Field(
-        None,
-        description="Geography type filter: National, State, MSA, ZIP3"
+        None, description="Geography type filter: National, State, MSA, ZIP3"
     )
     start_date: Optional[str] = Field(
-        None,
-        description="Start date in YYYY-MM-DD format"
+        None, description="Start date in YYYY-MM-DD format"
     )
-    end_date: Optional[str] = Field(
-        None,
-        description="End date in YYYY-MM-DD format"
-    )
+    end_date: Optional[str] = Field(None, description="End date in YYYY-MM-DD format")
 
 
 class HUDIngestRequest(BaseModel):
     """Request model for HUD Permits & Starts ingestion."""
+
     geography_type: str = Field(
-        "National",
-        description="Geography type: National, State, MSA, County"
+        "National", description="Geography type: National, State, MSA, County"
     )
     geography_id: Optional[str] = Field(
-        None,
-        description="Geography identifier (state FIPS, MSA code, etc.)"
+        None, description="Geography identifier (state FIPS, MSA code, etc.)"
     )
     start_date: Optional[str] = Field(
-        None,
-        description="Start date in YYYY-MM-DD format"
+        None, description="Start date in YYYY-MM-DD format"
     )
-    end_date: Optional[str] = Field(
-        None,
-        description="End date in YYYY-MM-DD format"
-    )
+    end_date: Optional[str] = Field(None, description="End date in YYYY-MM-DD format")
 
 
 class RedfinIngestRequest(BaseModel):
     """Request model for Redfin housing data ingestion."""
+
     region_type: str = Field(
-        "zip",
-        description="Region type: zip, city, neighborhood, metro"
+        "zip", description="Region type: zip, city, neighborhood, metro"
     )
-    property_type: str = Field(
-        "All Residential",
-        description="Property type filter"
-    )
+    property_type: str = Field("All Residential", description="Property type filter")
 
 
 class OSMIngestRequest(BaseModel):
     """Request model for OpenStreetMap buildings ingestion."""
+
     bounding_box: List[float] = Field(
         ...,
         description="Bounding box as [south, west, north, east]",
         min_length=4,
-        max_length=4
+        max_length=4,
     )
     building_type: Optional[str] = Field(
-        None,
-        description="Building type filter: residential, commercial, etc."
+        None, description="Building type filter: residential, commercial, etc."
     )
     limit: int = Field(
-        10000,
-        description="Maximum number of buildings to fetch",
-        ge=1,
-        le=50000
+        10000, description="Maximum number of buildings to fetch", ge=1, le=50000
     )
 
 
@@ -98,7 +81,7 @@ class OSMIngestRequest(BaseModel):
 async def ingest_fhfa_hpi(
     request: FHFAIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest FHFA House Price Index data.
@@ -111,7 +94,9 @@ async def ingest_fhfa_hpi(
     **Geographic Levels:** National, State, MSA, ZIP3
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="realestate",
+        db,
+        background_tasks,
+        source="realestate",
         config={
             "geography_type": request.geography_type,
             "start_date": request.start_date,
@@ -126,7 +111,7 @@ async def ingest_fhfa_hpi(
 async def ingest_hud_permits(
     request: HUDIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest HUD Building Permits and Housing Starts data.
@@ -136,7 +121,9 @@ async def ingest_hud_permits(
     **Geographic Levels:** National, State, MSA, County
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="realestate",
+        db,
+        background_tasks,
+        source="realestate",
         config={
             "dataset": "hud_permits",
             "geography_type": request.geography_type,
@@ -153,7 +140,7 @@ async def ingest_hud_permits(
 async def ingest_redfin_data(
     request: RedfinIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest Redfin housing market data.
@@ -163,7 +150,9 @@ async def ingest_redfin_data(
     **Geographic Levels:** ZIP, City, Neighborhood, Metro
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="realestate",
+        db,
+        background_tasks,
+        source="realestate",
         config={
             "dataset": "redfin",
             "region_type": request.region_type,
@@ -178,7 +167,7 @@ async def ingest_redfin_data(
 async def ingest_osm_buildings(
     request: OSMIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest OpenStreetMap building footprints.
@@ -192,7 +181,7 @@ async def ingest_osm_buildings(
     if len(request.bounding_box) != 4:
         raise HTTPException(
             status_code=400,
-            detail="Bounding box must have exactly 4 coordinates [south, west, north, east]"
+            detail="Bounding box must have exactly 4 coordinates [south, west, north, east]",
         )
 
     south, west, north, east = request.bounding_box
@@ -207,7 +196,9 @@ async def ingest_osm_buildings(
         raise HTTPException(status_code=400, detail="West must be less than east")
 
     return create_and_dispatch_job(
-        db, background_tasks, source="realestate",
+        db,
+        background_tasks,
+        source="realestate",
         config={
             "dataset": "osm_buildings",
             "bounding_box": request.bounding_box,
@@ -234,7 +225,7 @@ async def get_realestate_info():
                 "update_frequency": "Quarterly",
                 "geographic_levels": ["National", "State", "MSA", "ZIP3"],
                 "api_endpoint": "/api/v1/realestate/fhfa/ingest",
-                "documentation": "https://www.fhfa.gov/DataTools/Downloads/Pages/House-Price-Index-Datasets.aspx"
+                "documentation": "https://www.fhfa.gov/DataTools/Downloads/Pages/House-Price-Index-Datasets.aspx",
             },
             {
                 "id": "hud_permits",
@@ -244,7 +235,7 @@ async def get_realestate_info():
                 "update_frequency": "Monthly",
                 "geographic_levels": ["National", "State", "MSA", "County"],
                 "api_endpoint": "/api/v1/realestate/hud/ingest",
-                "documentation": "https://www.huduser.gov/portal/datasets/socds.html"
+                "documentation": "https://www.huduser.gov/portal/datasets/socds.html",
             },
             {
                 "id": "redfin",
@@ -254,7 +245,7 @@ async def get_realestate_info():
                 "update_frequency": "Weekly",
                 "geographic_levels": ["ZIP", "City", "Neighborhood", "Metro"],
                 "api_endpoint": "/api/v1/realestate/redfin/ingest",
-                "documentation": "https://www.redfin.com/news/data-center/"
+                "documentation": "https://www.redfin.com/news/data-center/",
             },
             {
                 "id": "osm_buildings",
@@ -264,7 +255,7 @@ async def get_realestate_info():
                 "update_frequency": "Real-time",
                 "geographic_scope": "Global (query by bounding box)",
                 "api_endpoint": "/api/v1/realestate/osm/ingest",
-                "documentation": "https://wiki.openstreetmap.org/wiki/Overpass_API"
-            }
+                "documentation": "https://wiki.openstreetmap.org/wiki/Overpass_API",
+            },
         ]
     }

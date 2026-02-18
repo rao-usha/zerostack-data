@@ -3,6 +3,7 @@ Data Export Service.
 
 Provides functionality to export table data to various file formats.
 """
+
 import os
 import gzip
 import json
@@ -34,6 +35,7 @@ _TABLE_CACHE_TTL = 300  # 5 minutes
 # Export Service
 # =============================================================================
 
+
 class ExportService:
     """Service for exporting table data to files."""
 
@@ -59,11 +61,13 @@ class ExportService:
         # Single query for all row counts via pg_stat — avoids N COUNT(*) queries
         row_counts: Dict[str, int] = {}
         try:
-            rows = self.db.execute(text(
-                "SELECT relname, n_live_tup "
-                "FROM pg_stat_user_tables "
-                "ORDER BY relname"
-            ))
+            rows = self.db.execute(
+                text(
+                    "SELECT relname, n_live_tup "
+                    "FROM pg_stat_user_tables "
+                    "ORDER BY relname"
+                )
+            )
             for r in rows:
                 row_counts[r[0]] = int(r[1])
         except Exception:
@@ -75,11 +79,13 @@ class ExportService:
 
             try:
                 columns = [col["name"] for col in inspector.get_columns(table_name)]
-                tables.append({
-                    "table_name": table_name,
-                    "row_count": row_counts.get(table_name, 0),
-                    "columns": columns
-                })
+                tables.append(
+                    {
+                        "table_name": table_name,
+                        "row_count": row_counts.get(table_name, 0),
+                        "columns": columns,
+                    }
+                )
             except Exception as e:
                 logger.warning(f"Could not inspect table {table_name}: {e}")
 
@@ -104,7 +110,7 @@ class ExportService:
         columns: Optional[List[str]] = None,
         row_limit: Optional[int] = None,
         filters: Optional[Dict] = None,
-        compress: bool = False
+        compress: bool = False,
     ) -> ExportJob:
         """Create a new export job."""
         # Validate table exists
@@ -127,7 +133,7 @@ class ExportService:
             row_limit=row_limit,
             filters=filters,
             compress=1 if compress else 0,
-            expires_at=datetime.utcnow() + timedelta(hours=EXPORT_EXPIRY_HOURS)
+            expires_at=datetime.utcnow() + timedelta(hours=EXPORT_EXPIRY_HOURS),
         )
         self.db.add(job)
         self.db.commit()
@@ -153,7 +159,9 @@ class ExportService:
         try:
             # Build query
             columns = job.columns if job.columns else ["*"]
-            columns_str = ", ".join(f'"{c}"' for c in columns) if columns != ["*"] else "*"
+            columns_str = (
+                ", ".join(f'"{c}"' for c in columns) if columns != ["*"] else "*"
+            )
 
             query = f'SELECT {columns_str} FROM "{job.table_name}"'
 
@@ -205,7 +213,9 @@ class ExportService:
             job.file_size_bytes = os.path.getsize(file_path)
             self.db.commit()
 
-            logger.info(f"Export job {job_id} completed: {len(rows)} rows, {job.file_size_bytes} bytes")
+            logger.info(
+                f"Export job {job_id} completed: {len(rows)} rows, {job.file_size_bytes} bytes"
+            )
             return job
 
         except Exception as e:
@@ -278,7 +288,7 @@ class ExportService:
         self,
         status: Optional[ExportStatus] = None,
         table_name: Optional[str] = None,
-        limit: int = 50
+        limit: int = 50,
     ) -> List[ExportJob]:
         """List export jobs with optional filtering."""
         query = self.db.query(ExportJob)
@@ -311,10 +321,13 @@ class ExportService:
     def cleanup_expired(self) -> int:
         """Clean up expired export jobs and files."""
         now = datetime.utcnow()
-        expired = self.db.query(ExportJob).filter(
-            ExportJob.expires_at < now,
-            ExportJob.status != ExportStatus.EXPIRED
-        ).all()
+        expired = (
+            self.db.query(ExportJob)
+            .filter(
+                ExportJob.expires_at < now, ExportJob.status != ExportStatus.EXPIRED
+            )
+            .all()
+        )
 
         count = 0
         for job in expired:
@@ -323,7 +336,9 @@ class ExportService:
                 try:
                     os.remove(job.file_path)
                 except Exception as e:
-                    logger.warning(f"Could not delete expired file {job.file_path}: {e}")
+                    logger.warning(
+                        f"Could not delete expired file {job.file_path}: {e}"
+                    )
 
             job.status = ExportStatus.EXPIRED
             job.file_path = None

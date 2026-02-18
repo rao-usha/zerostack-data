@@ -5,6 +5,7 @@ Simple pub/sub using asyncio.Queue. Clients subscribe to channels
 and receive SSE-formatted events. State is entirely in-memory;
 clients reconnect on restart.
 """
+
 import asyncio
 import json
 import logging
@@ -104,9 +105,7 @@ class _EventBus:
     def active_channels(self) -> Dict[str, int]:
         """Get active channels and subscriber counts."""
         return {
-            channel: len(subs)
-            for channel, subs in self._subscribers.items()
-            if subs
+            channel: len(subs) for channel, subs in self._subscribers.items() if subs
         }
 
 

@@ -6,6 +6,7 @@ GET /api/v1/jobs/stream/{id}    — SSE stream for a specific job
 GET /api/v1/jobs/active         — JSON list of currently running/claimed jobs
 GET /api/v1/jobs/history        — Unified paginated history from both tables
 """
+
 import logging
 from typing import Optional
 
@@ -72,10 +73,12 @@ async def get_active_jobs(
     Returns a JSON list suitable for the frontend Active Jobs panel.
     """
     query = db.query(JobQueue).filter(
-        JobQueue.status.in_([
-            QueueJobStatus.CLAIMED,
-            QueueJobStatus.RUNNING,
-        ])
+        JobQueue.status.in_(
+            [
+                QueueJobStatus.CLAIMED,
+                QueueJobStatus.RUNNING,
+            ]
+        )
     )
 
     if job_type:
@@ -125,13 +128,14 @@ async def get_queue_status(
     return {
         "total": sum(status_counts.values()),
         "by_status": {
-            (k if isinstance(k, str) else k.value): v
-            for k, v in status_counts.items()
+            (k if isinstance(k, str) else k.value): v for k, v in status_counts.items()
         },
         "jobs": [
             {
                 "id": j.id,
-                "job_type": j.job_type if isinstance(j.job_type, str) else j.job_type.value,
+                "job_type": j.job_type
+                if isinstance(j.job_type, str)
+                else j.job_type.value,
                 "status": j.status if isinstance(j.status, str) else j.status.value,
                 "worker_id": j.worker_id,
                 "priority": j.priority,
@@ -163,7 +167,9 @@ def _duration(started, completed):
 async def get_job_history(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    status: Optional[str] = Query(None, description="Filter by status (pending, running, success, failed)"),
+    status: Optional[str] = Query(
+        None, description="Filter by status (pending, running, success, failed)"
+    ),
     job_type: Optional[str] = Query(None, description="Filter by job type"),
     db: Session = Depends(get_db),
 ):
@@ -236,6 +242,7 @@ async def get_job_history(
     # --- Merge and sort ---
     all_jobs = queue_dicts + ingest_dicts
     from datetime import datetime as _dt
+
     _epoch = _dt(1970, 1, 1)
     all_jobs.sort(key=lambda x: x["_sort_key"] or _epoch, reverse=True)
 
@@ -255,7 +262,7 @@ async def get_job_history(
     total = len(all_jobs)
 
     # Apply pagination
-    page = all_jobs[offset:offset + limit]
+    page = all_jobs[offset : offset + limit]
 
     # Remove internal sort key
     for j in page:

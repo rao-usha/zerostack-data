@@ -9,6 +9,7 @@ Datasets:
 - Failed Banks: Historical bank failures
 - Summary of Deposits: Branch-level deposit data
 """
+
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -29,121 +30,80 @@ router = APIRouter(prefix="/fdic", tags=["FDIC BankFind"])
 # REQUEST/RESPONSE MODELS
 # =============================================================================
 
+
 class FinancialsIngestRequest(BaseModel):
     """Request model for bank financials ingestion."""
+
     cert: Optional[int] = Field(
-        None,
-        description="FDIC Certificate Number (optional - for specific bank)"
+        None, description="FDIC Certificate Number (optional - for specific bank)"
     )
     report_date: Optional[str] = Field(
-        None,
-        description="Report date filter (YYYYMMDD format, e.g., '20230630')"
+        None, description="Report date filter (YYYYMMDD format, e.g., '20230630')"
     )
-    year: Optional[int] = Field(
-        None,
-        description="Year filter (e.g., 2023)"
-    )
+    year: Optional[int] = Field(None, description="Year filter (e.g., 2023)")
     limit: Optional[int] = Field(
-        None,
-        description="Maximum records to fetch (optional)"
+        None, description="Maximum records to fetch (optional)"
     )
 
 
 class InstitutionsIngestRequest(BaseModel):
     """Request model for institutions ingestion."""
-    active_only: bool = Field(
-        True,
-        description="Only fetch active institutions"
-    )
+
+    active_only: bool = Field(True, description="Only fetch active institutions")
     state: Optional[str] = Field(
-        None,
-        description="State filter (2-letter code, e.g., 'CA')"
+        None, description="State filter (2-letter code, e.g., 'CA')"
     )
     limit: Optional[int] = Field(
-        None,
-        description="Maximum records to fetch (optional)"
+        None, description="Maximum records to fetch (optional)"
     )
 
 
 class FailedBanksIngestRequest(BaseModel):
     """Request model for failed banks ingestion."""
-    year_start: Optional[int] = Field(
-        None,
-        description="Start year filter"
-    )
-    year_end: Optional[int] = Field(
-        None,
-        description="End year filter"
-    )
+
+    year_start: Optional[int] = Field(None, description="Start year filter")
+    year_end: Optional[int] = Field(None, description="End year filter")
     limit: Optional[int] = Field(
-        None,
-        description="Maximum records to fetch (optional)"
+        None, description="Maximum records to fetch (optional)"
     )
 
 
 class DepositsIngestRequest(BaseModel):
     """Request model for Summary of Deposits ingestion."""
-    year: Optional[int] = Field(
-        None,
-        description="Year filter (e.g., 2023)"
-    )
-    cert: Optional[int] = Field(
-        None,
-        description="FDIC Certificate Number (optional)"
-    )
-    state: Optional[str] = Field(
-        None,
-        description="State filter (2-letter code)"
-    )
+
+    year: Optional[int] = Field(None, description="Year filter (e.g., 2023)")
+    cert: Optional[int] = Field(None, description="FDIC Certificate Number (optional)")
+    state: Optional[str] = Field(None, description="State filter (2-letter code)")
     limit: Optional[int] = Field(
-        None,
-        description="Maximum records to fetch (optional)"
+        None, description="Maximum records to fetch (optional)"
     )
 
 
 class AllDatasetsIngestRequest(BaseModel):
     """Request model for all FDIC datasets ingestion."""
-    include_financials: bool = Field(
-        True,
-        description="Include bank financials"
-    )
-    include_institutions: bool = Field(
-        True,
-        description="Include institutions"
-    )
-    include_failed_banks: bool = Field(
-        True,
-        description="Include failed banks"
-    )
+
+    include_financials: bool = Field(True, description="Include bank financials")
+    include_institutions: bool = Field(True, description="Include institutions")
+    include_failed_banks: bool = Field(True, description="Include failed banks")
     include_deposits: bool = Field(
-        False,
-        description="Include Summary of Deposits (large dataset!)"
+        False, description="Include Summary of Deposits (large dataset!)"
     )
     year: Optional[int] = Field(
-        None,
-        description="Year filter for financials and deposits"
+        None, description="Year filter for financials and deposits"
     )
 
 
 class BankSearchRequest(BaseModel):
     """Request model for bank search."""
-    query: str = Field(
-        ...,
-        description="Search term (bank name, city, etc.)"
-    )
-    active_only: bool = Field(
-        True,
-        description="Only return active banks"
-    )
-    limit: int = Field(
-        100,
-        description="Maximum results to return",
-        le=1000
-    )
+
+    query: str = Field(..., description="Search term (bank name, city, etc.)")
+    active_only: bool = Field(True, description="Only return active banks")
+    limit: int = Field(100, description="Maximum results to return", le=1000)
 
 
 class MetricInfo(BaseModel):
     """Financial metric information."""
+
     code: str
     description: str
     type: str
@@ -153,11 +113,12 @@ class MetricInfo(BaseModel):
 # INGESTION ENDPOINTS
 # =============================================================================
 
+
 @router.post("/financials/ingest")
 async def ingest_bank_financials(
     request: FinancialsIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest bank financial data from FDIC BankFind API.
@@ -181,7 +142,9 @@ async def ingest_bank_financials(
     **Note:** No API key required. Data is free and public.
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="fdic",
+        db,
+        background_tasks,
+        source="fdic",
         config={
             "dataset": "financials",
             "cert": request.cert,
@@ -197,7 +160,7 @@ async def ingest_bank_financials(
 async def ingest_institutions(
     request: InstitutionsIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest bank institution demographics from FDIC BankFind API.
@@ -220,7 +183,9 @@ async def ingest_institutions(
     **Note:** No API key required.
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="fdic",
+        db,
+        background_tasks,
+        source="fdic",
         config={
             "dataset": "institutions",
             "active_only": request.active_only,
@@ -235,7 +200,7 @@ async def ingest_institutions(
 async def ingest_failed_banks(
     request: FailedBanksIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest failed banks list from FDIC BankFind API.
@@ -262,7 +227,9 @@ async def ingest_failed_banks(
     **Note:** No API key required.
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="fdic",
+        db,
+        background_tasks,
+        source="fdic",
         config={
             "dataset": "failed_banks",
             "year_start": request.year_start,
@@ -277,7 +244,7 @@ async def ingest_failed_banks(
 async def ingest_summary_of_deposits(
     request: DepositsIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest Summary of Deposits (SOD) data from FDIC BankFind API.
@@ -305,7 +272,9 @@ async def ingest_summary_of_deposits(
     **Note:** No API key required.
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="fdic",
+        db,
+        background_tasks,
+        source="fdic",
         config={
             "dataset": "deposits",
             "year": request.year,
@@ -321,7 +290,7 @@ async def ingest_summary_of_deposits(
 async def ingest_all_datasets(
     request: AllDatasetsIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest all FDIC datasets at once.
@@ -341,7 +310,9 @@ async def ingest_all_datasets(
 
     if request.include_financials:
         result = create_and_dispatch_job(
-            db, background_tasks, source="fdic",
+            db,
+            background_tasks,
+            source="fdic",
             config={"dataset": "financials", "year": request.year},
             message="FDIC bank financials ingestion job created",
         )
@@ -350,7 +321,9 @@ async def ingest_all_datasets(
 
     if request.include_institutions:
         result = create_and_dispatch_job(
-            db, background_tasks, source="fdic",
+            db,
+            background_tasks,
+            source="fdic",
             config={"dataset": "institutions"},
             message="FDIC institutions ingestion job created",
         )
@@ -359,7 +332,9 @@ async def ingest_all_datasets(
 
     if request.include_failed_banks:
         result = create_and_dispatch_job(
-            db, background_tasks, source="fdic",
+            db,
+            background_tasks,
+            source="fdic",
             config={"dataset": "failed_banks"},
             message="FDIC failed banks ingestion job created",
         )
@@ -368,7 +343,9 @@ async def ingest_all_datasets(
 
     if request.include_deposits:
         result = create_and_dispatch_job(
-            db, background_tasks, source="fdic",
+            db,
+            background_tasks,
+            source="fdic",
             config={"dataset": "deposits", "year": request.year},
             message="FDIC Summary of Deposits ingestion job created",
         )
@@ -379,13 +356,14 @@ async def ingest_all_datasets(
         "job_ids": job_ids,
         "datasets": datasets,
         "status": "pending",
-        "message": f"Created {len(job_ids)} FDIC ingestion jobs"
+        "message": f"Created {len(job_ids)} FDIC ingestion jobs",
     }
 
 
 # =============================================================================
 # REFERENCE ENDPOINTS
 # =============================================================================
+
 
 @router.get("/reference/metrics")
 async def get_financial_metrics():
@@ -401,16 +379,14 @@ async def get_financial_metrics():
     """
     metrics = []
     for code, info in metadata.COMMON_FINANCIAL_METRICS.items():
-        metrics.append({
-            "code": code,
-            "description": info["description"],
-            "type": info["type"]
-        })
+        metrics.append(
+            {"code": code, "description": info["description"], "type": info["type"]}
+        )
 
     return {
         "metrics": metrics,
         "total": len(metrics),
-        "note": "These are the most common metrics. The FDIC API provides 1,100+ variables."
+        "note": "These are the most common metrics. The FDIC API provides 1,100+ variables.",
     }
 
 
@@ -426,32 +402,32 @@ async def get_available_datasets():
                 "display_name": "Bank Financials",
                 "description": "Balance sheets, income statements, 1,100+ financial metrics",
                 "endpoint": "/api/v1/fdic/financials/ingest",
-                "table": "fdic_bank_financials"
+                "table": "fdic_bank_financials",
             },
             {
                 "name": "institutions",
                 "display_name": "Bank Institutions",
                 "description": "Bank demographics, locations, charter info, ~4,700 active banks",
                 "endpoint": "/api/v1/fdic/institutions/ingest",
-                "table": "fdic_institutions"
+                "table": "fdic_institutions",
             },
             {
                 "name": "failed_banks",
                 "display_name": "Failed Banks",
                 "description": "Historical bank failures since 1934",
                 "endpoint": "/api/v1/fdic/failed-banks/ingest",
-                "table": "fdic_failed_banks"
+                "table": "fdic_failed_banks",
             },
             {
                 "name": "summary_deposits",
                 "display_name": "Summary of Deposits",
                 "description": "Branch-level deposit data, ~85,000+ branches",
                 "endpoint": "/api/v1/fdic/deposits/ingest",
-                "table": "fdic_summary_deposits"
-            }
+                "table": "fdic_summary_deposits",
+            },
         ],
         "api_docs": "https://banks.data.fdic.gov/docs/",
-        "api_key_required": False
+        "api_key_required": False,
     }
 
 
@@ -464,21 +440,59 @@ async def get_major_banks():
     """
     return {
         "major_banks": [
-            {"name": "JPMorgan Chase Bank", "cert": 628, "city": "Columbus", "state": "OH"},
-            {"name": "Bank of America", "cert": 3510, "city": "Charlotte", "state": "NC"},
-            {"name": "Wells Fargo Bank", "cert": 3511, "city": "Sioux Falls", "state": "SD"},
+            {
+                "name": "JPMorgan Chase Bank",
+                "cert": 628,
+                "city": "Columbus",
+                "state": "OH",
+            },
+            {
+                "name": "Bank of America",
+                "cert": 3510,
+                "city": "Charlotte",
+                "state": "NC",
+            },
+            {
+                "name": "Wells Fargo Bank",
+                "cert": 3511,
+                "city": "Sioux Falls",
+                "state": "SD",
+            },
             {"name": "Citibank", "cert": 7213, "city": "Sioux Falls", "state": "SD"},
             {"name": "U.S. Bank", "cert": 6548, "city": "Cincinnati", "state": "OH"},
             {"name": "PNC Bank", "cert": 6384, "city": "Wilmington", "state": "DE"},
             {"name": "Truist Bank", "cert": 9846, "city": "Charlotte", "state": "NC"},
-            {"name": "Goldman Sachs Bank USA", "cert": 33124, "city": "New York", "state": "NY"},
+            {
+                "name": "Goldman Sachs Bank USA",
+                "cert": 33124,
+                "city": "New York",
+                "state": "NY",
+            },
             {"name": "TD Bank", "cert": 17100, "city": "Wilmington", "state": "DE"},
             {"name": "Capital One", "cert": 33954, "city": "McLean", "state": "VA"},
-            {"name": "Silicon Valley Bank", "cert": 24735, "city": "Santa Clara", "state": "CA", "note": "Failed March 2023"},
-            {"name": "Signature Bank", "cert": 57053, "city": "New York", "state": "NY", "note": "Failed March 2023"},
-            {"name": "First Republic Bank", "cert": 59017, "city": "San Francisco", "state": "CA", "note": "Failed May 2023"},
+            {
+                "name": "Silicon Valley Bank",
+                "cert": 24735,
+                "city": "Santa Clara",
+                "state": "CA",
+                "note": "Failed March 2023",
+            },
+            {
+                "name": "Signature Bank",
+                "cert": 57053,
+                "city": "New York",
+                "state": "NY",
+                "note": "Failed March 2023",
+            },
+            {
+                "name": "First Republic Bank",
+                "cert": 59017,
+                "city": "San Francisco",
+                "state": "CA",
+                "note": "Failed May 2023",
+            },
         ],
-        "note": "Use 'cert' parameter to fetch data for specific banks"
+        "note": "Use 'cert' parameter to fetch data for specific banks",
     }
 
 
@@ -486,12 +500,9 @@ async def get_major_banks():
 # SEARCH ENDPOINT
 # =============================================================================
 
+
 @router.get("/search")
-async def search_banks(
-    query: str,
-    active_only: bool = True,
-    limit: int = 100
-):
+async def search_banks(query: str, active_only: bool = True, limit: int = 100):
     """
     Search for banks by name, city, or other text.
 
@@ -504,8 +515,7 @@ async def search_banks(
     """
     if not query or len(query) < 2:
         raise HTTPException(
-            status_code=400,
-            detail="Query must be at least 2 characters"
+            status_code=400, detail="Query must be at least 2 characters"
         )
 
     if limit > 1000:
@@ -516,32 +526,32 @@ async def search_banks(
 
         try:
             results = await client.search_banks(
-                query=query,
-                active_only=active_only,
-                limit=limit
+                query=query, active_only=active_only, limit=limit
             )
 
             # Format results
             banks = []
             for r in results:
                 data = r.get("data", r)
-                banks.append({
-                    "cert": data.get("CERT"),
-                    "name": data.get("NAME"),
-                    "city": data.get("CITY"),
-                    "state": data.get("STALP"),
-                    "active": data.get("ACTIVE") == 1,
-                    "asset": data.get("ASSET"),
-                    "charter": data.get("CHARTER"),
-                    "bkclass": data.get("BKCLASS"),
-                    "regulator": data.get("REGAGNT"),
-                })
+                banks.append(
+                    {
+                        "cert": data.get("CERT"),
+                        "name": data.get("NAME"),
+                        "city": data.get("CITY"),
+                        "state": data.get("STALP"),
+                        "active": data.get("ACTIVE") == 1,
+                        "asset": data.get("ASSET"),
+                        "charter": data.get("CHARTER"),
+                        "bkclass": data.get("BKCLASS"),
+                        "regulator": data.get("REGAGNT"),
+                    }
+                )
 
             return {
                 "query": query,
                 "results": banks,
                 "count": len(banks),
-                "active_only": active_only
+                "active_only": active_only,
             }
 
         finally:

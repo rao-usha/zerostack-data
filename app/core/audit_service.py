@@ -3,6 +3,7 @@ Collection audit trail service.
 
 Logs every collection trigger (API, schedule, retry) for observability.
 """
+
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List

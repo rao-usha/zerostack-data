@@ -7,6 +7,7 @@ Handles:
 - Data parsing and transformation
 - Schema definitions for Border Crossing, FAF5, VMT data
 """
+
 import logging
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timedelta
@@ -62,13 +63,13 @@ VMT_COLUMNS = {
 def generate_table_name(dataset: str) -> str:
     """
     Generate PostgreSQL table name for BTS data.
-    
+
     Args:
         dataset: Dataset identifier (border_crossing, faf_regional, vmt)
-        
+
     Returns:
         PostgreSQL table name
-        
+
     Examples:
         >>> generate_table_name("border_crossing")
         'bts_border_crossing'
@@ -82,11 +83,11 @@ def generate_table_name(dataset: str) -> str:
 def generate_create_table_sql(table_name: str, dataset: str) -> str:
     """
     Generate CREATE TABLE SQL for BTS data.
-    
+
     Args:
         table_name: PostgreSQL table name
         dataset: Dataset type to determine schema
-        
+
     Returns:
         CREATE TABLE SQL statement
     """
@@ -102,7 +103,9 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
         ]
     elif dataset == "faf_regional":
         columns = FAF_REGIONAL_COLUMNS
-        unique_constraint = '"year", "fr_orig", "fr_dest", "sctg2", "dms_mode", "trade_type"'
+        unique_constraint = (
+            '"year", "fr_orig", "fr_dest", "sctg2", "dms_mode", "trade_type"'
+        )
         indexes = [
             ("year", '"year"'),
             ("dms_mode", '"dms_mode"'),
@@ -119,20 +122,20 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
         ]
     else:
         raise ValueError(f"Unknown BTS dataset: {dataset}")
-    
+
     # Build column definitions
     column_defs = []
     column_defs.append("id SERIAL PRIMARY KEY")
-    
+
     for col_name, (col_type, col_desc) in columns.items():
         # Quote column names to handle reserved words like 'state', 'date', 'value'
         # Don't use SQL comments as they would comment out the comma separators
         column_defs.append(f'"{col_name}" {col_type}')
-    
+
     column_defs.append("ingested_at TIMESTAMP DEFAULT NOW()")
-    
+
     columns_sql = ",\n        ".join(column_defs)
-    
+
     # Build indexes
     index_sql_parts = []
     for idx_name, idx_cols in indexes:
@@ -140,9 +143,9 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
             f"CREATE INDEX IF NOT EXISTS idx_{table_name}_{idx_name} "
             f"ON {table_name} ({idx_cols});"
         )
-    
+
     indexes_sql = "\n    ".join(index_sql_parts)
-    
+
     sql = f"""
     CREATE TABLE IF NOT EXISTS {table_name} (
         {columns_sql},
@@ -151,24 +154,24 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
     
     {indexes_sql}
     """
-    
+
     return sql
 
 
 def parse_border_crossing_response(
-    records: List[Dict[str, Any]]
+    records: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     """
     Parse border crossing data from Socrata API response.
-    
+
     Args:
         records: Raw API response records
-        
+
     Returns:
         List of parsed records ready for insertion
     """
     parsed_records = []
-    
+
     for record in records:
         try:
             parsed = {
@@ -182,34 +185,32 @@ def parse_border_crossing_response(
                 "latitude": _safe_float(record.get("latitude")),
                 "longitude": _safe_float(record.get("longitude")),
             }
-            
+
             # Skip records without required fields
             if parsed["port_code"] and parsed["date"] and parsed["measure"]:
                 parsed_records.append(parsed)
             else:
                 logger.debug(f"Skipping incomplete border crossing record: {record}")
-        
+
         except Exception as e:
             logger.warning(f"Failed to parse border crossing record: {e}")
-    
+
     logger.info(f"Parsed {len(parsed_records)} border crossing records")
     return parsed_records
 
 
-def parse_vmt_response(
-    records: List[Dict[str, Any]]
-) -> List[Dict[str, Any]]:
+def parse_vmt_response(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Parse VMT data from Socrata API response.
-    
+
     Args:
         records: Raw API response records
-        
+
     Returns:
         List of parsed records ready for insertion
     """
     parsed_records = []
-    
+
     for record in records:
         try:
             parsed = {
@@ -218,37 +219,38 @@ def parse_vmt_response(
                 "state_fips": record.get("state_fips") or record.get("fips"),
                 "vmt": _safe_float(record.get("vmt") or record.get("travel")),
                 "vmt_sa": _safe_float(record.get("vmt_sa") or record.get("travel_sa")),
-                "percent_change": _safe_float(record.get("percent_change") or record.get("pct_change")),
-                "functional_system": record.get("functional_system") or record.get("f_system"),
+                "percent_change": _safe_float(
+                    record.get("percent_change") or record.get("pct_change")
+                ),
+                "functional_system": record.get("functional_system")
+                or record.get("f_system"),
             }
-            
+
             # Skip records without required fields
             if parsed["date"] and parsed["state"]:
                 parsed_records.append(parsed)
             else:
                 logger.debug(f"Skipping incomplete VMT record: {record}")
-        
+
         except Exception as e:
             logger.warning(f"Failed to parse VMT record: {e}")
-    
+
     logger.info(f"Parsed {len(parsed_records)} VMT records")
     return parsed_records
 
 
-def parse_faf_records(
-    records: List[Dict[str, Any]]
-) -> List[Dict[str, Any]]:
+def parse_faf_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Parse FAF5 freight data records.
-    
+
     Args:
         records: Records from CSV parsing
-        
+
     Returns:
         List of parsed records ready for insertion
     """
     parsed_records = []
-    
+
     for record in records:
         try:
             parsed = {
@@ -267,14 +269,14 @@ def parse_faf_records(
                 "curval": record.get("curval"),
                 "year": record.get("year"),
             }
-            
+
             # Skip records without critical fields
             if parsed["fr_orig"] and parsed["fr_dest"]:
                 parsed_records.append(parsed)
-        
+
         except Exception as e:
             logger.warning(f"Failed to parse FAF record: {e}")
-    
+
     logger.info(f"Parsed {len(parsed_records)} FAF records")
     return parsed_records
 
@@ -282,38 +284,38 @@ def parse_faf_records(
 def _normalize_date(date_str: Optional[str]) -> Optional[str]:
     """
     Normalize date string to YYYY-MM format.
-    
+
     Args:
         date_str: Date string in various formats
-        
+
     Returns:
         Normalized date string (YYYY-MM) or None
     """
     if not date_str:
         return None
-    
+
     try:
         # Handle ISO format (2024-01-01T00:00:00.000)
         if "T" in date_str:
             date_str = date_str.split("T")[0]
-        
+
         # Handle YYYY-MM-DD
         if len(date_str) == 10 and date_str[4] == "-":
             return date_str[:7]  # Return YYYY-MM
-        
+
         # Handle YYYY-MM
         if len(date_str) == 7 and date_str[4] == "-":
             return date_str
-        
+
         # Handle MM/YYYY
         if "/" in date_str:
             parts = date_str.split("/")
             if len(parts) == 2:
                 month, year = parts
                 return f"{year}-{month.zfill(2)}"
-        
+
         return date_str
-    
+
     except Exception:
         return date_str
 
@@ -341,39 +343,30 @@ def _safe_int(value: Any) -> Optional[int]:
 def get_default_date_range(dataset: str) -> Tuple[str, str]:
     """
     Get default date range for BTS data.
-    
+
     Args:
         dataset: Dataset identifier
-        
+
     Returns:
         Tuple of (start_date, end_date)
     """
     end_date = datetime.now()
-    
+
     if dataset == "border_crossing":
         # Last 5 years of border crossing data
         start_date = end_date.replace(year=end_date.year - 5)
-        return (
-            start_date.strftime("%Y-%m"),
-            end_date.strftime("%Y-%m")
-        )
+        return (start_date.strftime("%Y-%m"), end_date.strftime("%Y-%m"))
     elif dataset == "vmt":
         # Last 3 years of VMT data
         start_date = end_date.replace(year=end_date.year - 3)
-        return (
-            start_date.strftime("%Y-%m"),
-            end_date.strftime("%Y-%m")
-        )
+        return (start_date.strftime("%Y-%m"), end_date.strftime("%Y-%m"))
     elif dataset == "faf_regional":
         # FAF5 is 2018-2024
         return ("2018", "2024")
     else:
         # Default to last 5 years
         start_date = end_date.replace(year=end_date.year - 5)
-        return (
-            start_date.strftime("%Y-%m"),
-            end_date.strftime("%Y-%m")
-        )
+        return (start_date.strftime("%Y-%m"), end_date.strftime("%Y-%m"))
 
 
 def get_dataset_display_name(dataset: str) -> str:
@@ -407,7 +400,7 @@ def get_dataset_description(dataset: str) -> str:
     }
     return descriptions.get(
         dataset,
-        f"Transportation statistics data from Bureau of Transportation Statistics"
+        f"Transportation statistics data from Bureau of Transportation Statistics",
     )
 
 

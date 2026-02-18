@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LinkedInMatch:
     """A potential LinkedIn profile match."""
+
     url: str
     name_from_url: Optional[str]
     confidence: str  # high, medium, low
@@ -34,8 +35,7 @@ class LinkedInValidator:
     """
 
     LINKEDIN_URL_PATTERN = re.compile(
-        r'https?://(?:www\.)?linkedin\.com/in/([a-zA-Z0-9\-_]+)',
-        re.IGNORECASE
+        r"https?://(?:www\.)?linkedin\.com/in/([a-zA-Z0-9\-_]+)", re.IGNORECASE
     )
 
     def __init__(self):
@@ -104,8 +104,12 @@ class LinkedInValidator:
 
         if company_name:
             # Clean company name
-            clean_company = re.sub(r'\b(inc|llc|corp|corporation|company|co)\b', '',
-                                   company_name, flags=re.IGNORECASE).strip()
+            clean_company = re.sub(
+                r"\b(inc|llc|corp|corporation|company|co)\b",
+                "",
+                company_name,
+                flags=re.IGNORECASE,
+            ).strip()
             parts.append(f'"{clean_company}"')
 
         if title:
@@ -155,8 +159,7 @@ class LinkedInValidator:
                 username_lower = username.lower().replace("-", " ")
 
                 name_match_count = sum(
-                    1 for part in name_parts
-                    if len(part) > 2 and part in username_lower
+                    1 for part in name_parts if len(part) > 2 and part in username_lower
                 )
 
                 if name_match_count >= 2:
@@ -169,12 +172,14 @@ class LinkedInValidator:
                     confidence = "medium"
                     match_reason = "Top search result"
 
-                matches.append(LinkedInMatch(
-                    url=url,
-                    name_from_url=username.replace("-", " ").title(),
-                    confidence=confidence,
-                    match_reason=match_reason,
-                ))
+                matches.append(
+                    LinkedInMatch(
+                        url=url,
+                        name_from_url=username.replace("-", " ").title(),
+                        confidence=confidence,
+                        match_reason=match_reason,
+                    )
+                )
 
             return matches
 
@@ -279,9 +284,11 @@ class LinkedInEnricher:
                 match_score = self.validator.match_name_to_url(full_name, normalized)
                 result["validated_url"] = normalized
                 result["confidence"] = (
-                    "high" if match_score > 0.5 else
-                    "medium" if match_score > 0.25 else
-                    "low"
+                    "high"
+                    if match_score > 0.5
+                    else "medium"
+                    if match_score > 0.25
+                    else "low"
                 )
                 return result
 

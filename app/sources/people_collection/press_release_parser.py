@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PressRelease:
     """Represents a press release."""
+
     title: str
     content: str
     publish_date: Optional[date]
@@ -39,6 +40,7 @@ class PressRelease:
 @dataclass
 class PressReleaseParseResult:
     """Result of parsing a press release."""
+
     changes: List[LeadershipChange] = field(default_factory=list)
     is_leadership_related: bool = False
     extraction_confidence: ExtractionConfidence = ExtractionConfidence.MEDIUM
@@ -58,36 +60,85 @@ class PressReleaseParser:
     # Keywords indicating leadership announcement
     LEADERSHIP_KEYWORDS = [
         # Appointments
-        "appoints", "appointed", "names", "named", "promotes", "promoted",
-        "elevates", "elevated", "announces appointment", "new ceo",
-        "new chief", "new president", "joins as", "hire", "hired",
-
+        "appoints",
+        "appointed",
+        "names",
+        "named",
+        "promotes",
+        "promoted",
+        "elevates",
+        "elevated",
+        "announces appointment",
+        "new ceo",
+        "new chief",
+        "new president",
+        "joins as",
+        "hire",
+        "hired",
         # Departures
-        "resigns", "resigned", "resignation", "retires", "retired",
-        "retirement", "steps down", "stepping down", "departs",
-        "departure", "leaves", "leaving", "transition",
-
+        "resigns",
+        "resigned",
+        "resignation",
+        "retires",
+        "retired",
+        "retirement",
+        "steps down",
+        "stepping down",
+        "departs",
+        "departure",
+        "leaves",
+        "leaving",
+        "transition",
         # Board changes
-        "board of directors", "elected to board", "joins board",
-        "board appointment", "director", "chairman",
-
+        "board of directors",
+        "elected to board",
+        "joins board",
+        "board appointment",
+        "director",
+        "chairman",
         # Succession
-        "succession", "successor", "succeeds", "effective immediately",
+        "succession",
+        "successor",
+        "succeeds",
+        "effective immediately",
         "effective date",
     ]
 
     # Title keywords for classification
     EXECUTIVE_TITLES = [
-        "ceo", "cfo", "coo", "cto", "cio", "cmo", "cro", "chro",
-        "chief executive", "chief financial", "chief operating",
-        "chief technology", "chief information", "chief marketing",
-        "president", "vice president", "vp", "evp", "svp",
-        "general counsel", "general manager", "managing director",
+        "ceo",
+        "cfo",
+        "coo",
+        "cto",
+        "cio",
+        "cmo",
+        "cro",
+        "chro",
+        "chief executive",
+        "chief financial",
+        "chief operating",
+        "chief technology",
+        "chief information",
+        "chief marketing",
+        "president",
+        "vice president",
+        "vp",
+        "evp",
+        "svp",
+        "general counsel",
+        "general manager",
+        "managing director",
     ]
 
     BOARD_TITLES = [
-        "board", "director", "chairman", "chairwoman", "chair",
-        "trustee", "independent director", "non-executive",
+        "board",
+        "director",
+        "chairman",
+        "chairwoman",
+        "chair",
+        "trustee",
+        "independent director",
+        "non-executive",
     ]
 
     def __init__(self):
@@ -95,15 +146,15 @@ class PressReleaseParser:
 
     def _clean_html(self, html: str) -> str:
         """Remove HTML tags and clean text."""
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, "html.parser")
 
         # Remove script and style
-        for element in soup.find_all(['script', 'style', 'noscript']):
+        for element in soup.find_all(["script", "style", "noscript"]):
             element.decompose()
 
-        text = soup.get_text(separator='\n')
-        text = re.sub(r'\n{3,}', '\n\n', text)
-        text = re.sub(r'[ \t]+', ' ', text)
+        text = soup.get_text(separator="\n")
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        text = re.sub(r"[ \t]+", " ", text)
 
         return text.strip()
 
@@ -128,7 +179,9 @@ class PressReleaseParser:
         board_matches = sum(1 for t in self.BOARD_TITLES if t in text)
 
         # Need at least 2 leadership keywords OR 1 keyword + title mention
-        return matches >= 2 or (matches >= 1 and (title_matches >= 1 or board_matches >= 1))
+        return matches >= 2 or (
+            matches >= 1 and (title_matches >= 1 or board_matches >= 1)
+        )
 
     def _extract_key_phrases(self, text: str) -> List[str]:
         """Extract key phrases that indicate the type of announcement."""
@@ -136,15 +189,15 @@ class PressReleaseParser:
         text_lower = text.lower()
 
         phrase_patterns = [
-            (r'appoint\w*\s+\w+\s+\w+\s+as', 'appointment'),
-            (r'nam\w*\s+\w+\s+\w+\s+as', 'appointment'),
-            (r'promot\w*\s+to', 'promotion'),
-            (r'resign\w*', 'resignation'),
-            (r'retir\w*', 'retirement'),
-            (r'step\w*\s+down', 'departure'),
-            (r'succession\s+plan', 'succession'),
-            (r'effective\s+immediately', 'immediate'),
-            (r'effective\s+\w+\s+\d+', 'dated'),
+            (r"appoint\w*\s+\w+\s+\w+\s+as", "appointment"),
+            (r"nam\w*\s+\w+\s+\w+\s+as", "appointment"),
+            (r"promot\w*\s+to", "promotion"),
+            (r"resign\w*", "resignation"),
+            (r"retir\w*", "retirement"),
+            (r"step\w*\s+down", "departure"),
+            (r"succession\s+plan", "succession"),
+            (r"effective\s+immediately", "immediate"),
+            (r"effective\s+\w+\s+\d+", "dated"),
         ]
 
         for pattern, label in phrase_patterns:
@@ -170,7 +223,7 @@ class PressReleaseParser:
 
         # Clean content if HTML
         content = press_release.content
-        if '<html' in content.lower() or '<body' in content.lower():
+        if "<html" in content.lower() or "<body" in content.lower():
             content = self._clean_html(content)
 
         # Quick relevance check
@@ -232,8 +285,8 @@ class PressReleaseParser:
 
         # Pattern: "Company appoints/names NAME as TITLE"
         appointment_patterns = [
-            r'(?:appoints?|names?|hires?)\s+([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:as\s+)?(?:its\s+)?(?:new\s+)?([A-Z][^.]{5,60})',
-            r'([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+)\s+(?:has been|is)\s+(?:appointed|named|promoted)\s+(?:as\s+)?(?:the\s+)?([A-Z][^.]{5,60})',
+            r"(?:appoints?|names?|hires?)\s+([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:as\s+)?(?:its\s+)?(?:new\s+)?([A-Z][^.]{5,60})",
+            r"([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+)\s+(?:has been|is)\s+(?:appointed|named|promoted)\s+(?:as\s+)?(?:the\s+)?([A-Z][^.]{5,60})",
         ]
 
         for pattern in appointment_patterns:
@@ -255,8 +308,8 @@ class PressReleaseParser:
 
         # Pattern: "NAME resigns/retires from TITLE"
         departure_patterns = [
-            r'([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+)\s+(?:has\s+)?(?:resigned?|retires?|step(?:s|ped)\s+down)\s+(?:as\s+|from\s+)?(?:the\s+)?([A-Z][^.]{5,60})?',
-            r'(?:resignation|retirement|departure)\s+of\s+([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+)',
+            r"([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+)\s+(?:has\s+)?(?:resigned?|retires?|step(?:s|ped)\s+down)\s+(?:as\s+|from\s+)?(?:the\s+)?([A-Z][^.]{5,60})?",
+            r"(?:resignation|retirement|departure)\s+of\s+([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+)",
         ]
 
         for pattern in departure_patterns:
@@ -271,7 +324,11 @@ class PressReleaseParser:
 
                 if self._is_valid_name(name):
                     # Determine if retirement or resignation
-                    change_type = ChangeType.RETIREMENT if 'retire' in text.lower() else ChangeType.DEPARTURE
+                    change_type = (
+                        ChangeType.RETIREMENT
+                        if "retire" in text.lower()
+                        else ChangeType.DEPARTURE
+                    )
 
                     change = LeadershipChange(
                         person_name=name,
@@ -285,7 +342,7 @@ class PressReleaseParser:
 
         # Pattern: "NAME promoted to TITLE"
         promotion_patterns = [
-            r'([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+)\s+(?:has been\s+)?promoted\s+to\s+([A-Z][^.]{5,60})',
+            r"([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+)\s+(?:has been\s+)?promoted\s+to\s+([A-Z][^.]{5,60})",
         ]
 
         for pattern in promotion_patterns:
@@ -344,7 +401,7 @@ class PressReleaseParser:
 
     def _normalize_name(self, name: str) -> str:
         """Normalize name for comparison."""
-        return ' '.join(name.lower().split())
+        return " ".join(name.lower().split())
 
     def _is_valid_name(self, name: str) -> bool:
         """Validate potential person name."""
@@ -361,7 +418,7 @@ class PressReleaseParser:
             return False
 
         # Avoid common false positives
-        false_positives = ['the company', 'board of', 'effective']
+        false_positives = ["the company", "board of", "effective"]
         if any(fp in name.lower() for fp in false_positives):
             return False
 
@@ -370,18 +427,29 @@ class PressReleaseParser:
     def _clean_title(self, title: str) -> str:
         """Clean and normalize title."""
         # Remove trailing noise
-        noise = [' and will', ' effective', ' of the company', ' at the company']
+        noise = [" and will", " effective", " of the company", " at the company"]
         for n in noise:
             if n in title.lower():
                 idx = title.lower().find(n)
                 title = title[:idx]
 
-        return title.strip().rstrip(',').strip()
+        return title.strip().rstrip(",").strip()
 
     def _is_c_suite(self, title: str) -> bool:
         """Check if title is C-suite level."""
         title_lower = title.lower()
-        c_suite = ['chief', 'ceo', 'cfo', 'coo', 'cto', 'cio', 'cmo', 'cro', 'chro', 'president']
+        c_suite = [
+            "chief",
+            "ceo",
+            "cfo",
+            "coo",
+            "cto",
+            "cio",
+            "cmo",
+            "cro",
+            "chro",
+            "president",
+        ]
         return any(t in title_lower for t in c_suite)
 
     def _is_board_role(self, title: str) -> bool:

@@ -7,6 +7,7 @@ Handles:
 - Data parsing and transformation
 - Schema definitions for exports, imports, port-level, and state-level data
 """
+
 import logging
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
@@ -95,14 +96,14 @@ TRADE_SUMMARY_COLUMNS = {
 def generate_table_name(dataset: str, year: Optional[int] = None) -> str:
     """
     Generate PostgreSQL table name for US Trade data.
-    
+
     Args:
         dataset: Dataset identifier
         year: Optional year for year-specific tables
-        
+
     Returns:
         PostgreSQL table name
-        
+
     Examples:
         >>> generate_table_name("exports_hs")
         'us_trade_exports_hs'
@@ -110,7 +111,7 @@ def generate_table_name(dataset: str, year: Optional[int] = None) -> str:
         'us_trade_exports_hs_2024'
     """
     dataset_clean = dataset.lower().replace("-", "_").replace(" ", "_")
-    
+
     if year:
         return f"us_trade_{dataset_clean}_{year}"
     return f"us_trade_{dataset_clean}"
@@ -119,11 +120,11 @@ def generate_table_name(dataset: str, year: Optional[int] = None) -> str:
 def generate_create_table_sql(table_name: str, dataset: str) -> str:
     """
     Generate CREATE TABLE SQL for US Trade data.
-    
+
     Args:
         table_name: PostgreSQL table name
         dataset: Dataset type to determine schema
-        
+
     Returns:
         CREATE TABLE SQL statement
     """
@@ -157,7 +158,9 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
         ]
     elif dataset in ("exports_port", "imports_port", "port_trade"):
         columns = PORT_TRADE_COLUMNS
-        unique_constraint = '"year", "month", "district_code", "country_code", "hs_code", "trade_type"'
+        unique_constraint = (
+            '"year", "month", "district_code", "country_code", "hs_code", "trade_type"'
+        )
         indexes = [
             ("year_month", '"year", "month"'),
             ("district", '"district_code"'),
@@ -175,18 +178,18 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
         ]
     else:
         raise ValueError(f"Unknown US Trade dataset: {dataset}")
-    
+
     # Build column definitions
     column_defs = []
     column_defs.append("id SERIAL PRIMARY KEY")
-    
+
     for col_name, (col_type, col_desc) in columns.items():
         column_defs.append(f'"{col_name}" {col_type}')
-    
+
     column_defs.append("ingested_at TIMESTAMP DEFAULT NOW()")
-    
+
     columns_sql = ",\n        ".join(column_defs)
-    
+
     # Build indexes
     index_sql_parts = []
     for idx_name, idx_cols in indexes:
@@ -194,9 +197,9 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
             f"CREATE INDEX IF NOT EXISTS idx_{table_name}_{idx_name} "
             f"ON {table_name} ({idx_cols});"
         )
-    
+
     indexes_sql = "\n    ".join(index_sql_parts)
-    
+
     sql = f"""
     CREATE TABLE IF NOT EXISTS {table_name} (
         {columns_sql},
@@ -205,24 +208,22 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
     
     {indexes_sql}
     """
-    
+
     return sql
 
 
-def parse_exports_hs_response(
-    records: List[Dict[str, Any]]
-) -> List[Dict[str, Any]]:
+def parse_exports_hs_response(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Parse exports by HS code from Census API response.
-    
+
     Args:
         records: Raw API response records
-        
+
     Returns:
         List of parsed records ready for insertion
     """
     parsed_records = []
-    
+
     for record in records:
         try:
             # Parse time field (format: "2024-01") into year and month
@@ -232,7 +233,7 @@ def parse_exports_hs_response(
                 parts = time_val.split("-")
                 year = _safe_int(parts[0])
                 month = _safe_int(parts[1]) if len(parts) > 1 else None
-            
+
             parsed = {
                 "year": year,
                 "month": month,
@@ -246,34 +247,32 @@ def parse_exports_hs_response(
                 "quantity_ytd": _safe_float(record.get("QTY_1_YR")),
                 "quantity_unit": record.get("UNIT_QY1"),
             }
-            
+
             # Skip records without required fields
             if parsed["year"] and parsed["country_code"]:
                 parsed_records.append(parsed)
             else:
                 logger.debug(f"Skipping incomplete export record: {record}")
-        
+
         except Exception as e:
             logger.warning(f"Failed to parse export record: {e}")
-    
+
     logger.info(f"Parsed {len(parsed_records)} export records")
     return parsed_records
 
 
-def parse_imports_hs_response(
-    records: List[Dict[str, Any]]
-) -> List[Dict[str, Any]]:
+def parse_imports_hs_response(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Parse imports by HS code from Census API response.
-    
+
     Args:
         records: Raw API response records
-        
+
     Returns:
         List of parsed records ready for insertion
     """
     parsed_records = []
-    
+
     for record in records:
         try:
             # Parse time field (format: "2024-01") into year and month
@@ -283,7 +282,7 @@ def parse_imports_hs_response(
                 parts = time_val.split("-")
                 year = _safe_int(parts[0])
                 month = _safe_int(parts[1]) if len(parts) > 1 else None
-            
+
             parsed = {
                 "year": year,
                 "month": month,
@@ -301,33 +300,31 @@ def parse_imports_hs_response(
                 "quantity_ytd": _safe_float(record.get("GEN_QY1_YR")),
                 "quantity_unit": record.get("UNIT_QY1"),
             }
-            
+
             if parsed["year"] and parsed["country_code"]:
                 parsed_records.append(parsed)
             else:
                 logger.debug(f"Skipping incomplete import record: {record}")
-        
+
         except Exception as e:
             logger.warning(f"Failed to parse import record: {e}")
-    
+
     logger.info(f"Parsed {len(parsed_records)} import records")
     return parsed_records
 
 
-def parse_exports_state_response(
-    records: List[Dict[str, Any]]
-) -> List[Dict[str, Any]]:
+def parse_exports_state_response(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Parse state exports from Census API response.
-    
+
     Args:
         records: Raw API response records
-        
+
     Returns:
         List of parsed records ready for insertion
     """
     parsed_records = []
-    
+
     for record in records:
         try:
             # Parse time field (format: "2024-01") into year and month
@@ -337,7 +334,7 @@ def parse_exports_state_response(
                 parts = time_val.split("-")
                 year = _safe_int(parts[0])
                 month = _safe_int(parts[1]) if len(parts) > 1 else None
-            
+
             parsed = {
                 "year": year,
                 "month": month,
@@ -350,33 +347,32 @@ def parse_exports_state_response(
                 "value_monthly": _safe_int(record.get("ALL_VAL_MO")),
                 "value_ytd": _safe_int(record.get("ALL_VAL_YR")),
             }
-            
+
             if parsed["year"] and parsed["state_code"]:
                 parsed_records.append(parsed)
-        
+
         except Exception as e:
             logger.warning(f"Failed to parse state export record: {e}")
-    
+
     logger.info(f"Parsed {len(parsed_records)} state export records")
     return parsed_records
 
 
 def parse_port_trade_response(
-    records: List[Dict[str, Any]],
-    trade_type: str = "export"
+    records: List[Dict[str, Any]], trade_type: str = "export"
 ) -> List[Dict[str, Any]]:
     """
     Parse port-level trade data from Census API response.
-    
+
     Args:
         records: Raw API response records
         trade_type: "export" or "import"
-        
+
     Returns:
         List of parsed records ready for insertion
     """
     parsed_records = []
-    
+
     for record in records:
         try:
             # Parse time field (format: "2024-01") into year and month
@@ -386,7 +382,7 @@ def parse_port_trade_response(
                 parts = time_val.split("-")
                 year = _safe_int(parts[0])
                 month = _safe_int(parts[1]) if len(parts) > 1 else None
-            
+
             # Value and HS code fields differ between exports and imports
             if trade_type == "export":
                 value_monthly = _safe_int(record.get("ALL_VAL_MO"))
@@ -398,7 +394,7 @@ def parse_port_trade_response(
                 value_ytd = _safe_int(record.get("GEN_VAL_YR"))
                 hs_code = record.get("I_COMMODITY")
                 commodity_desc = record.get("I_COMMODITY_LDESC")
-            
+
             parsed = {
                 "year": year,
                 "month": month,
@@ -412,13 +408,13 @@ def parse_port_trade_response(
                 "value_monthly": value_monthly,
                 "value_ytd": value_ytd,
             }
-            
+
             if parsed["year"] and parsed["district_code"]:
                 parsed_records.append(parsed)
-        
+
         except Exception as e:
             logger.warning(f"Failed to parse port trade record: {e}")
-    
+
     logger.info(f"Parsed {len(parsed_records)} port {trade_type} records")
     return parsed_records
 
@@ -427,28 +423,28 @@ def parse_trade_summary(
     exports: List[Dict[str, Any]],
     imports: List[Dict[str, Any]],
     year: int,
-    month: Optional[int] = None
+    month: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """
     Create trade summary by country from exports and imports data.
-    
+
     Args:
         exports: Export records
         imports: Import records
         year: Data year
         month: Data month (None for annual)
-        
+
     Returns:
         List of trade summary records
     """
     country_data = {}
-    
+
     # Process exports
     for record in exports:
         cty_code = record.get("CTY_CODE") or record.get("country_code")
         if not cty_code:
             continue
-        
+
         if cty_code not in country_data:
             country_data[cty_code] = {
                 "year": year,
@@ -458,16 +454,22 @@ def parse_trade_summary(
                 "exports_value": 0,
                 "imports_value": 0,
             }
-        
-        val = record.get("ALL_VAL_YR") or record.get("ALL_VAL_MO") or record.get("value_ytd") or record.get("value_monthly") or 0
+
+        val = (
+            record.get("ALL_VAL_YR")
+            or record.get("ALL_VAL_MO")
+            or record.get("value_ytd")
+            or record.get("value_monthly")
+            or 0
+        )
         country_data[cty_code]["exports_value"] += int(val) if val else 0
-    
+
     # Process imports
     for record in imports:
         cty_code = record.get("CTY_CODE") or record.get("country_code")
         if not cty_code:
             continue
-        
+
         if cty_code not in country_data:
             country_data[cty_code] = {
                 "year": year,
@@ -477,17 +479,23 @@ def parse_trade_summary(
                 "exports_value": 0,
                 "imports_value": 0,
             }
-        
-        val = record.get("GEN_VAL_YR") or record.get("GEN_VAL_MO") or record.get("general_value_ytd") or record.get("general_value_monthly") or 0
+
+        val = (
+            record.get("GEN_VAL_YR")
+            or record.get("GEN_VAL_MO")
+            or record.get("general_value_ytd")
+            or record.get("general_value_monthly")
+            or 0
+        )
         country_data[cty_code]["imports_value"] += int(val) if val else 0
-    
+
     # Calculate totals
     results = []
     for cty in country_data.values():
         cty["total_trade"] = cty["exports_value"] + cty["imports_value"]
         cty["trade_balance"] = cty["exports_value"] - cty["imports_value"]
         results.append(cty)
-    
+
     logger.info(f"Created trade summary for {len(results)} countries")
     return results
 
@@ -515,16 +523,16 @@ def _safe_int(value: Any) -> Optional[int]:
 def get_default_date_range(dataset: str) -> Tuple[int, int, Optional[int]]:
     """
     Get default date range for US Trade data.
-    
+
     Args:
         dataset: Dataset identifier
-        
+
     Returns:
         Tuple of (start_year, end_year, month or None for annual)
     """
     current_year = datetime.now().year
     current_month = datetime.now().month
-    
+
     # Default to last 3 years of annual data
     return (current_year - 3, current_year, None)
 
@@ -576,12 +584,12 @@ def get_dataset_description(dataset: str) -> str:
         ),
     }
     return descriptions.get(
-        dataset,
-        "International trade statistics from US Census Bureau"
+        dataset, "International trade statistics from US Census Bureau"
     )
 
 
 # ========== HS Code Utilities ==========
+
 
 def get_hs_chapter(hs_code: str) -> str:
     """Get the 2-digit HS chapter from a longer code."""
@@ -606,11 +614,39 @@ def get_hs_subheading(hs_code: str) -> str:
 
 # Major commodity categories for analysis
 MAJOR_COMMODITY_CHAPTERS = {
-    "agricultural": ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"],
+    "agricultural": [
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08",
+        "09",
+        "10",
+        "11",
+        "12",
+    ],
     "fuels": ["27"],
     "chemicals": ["28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38"],
     "plastics_rubber": ["39", "40"],
-    "textiles": ["50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63"],
+    "textiles": [
+        "50",
+        "51",
+        "52",
+        "53",
+        "54",
+        "55",
+        "56",
+        "57",
+        "58",
+        "59",
+        "60",
+        "61",
+        "62",
+        "63",
+    ],
     "metals": ["72", "73", "74", "75", "76", "78", "79", "80", "81", "82", "83"],
     "machinery": ["84", "85"],
     "vehicles": ["86", "87", "88", "89"],

@@ -3,6 +3,7 @@ Job chain management endpoints.
 
 Provides API for creating and executing job chains (DAG workflows).
 """
+
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
@@ -11,7 +12,14 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.core.database import get_db
-from app.core.models import JobChain, JobChainExecution, JobDependency, IngestionJob, JobStatus, DependencyCondition
+from app.core.models import (
+    JobChain,
+    JobChainExecution,
+    JobDependency,
+    IngestionJob,
+    JobStatus,
+    DependencyCondition,
+)
 from app.core import dependency_service
 
 logger = logging.getLogger(__name__)
@@ -23,16 +31,26 @@ router = APIRouter(prefix="/chains", tags=["job-chains"])
 # Pydantic Schemas
 # =============================================================================
 
+
 class JobDefinition(BaseModel):
     """Definition of a single job in a chain."""
+
     source: str = Field(..., description="Data source (e.g., 'fred', 'census')")
-    config: dict = Field(default_factory=dict, description="Source-specific configuration")
-    depends_on: List[int] = Field(default_factory=list, description="Indices of jobs this depends on")
-    condition: str = Field(default="on_success", description="When dependency is satisfied: on_success, on_complete, on_failure")
+    config: dict = Field(
+        default_factory=dict, description="Source-specific configuration"
+    )
+    depends_on: List[int] = Field(
+        default_factory=list, description="Indices of jobs this depends on"
+    )
+    condition: str = Field(
+        default="on_success",
+        description="When dependency is satisfied: on_success, on_complete, on_failure",
+    )
 
 
 class ChainCreate(BaseModel):
     """Request schema for creating a job chain."""
+
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     jobs: List[JobDefinition] = Field(..., min_length=1)
@@ -40,6 +58,7 @@ class ChainCreate(BaseModel):
 
 class ChainResponse(BaseModel):
     """Response schema for job chain information."""
+
     id: int
     name: str
     description: Optional[str]
@@ -55,6 +74,7 @@ class ChainResponse(BaseModel):
 
 class ExecutionResponse(BaseModel):
     """Response schema for chain execution information."""
+
     id: int
     chain_id: int
     status: str
@@ -68,19 +88,23 @@ class ExecutionResponse(BaseModel):
 
 class DependencyCreate(BaseModel):
     """Request schema for creating a job dependency."""
+
     job_id: int = Field(..., description="The job that has the dependency")
     depends_on_job_id: int = Field(..., description="The job that must complete first")
-    condition: str = Field(default="on_success", description="Condition: on_success, on_complete, on_failure")
+    condition: str = Field(
+        default="on_success",
+        description="Condition: on_success, on_complete, on_failure",
+    )
 
 
 # =============================================================================
 # Chain Management Endpoints
 # =============================================================================
 
+
 @router.get("", response_model=List[ChainResponse])
 def list_chains(
-    active_only: bool = False,
-    db: Session = Depends(get_db)
+    active_only: bool = False, db: Session = Depends(get_db)
 ) -> List[ChainResponse]:
     """
     List all job chains.
@@ -102,7 +126,7 @@ def list_chains(
             times_executed=c.times_executed,
             last_executed_at=c.last_executed_at,
             created_at=c.created_at,
-            updated_at=c.updated_at
+            updated_at=c.updated_at,
         )
         for c in chains
     ]
@@ -110,8 +134,7 @@ def list_chains(
 
 @router.post("", response_model=ChainResponse, status_code=201)
 def create_chain(
-    chain_request: ChainCreate,
-    db: Session = Depends(get_db)
+    chain_request: ChainCreate, db: Session = Depends(get_db)
 ) -> ChainResponse:
     """
     Create a new job chain.
@@ -142,7 +165,7 @@ def create_chain(
             "source": job.source,
             "config": job.config,
             "depends_on": job.depends_on,
-            "condition": job.condition
+            "condition": job.condition,
         }
         for job in chain_request.jobs
     ]
@@ -152,7 +175,7 @@ def create_chain(
             db=db,
             name=chain_request.name,
             chain_definition=chain_definition,
-            description=chain_request.description
+            description=chain_request.description,
         )
 
         return ChainResponse(
@@ -164,7 +187,7 @@ def create_chain(
             times_executed=chain.times_executed,
             last_executed_at=chain.last_executed_at,
             created_at=chain.created_at,
-            updated_at=chain.updated_at
+            updated_at=chain.updated_at,
         )
 
     except ValueError as e:
@@ -190,7 +213,7 @@ def get_chain(chain_id: int, db: Session = Depends(get_db)) -> ChainResponse:
         times_executed=chain.times_executed,
         last_executed_at=chain.last_executed_at,
         created_at=chain.created_at,
-        updated_at=chain.updated_at
+        updated_at=chain.updated_at,
     )
 
 
@@ -209,7 +232,7 @@ def get_chain_definition(chain_id: int, db: Session = Depends(get_db)):
         "name": chain.name,
         "description": chain.description,
         "jobs": chain.chain_definition,
-        "is_active": bool(chain.is_active)
+        "is_active": bool(chain.is_active),
     }
 
 
@@ -265,11 +288,10 @@ def pause_chain(chain_id: int, db: Session = Depends(get_db)):
 # Chain Execution Endpoints
 # =============================================================================
 
+
 @router.post("/{chain_id}/execute", response_model=ExecutionResponse)
 async def execute_chain(
-    chain_id: int,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    chain_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ) -> ExecutionResponse:
     """
     Execute a job chain.
@@ -290,10 +312,7 @@ async def execute_chain(
             job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
             if job and job.status == JobStatus.PENDING:
                 background_tasks.add_task(
-                    run_ingestion_job,
-                    job.id,
-                    job.source,
-                    job.config
+                    run_ingestion_job, job.id, job.source, job.config
                 )
 
         return ExecutionResponse(
@@ -305,7 +324,7 @@ async def execute_chain(
             successful_jobs=execution.successful_jobs,
             failed_jobs=execution.failed_jobs,
             started_at=execution.started_at,
-            completed_at=execution.completed_at
+            completed_at=execution.completed_at,
         )
 
     except ValueError as e:
@@ -316,7 +335,7 @@ async def execute_chain(
 def list_chain_executions(
     chain_id: int,
     limit: int = Query(default=10, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> List[ExecutionResponse]:
     """
     List recent executions of a chain.
@@ -326,11 +345,13 @@ def list_chain_executions(
     if not chain:
         raise HTTPException(status_code=404, detail="Chain not found")
 
-    executions = db.query(JobChainExecution).filter(
-        JobChainExecution.chain_id == chain_id
-    ).order_by(
-        JobChainExecution.started_at.desc()
-    ).limit(limit).all()
+    executions = (
+        db.query(JobChainExecution)
+        .filter(JobChainExecution.chain_id == chain_id)
+        .order_by(JobChainExecution.started_at.desc())
+        .limit(limit)
+        .all()
+    )
 
     return [
         ExecutionResponse(
@@ -342,7 +363,7 @@ def list_chain_executions(
             successful_jobs=e.successful_jobs,
             failed_jobs=e.failed_jobs,
             started_at=e.started_at,
-            completed_at=e.completed_at
+            completed_at=e.completed_at,
         )
         for e in executions
     ]
@@ -365,11 +386,9 @@ def get_execution_status(execution_id: int, db: Session = Depends(get_db)):
 # Direct Dependency Management Endpoints
 # =============================================================================
 
+
 @router.post("/dependencies", status_code=201)
-def add_job_dependency(
-    dependency: DependencyCreate,
-    db: Session = Depends(get_db)
-):
+def add_job_dependency(dependency: DependencyCreate, db: Session = Depends(get_db)):
     """
     Add a dependency between two existing jobs.
 
@@ -386,18 +405,27 @@ def add_job_dependency(
     # Validate jobs exist
     job = db.query(IngestionJob).filter(IngestionJob.id == dependency.job_id).first()
     if not job:
-        raise HTTPException(status_code=404, detail=f"Job {dependency.job_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Job {dependency.job_id} not found"
+        )
 
-    parent = db.query(IngestionJob).filter(IngestionJob.id == dependency.depends_on_job_id).first()
+    parent = (
+        db.query(IngestionJob)
+        .filter(IngestionJob.id == dependency.depends_on_job_id)
+        .first()
+    )
     if not parent:
-        raise HTTPException(status_code=404, detail=f"Parent job {dependency.depends_on_job_id} not found")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Parent job {dependency.depends_on_job_id} not found",
+        )
 
     try:
         condition = DependencyCondition(dependency.condition)
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid condition. Must be: on_success, on_complete, on_failure"
+            detail=f"Invalid condition. Must be: on_success, on_complete, on_failure",
         )
 
     try:
@@ -405,13 +433,13 @@ def add_job_dependency(
             db=db,
             job_id=dependency.job_id,
             depends_on_job_id=dependency.depends_on_job_id,
-            condition=condition
+            condition=condition,
         )
 
         return {
             "message": f"Dependency added: job {dependency.job_id} depends on job {dependency.depends_on_job_id}",
             "dependency_id": dep.id,
-            "job_status": job.status.value
+            "job_status": job.status.value,
         }
 
     except ValueError as e:
@@ -431,15 +459,21 @@ def get_job_dependencies(job_id: int, db: Session = Depends(get_db)):
 
     dependencies = []
     for dep in deps:
-        parent = db.query(IngestionJob).filter(IngestionJob.id == dep.depends_on_job_id).first()
-        dependencies.append({
-            "dependency_id": dep.id,
-            "depends_on_job_id": dep.depends_on_job_id,
-            "parent_source": parent.source if parent else None,
-            "parent_status": parent.status.value if parent else None,
-            "condition": dep.condition.value,
-            "is_satisfied": dependency_service.is_dependency_satisfied(db, dep)
-        })
+        parent = (
+            db.query(IngestionJob)
+            .filter(IngestionJob.id == dep.depends_on_job_id)
+            .first()
+        )
+        dependencies.append(
+            {
+                "dependency_id": dep.id,
+                "depends_on_job_id": dep.depends_on_job_id,
+                "parent_source": parent.source if parent else None,
+                "parent_status": parent.status.value if parent else None,
+                "condition": dep.condition.value,
+                "is_satisfied": dependency_service.is_dependency_satisfied(db, dep),
+            }
+        )
 
     unsatisfied = dependency_service.get_unsatisfied_dependencies(db, job_id)
 
@@ -450,15 +484,13 @@ def get_job_dependencies(job_id: int, db: Session = Depends(get_db)):
         "satisfied": len(deps) - len(unsatisfied),
         "unsatisfied": len(unsatisfied),
         "can_run": dependency_service.are_all_dependencies_satisfied(db, job_id),
-        "dependencies": dependencies
+        "dependencies": dependencies,
     }
 
 
 @router.delete("/dependencies")
 def remove_job_dependency(
-    job_id: int,
-    depends_on_job_id: int,
-    db: Session = Depends(get_db)
+    job_id: int, depends_on_job_id: int, db: Session = Depends(get_db)
 ):
     """
     Remove a dependency between two jobs.

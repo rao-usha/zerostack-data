@@ -74,6 +74,7 @@ class ValuationEstimator(BasePECollector):
         """Lazily initialize LLM client."""
         if self._llm_client is None:
             from app.agentic.llm_client import get_llm_client
+
             self._llm_client = get_llm_client(model="gpt-4o-mini")
         return self._llm_client
 
@@ -164,13 +165,19 @@ class ValuationEstimator(BasePECollector):
                 "company_id": entity_id,
                 "company_name": entity_name,
                 "industry": industry,
-                "estimated_enterprise_value_usd": valuation.get("estimated_enterprise_value_usd"),
-                "estimated_equity_value_usd": valuation.get("estimated_equity_value_usd"),
+                "estimated_enterprise_value_usd": valuation.get(
+                    "estimated_enterprise_value_usd"
+                ),
+                "estimated_equity_value_usd": valuation.get(
+                    "estimated_equity_value_usd"
+                ),
                 "valuation_method": valuation.get("valuation_method"),
                 "ev_to_revenue_multiple": valuation.get("ev_to_revenue_multiple"),
                 "ev_to_ebitda_multiple": valuation.get("ev_to_ebitda_multiple"),
                 "comparable_companies": valuation.get("comparable_companies", []),
-                "industry_median_ev_revenue": valuation.get("industry_median_ev_revenue"),
+                "industry_median_ev_revenue": valuation.get(
+                    "industry_median_ev_revenue"
+                ),
                 "industry_median_ev_ebitda": valuation.get("industry_median_ev_ebitda"),
                 "confidence_level": valuation.get("confidence_level", "Low"),
                 "key_assumptions": valuation.get("key_assumptions", []),

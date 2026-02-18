@@ -7,6 +7,7 @@ Handles:
 - Data parsing and transformation
 - Schema definitions for business data
 """
+
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -71,14 +72,14 @@ REVIEW_COLUMNS = {
 def generate_table_name(dataset: str, identifier: Optional[str] = None) -> str:
     """
     Generate PostgreSQL table name for Yelp data.
-    
+
     Args:
         dataset: Dataset identifier (businesses, categories, reviews)
         identifier: Optional specific identifier (e.g., location, category)
-        
+
     Returns:
         PostgreSQL table name
-        
+
     Examples:
         >>> generate_table_name("businesses")
         'yelp_businesses'
@@ -86,9 +87,11 @@ def generate_table_name(dataset: str, identifier: Optional[str] = None) -> str:
         'yelp_businesses_san_francisco'
     """
     dataset_clean = dataset.lower().replace("-", "_").replace(" ", "_")
-    
+
     if identifier:
-        id_clean = identifier.lower().replace("-", "_").replace(" ", "_").replace(",", "")[:30]
+        id_clean = (
+            identifier.lower().replace("-", "_").replace(" ", "_").replace(",", "")[:30]
+        )
         return f"yelp_{dataset_clean}_{id_clean}"
     else:
         return f"yelp_{dataset_clean}"
@@ -97,11 +100,11 @@ def generate_table_name(dataset: str, identifier: Optional[str] = None) -> str:
 def generate_create_table_sql(table_name: str, dataset: str) -> str:
     """
     Generate CREATE TABLE SQL for Yelp data.
-    
+
     Args:
         table_name: PostgreSQL table name
         dataset: Dataset type to determine schema
-        
+
     Returns:
         CREATE TABLE SQL statement
     """
@@ -134,18 +137,18 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
         ]
     else:
         raise ValueError(f"Unknown Yelp dataset: {dataset}")
-    
+
     # Build column definitions
     column_defs = []
     column_defs.append("id SERIAL PRIMARY KEY")
-    
+
     for col_name, (col_type, _) in columns.items():
         column_defs.append(f"{col_name} {col_type}")
-    
+
     column_defs.append("ingested_at TIMESTAMP DEFAULT NOW()")
-    
+
     columns_sql = ",\n        ".join(column_defs)
-    
+
     # Build indexes
     index_sql_parts = []
     for idx_name, idx_cols in indexes:
@@ -153,9 +156,9 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
             f"CREATE INDEX IF NOT EXISTS idx_{table_name}_{idx_name} "
             f"ON {table_name} ({idx_cols});"
         )
-    
+
     indexes_sql = "\n    ".join(index_sql_parts)
-    
+
     sql = f"""
     CREATE TABLE IF NOT EXISTS {table_name} (
         {columns_sql},
@@ -164,41 +167,39 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
     
     {indexes_sql}
     """
-    
+
     return sql
 
 
 def parse_business_search_response(
-    response: Dict[str, Any],
-    search_location: str,
-    search_term: Optional[str] = None
+    response: Dict[str, Any], search_location: str, search_term: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Parse business search response from Yelp API.
-    
+
     Args:
         response: Raw API response
         search_location: Original search location
         search_term: Original search term
-        
+
     Returns:
         List of parsed business records ready for insertion
     """
     parsed_records = []
-    
+
     try:
         businesses = response.get("businesses", [])
-        
+
         if not businesses:
             logger.warning("No businesses in Yelp response")
             return []
-        
+
         for biz in businesses:
             try:
                 location = biz.get("location", {})
                 coordinates = biz.get("coordinates", {})
                 categories = biz.get("categories", [])
-                
+
                 parsed = {
                     "yelp_id": biz.get("id"),
                     "name": biz.get("name"),
@@ -221,48 +222,50 @@ def parse_business_search_response(
                     "state": location.get("state"),
                     "zip_code": location.get("zip_code"),
                     "country": location.get("country"),
-                    "categories": [c.get("alias") for c in categories if c.get("alias")],
-                    "category_titles": [c.get("title") for c in categories if c.get("title")],
+                    "categories": [
+                        c.get("alias") for c in categories if c.get("alias")
+                    ],
+                    "category_titles": [
+                        c.get("title") for c in categories if c.get("title")
+                    ],
                     "transactions": biz.get("transactions", []),
                     "search_location": search_location,
                     "search_term": search_term,
                 }
-                
+
                 if parsed["yelp_id"]:
                     parsed_records.append(parsed)
-            
+
             except Exception as e:
                 logger.warning(f"Failed to parse business: {e}")
-        
+
         logger.info(f"Parsed {len(parsed_records)} business records")
         return parsed_records
-    
+
     except Exception as e:
         logger.error(f"Failed to parse business search response: {e}")
         return []
 
 
-def parse_categories_response(
-    response: Dict[str, Any]
-) -> List[Dict[str, Any]]:
+def parse_categories_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Parse categories response from Yelp API.
-    
+
     Args:
         response: Raw API response
-        
+
     Returns:
         List of parsed category records ready for insertion
     """
     parsed_records = []
-    
+
     try:
         categories = response.get("categories", [])
-        
+
         if not categories:
             logger.warning("No categories in Yelp response")
             return []
-        
+
         for cat in categories:
             try:
                 parsed = {
@@ -272,48 +275,47 @@ def parse_categories_response(
                     "country_whitelist": cat.get("country_whitelist", []),
                     "country_blacklist": cat.get("country_blacklist", []),
                 }
-                
+
                 if parsed["alias"]:
                     parsed_records.append(parsed)
-            
+
             except Exception as e:
                 logger.warning(f"Failed to parse category: {e}")
-        
+
         logger.info(f"Parsed {len(parsed_records)} category records")
         return parsed_records
-    
+
     except Exception as e:
         logger.error(f"Failed to parse categories response: {e}")
         return []
 
 
 def parse_reviews_response(
-    response: Dict[str, Any],
-    business_id: str
+    response: Dict[str, Any], business_id: str
 ) -> List[Dict[str, Any]]:
     """
     Parse reviews response from Yelp API.
-    
+
     Args:
         response: Raw API response
         business_id: Associated business ID
-        
+
     Returns:
         List of parsed review records ready for insertion
     """
     parsed_records = []
-    
+
     try:
         reviews = response.get("reviews", [])
-        
+
         if not reviews:
             logger.warning("No reviews in Yelp response")
             return []
-        
+
         for review in reviews:
             try:
                 user = review.get("user", {})
-                
+
                 parsed = {
                     "review_id": review.get("id"),
                     "business_id": business_id,
@@ -324,16 +326,16 @@ def parse_reviews_response(
                     "user_name": user.get("name"),
                     "user_image_url": user.get("image_url"),
                 }
-                
+
                 if parsed["review_id"]:
                     parsed_records.append(parsed)
-            
+
             except Exception as e:
                 logger.warning(f"Failed to parse review: {e}")
-        
+
         logger.info(f"Parsed {len(parsed_records)} review records")
         return parsed_records
-    
+
     except Exception as e:
         logger.error(f"Failed to parse reviews response: {e}")
         return []
@@ -383,10 +385,7 @@ def get_dataset_description(dataset: str) -> str:
             "Business reviews from Yelp (limited to 3 per business on free tier)."
         ),
     }
-    return descriptions.get(
-        dataset,
-        "Business data from Yelp Fusion API"
-    )
+    return descriptions.get(dataset, "Business data from Yelp Fusion API")
 
 
 # Major US cities for business data collection

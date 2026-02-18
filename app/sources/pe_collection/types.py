@@ -15,6 +15,7 @@ from typing import List, Optional, Dict, Any
 
 class PECollectionSource(str, Enum):
     """Available data collection sources for PE intelligence."""
+
     # Firm Data
     SEC_ADV = "sec_adv"  # Form ADV for registered investment advisers
     FIRM_WEBSITE = "firm_website"  # PE firm website scraping
@@ -43,12 +44,14 @@ class PECollectionSource(str, Enum):
 
 class CollectionMode(str, Enum):
     """Collection mode options."""
+
     INCREMENTAL = "incremental"  # Only collect if stale
     FULL = "full"  # Force full re-collection
 
 
 class EntityType(str, Enum):
     """Entity types that can be collected."""
+
     FIRM = "firm"
     FUND = "fund"
     COMPANY = "company"
@@ -70,6 +73,7 @@ class PECollectionConfig:
         rate_limit_delay: Delay between requests in seconds
         max_retries: Maximum retry attempts
     """
+
     entity_type: EntityType = EntityType.FIRM
     sources: List[PECollectionSource] = field(
         default_factory=lambda: [PECollectionSource.FIRM_WEBSITE]
@@ -150,6 +154,7 @@ class PECollectedItem:
         confidence: Confidence level (high, medium, low)
         is_new: Whether this is a new item (not update)
     """
+
     item_type: str  # firm, fund, company, person, deal, valuation, news, etc.
     entity_type: EntityType
     data: Dict[str, Any]
@@ -188,6 +193,7 @@ class PECollectionResult:
         started_at: When collection started
         completed_at: When collection completed
     """
+
     entity_id: int
     entity_name: str
     entity_type: EntityType
@@ -247,6 +253,7 @@ class PEJobProgress:
     """
     Progress tracking for a collection job.
     """
+
     job_id: int
     total_entities: int = 0
     completed_entities: int = 0
@@ -273,6 +280,7 @@ class PEFirmSeed:
     """
     Seed data entry for a PE firm.
     """
+
     name: str
     website: str
     cik: Optional[str] = None

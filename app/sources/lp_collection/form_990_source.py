@@ -58,7 +58,6 @@ KNOWN_EINS = {
     "University of Southern California": "951642394",
     "Brown University": "050258776",
     "Johns Hopkins University": "520595110",
-
     # Major Foundations
     "Bill & Melinda Gates Foundation": "562618866",
     "Gates Foundation": "562618866",
@@ -146,7 +145,9 @@ class Form990Collector(BaseCollector):
                     lp_name=lp_name,
                     success=False,
                     error_message="Could not find EIN for this organization",
-                    warnings=["Organization may not be tax-exempt or EIN not in database"],
+                    warnings=[
+                        "Organization may not be tax-exempt or EIN not in database"
+                    ],
                     started_at=started_at,
                 )
 
@@ -218,7 +219,10 @@ class Form990Collector(BaseCollector):
 
         # Check known EINs
         for known_name, ein in KNOWN_EINS.items():
-            if known_name.lower() in lp_name.lower() or lp_name.lower() in known_name.lower():
+            if (
+                known_name.lower() in lp_name.lower()
+                or lp_name.lower() in known_name.lower()
+            ):
                 logger.debug(f"Found known EIN {ein} for {lp_name}")
                 return ein
 
@@ -322,13 +326,16 @@ class Form990Collector(BaseCollector):
                 "other_revenue": filing.get("othrevnue"),
                 # Expenses
                 "total_expenses": filing.get("totfuncexpns"),
-                "program_expenses": filing.get("prgmservexp") or filing.get("totprgmrevnue"),
+                "program_expenses": filing.get("prgmservexp")
+                or filing.get("totprgmrevnue"),
                 "management_expenses": filing.get("mgmtgenexp"),
-                "fundraising_expenses": filing.get("fundfees") or filing.get("fundrsngexp"),
+                "fundraising_expenses": filing.get("fundfees")
+                or filing.get("fundrsngexp"),
                 # Assets/Liabilities
                 "total_assets": filing.get("totassetsend"),
                 "total_liabilities": filing.get("totliabend"),
-                "net_assets": filing.get("netassetsend") or filing.get("totnetassetend"),
+                "net_assets": filing.get("netassetsend")
+                or filing.get("totnetassetend"),
                 # Investments
                 "investments_securities": filing.get("invstmntsec"),
                 "investments_land_buildings": filing.get("invstmntsland"),
@@ -354,18 +361,20 @@ class Form990Collector(BaseCollector):
                 if total_assets_val > 0:
                     securities_pct = (investments_val / total_assets_val) * 100
 
-                    items.append(CollectedItem(
-                        item_type="strategy_snapshot",
-                        data={
-                            "lp_id": lp_id,
-                            "fiscal_year": fiscal_year,
-                            "total_aum_usd": str(total_assets_val),
-                            "public_equity_pct": f"{securities_pct:.1f}",
-                            "source_type": "form_990",
-                        },
-                        source_url=filing.get("pdf_url"),
-                        confidence="medium",
-                    ))
+                    items.append(
+                        CollectedItem(
+                            item_type="strategy_snapshot",
+                            data={
+                                "lp_id": lp_id,
+                                "fiscal_year": fiscal_year,
+                                "total_aum_usd": str(total_assets_val),
+                                "public_equity_pct": f"{securities_pct:.1f}",
+                                "source_type": "form_990",
+                            },
+                            source_url=filing.get("pdf_url"),
+                            confidence="medium",
+                        )
+                    )
             except (ValueError, TypeError):
                 pass
 

@@ -7,6 +7,7 @@ Handles the full workflow of:
 3. Enriching location metadata
 4. Storing results in the database
 """
+
 import asyncio
 import logging
 from datetime import datetime, date, timedelta
@@ -46,11 +47,11 @@ async def discover_brand_locations(
     latitude: Optional[float] = None,
     longitude: Optional[float] = None,
     limit: int = 50,
-    job_id: Optional[int] = None
+    job_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Discover and store locations for a brand.
-    
+
     Args:
         db: Database session
         brand_name: Brand name to search for (e.g., "Starbucks", "Chipotle")
@@ -60,7 +61,7 @@ async def discover_brand_locations(
         longitude: Optional center longitude
         limit: Maximum locations to discover
         job_id: Optional job ID for tracking
-        
+
     Returns:
         Dictionary with discovery results
     """
@@ -68,16 +69,18 @@ async def discover_brand_locations(
     reasoning_log = []
     errors = []
     warnings = []
-    
+
     client = FootTrafficClient()
     available_sources = client.get_available_sources()
-    
-    reasoning_log.append({
-        "phase": "init",
-        "available_sources": available_sources,
-        "reasoning": f"Initialized with {len(available_sources)} available sources"
-    })
-    
+
+    reasoning_log.append(
+        {
+            "phase": "init",
+            "available_sources": available_sources,
+            "reasoning": f"Initialized with {len(available_sources)} available sources",
+        }
+    )
+
     try:
         # Discover locations
         locations = await client.discover_locations(
@@ -86,35 +89,39 @@ async def discover_brand_locations(
             state=state,
             latitude=latitude,
             longitude=longitude,
-            limit=limit
+            limit=limit,
         )
-        
-        reasoning_log.append({
-            "phase": "discover",
-            "locations_found": len(locations),
-            "reasoning": f"Found {len(locations)} locations for '{brand_name}'"
-        })
-        
+
+        reasoning_log.append(
+            {
+                "phase": "discover",
+                "locations_found": len(locations),
+                "reasoning": f"Found {len(locations)} locations for '{brand_name}'",
+            }
+        )
+
         # Store locations
         new_count = 0
         updated_count = 0
-        
+
         for loc in locations:
             result = await _store_location(db, loc, brand_name)
             if result == "new":
                 new_count += 1
             elif result == "updated":
                 updated_count += 1
-        
+
         db.commit()
-        
-        reasoning_log.append({
-            "phase": "store",
-            "new_locations": new_count,
-            "updated_locations": updated_count,
-            "reasoning": f"Stored {new_count} new, updated {updated_count} existing"
-        })
-        
+
+        reasoning_log.append(
+            {
+                "phase": "store",
+                "new_locations": new_count,
+                "updated_locations": updated_count,
+                "reasoning": f"Stored {new_count} new, updated {updated_count} existing",
+            }
+        )
+
         # Update job if provided
         if job_id:
             db.execute(
@@ -133,10 +140,10 @@ async def discover_brand_locations(
                     "locations_found": len(locations),
                     "sources_checked": available_sources,
                     "reasoning_log": reasoning_log,
-                }
+                },
             )
             db.commit()
-        
+
         return {
             "status": "success",
             "brand_name": brand_name,
@@ -147,11 +154,13 @@ async def discover_brand_locations(
             "reasoning_log": reasoning_log,
             "duration_seconds": (datetime.utcnow() - started_at).total_seconds(),
         }
-        
+
     except Exception as e:
-        logger.error(f"Error discovering locations for '{brand_name}': {e}", exc_info=True)
+        logger.error(
+            f"Error discovering locations for '{brand_name}': {e}", exc_info=True
+        )
         errors.append({"phase": "discover", "error": str(e)})
-        
+
         if job_id:
             db.execute(
                 text("""
@@ -167,10 +176,10 @@ async def discover_brand_locations(
                     "completed_at": datetime.utcnow(),
                     "errors": errors,
                     "reasoning_log": reasoning_log,
-                }
+                },
             )
             db.commit()
-        
+
         return {
             "status": "failed",
             "brand_name": brand_name,
@@ -181,20 +190,16 @@ async def discover_brand_locations(
         await client.close()
 
 
-async def _store_location(
-    db: Session,
-    loc: LocationResult,
-    brand_name: str
-) -> str:
+async def _store_location(db: Session, loc: LocationResult, brand_name: str) -> str:
     """
     Store or update a location in the database.
-    
+
     Returns:
         'new' if inserted, 'updated' if updated, 'skipped' if no change
     """
     # Check if exists by external ID (Foursquare) or address
     existing = None
-    
+
     if loc.external_id:
         result = db.execute(
             text("""
@@ -202,11 +207,11 @@ async def _store_location(
                 WHERE foursquare_fsq_id = :fsq_id
                 LIMIT 1
             """),
-            {"fsq_id": loc.external_id}
+            {"fsq_id": loc.external_id},
         ).fetchone()
         if result:
             existing = result[0]
-    
+
     if not existing:
         # Try matching by address
         result = db.execute(
@@ -221,11 +226,11 @@ async def _store_location(
                 "brand_name": brand_name,
                 "city": loc.city,
                 "address": loc.address,
-            }
+            },
         ).fetchone()
         if result:
             existing = result[0]
-    
+
     if existing:
         # Update existing
         db.execute(
@@ -254,7 +259,7 @@ async def _store_location(
                 "website": loc.website,
                 "hours": loc.hours,
                 "fsq_id": loc.external_id,
-            }
+            },
         )
         return "updated"
     else:
@@ -288,7 +293,7 @@ async def _store_location(
                 "website": loc.website,
                 "hours": loc.hours,
                 "fsq_id": loc.external_id,
-            }
+            },
         )
         return "new"
 
@@ -299,11 +304,11 @@ async def collect_traffic_for_location(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     sources: Optional[List[str]] = None,
-    job_id: Optional[int] = None
+    job_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Collect foot traffic data for a specific location.
-    
+
     Args:
         db: Database session
         location_id: Location ID to collect traffic for
@@ -311,7 +316,7 @@ async def collect_traffic_for_location(
         end_date: End of date range (default: today)
         sources: List of sources to use (default: all available)
         job_id: Optional job ID for tracking
-        
+
     Returns:
         Dictionary with collection results
     """
@@ -319,31 +324,33 @@ async def collect_traffic_for_location(
     reasoning_log = []
     errors = []
     observations_collected = 0
-    
+
     # Default date range: last 90 days
     if not end_date:
         end_date = date.today()
     if not start_date:
         start_date = end_date - timedelta(days=90)
-    
+
     # Get location details
     location = db.execute(
-        text("SELECT * FROM locations WHERE id = :id"),
-        {"id": location_id}
+        text("SELECT * FROM locations WHERE id = :id"), {"id": location_id}
     ).fetchone()
-    
+
     if not location:
         return {"status": "failed", "error": f"Location {location_id} not found"}
-    
-    reasoning_log.append({
-        "phase": "init",
-        "location": dict(location._mapping),
-        "date_range": f"{start_date} to {end_date}",
-    })
-    
+
+    reasoning_log.append(
+        {
+            "phase": "init",
+            "location": dict(location._mapping),
+            "date_range": f"{start_date} to {end_date}",
+        }
+    )
+
     from app.core.config import get_settings
+
     settings = get_settings()
-    
+
     try:
         # Collect from SafeGraph if available and configured
         if (not sources or "safegraph" in sources) and settings.get_safegraph_api_key():
@@ -353,48 +360,52 @@ async def collect_traffic_for_location(
                     observations = await client.get_traffic_patterns(
                         placekey=location.safegraph_placekey,
                         start_date=start_date,
-                        end_date=end_date
+                        end_date=end_date,
                     )
-                    
+
                     for obs in observations:
                         await _store_observation(db, location_id, obs)
                         observations_collected += 1
-                    
-                    reasoning_log.append({
-                        "phase": "collect",
-                        "source": "safegraph",
-                        "observations": len(observations),
-                    })
+
+                    reasoning_log.append(
+                        {
+                            "phase": "collect",
+                            "source": "safegraph",
+                            "observations": len(observations),
+                        }
+                    )
                     await client.close()
                 except Exception as e:
                     logger.warning(f"SafeGraph collection failed: {e}")
                     errors.append({"source": "safegraph", "error": str(e)})
-        
+
         # Collect from city data if in a supported city
-        if (not sources or "city_data" in sources) and location.city in CITY_PEDESTRIAN_DATA_SOURCES:
+        if (
+            not sources or "city_data" in sources
+        ) and location.city in CITY_PEDESTRIAN_DATA_SOURCES:
             try:
                 client = CityDataClient(city=location.city)
                 # Note: City data is typically for specific counters, not specific businesses
                 # This is included for completeness but may not match the exact location
                 observations = await client.get_pedestrian_counts(
-                    start_date=start_date,
-                    end_date=end_date,
-                    limit=100
+                    start_date=start_date, end_date=end_date, limit=100
                 )
-                
+
                 # Only store if we got data
                 if observations:
-                    reasoning_log.append({
-                        "phase": "collect",
-                        "source": "city_data",
-                        "note": f"Found {len(observations)} city pedestrian counts (may not be location-specific)",
-                    })
+                    reasoning_log.append(
+                        {
+                            "phase": "collect",
+                            "source": "city_data",
+                            "note": f"Found {len(observations)} city pedestrian counts (may not be location-specific)",
+                        }
+                    )
                 await client.close()
             except Exception as e:
                 logger.warning(f"City data collection failed: {e}")
-        
+
         db.commit()
-        
+
         # Update job if provided
         if job_id:
             status = "success" if not errors else "partial_success"
@@ -415,10 +426,10 @@ async def collect_traffic_for_location(
                     "observations": observations_collected,
                     "reasoning_log": reasoning_log,
                     "errors": errors if errors else None,
-                }
+                },
             )
             db.commit()
-        
+
         return {
             "status": "success" if not errors else "partial_success",
             "location_id": location_id,
@@ -428,9 +439,11 @@ async def collect_traffic_for_location(
             "errors": errors,
             "duration_seconds": (datetime.utcnow() - started_at).total_seconds(),
         }
-        
+
     except Exception as e:
-        logger.error(f"Error collecting traffic for location {location_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error collecting traffic for location {location_id}: {e}", exc_info=True
+        )
         return {
             "status": "failed",
             "location_id": location_id,
@@ -440,9 +453,7 @@ async def collect_traffic_for_location(
 
 
 async def _store_observation(
-    db: Session,
-    location_id: int,
-    obs: TrafficObservation
+    db: Session, location_id: int, obs: TrafficObservation
 ) -> None:
     """Store a traffic observation in the database."""
     db.execute(
@@ -474,79 +485,83 @@ async def _store_observation(
             "visit_count": obs.visit_count,
             "visitor_count": obs.visitor_count,
             "relative": obs.visit_count_relative,
-            "dwell": str(obs.median_dwell_minutes) if obs.median_dwell_minutes else None,
+            "dwell": str(obs.median_dwell_minutes)
+            if obs.median_dwell_minutes
+            else None,
             "hourly": obs.hourly_traffic,
             "daily": obs.daily_traffic,
             "demographics": obs.visitor_demographics,
             "source": obs.source_type,
             "confidence": obs.confidence,
-        }
+        },
     )
 
 
 async def enrich_location_metadata(
-    db: Session,
-    location_id: int,
-    job_id: Optional[int] = None
+    db: Session, location_id: int, job_id: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Enrich location with additional metadata (ratings, trade area, competitors).
-    
+
     Args:
         db: Database session
         location_id: Location ID to enrich
         job_id: Optional job ID for tracking
-        
+
     Returns:
         Dictionary with enrichment results
     """
     started_at = datetime.utcnow()
     reasoning_log = []
-    
+
     # Get location details
     location = db.execute(
-        text("SELECT * FROM locations WHERE id = :id"),
-        {"id": location_id}
+        text("SELECT * FROM locations WHERE id = :id"), {"id": location_id}
     ).fetchone()
-    
+
     if not location:
         return {"status": "failed", "error": f"Location {location_id} not found"}
-    
+
     from app.core.config import get_settings
+
     settings = get_settings()
-    
+
     enrichments = {}
-    
+
     try:
         # Enrich with Foursquare details (ratings, etc.)
         if settings.get_foursquare_api_key() and location.foursquare_fsq_id:
             try:
                 client = FoursquareClient()
                 details = await client.get_place_details(location.foursquare_fsq_id)
-                
+
                 # Extract useful fields
                 if "rating" in details:
                     enrichments["foursquare_rating"] = details["rating"]
                 if "stats" in details:
-                    enrichments["foursquare_checkins"] = details["stats"].get("total_checkins", 0)
-                
-                reasoning_log.append({
-                    "phase": "enrich",
-                    "source": "foursquare",
-                    "fields_enriched": list(enrichments.keys()),
-                })
+                    enrichments["foursquare_checkins"] = details["stats"].get(
+                        "total_checkins", 0
+                    )
+
+                reasoning_log.append(
+                    {
+                        "phase": "enrich",
+                        "source": "foursquare",
+                        "fields_enriched": list(enrichments.keys()),
+                    }
+                )
                 await client.close()
             except Exception as e:
                 logger.warning(f"Foursquare enrichment failed: {e}")
-        
+
         # Store metadata
         if enrichments:
             # Check if metadata exists
             existing = db.execute(
                 text("SELECT id FROM location_metadata WHERE location_id = :id"),
-                {"id": location_id}
+                {"id": location_id},
             ).fetchone()
-            
+
             if existing:
                 # Update
                 db.execute(
@@ -561,7 +576,7 @@ async def enrich_location_metadata(
                         "location_id": location_id,
                         "google_rating": enrichments.get("google_rating"),
                         "yelp_rating": enrichments.get("yelp_rating"),
-                    }
+                    },
                 )
             else:
                 # Insert
@@ -577,11 +592,11 @@ async def enrich_location_metadata(
                         "location_id": location_id,
                         "google_rating": enrichments.get("google_rating"),
                         "yelp_rating": enrichments.get("yelp_rating"),
-                    }
+                    },
                 )
-            
+
             db.commit()
-        
+
         return {
             "status": "success",
             "location_id": location_id,
@@ -589,7 +604,7 @@ async def enrich_location_metadata(
             "reasoning_log": reasoning_log,
             "duration_seconds": (datetime.utcnow() - started_at).total_seconds(),
         }
-        
+
     except Exception as e:
         logger.error(f"Error enriching location {location_id}: {e}", exc_info=True)
         return {
@@ -605,11 +620,11 @@ async def get_brand_traffic_summary(
     city: Optional[str] = None,
     state: Optional[str] = None,
     start_date: Optional[date] = None,
-    end_date: Optional[date] = None
+    end_date: Optional[date] = None,
 ) -> Dict[str, Any]:
     """
     Get aggregated traffic summary for a brand.
-    
+
     Args:
         db: Database session
         brand_name: Brand name
@@ -617,7 +632,7 @@ async def get_brand_traffic_summary(
         state: Optional state filter
         start_date: Start of date range
         end_date: End of date range
-        
+
     Returns:
         Dictionary with aggregated traffic metrics
     """
@@ -636,7 +651,7 @@ async def get_brand_traffic_summary(
         WHERE l.brand_name = :brand_name
     """
     params = {"brand_name": brand_name}
-    
+
     if city:
         query += " AND l.city = :city"
         params["city"] = city
@@ -649,14 +664,14 @@ async def get_brand_traffic_summary(
     if end_date:
         query += " AND fto.observation_date <= :end_date"
         params["end_date"] = end_date
-    
+
     query += " GROUP BY l.brand_name"
-    
+
     result = db.execute(text(query), params).fetchone()
-    
+
     if not result:
         return {"status": "not_found", "brand_name": brand_name}
-    
+
     return {
         "brand_name": result.brand_name,
         "location_count": result.location_count,

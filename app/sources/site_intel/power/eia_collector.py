@@ -11,6 +11,7 @@ Electricity data: https://api.eia.gov/v2/electricity/
 
 Requires EIA_API_KEY environment variable.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -21,7 +22,11 @@ from app.core.config import get_settings
 from app.core.models_site_intel import PowerPlant, ElectricityPrice
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -49,7 +54,7 @@ class EIAPowerCollector(BaseCollector):
         super().__init__(db, api_key, **kwargs)
         if not self.api_key:
             settings = get_settings()
-            self.api_key = getattr(settings, 'eia_api_key', None)
+            self.api_key = getattr(settings, "eia_api_key", None)
 
     def get_default_base_url(self) -> str:
         return "https://api.eia.gov/v2"
@@ -69,7 +74,7 @@ class EIAPowerCollector(BaseCollector):
         if not self.api_key:
             return self.create_result(
                 status=CollectionStatus.FAILED,
-                error_message="EIA_API_KEY not configured. Get free key at https://www.eia.gov/opendata/register.php"
+                error_message="EIA_API_KEY not configured. Get free key at https://www.eia.gov/opendata/register.php",
             )
 
         total_inserted = 0
@@ -83,7 +88,9 @@ class EIAPowerCollector(BaseCollector):
             total_inserted += plants_result.get("inserted", 0)
             total_processed += plants_result.get("processed", 0)
             if plants_result.get("error"):
-                errors.append({"source": "power_plants", "error": plants_result["error"]})
+                errors.append(
+                    {"source": "power_plants", "error": plants_result["error"]}
+                )
 
             # Collect electricity prices
             logger.info("Collecting EIA electricity price data...")
@@ -91,9 +98,13 @@ class EIAPowerCollector(BaseCollector):
             total_inserted += prices_result.get("inserted", 0)
             total_processed += prices_result.get("processed", 0)
             if prices_result.get("error"):
-                errors.append({"source": "electricity_prices", "error": prices_result["error"]})
+                errors.append(
+                    {"source": "electricity_prices", "error": prices_result["error"]}
+                )
 
-            status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            status = (
+                CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            )
 
             return self.create_result(
                 status=status,
@@ -149,13 +160,19 @@ class EIAPowerCollector(BaseCollector):
                     break
 
                 all_plants.extend(data)
-                logger.info(f"Fetched {len(data)} power plant records (total: {len(all_plants)})")
+                logger.info(
+                    f"Fetched {len(data)} power plant records (total: {len(all_plants)})"
+                )
 
                 if len(data) < page_size:
                     break
 
                 offset += page_size
-                self.update_progress(len(all_plants), len(all_plants) + page_size, "Fetching power plants")
+                self.update_progress(
+                    len(all_plants),
+                    len(all_plants) + page_size,
+                    "Fetching power plants",
+                )
 
             # Transform and deduplicate by plant
             plants_by_id = {}
@@ -171,7 +188,9 @@ class EIAPowerCollector(BaseCollector):
                     # Aggregate capacity
                     existing = plants_by_id[plant_id]
                     new_capacity = float(record.get("nameplate-capacity-mw") or 0)
-                    existing["nameplate_capacity_mw"] = (existing.get("nameplate_capacity_mw") or 0) + new_capacity
+                    existing["nameplate_capacity_mw"] = (
+                        existing.get("nameplate_capacity_mw") or 0
+                    ) + new_capacity
 
             # Insert into database
             records = list(plants_by_id.values())
@@ -181,9 +200,19 @@ class EIAPowerCollector(BaseCollector):
                     records,
                     unique_columns=["eia_plant_id"],
                     update_columns=[
-                        "name", "operator_name", "state", "county", "latitude", "longitude",
-                        "primary_fuel", "nameplate_capacity_mw", "summer_capacity_mw",
-                        "winter_capacity_mw", "grid_region", "balancing_authority", "collected_at"
+                        "name",
+                        "operator_name",
+                        "state",
+                        "county",
+                        "latitude",
+                        "longitude",
+                        "primary_fuel",
+                        "nameplate_capacity_mw",
+                        "summer_capacity_mw",
+                        "winter_capacity_mw",
+                        "grid_region",
+                        "balancing_authority",
+                        "collected_at",
                     ],
                 )
                 return {"processed": len(all_plants), "inserted": inserted}
@@ -204,8 +233,12 @@ class EIAPowerCollector(BaseCollector):
             "county": record.get("county"),
             "latitude": self._safe_float(record.get("latitude")),
             "longitude": self._safe_float(record.get("longitude")),
-            "primary_fuel": self._map_fuel_type(record.get("energy_source_code") or record.get("technology")),
-            "nameplate_capacity_mw": self._safe_float(record.get("nameplate-capacity-mw")),
+            "primary_fuel": self._map_fuel_type(
+                record.get("energy_source_code") or record.get("technology")
+            ),
+            "nameplate_capacity_mw": self._safe_float(
+                record.get("nameplate-capacity-mw")
+            ),
             "summer_capacity_mw": self._safe_float(record.get("summer-capacity-mw")),
             "winter_capacity_mw": self._safe_float(record.get("winter-capacity-mw")),
             "grid_region": record.get("balancing_authority_code"),
@@ -215,7 +248,9 @@ class EIAPowerCollector(BaseCollector):
             "collected_at": datetime.utcnow(),
         }
 
-    async def _collect_electricity_prices(self, config: CollectionConfig) -> Dict[str, Any]:
+    async def _collect_electricity_prices(
+        self, config: CollectionConfig
+    ) -> Dict[str, Any]:
         """
         Collect electricity prices by state and sector.
 
@@ -261,7 +296,9 @@ class EIAPowerCollector(BaseCollector):
                     break
 
                 all_prices.extend(data)
-                logger.info(f"Fetched {len(data)} electricity price records (total: {len(all_prices)})")
+                logger.info(
+                    f"Fetched {len(data)} electricity price records (total: {len(all_prices)})"
+                )
 
                 if len(data) < page_size:
                     break
@@ -280,7 +317,13 @@ class EIAPowerCollector(BaseCollector):
                 inserted, _ = self.bulk_upsert(
                     ElectricityPrice,
                     records,
-                    unique_columns=["geography_type", "geography_id", "period_year", "period_month", "sector"],
+                    unique_columns=[
+                        "geography_type",
+                        "geography_id",
+                        "period_year",
+                        "period_month",
+                        "sector",
+                    ],
                 )
                 return {"processed": len(all_prices), "inserted": inserted}
 
@@ -290,7 +333,9 @@ class EIAPowerCollector(BaseCollector):
             logger.error(f"Failed to collect electricity prices: {e}", exc_info=True)
             return {"processed": 0, "inserted": 0, "error": str(e)}
 
-    def _transform_price_record(self, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _transform_price_record(
+        self, record: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """Transform EIA price record to database format."""
         state_id = record.get("stateid")
         if not state_id:
@@ -310,7 +355,9 @@ class EIAPowerCollector(BaseCollector):
         }
 
         sector_code = record.get("sectorid", "ALL")
-        sector = sector_map.get(sector_code, sector_code.lower() if sector_code else "all")
+        sector = sector_map.get(
+            sector_code, sector_code.lower() if sector_code else "all"
+        )
 
         return {
             "geography_type": "state",

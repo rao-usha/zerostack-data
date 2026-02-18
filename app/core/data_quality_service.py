@@ -4,6 +4,7 @@ Data quality rules engine service.
 Provides functionality for defining, evaluating, and reporting on data quality rules.
 Supports various rule types including range checks, null checks, freshness, regex patterns.
 """
+
 import logging
 import re
 import time
@@ -14,8 +15,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text, func
 
 from app.core.models import (
-    DataQualityRule, DataQualityResult, DataQualityReport,
-    RuleType, RuleSeverity, IngestionJob
+    DataQualityRule,
+    DataQualityResult,
+    DataQualityReport,
+    RuleType,
+    RuleSeverity,
+    IngestionJob,
 )
 
 logger = logging.getLogger(__name__)
@@ -25,9 +30,11 @@ logger = logging.getLogger(__name__)
 # Rule Evaluation Results
 # =============================================================================
 
+
 @dataclass
 class RuleEvaluationResult:
     """Result of evaluating a single rule."""
+
     rule_id: int
     rule_name: str
     passed: bool
@@ -46,11 +53,9 @@ class RuleEvaluationResult:
 # Rule Evaluators
 # =============================================================================
 
+
 def evaluate_range_rule(
-    db: Session,
-    rule: DataQualityRule,
-    table_name: str,
-    column_name: str
+    db: Session, rule: DataQualityRule, table_name: str, column_name: str
 ) -> RuleEvaluationResult:
     """
     Evaluate a range rule (value must be within min/max).
@@ -78,16 +83,16 @@ def evaluate_range_rule(
             passed=True,
             severity=rule.severity,
             message="No range constraints specified",
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
     where_clause = " OR ".join(conditions)
-    query = text(f'''
+    query = text(f"""
         SELECT COUNT(*) as total,
                SUM(CASE WHEN {where_clause} THEN 1 ELSE 0 END) as violations
         FROM "{table_name}"
         WHERE "{column_name}" IS NOT NULL
-    ''')
+    """)
 
     try:
         bind_params = {}
@@ -106,11 +111,11 @@ def evaluate_range_rule(
         # Get sample failures if any
         sample_failures = None
         if violations > 0:
-            sample_query = text(f'''
+            sample_query = text(f"""
                 SELECT "{column_name}" FROM "{table_name}"
                 WHERE {where_clause}
                 LIMIT 5
-            ''')
+            """)
             samples = db.execute(sample_query, bind_params).fetchall()
             sample_failures = [str(s[0]) for s in samples]
 
@@ -119,14 +124,16 @@ def evaluate_range_rule(
             rule_name=rule.name,
             passed=passed,
             severity=rule.severity,
-            message=f"Found {violations} values outside range {expected}" if not passed else f"All {total} values within range",
+            message=f"Found {violations} values outside range {expected}"
+            if not passed
+            else f"All {total} values within range",
             actual_value=f"{violations} violations",
             expected_value=expected,
             rows_checked=total,
             rows_passed=total - violations,
             rows_failed=violations,
             sample_failures=sample_failures,
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
     except Exception as e:
@@ -137,26 +144,23 @@ def evaluate_range_rule(
             passed=False,
             severity=rule.severity,
             message=f"Error evaluating rule: {str(e)}",
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
 
 def evaluate_not_null_rule(
-    db: Session,
-    rule: DataQualityRule,
-    table_name: str,
-    column_name: str
+    db: Session, rule: DataQualityRule, table_name: str, column_name: str
 ) -> RuleEvaluationResult:
     """
     Evaluate a not-null rule (value must not be null).
     """
     start_time = time.time()
 
-    query = text(f'''
+    query = text(f"""
         SELECT COUNT(*) as total,
                SUM(CASE WHEN "{column_name}" IS NULL THEN 1 ELSE 0 END) as nulls
         FROM "{table_name}"
-    ''')
+    """)
 
     try:
         result = db.execute(query).fetchone()
@@ -170,13 +174,15 @@ def evaluate_not_null_rule(
             rule_name=rule.name,
             passed=passed,
             severity=rule.severity,
-            message=f"Found {nulls} null values" if not passed else f"No null values in {total} rows",
+            message=f"Found {nulls} null values"
+            if not passed
+            else f"No null values in {total} rows",
             actual_value=f"{nulls} nulls",
             expected_value="0 nulls",
             rows_checked=total,
             rows_passed=total - nulls,
             rows_failed=nulls,
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
     except Exception as e:
@@ -187,27 +193,24 @@ def evaluate_not_null_rule(
             passed=False,
             severity=rule.severity,
             message=f"Error evaluating rule: {str(e)}",
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
 
 def evaluate_unique_rule(
-    db: Session,
-    rule: DataQualityRule,
-    table_name: str,
-    column_name: str
+    db: Session, rule: DataQualityRule, table_name: str, column_name: str
 ) -> RuleEvaluationResult:
     """
     Evaluate a uniqueness rule (values must be unique).
     """
     start_time = time.time()
 
-    query = text(f'''
+    query = text(f"""
         SELECT COUNT(*) as total,
                COUNT(DISTINCT "{column_name}") as unique_count
         FROM "{table_name}"
         WHERE "{column_name}" IS NOT NULL
-    ''')
+    """)
 
     try:
         result = db.execute(query).fetchone()
@@ -220,14 +223,14 @@ def evaluate_unique_rule(
         # Get sample duplicates
         sample_failures = None
         if duplicates > 0:
-            dup_query = text(f'''
+            dup_query = text(f"""
                 SELECT "{column_name}", COUNT(*) as cnt
                 FROM "{table_name}"
                 WHERE "{column_name}" IS NOT NULL
                 GROUP BY "{column_name}"
                 HAVING COUNT(*) > 1
                 LIMIT 5
-            ''')
+            """)
             samples = db.execute(dup_query).fetchall()
             sample_failures = [f"{s[0]} (x{s[1]})" for s in samples]
 
@@ -236,14 +239,16 @@ def evaluate_unique_rule(
             rule_name=rule.name,
             passed=passed,
             severity=rule.severity,
-            message=f"Found {duplicates} duplicate values" if not passed else f"All {total} values are unique",
+            message=f"Found {duplicates} duplicate values"
+            if not passed
+            else f"All {total} values are unique",
             actual_value=f"{unique_count} unique / {total} total",
             expected_value="All unique",
             rows_checked=total,
             rows_passed=unique_count,
             rows_failed=duplicates,
             sample_failures=sample_failures,
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
     except Exception as e:
@@ -254,14 +259,12 @@ def evaluate_unique_rule(
             passed=False,
             severity=rule.severity,
             message=f"Error evaluating rule: {str(e)}",
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
 
 def evaluate_row_count_rule(
-    db: Session,
-    rule: DataQualityRule,
-    table_name: str
+    db: Session, rule: DataQualityRule, table_name: str
 ) -> RuleEvaluationResult:
     """
     Evaluate a row count rule (min/max row count).
@@ -299,11 +302,13 @@ def evaluate_row_count_rule(
             rule_name=rule.name,
             passed=passed,
             severity=rule.severity,
-            message="; ".join(messages) if messages else f"Row count {row_count} within expected range",
+            message="; ".join(messages)
+            if messages
+            else f"Row count {row_count} within expected range",
             actual_value=str(row_count),
             expected_value=expected,
             rows_checked=row_count,
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
     except Exception as e:
@@ -314,15 +319,12 @@ def evaluate_row_count_rule(
             passed=False,
             severity=rule.severity,
             message=f"Error evaluating rule: {str(e)}",
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
 
 def evaluate_enum_rule(
-    db: Session,
-    rule: DataQualityRule,
-    table_name: str,
-    column_name: str
+    db: Session, rule: DataQualityRule, table_name: str, column_name: str
 ) -> RuleEvaluationResult:
     """
     Evaluate an enum rule (value must be in allowed list).
@@ -341,17 +343,17 @@ def evaluate_enum_rule(
             passed=False,
             severity=rule.severity,
             message="No allowed values specified in rule parameters",
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
     # Build parameterized query
     placeholders = ", ".join([f":val_{i}" for i in range(len(allowed))])
-    query = text(f'''
+    query = text(f"""
         SELECT COUNT(*) as total,
                SUM(CASE WHEN "{column_name}" NOT IN ({placeholders}) THEN 1 ELSE 0 END) as violations
         FROM "{table_name}"
         WHERE "{column_name}" IS NOT NULL
-    ''')
+    """)
 
     try:
         bind_params = {f"val_{i}": v for i, v in enumerate(allowed)}
@@ -364,12 +366,12 @@ def evaluate_enum_rule(
         # Get sample invalid values
         sample_failures = None
         if violations > 0:
-            sample_query = text(f'''
+            sample_query = text(f"""
                 SELECT DISTINCT "{column_name}" FROM "{table_name}"
                 WHERE "{column_name}" IS NOT NULL
                   AND "{column_name}" NOT IN ({placeholders})
                 LIMIT 5
-            ''')
+            """)
             samples = db.execute(sample_query, bind_params).fetchall()
             sample_failures = [str(s[0]) for s in samples]
 
@@ -378,14 +380,16 @@ def evaluate_enum_rule(
             rule_name=rule.name,
             passed=passed,
             severity=rule.severity,
-            message=f"Found {violations} values not in allowed list" if not passed else f"All {total} values valid",
+            message=f"Found {violations} values not in allowed list"
+            if not passed
+            else f"All {total} values valid",
             actual_value=f"{violations} invalid values",
             expected_value=f"One of: {allowed[:5]}{'...' if len(allowed) > 5 else ''}",
             rows_checked=total,
             rows_passed=total - violations,
             rows_failed=violations,
             sample_failures=sample_failures,
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
     except Exception as e:
@@ -396,15 +400,12 @@ def evaluate_enum_rule(
             passed=False,
             severity=rule.severity,
             message=f"Error evaluating rule: {str(e)}",
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
 
 def evaluate_freshness_rule(
-    db: Session,
-    rule: DataQualityRule,
-    table_name: str,
-    column_name: str
+    db: Session, rule: DataQualityRule, table_name: str, column_name: str
 ) -> RuleEvaluationResult:
     """
     Evaluate a freshness rule (data must be recent).
@@ -428,15 +429,15 @@ def evaluate_freshness_rule(
             passed=False,
             severity=rule.severity,
             message="No max_age_hours or max_age_days specified",
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
     cutoff_time = datetime.utcnow() - timedelta(hours=max_age_hours)
 
-    query = text(f'''
+    query = text(f"""
         SELECT MAX("{column_name}") as latest
         FROM "{table_name}"
-    ''')
+    """)
 
     try:
         result = db.execute(query).fetchone()
@@ -449,15 +450,15 @@ def evaluate_freshness_rule(
                 passed=False,
                 severity=rule.severity,
                 message="No data found in table",
-                execution_time_ms=int((time.time() - start_time) * 1000)
+                execution_time_ms=int((time.time() - start_time) * 1000),
             )
 
         # Handle different date formats
         if isinstance(latest, str):
             try:
-                latest = datetime.fromisoformat(latest.replace('Z', '+00:00'))
+                latest = datetime.fromisoformat(latest.replace("Z", "+00:00"))
             except ValueError:
-                latest = datetime.strptime(latest[:19], '%Y-%m-%d %H:%M:%S')
+                latest = datetime.strptime(latest[:19], "%Y-%m-%d %H:%M:%S")
 
         passed = latest >= cutoff_time
         age_hours = (datetime.utcnow() - latest).total_seconds() / 3600
@@ -467,10 +468,11 @@ def evaluate_freshness_rule(
             rule_name=rule.name,
             passed=passed,
             severity=rule.severity,
-            message=f"Data is {age_hours:.1f} hours old" + (" (stale)" if not passed else " (fresh)"),
+            message=f"Data is {age_hours:.1f} hours old"
+            + (" (stale)" if not passed else " (fresh)"),
             actual_value=f"{age_hours:.1f} hours",
             expected_value=f"<= {max_age_hours} hours",
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
     except Exception as e:
@@ -481,15 +483,12 @@ def evaluate_freshness_rule(
             passed=False,
             severity=rule.severity,
             message=f"Error evaluating rule: {str(e)}",
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
 
 def evaluate_regex_rule(
-    db: Session,
-    rule: DataQualityRule,
-    table_name: str,
-    column_name: str
+    db: Session, rule: DataQualityRule, table_name: str, column_name: str
 ) -> RuleEvaluationResult:
     """
     Evaluate a regex rule (value must match pattern).
@@ -508,14 +507,14 @@ def evaluate_regex_rule(
             passed=False,
             severity=rule.severity,
             message="No regex pattern specified",
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
     # Fetch values and check with Python regex (more portable than DB-specific regex)
-    query = text(f'''
+    query = text(f"""
         SELECT "{column_name}" FROM "{table_name}"
         WHERE "{column_name}" IS NOT NULL
-    ''')
+    """)
 
     try:
         compiled_pattern = re.compile(pattern)
@@ -539,14 +538,16 @@ def evaluate_regex_rule(
             rule_name=rule.name,
             passed=passed,
             severity=rule.severity,
-            message=f"Found {violations} values not matching pattern" if not passed else f"All {total} values match pattern",
+            message=f"Found {violations} values not matching pattern"
+            if not passed
+            else f"All {total} values match pattern",
             actual_value=f"{violations} mismatches",
             expected_value=f"Pattern: {pattern}",
             rows_checked=total,
             rows_passed=total - violations,
             rows_failed=violations,
             sample_failures=sample_failures if sample_failures else None,
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
     except re.error as e:
@@ -556,7 +557,7 @@ def evaluate_regex_rule(
             passed=False,
             severity=rule.severity,
             message=f"Invalid regex pattern: {str(e)}",
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
     except Exception as e:
         logger.error(f"Error evaluating regex rule: {e}")
@@ -566,7 +567,7 @@ def evaluate_regex_rule(
             passed=False,
             severity=rule.severity,
             message=f"Error evaluating rule: {str(e)}",
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
 
@@ -574,11 +575,12 @@ def evaluate_regex_rule(
 # Rule Matching
 # =============================================================================
 
+
 def get_matching_rules(
     db: Session,
     source: str,
     dataset_name: Optional[str] = None,
-    enabled_only: bool = True
+    enabled_only: bool = True,
 ) -> List[DataQualityRule]:
     """
     Get rules that apply to a source/dataset.
@@ -613,7 +615,9 @@ def get_matching_rules(
                     if re.match(rule.dataset_pattern, dataset_name):
                         matched_rules.append(rule)
                 except re.error:
-                    logger.warning(f"Invalid dataset pattern in rule {rule.id}: {rule.dataset_pattern}")
+                    logger.warning(
+                        f"Invalid dataset pattern in rule {rule.id}: {rule.dataset_pattern}"
+                    )
             else:
                 # No pattern = matches all datasets
                 matched_rules.append(rule)
@@ -626,10 +630,9 @@ def get_matching_rules(
 # Rule Evaluation Engine
 # =============================================================================
 
+
 def evaluate_rule(
-    db: Session,
-    rule: DataQualityRule,
-    table_name: str
+    db: Session, rule: DataQualityRule, table_name: str
 ) -> RuleEvaluationResult:
     """
     Evaluate a single rule against a table.
@@ -652,7 +655,7 @@ def evaluate_rule(
                 rule_name=rule.name,
                 passed=False,
                 severity=rule.severity,
-                message="Range rule requires column_name"
+                message="Range rule requires column_name",
             )
         return evaluate_range_rule(db, rule, table_name, column_name)
 
@@ -663,7 +666,7 @@ def evaluate_rule(
                 rule_name=rule.name,
                 passed=False,
                 severity=rule.severity,
-                message="Not-null rule requires column_name"
+                message="Not-null rule requires column_name",
             )
         return evaluate_not_null_rule(db, rule, table_name, column_name)
 
@@ -674,7 +677,7 @@ def evaluate_rule(
                 rule_name=rule.name,
                 passed=False,
                 severity=rule.severity,
-                message="Unique rule requires column_name"
+                message="Unique rule requires column_name",
             )
         return evaluate_unique_rule(db, rule, table_name, column_name)
 
@@ -688,7 +691,7 @@ def evaluate_rule(
                 rule_name=rule.name,
                 passed=False,
                 severity=rule.severity,
-                message="Enum rule requires column_name"
+                message="Enum rule requires column_name",
             )
         return evaluate_enum_rule(db, rule, table_name, column_name)
 
@@ -699,7 +702,7 @@ def evaluate_rule(
                 rule_name=rule.name,
                 passed=False,
                 severity=rule.severity,
-                message="Freshness rule requires column_name (date/timestamp column)"
+                message="Freshness rule requires column_name (date/timestamp column)",
             )
         return evaluate_freshness_rule(db, rule, table_name, column_name)
 
@@ -710,7 +713,7 @@ def evaluate_rule(
                 rule_name=rule.name,
                 passed=False,
                 severity=rule.severity,
-                message="Regex rule requires column_name"
+                message="Regex rule requires column_name",
             )
         return evaluate_regex_rule(db, rule, table_name, column_name)
 
@@ -720,14 +723,12 @@ def evaluate_rule(
             rule_name=rule.name,
             passed=False,
             severity=rule.severity,
-            message=f"Unsupported rule type: {rule.rule_type}"
+            message=f"Unsupported rule type: {rule.rule_type}",
         )
 
 
 def evaluate_rules_for_job(
-    db: Session,
-    job: IngestionJob,
-    table_name: str
+    db: Session, job: IngestionJob, table_name: str
 ) -> DataQualityReport:
     """
     Evaluate all applicable rules for an ingestion job.
@@ -750,13 +751,13 @@ def evaluate_rules_for_job(
         report = DataQualityReport(
             job_id=job.id,
             source=job.source,
-            report_type='job',
+            report_type="job",
             total_rules=0,
             rules_passed=0,
             rules_failed=0,
-            overall_status='passed',
+            overall_status="passed",
             completed_at=datetime.utcnow(),
-            execution_time_ms=int((time.time() - start_time) * 1000)
+            execution_time_ms=int((time.time() - start_time) * 1000),
         )
         db.add(report)
         db.commit()
@@ -765,10 +766,7 @@ def evaluate_rules_for_job(
 
     # Create report
     report = DataQualityReport(
-        job_id=job.id,
-        source=job.source,
-        report_type='job',
-        total_rules=len(rules)
+        job_id=job.id, source=job.source, report_type="job", total_rules=len(rules)
     )
     db.add(report)
     db.commit()
@@ -798,7 +796,7 @@ def evaluate_rules_for_job(
             rows_checked=eval_result.rows_checked,
             rows_passed=eval_result.rows_passed,
             rows_failed=eval_result.rows_failed,
-            execution_time_ms=eval_result.execution_time_ms
+            execution_time_ms=eval_result.execution_time_ms,
         )
         db.add(db_result)
 
@@ -816,17 +814,21 @@ def evaluate_rules_for_job(
     # Calculate report summary
     passed_count = sum(1 for r in results if r.passed)
     failed_count = len(results) - passed_count
-    errors = sum(1 for r in results if not r.passed and r.severity == RuleSeverity.ERROR)
-    warnings = sum(1 for r in results if not r.passed and r.severity == RuleSeverity.WARNING)
+    errors = sum(
+        1 for r in results if not r.passed and r.severity == RuleSeverity.ERROR
+    )
+    warnings = sum(
+        1 for r in results if not r.passed and r.severity == RuleSeverity.WARNING
+    )
     info = sum(1 for r in results if not r.passed and r.severity == RuleSeverity.INFO)
 
     # Determine overall status
     if errors > 0:
-        overall_status = 'failed'
+        overall_status = "failed"
     elif warnings > 0:
-        overall_status = 'warning'
+        overall_status = "warning"
     else:
-        overall_status = 'passed'
+        overall_status = "passed"
 
     # Update report
     report.rules_passed = passed_count
@@ -854,6 +856,7 @@ def evaluate_rules_for_job(
 # Rule Management
 # =============================================================================
 
+
 def create_rule(
     db: Session,
     name: str,
@@ -864,7 +867,7 @@ def create_rule(
     column_name: Optional[str] = None,
     parameters: Optional[Dict[str, Any]] = None,
     description: Optional[str] = None,
-    priority: int = 5
+    priority: int = 5,
 ) -> DataQualityRule:
     """
     Create a new data quality rule.
@@ -878,14 +881,16 @@ def create_rule(
         rule_type=rule_type,
         severity=severity,
         parameters=parameters or {},
-        priority=priority
+        priority=priority,
     )
 
     db.add(rule)
     db.commit()
     db.refresh(rule)
 
-    logger.info(f"Created data quality rule '{name}' (type={rule_type}, severity={severity})")
+    logger.info(
+        f"Created data quality rule '{name}' (type={rule_type}, severity={severity})"
+    )
     return rule
 
 
@@ -894,7 +899,7 @@ def get_rule_results(
     rule_id: Optional[int] = None,
     job_id: Optional[int] = None,
     passed_only: Optional[bool] = None,
-    limit: int = 100
+    limit: int = 100,
 ) -> List[DataQualityResult]:
     """
     Get rule evaluation results with optional filters.
@@ -918,6 +923,9 @@ def get_report(db: Session, report_id: int) -> Optional[DataQualityReport]:
 
 def get_job_report(db: Session, job_id: int) -> Optional[DataQualityReport]:
     """Get the data quality report for a job."""
-    return db.query(DataQualityReport).filter(
-        DataQualityReport.job_id == job_id
-    ).order_by(DataQualityReport.started_at.desc()).first()
+    return (
+        db.query(DataQualityReport)
+        .filter(DataQualityReport.job_id == job_id)
+        .order_by(DataQualityReport.started_at.desc())
+        .first()
+    )

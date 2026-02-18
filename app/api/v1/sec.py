@@ -3,6 +3,7 @@ SEC EDGAR API routes.
 
 Endpoints for ingesting SEC corporate filings.
 """
+
 import logging
 import asyncio
 from typing import List, Optional
@@ -24,8 +25,8 @@ router = APIRouter(
     tags=["SEC EDGAR"],
     responses={
         404: {"description": "Not found"},
-        500: {"description": "Internal server error"}
-    }
+        500: {"description": "Internal server error"},
+    },
 )
 
 
@@ -40,22 +41,22 @@ class IngestCompanyRequest(BaseModel):
     cik: str = Field(
         ...,
         description="Company CIK (Central Index Key), e.g., '0000320193' for Apple",
-        examples=["0000320193"]
+        examples=["0000320193"],
     )
     filing_types: Optional[List[str]] = Field(
         default=None,
         description="Filing types to ingest (defaults to 10-K and 10-Q)",
-        examples=[["10-K", "10-Q", "8-K"]]
+        examples=[["10-K", "10-Q", "8-K"]],
     )
     start_date: Optional[date] = Field(
         default=None,
         description="Start date for filings (ISO format)",
-        examples=["2020-01-01"]
+        examples=["2020-01-01"],
     )
     end_date: Optional[date] = Field(
         default=None,
         description="End date for filings (ISO format)",
-        examples=["2024-12-31"]
+        examples=["2024-12-31"],
     )
 
 
@@ -65,22 +66,22 @@ class IngestMultipleCompaniesRequest(BaseModel):
     ciks: List[str] = Field(
         ...,
         description="List of company CIKs",
-        examples=[["0000320193", "0000789019", "0001652044"]]
+        examples=[["0000320193", "0000789019", "0001652044"]],
     )
     filing_types: Optional[List[str]] = Field(
         default=None,
         description="Filing types to ingest (defaults to 10-K and 10-Q)",
-        examples=[["10-K", "10-Q"]]
+        examples=[["10-K", "10-Q"]],
     )
     start_date: Optional[date] = Field(
         default=None,
         description="Start date for filings (ISO format)",
-        examples=["2020-01-01"]
+        examples=["2020-01-01"],
     )
     end_date: Optional[date] = Field(
         default=None,
         description="End date for filings (ISO format)",
-        examples=["2024-12-31"]
+        examples=["2024-12-31"],
     )
 
 
@@ -100,19 +101,16 @@ class IngestFormADVRequest(BaseModel):
     family_office_names: List[str] = Field(
         ...,
         description="List of family office names to search and ingest",
-        examples=[["Soros Fund Management", "Pritzker Group", "Cascade Investment"]]
+        examples=[["Soros Fund Management", "Pritzker Group", "Cascade Investment"]],
     )
     max_concurrency: Optional[int] = Field(
         default=1,
         description="Maximum concurrent API requests (conservative for IAPD)",
         ge=1,
-        le=3
+        le=3,
     )
     max_requests_per_second: Optional[float] = Field(
-        default=2.0,
-        description="Rate limit for IAPD API requests",
-        gt=0,
-        le=5.0
+        default=2.0, description="Rate limit for IAPD API requests", gt=0, le=5.0
     )
 
 
@@ -122,7 +120,7 @@ class IngestFormADVByCRDRequest(BaseModel):
     crd_number: str = Field(
         ...,
         description="Investment adviser CRD (Central Registration Depository) number",
-        examples=["158626"]
+        examples=["158626"],
     )
 
 
@@ -135,7 +133,7 @@ class IngestFormADVByCRDRequest(BaseModel):
 async def ingest_company(
     request: IngestCompanyRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest SEC filings for a single company.
@@ -168,19 +166,22 @@ async def ingest_company(
     # Validate CIK
     if not metadata.validate_cik(request.cik):
         raise HTTPException(
-            status_code=400,
-            detail=f"Invalid CIK format: {request.cik}"
+            status_code=400, detail=f"Invalid CIK format: {request.cik}"
         )
 
     cik_normalized = metadata.normalize_cik(request.cik)
 
     result = create_and_dispatch_job(
-        db, background_tasks, source="sec",
+        db,
+        background_tasks,
+        source="sec",
         config={
             "source": "sec",
             "cik": cik_normalized,
             "filing_types": request.filing_types or ["10-K", "10-Q"],
-            "start_date": request.start_date.isoformat() if request.start_date else None,
+            "start_date": request.start_date.isoformat()
+            if request.start_date
+            else None,
             "end_date": request.end_date.isoformat() if request.end_date else None,
         },
         message=f"Ingestion job created for CIK {cik_normalized}",
@@ -190,7 +191,7 @@ async def ingest_company(
         job_id=result["job_id"],
         status=result["status"],
         message=result["message"],
-        cik=cik_normalized
+        cik=cik_normalized,
     )
 
 
@@ -198,7 +199,7 @@ async def ingest_company(
 async def ingest_multiple_companies(
     request: IngestMultipleCompaniesRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest SEC filings for multiple companies.
@@ -230,26 +231,30 @@ async def ingest_multiple_companies(
             cik_normalized = metadata.normalize_cik(cik)
 
             result = create_and_dispatch_job(
-                db, background_tasks, source="sec",
+                db,
+                background_tasks,
+                source="sec",
                 config={
                     "source": "sec",
                     "cik": cik_normalized,
                     "filing_types": request.filing_types or ["10-K", "10-Q"],
-                    "start_date": request.start_date.isoformat() if request.start_date else None,
-                    "end_date": request.end_date.isoformat() if request.end_date else None,
+                    "start_date": request.start_date.isoformat()
+                    if request.start_date
+                    else None,
+                    "end_date": request.end_date.isoformat()
+                    if request.end_date
+                    else None,
                 },
                 message=f"Ingestion job created for CIK {cik_normalized}",
             )
 
-            jobs_created.append({
-                "job_id": result["job_id"],
-                "cik": cik_normalized,
-                "status": "pending"
-            })
+            jobs_created.append(
+                {"job_id": result["job_id"], "cik": cik_normalized, "status": "pending"}
+            )
 
         return {
             "message": f"Created {len(jobs_created)} ingestion jobs",
-            "jobs": jobs_created
+            "jobs": jobs_created,
         }
 
     except Exception as e:
@@ -264,9 +269,7 @@ async def get_supported_filing_types():
 
     Returns a dictionary mapping filing type codes to descriptions.
     """
-    return {
-        "filing_types": metadata.SUPPORTED_FILING_TYPES
-    }
+    return {"filing_types": metadata.SUPPORTED_FILING_TYPES}
 
 
 @router.get("/common-companies")
@@ -278,16 +281,14 @@ async def get_common_companies():
     """
     from app.sources.sec.client import COMMON_COMPANIES
 
-    return {
-        "companies": COMMON_COMPANIES
-    }
+    return {"companies": COMMON_COMPANIES}
 
 
 @router.post("/ingest/financial-data", response_model=IngestResponse)
 async def ingest_financial_data(
     request: IngestCompanyRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest structured financial data (XBRL) for a company.
@@ -318,14 +319,15 @@ async def ingest_financial_data(
     # Validate CIK
     if not metadata.validate_cik(request.cik):
         raise HTTPException(
-            status_code=400,
-            detail=f"Invalid CIK format: {request.cik}"
+            status_code=400, detail=f"Invalid CIK format: {request.cik}"
         )
 
     cik_normalized = metadata.normalize_cik(request.cik)
 
     result = create_and_dispatch_job(
-        db, background_tasks, source="sec",
+        db,
+        background_tasks,
+        source="sec",
         config={
             "source": "sec",
             "type": "xbrl_financial_data",
@@ -338,7 +340,7 @@ async def ingest_financial_data(
         job_id=result["job_id"],
         status=result["status"],
         message=result["message"],
-        cik=cik_normalized
+        cik=cik_normalized,
     )
 
 
@@ -346,7 +348,7 @@ async def ingest_financial_data(
 async def ingest_full_company(
     request: IngestCompanyRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Comprehensive ingestion: Both filings AND financial data.
@@ -369,8 +371,7 @@ async def ingest_full_company(
     # Validate CIK
     if not metadata.validate_cik(request.cik):
         raise HTTPException(
-            status_code=400,
-            detail=f"Invalid CIK format: {request.cik}"
+            status_code=400, detail=f"Invalid CIK format: {request.cik}"
         )
 
     cik_normalized = metadata.normalize_cik(request.cik)
@@ -380,13 +381,17 @@ async def ingest_full_company(
 
         # Job 1: Filing metadata
         result_filings = create_and_dispatch_job(
-            db, background_tasks, source="sec",
+            db,
+            background_tasks,
+            source="sec",
             config={
                 "source": "sec",
                 "type": "filings",
                 "cik": cik_normalized,
                 "filing_types": request.filing_types or ["10-K", "10-Q"],
-                "start_date": request.start_date.isoformat() if request.start_date else None,
+                "start_date": request.start_date.isoformat()
+                if request.start_date
+                else None,
                 "end_date": request.end_date.isoformat() if request.end_date else None,
             },
             message=f"Filings ingestion job created for CIK {cik_normalized}",
@@ -395,7 +400,9 @@ async def ingest_full_company(
 
         # Job 2: Financial data
         result_xbrl = create_and_dispatch_job(
-            db, background_tasks, source="sec",
+            db,
+            background_tasks,
+            source="sec",
             config={
                 "source": "sec",
                 "type": "xbrl_financial_data",
@@ -408,20 +415,21 @@ async def ingest_full_company(
         return {
             "message": f"Full company ingestion started for CIK {cik_normalized}",
             "cik": cik_normalized,
-            "jobs": jobs_created
+            "jobs": jobs_created,
         }
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to create full company ingestion jobs: {e}", exc_info=True)
+        logger.error(
+            f"Failed to create full company ingestion jobs: {e}", exc_info=True
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/ingest/industrial-companies")
 async def ingest_industrial_companies(
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ):
     """
     Ingest SEC XBRL financial data for all industrial companies with CIK numbers.
@@ -433,15 +441,16 @@ async def ingest_industrial_companies(
     """
     try:
         # Query all industrial companies with CIK numbers
-        result = db.execute(text(
-            "SELECT id, name, cik FROM industrial_companies WHERE cik IS NOT NULL AND cik != '' ORDER BY name"
-        ))
+        result = db.execute(
+            text(
+                "SELECT id, name, cik FROM industrial_companies WHERE cik IS NOT NULL AND cik != '' ORDER BY name"
+            )
+        )
         companies = result.fetchall()
 
         if not companies:
             raise HTTPException(
-                status_code=404,
-                detail="No industrial companies with CIK numbers found"
+                status_code=404, detail="No industrial companies with CIK numbers found"
             )
 
         # Create a master job
@@ -452,31 +461,26 @@ async def ingest_industrial_companies(
         }
 
         master_job = IngestionJob(
-            source="sec",
-            status=JobStatus.PENDING,
-            config=job_config
+            source="sec", status=JobStatus.PENDING, config=job_config
         )
         db.add(master_job)
         db.commit()
         db.refresh(master_job)
 
         company_list = [
-            {"id": row[0], "name": row[1], "cik": row[2]}
-            for row in companies
+            {"id": row[0], "name": row[1], "cik": row[2]} for row in companies
         ]
 
         # Run batch ingestion in background
         background_tasks.add_task(
-            _run_industrial_companies_batch,
-            master_job.id,
-            company_list
+            _run_industrial_companies_batch, master_job.id, company_list
         )
 
         return {
             "job_id": master_job.id,
             "status": "pending",
             "message": f"Batch ingestion started for {len(companies)} industrial companies",
-            "companies": company_list
+            "companies": company_list,
         }
 
     except HTTPException:
@@ -491,10 +495,7 @@ async def ingest_industrial_companies(
 # =============================================================================
 
 
-async def _run_industrial_companies_batch(
-    master_job_id: int,
-    companies: List[dict]
-):
+async def _run_industrial_companies_batch(master_job_id: int, companies: List[dict]):
     """
     Background task: sequentially ingest financial data for all industrial companies.
 
@@ -512,7 +513,9 @@ async def _run_industrial_companies_batch(
 
     try:
         # Mark master job as running
-        master_job = db.query(IngestionJob).filter(IngestionJob.id == master_job_id).first()
+        master_job = (
+            db.query(IngestionJob).filter(IngestionJob.id == master_job_id).first()
+        )
         if master_job:
             master_job.status = JobStatus.RUNNING
             master_job.started_at = datetime.utcnow()
@@ -523,7 +526,9 @@ async def _run_industrial_companies_batch(
             name = company["name"]
             cik_normalized = metadata.normalize_cik(cik)
 
-            logger.info(f"[{i+1}/{len(companies)}] Ingesting financials for {name} (CIK {cik_normalized})")
+            logger.info(
+                f"[{i+1}/{len(companies)}] Ingesting financials for {name} (CIK {cik_normalized})"
+            )
 
             # Create a sub-job for this company
             sub_job = IngestionJob(
@@ -535,7 +540,7 @@ async def _run_industrial_companies_batch(
                     "cik": cik_normalized,
                     "company_name": name,
                     "parent_job_id": master_job_id,
-                }
+                },
             )
             db.add(sub_job)
             db.commit()
@@ -548,11 +553,25 @@ async def _run_industrial_companies_batch(
                     cik=cik_normalized,
                     skip_facts=True,  # Skip raw facts for batch -- much faster
                 )
-                results.append({"company": name, "cik": cik_normalized, "status": "success", **result})
+                results.append(
+                    {
+                        "company": name,
+                        "cik": cik_normalized,
+                        "status": "success",
+                        **result,
+                    }
+                )
                 succeeded += 1
                 logger.info(f"  -> {name}: {result['total_rows']} rows ingested")
             except Exception as e:
-                results.append({"company": name, "cik": cik_normalized, "status": "failed", "error": str(e)})
+                results.append(
+                    {
+                        "company": name,
+                        "cik": cik_normalized,
+                        "status": "failed",
+                        "error": str(e),
+                    }
+                )
                 failed += 1
                 logger.error(f"  -> {name}: FAILED - {e}")
 
@@ -561,20 +580,30 @@ async def _run_industrial_companies_batch(
                 await asyncio.sleep(1.0)
 
         # Update master job
-        master_job = db.query(IngestionJob).filter(IngestionJob.id == master_job_id).first()
+        master_job = (
+            db.query(IngestionJob).filter(IngestionJob.id == master_job_id).first()
+        )
         if master_job:
             master_job.status = JobStatus.SUCCESS if failed == 0 else JobStatus.FAILED
             master_job.completed_at = datetime.utcnow()
-            master_job.rows_inserted = sum(r.get("total_rows", 0) for r in results if r["status"] == "success")
-            master_job.error_message = f"{succeeded} succeeded, {failed} failed" if failed > 0 else None
+            master_job.rows_inserted = sum(
+                r.get("total_rows", 0) for r in results if r["status"] == "success"
+            )
+            master_job.error_message = (
+                f"{succeeded} succeeded, {failed} failed" if failed > 0 else None
+            )
             db.commit()
 
-        logger.info(f"Industrial companies batch complete: {succeeded} succeeded, {failed} failed")
+        logger.info(
+            f"Industrial companies batch complete: {succeeded} succeeded, {failed} failed"
+        )
 
     except Exception as e:
         logger.error(f"Industrial companies batch failed: {e}", exc_info=True)
         try:
-            master_job = db.query(IngestionJob).filter(IngestionJob.id == master_job_id).first()
+            master_job = (
+                db.query(IngestionJob).filter(IngestionJob.id == master_job_id).first()
+            )
             if master_job:
                 master_job.status = JobStatus.FAILED
                 master_job.completed_at = datetime.utcnow()
@@ -591,11 +620,15 @@ async def _run_industrial_companies_batch(
 # =============================================================================
 
 
-@router.post("/form-adv/ingest/family-offices", response_model=IngestResponse, tags=["Form ADV - Ingestion"])
+@router.post(
+    "/form-adv/ingest/family-offices",
+    response_model=IngestResponse,
+    tags=["Form ADV - Ingestion"],
+)
 async def ingest_form_adv_family_offices(
     request: IngestFormADVRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest SEC Form ADV data for family offices.
@@ -638,12 +671,13 @@ async def ingest_form_adv_family_offices(
     """
     if not request.family_office_names:
         raise HTTPException(
-            status_code=400,
-            detail="At least one family office name must be provided"
+            status_code=400, detail="At least one family office name must be provided"
         )
 
     result = create_and_dispatch_job(
-        db, background_tasks, source="sec",
+        db,
+        background_tasks,
+        source="sec",
         config={
             "source": "sec",
             "type": "form_adv",
@@ -661,11 +695,13 @@ async def ingest_form_adv_family_offices(
     )
 
 
-@router.post("/form-adv/ingest/crd", response_model=IngestResponse, tags=["Form ADV - Ingestion"])
+@router.post(
+    "/form-adv/ingest/crd", response_model=IngestResponse, tags=["Form ADV - Ingestion"]
+)
 async def ingest_form_adv_by_crd(
     request: IngestFormADVByCRDRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest SEC Form ADV data for a specific firm by CRD number.
@@ -682,13 +718,12 @@ async def ingest_form_adv_by_crd(
     ```
     """
     if not request.crd_number:
-        raise HTTPException(
-            status_code=400,
-            detail="CRD number is required"
-        )
+        raise HTTPException(status_code=400, detail="CRD number is required")
 
     result = create_and_dispatch_job(
-        db, background_tasks, source="sec",
+        db,
+        background_tasks,
+        source="sec",
         config={
             "source": "sec",
             "type": "form_adv_crd",
@@ -715,7 +750,7 @@ async def query_form_adv_firms(
     offset: int = 0,
     family_office_only: bool = False,
     state: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Query Form ADV firms from the database.
@@ -785,35 +820,28 @@ async def query_form_adv_firms(
         # Convert to dict
         firms = []
         for row in rows:
-            firms.append({
-                "crd_number": row[0],
-                "sec_number": row[1],
-                "firm_name": row[2],
-                "legal_name": row[3],
-                "business_address": {
-                    "street": row[4],
-                    "city": row[5],
-                    "state": row[6],
-                    "zip": row[7]
-                },
-                "contact": {
-                    "phone": row[8],
-                    "email": row[9],
-                    "website": row[10]
-                },
-                "assets_under_management": float(row[11]) if row[11] else None,
-                "is_family_office": row[12],
-                "registration_status": row[13],
-                "registration_date": row[14].isoformat() if row[14] else None,
-                "ingested_at": row[15].isoformat() if row[15] else None
-            })
+            firms.append(
+                {
+                    "crd_number": row[0],
+                    "sec_number": row[1],
+                    "firm_name": row[2],
+                    "legal_name": row[3],
+                    "business_address": {
+                        "street": row[4],
+                        "city": row[5],
+                        "state": row[6],
+                        "zip": row[7],
+                    },
+                    "contact": {"phone": row[8], "email": row[9], "website": row[10]},
+                    "assets_under_management": float(row[11]) if row[11] else None,
+                    "is_family_office": row[12],
+                    "registration_status": row[13],
+                    "registration_date": row[14].isoformat() if row[14] else None,
+                    "ingested_at": row[15].isoformat() if row[15] else None,
+                }
+            )
 
-        return {
-            "count": len(firms),
-            "limit": limit,
-            "offset": offset,
-            "firms": firms
-        }
+        return {"count": len(firms), "limit": limit, "offset": offset, "firms": firms}
 
     except Exception as e:
         logger.error(f"Error querying Form ADV firms: {e}", exc_info=True)
@@ -821,10 +849,7 @@ async def query_form_adv_firms(
 
 
 @router.get("/form-adv/firms/{crd_number}", tags=["Form ADV - Query"])
-async def get_form_adv_firm(
-    crd_number: str,
-    db: Session = Depends(get_db)
-):
+async def get_form_adv_firm(crd_number: str, db: Session = Depends(get_db)):
     """
     Get detailed information for a specific firm by CRD number.
 
@@ -879,7 +904,9 @@ async def get_form_adv_firm(
         row = result.fetchone()
 
         if not row:
-            raise HTTPException(status_code=404, detail=f"Firm with CRD {crd_number} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Firm with CRD {crd_number} not found"
+            )
 
         # Query personnel
         personnel_query = text("""
@@ -899,13 +926,15 @@ async def get_form_adv_firm(
 
         personnel = []
         for p_row in personnel_rows:
-            personnel.append({
-                "name": p_row[0],
-                "title": p_row[1],
-                "position_type": p_row[2],
-                "email": p_row[3],
-                "phone": p_row[4]
-            })
+            personnel.append(
+                {
+                    "name": p_row[0],
+                    "title": p_row[1],
+                    "position_type": p_row[2],
+                    "email": p_row[3],
+                    "phone": p_row[4],
+                }
+            )
 
         # Build response
         firm = {
@@ -920,40 +949,38 @@ async def get_form_adv_firm(
                 "city": row[7],
                 "state": row[8],
                 "zip": row[9],
-                "country": row[10]
+                "country": row[10],
             },
             "contact": {
                 "phone": row[11],
                 "fax": row[12],
                 "email": row[13],
-                "website": row[14]
+                "website": row[14],
             },
             "mailing_address": {
                 "street": row[15],
                 "city": row[16],
                 "state": row[17],
-                "zip": row[18]
+                "zip": row[18],
             },
             "registration": {
                 "status": row[19],
                 "date": row[20].isoformat() if row[20] else None,
-                "states": row[21] if row[21] else []
+                "states": row[21] if row[21] else [],
             },
             "assets_under_management": {
                 "amount": float(row[22]) if row[22] else None,
-                "date": row[23].isoformat() if row[23] else None
+                "date": row[23].isoformat() if row[23] else None,
             },
             "client_count": row[24],
             "is_family_office": row[25],
             "form_adv": {
                 "url": row[26],
                 "filing_date": row[27].isoformat() if row[27] else None,
-                "last_amended": row[28].isoformat() if row[28] else None
+                "last_amended": row[28].isoformat() if row[28] else None,
             },
             "personnel": personnel,
-            "metadata": {
-                "ingested_at": row[29].isoformat() if row[29] else None
-            }
+            "metadata": {"ingested_at": row[29].isoformat() if row[29] else None},
         }
 
         return firm
@@ -1007,21 +1034,19 @@ async def get_form_adv_stats(db: Session = Depends(get_db)):
             "firms": {
                 "total": row[0],
                 "family_offices": row[1],
-                "states_represented": row[2]
+                "states_represented": row[2],
             },
             "assets_under_management": {
                 "total": float(row[3]) if row[3] else 0,
                 "average": float(row[4]) if row[4] else 0,
-                "maximum": float(row[5]) if row[5] else 0
+                "maximum": float(row[5]) if row[5] else 0,
             },
             "contact_info_availability": {
                 "email": row[6],
                 "phone": row[7],
-                "website": row[8]
+                "website": row[8],
             },
-            "personnel": {
-                "total_records": personnel_count
-            }
+            "personnel": {"total_records": personnel_count},
         }
 
     except Exception as e:

@@ -22,6 +22,7 @@ JS Rendering Support (T10):
 - Uses Playwright for JS rendering when needed
 - Falls back to httpx for static pages (faster)
 """
+
 import asyncio
 import logging
 import re
@@ -40,27 +41,30 @@ logger = logging.getLogger(__name__)
 # Optional Playwright import - graceful fallback if not installed
 try:
     from playwright.async_api import async_playwright, Browser, BrowserContext
+
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
-    logger.info("Playwright not installed - JS rendering disabled. Install with: pip install playwright && playwright install chromium")
+    logger.info(
+        "Playwright not installed - JS rendering disabled. Install with: pip install playwright && playwright install chromium"
+    )
 
 
 class WebsiteStrategy(BaseStrategy):
     """
     Strategy for scraping portfolio information from investor websites.
-    
+
     Looks for public portfolio pages and extracts company names.
     Respects robots.txt and rate limits.
-    
+
     Confidence: MEDIUM - Website data can be outdated or incomplete
     """
-    
+
     name = "website_scraping"
     display_name = "Website Portfolio Scraping"
     source_type = "website"
     default_confidence = "medium"
-    
+
     # Conservative rate limits for website scraping
     max_requests_per_second = 0.5  # 1 request per 2 seconds
     max_concurrent_requests = 1
@@ -73,53 +77,62 @@ class WebsiteStrategy(BaseStrategy):
 
     # Cache TTLs
     ROBOTS_CACHE_TTL = 86400  # 24 hours for robots.txt
-    PAGE_CACHE_TTL = 3600     # 1 hour for scraped pages
+    PAGE_CACHE_TTL = 3600  # 1 hour for scraped pages
 
     # JS Detection - indicators that a page needs JavaScript rendering
     JS_FRAMEWORK_INDICATORS = [
         # React
         '<div id="root"></div>',
         '<div id="app"></div>',
-        'data-reactroot',
-        '__NEXT_DATA__',
+        "data-reactroot",
+        "__NEXT_DATA__",
         # Vue
         '<div id="__nuxt">',
-        'data-v-',
+        "data-v-",
         # Angular
-        'ng-version',
-        '<app-root>',
+        "ng-version",
+        "<app-root>",
         # Generic SPA indicators
-        'window.__INITIAL_STATE__',
-        'window.__PRELOADED_STATE__',
+        "window.__INITIAL_STATE__",
+        "window.__PRELOADED_STATE__",
     ]
 
     # Content indicators that suggest JS hasn't loaded
     EMPTY_CONTENT_INDICATORS = [
-        'loading...',
-        'please wait',
-        'javascript required',
-        'enable javascript',
-        '<noscript>',
+        "loading...",
+        "please wait",
+        "javascript required",
+        "enable javascript",
+        "<noscript>",
     ]
-    
+
     # Portfolio page keywords
     PORTFOLIO_KEYWORDS = [
-        "portfolio", "investments", "companies", "holdings",
-        "our-portfolio", "portfolio-companies", "investment-portfolio",
-        "backed-companies", "our-investments", "current-investments"
+        "portfolio",
+        "investments",
+        "companies",
+        "holdings",
+        "our-portfolio",
+        "portfolio-companies",
+        "investment-portfolio",
+        "backed-companies",
+        "our-investments",
+        "current-investments",
     ]
-    
+
     # User-Agent for respectful scraping
     USER_AGENT = "Nexdata Research Bot (portfolio research, respects robots.txt)"
-    
+
     def __init__(
         self,
         max_requests_per_second: Optional[float] = None,
         max_concurrent_requests: Optional[int] = None,
         timeout_seconds: Optional[int] = None,
-        enable_js_rendering: bool = True
+        enable_js_rendering: bool = True,
     ):
-        super().__init__(max_requests_per_second, max_concurrent_requests, timeout_seconds)
+        super().__init__(
+            max_requests_per_second, max_concurrent_requests, timeout_seconds
+        )
         self._client: Optional[httpx.AsyncClient] = None
         self._rate_limiter = asyncio.Semaphore(1)
         self._last_request_time: Dict[str, float] = {}  # Per-domain rate limiting
@@ -131,7 +144,7 @@ class WebsiteStrategy(BaseStrategy):
         self._browser: Optional["Browser"] = None
         self._browser_context: Optional["BrowserContext"] = None
         self._js_domains: Set[str] = set()  # Track domains that need JS rendering
-    
+
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create the HTTP client."""
         if self._client is None:
@@ -139,12 +152,12 @@ class WebsiteStrategy(BaseStrategy):
                 timeout=httpx.Timeout(self.REQUEST_TIMEOUT, connect=5.0),
                 headers={
                     "User-Agent": self.USER_AGENT,
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 },
-                follow_redirects=True
+                follow_redirects=True,
             )
         return self._client
-    
+
     async def close(self):
         """Close the HTTP client and Playwright browser."""
         if self._client:
@@ -188,11 +201,10 @@ class WebsiteStrategy(BaseStrategy):
                         "--no-sandbox",
                         "--disable-dev-shm-usage",
                         "--disable-setuid-sandbox",
-                    ]
+                    ],
                 )
                 self._browser_context = await self._browser.new_context(
-                    user_agent=self.USER_AGENT,
-                    viewport={"width": 1280, "height": 720}
+                    user_agent=self.USER_AGENT, viewport={"width": 1280, "height": 720}
                 )
                 logger.info("Playwright browser initialized for JS rendering")
             except Exception as e:
@@ -201,23 +213,23 @@ class WebsiteStrategy(BaseStrategy):
                 return None
 
         return self._browser
-    
+
     async def _rate_limited_request(self, url: str) -> Optional[httpx.Response]:
         """Make a rate-limited request with per-domain tracking."""
         import time
-        
+
         domain = urlparse(url).netloc
-        
+
         async with self._rate_limiter:
             # Enforce per-domain rate limit
             now = time.time()
             last_request = self._last_request_time.get(domain, 0)
             elapsed = now - last_request
             wait_time = (1.0 / self.max_requests_per_second) - elapsed
-            
+
             if wait_time > 0:
                 await asyncio.sleep(wait_time)
-            
+
             try:
                 client = await self._get_client()
                 response = await client.get(url)
@@ -260,7 +272,9 @@ class WebsiteStrategy(BaseStrategy):
 
         # If lots of scripts but very little text, likely JS-rendered
         if script_count > 10 and len(text_content) < 500:
-            logger.debug(f"High script count ({script_count}) with little text ({len(text_content)} chars)")
+            logger.debug(
+                f"High script count ({script_count}) with little text ({len(text_content)} chars)"
+            )
             return True
 
         return False
@@ -283,7 +297,9 @@ class WebsiteStrategy(BaseStrategy):
             page = await self._browser_context.new_page()
             try:
                 # Navigate to page with timeout
-                await page.goto(url, wait_until="networkidle", timeout=self.PLAYWRIGHT_TIMEOUT)
+                await page.goto(
+                    url, wait_until="networkidle", timeout=self.PLAYWRIGHT_TIMEOUT
+                )
 
                 # Wait a bit more for any lazy-loaded content
                 await page.wait_for_timeout(1000)
@@ -300,7 +316,9 @@ class WebsiteStrategy(BaseStrategy):
             logger.warning(f"Playwright fetch failed for {url}: {e}")
             return None
 
-    async def _fetch_page_cached(self, url: str, force_js: bool = False) -> Optional[str]:
+    async def _fetch_page_cached(
+        self, url: str, force_js: bool = False
+    ) -> Optional[str]:
         """
         Fetch a page with caching and smart JS rendering fallback.
 
@@ -341,7 +359,9 @@ class WebsiteStrategy(BaseStrategy):
 
             # Check if content looks JS-heavy and needs rendering
             if self._is_js_heavy_page(content) and self._enable_js_rendering:
-                logger.info(f"Detected JS-heavy page, retrying with Playwright: {url[:50]}...")
+                logger.info(
+                    f"Detected JS-heavy page, retrying with Playwright: {url[:50]}..."
+                )
 
                 # Remember this domain needs JS rendering
                 self._js_domains.add(domain)
@@ -358,10 +378,14 @@ class WebsiteStrategy(BaseStrategy):
 
                     if js_text_len > static_text_len * 1.5:
                         # JS rendering produced significantly more content
-                        logger.info(f"JS rendering improved content: {static_text_len} -> {js_text_len} chars")
+                        logger.info(
+                            f"JS rendering improved content: {static_text_len} -> {js_text_len} chars"
+                        )
                         content = js_content
                     else:
-                        logger.debug(f"JS rendering didn't improve content much, using static")
+                        logger.debug(
+                            f"JS rendering didn't improve content much, using static"
+                        )
                         # Remove from JS domains since it didn't help
                         self._js_domains.discard(domain)
 
@@ -416,11 +440,11 @@ class WebsiteStrategy(BaseStrategy):
             logger.warning(f"Error checking robots.txt for {domain}: {e}")
             # Assume allowed on error, but don't cache errors
             return True
-    
+
     def is_applicable(self, context: InvestorContext) -> Tuple[bool, str]:
         """
         Check if website scraping strategy is applicable.
-        
+
         Requires:
         - A valid website URL
         """
@@ -428,17 +452,17 @@ class WebsiteStrategy(BaseStrategy):
             # Validate URL format
             try:
                 parsed = urlparse(context.website_url)
-                if parsed.scheme in ('http', 'https') and parsed.netloc:
+                if parsed.scheme in ("http", "https") and parsed.netloc:
                     return True, f"Website URL available: {context.website_url}"
             except Exception:
                 pass
-        
+
         return False, "No valid website URL available"
-    
+
     def calculate_priority(self, context: InvestorContext) -> int:
         """
         Calculate priority for website strategy.
-        
+
         Higher priority for:
         - Investors with known portfolio pages
         - VCs and PE firms (more likely to have portfolio pages)
@@ -446,24 +470,24 @@ class WebsiteStrategy(BaseStrategy):
         applicable, _ = self.is_applicable(context)
         if not applicable:
             return 0
-        
+
         # Base priority
         priority = 6
-        
+
         # Family offices are less likely to have portfolio pages
         if context.investor_type == "family_office":
             priority = 5
-        
+
         # Public pensions often have detailed portfolio pages
         if context.lp_type == "public_pension":
             priority = 8
-        
+
         return priority
-    
+
     async def execute(self, context: InvestorContext) -> StrategyResult:
         """
         Execute website scraping strategy.
-        
+
         Steps:
         1. Fetch the homepage
         2. Find portfolio-related links
@@ -474,32 +498,34 @@ class WebsiteStrategy(BaseStrategy):
         requests_made = 0
         companies = []
         reasoning_parts = []
-        
+
         try:
             website_url = context.website_url
             if not website_url:
                 return self._create_result(
                     success=False,
                     error_message="No website URL provided",
-                    reasoning="Cannot execute website strategy without a URL"
+                    reasoning="Cannot execute website strategy without a URL",
                 )
-            
-            logger.info(f"Executing website strategy for {context.investor_name}: {website_url}")
+
+            logger.info(
+                f"Executing website strategy for {context.investor_name}: {website_url}"
+            )
             reasoning_parts.append(f"Starting website scrape for '{website_url}'")
-            
+
             # Step 1: Check robots.txt
             allowed = await self._check_robots_txt(website_url)
             requests_made += 1
-            
+
             if not allowed:
                 reasoning_parts.append("robots.txt disallows scraping")
                 return self._create_result(
                     success=False,
                     error_message="Scraping disallowed by robots.txt",
                     reasoning="\n".join(reasoning_parts),
-                    requests_made=requests_made
+                    requests_made=requests_made,
                 )
-            
+
             reasoning_parts.append("robots.txt allows scraping")
 
             # Step 2: Fetch homepage (cached)
@@ -512,118 +538,138 @@ class WebsiteStrategy(BaseStrategy):
                     success=False,
                     error_message="Failed to fetch homepage",
                     reasoning="\n".join(reasoning_parts),
-                    requests_made=requests_made
+                    requests_made=requests_made,
                 )
 
             reasoning_parts.append("Homepage fetched successfully")
 
             # Step 3: Find portfolio links
             portfolio_links = self._find_portfolio_links(homepage_content, website_url)
-            reasoning_parts.append(f"Found {len(portfolio_links)} potential portfolio links")
+            reasoning_parts.append(
+                f"Found {len(portfolio_links)} potential portfolio links"
+            )
 
             if not portfolio_links:
                 # No portfolio links found on homepage - still try to extract from homepage
-                homepage_companies = self._extract_companies_from_page(homepage_content, website_url)
+                homepage_companies = self._extract_companies_from_page(
+                    homepage_content, website_url
+                )
                 if homepage_companies:
                     companies.extend(homepage_companies)
-                    reasoning_parts.append(f"Extracted {len(homepage_companies)} companies from homepage")
+                    reasoning_parts.append(
+                        f"Extracted {len(homepage_companies)} companies from homepage"
+                    )
 
             # Step 4: Scrape portfolio pages (up to MAX_PAGES, with caching)
             pages_scraped = 0
-            for link in portfolio_links[:self.MAX_PAGES_PER_INVESTOR]:
+            for link in portfolio_links[: self.MAX_PAGES_PER_INVESTOR]:
                 page_content = await self._fetch_page_cached(link)
                 requests_made += 1
                 pages_scraped += 1
 
                 if page_content:
-                    page_companies = self._extract_companies_from_page(page_content, link)
+                    page_companies = self._extract_companies_from_page(
+                        page_content, link
+                    )
                     companies.extend(page_companies)
-                    reasoning_parts.append(f"Extracted {len(page_companies)} companies from {link}")
-            
+                    reasoning_parts.append(
+                        f"Extracted {len(page_companies)} companies from {link}"
+                    )
+
             # Deduplicate companies
             unique_companies = self._deduplicate_companies(companies)
-            reasoning_parts.append(f"Total unique companies found: {len(unique_companies)}")
-            
+            reasoning_parts.append(
+                f"Total unique companies found: {len(unique_companies)}"
+            )
+
             # Add investor context to each company
             for company in unique_companies:
                 company["source_type"] = self.source_type
                 company["confidence_level"] = self.default_confidence
                 company["source_url"] = website_url
-            
+
             result = self._create_result(
                 success=len(unique_companies) > 0,
                 companies=unique_companies,
                 reasoning="\n".join(reasoning_parts),
-                requests_made=requests_made
+                requests_made=requests_made,
             )
             result.started_at = started_at
             return result
-        
+
         except Exception as e:
             logger.error(f"Error executing website strategy: {e}", exc_info=True)
             return self._create_result(
                 success=False,
                 error_message=str(e),
                 reasoning="\n".join(reasoning_parts) + f"\nError: {str(e)}",
-                requests_made=requests_made
+                requests_made=requests_made,
             )
-        
+
         finally:
             await self.close()
-    
+
     def _find_portfolio_links(self, html_content: str, base_url: str) -> List[str]:
         """Find links that likely lead to portfolio pages."""
         links = []
         seen_urls: Set[str] = set()
-        
+
         try:
-            soup = BeautifulSoup(html_content, 'lxml')
-            
-            for a_tag in soup.find_all('a', href=True):
-                href = a_tag['href']
+            soup = BeautifulSoup(html_content, "lxml")
+
+            for a_tag in soup.find_all("a", href=True):
+                href = a_tag["href"]
                 text = a_tag.get_text().lower().strip()
-                
+
                 # Check if link text or URL contains portfolio keywords
                 is_portfolio_link = False
-                
+
                 for keyword in self.PORTFOLIO_KEYWORDS:
                     if keyword in href.lower() or keyword in text:
                         is_portfolio_link = True
                         break
-                
+
                 if is_portfolio_link:
                     # Resolve relative URLs
                     full_url = urljoin(base_url, href)
-                    
+
                     # Only include same-domain URLs
                     if urlparse(full_url).netloc == urlparse(base_url).netloc:
                         if full_url not in seen_urls:
                             seen_urls.add(full_url)
                             links.append(full_url)
-            
+
             return links
-        
+
         except Exception as e:
             logger.warning(f"Error finding portfolio links: {e}")
             return []
-    
-    def _extract_companies_from_page(self, html_content: str, source_url: str) -> List[Dict[str, Any]]:
+
+    def _extract_companies_from_page(
+        self, html_content: str, source_url: str
+    ) -> List[Dict[str, Any]]:
         """Extract company names from a portfolio page."""
         companies = []
-        
+
         try:
-            soup = BeautifulSoup(html_content, 'lxml')
-            
+            soup = BeautifulSoup(html_content, "lxml")
+
             # Strategy 1: Look for structured portfolio elements
             # Many sites use cards, grids, or lists for portfolio companies
-            
+
             # Common patterns for portfolio items
             portfolio_selectors = [
-                '.portfolio-item', '.portfolio-company', '.investment',
-                '.company-card', '.portfolio-card', '.holding',
-                '[class*="portfolio"]', '[class*="investment"]', '[class*="company"]'
+                ".portfolio-item",
+                ".portfolio-company",
+                ".investment",
+                ".company-card",
+                ".portfolio-card",
+                ".holding",
+                '[class*="portfolio"]',
+                '[class*="investment"]',
+                '[class*="company"]',
             ]
-            
+
             for selector in portfolio_selectors:
                 items = soup.select(selector)
                 for item in items:
@@ -631,17 +677,19 @@ class WebsiteStrategy(BaseStrategy):
                     if company_name:
                         company = {
                             "company_name": company_name,
-                            "company_industry": self._extract_industry_from_element(item),
+                            "company_industry": self._extract_industry_from_element(
+                                item
+                            ),
                             "company_website": self._extract_website_from_element(item),
                             "investment_type": "unknown",
                             "current_holding": 1,
                         }
                         companies.append(company)
-            
+
             # Strategy 2: Look for headings followed by text
             # Many portfolio pages list company names as h3/h4 elements
             if len(companies) < 5:
-                for heading in soup.find_all(['h2', 'h3', 'h4', 'h5']):
+                for heading in soup.find_all(["h2", "h3", "h4", "h5"]):
                     text = heading.get_text().strip()
                     if self._looks_like_company_name(text):
                         company = {
@@ -650,112 +698,124 @@ class WebsiteStrategy(BaseStrategy):
                             "current_holding": 1,
                         }
                         # Avoid duplicates
-                        if not any(c["company_name"].lower() == text.lower() for c in companies):
+                        if not any(
+                            c["company_name"].lower() == text.lower() for c in companies
+                        ):
                             companies.append(company)
-            
+
             # Strategy 3: Look for image alt text (logos often have company names)
             if len(companies) < 5:
-                for img in soup.find_all('img', alt=True):
-                    alt_text = img.get('alt', '').strip()
+                for img in soup.find_all("img", alt=True):
+                    alt_text = img.get("alt", "").strip()
                     if self._looks_like_company_name(alt_text):
                         # Check parent for more context
                         parent = img.parent
-                        if parent and 'portfolio' in str(parent.get('class', [])).lower():
+                        if (
+                            parent
+                            and "portfolio" in str(parent.get("class", [])).lower()
+                        ):
                             company = {
                                 "company_name": alt_text,
                                 "investment_type": "unknown",
                                 "current_holding": 1,
                             }
-                            if not any(c["company_name"].lower() == alt_text.lower() for c in companies):
+                            if not any(
+                                c["company_name"].lower() == alt_text.lower()
+                                for c in companies
+                            ):
                                 companies.append(company)
-            
+
             return companies
-        
+
         except Exception as e:
             logger.warning(f"Error extracting companies from page: {e}")
             return []
-    
+
     def _extract_company_name_from_element(self, element) -> Optional[str]:
         """Extract company name from a portfolio element."""
         # Try various common patterns
-        
+
         # Look for heading
-        heading = element.find(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+        heading = element.find(["h1", "h2", "h3", "h4", "h5", "h6"])
         if heading:
             text = heading.get_text().strip()
             if self._looks_like_company_name(text):
                 return text
-        
+
         # Look for title class
-        title_elem = element.find(class_=re.compile(r'title|name|company', re.I))
+        title_elem = element.find(class_=re.compile(r"title|name|company", re.I))
         if title_elem:
             text = title_elem.get_text().strip()
             if self._looks_like_company_name(text):
                 return text
-        
+
         # Look for link text
-        link = element.find('a')
+        link = element.find("a")
         if link:
             text = link.get_text().strip()
             if self._looks_like_company_name(text):
                 return text
-        
+
         return None
-    
+
     def _extract_industry_from_element(self, element) -> Optional[str]:
         """Extract industry/sector from a portfolio element."""
-        industry_elem = element.find(class_=re.compile(r'sector|industry|category', re.I))
+        industry_elem = element.find(
+            class_=re.compile(r"sector|industry|category", re.I)
+        )
         if industry_elem:
             return industry_elem.get_text().strip()
         return None
-    
+
     def _extract_website_from_element(self, element) -> Optional[str]:
         """Extract company website from a portfolio element."""
-        link = element.find('a', href=True)
+        link = element.find("a", href=True)
         if link:
-            href = link['href']
+            href = link["href"]
             # Check if it's an external link (company website)
-            if href.startswith('http') and 'portfolio' not in href.lower():
+            if href.startswith("http") and "portfolio" not in href.lower():
                 return href
         return None
-    
+
     def _looks_like_company_name(self, text: str) -> bool:
         """Check if text looks like a company name."""
         if not text or len(text) < 2 or len(text) > 100:
             return False
-        
+
         # Exclude common non-company strings
         exclude_patterns = [
-            r'^(home|about|contact|portfolio|investments|news|blog|press)$',
-            r'^(read more|learn more|view|see all|load more)$',
-            r'^\d+$',  # Just numbers
-            r'^[^a-zA-Z]*$',  # No letters
+            r"^(home|about|contact|portfolio|investments|news|blog|press)$",
+            r"^(read more|learn more|view|see all|load more)$",
+            r"^\d+$",  # Just numbers
+            r"^[^a-zA-Z]*$",  # No letters
         ]
-        
+
         text_lower = text.lower()
         for pattern in exclude_patterns:
             if re.match(pattern, text_lower):
                 return False
-        
+
         # Company names usually:
         # - Start with capital letter or number
         # - Contain letters
         # - May have spaces, dots, or common suffixes
-        
-        if re.match(r'^[A-Z0-9]', text) and re.search(r'[a-zA-Z]', text):
+
+        if re.match(r"^[A-Z0-9]", text) and re.search(r"[a-zA-Z]", text):
             return True
-        
+
         return False
-    
-    def _deduplicate_companies(self, companies: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+
+    def _deduplicate_companies(
+        self, companies: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """Remove duplicate companies from list."""
         seen_names: Set[str] = set()
         unique = []
-        
+
         for company in companies:
             name = company.get("company_name", "").lower().strip()
             if name and name not in seen_names:
                 seen_names.add(name)
                 unique.append(company)
-        
+
         return unique

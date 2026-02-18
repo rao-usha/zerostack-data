@@ -9,6 +9,7 @@ Fetches electricity data from EIA:
 Data source: https://www.eia.gov/opendata/
 API key required (free registration).
 """
+
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -18,7 +19,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import UtilityRate
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 from app.core.config import get_settings
@@ -28,19 +33,56 @@ logger = logging.getLogger(__name__)
 
 # State FIPS to abbreviation for price data
 STATE_ABBR = {
-    "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas",
-    "CA": "California", "CO": "Colorado", "CT": "Connecticut", "DE": "Delaware",
-    "FL": "Florida", "GA": "Georgia", "HI": "Hawaii", "ID": "Idaho",
-    "IL": "Illinois", "IN": "Indiana", "IA": "Iowa", "KS": "Kansas",
-    "KY": "Kentucky", "LA": "Louisiana", "ME": "Maine", "MD": "Maryland",
-    "MA": "Massachusetts", "MI": "Michigan", "MN": "Minnesota", "MS": "Mississippi",
-    "MO": "Missouri", "MT": "Montana", "NE": "Nebraska", "NV": "Nevada",
-    "NH": "New Hampshire", "NJ": "New Jersey", "NM": "New Mexico", "NY": "New York",
-    "NC": "North Carolina", "ND": "North Dakota", "OH": "Ohio", "OK": "Oklahoma",
-    "OR": "Oregon", "PA": "Pennsylvania", "RI": "Rhode Island", "SC": "South Carolina",
-    "SD": "South Dakota", "TN": "Tennessee", "TX": "Texas", "UT": "Utah",
-    "VT": "Vermont", "VA": "Virginia", "WA": "Washington", "WV": "West Virginia",
-    "WI": "Wisconsin", "WY": "Wyoming"
+    "AL": "Alabama",
+    "AK": "Alaska",
+    "AZ": "Arizona",
+    "AR": "Arkansas",
+    "CA": "California",
+    "CO": "Colorado",
+    "CT": "Connecticut",
+    "DE": "Delaware",
+    "FL": "Florida",
+    "GA": "Georgia",
+    "HI": "Hawaii",
+    "ID": "Idaho",
+    "IL": "Illinois",
+    "IN": "Indiana",
+    "IA": "Iowa",
+    "KS": "Kansas",
+    "KY": "Kentucky",
+    "LA": "Louisiana",
+    "ME": "Maine",
+    "MD": "Maryland",
+    "MA": "Massachusetts",
+    "MI": "Michigan",
+    "MN": "Minnesota",
+    "MS": "Mississippi",
+    "MO": "Missouri",
+    "MT": "Montana",
+    "NE": "Nebraska",
+    "NV": "Nevada",
+    "NH": "New Hampshire",
+    "NJ": "New Jersey",
+    "NM": "New Mexico",
+    "NY": "New York",
+    "NC": "North Carolina",
+    "ND": "North Dakota",
+    "OH": "Ohio",
+    "OK": "Oklahoma",
+    "OR": "Oregon",
+    "PA": "Pennsylvania",
+    "RI": "Rhode Island",
+    "SC": "South Carolina",
+    "SD": "South Dakota",
+    "TN": "Tennessee",
+    "TX": "Texas",
+    "UT": "Utah",
+    "VT": "Vermont",
+    "VA": "Virginia",
+    "WA": "Washington",
+    "WV": "West Virginia",
+    "WI": "Wisconsin",
+    "WY": "Wyoming",
 }
 
 
@@ -68,7 +110,7 @@ class EIAElectricityCollector(BaseCollector):
         super().__init__(db, api_key, **kwargs)
         if not self.api_key:
             settings = get_settings()
-            self.api_key = getattr(settings, 'eia_api_key', None)
+            self.api_key = getattr(settings, "eia_api_key", None)
 
     def get_default_base_url(self) -> str:
         return "https://api.eia.gov/v2"
@@ -84,7 +126,7 @@ class EIAElectricityCollector(BaseCollector):
         if not self.api_key:
             return self.create_result(
                 status=CollectionStatus.FAILED,
-                error_message="EIA_API_KEY not configured. Get free key at https://www.eia.gov/opendata/register.php"
+                error_message="EIA_API_KEY not configured. Get free key at https://www.eia.gov/opendata/register.php",
             )
 
         total_inserted = 0
@@ -99,9 +141,13 @@ class EIAElectricityCollector(BaseCollector):
             total_inserted += prices_result.get("inserted", 0)
             total_processed += prices_result.get("processed", 0)
             if prices_result.get("error"):
-                errors.append({"source": "state_prices", "error": prices_result["error"]})
+                errors.append(
+                    {"source": "state_prices", "error": prices_result["error"]}
+                )
 
-            status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            status = (
+                CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            )
 
             return self.create_result(
                 status=status,
@@ -130,7 +176,11 @@ class EIAElectricityCollector(BaseCollector):
                 "api_key": self.api_key,
                 "frequency": "monthly",
                 "data[0]": "price",
-                "facets[sectorid][]": ["IND", "COM", "RES"],  # Industrial, Commercial, Residential
+                "facets[sectorid][]": [
+                    "IND",
+                    "COM",
+                    "RES",
+                ],  # Industrial, Commercial, Residential
                 "sort[0][column]": "period",
                 "sort[0][direction]": "desc",
                 "length": 500,
@@ -177,9 +227,15 @@ class EIAElectricityCollector(BaseCollector):
                     records,
                     unique_columns=["rate_schedule_id"],
                     update_columns=[
-                        "utility_id", "utility_name", "state", "rate_schedule_name",
-                        "customer_class", "energy_rate_kwh", "effective_date",
-                        "source", "collected_at"
+                        "utility_id",
+                        "utility_name",
+                        "state",
+                        "rate_schedule_name",
+                        "customer_class",
+                        "energy_rate_kwh",
+                        "effective_date",
+                        "source",
+                        "collected_at",
                     ],
                 )
                 logger.info(f"Inserted/updated {inserted} state electricity prices")

@@ -3,6 +3,7 @@ Strawberry GraphQL type definitions for Nexdata.
 
 Defines all GraphQL types for investors, portfolio companies, and analytics.
 """
+
 import strawberry
 from datetime import datetime
 from typing import Optional, List
@@ -11,6 +12,7 @@ from typing import Optional, List
 @strawberry.type
 class PortfolioCompanyType:
     """Portfolio company/investment holding."""
+
     id: int
     investor_id: int
     investor_type: str
@@ -38,6 +40,7 @@ class PortfolioCompanyType:
 @strawberry.type
 class CoInvestorType:
     """Co-investor relationship."""
+
     id: int
     co_investor_name: str
     co_investor_type: Optional[str] = None
@@ -53,6 +56,7 @@ class CoInvestorType:
 @strawberry.type
 class LPFundType:
     """Limited Partner (LP) fund - pension funds, endowments, etc."""
+
     id: int
     name: str
     formal_name: Optional[str] = None
@@ -62,7 +66,9 @@ class LPFundType:
     created_at: Optional[datetime] = None
 
     # These will be populated by resolvers
-    portfolio_companies: List[PortfolioCompanyType] = strawberry.field(default_factory=list)
+    portfolio_companies: List[PortfolioCompanyType] = strawberry.field(
+        default_factory=list
+    )
     co_investors: List[CoInvestorType] = strawberry.field(default_factory=list)
     portfolio_count: int = 0
 
@@ -70,6 +76,7 @@ class LPFundType:
 @strawberry.type
 class FamilyOfficeType:
     """Family office investor."""
+
     id: int
     name: str
     legal_name: Optional[str] = None
@@ -93,7 +100,9 @@ class FamilyOfficeType:
     created_at: Optional[datetime] = None
 
     # These will be populated by resolvers
-    portfolio_companies: List[PortfolioCompanyType] = strawberry.field(default_factory=list)
+    portfolio_companies: List[PortfolioCompanyType] = strawberry.field(
+        default_factory=list
+    )
     co_investors: List[CoInvestorType] = strawberry.field(default_factory=list)
     portfolio_count: int = 0
 
@@ -101,6 +110,7 @@ class FamilyOfficeType:
 @strawberry.type
 class SearchResultType:
     """Search result from full-text search."""
+
     id: int
     type: str
     name: str
@@ -111,6 +121,7 @@ class SearchResultType:
 @strawberry.type
 class AnalyticsOverviewType:
     """System-wide analytics overview."""
+
     total_lp_funds: int
     total_family_offices: int
     total_portfolio_companies: int
@@ -123,6 +134,7 @@ class AnalyticsOverviewType:
 @strawberry.type
 class IndustryBreakdownType:
     """Industry distribution data."""
+
     industry: str
     count: int
     percentage: float
@@ -131,6 +143,7 @@ class IndustryBreakdownType:
 @strawberry.type
 class TopMoverType:
     """Recent portfolio change."""
+
     investor_id: int
     investor_type: str
     investor_name: str

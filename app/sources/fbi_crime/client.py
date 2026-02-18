@@ -17,6 +17,7 @@ Rate limits:
 - Reasonable use with API key
 - API key available free at: https://api.data.gov/signup/
 """
+
 import logging
 from typing import Dict, List, Optional, Any
 
@@ -38,18 +39,73 @@ class FBICrimeClient(BaseAPIClient):
 
     # Valid offense types
     OFFENSE_TYPES = [
-        "aggravated-assault", "arson", "burglary", "homicide",
-        "human-trafficking", "larceny", "motor-vehicle-theft",
-        "property-crime", "rape", "rape-legacy", "robbery", "violent-crime",
+        "aggravated-assault",
+        "arson",
+        "burglary",
+        "homicide",
+        "human-trafficking",
+        "larceny",
+        "motor-vehicle-theft",
+        "property-crime",
+        "rape",
+        "rape-legacy",
+        "robbery",
+        "violent-crime",
     ]
 
     # State abbreviations
     STATE_ABBRS = [
-        "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL",
-        "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME",
-        "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH",
-        "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI",
-        "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"
+        "AL",
+        "AK",
+        "AZ",
+        "AR",
+        "CA",
+        "CO",
+        "CT",
+        "DE",
+        "DC",
+        "FL",
+        "GA",
+        "HI",
+        "ID",
+        "IL",
+        "IN",
+        "IA",
+        "KS",
+        "KY",
+        "LA",
+        "ME",
+        "MD",
+        "MA",
+        "MI",
+        "MN",
+        "MS",
+        "MO",
+        "MT",
+        "NE",
+        "NV",
+        "NH",
+        "NJ",
+        "NM",
+        "NY",
+        "NC",
+        "ND",
+        "OH",
+        "OK",
+        "OR",
+        "PA",
+        "RI",
+        "SC",
+        "SD",
+        "TN",
+        "TX",
+        "UT",
+        "VT",
+        "VA",
+        "WA",
+        "WV",
+        "WI",
+        "WY",
     ]
 
     def __init__(
@@ -57,7 +113,7 @@ class FBICrimeClient(BaseAPIClient):
         api_key: str,
         max_concurrency: int = 2,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize FBI Crime API client.
@@ -83,7 +139,7 @@ class FBICrimeClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=config.timeout_seconds,
             connect_timeout=config.connect_timeout_seconds,
-            rate_limit_interval=config.get_rate_limit_interval()
+            rate_limit_interval=config.get_rate_limit_interval(),
         )
 
     def _build_headers(self) -> Dict[str, str]:
@@ -101,23 +157,18 @@ class FBICrimeClient(BaseAPIClient):
     # National Estimates Endpoints
     # ============================================
 
-    async def get_national_estimates(
-        self,
-        offense: str
-    ) -> Dict[str, Any]:
+    async def get_national_estimates(self, offense: str) -> Dict[str, Any]:
         """Fetch national crime estimates for a specific offense."""
         if offense not in self.OFFENSE_TYPES:
             raise ValueError(f"Invalid offense type: {offense}")
 
         return await self.get(
             f"api/estimates/national/{offense}",
-            resource_id=f"national_estimates_{offense}"
+            resource_id=f"national_estimates_{offense}",
         )
 
     async def get_state_estimates(
-        self,
-        state_abbr: str,
-        offense: str
+        self, state_abbr: str, offense: str
     ) -> Dict[str, Any]:
         """Fetch state-level crime estimates for a specific offense."""
         if offense not in self.OFFENSE_TYPES:
@@ -127,18 +178,16 @@ class FBICrimeClient(BaseAPIClient):
 
         return await self.get(
             f"api/estimates/states/{state_abbr.upper()}/{offense}",
-            resource_id=f"state_estimates_{state_abbr}_{offense}"
+            resource_id=f"state_estimates_{state_abbr}_{offense}",
         )
 
     async def get_regional_estimates(
-        self,
-        region_name: str,
-        offense: str
+        self, region_name: str, offense: str
     ) -> Dict[str, Any]:
         """Fetch regional crime estimates."""
         return await self.get(
             f"api/estimates/regions/{region_name}/{offense}",
-            resource_id=f"regional_estimates_{region_name}_{offense}"
+            resource_id=f"regional_estimates_{region_name}_{offense}",
         )
 
     # ============================================
@@ -147,21 +196,19 @@ class FBICrimeClient(BaseAPIClient):
 
     async def get_agency_participation(self) -> Dict[str, Any]:
         """Fetch national agency participation data."""
-        return await self.get("api/participation/national", resource_id="participation_national")
+        return await self.get(
+            "api/participation/national", resource_id="participation_national"
+        )
 
     async def get_state_participation(self, state_abbr: str) -> Dict[str, Any]:
         """Fetch state agency participation data."""
         return await self.get(
             f"api/participation/states/{state_abbr.upper()}",
-            resource_id=f"participation_{state_abbr}"
+            resource_id=f"participation_{state_abbr}",
         )
 
     async def get_summarized_data(
-        self,
-        state_abbr: str,
-        offense: str,
-        since: int,
-        until: int
+        self, state_abbr: str, offense: str, since: int, until: int
     ) -> Dict[str, Any]:
         """Fetch summarized crime data for a state."""
         if offense not in self.OFFENSE_TYPES:
@@ -169,7 +216,7 @@ class FBICrimeClient(BaseAPIClient):
 
         return await self.get(
             f"api/summarized/state/{state_abbr.upper()}/{offense}/{since}/{until}",
-            resource_id=f"summarized_{state_abbr}_{offense}_{since}_{until}"
+            resource_id=f"summarized_{state_abbr}_{offense}_{since}_{until}",
         )
 
     # ============================================
@@ -177,39 +224,33 @@ class FBICrimeClient(BaseAPIClient):
     # ============================================
 
     async def get_nibrs_offense_data(
-        self,
-        state_abbr: str,
-        variable: str = "count"
+        self, state_abbr: str, variable: str = "count"
     ) -> Dict[str, Any]:
         """Fetch NIBRS offense data for a state."""
         var_encoded = variable.replace("/", "%2F")
         return await self.get(
             f"api/nibrs/offense/states/{state_abbr.upper()}/{var_encoded}",
-            resource_id=f"nibrs_offense_{state_abbr}_{variable}"
+            resource_id=f"nibrs_offense_{state_abbr}_{variable}",
         )
 
     async def get_nibrs_victim_data(
-        self,
-        state_abbr: str,
-        variable: str = "count"
+        self, state_abbr: str, variable: str = "count"
     ) -> Dict[str, Any]:
         """Fetch NIBRS victim data for a state."""
         var_encoded = variable.replace("/", "%2F")
         return await self.get(
             f"api/nibrs/victim/states/{state_abbr.upper()}/{var_encoded}",
-            resource_id=f"nibrs_victim_{state_abbr}_{variable}"
+            resource_id=f"nibrs_victim_{state_abbr}_{variable}",
         )
 
     async def get_nibrs_offender_data(
-        self,
-        state_abbr: str,
-        variable: str = "count"
+        self, state_abbr: str, variable: str = "count"
     ) -> Dict[str, Any]:
         """Fetch NIBRS offender data for a state."""
         var_encoded = variable.replace("/", "%2F")
         return await self.get(
             f"api/nibrs/offender/states/{state_abbr.upper()}/{var_encoded}",
-            resource_id=f"nibrs_offender_{state_abbr}_{variable}"
+            resource_id=f"nibrs_offender_{state_abbr}_{variable}",
         )
 
     # ============================================
@@ -218,13 +259,15 @@ class FBICrimeClient(BaseAPIClient):
 
     async def get_hate_crime_national(self) -> Dict[str, Any]:
         """Fetch national hate crime statistics."""
-        return await self.get("api/hate-crime/national", resource_id="hate_crime_national")
+        return await self.get(
+            "api/hate-crime/national", resource_id="hate_crime_national"
+        )
 
     async def get_hate_crime_by_state(self, state_abbr: str) -> Dict[str, Any]:
         """Fetch hate crime statistics for a state."""
         return await self.get(
             f"api/hate-crime/states/{state_abbr.upper()}",
-            resource_id=f"hate_crime_{state_abbr}"
+            resource_id=f"hate_crime_{state_abbr}",
         )
 
     # ============================================
@@ -238,8 +281,7 @@ class FBICrimeClient(BaseAPIClient):
     async def get_leoka_by_state(self, state_abbr: str) -> Dict[str, Any]:
         """Fetch LEOKA statistics for a state."""
         return await self.get(
-            f"api/leoka/states/{state_abbr.upper()}",
-            resource_id=f"leoka_{state_abbr}"
+            f"api/leoka/states/{state_abbr.upper()}", resource_id=f"leoka_{state_abbr}"
         )
 
     # ============================================
@@ -247,9 +289,7 @@ class FBICrimeClient(BaseAPIClient):
     # ============================================
 
     async def lookup_agencies(
-        self,
-        state_abbr: Optional[str] = None,
-        agency_name: Optional[str] = None
+        self, state_abbr: Optional[str] = None, agency_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """Lookup law enforcement agencies."""
         params = {}
@@ -258,7 +298,9 @@ class FBICrimeClient(BaseAPIClient):
         if agency_name:
             params["name"] = agency_name
 
-        return await self.get("api/agencies", params=params, resource_id="agencies_lookup")
+        return await self.get(
+            "api/agencies", params=params, resource_id="agencies_lookup"
+        )
 
     # ============================================
     # Bulk Data Methods
@@ -279,7 +321,9 @@ class FBICrimeClient(BaseAPIClient):
 
         return results
 
-    async def get_all_state_estimates(self, offense: str) -> Dict[str, List[Dict[str, Any]]]:
+    async def get_all_state_estimates(
+        self, offense: str
+    ) -> Dict[str, List[Dict[str, Any]]]:
         """Fetch state estimates for all states for a specific offense."""
         results = {}
 
@@ -298,15 +342,27 @@ class FBICrimeClient(BaseAPIClient):
 # Data categories for organizing crime data
 CRIME_CATEGORIES = {
     "violent_crime": {
-        "offenses": ["violent-crime", "homicide", "rape", "robbery", "aggravated-assault"],
-        "description": "Violent crime offenses"
+        "offenses": [
+            "violent-crime",
+            "homicide",
+            "rape",
+            "robbery",
+            "aggravated-assault",
+        ],
+        "description": "Violent crime offenses",
     },
     "property_crime": {
-        "offenses": ["property-crime", "burglary", "larceny", "motor-vehicle-theft", "arson"],
-        "description": "Property crime offenses"
+        "offenses": [
+            "property-crime",
+            "burglary",
+            "larceny",
+            "motor-vehicle-theft",
+            "arson",
+        ],
+        "description": "Property crime offenses",
     },
     "special_crimes": {
         "offenses": ["human-trafficking"],
-        "description": "Special category crimes"
-    }
+        "description": "Special category crimes",
+    },
 }

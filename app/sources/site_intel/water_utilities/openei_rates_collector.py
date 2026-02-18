@@ -9,6 +9,7 @@ Fetches electric utility rate information from OpenEI:
 Data source: https://openei.org/wiki/Utility_Rate_Database
 No API key required for basic access.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -18,7 +19,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import UtilityRate
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -82,9 +87,13 @@ class OpenEIRatesCollector(BaseCollector):
             total_inserted += rates_result.get("inserted", 0)
             total_processed += rates_result.get("processed", 0)
             if rates_result.get("error"):
-                errors.append({"source": "utility_rates", "error": rates_result["error"]})
+                errors.append(
+                    {"source": "utility_rates", "error": rates_result["error"]}
+                )
 
-            status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            status = (
+                CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            )
 
             return self.create_result(
                 status=status,
@@ -129,7 +138,9 @@ class OpenEIRatesCollector(BaseCollector):
                     response = await client.get(self.OPENEI_API_URL, params=params)
 
                     if response.status_code != 200:
-                        logger.warning(f"OpenEI API returned {response.status_code} for {state}")
+                        logger.warning(
+                            f"OpenEI API returned {response.status_code} for {state}"
+                        )
                         continue
 
                     data = response.json()
@@ -155,7 +166,10 @@ class OpenEIRatesCollector(BaseCollector):
                 if transformed:
                     # Filter by customer class if specified
                     if config.options and config.options.get("customer_class"):
-                        if transformed.get("customer_class") != config.options["customer_class"]:
+                        if (
+                            transformed.get("customer_class")
+                            != config.options["customer_class"]
+                        ):
                             continue
                     records.append(transformed)
 
@@ -165,11 +179,24 @@ class OpenEIRatesCollector(BaseCollector):
                     records,
                     unique_columns=["rate_schedule_id"],
                     update_columns=[
-                        "utility_id", "utility_name", "state", "service_territory",
-                        "rate_schedule_name", "customer_class", "sector",
-                        "energy_rate_kwh", "demand_charge_kw", "fixed_monthly_charge",
-                        "has_time_of_use", "has_demand_charges", "has_net_metering",
-                        "effective_date", "description", "source", "source_url", "collected_at"
+                        "utility_id",
+                        "utility_name",
+                        "state",
+                        "service_territory",
+                        "rate_schedule_name",
+                        "customer_class",
+                        "sector",
+                        "energy_rate_kwh",
+                        "demand_charge_kw",
+                        "fixed_monthly_charge",
+                        "has_time_of_use",
+                        "has_demand_charges",
+                        "has_net_metering",
+                        "effective_date",
+                        "description",
+                        "source",
+                        "source_url",
+                        "collected_at",
                     ],
                 )
                 logger.info(f"Inserted/updated {inserted} utility rates")
@@ -194,7 +221,9 @@ class OpenEIRatesCollector(BaseCollector):
 
         # Map customer class
         sector = rate.get("sector", "")
-        customer_class = CUSTOMER_CLASS_MAP.get(sector, sector.lower() if sector else "commercial")
+        customer_class = CUSTOMER_CLASS_MAP.get(
+            sector, sector.lower() if sector else "commercial"
+        )
 
         # Extract rates - OpenEI uses complex rate structures
         energy_rate = None
@@ -220,16 +249,22 @@ class OpenEIRatesCollector(BaseCollector):
                 demand_charge = self._parse_float(first_tier.get("rate"))
 
         # Fixed charges
-        fixed_charge = self._parse_float(rate.get("fixedmonthlycharge") or rate.get("minmonthlycharge"))
+        fixed_charge = self._parse_float(
+            rate.get("fixedmonthlycharge") or rate.get("minmonthlycharge")
+        )
 
         # Time of use
-        has_tou = bool(rate.get("tou", False)) or bool(rate.get("energyweekdayschedule"))
+        has_tou = bool(rate.get("tou", False)) or bool(
+            rate.get("energyweekdayschedule")
+        )
 
         # Parse effective date
         effective_date = None
         if rate.get("startdate"):
             try:
-                effective_date = datetime.strptime(str(rate["startdate"])[:10], "%Y-%m-%d").date()
+                effective_date = datetime.strptime(
+                    str(rate["startdate"])[:10], "%Y-%m-%d"
+                ).date()
             except (ValueError, TypeError):
                 pass
 

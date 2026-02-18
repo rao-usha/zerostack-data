@@ -97,15 +97,11 @@ class FoWebsiteCollector(FoBaseCollector):
 
         try:
             # Collect team members
-            team_items = await self._collect_team_members(
-                website_url, fo_id, fo_name
-            )
+            team_items = await self._collect_team_members(website_url, fo_id, fo_name)
             items.extend(team_items)
 
             # Collect portfolio companies
-            portfolio_items = await self._collect_portfolio(
-                website_url, fo_id, fo_name
-            )
+            portfolio_items = await self._collect_portfolio(website_url, fo_id, fo_name)
             items.extend(portfolio_items)
 
             # Collect contact info from main page
@@ -175,17 +171,17 @@ class FoWebsiteCollector(FoBaseCollector):
 
         # Pattern 1: Name in heading followed by title
         name_title_pattern = re.compile(
-            r'<(?:h[2-4]|strong|b)[^>]*>\s*([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*</(?:h[2-4]|strong|b)>'
-            r'[^<]*<[^>]*>\s*([^<]{3,100})',
-            re.IGNORECASE
+            r"<(?:h[2-4]|strong|b)[^>]*>\s*([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*</(?:h[2-4]|strong|b)>"
+            r"[^<]*<[^>]*>\s*([^<]{3,100})",
+            re.IGNORECASE,
         )
 
         # Pattern 2: Card/list item with name and role
         card_pattern = re.compile(
             r'class="[^"]*(?:team|member|person|principal)[^"]*"[^>]*>.*?'
-            r'([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'
-            r'.*?(?:title|role|position)[^>]*>([^<]+)',
-            re.IGNORECASE | re.DOTALL
+            r"([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)"
+            r".*?(?:title|role|position)[^>]*>([^<]+)",
+            re.IGNORECASE | re.DOTALL,
         )
 
         for match in name_title_pattern.finditer(html):
@@ -197,19 +193,21 @@ class FoWebsiteCollector(FoBaseCollector):
                 role = self._categorize_fo_role(title)
 
                 if role:
-                    items.append(FoCollectedItem(
-                        item_type="team_member",
-                        data={
-                            "fo_id": fo_id,
-                            "fo_name": fo_name,
-                            "full_name": name,
-                            "title": title[:200],
-                            "role_category": role,
-                            "source_type": "website",
-                        },
-                        source_url=source_url,
-                        confidence="medium",
-                    ))
+                    items.append(
+                        FoCollectedItem(
+                            item_type="team_member",
+                            data={
+                                "fo_id": fo_id,
+                                "fo_name": fo_name,
+                                "full_name": name,
+                                "title": title[:200],
+                                "role_category": role,
+                                "source_type": "website",
+                            },
+                            source_url=source_url,
+                            confidence="medium",
+                        )
+                    )
 
         # Try card pattern if not enough found
         if len(items) < 3:
@@ -222,19 +220,21 @@ class FoWebsiteCollector(FoBaseCollector):
                     role = self._categorize_fo_role(title)
 
                     if role:
-                        items.append(FoCollectedItem(
-                            item_type="team_member",
-                            data={
-                                "fo_id": fo_id,
-                                "fo_name": fo_name,
-                                "full_name": name,
-                                "title": title[:200],
-                                "role_category": role,
-                                "source_type": "website",
-                            },
-                            source_url=source_url,
-                            confidence="medium",
-                        ))
+                        items.append(
+                            FoCollectedItem(
+                                item_type="team_member",
+                                data={
+                                    "fo_id": fo_id,
+                                    "fo_name": fo_name,
+                                    "full_name": name,
+                                    "title": title[:200],
+                                    "role_category": role,
+                                    "source_type": "website",
+                                },
+                                source_url=source_url,
+                                confidence="medium",
+                            )
+                        )
 
         return items
 
@@ -249,9 +249,20 @@ class FoWebsiteCollector(FoBaseCollector):
 
         # Check for common non-name patterns
         non_names = [
-            "about", "contact", "home", "login", "menu", "search",
-            "privacy", "terms", "copyright", "read more", "learn more",
-            "portfolio", "investment", "company",
+            "about",
+            "contact",
+            "home",
+            "login",
+            "menu",
+            "search",
+            "privacy",
+            "terms",
+            "copyright",
+            "read more",
+            "learn more",
+            "portfolio",
+            "investment",
+            "company",
         ]
         name_lower = name.lower()
         if any(non in name_lower for non in non_names):
@@ -312,7 +323,9 @@ class FoWebsiteCollector(FoBaseCollector):
                 items.extend(companies)
 
                 if companies:
-                    logger.info(f"Found {len(companies)} portfolio companies at {page_url}")
+                    logger.info(
+                        f"Found {len(companies)} portfolio companies at {page_url}"
+                    )
                     break
 
         return items
@@ -332,14 +345,14 @@ class FoWebsiteCollector(FoBaseCollector):
         company_pattern = re.compile(
             r'<(?:a|div)[^>]*(?:href="([^"]+)")?[^>]*class="[^"]*(?:portfolio|company|investment)[^"]*"[^>]*>'
             r'.*?(?:<img[^>]*alt="([^"]+)"[^>]*>|<h[2-5][^>]*>([^<]+)</h[2-5]>)',
-            re.IGNORECASE | re.DOTALL
+            re.IGNORECASE | re.DOTALL,
         )
 
         # Simpler pattern for company names in lists
         list_pattern = re.compile(
             r'<li[^>]*class="[^"]*(?:portfolio|company)[^"]*"[^>]*>.*?'
-            r'(?:<a[^>]*>([^<]+)</a>|([^<]+))</li>',
-            re.IGNORECASE | re.DOTALL
+            r"(?:<a[^>]*>([^<]+)</a>|([^<]+))</li>",
+            re.IGNORECASE | re.DOTALL,
         )
 
         for match in company_pattern.finditer(html):
@@ -351,18 +364,20 @@ class FoWebsiteCollector(FoBaseCollector):
 
                 if len(company_name) > 2 and company_name not in seen_companies:
                     seen_companies.add(company_name)
-                    items.append(FoCollectedItem(
-                        item_type="portfolio_company",
-                        data={
-                            "fo_id": fo_id,
-                            "fo_name": fo_name,
-                            "company_name": company_name,
-                            "company_url": company_url,
-                            "source_type": "website",
-                        },
-                        source_url=source_url,
-                        confidence="medium",
-                    ))
+                    items.append(
+                        FoCollectedItem(
+                            item_type="portfolio_company",
+                            data={
+                                "fo_id": fo_id,
+                                "fo_name": fo_name,
+                                "company_name": company_name,
+                                "company_url": company_url,
+                                "source_type": "website",
+                            },
+                            source_url=source_url,
+                            confidence="medium",
+                        )
+                    )
 
         # Try list pattern
         for match in list_pattern.finditer(html):
@@ -373,17 +388,19 @@ class FoWebsiteCollector(FoBaseCollector):
 
                 if len(company_name) > 2 and company_name not in seen_companies:
                     seen_companies.add(company_name)
-                    items.append(FoCollectedItem(
-                        item_type="portfolio_company",
-                        data={
-                            "fo_id": fo_id,
-                            "fo_name": fo_name,
-                            "company_name": company_name,
-                            "source_type": "website",
-                        },
-                        source_url=source_url,
-                        confidence="low",
-                    ))
+                    items.append(
+                        FoCollectedItem(
+                            item_type="portfolio_company",
+                            data={
+                                "fo_id": fo_id,
+                                "fo_name": fo_name,
+                                "company_name": company_name,
+                                "source_type": "website",
+                            },
+                            source_url=source_url,
+                            confidence="low",
+                        )
+                    )
 
         return items[:50]  # Limit
 
@@ -403,47 +420,52 @@ class FoWebsiteCollector(FoBaseCollector):
         html = response.text
 
         # Extract email addresses
-        email_pattern = re.compile(
-            r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
-        )
+        email_pattern = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
         emails = set(email_pattern.findall(html))
 
         # Filter out common non-contact emails
         filtered_emails = [
-            e for e in emails
-            if not any(x in e.lower() for x in ['support', 'noreply', 'unsubscribe', 'example'])
+            e
+            for e in emails
+            if not any(
+                x in e.lower() for x in ["support", "noreply", "unsubscribe", "example"]
+            )
         ]
 
         for email in filtered_emails[:3]:  # Limit
-            items.append(FoCollectedItem(
-                item_type="contact_info",
-                data={
-                    "fo_id": fo_id,
-                    "fo_name": fo_name,
-                    "email": email,
-                    "source_type": "website",
-                },
-                source_url=website_url,
-                confidence="medium",
-            ))
+            items.append(
+                FoCollectedItem(
+                    item_type="contact_info",
+                    data={
+                        "fo_id": fo_id,
+                        "fo_name": fo_name,
+                        "email": email,
+                        "source_type": "website",
+                    },
+                    source_url=website_url,
+                    confidence="medium",
+                )
+            )
 
         # Extract phone numbers
         phone_pattern = re.compile(
-            r'(?:\+1|1)?[-.\s]?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})'
+            r"(?:\+1|1)?[-.\s]?\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})"
         )
         for match in phone_pattern.finditer(html):
             phone = f"({match.group(1)}) {match.group(2)}-{match.group(3)}"
-            items.append(FoCollectedItem(
-                item_type="contact_info",
-                data={
-                    "fo_id": fo_id,
-                    "fo_name": fo_name,
-                    "phone": phone,
-                    "source_type": "website",
-                },
-                source_url=website_url,
-                confidence="low",
-            ))
+            items.append(
+                FoCollectedItem(
+                    item_type="contact_info",
+                    data={
+                        "fo_id": fo_id,
+                        "fo_name": fo_name,
+                        "phone": phone,
+                        "source_type": "website",
+                    },
+                    source_url=website_url,
+                    confidence="low",
+                )
+            )
             break  # Only first phone
 
         return items

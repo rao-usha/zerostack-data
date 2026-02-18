@@ -8,7 +8,9 @@ Collectors for gathering data about PE/VC firms:
 """
 
 from app.sources.pe_collection.firm_collectors.sec_adv_collector import SECADVCollector
-from app.sources.pe_collection.firm_collectors.firm_website_collector import FirmWebsiteCollector
+from app.sources.pe_collection.firm_collectors.firm_website_collector import (
+    FirmWebsiteCollector,
+)
 
 __all__ = [
     "SECADVCollector",

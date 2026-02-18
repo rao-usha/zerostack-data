@@ -13,6 +13,7 @@ Datasets:
 - /api/failures - Failed banks list (crisis indicator)
 - /api/sod - Summary of deposits (branch-level deposit data)
 """
+
 from app.sources.fdic.client import FDICClient
 from app.sources.fdic.ingest import (
     ingest_bank_financials,

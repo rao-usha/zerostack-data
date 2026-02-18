@@ -3,6 +3,7 @@ CMS / HHS API endpoints.
 
 Provides REST API endpoints for ingesting and querying CMS healthcare data.
 """
+
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -24,28 +25,37 @@ router = APIRouter(
 
 # Request/Response Models
 
+
 class MedicareUtilizationRequest(BaseModel):
     """Request to ingest Medicare Utilization data."""
+
     year: Optional[int] = Field(None, description="Optional year filter")
     state: Optional[str] = Field(None, description="Two-letter state code (e.g., 'CA')")
-    limit: Optional[int] = Field(None, description="Maximum records to ingest (for testing)")
+    limit: Optional[int] = Field(
+        None, description="Maximum records to ingest (for testing)"
+    )
 
 
 class HospitalCostReportRequest(BaseModel):
     """Request to ingest Hospital Cost Report data."""
+
     year: Optional[int] = Field(None, description="Optional year filter")
     limit: Optional[int] = Field(None, description="Maximum records to ingest")
 
 
 class DrugPricingRequest(BaseModel):
     """Request to ingest Drug Pricing data."""
+
     year: Optional[int] = Field(None, description="Optional year filter")
     brand_name: Optional[str] = Field(None, description="Optional filter by brand name")
-    limit: Optional[int] = Field(None, description="Maximum records to ingest (for testing)")
+    limit: Optional[int] = Field(
+        None, description="Maximum records to ingest (for testing)"
+    )
 
 
 class CMSDatasetInfo(BaseModel):
     """Information about a CMS dataset."""
+
     dataset_type: str
     table_name: str
     display_name: str
@@ -55,6 +65,7 @@ class CMSDatasetInfo(BaseModel):
 
 
 # Endpoints
+
 
 @router.get(
     "/datasets",
@@ -67,21 +78,23 @@ class CMSDatasetInfo(BaseModel):
     - **medicare_utilization**: Medicare Provider Utilization and Payment Data
     - **hospital_cost_reports**: Hospital Cost Reporting Information System (HCRIS)
     - **drug_pricing**: Medicare Part D Drug Spending Data
-    """
+    """,
 )
 def list_datasets():
     """List all available CMS datasets."""
     datasets = []
 
     for dataset_type, meta in metadata.DATASETS.items():
-        datasets.append(CMSDatasetInfo(
-            dataset_type=dataset_type,
-            table_name=meta["table_name"],
-            display_name=meta["display_name"],
-            description=meta["description"],
-            source_url=meta["source_url"],
-            column_count=len(meta["columns"])
-        ))
+        datasets.append(
+            CMSDatasetInfo(
+                dataset_type=dataset_type,
+                table_name=meta["table_name"],
+                display_name=meta["display_name"],
+                description=meta["description"],
+                source_url=meta["source_url"],
+                column_count=len(meta["columns"]),
+            )
+        )
 
     return datasets
 
@@ -93,7 +106,7 @@ def list_datasets():
     Get the database schema for a specific CMS dataset.
 
     Returns column names, types, and descriptions for the specified dataset.
-    """
+    """,
 )
 def get_dataset_schema(dataset_type: str):
     """Get schema for a specific CMS dataset."""
@@ -104,7 +117,7 @@ def get_dataset_schema(dataset_type: str):
             "table_name": meta["table_name"],
             "display_name": meta["display_name"],
             "description": meta["description"],
-            "columns": meta["columns"]
+            "columns": meta["columns"],
         }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -135,16 +148,18 @@ def get_dataset_schema(dataset_type: str):
     - Identify high-volume procedures
     - Track Medicare spending trends
     """,
-    response_model=dict
+    response_model=dict,
 )
 async def ingest_medicare_utilization(
     request: MedicareUtilizationRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Start Medicare Utilization data ingestion job."""
     return create_and_dispatch_job(
-        db, background_tasks, source="cms",
+        db,
+        background_tasks,
+        source="cms",
         config={
             "dataset": "medicare_utilization",
             "year": request.year,
@@ -182,16 +197,18 @@ async def ingest_medicare_utilization(
     - Utilization trends
     - Provider comparison
     """,
-    response_model=dict
+    response_model=dict,
 )
 async def ingest_hospital_cost_reports(
     request: HospitalCostReportRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Start Hospital Cost Report data ingestion job."""
     return create_and_dispatch_job(
-        db, background_tasks, source="cms",
+        db,
+        background_tasks,
+        source="cms",
         config={
             "dataset": "hospital_cost_reports",
             "year": request.year,
@@ -229,16 +246,18 @@ async def ingest_hospital_cost_reports(
     - Analyze Medicare drug spending
     - Price benchmarking
     """,
-    response_model=dict
+    response_model=dict,
 )
 async def ingest_drug_pricing(
     request: DrugPricingRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Start Drug Pricing data ingestion job."""
     return create_and_dispatch_job(
-        db, background_tasks, source="cms",
+        db,
+        background_tasks,
+        source="cms",
         config={
             "dataset": "drug_pricing",
             "year": request.year,

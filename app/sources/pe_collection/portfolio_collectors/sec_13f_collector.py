@@ -99,9 +99,7 @@ class SEC13FCollector(BasePECollector):
                 )
 
             # Extract 13F filings (limit to 4 quarters)
-            filings_13f = self._extract_filings(
-                submissions, FORM_13F_TYPES, limit=4
-            )
+            filings_13f = self._extract_filings(submissions, FORM_13F_TYPES, limit=4)
             logger.info(
                 f"Found {len(filings_13f)} 13F filings for {entity_name} (CIK {cik})"
             )
@@ -118,12 +116,8 @@ class SEC13FCollector(BasePECollector):
                     )
 
             # Extract 13D/13G filings (limit to 10)
-            filings_13d = self._extract_filings(
-                submissions, FORM_13D_TYPES, limit=10
-            )
-            logger.info(
-                f"Found {len(filings_13d)} 13D/13G filings for {entity_name}"
-            )
+            filings_13d = self._extract_filings(submissions, FORM_13D_TYPES, limit=10)
+            logger.info(f"Found {len(filings_13d)} 13D/13G filings for {entity_name}")
 
             # Process 13D filings (extract issuer/stake info from metadata)
             for filing in filings_13d:
@@ -151,9 +145,7 @@ class SEC13FCollector(BasePECollector):
                 started_at=started_at,
             )
 
-    async def _fetch_submissions(
-        self, cik: str
-    ) -> Optional[Dict[str, Any]]:
+    async def _fetch_submissions(self, cik: str) -> Optional[Dict[str, Any]]:
         """Fetch SEC EDGAR submissions JSON for a CIK."""
         url = SEC_SUBMISSIONS_URL.format(cik=cik)
         headers = {
@@ -180,13 +172,23 @@ class SEC13FCollector(BasePECollector):
 
         for i, form in enumerate(forms):
             if form in form_types and len(filings) < limit:
-                filings.append({
-                    "form": form,
-                    "accessionNumber": accessions[i] if i < len(accessions) else None,
-                    "filingDate": filing_dates[i] if i < len(filing_dates) else None,
-                    "reportDate": report_dates[i] if i < len(report_dates) else None,
-                    "primaryDocument": primary_docs[i] if i < len(primary_docs) else None,
-                })
+                filings.append(
+                    {
+                        "form": form,
+                        "accessionNumber": accessions[i]
+                        if i < len(accessions)
+                        else None,
+                        "filingDate": filing_dates[i]
+                        if i < len(filing_dates)
+                        else None,
+                        "reportDate": report_dates[i]
+                        if i < len(report_dates)
+                        else None,
+                        "primaryDocument": primary_docs[i]
+                        if i < len(primary_docs)
+                        else None,
+                    }
+                )
 
         return filings
 
@@ -326,8 +328,8 @@ class SEC13FCollector(BasePECollector):
             return []
 
         # Strip namespace declarations and prefixes for simpler parsing
-        clean_xml = re.sub(r'\sxmlns(?::[^=]*)?\s*=\s*"[^"]*"', '', xml_content)
-        clean_xml = re.sub(r'<(/?)(\w+):', r'<\1', clean_xml)
+        clean_xml = re.sub(r'\sxmlns(?::[^=]*)?\s*=\s*"[^"]*"', "", xml_content)
+        clean_xml = re.sub(r"<(/?)(\w+):", r"<\1", clean_xml)
 
         try:
             root = ET.fromstring(clean_xml)
@@ -364,7 +366,10 @@ class SEC13FCollector(BasePECollector):
             ("putCall", ["putCall"]),
             ("investmentDiscretion", ["investmentDiscretion"]),
             ("votingAuthoritySole", ["votingAuthority/Sole", "votingAuthSole", "Sole"]),
-            ("votingAuthorityShared", ["votingAuthority/Shared", "votingAuthShared", "Shared"]),
+            (
+                "votingAuthorityShared",
+                ["votingAuthority/Shared", "votingAuthShared", "Shared"],
+            ),
             ("votingAuthorityNone", ["votingAuthority/None", "votingAuthNone", "None"]),
         ]
 
@@ -374,7 +379,9 @@ class SEC13FCollector(BasePECollector):
                 if elem is None:
                     target_tag = path.lower().split("/")[-1]
                     for child in entry.iter():
-                        local_tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+                        local_tag = (
+                            child.tag.split("}")[-1] if "}" in child.tag else child.tag
+                        )
                         if local_tag.lower() == target_tag:
                             elem = child
                             break

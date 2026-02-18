@@ -3,6 +3,7 @@ Census-specific geographic endpoints.
 
 Provides separate endpoints for each geographic level with GeoJSON support.
 """
+
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, BackgroundTasks
@@ -20,45 +21,63 @@ router = APIRouter(prefix="/census", tags=["census-geography"])
 
 class CensusStateRequest(BaseModel):
     """Request to ingest Census data at state level."""
+
     survey: str = Field(default="acs5", description="Survey type (acs5, acs1)")
     year: int = Field(..., description="Survey year", ge=2010, le=2023)
     table_id: str = Field(..., description="Census table ID (e.g., B01001)")
-    include_geojson: bool = Field(default=True, description="Include GeoJSON boundaries")
+    include_geojson: bool = Field(
+        default=True, description="Include GeoJSON boundaries"
+    )
 
 
 class CensusCountyRequest(BaseModel):
     """Request to ingest Census data at county level."""
+
     survey: str = Field(default="acs5", description="Survey type (acs5, acs1)")
     year: int = Field(..., description="Survey year", ge=2010, le=2023)
     table_id: str = Field(..., description="Census table ID (e.g., B01001)")
-    state_fips: Optional[str] = Field(None, description="Filter to specific state FIPS code")
-    include_geojson: bool = Field(default=True, description="Include GeoJSON boundaries")
+    state_fips: Optional[str] = Field(
+        None, description="Filter to specific state FIPS code"
+    )
+    include_geojson: bool = Field(
+        default=True, description="Include GeoJSON boundaries"
+    )
 
 
 class CensusTractRequest(BaseModel):
     """Request to ingest Census data at tract level."""
+
     survey: str = Field(default="acs5", description="Survey type (acs5, acs1)")
     year: int = Field(..., description="Survey year", ge=2010, le=2023)
     table_id: str = Field(..., description="Census table ID (e.g., B01001)")
-    state_fips: str = Field(..., description="Required: State FIPS code (e.g., '06' for California)")
+    state_fips: str = Field(
+        ..., description="Required: State FIPS code (e.g., '06' for California)"
+    )
     county_fips: Optional[str] = Field(None, description="Optional: County FIPS code")
-    include_geojson: bool = Field(default=True, description="Include GeoJSON boundaries")
+    include_geojson: bool = Field(
+        default=True, description="Include GeoJSON boundaries"
+    )
 
 
 class CensusZipRequest(BaseModel):
     """Request to ingest Census data at ZCTA (ZIP) level."""
+
     survey: str = Field(default="acs5", description="Survey type (acs5, acs1)")
     year: int = Field(..., description="Survey year", ge=2010, le=2023)
     table_id: str = Field(..., description="Census table ID (e.g., B01001)")
-    state_fips: Optional[str] = Field(None, description="Filter to specific state FIPS code")
-    include_geojson: bool = Field(default=True, description="Include GeoJSON boundaries")
+    state_fips: Optional[str] = Field(
+        None, description="Filter to specific state FIPS code"
+    )
+    include_geojson: bool = Field(
+        default=True, description="Include GeoJSON boundaries"
+    )
 
 
 @router.post("/state", status_code=201)
 async def ingest_state_data(
     request: CensusStateRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest Census data at STATE level.
@@ -67,7 +86,9 @@ async def ingest_state_data(
     Optionally includes GeoJSON state boundaries.
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="census",
+        db,
+        background_tasks,
+        source="census",
         config={
             "survey": request.survey,
             "year": request.year,
@@ -83,7 +104,7 @@ async def ingest_state_data(
 async def ingest_county_data(
     request: CensusCountyRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest Census data at COUNTY level.
@@ -102,7 +123,9 @@ async def ingest_county_data(
         config["geo_filter"] = {"state": request.state_fips}
 
     return create_and_dispatch_job(
-        db, background_tasks, source="census",
+        db,
+        background_tasks,
+        source="census",
         config=config,
         message=f"Census COUNTY-level ingestion job created for {request.table_id}",
     )
@@ -112,7 +135,7 @@ async def ingest_county_data(
 async def ingest_tract_data(
     request: CensusTractRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest Census data at TRACT level.
@@ -126,7 +149,9 @@ async def ingest_tract_data(
         geo_filter["county"] = request.county_fips
 
     return create_and_dispatch_job(
-        db, background_tasks, source="census",
+        db,
+        background_tasks,
+        source="census",
         config={
             "survey": request.survey,
             "year": request.year,
@@ -143,7 +168,7 @@ async def ingest_tract_data(
 async def ingest_zip_data(
     request: CensusZipRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest Census data at ZCTA (ZIP Code Tabulation Area) level.
@@ -163,7 +188,9 @@ async def ingest_zip_data(
         config["geo_filter"] = {"state": request.state_fips}
 
     return create_and_dispatch_job(
-        db, background_tasks, source="census",
+        db,
+        background_tasks,
+        source="census",
         config=config,
         message=f"Census ZCTA-level ingestion job created for {request.table_id}",
     )

@@ -7,7 +7,9 @@ Collectors for gathering data about PE-backed portfolio companies:
 - Crunchbase API for company data
 """
 
-from app.sources.pe_collection.portfolio_collectors.sec_13f_collector import SEC13FCollector
+from app.sources.pe_collection.portfolio_collectors.sec_13f_collector import (
+    SEC13FCollector,
+)
 
 __all__ = [
     "SEC13FCollector",

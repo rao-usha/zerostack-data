@@ -12,6 +12,7 @@ Usage:
     async def fetch_portfolio_page(url: str):
         ...
 """
+
 import asyncio
 import functools
 import hashlib
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CacheEntry:
     """A single cache entry with value and metadata."""
+
     value: Any
     created_at: float
     ttl: float  # Time-to-live in seconds
@@ -60,7 +62,7 @@ class InMemoryCache:
         self,
         default_ttl: float = 3600,
         max_size: int = 1000,
-        cleanup_interval: float = 300
+        cleanup_interval: float = 300,
     ):
         """
         Initialize the cache.
@@ -114,12 +116,7 @@ class InMemoryCache:
             self._stats["hits"] += 1
             return entry.value
 
-    async def set(
-        self,
-        key: str,
-        value: Any,
-        ttl: Optional[float] = None
-    ) -> None:
+    async def set(self, key: str, value: Any, ttl: Optional[float] = None) -> None:
         """
         Set a value in the cache.
 
@@ -138,11 +135,7 @@ class InMemoryCache:
             if len(self._cache) >= self.max_size and key not in self._cache:
                 await self._evict_oldest()
 
-            self._cache[key] = CacheEntry(
-                value=value,
-                created_at=time.time(),
-                ttl=ttl
-            )
+            self._cache[key] = CacheEntry(value=value, created_at=time.time(), ttl=ttl)
             self._stats["sets"] += 1
 
     async def delete(self, key: str) -> bool:
@@ -182,10 +175,7 @@ class InMemoryCache:
         """Get cache statistics."""
         async with self._lock:
             total_requests = self._stats["hits"] + self._stats["misses"]
-            hit_rate = (
-                self._stats["hits"] / total_requests
-                if total_requests > 0 else 0
-            )
+            hit_rate = self._stats["hits"] / total_requests if total_requests > 0 else 0
 
             return {
                 **self._stats,
@@ -201,10 +191,7 @@ class InMemoryCache:
             return
 
         self._last_cleanup = now
-        expired_keys = [
-            key for key, entry in self._cache.items()
-            if entry.is_expired
-        ]
+        expired_keys = [key for key, entry in self._cache.items() if entry.is_expired]
 
         for key in expired_keys:
             del self._cache[key]
@@ -217,10 +204,7 @@ class InMemoryCache:
         if not self._cache:
             return
 
-        oldest_key = min(
-            self._cache.keys(),
-            key=lambda k: self._cache[k].created_at
-        )
+        oldest_key = min(self._cache.keys(), key=lambda k: self._cache[k].created_at)
         del self._cache[oldest_key]
         self._stats["evictions"] += 1
 
@@ -252,7 +236,7 @@ def generate_cache_key(*args, prefix: str = "", **kwargs) -> str:
     # Create a hashable representation
     key_data = {
         "args": [str(a) for a in args],
-        "kwargs": {k: str(v) for k, v in sorted(kwargs.items())}
+        "kwargs": {k: str(v) for k, v in sorted(kwargs.items())},
     }
 
     key_str = json.dumps(key_data, sort_keys=True)
@@ -281,7 +265,7 @@ def url_to_cache_key(url: str, prefix: str = "url") -> str:
 def cached(
     ttl: Optional[float] = None,
     key_prefix: str = "",
-    key_builder: Optional[Callable[..., str]] = None
+    key_builder: Optional[Callable[..., str]] = None,
 ):
     """
     Decorator to cache async function results.
@@ -301,6 +285,7 @@ def cached(
         async def scrape_page(url: str):
             ...
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
@@ -333,6 +318,7 @@ def cached(
         wrapper.cache_stats = lambda: get_cache().get_stats()
 
         return wrapper
+
     return decorator
 
 

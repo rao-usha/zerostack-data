@@ -66,9 +66,7 @@ class DataNormalizer:
         }
 
         sorted_results = sorted(
-            results,
-            key=lambda r: source_priority.get(r.source.value, 0),
-            reverse=True
+            results, key=lambda r: source_priority.get(r.source.value, 0), reverse=True
         )
 
         for result in sorted_results:
@@ -159,9 +157,7 @@ class DataNormalizer:
         if "full_name" in cleaned:
             name = cleaned["full_name"]
             # Title case
-            cleaned["full_name"] = " ".join(
-                word.capitalize() for word in name.split()
-            )
+            cleaned["full_name"] = " ".join(word.capitalize() for word in name.split())
 
         # Normalize email
         if "email" in cleaned and cleaned["email"]:

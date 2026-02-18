@@ -7,6 +7,7 @@ Provides REST API for:
 - Managing alerts and notifications
 - Dashboard data and analytics
 """
+
 import asyncio
 import logging
 from datetime import datetime, date, timedelta
@@ -16,7 +17,12 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from app.core.database import get_db
-from app.core.models import PredictionMarket, MarketObservation, MarketAlert, PredictionMarketJob
+from app.core.models import (
+    PredictionMarket,
+    MarketObservation,
+    MarketAlert,
+    PredictionMarketJob,
+)
 from app.sources.prediction_markets.ingest import (
     monitor_all_platforms,
     monitor_kalshi,
@@ -28,7 +34,10 @@ from app.sources.prediction_markets.ingest import (
     get_dashboard_data,
     get_top_probability_movers,
 )
-from app.sources.prediction_markets.metadata import MARKET_CATEGORIES, get_high_priority_categories
+from app.sources.prediction_markets.metadata import (
+    MARKET_CATEGORIES,
+    get_high_priority_categories,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,22 +48,22 @@ router = APIRouter(prefix="/prediction-markets", tags=["Prediction Markets"])
 # REQUEST/RESPONSE MODELS
 # =============================================================================
 
+
 class MonitorRequest(BaseModel):
     """Request to monitor prediction markets."""
+
     kalshi_categories: Optional[List[str]] = Field(
         default=None,
-        description="Kalshi series to monitor (e.g., ['FED', 'CPI', 'PRES']). If None, monitors all high-priority series."
+        description="Kalshi series to monitor (e.g., ['FED', 'CPI', 'PRES']). If None, monitors all high-priority series.",
     )
     limit_per_platform: int = Field(
-        default=50,
-        ge=10,
-        le=200,
-        description="Maximum markets to fetch per platform"
+        default=50, ge=10, le=200, description="Maximum markets to fetch per platform"
     )
 
 
 class MonitorResponse(BaseModel):
     """Response from monitoring job."""
+
     job_id: int
     status: str
     kalshi: dict
@@ -65,6 +74,7 @@ class MonitorResponse(BaseModel):
 
 class MarketResponse(BaseModel):
     """Single market data."""
+
     id: int
     source: str
     question: str
@@ -79,6 +89,7 @@ class MarketResponse(BaseModel):
 
 class AlertResponse(BaseModel):
     """Market alert data."""
+
     id: int
     market_id: int
     market_question: Optional[str]
@@ -94,6 +105,7 @@ class AlertResponse(BaseModel):
 
 class DashboardResponse(BaseModel):
     """Dashboard summary data."""
+
     market_counts: dict
     total_markets: int
     alerts_24h: int
@@ -107,6 +119,7 @@ class DashboardResponse(BaseModel):
 # MONITORING ENDPOINTS
 # =============================================================================
 
+
 @router.post("/monitor/all", response_model=MonitorResponse)
 async def trigger_monitor_all(
     request: MonitorRequest = MonitorRequest(),
@@ -115,19 +128,19 @@ async def trigger_monitor_all(
 ):
     """
     Monitor all prediction market platforms (Kalshi + Polymarket).
-    
+
     This endpoint:
     1. Fetches current market data from all platforms
     2. Stores observations in the database
     3. Detects significant probability changes
     4. Generates alerts for large movements
-    
+
     **Categories for Kalshi:**
     - Economics: FED, CPI, UNRATE, GDP
     - Politics: PRES, SENATE, HOUSE
     - Crypto: BTCUSD, ETHUSD
     - Climate: CLIMATE
-    
+
     **Returns:** Job status with counts of markets checked, updated, and alerts generated.
     """
     try:
@@ -145,15 +158,14 @@ async def trigger_monitor_all(
 @router.post("/monitor/kalshi")
 async def trigger_monitor_kalshi(
     categories: Optional[List[str]] = Query(
-        default=None,
-        description="Kalshi series to monitor (e.g., FED, CPI, PRES)"
+        default=None, description="Kalshi series to monitor (e.g., FED, CPI, PRES)"
     ),
     limit: int = Query(default=50, ge=10, le=200),
     db: Session = Depends(get_db),
 ):
     """
     Monitor Kalshi markets only.
-    
+
     **Available Categories (series):**
     - FED: Federal Reserve rate decisions
     - CPI: Consumer Price Index / Inflation
@@ -182,7 +194,7 @@ async def trigger_monitor_polymarket(
 ):
     """
     Monitor Polymarket markets only.
-    
+
     Polymarket covers:
     - Politics (US and international)
     - Economics (Fed, recession, inflation)
@@ -206,16 +218,22 @@ async def trigger_monitor_polymarket(
 # QUERY ENDPOINTS
 # =============================================================================
 
+
 @router.get("/markets/top", response_model=List[MarketResponse])
 async def get_top_prediction_markets(
-    platform: Optional[str] = Query(default=None, description="Filter by platform: kalshi, polymarket"),
-    category: Optional[str] = Query(default=None, description="Filter by category: economics, politics, sports, crypto"),
+    platform: Optional[str] = Query(
+        default=None, description="Filter by platform: kalshi, polymarket"
+    ),
+    category: Optional[str] = Query(
+        default=None,
+        description="Filter by category: economics, politics, sports, crypto",
+    ),
     limit: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     """
     Get top prediction markets by volume/activity.
-    
+
     **Categories:**
     - economics: Fed rates, inflation, recession, unemployment
     - politics: Elections, legislation, cabinet
@@ -240,7 +258,7 @@ async def get_markets_by_category(
 ):
     """
     Get all markets in a specific category.
-    
+
     **Available categories:**
     - economics, politics, sports, crypto, world, business, entertainment, environment
     """
@@ -267,12 +285,15 @@ async def get_market_details(
     market = db.query(PredictionMarket).filter(PredictionMarket.id == market_id).first()
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
-    
+
     # Get latest observation
-    latest_obs = db.query(MarketObservation).filter(
-        MarketObservation.market_id == market_id
-    ).order_by(MarketObservation.observation_timestamp.desc()).first()
-    
+    latest_obs = (
+        db.query(MarketObservation)
+        .filter(MarketObservation.market_id == market_id)
+        .order_by(MarketObservation.observation_timestamp.desc())
+        .first()
+    )
+
     return {
         "id": market.id,
         "source": market.source,
@@ -284,16 +305,32 @@ async def get_market_details(
         "close_date": market.close_date.isoformat() if market.close_date else None,
         "is_active": market.is_active == 1,
         "market_url": market.market_url,
-        "current_probability": float(market.last_yes_probability) if market.last_yes_probability else None,
+        "current_probability": float(market.last_yes_probability)
+        if market.last_yes_probability
+        else None,
         "volume_usd": float(market.last_volume_usd) if market.last_volume_usd else None,
-        "last_updated": market.last_updated.isoformat() if market.last_updated else None,
-        "first_observed": market.first_observed.isoformat() if market.first_observed else None,
+        "last_updated": market.last_updated.isoformat()
+        if market.last_updated
+        else None,
+        "first_observed": market.first_observed.isoformat()
+        if market.first_observed
+        else None,
         "latest_observation": {
-            "timestamp": latest_obs.observation_timestamp.isoformat() if latest_obs else None,
-            "probability": float(latest_obs.yes_probability) if latest_obs and latest_obs.yes_probability else None,
-            "volume_24h": float(latest_obs.volume_24h_usd) if latest_obs and latest_obs.volume_24h_usd else None,
-            "change_24h": float(latest_obs.probability_change_24h) if latest_obs and latest_obs.probability_change_24h else None,
-        } if latest_obs else None,
+            "timestamp": latest_obs.observation_timestamp.isoformat()
+            if latest_obs
+            else None,
+            "probability": float(latest_obs.yes_probability)
+            if latest_obs and latest_obs.yes_probability
+            else None,
+            "volume_24h": float(latest_obs.volume_24h_usd)
+            if latest_obs and latest_obs.volume_24h_usd
+            else None,
+            "change_24h": float(latest_obs.probability_change_24h)
+            if latest_obs and latest_obs.probability_change_24h
+            else None,
+        }
+        if latest_obs
+        else None,
     }
 
 
@@ -305,7 +342,7 @@ async def get_market_probability_history(
 ):
     """
     Get probability history for a market (time series).
-    
+
     Returns observations over the specified number of days,
     useful for charting probability trends.
     """
@@ -313,7 +350,7 @@ async def get_market_probability_history(
     market = db.query(PredictionMarket).filter(PredictionMarket.id == market_id).first()
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
-    
+
     try:
         history = get_market_history(db, market_id, days)
         return {
@@ -332,11 +369,11 @@ async def get_market_probability_history(
 # ALERT ENDPOINTS
 # =============================================================================
 
+
 @router.get("/alerts", response_model=List[AlertResponse])
 async def get_alerts(
     severity: Optional[str] = Query(
-        default=None,
-        description="Filter by severity: critical, high, medium, low"
+        default=None, description="Filter by severity: critical, high, medium, low"
     ),
     acknowledged: bool = Query(default=False, description="Show acknowledged alerts"),
     limit: int = Query(default=50, ge=1, le=200),
@@ -344,7 +381,7 @@ async def get_alerts(
 ):
     """
     Get recent market alerts.
-    
+
     Alerts are generated when market probabilities change significantly:
     - Critical: >20% change
     - High: >15% change
@@ -371,12 +408,12 @@ async def acknowledge_alert(
     alert = db.query(MarketAlert).filter(MarketAlert.id == alert_id).first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
-    
+
     alert.is_acknowledged = 1
     alert.acknowledged_at = datetime.utcnow()
     alert.acknowledged_by = acknowledged_by
     db.commit()
-    
+
     return {"status": "acknowledged", "alert_id": alert_id}
 
 
@@ -384,13 +421,14 @@ async def acknowledge_alert(
 # DASHBOARD & ANALYTICS
 # =============================================================================
 
+
 @router.get("/dashboard", response_model=DashboardResponse)
 async def get_prediction_market_dashboard(
     db: Session = Depends(get_db),
 ):
     """
     Get dashboard summary data.
-    
+
     Returns:
     - Market counts by platform
     - Recent alerts (24h)
@@ -413,7 +451,7 @@ async def get_probability_movers(
 ):
     """
     Get markets with largest probability changes.
-    
+
     Useful for identifying significant market movements
     and potential trading signals.
     """
@@ -432,6 +470,7 @@ async def get_probability_movers(
 # =============================================================================
 # JOB STATUS
 # =============================================================================
+
 
 @router.get("/jobs/{job_id}")
 async def get_monitoring_job_status(
@@ -455,10 +494,13 @@ async def list_recent_jobs(
     """
     List recent prediction market monitoring jobs.
     """
-    jobs = db.query(PredictionMarketJob).order_by(
-        PredictionMarketJob.created_at.desc()
-    ).limit(limit).all()
-    
+    jobs = (
+        db.query(PredictionMarketJob)
+        .order_by(PredictionMarketJob.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
     return [
         {
             "id": j.id,
@@ -478,11 +520,12 @@ async def list_recent_jobs(
 # METADATA
 # =============================================================================
 
+
 @router.get("/categories")
 async def list_market_categories():
     """
     List all supported market categories and their configuration.
-    
+
     Shows:
     - Category name and display name
     - Keywords used for classification

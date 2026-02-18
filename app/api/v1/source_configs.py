@@ -3,6 +3,7 @@ Source Configuration API.
 
 CRUD endpoints for per-source timeouts, retry policies, and rate limits.
 """
+
 import logging
 from typing import Optional
 
@@ -20,7 +21,10 @@ router = APIRouter(prefix="/source-configs", tags=["Source Configuration"])
 
 class SourceConfigUpdate(BaseModel):
     """Request body for creating/updating a source config."""
-    timeout_seconds: Optional[int] = Field(None, ge=30, le=86400, description="Job timeout in seconds")
+
+    timeout_seconds: Optional[int] = Field(
+        None, ge=30, le=86400, description="Job timeout in seconds"
+    )
     max_retries: Optional[int] = Field(None, ge=0, le=20)
     retry_backoff_base_min: Optional[int] = Field(None, ge=1, le=1440)
     retry_backoff_max_min: Optional[int] = Field(None, ge=1, le=10080)
@@ -71,5 +75,7 @@ async def delete_config(source: str, db: Session = Depends(get_db)):
     """Delete a source configuration (reverts to global defaults)."""
     deleted = source_config_service.delete_source_config(db, source)
     if not deleted:
-        raise HTTPException(status_code=404, detail=f"No config found for source '{source}'")
+        raise HTTPException(
+            status_code=404, detail=f"No config found for source '{source}'"
+        )
     return {"deleted": True, "source": source, "message": "Reverted to global defaults"}

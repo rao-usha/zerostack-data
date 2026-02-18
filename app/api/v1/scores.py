@@ -18,7 +18,7 @@ router = APIRouter(prefix="/scores", tags=["Company Scores"])
 def get_company_score(
     name: str,
     refresh: bool = Query(False, description="Force recalculate score"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get health score for a company.
@@ -43,9 +43,13 @@ def get_company_score(
 @router.get("/portfolio/{investor_id}")
 def get_portfolio_scores(
     investor_id: int,
-    min_score: Optional[float] = Query(None, ge=0, le=100, description="Filter by minimum score"),
-    tier: Optional[str] = Query(None, pattern="^[A-F]$", description="Filter by tier (A-F)"),
-    db: Session = Depends(get_db)
+    min_score: Optional[float] = Query(
+        None, ge=0, le=100, description="Filter by minimum score"
+    ),
+    tier: Optional[str] = Query(
+        None, pattern="^[A-F]$", description="Filter by tier (A-F)"
+    ),
+    db: Session = Depends(get_db),
 ):
     """
     Get scores for all companies in an investor's portfolio.
@@ -70,8 +74,10 @@ def get_score_rankings(
     order: str = Query("top", pattern="^(top|bottom)$", description="Ranking order"),
     limit: int = Query(20, ge=1, le=100, description="Number of results"),
     sector: Optional[str] = Query(None, description="Filter by sector"),
-    min_confidence: float = Query(0.0, ge=0, le=1, description="Minimum confidence threshold"),
-    db: Session = Depends(get_db)
+    min_confidence: float = Query(
+        0.0, ge=0, le=1, description="Minimum confidence threshold"
+    ),
+    db: Session = Depends(get_db),
 ):
     """
     Get top or bottom scored companies.
@@ -81,10 +87,7 @@ def get_score_rankings(
     """
     scorer = CompanyScorer(db)
     result = scorer.get_rankings(
-        order=order,
-        limit=limit,
-        sector=sector,
-        min_confidence=min_confidence
+        order=order, limit=limit, sector=sector, min_confidence=min_confidence
     )
 
     return result
@@ -105,10 +108,7 @@ def get_scoring_methodology():
 
 
 @router.post("/batch")
-def batch_score_companies(
-    company_names: list[str],
-    db: Session = Depends(get_db)
-):
+def batch_score_companies(company_names: list[str], db: Session = Depends(get_db)):
     """
     Score multiple companies in a single request.
 
@@ -117,8 +117,7 @@ def batch_score_companies(
     """
     if len(company_names) > 50:
         raise HTTPException(
-            status_code=400,
-            detail="Maximum 50 companies per batch request"
+            status_code=400, detail="Maximum 50 companies per batch request"
         )
 
     scorer = CompanyScorer(db)
@@ -129,10 +128,12 @@ def batch_score_companies(
             score = scorer.score_company(name)
             results.append(score)
         except Exception as e:
-            results.append({
-                "company_name": name,
-                "error": str(e),
-            })
+            results.append(
+                {
+                    "company_name": name,
+                    "error": str(e),
+                }
+            )
 
     # Summary stats
     valid_scores = [r["composite_score"] for r in results if "composite_score" in r]

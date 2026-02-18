@@ -45,7 +45,7 @@ class FormDClient:
         """Get request headers with required User-Agent."""
         return {
             "User-Agent": self.USER_AGENT,
-            "Accept": "application/json, application/xml, text/html"
+            "Accept": "application/json, application/xml, text/html",
         }
 
     async def get_company_submissions(self, cik: str) -> Dict[str, Any]:
@@ -90,18 +90,28 @@ class FormDClient:
 
         for i, form in enumerate(forms):
             if form in ("D", "D/A"):
-                filings.append({
-                    "cik": cik,
-                    "form": form,
-                    "accession_number": accessions[i] if i < len(accessions) else None,
-                    "filing_date": filing_dates[i] if i < len(filing_dates) else None,
-                    "primary_document": primary_docs[i] if i < len(primary_docs) else None,
-                    "company_name": submissions.get("name"),
-                })
+                filings.append(
+                    {
+                        "cik": cik,
+                        "form": form,
+                        "accession_number": accessions[i]
+                        if i < len(accessions)
+                        else None,
+                        "filing_date": filing_dates[i]
+                        if i < len(filing_dates)
+                        else None,
+                        "primary_document": primary_docs[i]
+                        if i < len(primary_docs)
+                        else None,
+                        "company_name": submissions.get("name"),
+                    }
+                )
 
         return filings
 
-    async def get_filing_xml(self, cik: str, accession_number: str, primary_document: str = None) -> Optional[str]:
+    async def get_filing_xml(
+        self, cik: str, accession_number: str, primary_document: str = None
+    ) -> Optional[str]:
         """
         Download Form D XML content.
 
@@ -128,21 +138,28 @@ class FormDClient:
             )
 
         # Standard Form D document names
-        urls_to_try.extend([
-            f"{self.BASE_URL}/Archives/edgar/data/{cik_padded}/{accession_clean}/primary_doc.xml",
-            f"https://www.sec.gov/Archives/edgar/data/{cik_padded}/{accession_clean}/primary_doc.xml",
-            f"{self.BASE_URL}/Archives/edgar/data/{cik_padded}/{accession_clean}/form-d.xml",
-            f"https://www.sec.gov/Archives/edgar/data/{cik_padded}/{accession_clean}/form-d.xml",
-        ])
+        urls_to_try.extend(
+            [
+                f"{self.BASE_URL}/Archives/edgar/data/{cik_padded}/{accession_clean}/primary_doc.xml",
+                f"https://www.sec.gov/Archives/edgar/data/{cik_padded}/{accession_clean}/primary_doc.xml",
+                f"{self.BASE_URL}/Archives/edgar/data/{cik_padded}/{accession_clean}/form-d.xml",
+                f"https://www.sec.gov/Archives/edgar/data/{cik_padded}/{accession_clean}/form-d.xml",
+            ]
+        )
 
         async with httpx.AsyncClient() as client:
             for url in urls_to_try:
                 try:
-                    response = await client.get(url, headers=self._get_headers(), timeout=30)
+                    response = await client.get(
+                        url, headers=self._get_headers(), timeout=30
+                    )
                     if response.status_code == 200:
                         content = response.text
                         # Verify it's XML
-                        if content.strip().startswith("<?xml") or "<edgarSubmission" in content:
+                        if (
+                            content.strip().startswith("<?xml")
+                            or "<edgarSubmission" in content
+                        ):
                             return content
                 except Exception as e:
                     logger.debug(f"Failed to fetch {url}: {e}")
@@ -158,7 +175,9 @@ class FormDClient:
                         name = item.get("name", "")
                         if name.endswith(".xml") and "form" in name.lower():
                             url = f"{self.BASE_URL}/Archives/edgar/data/{cik_padded}/{accession_clean}/{name}"
-                            response = await client.get(url, headers=self._get_headers(), timeout=30)
+                            response = await client.get(
+                                url, headers=self._get_headers(), timeout=30
+                            )
                             if response.status_code == 200:
                                 return response.text
             except Exception as e:
@@ -187,7 +206,9 @@ class FormDClient:
 
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.get(url, headers=self._get_headers(), timeout=30)
+                response = await client.get(
+                    url, headers=self._get_headers(), timeout=30
+                )
                 if response.status_code == 200:
                     return response.json()
             except Exception as e:
@@ -227,7 +248,7 @@ class FormDClient:
                     self.EFTS_URL,
                     params=params,
                     headers=self._get_headers(),
-                    timeout=30
+                    timeout=30,
                 )
                 if response.status_code == 200:
                     data = response.json()
@@ -255,16 +276,13 @@ class FormDClient:
             "dateb": "",
             "owner": "include",
             "count": 100,
-            "output": "atom"
+            "output": "atom",
         }
 
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(
-                    url,
-                    params=params,
-                    headers=self._get_headers(),
-                    timeout=30
+                    url, params=params, headers=self._get_headers(), timeout=30
                 )
                 if response.status_code == 200:
                     # Parse Atom feed
@@ -290,12 +308,14 @@ class FormDClient:
                 summary = entry.find("atom:summary", ns)
 
                 if title is not None:
-                    filings.append({
-                        "title": title.text,
-                        "link": link.get("href") if link is not None else None,
-                        "updated": updated.text if updated is not None else None,
-                        "summary": summary.text if summary is not None else None,
-                    })
+                    filings.append(
+                        {
+                            "title": title.text,
+                            "link": link.get("href") if link is not None else None,
+                            "updated": updated.text if updated is not None else None,
+                            "summary": summary.text if summary is not None else None,
+                        }
+                    )
         except Exception as e:
             logger.warning(f"Failed to parse Atom feed: {e}")
 

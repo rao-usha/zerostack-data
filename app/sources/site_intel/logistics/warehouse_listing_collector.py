@@ -11,6 +11,7 @@ Data sources:
 
 No API key required for public listings.
 """
+
 import logging
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any
@@ -21,7 +22,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import WarehouseListing
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -94,16 +99,42 @@ class WarehouseListingCollector(BaseCollector):
                     records,
                     unique_columns=["listing_id"],
                     update_columns=[
-                        "source", "property_name", "listing_type", "property_type",
-                        "address", "city", "state", "zip", "latitude", "longitude",
-                        "total_sqft", "available_sqft", "min_divisible_sqft", "land_acres",
-                        "clear_height_ft", "dock_doors", "drive_in_doors", "column_spacing",
-                        "floor_load_capacity", "year_built",
-                        "has_rail_spur", "has_cold_storage", "has_freezer",
-                        "has_sprinkler", "has_fenced_yard", "trailer_parking_spaces",
-                        "asking_rent_psf", "asking_rent_nnn", "asking_price",
-                        "listing_date", "broker_name", "broker_company", "broker_phone",
-                        "listing_url", "is_active", "updated_at"
+                        "source",
+                        "property_name",
+                        "listing_type",
+                        "property_type",
+                        "address",
+                        "city",
+                        "state",
+                        "zip",
+                        "latitude",
+                        "longitude",
+                        "total_sqft",
+                        "available_sqft",
+                        "min_divisible_sqft",
+                        "land_acres",
+                        "clear_height_ft",
+                        "dock_doors",
+                        "drive_in_doors",
+                        "column_spacing",
+                        "floor_load_capacity",
+                        "year_built",
+                        "has_rail_spur",
+                        "has_cold_storage",
+                        "has_freezer",
+                        "has_sprinkler",
+                        "has_fenced_yard",
+                        "trailer_parking_spaces",
+                        "asking_rent_psf",
+                        "asking_rent_nnn",
+                        "asking_price",
+                        "listing_date",
+                        "broker_name",
+                        "broker_company",
+                        "broker_phone",
+                        "listing_url",
+                        "is_active",
+                        "updated_at",
                     ],
                 )
 
@@ -157,36 +188,176 @@ class WarehouseListingCollector(BaseCollector):
         # Sample warehouse markets with typical specs
         markets = [
             # Inland Empire, CA
-            {"city": "Ontario", "state": "CA", "zip": "91761", "lat": 34.0633, "lng": -117.6509, "market": "Inland Empire"},
-            {"city": "Riverside", "state": "CA", "zip": "92507", "lat": 33.9533, "lng": -117.3962, "market": "Inland Empire"},
-            {"city": "San Bernardino", "state": "CA", "zip": "92408", "lat": 34.1083, "lng": -117.2898, "market": "Inland Empire"},
+            {
+                "city": "Ontario",
+                "state": "CA",
+                "zip": "91761",
+                "lat": 34.0633,
+                "lng": -117.6509,
+                "market": "Inland Empire",
+            },
+            {
+                "city": "Riverside",
+                "state": "CA",
+                "zip": "92507",
+                "lat": 33.9533,
+                "lng": -117.3962,
+                "market": "Inland Empire",
+            },
+            {
+                "city": "San Bernardino",
+                "state": "CA",
+                "zip": "92408",
+                "lat": 34.1083,
+                "lng": -117.2898,
+                "market": "Inland Empire",
+            },
             # Dallas-Fort Worth
-            {"city": "Fort Worth", "state": "TX", "zip": "76177", "lat": 32.9707, "lng": -97.3103, "market": "DFW"},
-            {"city": "Dallas", "state": "TX", "zip": "75212", "lat": 32.7767, "lng": -96.7970, "market": "DFW"},
-            {"city": "Garland", "state": "TX", "zip": "75040", "lat": 32.9126, "lng": -96.6389, "market": "DFW"},
+            {
+                "city": "Fort Worth",
+                "state": "TX",
+                "zip": "76177",
+                "lat": 32.9707,
+                "lng": -97.3103,
+                "market": "DFW",
+            },
+            {
+                "city": "Dallas",
+                "state": "TX",
+                "zip": "75212",
+                "lat": 32.7767,
+                "lng": -96.7970,
+                "market": "DFW",
+            },
+            {
+                "city": "Garland",
+                "state": "TX",
+                "zip": "75040",
+                "lat": 32.9126,
+                "lng": -96.6389,
+                "market": "DFW",
+            },
             # Atlanta
-            {"city": "Atlanta", "state": "GA", "zip": "30336", "lat": 33.7490, "lng": -84.3880, "market": "Atlanta"},
-            {"city": "Lawrenceville", "state": "GA", "zip": "30043", "lat": 33.9562, "lng": -83.9880, "market": "Atlanta"},
+            {
+                "city": "Atlanta",
+                "state": "GA",
+                "zip": "30336",
+                "lat": 33.7490,
+                "lng": -84.3880,
+                "market": "Atlanta",
+            },
+            {
+                "city": "Lawrenceville",
+                "state": "GA",
+                "zip": "30043",
+                "lat": 33.9562,
+                "lng": -83.9880,
+                "market": "Atlanta",
+            },
             # Chicago
-            {"city": "Chicago", "state": "IL", "zip": "60638", "lat": 41.8781, "lng": -87.6298, "market": "Chicago"},
-            {"city": "Joliet", "state": "IL", "zip": "60436", "lat": 41.5250, "lng": -88.0817, "market": "Chicago"},
+            {
+                "city": "Chicago",
+                "state": "IL",
+                "zip": "60638",
+                "lat": 41.8781,
+                "lng": -87.6298,
+                "market": "Chicago",
+            },
+            {
+                "city": "Joliet",
+                "state": "IL",
+                "zip": "60436",
+                "lat": 41.5250,
+                "lng": -88.0817,
+                "market": "Chicago",
+            },
             # New Jersey
-            {"city": "Edison", "state": "NJ", "zip": "08817", "lat": 40.5187, "lng": -74.4121, "market": "NJ/PA"},
-            {"city": "Elizabeth", "state": "NJ", "zip": "07201", "lat": 40.6640, "lng": -74.2107, "market": "NJ/PA"},
+            {
+                "city": "Edison",
+                "state": "NJ",
+                "zip": "08817",
+                "lat": 40.5187,
+                "lng": -74.4121,
+                "market": "NJ/PA",
+            },
+            {
+                "city": "Elizabeth",
+                "state": "NJ",
+                "zip": "07201",
+                "lat": 40.6640,
+                "lng": -74.2107,
+                "market": "NJ/PA",
+            },
             # Savannah
-            {"city": "Savannah", "state": "GA", "zip": "31302", "lat": 32.0809, "lng": -81.0912, "market": "Savannah"},
-            {"city": "Pooler", "state": "GA", "zip": "31322", "lat": 32.1155, "lng": -81.2468, "market": "Savannah"},
+            {
+                "city": "Savannah",
+                "state": "GA",
+                "zip": "31302",
+                "lat": 32.0809,
+                "lng": -81.0912,
+                "market": "Savannah",
+            },
+            {
+                "city": "Pooler",
+                "state": "GA",
+                "zip": "31322",
+                "lat": 32.1155,
+                "lng": -81.2468,
+                "market": "Savannah",
+            },
             # Phoenix
-            {"city": "Phoenix", "state": "AZ", "zip": "85043", "lat": 33.4484, "lng": -112.0740, "market": "Phoenix"},
-            {"city": "Goodyear", "state": "AZ", "zip": "85338", "lat": 33.4353, "lng": -112.3580, "market": "Phoenix"},
+            {
+                "city": "Phoenix",
+                "state": "AZ",
+                "zip": "85043",
+                "lat": 33.4484,
+                "lng": -112.0740,
+                "market": "Phoenix",
+            },
+            {
+                "city": "Goodyear",
+                "state": "AZ",
+                "zip": "85338",
+                "lat": 33.4353,
+                "lng": -112.3580,
+                "market": "Phoenix",
+            },
             # Columbus
-            {"city": "Columbus", "state": "OH", "zip": "43228", "lat": 39.9612, "lng": -83.0007, "market": "Columbus"},
+            {
+                "city": "Columbus",
+                "state": "OH",
+                "zip": "43228",
+                "lat": 39.9612,
+                "lng": -83.0007,
+                "market": "Columbus",
+            },
             # Indianapolis
-            {"city": "Indianapolis", "state": "IN", "zip": "46241", "lat": 39.7684, "lng": -86.1581, "market": "Indianapolis"},
+            {
+                "city": "Indianapolis",
+                "state": "IN",
+                "zip": "46241",
+                "lat": 39.7684,
+                "lng": -86.1581,
+                "market": "Indianapolis",
+            },
             # Houston
-            {"city": "Houston", "state": "TX", "zip": "77032", "lat": 29.7604, "lng": -95.3698, "market": "Houston"},
+            {
+                "city": "Houston",
+                "state": "TX",
+                "zip": "77032",
+                "lat": 29.7604,
+                "lng": -95.3698,
+                "market": "Houston",
+            },
             # Memphis
-            {"city": "Memphis", "state": "TN", "zip": "38118", "lat": 35.0532, "lng": -89.9923, "market": "Memphis"},
+            {
+                "city": "Memphis",
+                "state": "TN",
+                "zip": "38118",
+                "lat": 35.0532,
+                "lng": -89.9923,
+                "market": "Memphis",
+            },
         ]
 
         # Market rent ranges ($/SF/year)
@@ -218,7 +389,9 @@ class WarehouseListingCollector(BaseCollector):
                 rent_range = market_rents.get(market, (0.50, 0.80))
 
                 # Property specs
-                total_sqft = random.choice([50000, 100000, 150000, 200000, 300000, 500000, 750000, 1000000])
+                total_sqft = random.choice(
+                    [50000, 100000, 150000, 200000, 300000, 500000, 750000, 1000000]
+                )
                 available_sqft = int(total_sqft * random.uniform(0.3, 1.0))
                 min_divisible = min(25000, available_sqft // 2)
                 land_acres = round(total_sqft / 20000 * random.uniform(1.5, 2.5), 2)
@@ -228,52 +401,86 @@ class WarehouseListingCollector(BaseCollector):
                 drive_in_doors = random.randint(1, 4)
 
                 # Listing details
-                listing_type = random.choice(["for_lease", "for_lease", "for_lease", "for_sale"])
-                property_type = random.choice(["warehouse", "distribution", "distribution", "manufacturing", "flex"])
+                listing_type = random.choice(
+                    ["for_lease", "for_lease", "for_lease", "for_sale"]
+                )
+                property_type = random.choice(
+                    [
+                        "warehouse",
+                        "distribution",
+                        "distribution",
+                        "manufacturing",
+                        "flex",
+                    ]
+                )
 
-                asking_rent = round(random.uniform(*rent_range), 2) if listing_type == "for_lease" else None
-                asking_price = int(total_sqft * random.uniform(80, 150)) if listing_type == "for_sale" else None
+                asking_rent = (
+                    round(random.uniform(*rent_range), 2)
+                    if listing_type == "for_lease"
+                    else None
+                )
+                asking_price = (
+                    int(total_sqft * random.uniform(80, 150))
+                    if listing_type == "for_sale"
+                    else None
+                )
 
-                year_built = random.choice([2018, 2019, 2020, 2021, 2022, 2023, 2024, None])
+                year_built = random.choice(
+                    [2018, 2019, 2020, 2021, 2022, 2023, 2024, None]
+                )
 
-                listings.append({
-                    "listing_id": listing_id,
-                    "source": "loopnet",
-                    "property_name": f"{property_type.title()} at {market_info['city']}",
-                    "listing_type": listing_type,
-                    "property_type": property_type,
-                    "address": f"{random.randint(1000, 9999)} Industrial Parkway",
-                    "city": market_info["city"],
-                    "state": market_info["state"],
-                    "zip": market_info["zip"],
-                    "latitude": market_info["lat"] + random.uniform(-0.05, 0.05),
-                    "longitude": market_info["lng"] + random.uniform(-0.05, 0.05),
-                    "total_sqft": total_sqft,
-                    "available_sqft": available_sqft,
-                    "min_divisible_sqft": min_divisible,
-                    "land_acres": land_acres,
-                    "clear_height_ft": clear_height,
-                    "dock_doors": dock_doors,
-                    "drive_in_doors": drive_in_doors,
-                    "column_spacing": f"{random.choice([50, 52, 54, 56])}x{random.choice([50, 52, 54, 56])}",
-                    "floor_load_capacity": f"{random.choice([3000, 4000, 5000])} psf",
-                    "year_built": year_built,
-                    "has_rail_spur": random.random() < 0.15,
-                    "has_cold_storage": random.random() < 0.10,
-                    "has_freezer": random.random() < 0.05,
-                    "has_sprinkler": True,
-                    "has_fenced_yard": random.random() < 0.60,
-                    "trailer_parking_spaces": random.randint(20, 150),
-                    "asking_rent_psf": asking_rent,
-                    "asking_rent_nnn": True if asking_rent else None,
-                    "asking_price": asking_price,
-                    "listing_date": (today - timedelta(days=random.randint(1, 90))).isoformat(),
-                    "broker_name": random.choice(["John Smith", "Jane Doe", "Mike Johnson", "Sarah Williams"]),
-                    "broker_company": random.choice(["CBRE", "JLL", "Cushman & Wakefield", "Colliers", "Newmark"]),
-                    "broker_phone": f"({random.randint(200, 999)}) {random.randint(200, 999)}-{random.randint(1000, 9999)}",
-                    "listing_url": f"https://www.loopnet.com/listing/{listing_id}",
-                    "is_active": True,
-                })
+                listings.append(
+                    {
+                        "listing_id": listing_id,
+                        "source": "loopnet",
+                        "property_name": f"{property_type.title()} at {market_info['city']}",
+                        "listing_type": listing_type,
+                        "property_type": property_type,
+                        "address": f"{random.randint(1000, 9999)} Industrial Parkway",
+                        "city": market_info["city"],
+                        "state": market_info["state"],
+                        "zip": market_info["zip"],
+                        "latitude": market_info["lat"] + random.uniform(-0.05, 0.05),
+                        "longitude": market_info["lng"] + random.uniform(-0.05, 0.05),
+                        "total_sqft": total_sqft,
+                        "available_sqft": available_sqft,
+                        "min_divisible_sqft": min_divisible,
+                        "land_acres": land_acres,
+                        "clear_height_ft": clear_height,
+                        "dock_doors": dock_doors,
+                        "drive_in_doors": drive_in_doors,
+                        "column_spacing": f"{random.choice([50, 52, 54, 56])}x{random.choice([50, 52, 54, 56])}",
+                        "floor_load_capacity": f"{random.choice([3000, 4000, 5000])} psf",
+                        "year_built": year_built,
+                        "has_rail_spur": random.random() < 0.15,
+                        "has_cold_storage": random.random() < 0.10,
+                        "has_freezer": random.random() < 0.05,
+                        "has_sprinkler": True,
+                        "has_fenced_yard": random.random() < 0.60,
+                        "trailer_parking_spaces": random.randint(20, 150),
+                        "asking_rent_psf": asking_rent,
+                        "asking_rent_nnn": True if asking_rent else None,
+                        "asking_price": asking_price,
+                        "listing_date": (
+                            today - timedelta(days=random.randint(1, 90))
+                        ).isoformat(),
+                        "broker_name": random.choice(
+                            ["John Smith", "Jane Doe", "Mike Johnson", "Sarah Williams"]
+                        ),
+                        "broker_company": random.choice(
+                            [
+                                "CBRE",
+                                "JLL",
+                                "Cushman & Wakefield",
+                                "Colliers",
+                                "Newmark",
+                            ]
+                        ),
+                        "broker_phone": f"({random.randint(200, 999)}) {random.randint(200, 999)}-{random.randint(1000, 9999)}",
+                        "listing_url": f"https://www.loopnet.com/listing/{listing_id}",
+                        "is_active": True,
+                    }
+                )
 
         return listings
 
@@ -320,7 +527,9 @@ class WarehouseListingCollector(BaseCollector):
             "has_freezer": listing.get("has_freezer"),
             "has_sprinkler": listing.get("has_sprinkler"),
             "has_fenced_yard": listing.get("has_fenced_yard"),
-            "trailer_parking_spaces": self._safe_int(listing.get("trailer_parking_spaces")),
+            "trailer_parking_spaces": self._safe_int(
+                listing.get("trailer_parking_spaces")
+            ),
             "asking_rent_psf": self._safe_float(listing.get("asking_rent_psf")),
             "asking_rent_nnn": listing.get("asking_rent_nnn"),
             "asking_price": self._safe_int(listing.get("asking_price")),

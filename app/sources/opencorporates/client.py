@@ -45,7 +45,9 @@ class OpenCorporatesClient:
             "current_status": company.get("current_status"),
             "registry_url": company.get("registry_url"),
             "opencorporates_url": company.get("opencorporates_url"),
-            "registered_address": self._parse_address(company.get("registered_address")),
+            "registered_address": self._parse_address(
+                company.get("registered_address")
+            ),
             "agent_name": company.get("agent_name"),
             "agent_address": company.get("agent_address"),
             "previous_names": company.get("previous_names", []),
@@ -65,7 +67,8 @@ class OpenCorporatesClient:
             "region": address_data.get("region"),
             "postal_code": address_data.get("postal_code"),
             "country": address_data.get("country"),
-            "full_address": address_data.get("full_address") or address_data.get("street_address"),
+            "full_address": address_data.get("full_address")
+            or address_data.get("street_address"),
         }
 
     def _parse_officer(self, officer_data: dict) -> dict:
@@ -206,8 +209,7 @@ class OpenCorporatesClient:
 
         try:
             data = self._make_request(
-                f"/companies/{jurisdiction}/{company_number}/officers",
-                params
+                f"/companies/{jurisdiction}/{company_number}/officers", params
             )
             results = data.get("results", {})
             officers = results.get("officers", [])
@@ -251,8 +253,7 @@ class OpenCorporatesClient:
 
         try:
             data = self._make_request(
-                f"/companies/{jurisdiction}/{company_number}/filings",
-                params
+                f"/companies/{jurisdiction}/{company_number}/filings", params
             )
             results = data.get("results", {})
             filings = results.get("filings", [])

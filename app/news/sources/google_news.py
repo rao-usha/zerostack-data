@@ -92,9 +92,9 @@ class GoogleNewsSource:
         url = self._build_url(query)
 
         try:
-            response = await self.client.get(url, headers={
-                "User-Agent": "Mozilla/5.0 (compatible; Nexdata/1.0)"
-            })
+            response = await self.client.get(
+                url, headers={"User-Agent": "Mozilla/5.0 (compatible; Nexdata/1.0)"}
+            )
             response.raise_for_status()
 
             # Parse RSS feed
@@ -135,6 +135,7 @@ class GoogleNewsSource:
             if pubdate_elem is not None and pubdate_elem.text:
                 try:
                     from email.utils import parsedate_to_datetime
+
                     published_at = parsedate_to_datetime(pubdate_elem.text)
                 except Exception:
                     published_at = datetime.utcnow()
@@ -175,7 +176,9 @@ class GoogleNewsSource:
                 "company_ticker": None,
                 "investor_id": None,
                 "investor_type": None,
-                "relevance_score": self._calculate_relevance(title, summary or "", query),
+                "relevance_score": self._calculate_relevance(
+                    title, summary or "", query
+                ),
             }
 
         except Exception as e:
@@ -192,17 +195,40 @@ class GoogleNewsSource:
         """Classify the event type based on content."""
         text = f"{title} {summary}".lower()
 
-        if any(kw in text for kw in ["raises", "funding", "series a", "series b", "series c", "seed round", "venture"]):
+        if any(
+            kw in text
+            for kw in [
+                "raises",
+                "funding",
+                "series a",
+                "series b",
+                "series c",
+                "seed round",
+                "venture",
+            ]
+        ):
             return "funding"
-        elif any(kw in text for kw in ["acquires", "acquisition", "merger", "bought", "deal closes"]):
+        elif any(
+            kw in text
+            for kw in ["acquires", "acquisition", "merger", "bought", "deal closes"]
+        ):
             return "acquisition"
-        elif any(kw in text for kw in ["ipo", "goes public", "public offering", "listing"]):
+        elif any(
+            kw in text for kw in ["ipo", "goes public", "public offering", "listing"]
+        ):
             return "ipo"
-        elif any(kw in text for kw in ["ceo", "cfo", "appoints", "hires", "joins as", "executive"]):
+        elif any(
+            kw in text
+            for kw in ["ceo", "cfo", "appoints", "hires", "joins as", "executive"]
+        ):
             return "leadership"
-        elif any(kw in text for kw in ["layoff", "cuts", "downsizing", "restructuring"]):
+        elif any(
+            kw in text for kw in ["layoff", "cuts", "downsizing", "restructuring"]
+        ):
             return "restructuring"
-        elif any(kw in text for kw in ["partnership", "partners with", "collaboration"]):
+        elif any(
+            kw in text for kw in ["partnership", "partners with", "collaboration"]
+        ):
             return "partnership"
         else:
             return "news"
@@ -218,7 +244,17 @@ class GoogleNewsSource:
         if match:
             company = match.group(1)
             # Filter out common non-company words
-            skip_words = {"The", "A", "An", "This", "How", "Why", "What", "When", "Where"}
+            skip_words = {
+                "The",
+                "A",
+                "An",
+                "This",
+                "How",
+                "Why",
+                "What",
+                "When",
+                "Where",
+            }
             if company.split()[0] not in skip_words:
                 return company
 
@@ -238,7 +274,14 @@ class GoogleNewsSource:
         score += (matches / len(query_words)) * 0.3
 
         # Boost for investment-related keywords
-        investment_keywords = ["funding", "investment", "acquire", "ipo", "venture", "private equity"]
+        investment_keywords = [
+            "funding",
+            "investment",
+            "acquire",
+            "ipo",
+            "venture",
+            "private equity",
+        ]
         if any(kw in text for kw in investment_keywords):
             score += 0.2
 

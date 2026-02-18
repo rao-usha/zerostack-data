@@ -8,6 +8,7 @@ Provides:
 - Per-investor statistics
 - Real-time metrics for monitoring dashboards
 """
+
 import logging
 import time
 from collections import defaultdict
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class StrategyMetrics:
     """Metrics for a single strategy."""
+
     name: str
     executions: int = 0
     successes: int = 0
@@ -68,13 +70,16 @@ class StrategyMetrics:
             "total_requests_made": self.total_requests_made,
             "total_tokens_used": self.total_tokens_used,
             "total_cost_usd": round(self.total_cost_usd, 4),
-            "last_execution": self.last_execution.isoformat() if self.last_execution else None,
+            "last_execution": self.last_execution.isoformat()
+            if self.last_execution
+            else None,
         }
 
 
 @dataclass
 class JobMetrics:
     """Metrics for collection jobs."""
+
     total_jobs: int = 0
     pending_jobs: int = 0
     running_jobs: int = 0
@@ -128,6 +133,7 @@ class JobMetrics:
 @dataclass
 class InvestorMetrics:
     """Metrics for a single investor."""
+
     investor_id: int
     investor_type: str
     investor_name: str
@@ -144,7 +150,9 @@ class InvestorMetrics:
             "investor_type": self.investor_type,
             "investor_name": self.investor_name,
             "jobs_run": self.jobs_run,
-            "last_collection": self.last_collection.isoformat() if self.last_collection else None,
+            "last_collection": self.last_collection.isoformat()
+            if self.last_collection
+            else None,
             "total_companies": self.total_companies,
             "total_cost_usd": round(self.total_cost_usd, 4),
             "strategies_used": list(set(self.strategies_used)),
@@ -206,11 +214,7 @@ class MetricsCollector:
         logger.info("MetricsCollector initialized")
 
     def record_job_start(
-        self,
-        job_id: int,
-        investor_id: int,
-        investor_type: str,
-        investor_name: str = ""
+        self, job_id: int, investor_id: int, investor_type: str, investor_name: str = ""
     ) -> None:
         """Record the start of a collection job."""
         with self._metrics_lock:
@@ -250,7 +254,7 @@ class MetricsCollector:
         companies_found: int = 0,
         tokens_used: int = 0,
         cost_usd: float = 0.0,
-        strategies_used: Optional[List[str]] = None
+        strategies_used: Optional[List[str]] = None,
     ) -> None:
         """Record the completion of a collection job."""
         with self._metrics_lock:
@@ -307,12 +311,14 @@ class MetricsCollector:
         companies_found: int = 0,
         requests_made: int = 0,
         tokens_used: int = 0,
-        cost_usd: float = 0.0
+        cost_usd: float = 0.0,
     ) -> None:
         """Record a strategy execution."""
         with self._metrics_lock:
             if strategy_name not in self._strategy_metrics:
-                self._strategy_metrics[strategy_name] = StrategyMetrics(name=strategy_name)
+                self._strategy_metrics[strategy_name] = StrategyMetrics(
+                    name=strategy_name
+                )
 
             metrics = self._strategy_metrics[strategy_name]
             metrics.executions += 1
@@ -336,9 +342,7 @@ class MetricsCollector:
     def _cleanup_old_completions(self) -> None:
         """Remove job completions older than 24 hours."""
         cutoff = datetime.utcnow() - timedelta(hours=24)
-        self._job_completions = [
-            dt for dt in self._job_completions if dt > cutoff
-        ]
+        self._job_completions = [dt for dt in self._job_completions if dt > cutoff]
 
     def _calculate_throughput(self) -> None:
         """Calculate jobs completed in last hour and 24 hours."""
@@ -372,8 +376,9 @@ class MetricsCollector:
                     "total_tokens_used": self._job_metrics.total_tokens_used,
                     "total_cost_usd": round(self._job_metrics.total_cost_usd, 4),
                     "avg_cost_per_job": round(
-                        self._job_metrics.total_cost_usd / max(1, self._job_metrics.successful_jobs),
-                        4
+                        self._job_metrics.total_cost_usd
+                        / max(1, self._job_metrics.successful_jobs),
+                        4,
                     ),
                     "investors_processed": len(self._investor_metrics),
                 },
@@ -387,9 +392,7 @@ class MetricsCollector:
             return None
 
     def get_investor_metrics(
-        self,
-        investor_id: int,
-        investor_type: str
+        self, investor_id: int, investor_type: str
     ) -> Optional[Dict[str, Any]]:
         """Get metrics for a specific investor."""
         with self._metrics_lock:
@@ -404,7 +407,7 @@ class MetricsCollector:
             sorted_investors = sorted(
                 self._investor_metrics.values(),
                 key=lambda x: x.total_cost_usd,
-                reverse=True
+                reverse=True,
             )
             return [inv.to_dict() for inv in sorted_investors[:limit]]
 

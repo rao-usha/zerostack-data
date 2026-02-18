@@ -7,6 +7,7 @@ This file contains:
 - Program constants
 - Projection horizon constants
 """
+
 from typing import Dict, Any, List
 
 
@@ -354,7 +355,12 @@ FILE_FORMAT_PPTX = "pptx"
 FILE_FORMAT_HTML = "html"
 FILE_FORMAT_DOCX = "docx"
 
-VALID_FILE_FORMATS = [FILE_FORMAT_PDF, FILE_FORMAT_PPTX, FILE_FORMAT_HTML, FILE_FORMAT_DOCX]
+VALID_FILE_FORMATS = [
+    FILE_FORMAT_PDF,
+    FILE_FORMAT_PPTX,
+    FILE_FORMAT_HTML,
+    FILE_FORMAT_DOCX,
+]
 
 
 # =============================================================================
@@ -367,5 +373,3 @@ FISCAL_Q3 = "Q3"
 FISCAL_Q4 = "Q4"
 
 VALID_FISCAL_QUARTERS = [FISCAL_Q1, FISCAL_Q2, FISCAL_Q3, FISCAL_Q4]
-
-

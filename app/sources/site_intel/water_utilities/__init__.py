@@ -12,11 +12,17 @@ Sources:
 - EIA Electricity: Electricity prices and consumption
 """
 
-from app.sources.site_intel.water_utilities.usgs_water_collector import USGSWaterCollector
+from app.sources.site_intel.water_utilities.usgs_water_collector import (
+    USGSWaterCollector,
+)
 from app.sources.site_intel.water_utilities.epa_sdwis_collector import EPASDWISCollector
 from app.sources.site_intel.water_utilities.eia_gas_collector import EIAGasCollector
-from app.sources.site_intel.water_utilities.openei_rates_collector import OpenEIRatesCollector
-from app.sources.site_intel.water_utilities.eia_electricity_collector import EIAElectricityCollector
+from app.sources.site_intel.water_utilities.openei_rates_collector import (
+    OpenEIRatesCollector,
+)
+from app.sources.site_intel.water_utilities.eia_electricity_collector import (
+    EIAElectricityCollector,
+)
 
 __all__ = [
     "USGSWaterCollector",

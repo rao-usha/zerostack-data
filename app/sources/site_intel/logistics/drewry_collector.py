@@ -10,6 +10,7 @@ Data sources:
 
 No API key required for public index data.
 """
+
 import logging
 from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict, Any
@@ -19,7 +20,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import ContainerFreightIndex
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -166,11 +171,18 @@ class DrewryCollector(BaseCollector):
                     records,
                     unique_columns=["index_code", "rate_date"],
                     update_columns=[
-                        "provider", "route_origin_region", "route_origin_port",
-                        "route_destination_region", "route_destination_port",
-                        "container_type", "rate_value",
-                        "change_pct_wow", "change_pct_mom", "change_pct_yoy",
-                        "source", "collected_at"
+                        "provider",
+                        "route_origin_region",
+                        "route_origin_port",
+                        "route_destination_region",
+                        "route_destination_port",
+                        "container_type",
+                        "rate_value",
+                        "change_pct_wow",
+                        "change_pct_mom",
+                        "change_pct_yoy",
+                        "source",
+                        "collected_at",
                     ],
                 )
 
@@ -256,6 +268,7 @@ class DrewryCollector(BaseCollector):
                 route = self.WCI_ROUTES.get(index_code, {})
 
                 import random
+
                 variation = random.uniform(-0.06, 0.06)
                 current_rate = base_rate * (1 + variation)
 
@@ -263,21 +276,23 @@ class DrewryCollector(BaseCollector):
                 mom_change = random.uniform(-10, 10)
                 yoy_change = random.uniform(-25, 25)
 
-                rates.append({
-                    "index_code": index_code,
-                    "provider": "drewry",
-                    "index_name": route.get("name", f"WCI {index_code}"),
-                    "route_origin_region": route.get("origin_region"),
-                    "route_origin_port": route.get("origin_port"),
-                    "route_destination_region": route.get("destination_region"),
-                    "route_destination_port": route.get("destination_port"),
-                    "container_type": route.get("container_type", "40ft"),
-                    "rate_value": round(current_rate, 2),
-                    "rate_date": rate_date.isoformat(),
-                    "change_pct_wow": round(wow_change, 2),
-                    "change_pct_mom": round(mom_change, 2),
-                    "change_pct_yoy": round(yoy_change, 2),
-                })
+                rates.append(
+                    {
+                        "index_code": index_code,
+                        "provider": "drewry",
+                        "index_name": route.get("name", f"WCI {index_code}"),
+                        "route_origin_region": route.get("origin_region"),
+                        "route_origin_port": route.get("origin_port"),
+                        "route_destination_region": route.get("destination_region"),
+                        "route_destination_port": route.get("destination_port"),
+                        "container_type": route.get("container_type", "40ft"),
+                        "rate_value": round(current_rate, 2),
+                        "rate_date": rate_date.isoformat(),
+                        "change_pct_wow": round(wow_change, 2),
+                        "change_pct_mom": round(mom_change, 2),
+                        "change_pct_yoy": round(yoy_change, 2),
+                    }
+                )
 
         return rates
 
@@ -301,11 +316,16 @@ class DrewryCollector(BaseCollector):
         return {
             "index_code": index_code,
             "provider": "drewry",
-            "route_origin_region": rate.get("route_origin_region") or route_info.get("origin_region"),
-            "route_origin_port": rate.get("route_origin_port") or route_info.get("origin_port"),
-            "route_destination_region": rate.get("route_destination_region") or route_info.get("destination_region"),
-            "route_destination_port": rate.get("route_destination_port") or route_info.get("destination_port"),
-            "container_type": rate.get("container_type") or route_info.get("container_type", "40ft"),
+            "route_origin_region": rate.get("route_origin_region")
+            or route_info.get("origin_region"),
+            "route_origin_port": rate.get("route_origin_port")
+            or route_info.get("origin_port"),
+            "route_destination_region": rate.get("route_destination_region")
+            or route_info.get("destination_region"),
+            "route_destination_port": rate.get("route_destination_port")
+            or route_info.get("destination_port"),
+            "container_type": rate.get("container_type")
+            or route_info.get("container_type", "40ft"),
             "rate_value": self._parse_rate(rate.get("rate_value")),
             "rate_date": rate_date,
             "change_pct_wow": self._parse_rate(rate.get("change_pct_wow")),
@@ -323,7 +343,9 @@ class DrewryCollector(BaseCollector):
             return float(value)
         if isinstance(value, str):
             try:
-                cleaned = value.replace("$", "").replace(",", "").replace("%", "").strip()
+                cleaned = (
+                    value.replace("$", "").replace(",", "").replace("%", "").strip()
+                )
                 return float(cleaned)
             except (ValueError, TypeError):
                 return None

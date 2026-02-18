@@ -16,6 +16,7 @@ Rate limits:
 
 API v2 is the current version as of 2025.
 """
+
 import logging
 from typing import Dict, List, Optional, Any
 
@@ -41,7 +42,7 @@ class EIAClient(BaseAPIClient):
         api_key: str,
         max_concurrency: int = 2,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize EIA API client.
@@ -71,7 +72,7 @@ class EIAClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=config.timeout_seconds,
             connect_timeout=config.connect_timeout_seconds,
-            rate_limit_interval=config.get_rate_limit_interval()
+            rate_limit_interval=config.get_rate_limit_interval(),
         )
 
     def _add_auth_to_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -80,9 +81,7 @@ class EIAClient(BaseAPIClient):
         return params
 
     def _check_api_error(
-        self,
-        data: Dict[str, Any],
-        resource_id: str
+        self, data: Dict[str, Any], resource_id: str
     ) -> Optional[Exception]:
         """Check for EIA-specific API errors."""
         if "error" in data or "errors" in data:
@@ -93,7 +92,7 @@ class EIAClient(BaseAPIClient):
             return RetryableError(
                 message=f"EIA API error: {error_msg}",
                 source=self.SOURCE_NAME,
-                response_data=data
+                response_data=data,
             )
 
         return None
@@ -106,7 +105,7 @@ class EIAClient(BaseAPIClient):
         end: Optional[str] = None,
         facets: Optional[Dict[str, str]] = None,
         offset: int = 0,
-        length: int = 5000
+        length: int = 5000,
     ) -> Dict[str, Any]:
         """
         Fetch petroleum data from EIA API.
@@ -126,7 +125,7 @@ class EIAClient(BaseAPIClient):
         params: Dict[str, Any] = {
             "frequency": frequency,
             "offset": offset,
-            "length": length
+            "length": length,
         }
 
         if start:
@@ -138,9 +137,7 @@ class EIAClient(BaseAPIClient):
                 params[f"facets[{key}]"] = value
 
         return await self.get(
-            f"{route}/data/",
-            params=params,
-            resource_id=f"petroleum:{route}"
+            f"{route}/data/", params=params, resource_id=f"petroleum:{route}"
         )
 
     async def get_natural_gas_data(
@@ -151,7 +148,7 @@ class EIAClient(BaseAPIClient):
         end: Optional[str] = None,
         facets: Optional[Dict[str, str]] = None,
         offset: int = 0,
-        length: int = 5000
+        length: int = 5000,
     ) -> Dict[str, Any]:
         """
         Fetch natural gas data from EIA API.
@@ -171,7 +168,7 @@ class EIAClient(BaseAPIClient):
         params: Dict[str, Any] = {
             "frequency": frequency,
             "offset": offset,
-            "length": length
+            "length": length,
         }
 
         if start:
@@ -183,9 +180,7 @@ class EIAClient(BaseAPIClient):
                 params[f"facets[{key}]"] = value
 
         return await self.get(
-            f"{route}/data/",
-            params=params,
-            resource_id=f"natural-gas:{route}"
+            f"{route}/data/", params=params, resource_id=f"natural-gas:{route}"
         )
 
     async def get_electricity_data(
@@ -196,7 +191,7 @@ class EIAClient(BaseAPIClient):
         end: Optional[str] = None,
         facets: Optional[Dict[str, str]] = None,
         offset: int = 0,
-        length: int = 5000
+        length: int = 5000,
     ) -> Dict[str, Any]:
         """
         Fetch electricity data from EIA API.
@@ -216,7 +211,7 @@ class EIAClient(BaseAPIClient):
         params: Dict[str, Any] = {
             "frequency": frequency,
             "offset": offset,
-            "length": length
+            "length": length,
         }
 
         if start:
@@ -228,9 +223,7 @@ class EIAClient(BaseAPIClient):
                 params[f"facets[{key}]"] = value
 
         return await self.get(
-            f"{route}/data/",
-            params=params,
-            resource_id=f"electricity:{route}"
+            f"{route}/data/", params=params, resource_id=f"electricity:{route}"
         )
 
     async def get_retail_gas_prices(
@@ -240,7 +233,7 @@ class EIAClient(BaseAPIClient):
         end: Optional[str] = None,
         facets: Optional[Dict[str, str]] = None,
         offset: int = 0,
-        length: int = 5000
+        length: int = 5000,
     ) -> Dict[str, Any]:
         """
         Fetch retail gas prices from EIA API.
@@ -259,7 +252,7 @@ class EIAClient(BaseAPIClient):
         params: Dict[str, Any] = {
             "frequency": frequency,
             "offset": offset,
-            "length": length
+            "length": length,
         }
 
         if start:
@@ -271,9 +264,7 @@ class EIAClient(BaseAPIClient):
                 params[f"facets[{key}]"] = value
 
         return await self.get(
-            "petroleum/pri/gnd/data/",
-            params=params,
-            resource_id="retail-gas-prices"
+            "petroleum/pri/gnd/data/", params=params, resource_id="retail-gas-prices"
         )
 
     async def get_steo_projections(
@@ -284,7 +275,7 @@ class EIAClient(BaseAPIClient):
         end: Optional[str] = None,
         facets: Optional[Dict[str, str]] = None,
         offset: int = 0,
-        length: int = 5000
+        length: int = 5000,
     ) -> Dict[str, Any]:
         """
         Fetch Short-Term Energy Outlook (STEO) projections from EIA API.
@@ -304,7 +295,7 @@ class EIAClient(BaseAPIClient):
         params: Dict[str, Any] = {
             "frequency": frequency,
             "offset": offset,
-            "length": length
+            "length": length,
         }
 
         if start:
@@ -316,9 +307,7 @@ class EIAClient(BaseAPIClient):
                 params[f"facets[{key}]"] = value
 
         return await self.get(
-            f"{route}/data/",
-            params=params,
-            resource_id="steo-projections"
+            f"{route}/data/", params=params, resource_id="steo-projections"
         )
 
     async def get_facets(self, route: str) -> Dict[str, Any]:
@@ -332,9 +321,7 @@ class EIAClient(BaseAPIClient):
             Dict containing available facets
         """
         return await self.get(
-            f"{route}/facets/",
-            params={},
-            resource_id=f"facets:{route}"
+            f"{route}/facets/", params={}, resource_id=f"facets:{route}"
         )
 
 
@@ -364,5 +351,5 @@ COMMON_ROUTES = {
     },
     "steo": {
         "projections": "steo",
-    }
+    },
 }

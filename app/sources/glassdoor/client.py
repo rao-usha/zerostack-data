@@ -158,7 +158,9 @@ class GlassdoorClient:
                 "ceo_name": row["ceo_name"],
                 "logo_url": row["logo_url"],
             },
-            "retrieved_at": row["retrieved_at"].isoformat() + "Z" if row["retrieved_at"] else None,
+            "retrieved_at": row["retrieved_at"].isoformat() + "Z"
+            if row["retrieved_at"]
+            else None,
             "data_source": row["data_source"],
         }
 
@@ -249,7 +251,7 @@ class GlassdoorClient:
         company_name: str,
         job_title: Optional[str] = None,
         location: Optional[str] = None,
-        limit: int = 20
+        limit: int = 20,
     ) -> Dict[str, Any]:
         """
         Get salary data for a company.
@@ -320,22 +322,24 @@ class GlassdoorClient:
 
         salaries = []
         for row in rows:
-            salaries.append({
-                "job_title": row["job_title"],
-                "location": row["location"],
-                "base_salary": {
-                    "min": row["base_salary_min"],
-                    "median": row["base_salary_median"],
-                    "max": row["base_salary_max"],
-                },
-                "total_comp": {
-                    "min": row["total_comp_min"],
-                    "median": row["total_comp_median"],
-                    "max": row["total_comp_max"],
-                },
-                "sample_size": row["sample_size"],
-                "experience_level": row["experience_level"],
-            })
+            salaries.append(
+                {
+                    "job_title": row["job_title"],
+                    "location": row["location"],
+                    "base_salary": {
+                        "min": row["base_salary_min"],
+                        "median": row["base_salary_median"],
+                        "max": row["base_salary_max"],
+                    },
+                    "total_comp": {
+                        "min": row["total_comp_min"],
+                        "median": row["total_comp_median"],
+                        "max": row["total_comp_max"],
+                    },
+                    "sample_size": row["sample_size"],
+                    "experience_level": row["experience_level"],
+                }
+            )
 
         return {
             "company_name": company_name,
@@ -385,19 +389,22 @@ class GlassdoorClient:
         added = 0
         for salary in salaries:
             try:
-                self.db.execute(insert_query, {
-                    "company_id": company_id,
-                    "job_title": salary.get("job_title"),
-                    "location": salary.get("location"),
-                    "base_salary_min": salary.get("base_salary_min"),
-                    "base_salary_median": salary.get("base_salary_median"),
-                    "base_salary_max": salary.get("base_salary_max"),
-                    "total_comp_min": salary.get("total_comp_min"),
-                    "total_comp_median": salary.get("total_comp_median"),
-                    "total_comp_max": salary.get("total_comp_max"),
-                    "sample_size": salary.get("sample_size"),
-                    "experience_level": salary.get("experience_level"),
-                })
+                self.db.execute(
+                    insert_query,
+                    {
+                        "company_id": company_id,
+                        "job_title": salary.get("job_title"),
+                        "location": salary.get("location"),
+                        "base_salary_min": salary.get("base_salary_min"),
+                        "base_salary_median": salary.get("base_salary_median"),
+                        "base_salary_max": salary.get("base_salary_max"),
+                        "total_comp_min": salary.get("total_comp_min"),
+                        "total_comp_median": salary.get("total_comp_median"),
+                        "total_comp_max": salary.get("total_comp_max"),
+                        "sample_size": salary.get("sample_size"),
+                        "experience_level": salary.get("experience_level"),
+                    },
+                )
                 added += 1
             except Exception as e:
                 logger.warning(f"Failed to add salary: {e}")
@@ -461,11 +468,13 @@ class GlassdoorClient:
         all_cons = []
 
         for row in reviews:
-            rating_trend.append({
-                "period": row["period"],
-                "avg_rating": row["avg_rating"],
-                "count": row["review_count"],
-            })
+            rating_trend.append(
+                {
+                    "period": row["period"],
+                    "avg_rating": row["avg_rating"],
+                    "count": row["review_count"],
+                }
+            )
             if row["top_pros"]:
                 all_pros.extend(row["top_pros"])
             if row["top_cons"]:
@@ -491,7 +500,7 @@ class GlassdoorClient:
         avg_rating: float,
         review_count: int,
         top_pros: Optional[List[str]] = None,
-        top_cons: Optional[List[str]] = None
+        top_cons: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Add review summary for a period.
@@ -529,14 +538,17 @@ class GlassdoorClient:
             ON CONFLICT DO NOTHING
         """)
 
-        self.db.execute(insert_query, {
-            "company_id": company_id,
-            "period": period,
-            "avg_rating": avg_rating,
-            "review_count": review_count,
-            "top_pros": top_pros or [],
-            "top_cons": top_cons or [],
-        })
+        self.db.execute(
+            insert_query,
+            {
+                "company_id": company_id,
+                "period": period,
+                "avg_rating": avg_rating,
+                "review_count": review_count,
+                "top_pros": top_pros or [],
+                "top_cons": top_cons or [],
+            },
+        )
 
         # Update total review count
         update_query = text("""
@@ -568,29 +580,30 @@ class GlassdoorClient:
         for name in company_names:
             company = self.get_company(name)
             if company:
-                comparison.append({
-                    "company": name,
-                    "overall": company["ratings"]["overall"],
-                    "work_life_balance": company["ratings"]["work_life_balance"],
-                    "compensation": company["ratings"]["compensation_benefits"],
-                    "culture": company["ratings"]["culture_values"],
-                    "career": company["ratings"]["career_opportunities"],
-                    "management": company["ratings"]["senior_management"],
-                    "ceo_approval": company["sentiment"]["ceo_approval"],
-                    "recommend": company["sentiment"]["recommend_to_friend"],
-                    "review_count": company["stats"]["review_count"],
-                })
+                comparison.append(
+                    {
+                        "company": name,
+                        "overall": company["ratings"]["overall"],
+                        "work_life_balance": company["ratings"]["work_life_balance"],
+                        "compensation": company["ratings"]["compensation_benefits"],
+                        "culture": company["ratings"]["culture_values"],
+                        "career": company["ratings"]["career_opportunities"],
+                        "management": company["ratings"]["senior_management"],
+                        "ceo_approval": company["sentiment"]["ceo_approval"],
+                        "recommend": company["sentiment"]["recommend_to_friend"],
+                        "review_count": company["stats"]["review_count"],
+                    }
+                )
             else:
-                comparison.append({
-                    "company": name,
-                    "error": "Not found",
-                })
+                comparison.append(
+                    {
+                        "company": name,
+                        "error": "Not found",
+                    }
+                )
 
         # Sort by overall rating
-        comparison.sort(
-            key=lambda x: x.get("overall") or 0,
-            reverse=True
-        )
+        comparison.sort(key=lambda x: x.get("overall") or 0, reverse=True)
 
         return {
             "companies": company_names,
@@ -603,7 +616,7 @@ class GlassdoorClient:
         industry: Optional[str] = None,
         min_rating: Optional[float] = None,
         limit: int = 20,
-        offset: int = 0
+        offset: int = 0,
     ) -> Dict[str, Any]:
         """
         Search companies in database.
@@ -658,14 +671,16 @@ class GlassdoorClient:
 
         results = []
         for row in rows:
-            results.append({
-                "company_name": row["company_name"],
-                "overall_rating": row["overall_rating"],
-                "industry": row["industry"],
-                "size": row["company_size"],
-                "headquarters": row["headquarters"],
-                "review_count": row["review_count"],
-            })
+            results.append(
+                {
+                    "company_name": row["company_name"],
+                    "overall_rating": row["overall_rating"],
+                    "industry": row["industry"],
+                    "size": row["company_size"],
+                    "headquarters": row["headquarters"],
+                    "review_count": row["review_count"],
+                }
+            )
 
         return {
             "query": query,
@@ -677,10 +692,7 @@ class GlassdoorClient:
         }
 
     def get_rankings(
-        self,
-        metric: str = "overall",
-        industry: Optional[str] = None,
-        limit: int = 20
+        self, metric: str = "overall", industry: Optional[str] = None, limit: int = 20
     ) -> Dict[str, Any]:
         """
         Get top-rated companies by metric.
@@ -729,15 +741,17 @@ class GlassdoorClient:
 
         rankings = []
         for i, row in enumerate(rows, 1):
-            rankings.append({
-                "rank": i,
-                "company_name": row["company_name"],
-                "metric_value": row["metric_value"],
-                "overall_rating": row["overall_rating"],
-                "industry": row["industry"],
-                "size": row["company_size"],
-                "review_count": row["review_count"],
-            })
+            rankings.append(
+                {
+                    "rank": i,
+                    "company_name": row["company_name"],
+                    "metric_value": row["metric_value"],
+                    "overall_rating": row["overall_rating"],
+                    "industry": row["industry"],
+                    "size": row["company_size"],
+                    "review_count": row["review_count"],
+                }
+            )
 
         return {
             "metric": metric,

@@ -132,8 +132,8 @@ class LpCollectionOrchestrator:
         if self.config.mode.value == "incremental":
             cutoff = datetime.utcnow() - timedelta(days=self.config.max_age_days)
             query = query.filter(
-                (LpFund.last_collection_at == None) |
-                (LpFund.last_collection_at < cutoff)
+                (LpFund.last_collection_at == None)
+                | (LpFund.last_collection_at < cutoff)
             )
 
         # Order by collection priority
@@ -279,13 +279,18 @@ class LpCollectionOrchestrator:
                     try:
                         self._persist_items(lp.id, result.items)
                     except Exception as persist_error:
-                        logger.error(f"Error persisting items for {lp.name}: {persist_error}")
+                        logger.error(
+                            f"Error persisting items for {lp.name}: {persist_error}"
+                        )
                         self.db.rollback()
-                        result.warnings.append(f"Failed to persist items: {persist_error}")
+                        result.warnings.append(
+                            f"Failed to persist items: {persist_error}"
+                        )
 
                 # Update run record
                 run.status = (
-                    LpCollectionStatus.SUCCESS if result.success
+                    LpCollectionStatus.SUCCESS
+                    if result.success
                     else LpCollectionStatus.FAILED
                 )
                 run.items_found = result.items_found
@@ -314,13 +319,15 @@ class LpCollectionOrchestrator:
                     except Exception:
                         self.db.rollback()
 
-                results.append(CollectionResult(
-                    lp_id=lp.id,
-                    lp_name=lp.name,
-                    source=source,
-                    success=False,
-                    error_message=str(e),
-                ))
+                results.append(
+                    CollectionResult(
+                        lp_id=lp.id,
+                        lp_name=lp.name,
+                        source=source,
+                        success=False,
+                        error_message=str(e),
+                    )
+                )
 
         # Update LP last collection time if any succeeded
         if any(r.success for r in results):
@@ -370,10 +377,14 @@ class LpCollectionOrchestrator:
             return
 
         # Check for existing contact
-        existing = self.db.query(LpKeyContact).filter(
-            LpKeyContact.lp_id == lp_id,
-            LpKeyContact.full_name == name,
-        ).first()
+        existing = (
+            self.db.query(LpKeyContact)
+            .filter(
+                LpKeyContact.lp_id == lp_id,
+                LpKeyContact.full_name == name,
+            )
+            .first()
+        )
 
         if existing:
             # Update if new data has higher confidence
@@ -434,11 +445,15 @@ class LpCollectionOrchestrator:
             return
 
         # Check for existing member
-        existing = self.db.query(LpGovernanceMember).filter(
-            LpGovernanceMember.lp_id == lp_id,
-            LpGovernanceMember.full_name == name,
-            LpGovernanceMember.governance_role == role,
-        ).first()
+        existing = (
+            self.db.query(LpGovernanceMember)
+            .filter(
+                LpGovernanceMember.lp_id == lp_id,
+                LpGovernanceMember.full_name == name,
+                LpGovernanceMember.governance_role == role,
+            )
+            .first()
+        )
 
         if existing:
             # Update existing record
@@ -488,11 +503,15 @@ class LpCollectionOrchestrator:
             meeting_date = datetime.utcnow()
 
         # Check for existing meeting
-        existing = self.db.query(LpBoardMeeting).filter(
-            LpBoardMeeting.lp_id == lp_id,
-            LpBoardMeeting.meeting_date == meeting_date,
-            LpBoardMeeting.meeting_type == meeting_type,
-        ).first()
+        existing = (
+            self.db.query(LpBoardMeeting)
+            .filter(
+                LpBoardMeeting.lp_id == lp_id,
+                LpBoardMeeting.meeting_date == meeting_date,
+                LpBoardMeeting.meeting_type == meeting_type,
+            )
+            .first()
+        )
 
         if existing:
             # Update document URLs if we have new ones
@@ -529,17 +548,29 @@ class LpCollectionOrchestrator:
             return
 
         # Check for existing performance record
-        existing = self.db.query(LpPerformanceReturn).filter(
-            LpPerformanceReturn.lp_id == lp_id,
-            LpPerformanceReturn.fiscal_year == fiscal_year,
-        ).first()
+        existing = (
+            self.db.query(LpPerformanceReturn)
+            .filter(
+                LpPerformanceReturn.lp_id == lp_id,
+                LpPerformanceReturn.fiscal_year == fiscal_year,
+            )
+            .first()
+        )
 
         return_fields = [
-            "one_year_return_pct", "three_year_return_pct", "five_year_return_pct",
-            "ten_year_return_pct", "twenty_year_return_pct", "since_inception_return_pct",
-            "benchmark_name", "benchmark_one_year_pct", "benchmark_three_year_pct",
-            "benchmark_five_year_pct", "benchmark_ten_year_pct",
-            "total_fund_value_usd", "net_cash_flow_usd",
+            "one_year_return_pct",
+            "three_year_return_pct",
+            "five_year_return_pct",
+            "ten_year_return_pct",
+            "twenty_year_return_pct",
+            "since_inception_return_pct",
+            "benchmark_name",
+            "benchmark_one_year_pct",
+            "benchmark_three_year_pct",
+            "benchmark_five_year_pct",
+            "benchmark_ten_year_pct",
+            "total_fund_value_usd",
+            "net_cash_flow_usd",
         ]
 
         if existing:
@@ -594,16 +625,22 @@ class LpCollectionOrchestrator:
                     report_date = datetime.utcnow()
 
         # Check for existing holding (same LP, cusip, and report period)
-        existing = self.db.query(PortfolioCompany).filter(
-            PortfolioCompany.investor_id == lp_id,
-            PortfolioCompany.investor_type == "lp",
-            PortfolioCompany.company_cusip == cusip,
-            PortfolioCompany.source_type == "sec_13f",
-        ).first()
+        existing = (
+            self.db.query(PortfolioCompany)
+            .filter(
+                PortfolioCompany.investor_id == lp_id,
+                PortfolioCompany.investor_type == "lp",
+                PortfolioCompany.company_cusip == cusip,
+                PortfolioCompany.source_type == "sec_13f",
+            )
+            .first()
+        )
 
         if existing:
             # Update existing holding with newer data
-            if report_date and (not existing.investment_date or report_date > existing.investment_date):
+            if report_date and (
+                not existing.investment_date or report_date > existing.investment_date
+            ):
                 existing.shares_held = data.get("shares")
                 existing.market_value_usd = data.get("value_usd")
                 existing.investment_date = report_date
@@ -654,7 +691,10 @@ class LpCollectionOrchestrator:
             if total_assets:
                 try:
                     aum_billions = float(total_assets) / 1_000_000_000
-                    if not lp.aum_usd_billions or float(lp.aum_usd_billions or 0) < aum_billions:
+                    if (
+                        not lp.aum_usd_billions
+                        or float(lp.aum_usd_billions or 0) < aum_billions
+                    ):
                         lp.aum_usd_billions = f"{aum_billions:.2f}"
                 except (ValueError, TypeError):
                     pass
@@ -677,12 +717,16 @@ class LpCollectionOrchestrator:
             return
 
         # Check for existing snapshot
-        existing = self.db.query(LpStrategySnapshot).filter(
-            LpStrategySnapshot.lp_id == lp_id,
-            LpStrategySnapshot.fiscal_year == fiscal_year,
-            LpStrategySnapshot.program == "total_fund",
-            LpStrategySnapshot.fiscal_quarter == "Q4",  # Annual data
-        ).first()
+        existing = (
+            self.db.query(LpStrategySnapshot)
+            .filter(
+                LpStrategySnapshot.lp_id == lp_id,
+                LpStrategySnapshot.fiscal_year == fiscal_year,
+                LpStrategySnapshot.program == "total_fund",
+                LpStrategySnapshot.fiscal_quarter == "Q4",  # Annual data
+            )
+            .first()
+        )
 
         if existing:
             # Update existing snapshot
@@ -696,7 +740,9 @@ class LpCollectionOrchestrator:
                 program="total_fund",
                 fiscal_year=fiscal_year,
                 fiscal_quarter="Q4",
-                summary_text=f"Total assets: ${data.get('total_aum_usd')}" if data.get('total_aum_usd') else None,
+                summary_text=f"Total assets: ${data.get('total_aum_usd')}"
+                if data.get("total_aum_usd")
+                else None,
                 created_at=datetime.utcnow(),
             )
             self.db.add(snapshot)
@@ -755,10 +801,16 @@ class LpCollectionOrchestrator:
         if limit:
             # Select limited number of stale LPs
             cutoff = datetime.utcnow() - timedelta(days=max_age_days)
-            lps = self.db.query(LpFund).filter(
-                (LpFund.last_collection_at == None) |
-                (LpFund.last_collection_at < cutoff)
-            ).order_by(LpFund.collection_priority.asc()).limit(limit).all()
+            lps = (
+                self.db.query(LpFund)
+                .filter(
+                    (LpFund.last_collection_at == None)
+                    | (LpFund.last_collection_at < cutoff)
+                )
+                .order_by(LpFund.collection_priority.asc())
+                .limit(limit)
+                .all()
+            )
 
             self.config.lp_ids = [lp.id for lp in lps]
 
@@ -774,9 +826,9 @@ class LpCollectionOrchestrator:
         Returns:
             Status dictionary or None if not found
         """
-        job = self.db.query(LpCollectionJob).filter(
-            LpCollectionJob.id == job_id
-        ).first()
+        job = (
+            self.db.query(LpCollectionJob).filter(LpCollectionJob.id == job_id).first()
+        )
 
         if not job:
             return None
@@ -794,7 +846,6 @@ class LpCollectionOrchestrator:
             "started_at": job.started_at.isoformat() if job.started_at else None,
             "completed_at": job.completed_at.isoformat() if job.completed_at else None,
             "progress_pct": (
-                (job.completed_lps / job.total_lps * 100)
-                if job.total_lps > 0 else 0
+                (job.completed_lps / job.total_lps * 100) if job.total_lps > 0 else 0
             ),
         }

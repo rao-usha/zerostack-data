@@ -18,12 +18,13 @@ router = APIRouter(prefix="/diligence", tags=["Due Diligence"])
 # Request/Response Models
 class StartDiligenceRequest(BaseModel):
     """Request to start due diligence."""
+
     company_name: str = Field(..., description="Company name to analyze")
     domain: Optional[str] = Field(None, description="Company domain for enrichment")
     template: str = Field("standard", description="DD template: standard, quick, deep")
     focus_areas: Optional[List[str]] = Field(
         None,
-        description="Specific areas to focus on: financial, team, legal, competitive, market, operational"
+        description="Specific areas to focus on: financial, team, legal, competitive, market, operational",
     )
 
 
@@ -40,10 +41,7 @@ def list_templates(db: Session = Depends(get_db)):
     agent = DueDiligenceAgent(db)
     templates = agent.get_templates()
 
-    return {
-        "count": len(templates),
-        "templates": templates
-    }
+    return {"count": len(templates), "templates": templates}
 
 
 @router.get("/stats")
@@ -61,7 +59,7 @@ def get_stats(db: Session = Depends(get_db)):
 def list_jobs(
     status: Optional[str] = Query(None, description="Filter by status"),
     limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     List recent due diligence jobs.
@@ -71,17 +69,11 @@ def list_jobs(
     agent = DueDiligenceAgent(db)
     jobs = agent.list_jobs(status=status, limit=limit)
 
-    return {
-        "count": len(jobs),
-        "jobs": jobs
-    }
+    return {"count": len(jobs), "jobs": jobs}
 
 
 @router.post("/start")
-def start_diligence(
-    request: StartDiligenceRequest,
-    db: Session = Depends(get_db)
-):
+def start_diligence(request: StartDiligenceRequest, db: Session = Depends(get_db)):
     """
     Start due diligence process for a company.
 
@@ -99,7 +91,7 @@ def start_diligence(
     if request.template not in valid_templates:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid template. Must be one of: {', '.join(valid_templates)}"
+            detail=f"Invalid template. Must be one of: {', '.join(valid_templates)}",
         )
 
     # Validate focus areas if provided
@@ -109,7 +101,7 @@ def start_diligence(
         if invalid:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid focus areas: {', '.join(invalid)}. Valid: {', '.join(valid_areas)}"
+                detail=f"Invalid focus areas: {', '.join(invalid)}. Valid: {', '.join(valid_areas)}",
             )
 
     agent = DueDiligenceAgent(db)
@@ -118,7 +110,7 @@ def start_diligence(
         company_name=request.company_name,
         domain=request.domain,
         template=request.template,
-        focus_areas=request.focus_areas
+        focus_areas=request.focus_areas,
     )
 
     return {
@@ -126,15 +118,12 @@ def start_diligence(
         "job_id": job_id,
         "company_name": request.company_name,
         "template": request.template,
-        "message": "Due diligence started. Poll GET /diligence/{job_id} for results."
+        "message": "Due diligence started. Poll GET /diligence/{job_id} for results.",
     }
 
 
 @router.get("/company/{company_name}")
-def get_cached_diligence(
-    company_name: str,
-    db: Session = Depends(get_db)
-):
+def get_cached_diligence(company_name: str, db: Session = Depends(get_db)):
     """
     Get cached due diligence report for a company.
 
@@ -147,17 +136,14 @@ def get_cached_diligence(
     if not result:
         raise HTTPException(
             status_code=404,
-            detail=f"No cached due diligence for '{company_name}'. Use POST /diligence/start to begin."
+            detail=f"No cached due diligence for '{company_name}'. Use POST /diligence/start to begin.",
         )
 
     return result
 
 
 @router.get("/{job_id}")
-def get_diligence_status(
-    job_id: str,
-    db: Session = Depends(get_db)
-):
+def get_diligence_status(job_id: str, db: Session = Depends(get_db)):
     """
     Get status and results of a due diligence job.
 
@@ -179,6 +165,8 @@ def get_diligence_status(
     result = agent.get_job_status(job_id)
 
     if not result:
-        raise HTTPException(status_code=404, detail=f"Due diligence job {job_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Due diligence job {job_id} not found"
+        )
 
     return result

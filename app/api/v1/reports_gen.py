@@ -22,9 +22,13 @@ router = APIRouter(prefix="/ai-reports", tags=["Report Generation"])
 # Request/Response Models
 # =============================================================================
 
+
 class GenerateReportRequest(BaseModel):
     """Request to generate a report."""
-    report_type: str = Field(..., description="Type: company_profile, due_diligence, competitive_landscape")
+
+    report_type: str = Field(
+        ..., description="Type: company_profile, due_diligence, competitive_landscape"
+    )
     entity_name: str = Field(..., description="Target entity name")
     template: str = Field("full_report", description="Template name")
     options: Optional[Dict[str, Any]] = Field(None, description="Additional options")
@@ -32,6 +36,7 @@ class GenerateReportRequest(BaseModel):
 
 class GenerateReportResponse(BaseModel):
     """Response for report generation."""
+
     report_id: str
     status: str
     error: Optional[str] = None
@@ -39,6 +44,7 @@ class GenerateReportResponse(BaseModel):
 
 class ReportStatusResponse(BaseModel):
     """Response for report status."""
+
     report_id: str
     status: str
     progress: int
@@ -47,17 +53,23 @@ class ReportStatusResponse(BaseModel):
 
 class CreateTemplateRequest(BaseModel):
     """Request to create a custom template."""
+
     name: str = Field(..., description="Template name")
     description: str = Field(..., description="Template description")
     sections: List[str] = Field(..., description="Sections to include")
-    tone: str = Field("formal", description="Tone: executive, formal, professional, casual")
-    detail_level: str = Field("standard", description="Detail: summary, standard, detailed")
+    tone: str = Field(
+        "formal", description="Tone: executive, formal, professional, casual"
+    )
+    detail_level: str = Field(
+        "standard", description="Detail: summary, standard, detailed"
+    )
     max_words: int = Field(2000, ge=100, le=10000, description="Maximum word count")
     report_type: Optional[str] = Field(None, description="Restrict to report type")
 
 
 class TemplateResponse(BaseModel):
     """Response for template."""
+
     name: str
     description: str
     sections: List[str]
@@ -71,10 +83,10 @@ class TemplateResponse(BaseModel):
 # API Endpoints - Static routes first, then parameterized routes
 # =============================================================================
 
+
 @router.post("/generate", response_model=GenerateReportResponse)
 async def generate_report(
-    request: GenerateReportRequest,
-    db: Session = Depends(get_db)
+    request: GenerateReportRequest, db: Session = Depends(get_db)
 ):
     """
     Generate a comprehensive report.
@@ -93,19 +105,18 @@ async def generate_report(
         report_type=request.report_type,
         entity_name=request.entity_name,
         template_name=request.template,
-        options=request.options or {}
+        options=request.options or {},
     )
 
     if "error" in result:
         return GenerateReportResponse(
             report_id=result.get("report_id", ""),
             status="failed",
-            error=result["error"]
+            error=result["error"],
         )
 
     return GenerateReportResponse(
-        report_id=result.get("report_id", ""),
-        status=result.get("status", "completed")
+        report_id=result.get("report_id", ""), status=result.get("status", "completed")
     )
 
 
@@ -127,7 +138,7 @@ async def list_templates(db: Session = Depends(get_db)):
             tone=t.get("tone", "formal"),
             detail_level=t.get("detail_level", "standard"),
             max_words=t.get("max_words", 2000),
-            is_default=t.get("is_default", False)
+            is_default=t.get("is_default", False),
         )
         for t in templates
     ]
@@ -135,8 +146,7 @@ async def list_templates(db: Session = Depends(get_db)):
 
 @router.post("/templates")
 async def create_template(
-    request: CreateTemplateRequest,
-    db: Session = Depends(get_db)
+    request: CreateTemplateRequest, db: Session = Depends(get_db)
 ):
     """
     Create a custom report template.
@@ -151,7 +161,7 @@ async def create_template(
         tone=request.tone,
         detail_level=request.detail_level,
         max_words=request.max_words,
-        report_type=request.report_type
+        report_type=request.report_type,
     )
 
     if "error" in result:
@@ -161,10 +171,7 @@ async def create_template(
 
 
 @router.get("/templates/{name}")
-async def get_template(
-    name: str,
-    db: Session = Depends(get_db)
-):
+async def get_template(name: str, db: Session = Depends(get_db)):
     """
     Get a specific template by name.
     """
@@ -183,7 +190,7 @@ async def list_reports(
     entity_name: Optional[str] = Query(None, description="Filter by entity name"),
     status: Optional[str] = Query(None, description="Filter by status"),
     limit: int = Query(50, ge=1, le=200, description="Max results"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     List generated reports.
@@ -192,10 +199,7 @@ async def list_reports(
     """
     writer = ReportWriterAgent(db)
     result = writer.list_reports(
-        report_type=report_type,
-        entity_name=entity_name,
-        status=status,
-        limit=limit
+        report_type=report_type, entity_name=entity_name, status=status, limit=limit
     )
 
     return result
@@ -205,7 +209,7 @@ async def list_reports(
 async def get_report(
     report_id: str,
     include_content: bool = Query(True, description="Include full content"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get a generated report.
@@ -236,10 +240,7 @@ async def get_report(
 
 
 @router.get("/{report_id}/status", response_model=ReportStatusResponse)
-async def get_report_status(
-    report_id: str,
-    db: Session = Depends(get_db)
-):
+async def get_report_status(report_id: str, db: Session = Depends(get_db)):
     """
     Get report generation status.
 
@@ -255,7 +256,7 @@ async def get_report_status(
         report_id=status["report_id"],
         status=status["status"],
         progress=status["progress"],
-        error=status.get("error")
+        error=status.get("error"),
     )
 
 
@@ -263,7 +264,7 @@ async def get_report_status(
 async def export_report(
     report_id: str,
     format: str = Query("markdown", description="Export format: markdown, html, json"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Export report in specified format.
@@ -300,5 +301,5 @@ async def export_report(
         media_type=content_type,
         headers={
             "Content-Disposition": f"attachment; filename=report_{report_id}.{ext}"
-        }
+        },
     )

@@ -34,7 +34,8 @@ class DealTracker:
 
     def _ensure_tables(self):
         """Create tables if they don't exist."""
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             CREATE TABLE IF NOT EXISTS deals (
                 id SERIAL PRIMARY KEY,
 
@@ -70,9 +71,11 @@ class DealTracker:
                 -- Tags
                 tags TEXT[]
             )
-        """))
+        """)
+        )
 
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             CREATE TABLE IF NOT EXISTS deal_activities (
                 id SERIAL PRIMARY KEY,
                 deal_id INTEGER REFERENCES deals(id) ON DELETE CASCADE,
@@ -89,21 +92,30 @@ class DealTracker:
                 created_by VARCHAR(255),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """))
+        """)
+        )
 
         # Create indexes if they don't exist
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             CREATE INDEX IF NOT EXISTS idx_deals_stage ON deals(pipeline_stage)
-        """))
-        self.db.execute(text("""
+        """)
+        )
+        self.db.execute(
+            text("""
             CREATE INDEX IF NOT EXISTS idx_deals_sector ON deals(company_sector)
-        """))
-        self.db.execute(text("""
+        """)
+        )
+        self.db.execute(
+            text("""
             CREATE INDEX IF NOT EXISTS idx_deals_priority ON deals(priority)
-        """))
-        self.db.execute(text("""
+        """)
+        )
+        self.db.execute(
+            text("""
             CREATE INDEX IF NOT EXISTS idx_activities_deal ON deal_activities(deal_id)
-        """))
+        """)
+        )
 
         self.db.commit()
 
@@ -131,13 +143,16 @@ class DealTracker:
 
         # Validate pipeline stage
         if pipeline_stage not in PIPELINE_STAGES:
-            raise ValueError(f"Invalid pipeline_stage. Must be one of: {PIPELINE_STAGES}")
+            raise ValueError(
+                f"Invalid pipeline_stage. Must be one of: {PIPELINE_STAGES}"
+            )
 
         # Validate priority
         if priority < 1 or priority > 5:
             raise ValueError("Priority must be between 1 and 5")
 
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             INSERT INTO deals (
                 company_name, company_sector, company_stage, company_location, company_website,
                 deal_type, deal_size_millions, valuation_millions,
@@ -150,23 +165,25 @@ class DealTracker:
                 :source, :source_contact, :assigned_to, :tags
             )
             RETURNING id, created_at
-        """), {
-            "company_name": company_name,
-            "company_sector": company_sector,
-            "company_stage": company_stage,
-            "company_location": company_location,
-            "company_website": company_website,
-            "deal_type": deal_type,
-            "deal_size_millions": deal_size_millions,
-            "valuation_millions": valuation_millions,
-            "pipeline_stage": pipeline_stage,
-            "priority": priority,
-            "fit_score": fit_score,
-            "source": source,
-            "source_contact": source_contact,
-            "assigned_to": assigned_to,
-            "tags": tags,
-        })
+        """),
+            {
+                "company_name": company_name,
+                "company_sector": company_sector,
+                "company_stage": company_stage,
+                "company_location": company_location,
+                "company_website": company_website,
+                "deal_type": deal_type,
+                "deal_size_millions": deal_size_millions,
+                "valuation_millions": valuation_millions,
+                "pipeline_stage": pipeline_stage,
+                "priority": priority,
+                "fit_score": fit_score,
+                "source": source,
+                "source_contact": source_contact,
+                "assigned_to": assigned_to,
+                "tags": tags,
+            },
+        )
 
         row = result.fetchone()
         self.db.commit()
@@ -182,13 +199,16 @@ class DealTracker:
 
     def get_deal(self, deal_id: int) -> Optional[Dict[str, Any]]:
         """Get deal with activity count."""
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             SELECT
                 d.*,
                 (SELECT COUNT(*) FROM deal_activities WHERE deal_id = d.id) as activity_count
             FROM deals d
             WHERE d.id = :deal_id
-        """), {"deal_id": deal_id})
+        """),
+            {"deal_id": deal_id},
+        )
 
         row = result.fetchone()
         if not row:
@@ -196,14 +216,27 @@ class DealTracker:
 
         return self._row_to_dict(row)
 
-    def update_deal(self, deal_id: int, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_deal(
+        self, deal_id: int, updates: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """Update deal fields."""
         # Build dynamic update
         allowed_fields = [
-            "company_name", "company_sector", "company_stage", "company_location", "company_website",
-            "deal_type", "deal_size_millions", "valuation_millions",
-            "pipeline_stage", "priority", "fit_score",
-            "source", "source_contact", "assigned_to", "tags",
+            "company_name",
+            "company_sector",
+            "company_stage",
+            "company_location",
+            "company_website",
+            "deal_type",
+            "deal_size_millions",
+            "valuation_millions",
+            "pipeline_stage",
+            "priority",
+            "fit_score",
+            "source",
+            "source_contact",
+            "assigned_to",
+            "tags",
         ]
 
         set_clauses = []
@@ -215,7 +248,9 @@ class DealTracker:
 
                 # Validate pipeline stage
                 if field == "pipeline_stage" and value not in PIPELINE_STAGES:
-                    raise ValueError(f"Invalid pipeline_stage. Must be one of: {PIPELINE_STAGES}")
+                    raise ValueError(
+                        f"Invalid pipeline_stage. Must be one of: {PIPELINE_STAGES}"
+                    )
 
                 # Validate priority
                 if field == "priority" and (value < 1 or value > 5):
@@ -242,9 +277,12 @@ class DealTracker:
 
     def delete_deal(self, deal_id: int) -> bool:
         """Delete a deal and its activities."""
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             DELETE FROM deals WHERE id = :deal_id
-        """), {"deal_id": deal_id})
+        """),
+            {"deal_id": deal_id},
+        )
         self.db.commit()
         return result.rowcount > 0
 
@@ -280,13 +318,17 @@ class DealTracker:
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
         # Get total count
-        count_result = self.db.execute(text(f"""
+        count_result = self.db.execute(
+            text(f"""
             SELECT COUNT(*) FROM deals {where_sql}
-        """), params)
+        """),
+            params,
+        )
         total = count_result.scalar()
 
         # Get deals
-        result = self.db.execute(text(f"""
+        result = self.db.execute(
+            text(f"""
             SELECT
                 d.*,
                 (SELECT COUNT(*) FROM deal_activities WHERE deal_id = d.id) as activity_count
@@ -294,7 +336,9 @@ class DealTracker:
             {where_sql}
             ORDER BY priority ASC, updated_at DESC
             LIMIT :limit OFFSET :offset
-        """), params)
+        """),
+            params,
+        )
 
         deals = [self._row_to_dict(row) for row in result.fetchall()]
 
@@ -321,7 +365,8 @@ class DealTracker:
         attendees = activity.get("attendees", [])
         created_by = activity.get("created_by")
 
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             INSERT INTO deal_activities (
                 deal_id, activity_type, title, description,
                 meeting_date, attendees, created_by
@@ -330,15 +375,17 @@ class DealTracker:
                 :meeting_date, :attendees, :created_by
             )
             RETURNING id, created_at
-        """), {
-            "deal_id": deal_id,
-            "activity_type": activity_type,
-            "title": title,
-            "description": description,
-            "meeting_date": meeting_date,
-            "attendees": attendees,
-            "created_by": created_by,
-        })
+        """),
+            {
+                "deal_id": deal_id,
+                "activity_type": activity_type,
+                "title": title,
+                "description": description,
+                "meeting_date": meeting_date,
+                "attendees": attendees,
+                "created_by": created_by,
+            },
+        )
 
         row = result.fetchone()
         self.db.commit()
@@ -353,14 +400,17 @@ class DealTracker:
 
     def get_activities(self, deal_id: int, limit: int = 50) -> List[Dict[str, Any]]:
         """Get activities for a deal."""
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             SELECT id, deal_id, activity_type, title, description,
                    meeting_date, attendees, created_by, created_at
             FROM deal_activities
             WHERE deal_id = :deal_id
             ORDER BY created_at DESC
             LIMIT :limit
-        """), {"deal_id": deal_id, "limit": limit})
+        """),
+            {"deal_id": deal_id, "limit": limit},
+        )
 
         return [
             {
@@ -380,21 +430,25 @@ class DealTracker:
     def get_pipeline_summary(self) -> Dict[str, Any]:
         """Get pipeline stage summary."""
         # Count by stage
-        stage_result = self.db.execute(text("""
+        stage_result = self.db.execute(
+            text("""
             SELECT pipeline_stage, COUNT(*) as count
             FROM deals
             GROUP BY pipeline_stage
-        """))
+        """)
+        )
         by_stage = {row[0]: row[1] for row in stage_result.fetchall()}
 
         # Count by priority
-        priority_result = self.db.execute(text("""
+        priority_result = self.db.execute(
+            text("""
             SELECT priority, COUNT(*) as count
             FROM deals
             WHERE pipeline_stage NOT IN ('closed_won', 'closed_lost', 'passed')
             GROUP BY priority
             ORDER BY priority
-        """))
+        """)
+        )
         by_priority = {str(row[0]): row[1] for row in priority_result.fetchall()}
 
         # Total deals
@@ -402,17 +456,21 @@ class DealTracker:
         total = total_result.scalar()
 
         # Recent activity count (last 7 days)
-        activity_result = self.db.execute(text("""
+        activity_result = self.db.execute(
+            text("""
             SELECT COUNT(*) FROM deal_activities
             WHERE created_at > CURRENT_TIMESTAMP - INTERVAL '7 days'
-        """))
+        """)
+        )
         recent_activity = activity_result.scalar()
 
         # Active deals (not closed)
-        active_result = self.db.execute(text("""
+        active_result = self.db.execute(
+            text("""
             SELECT COUNT(*) FROM deals
             WHERE pipeline_stage NOT IN ('closed_won', 'closed_lost', 'passed')
-        """))
+        """)
+        )
         active_deals = active_result.scalar()
 
         return {

@@ -28,9 +28,21 @@ class FoDataNormalizer:
 
     # Common suffixes to normalize
     COMPANY_SUFFIXES = [
-        "LLC", "L.L.C.", "Inc.", "Inc", "Corporation", "Corp.",
-        "LP", "L.P.", "LLP", "Holdings", "Group", "Partners",
-        "Family Office", "Family Investments", "Capital",
+        "LLC",
+        "L.L.C.",
+        "Inc.",
+        "Inc",
+        "Corporation",
+        "Corp.",
+        "LP",
+        "L.P.",
+        "LLP",
+        "Holdings",
+        "Group",
+        "Partners",
+        "Family Office",
+        "Family Investments",
+        "Capital",
     ]
 
     # Confidence ranking
@@ -55,9 +67,9 @@ class FoDataNormalizer:
         for suffix in self.COMPANY_SUFFIXES:
             suffix_lower = suffix.lower()
             if normalized.endswith(suffix_lower):
-                normalized = normalized[:-len(suffix_lower)].strip()
+                normalized = normalized[: -len(suffix_lower)].strip()
             if normalized.endswith(f", {suffix_lower}"):
-                normalized = normalized[:-len(f", {suffix_lower}")].strip()
+                normalized = normalized[: -len(f", {suffix_lower}")].strip()
 
         # Remove punctuation except spaces
         normalized = re.sub(r"[^\w\s]", "", normalized)
@@ -112,7 +124,7 @@ class FoDataNormalizer:
                 # Sort by confidence (highest first)
                 group.sort(
                     key=lambda x: self.CONFIDENCE_ORDER.get(x.confidence, 0),
-                    reverse=True
+                    reverse=True,
                 )
                 # Merge data from all items into best one
                 best = group[0]
@@ -205,7 +217,8 @@ class FoDataNormalizer:
         min_level = self.CONFIDENCE_ORDER.get(min_confidence, 0)
 
         return [
-            item for item in items
+            item
+            for item in items
             if self.CONFIDENCE_ORDER.get(item.confidence, 0) >= min_level
         ]
 
@@ -254,14 +267,16 @@ class FoDataNormalizer:
                 if fo_name not in contacts:
                     contacts[fo_name] = []
 
-                contacts[fo_name].append({
-                    "name": item.data.get("full_name"),
-                    "title": item.data.get("title"),
-                    "email": item.data.get("email"),
-                    "phone": item.data.get("phone"),
-                    "role": item.data.get("role_category"),
-                    "source": item.source_url,
-                    "confidence": item.confidence,
-                })
+                contacts[fo_name].append(
+                    {
+                        "name": item.data.get("full_name"),
+                        "title": item.data.get("title"),
+                        "email": item.data.get("email"),
+                        "phone": item.data.get("phone"),
+                        "role": item.data.get("role_category"),
+                        "source": item.source_url,
+                        "confidence": item.confidence,
+                    }
+                )
 
         return contacts

@@ -61,10 +61,14 @@ class PECollectionOrchestrator:
             collector_class: The collector class to use
         """
         cls._collectors[source] = collector_class
-        logger.info(f"Registered collector for {source.value}: {collector_class.__name__}")
+        logger.info(
+            f"Registered collector for {source.value}: {collector_class.__name__}"
+        )
 
     @classmethod
-    def get_collector(cls, source: PECollectionSource) -> Optional[Type[BasePECollector]]:
+    def get_collector(
+        cls, source: PECollectionSource
+    ) -> Optional[Type[BasePECollector]]:
         """Get the registered collector for a source type."""
         return cls._collectors.get(source)
 
@@ -172,7 +176,8 @@ class PECollectionOrchestrator:
 
                 # Forward entity fields (cik, crd_number, ticker, etc.) to collectors
                 extra_kwargs = {
-                    k: v for k, v in entity.items()
+                    k: v
+                    for k, v in entity.items()
                     if k not in ("id", "name", "website") and v is not None
                 }
                 result = await collector.collect(
@@ -198,9 +203,7 @@ class PECollectionOrchestrator:
                     )
 
             except Exception as e:
-                logger.error(
-                    f"Error collecting {entity_name} from {source.value}: {e}"
-                )
+                logger.error(f"Error collecting {entity_name} from {source.value}: {e}")
                 self._progress.failed_entities += 1
 
             finally:
@@ -226,7 +229,10 @@ class PECollectionOrchestrator:
 
         def _to_entity(row, extra: dict = None) -> Dict[str, Any]:
             """Convert a model instance to an entity dict."""
-            d = {"id": row.id, "name": getattr(row, "name", None) or getattr(row, "full_name", None)}
+            d = {
+                "id": row.id,
+                "name": getattr(row, "name", None) or getattr(row, "full_name", None),
+            }
             if hasattr(row, "website"):
                 d["website"] = row.website
             if hasattr(row, "cik"):
@@ -262,7 +268,9 @@ class PECollectionOrchestrator:
             else:
                 query = query.filter(PEPortfolioCompany.status == "Active")
                 if config.sectors:
-                    query = query.filter(PEPortfolioCompany.industry.in_(config.sectors))
+                    query = query.filter(
+                        PEPortfolioCompany.industry.in_(config.sectors)
+                    )
             entities = [_to_entity(r) for r in query.all()]
 
         elif config.entity_type == EntityType.PERSON:
@@ -278,11 +286,12 @@ class PECollectionOrchestrator:
         elif config.entity_type == EntityType.DEAL:
             query = db.query(PEDeal)
             entities = [
-                {"id": r.id, "name": r.deal_name or f"Deal {r.id}"}
-                for r in query.all()
+                {"id": r.id, "name": r.deal_name or f"Deal {r.id}"} for r in query.all()
             ]
 
-        logger.info(f"Fetched {len(entities)} {config.entity_type.value} entities from DB")
+        logger.info(
+            f"Fetched {len(entities)} {config.entity_type.value} entities from DB"
+        )
         return entities
 
     @property

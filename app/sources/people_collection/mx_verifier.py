@@ -19,6 +19,7 @@ MX_CACHE_TTL_SECONDS = 86400
 @dataclass
 class MXVerificationResult:
     """Result of an MX record verification."""
+
     has_mx: bool
     mx_records: List[str] = field(default_factory=list)
     error: Optional[str] = None
@@ -108,14 +109,18 @@ class MXVerifier:
             elif "NoAnswer" in error_type or "NoAnswer" in str(e):
                 # No MX records but domain exists — might still accept email via A record
                 logger.debug(f"No MX records for {domain}, but domain exists")
-                return MXVerificationResult(has_mx=True, error="No MX records (A record fallback)")
+                return MXVerificationResult(
+                    has_mx=True, error="No MX records (A record fallback)"
+                )
             elif "NoNameservers" in error_type or "NoNameservers" in str(e):
                 logger.debug(f"No nameservers for {domain}")
                 return MXVerificationResult(has_mx=False, error="No nameservers")
             else:
                 # Graceful degradation: on unexpected DNS errors, assume valid
                 logger.warning(f"DNS lookup failed for {domain}: {error_type}: {e}")
-                return MXVerificationResult(has_mx=True, error=f"DNS error: {error_type}")
+                return MXVerificationResult(
+                    has_mx=True, error=f"DNS error: {error_type}"
+                )
 
     def clear_cache(self) -> int:
         """Clear the MX cache. Returns number of entries cleared."""

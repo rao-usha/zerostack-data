@@ -123,15 +123,13 @@ class FoDealsCollector(FoBaseCollector):
             # 2. Search for principal/family if provided
             if principal_name and principal_name.lower() != fo_name.lower():
                 principal_deals = await self._search_news_deals(
-                    f'"{principal_name}" investment',
-                    days_back
+                    f'"{principal_name}" investment', days_back
                 )
                 items.extend(self._deduplicate_deals(principal_deals, items))
 
             if principal_family and principal_family.lower() != fo_name.lower():
                 family_deals = await self._search_news_deals(
-                    f'"{principal_family}" family office investment',
-                    days_back
+                    f'"{principal_family}" family office investment', days_back
                 )
                 items.extend(self._deduplicate_deals(family_deals, items))
 
@@ -200,7 +198,9 @@ class FoDealsCollector(FoBaseCollector):
             # Filter by date and deduplicate
             cutoff = datetime.utcnow() - timedelta(days=days_back)
             for item in news_items:
-                if item.source_url not in seen_urls and self._item_is_recent(item, cutoff):
+                if item.source_url not in seen_urls and self._item_is_recent(
+                    item, cutoff
+                ):
                     seen_urls.add(item.source_url)
                     items.append(item)
 
@@ -210,13 +210,15 @@ class FoDealsCollector(FoBaseCollector):
 
         return items[:50]  # Limit results
 
-    def _parse_deal_rss(self, xml_content: str, search_query: str) -> List[FoCollectedItem]:
+    def _parse_deal_rss(
+        self, xml_content: str, search_query: str
+    ) -> List[FoCollectedItem]:
         """Parse Google News RSS feed for deal items."""
         items = []
 
         item_pattern = re.compile(
-            r'<item>.*?<title>([^<]+)</title>.*?<link>([^<]+)</link>.*?<pubDate>([^<]+)</pubDate>.*?</item>',
-            re.DOTALL
+            r"<item>.*?<title>([^<]+)</title>.*?<link>([^<]+)</link>.*?<pubDate>([^<]+)</pubDate>.*?</item>",
+            re.DOTALL,
         )
 
         for match in item_pattern.finditer(xml_content):
@@ -225,7 +227,7 @@ class FoDealsCollector(FoBaseCollector):
             pub_date = match.group(3).strip()
 
             # Clean up title
-            title = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', title)
+            title = re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"\1", title)
             title = title.replace("&amp;", "&").replace("&quot;", '"')
 
             # Extract deal details from title
@@ -236,12 +238,14 @@ class FoDealsCollector(FoBaseCollector):
                 deal_data["pub_date"] = pub_date
                 deal_data["search_query"] = search_query
 
-                items.append(FoCollectedItem(
-                    item_type="deal",
-                    data=deal_data,
-                    source_url=link,
-                    confidence=deal_data.get("confidence", "medium"),
-                ))
+                items.append(
+                    FoCollectedItem(
+                        item_type="deal",
+                        data=deal_data,
+                        source_url=link,
+                        confidence=deal_data.get("confidence", "medium"),
+                    )
+                )
 
         return items
 
@@ -251,9 +255,20 @@ class FoDealsCollector(FoBaseCollector):
 
         # Must contain deal-related keywords
         deal_keywords = [
-            "invest", "funded", "funding", "raise", "led",
-            "acquired", "acquisition", "backs", "backed",
-            "series", "round", "stake", "buys", "bought"
+            "invest",
+            "funded",
+            "funding",
+            "raise",
+            "led",
+            "acquired",
+            "acquisition",
+            "backs",
+            "backed",
+            "series",
+            "round",
+            "stake",
+            "buys",
+            "bought",
         ]
 
         if not any(kw in title_lower for kw in deal_keywords):
@@ -350,8 +365,18 @@ class FoDealsCollector(FoBaseCollector):
                 company = match.group(1).strip()
                 # Filter out common false positives
                 if company.lower() not in [
-                    "the", "a", "series", "family", "office", "new",
-                    "this", "that", "its", "their", "our", "we"
+                    "the",
+                    "a",
+                    "series",
+                    "family",
+                    "office",
+                    "new",
+                    "this",
+                    "that",
+                    "its",
+                    "their",
+                    "our",
+                    "we",
                 ]:
                     return company
 
@@ -366,10 +391,18 @@ class FoDealsCollector(FoBaseCollector):
             month_name = match.group(1)
             year = match.group(2)
             months = {
-                "january": "01", "february": "02", "march": "03",
-                "april": "04", "may": "05", "june": "06",
-                "july": "07", "august": "08", "september": "09",
-                "october": "10", "november": "11", "december": "12"
+                "january": "01",
+                "february": "02",
+                "march": "03",
+                "april": "04",
+                "may": "05",
+                "june": "06",
+                "july": "07",
+                "august": "08",
+                "september": "09",
+                "october": "10",
+                "november": "11",
+                "december": "12",
             }
             return f"{year}-{months[month_name]}-01"
 
@@ -383,6 +416,7 @@ class FoDealsCollector(FoBaseCollector):
 
         try:
             from email.utils import parsedate_to_datetime
+
             dt = parsedate_to_datetime(pub_date)
             return dt.replace(tzinfo=None) >= cutoff
         except Exception:
@@ -455,12 +489,14 @@ class FoDealsCollector(FoBaseCollector):
                 if amount:
                     filing_data["investment_amount_usd"] = amount
 
-                items.append(FoCollectedItem(
-                    item_type="deal",
-                    data=filing_data,
-                    source_url=f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={filing_data['cik']}&type=D",
-                    confidence="high",  # SEC filings are authoritative
-                ))
+                items.append(
+                    FoCollectedItem(
+                        item_type="deal",
+                        data=filing_data,
+                        source_url=f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={filing_data['cik']}&type=D",
+                        confidence="high",  # SEC filings are authoritative
+                    )
+                )
 
         except Exception as e:
             logger.warning(f"Error searching SEC EDGAR for {fo_name}: {e}")

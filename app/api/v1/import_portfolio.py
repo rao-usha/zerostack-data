@@ -4,6 +4,7 @@ Bulk Portfolio Import API endpoints.
 Provides endpoints for uploading, validating, and importing
 portfolio data from CSV/Excel files.
 """
+
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel, Field
@@ -18,8 +19,10 @@ router = APIRouter(prefix="/import", tags=["import"])
 
 # Response Models
 
+
 class UploadResponse(BaseModel):
     """Response after file upload."""
+
     import_id: int
     filename: str
     row_count: int
@@ -29,6 +32,7 @@ class UploadResponse(BaseModel):
 
 class ValidationErrorItem(BaseModel):
     """A single validation error."""
+
     row: int
     column: str
     error: str
@@ -36,12 +40,14 @@ class ValidationErrorItem(BaseModel):
 
 class ValidationWarningItem(BaseModel):
     """A single validation warning."""
+
     row: int
     message: str
 
 
 class ValidationSummary(BaseModel):
     """Validation summary."""
+
     total_rows: int
     valid_rows: int
     invalid_rows: int
@@ -51,6 +57,7 @@ class ValidationSummary(BaseModel):
 
 class PreviewRow(BaseModel):
     """A row in the preview."""
+
     row_num: int
     company_name: str
     investor_name: str
@@ -61,6 +68,7 @@ class PreviewRow(BaseModel):
 
 class PreviewResponse(BaseModel):
     """Preview response with validation and sample data."""
+
     import_id: int
     status: str
     validation: ValidationSummary
@@ -69,6 +77,7 @@ class PreviewResponse(BaseModel):
 
 class ImportResultResponse(BaseModel):
     """Import execution result."""
+
     import_id: int
     status: str
     results: dict
@@ -77,6 +86,7 @@ class ImportResultResponse(BaseModel):
 
 class ImportStatusResponse(BaseModel):
     """Import job status."""
+
     import_id: int
     filename: str
     status: str
@@ -92,6 +102,7 @@ class ImportStatusResponse(BaseModel):
 
 class ImportHistoryItem(BaseModel):
     """Import history item."""
+
     id: int
     filename: str
     status: str
@@ -103,6 +114,7 @@ class ImportHistoryItem(BaseModel):
 
 class RollbackResponse(BaseModel):
     """Rollback response."""
+
     import_id: int
     status: str
     message: str
@@ -113,6 +125,7 @@ _parsed_rows_cache: dict = {}
 
 
 # Endpoints
+
 
 @router.post(
     "/upload",
@@ -144,7 +157,7 @@ async def upload_file(
     if not filename.lower().endswith((".csv", ".xlsx", ".xls")):
         raise HTTPException(
             status_code=400,
-            detail="Unsupported file type. Please upload CSV or Excel (.xlsx/.xls)"
+            detail="Unsupported file type. Please upload CSV or Excel (.xlsx/.xls)",
         )
 
     # Read file content
@@ -153,8 +166,7 @@ async def upload_file(
 
     if file_size > 10 * 1024 * 1024:  # 10MB limit
         raise HTTPException(
-            status_code=400,
-            detail="File too large. Maximum size is 10MB"
+            status_code=400, detail="File too large. Maximum size is 10MB"
         )
 
     importer = PortfolioImporter(db)
@@ -171,7 +183,7 @@ async def upload_file(
         if missing:
             raise HTTPException(
                 status_code=400,
-                detail=f"Missing required columns: {', '.join(missing)}"
+                detail=f"Missing required columns: {', '.join(missing)}",
             )
 
         # Create import job
@@ -185,7 +197,7 @@ async def upload_file(
             "filename": filename,
             "row_count": len(rows),
             "status": "pending",
-            "message": f"File uploaded successfully. Use /import/{import_id}/preview to validate."
+            "message": f"File uploaded successfully. Use /import/{import_id}/preview to validate.",
         }
 
     except ValueError as e:
@@ -207,7 +219,9 @@ async def upload_file(
 )
 def get_preview(
     import_id: int,
-    preview_limit: int = Query(10, ge=1, le=100, description="Number of rows to preview"),
+    preview_limit: int = Query(
+        10, ge=1, le=100, description="Number of rows to preview"
+    ),
     db: Session = Depends(get_db),
 ):
     """Get preview of import with validation results."""
@@ -222,8 +236,7 @@ def get_preview(
     rows = _parsed_rows_cache.get(import_id)
     if not rows:
         raise HTTPException(
-            status_code=400,
-            detail="Import data not found. Please re-upload the file."
+            status_code=400, detail="Import data not found. Please re-upload the file."
         )
 
     # Validate
@@ -266,15 +279,14 @@ def confirm_import(
     if import_job["status"] not in ("pending", "previewing"):
         raise HTTPException(
             status_code=400,
-            detail=f"Import cannot be executed. Status: {import_job['status']}"
+            detail=f"Import cannot be executed. Status: {import_job['status']}",
         )
 
     # Get cached rows
     rows = _parsed_rows_cache.get(import_id)
     if not rows:
         raise HTTPException(
-            status_code=400,
-            detail="Import data not found. Please re-upload the file."
+            status_code=400, detail="Import data not found. Please re-upload the file."
         )
 
     # Execute import
@@ -321,8 +333,12 @@ def get_import_status(
         "imported_count": import_job["imported_count"],
         "skipped_count": import_job["skipped_count"],
         "error_count": import_job["error_count"],
-        "created_at": import_job["created_at"].isoformat() if import_job.get("created_at") else None,
-        "completed_at": import_job["completed_at"].isoformat() if import_job.get("completed_at") else None,
+        "created_at": import_job["created_at"].isoformat()
+        if import_job.get("created_at")
+        else None,
+        "completed_at": import_job["completed_at"].isoformat()
+        if import_job.get("completed_at")
+        else None,
     }
 
 
@@ -348,8 +364,12 @@ def list_import_history(
             "status": imp["status"],
             "row_count": imp["row_count"],
             "imported_count": imp["imported_count"],
-            "created_at": imp["created_at"].isoformat() if imp.get("created_at") else None,
-            "completed_at": imp["completed_at"].isoformat() if imp.get("completed_at") else None,
+            "created_at": imp["created_at"].isoformat()
+            if imp.get("created_at")
+            else None,
+            "completed_at": imp["completed_at"].isoformat()
+            if imp.get("completed_at")
+            else None,
         }
         for imp in imports
     ]
@@ -380,7 +400,7 @@ def rollback_import(
     if import_job["status"] != "completed":
         raise HTTPException(
             status_code=400,
-            detail=f"Only completed imports can be rolled back. Status: {import_job['status']}"
+            detail=f"Only completed imports can be rolled back. Status: {import_job['status']}",
         )
 
     success = importer.rollback_import(import_id)
@@ -389,10 +409,9 @@ def rollback_import(
         return {
             "import_id": import_id,
             "status": "rolled_back",
-            "message": "Import successfully rolled back. All imported records have been deleted."
+            "message": "Import successfully rolled back. All imported records have been deleted.",
         }
     else:
         raise HTTPException(
-            status_code=500,
-            detail="Rollback failed. Please check logs for details."
+            status_code=500, detail="Rollback failed. Please check logs for details."
         )

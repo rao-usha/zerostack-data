@@ -36,19 +36,42 @@ logger = logging.getLogger(__name__)
 
 # Role x Department search matrix for targeted discovery
 TECH_ROLES = [
-    "CTO", "CIO", "CISO", "CDO",
-    "VP Engineering", "VP Technology", "VP Infrastructure", "VP Data",
-    "VP Information Technology", "VP Platform", "VP Security",
-    "Director Engineering", "Director Technology", "Director IT",
-    "Director DevOps", "Director Infrastructure", "Director Data",
-    "Head of Engineering", "Head of Technology", "Chief Architect",
-    "Chief Technology Officer", "Chief Information Officer",
-    "Chief Information Security Officer", "Chief Data Officer",
+    "CTO",
+    "CIO",
+    "CISO",
+    "CDO",
+    "VP Engineering",
+    "VP Technology",
+    "VP Infrastructure",
+    "VP Data",
+    "VP Information Technology",
+    "VP Platform",
+    "VP Security",
+    "Director Engineering",
+    "Director Technology",
+    "Director IT",
+    "Director DevOps",
+    "Director Infrastructure",
+    "Director Data",
+    "Head of Engineering",
+    "Head of Technology",
+    "Chief Architect",
+    "Chief Technology Officer",
+    "Chief Information Officer",
+    "Chief Information Security Officer",
+    "Chief Data Officer",
 ]
 
 TECH_DEPARTMENTS = [
-    "Technology", "Engineering", "IT", "Infrastructure",
-    "Data", "Platform", "Security", "DevOps", "Software",
+    "Technology",
+    "Engineering",
+    "IT",
+    "Infrastructure",
+    "Data",
+    "Platform",
+    "Security",
+    "DevOps",
+    "Software",
 ]
 
 FUNCTION_ROLE_CONFIGS = {
@@ -58,24 +81,36 @@ FUNCTION_ROLE_CONFIGS = {
     },
     "finance": {
         "title_patterns": [
-            "CFO", "Controller", "Treasurer", "VP Finance",
-            "Chief Financial Officer", "Chief Accounting Officer",
-            "Director Finance", "Head of Finance",
+            "CFO",
+            "Controller",
+            "Treasurer",
+            "VP Finance",
+            "Chief Financial Officer",
+            "Chief Accounting Officer",
+            "Director Finance",
+            "Head of Finance",
         ],
         "department_keywords": ["Finance", "Accounting", "Treasury"],
     },
     "legal": {
         "title_patterns": [
-            "General Counsel", "CLO", "Chief Legal Officer",
-            "VP Legal", "Deputy General Counsel",
-            "Chief Compliance Officer", "Head of Legal",
+            "General Counsel",
+            "CLO",
+            "Chief Legal Officer",
+            "VP Legal",
+            "Deputy General Counsel",
+            "Chief Compliance Officer",
+            "Head of Legal",
         ],
         "department_keywords": ["Legal", "Compliance"],
     },
     "operations": {
         "title_patterns": [
-            "COO", "Chief Operating Officer", "VP Operations",
-            "Head of Operations", "Director Operations",
+            "COO",
+            "Chief Operating Officer",
+            "VP Operations",
+            "Head of Operations",
+            "Director Operations",
         ],
         "department_keywords": ["Operations"],
     },
@@ -85,21 +120,17 @@ FUNCTION_ROLE_CONFIGS = {
 SNIPPET_PATTERNS = [
     # "Jane Smith - VP of Engineering - PGIM | LinkedIn"
     re.compile(
-        r'^([A-Z][a-zA-Z\-\'\. ]{2,30})\s*[-–—]\s*(.{5,80}?)\s*[-–—]\s*(.+?)(?:\s*\|\s*LinkedIn)?$'
+        r"^([A-Z][a-zA-Z\-\'\. ]{2,30})\s*[-–—]\s*(.{5,80}?)\s*[-–—]\s*(.+?)(?:\s*\|\s*LinkedIn)?$"
     ),
     # "Jane Smith. VP of Engineering at PGIM."
-    re.compile(
-        r'^([A-Z][a-zA-Z\-\'\. ]{2,30})\.\s*(.{5,80}?)\s+at\s+(.+?)\.?$'
-    ),
+    re.compile(r"^([A-Z][a-zA-Z\-\'\. ]{2,30})\.\s*(.{5,80}?)\s+at\s+(.+?)\.?$"),
     # "Jane Smith VP of Engineering | PGIM"
-    re.compile(
-        r'^([A-Z][a-zA-Z\-\'\. ]{2,30})\s+(.{5,80}?)\s*\|\s*(.+?)$'
-    ),
+    re.compile(r"^([A-Z][a-zA-Z\-\'\. ]{2,30})\s+(.{5,80}?)\s*\|\s*(.+?)$"),
 ]
 
 # Google search result link pattern
 LINKEDIN_URL_RE = re.compile(
-    r'https?://(?:www\.)?linkedin\.com/in/([a-zA-Z0-9\-_]+)',
+    r"https?://(?:www\.)?linkedin\.com/in/([a-zA-Z0-9\-_]+)",
     re.IGNORECASE,
 )
 
@@ -179,9 +210,7 @@ class LinkedInDiscovery(BaseCollector):
         # Limit queries
         queries = queries[:max_searches]
 
-        logger.info(
-            f"[LinkedInDiscovery] Running {len(queries)} Google searches"
-        )
+        logger.info(f"[LinkedInDiscovery] Running {len(queries)} Google searches")
 
         # Execute searches with rate limiting
         all_people: List[ExtractedPerson] = []
@@ -209,9 +238,7 @@ class LinkedInDiscovery(BaseCollector):
                 )
 
             except Exception as e:
-                logger.warning(
-                    f"[LinkedInDiscovery] Search {i+1} failed: {e}"
-                )
+                logger.warning(f"[LinkedInDiscovery] Search {i+1} failed: {e}")
                 continue
 
         logger.info(
@@ -260,7 +287,12 @@ class LinkedInDiscovery(BaseCollector):
 
         # Level 1: CTO/CIO
         if not known_cto and depth >= 1:
-            level1_roles = ["CTO", "CIO", "Chief Technology Officer", "Chief Information Officer"]
+            level1_roles = [
+                "CTO",
+                "CIO",
+                "Chief Technology Officer",
+                "Chief Information Officer",
+            ]
             for co in companies[:5]:  # Top 5 companies only for L1
                 for role in level1_roles:
                     if search_count >= max_searches:
@@ -285,8 +317,12 @@ class LinkedInDiscovery(BaseCollector):
         # Level 2: VPs
         if depth >= 2:
             level2_roles = [
-                "VP Engineering", "VP Technology", "VP Infrastructure",
-                "VP Data", "VP Platform", "VP Security",
+                "VP Engineering",
+                "VP Technology",
+                "VP Infrastructure",
+                "VP Data",
+                "VP Platform",
+                "VP Security",
             ]
             for co in companies[:8]:
                 for role in level2_roles:
@@ -312,8 +348,11 @@ class LinkedInDiscovery(BaseCollector):
         # Level 3: Directors
         if depth >= 3:
             level3_roles = [
-                "Director Engineering", "Director Technology",
-                "Director IT", "Director DevOps", "Director Infrastructure",
+                "Director Engineering",
+                "Director Technology",
+                "Director IT",
+                "Director DevOps",
+                "Director Infrastructure",
             ]
             for co in companies[:5]:
                 for role in level3_roles:
@@ -365,24 +404,26 @@ class LinkedInDiscovery(BaseCollector):
             # Role-targeted search
             for co in all_companies:
                 for role in roles:
-                    queries.append(
-                        f'site:linkedin.com/in "{co}" "{role}"'
-                    )
+                    queries.append(f'site:linkedin.com/in "{co}" "{role}"')
         elif department and department in FUNCTION_ROLE_CONFIGS:
             # Department-targeted search
             config = FUNCTION_ROLE_CONFIGS[department]
             for co in all_companies:
                 for role in config["title_patterns"]:
-                    queries.append(
-                        f'site:linkedin.com/in "{co}" "{role}"'
-                    )
+                    queries.append(f'site:linkedin.com/in "{co}" "{role}"')
         else:
             # General leadership search
             general_roles = [
-                "CEO", "President", "Chief",
-                "Senior Vice President", "Executive Vice President",
-                "Vice President", "SVP", "EVP",
-                "Managing Director", "Director",
+                "CEO",
+                "President",
+                "Chief",
+                "Senior Vice President",
+                "Executive Vice President",
+                "Vice President",
+                "SVP",
+                "EVP",
+                "Managing Director",
+                "Director",
                 "Head of",
             ]
             for co in all_companies:
@@ -390,9 +431,7 @@ class LinkedInDiscovery(BaseCollector):
                 queries.append(f'site:linkedin.com/in "{co}" leadership')
 
                 for role in general_roles:
-                    queries.append(
-                        f'site:linkedin.com/in "{co}" "{role}"'
-                    )
+                    queries.append(f'site:linkedin.com/in "{co}" "{role}"')
 
         # Deduplicate while preserving order
         seen = set()
@@ -460,7 +499,9 @@ class LinkedInDiscovery(BaseCollector):
                 # Add LinkedIn URL
                 url_match = LINKEDIN_URL_RE.search(url) if url else None
                 if url_match:
-                    person.linkedin_url = f"https://www.linkedin.com/in/{url_match.group(1)}"
+                    person.linkedin_url = (
+                        f"https://www.linkedin.com/in/{url_match.group(1)}"
+                    )
                 elif url:
                     person.linkedin_url = url
 
@@ -486,46 +527,50 @@ class LinkedInDiscovery(BaseCollector):
         # Google formats results with <a> tags containing the URL and <h3> containing title
         link_pattern = re.compile(
             r'<a[^>]+href="(/url\?q=|)(https?://[^"]*linkedin\.com/in/[^"&]+)[^"]*"[^>]*>'
-            r'.*?<h3[^>]*>(.*?)</h3>',
+            r".*?<h3[^>]*>(.*?)</h3>",
             re.DOTALL | re.IGNORECASE,
         )
 
         for match in link_pattern.finditer(html):
             url = match.group(2)
-            title = re.sub(r'<[^>]+>', '', match.group(3)).strip()
+            title = re.sub(r"<[^>]+>", "", match.group(3)).strip()
 
             # Try to find the snippet near this result
             snippet = ""
             pos = match.end()
             snippet_match = re.search(
                 r'<(?:span|div)[^>]*class="[^"]*(?:st|VwiC3b|IsZvec)[^"]*"[^>]*>(.*?)</(?:span|div)>',
-                html[pos:pos + 2000],
+                html[pos : pos + 2000],
                 re.DOTALL | re.IGNORECASE,
             )
             if snippet_match:
-                snippet = re.sub(r'<[^>]+>', '', snippet_match.group(1)).strip()
+                snippet = re.sub(r"<[^>]+>", "", snippet_match.group(1)).strip()
 
             if title:
-                results.append({
-                    "title": title,
-                    "snippet": snippet,
-                    "url": url,
-                })
+                results.append(
+                    {
+                        "title": title,
+                        "snippet": snippet,
+                        "url": url,
+                    }
+                )
 
         # Fallback: simpler pattern matching
         if not results:
             # Look for linkedin.com/in URLs near text that looks like names
             simple_pattern = re.compile(
-                r'(https?://(?:www\.)?linkedin\.com/in/[a-zA-Z0-9\-_]+)[^<]*'
-                r'(?:<[^>]+>)*\s*([A-Z][a-zA-Z\-\'\. ]+[-–—].+?)(?:<|$)',
+                r"(https?://(?:www\.)?linkedin\.com/in/[a-zA-Z0-9\-_]+)[^<]*"
+                r"(?:<[^>]+>)*\s*([A-Z][a-zA-Z\-\'\. ]+[-–—].+?)(?:<|$)",
                 re.IGNORECASE,
             )
             for match in simple_pattern.finditer(html):
-                results.append({
-                    "title": re.sub(r'<[^>]+>', '', match.group(2)).strip(),
-                    "snippet": "",
-                    "url": match.group(1),
-                })
+                results.append(
+                    {
+                        "title": re.sub(r"<[^>]+>", "", match.group(2)).strip(),
+                        "snippet": "",
+                        "url": match.group(1),
+                    }
+                )
 
         return results
 
@@ -539,8 +584,8 @@ class LinkedInDiscovery(BaseCollector):
         Parse a person's name and title from Google result title/snippet text.
         """
         # Clean up text
-        title = re.sub(r'\s*\|\s*LinkedIn\s*$', '', title).strip()
-        title = re.sub(r'\s*-\s*LinkedIn\s*$', '', title).strip()
+        title = re.sub(r"\s*\|\s*LinkedIn\s*$", "", title).strip()
+        title = re.sub(r"\s*-\s*LinkedIn\s*$", "", title).strip()
 
         # Try snippet patterns
         for pattern in SNIPPET_PATTERNS:
@@ -577,7 +622,7 @@ class LinkedInDiscovery(BaseCollector):
 
         # Try "Name at Company" pattern from snippet
         at_pattern = re.compile(
-            r'([A-Z][a-zA-Z\-\'\. ]{2,30})\.\s*(.{5,80}?)\s+at\s+',
+            r"([A-Z][a-zA-Z\-\'\. ]{2,30})\.\s*(.{5,80}?)\s+at\s+",
         )
         for text in [title, snippet]:
             match = at_pattern.search(text)
@@ -594,7 +639,7 @@ class LinkedInDiscovery(BaseCollector):
                     )
 
         # Last resort: if title has "Name - Title" format
-        parts = re.split(r'\s*[-–—]\s*', title)
+        parts = re.split(r"\s*[-–—]\s*", title)
         if len(parts) >= 2:
             name = parts[0].strip()
             role = parts[1].strip()
@@ -620,8 +665,8 @@ class LinkedInDiscovery(BaseCollector):
         """
         # Convert slug to name: "jane-smith-12345" -> "Jane Smith"
         # Remove trailing numbers
-        clean = re.sub(r'-\d+[a-z]?$', '', username)
-        clean = re.sub(r'-\d{4,}', '', clean)  # Remove long number sequences
+        clean = re.sub(r"-\d+[a-z]?$", "", username)
+        clean = re.sub(r"-\d{4,}", "", clean)  # Remove long number sequences
         parts = clean.split("-")
 
         # Filter out very short parts and numbers
@@ -635,13 +680,13 @@ class LinkedInDiscovery(BaseCollector):
         # Try to find their title near this username in the HTML
         username_pos = html.find(username)
         if username_pos > 0:
-            context = html[max(0, username_pos - 500):username_pos + 500]
-            context_clean = re.sub(r'<[^>]+>', ' ', context)
+            context = html[max(0, username_pos - 500) : username_pos + 500]
+            context_clean = re.sub(r"<[^>]+>", " ", context)
 
             # Look for title patterns near the name
             title_match = re.search(
-                r'(?:' + re.escape(name_parts[0]) + r'.*?)'
-                r'[-–—]\s*(.{5,80}?)(?:\s*[-–—]|\s*\||\s*at\s)',
+                r"(?:" + re.escape(name_parts[0]) + r".*?)"
+                r"[-–—]\s*(.{5,80}?)(?:\s*[-–—]|\s*\||\s*at\s)",
                 context_clean,
                 re.IGNORECASE,
             )
@@ -683,8 +728,13 @@ class LinkedInDiscovery(BaseCollector):
         # Filter common false positives
         lower = name.lower()
         false_positives = [
-            "view all", "see more", "show more", "people also",
-            "related searches", "sign in", "log in",
+            "view all",
+            "see more",
+            "show more",
+            "people also",
+            "related searches",
+            "sign in",
+            "log in",
         ]
         if any(fp in lower for fp in false_positives):
             return False
@@ -700,10 +750,21 @@ class LinkedInDiscovery(BaseCollector):
 
         if any(k in title_lower for k in ["ceo", "chief executive"]):
             return TitleLevel.C_SUITE
-        if any(k in title_lower for k in [
-            "cto", "cfo", "coo", "cio", "ciso", "cdo", "cmo", "cro",
-            "chief", "general counsel",
-        ]):
+        if any(
+            k in title_lower
+            for k in [
+                "cto",
+                "cfo",
+                "coo",
+                "cio",
+                "ciso",
+                "cdo",
+                "cmo",
+                "cro",
+                "chief",
+                "general counsel",
+            ]
+        ):
             return TitleLevel.C_SUITE
         if "president" in title_lower and "vice" not in title_lower:
             return TitleLevel.PRESIDENT
@@ -713,9 +774,14 @@ class LinkedInDiscovery(BaseCollector):
             return TitleLevel.SVP
         if "vice president" in title_lower or title_lower.startswith("vp"):
             return TitleLevel.VP
-        if any(k in title_lower for k in [
-            "managing director", "head of", "director",
-        ]):
+        if any(
+            k in title_lower
+            for k in [
+                "managing director",
+                "head of",
+                "director",
+            ]
+        ):
             return TitleLevel.DIRECTOR
         if "manager" in title_lower:
             return TitleLevel.MANAGER

@@ -214,6 +214,7 @@ class BaseCollector:
         content = await self.fetch_url(url, use_cache=use_cache)
         if content:
             import json
+
             try:
                 return json.loads(content)
             except json.JSONDecodeError as e:

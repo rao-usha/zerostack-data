@@ -3,6 +3,7 @@ GraphQL schema and FastAPI integration for Nexdata.
 
 Assembles all types, resolvers, and creates the GraphQL endpoint.
 """
+
 import strawberry
 from strawberry.fastapi import GraphQLRouter
 from typing import Optional, List
@@ -54,8 +55,12 @@ class Query:
     ) -> Optional[LPFundType]:
         db = info.context["db"]
         return resolve_lp_fund(
-            db, id, include_portfolio, portfolio_limit,
-            include_coinvestors, coinvestor_limit
+            db,
+            id,
+            include_portfolio,
+            portfolio_limit,
+            include_coinvestors,
+            coinvestor_limit,
         )
 
     @strawberry.field(description="List LP funds with optional filters")
@@ -71,8 +76,7 @@ class Query:
     ) -> List[LPFundType]:
         db = info.context["db"]
         return resolve_lp_funds(
-            db, limit, offset, lp_type, jurisdiction,
-            include_portfolio, portfolio_limit
+            db, limit, offset, lp_type, jurisdiction, include_portfolio, portfolio_limit
         )
 
     @strawberry.field(description="Get a single family office by ID")
@@ -87,8 +91,12 @@ class Query:
     ) -> Optional[FamilyOfficeType]:
         db = info.context["db"]
         return resolve_family_office(
-            db, id, include_portfolio, portfolio_limit,
-            include_coinvestors, coinvestor_limit
+            db,
+            id,
+            include_portfolio,
+            portfolio_limit,
+            include_coinvestors,
+            coinvestor_limit,
         )
 
     @strawberry.field(description="List family offices with optional filters")
@@ -105,8 +113,7 @@ class Query:
     ) -> List[FamilyOfficeType]:
         db = info.context["db"]
         return resolve_family_offices(
-            db, limit, offset, region, country, type,
-            include_portfolio, portfolio_limit
+            db, limit, offset, region, country, type, include_portfolio, portfolio_limit
         )
 
     @strawberry.field(description="Get a single portfolio company by ID")

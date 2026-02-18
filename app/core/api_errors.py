@@ -5,6 +5,7 @@ Provides a unified error hierarchy for all external API clients.
 Each error type indicates whether the operation should be retried
 and includes context for debugging.
 """
+
 from typing import Optional, Dict, Any
 
 
@@ -26,7 +27,7 @@ class APIError(Exception):
         source: Optional[str] = None,
         status_code: Optional[int] = None,
         response_data: Optional[Dict[str, Any]] = None,
-        retryable: bool = False
+        retryable: bool = False,
     ):
         super().__init__(message)
         self.message = message
@@ -51,7 +52,7 @@ class APIError(Exception):
             "source": self.source,
             "status_code": self.status_code,
             "retryable": self.retryable,
-            "response_data": self.response_data
+            "response_data": self.response_data,
         }
 
 
@@ -71,14 +72,14 @@ class RetryableError(APIError):
         message: str,
         source: Optional[str] = None,
         status_code: Optional[int] = None,
-        response_data: Optional[Dict[str, Any]] = None
+        response_data: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
             message=message,
             source=source,
             status_code=status_code,
             response_data=response_data,
-            retryable=True
+            retryable=True,
         )
 
 
@@ -95,14 +96,14 @@ class RateLimitError(APIError):
         message: str,
         source: Optional[str] = None,
         retry_after: Optional[int] = None,
-        response_data: Optional[Dict[str, Any]] = None
+        response_data: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
             message=message,
             source=source,
             status_code=429,
             response_data=response_data,
-            retryable=True
+            retryable=True,
         )
         self.retry_after = retry_after or 60  # Default to 60 seconds
 
@@ -123,14 +124,14 @@ class FatalError(APIError):
         message: str,
         source: Optional[str] = None,
         status_code: Optional[int] = None,
-        response_data: Optional[Dict[str, Any]] = None
+        response_data: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
             message=message,
             source=source,
             status_code=status_code,
             response_data=response_data,
-            retryable=False
+            retryable=False,
         )
 
 
@@ -145,13 +146,10 @@ class AuthenticationError(FatalError):
         self,
         message: str = "Authentication failed - check API key",
         source: Optional[str] = None,
-        response_data: Optional[Dict[str, Any]] = None
+        response_data: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
-            message=message,
-            source=source,
-            status_code=401,
-            response_data=response_data
+            message=message, source=source, status_code=401, response_data=response_data
         )
 
 
@@ -167,15 +165,12 @@ class NotFoundError(FatalError):
         message: str = "Resource not found",
         source: Optional[str] = None,
         resource_id: Optional[str] = None,
-        response_data: Optional[Dict[str, Any]] = None
+        response_data: Optional[Dict[str, Any]] = None,
     ):
         if resource_id:
             message = f"{message}: {resource_id}"
         super().__init__(
-            message=message,
-            source=source,
-            status_code=404,
-            response_data=response_data
+            message=message, source=source, status_code=404, response_data=response_data
         )
         self.resource_id = resource_id
 
@@ -192,13 +187,10 @@ class ValidationError(FatalError):
         message: str = "Invalid request parameters",
         source: Optional[str] = None,
         invalid_params: Optional[Dict[str, str]] = None,
-        response_data: Optional[Dict[str, Any]] = None
+        response_data: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
-            message=message,
-            source=source,
-            status_code=400,
-            response_data=response_data
+            message=message, source=source, status_code=400, response_data=response_data
         )
         self.invalid_params = invalid_params or {}
 
@@ -214,21 +206,16 @@ class ConfigurationError(FatalError):
         self,
         message: str,
         source: Optional[str] = None,
-        missing_config: Optional[str] = None
+        missing_config: Optional[str] = None,
     ):
         super().__init__(
-            message=message,
-            source=source,
-            status_code=None,
-            response_data=None
+            message=message, source=source, status_code=None, response_data=None
         )
         self.missing_config = missing_config
 
 
 def classify_http_error(
-    status_code: int,
-    response_text: str = "",
-    source: Optional[str] = None
+    status_code: int, response_text: str = "", source: Optional[str] = None
 ) -> APIError:
     """
     Classify an HTTP error into the appropriate APIError subclass.
@@ -243,40 +230,34 @@ def classify_http_error(
     """
     if status_code == 429:
         return RateLimitError(
-            message=f"Rate limited: {response_text[:200]}",
-            source=source
+            message=f"Rate limited: {response_text[:200]}", source=source
         )
     elif status_code == 401:
         return AuthenticationError(
-            message=f"Authentication failed: {response_text[:200]}",
-            source=source
+            message=f"Authentication failed: {response_text[:200]}", source=source
         )
     elif status_code == 403:
         return FatalError(
             message=f"Access forbidden: {response_text[:200]}",
             source=source,
-            status_code=403
+            status_code=403,
         )
     elif status_code == 404:
-        return NotFoundError(
-            message=f"Not found: {response_text[:200]}",
-            source=source
-        )
+        return NotFoundError(message=f"Not found: {response_text[:200]}", source=source)
     elif status_code == 400:
         return ValidationError(
-            message=f"Bad request: {response_text[:200]}",
-            source=source
+            message=f"Bad request: {response_text[:200]}", source=source
         )
     elif 500 <= status_code < 600:
         return RetryableError(
             message=f"Server error: {response_text[:200]}",
             source=source,
-            status_code=status_code
+            status_code=status_code,
         )
     else:
         return APIError(
             message=f"HTTP error {status_code}: {response_text[:200]}",
             source=source,
             status_code=status_code,
-            retryable=False
+            retryable=False,
         )

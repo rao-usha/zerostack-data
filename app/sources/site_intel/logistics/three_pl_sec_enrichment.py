@@ -7,6 +7,7 @@ Uses the SEC company submissions and XBRL company facts APIs.
 Rate limit: 10 req/sec per SEC fair access policy.
 User-Agent must include company/contact info per SEC guidelines.
 """
+
 import asyncio
 import logging
 from datetime import datetime
@@ -17,7 +18,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import ThreePLCompany
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -75,7 +80,9 @@ class ThreePLSECEnrichmentCollector(BaseCollector):
     async def collect(self, config: CollectionConfig) -> CollectionResult:
         """Fetch SEC EDGAR data for public 3PL companies."""
         try:
-            logger.info(f"Enriching {len(PUBLIC_3PL_CIK_MAP)} public 3PL companies from SEC EDGAR...")
+            logger.info(
+                f"Enriching {len(PUBLIC_3PL_CIK_MAP)} public 3PL companies from SEC EDGAR..."
+            )
 
             records = []
             errors = []
@@ -87,7 +94,9 @@ class ThreePLSECEnrichmentCollector(BaseCollector):
                     record = await self._fetch_company_data(company_name, sec_info)
                     if record:
                         records.append(record)
-                        logger.debug(f"Enriched {company_name} from SEC ({sec_info['ticker']})")
+                        logger.debug(
+                            f"Enriched {company_name} from SEC ({sec_info['ticker']})"
+                        )
 
                     self.update_progress(
                         processed=processed,
@@ -97,21 +106,30 @@ class ThreePLSECEnrichmentCollector(BaseCollector):
 
                 except Exception as e:
                     logger.warning(f"Failed to fetch SEC data for {company_name}: {e}")
-                    errors.append({
-                        "company": company_name,
-                        "ticker": sec_info.get("ticker"),
-                        "error": str(e),
-                    })
+                    errors.append(
+                        {
+                            "company": company_name,
+                            "ticker": sec_info.get("ticker"),
+                            "error": str(e),
+                        }
+                    )
 
-            logger.info(f"Fetched SEC data for {len(records)}/{len(PUBLIC_3PL_CIK_MAP)} companies")
+            logger.info(
+                f"Fetched SEC data for {len(records)}/{len(PUBLIC_3PL_CIK_MAP)} companies"
+            )
 
             if records:
                 # Ensure all records have consistent keys for batch INSERT
                 all_keys = [
-                    "company_name", "headquarters_city", "headquarters_state",
-                    "employee_count", "annual_revenue_million",
-                    "facility_count", "website",
-                    "source", "collected_at",
+                    "company_name",
+                    "headquarters_city",
+                    "headquarters_state",
+                    "employee_count",
+                    "annual_revenue_million",
+                    "facility_count",
+                    "website",
+                    "source",
+                    "collected_at",
                 ]
                 for rec in records:
                     for key in all_keys:
@@ -122,15 +140,21 @@ class ThreePLSECEnrichmentCollector(BaseCollector):
                     records,
                     unique_columns=["company_name"],
                     update_columns=[
-                        "headquarters_city", "headquarters_state",
-                        "employee_count", "annual_revenue_million",
-                        "facility_count", "website",
-                        "source", "collected_at",
+                        "headquarters_city",
+                        "headquarters_state",
+                        "employee_count",
+                        "annual_revenue_million",
+                        "facility_count",
+                        "website",
+                        "source",
+                        "collected_at",
                     ],
                 )
 
                 return self.create_result(
-                    status=CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL,
+                    status=CollectionStatus.SUCCESS
+                    if not errors
+                    else CollectionStatus.PARTIAL,
                     total=len(PUBLIC_3PL_CIK_MAP),
                     processed=processed,
                     inserted=inserted,
@@ -242,10 +266,7 @@ class ThreePLSECEnrichmentCollector(BaseCollector):
                 return None
 
             # Get the most recent 10-K filing (annual report)
-            annual_values = [
-                v for v in values
-                if v.get("form") in ("10-K", "10-K/A")
-            ]
+            annual_values = [v for v in values if v.get("form") in ("10-K", "10-K/A")]
 
             if annual_values:
                 # Sort by end date descending
@@ -287,16 +308,15 @@ class ThreePLSECEnrichmentCollector(BaseCollector):
 
                 # Get most recent 10-K annual value (full year, not quarterly)
                 annual_values = [
-                    v for v in usd_values
-                    if v.get("form") in ("10-K", "10-K/A")
-                    and v.get("fp") == "FY"
+                    v
+                    for v in usd_values
+                    if v.get("form") in ("10-K", "10-K/A") and v.get("fp") == "FY"
                 ]
 
                 if not annual_values:
                     # Fallback: 10-K without FY filter
                     annual_values = [
-                        v for v in usd_values
-                        if v.get("form") in ("10-K", "10-K/A")
+                        v for v in usd_values if v.get("form") in ("10-K", "10-K/A")
                     ]
 
                 if annual_values:
@@ -324,17 +344,18 @@ class ThreePLSECEnrichmentCollector(BaseCollector):
             for concept in facility_concepts:
                 fact = us_gaap.get(concept, {})
                 # Try pure units first, then number
-                values = fact.get("units", {}).get("pure", []) or \
-                         fact.get("units", {}).get("facility", []) or \
-                         fact.get("units", {}).get("property", []) or \
-                         fact.get("units", {}).get("store", [])
+                values = (
+                    fact.get("units", {}).get("pure", [])
+                    or fact.get("units", {}).get("facility", [])
+                    or fact.get("units", {}).get("property", [])
+                    or fact.get("units", {}).get("store", [])
+                )
 
                 if not values:
                     continue
 
                 annual_values = [
-                    v for v in values
-                    if v.get("form") in ("10-K", "10-K/A")
+                    v for v in values if v.get("form") in ("10-K", "10-K/A")
                 ]
 
                 if annual_values:

@@ -1,4 +1,5 @@
 """LP collection executor for the worker queue."""
+
 import asyncio
 import logging
 
@@ -14,7 +15,11 @@ async def execute(job: JobQueue, db: Session):
     """Execute an LP collection job."""
     from app.core.database import get_session_factory
     from app.sources.lp_collection.runner import LpCollectionOrchestrator
-    from app.sources.lp_collection.types import CollectionConfig, LpCollectionSource, CollectionMode
+    from app.sources.lp_collection.types import (
+        CollectionConfig,
+        LpCollectionSource,
+        CollectionMode,
+    )
 
     payload = job.payload or {}
 
@@ -40,12 +45,16 @@ async def execute(job: JobQueue, db: Session):
     try:
         orchestrator = LpCollectionOrchestrator(work_db, config)
 
-        send_job_event(db, "job_progress", {
-            "job_id": job.id,
-            "job_type": "lp",
-            "progress_pct": 10.0,
-            "progress_message": "Running LP collection",
-        })
+        send_job_event(
+            db,
+            "job_progress",
+            {
+                "job_id": job.id,
+                "job_type": "lp",
+                "progress_pct": 10.0,
+                "progress_message": "Running LP collection",
+            },
+        )
         db.commit()
 
         await orchestrator.run_collection_job()

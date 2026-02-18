@@ -44,31 +44,89 @@ class DeepCrawler(BaseCollector):
 
     # Keywords that boost a link's relevance score
     HIGH_VALUE_KEYWORDS = [
-        "leadership", "leaders", "executive", "executives", "management",
-        "management-team", "our-team", "team", "board", "directors",
-        "board-of-directors", "officers", "who-we-are",
+        "leadership",
+        "leaders",
+        "executive",
+        "executives",
+        "management",
+        "management-team",
+        "our-team",
+        "team",
+        "board",
+        "directors",
+        "board-of-directors",
+        "officers",
+        "who-we-are",
     ]
     MEDIUM_VALUE_KEYWORDS = [
-        "about", "about-us", "people", "staff", "bios", "profiles",
-        "governance", "corporate-governance", "senior-management",
+        "about",
+        "about-us",
+        "people",
+        "staff",
+        "bios",
+        "profiles",
+        "governance",
+        "corporate-governance",
+        "senior-management",
     ]
     # Keywords that penalize a link (not relevant to people)
     PENALTY_KEYWORDS = [
-        "careers", "jobs", "job", "apply", "recruiting", "recruitment",
-        "login", "sign-in", "signup", "cart", "checkout", "shop",
-        "products", "services", "solutions", "pricing",
-        "blog", "news", "press", "media", "events", "webinar",
-        "faq", "help", "support", "contact-us", "privacy", "terms",
-        "cookie", "sitemap", "search", "subscribe", "unsubscribe",
-        "esg", "sustainability", "diversity", "inclusion",
-        "annual-report", "investor", "sec-filing", "financial",
+        "careers",
+        "jobs",
+        "job",
+        "apply",
+        "recruiting",
+        "recruitment",
+        "login",
+        "sign-in",
+        "signup",
+        "cart",
+        "checkout",
+        "shop",
+        "products",
+        "services",
+        "solutions",
+        "pricing",
+        "blog",
+        "news",
+        "press",
+        "media",
+        "events",
+        "webinar",
+        "faq",
+        "help",
+        "support",
+        "contact-us",
+        "privacy",
+        "terms",
+        "cookie",
+        "sitemap",
+        "search",
+        "subscribe",
+        "unsubscribe",
+        "esg",
+        "sustainability",
+        "diversity",
+        "inclusion",
+        "annual-report",
+        "investor",
+        "sec-filing",
+        "financial",
     ]
 
     # Text content on links that suggests people content
     LINK_TEXT_KEYWORDS = [
-        "leadership", "team", "executive", "management", "board",
-        "directors", "officers", "who we are", "our people",
-        "senior leadership", "leadership team",
+        "leadership",
+        "team",
+        "executive",
+        "management",
+        "board",
+        "directors",
+        "officers",
+        "who we are",
+        "our people",
+        "senior leadership",
+        "leadership team",
     ]
 
     def __init__(self):
@@ -133,7 +191,9 @@ class DeepCrawler(BaseCollector):
 
             # Check domain is allowed
             domain = urlparse(url).netloc.lower().lstrip("www.")
-            if domain not in allowed and not any(domain.endswith("." + d) for d in allowed):
+            if domain not in allowed and not any(
+                domain.endswith("." + d) for d in allowed
+            ):
                 continue
 
             logger.debug(f"[DeepCrawler] Visiting (depth={depth}): {url}")
@@ -151,7 +211,9 @@ class DeepCrawler(BaseCollector):
                 # Check if page has people content
                 cleaned = self.html_cleaner.clean(html, url)
 
-                if cleaned.has_leadership_content or self._page_likely_has_people(html, url):
+                if cleaned.has_leadership_content or self._page_likely_has_people(
+                    html, url
+                ):
                     # Extract people from this page
                     people = await self._extract_people_from_page(
                         html, cleaned, url, company_name
@@ -217,7 +279,7 @@ class DeepCrawler(BaseCollector):
         )
 
         # Content-based signals (check for multiple name-title patterns)
-        name_title_pattern = r'[A-Z][a-z]+ [A-Z][a-z]+.*(?:Chief|President|Vice|Director|Officer|Manager|SVP|EVP|VP|CEO|CFO|COO|CTO)'
+        name_title_pattern = r"[A-Z][a-z]+ [A-Z][a-z]+.*(?:Chief|President|Vice|Director|Officer|Manager|SVP|EVP|VP|CEO|CFO|COO|CTO)"
         content_signals = len(re.findall(name_title_pattern, html[:20000])) >= 2
 
         return url_signals or content_signals
@@ -315,7 +377,17 @@ class DeepCrawler(BaseCollector):
             path_lower = urlparse(normalized).path.lower()
             if any(
                 path_lower.endswith(ext)
-                for ext in [".pdf", ".jpg", ".png", ".gif", ".css", ".js", ".zip", ".doc", ".xlsx"]
+                for ext in [
+                    ".pdf",
+                    ".jpg",
+                    ".png",
+                    ".gif",
+                    ".css",
+                    ".js",
+                    ".zip",
+                    ".doc",
+                    ".xlsx",
+                ]
             ):
                 continue
 

@@ -28,9 +28,12 @@ router = APIRouter(prefix="/compare", tags=["Portfolio Comparison"])
 
 class PortfolioCompareRequest(BaseModel):
     """Request to compare two portfolios."""
+
     investor_a: int = Field(..., gt=0, description="First investor ID")
     investor_b: int = Field(..., gt=0, description="Second investor ID")
-    top_holdings: int = Field(10, ge=1, le=50, description="Number of top holdings to include")
+    top_holdings: int = Field(
+        10, ge=1, le=50, description="Number of top holdings to include"
+    )
 
 
 # =============================================================================
@@ -40,6 +43,7 @@ class PortfolioCompareRequest(BaseModel):
 
 class HoldingResponse(BaseModel):
     """A portfolio holding."""
+
     company_id: int
     company_name: str
     industry: Optional[str]
@@ -49,6 +53,7 @@ class HoldingResponse(BaseModel):
 
 class InvestorResponse(BaseModel):
     """Investor summary."""
+
     id: int
     name: str
     investor_type: str
@@ -57,6 +62,7 @@ class InvestorResponse(BaseModel):
 
 class IndustryAllocationResponse(BaseModel):
     """Industry allocation comparison."""
+
     industry: str
     count_a: int
     count_b: int
@@ -66,18 +72,25 @@ class IndustryAllocationResponse(BaseModel):
 
 class PortfolioComparisonResponse(BaseModel):
     """Complete portfolio comparison response."""
+
     investor_a: InvestorResponse
     investor_b: InvestorResponse
 
     # Overlap metrics
     overlap_count: int = Field(..., description="Number of shared holdings")
-    overlap_percentage_a: float = Field(..., description="% of A's portfolio that overlaps")
-    overlap_percentage_b: float = Field(..., description="% of B's portfolio that overlaps")
+    overlap_percentage_a: float = Field(
+        ..., description="% of A's portfolio that overlaps"
+    )
+    overlap_percentage_b: float = Field(
+        ..., description="% of B's portfolio that overlaps"
+    )
     jaccard_similarity: float = Field(..., description="Jaccard similarity index (0-1)")
     jaccard_percentage: float = Field(..., description="Jaccard as percentage (0-100)")
 
     # Holdings
-    shared_holdings: List[HoldingResponse] = Field(..., description="Companies held by both")
+    shared_holdings: List[HoldingResponse] = Field(
+        ..., description="Companies held by both"
+    )
     unique_to_a: List[HoldingResponse] = Field(..., description="Companies only in A")
     unique_to_b: List[HoldingResponse] = Field(..., description="Companies only in B")
 
@@ -94,6 +107,7 @@ class PortfolioComparisonResponse(BaseModel):
 
 class HistoricalDiffResponse(BaseModel):
     """Historical portfolio diff response."""
+
     investor_id: int
     investor_name: str
     period_start: str
@@ -112,6 +126,7 @@ class HistoricalDiffResponse(BaseModel):
 
 class IndustryComparisonResponse(BaseModel):
     """Industry-only comparison response."""
+
     investor_a_id: int
     investor_a_name: str
     investor_b_id: int
@@ -126,8 +141,7 @@ class IndustryComparisonResponse(BaseModel):
 
 @router.post("/portfolios", response_model=PortfolioComparisonResponse)
 async def compare_portfolios(
-    request: PortfolioCompareRequest,
-    db: Session = Depends(get_db)
+    request: PortfolioCompareRequest, db: Session = Depends(get_db)
 ):
     """
     Compare two investors' portfolios side-by-side.
@@ -156,8 +170,7 @@ async def compare_portfolios(
     """
     if request.investor_a == request.investor_b:
         raise HTTPException(
-            status_code=400,
-            detail="Cannot compare an investor to itself"
+            status_code=400, detail="Cannot compare an investor to itself"
         )
 
     service = PortfolioComparisonService(db)
@@ -166,22 +179,20 @@ async def compare_portfolios(
     investor_a = service.get_investor_info(request.investor_a)
     if not investor_a:
         raise HTTPException(
-            status_code=404,
-            detail=f"Investor {request.investor_a} not found"
+            status_code=404, detail=f"Investor {request.investor_a} not found"
         )
 
     investor_b = service.get_investor_info(request.investor_b)
     if not investor_b:
         raise HTTPException(
-            status_code=404,
-            detail=f"Investor {request.investor_b} not found"
+            status_code=404, detail=f"Investor {request.investor_b} not found"
         )
 
     try:
         comparison = service.compare_portfolios(
             investor_a_id=request.investor_a,
             investor_b_id=request.investor_b,
-            top_holdings=request.top_holdings
+            top_holdings=request.top_holdings,
         )
 
         if not comparison:
@@ -192,13 +203,13 @@ async def compare_portfolios(
                 id=comparison.investor_a.id,
                 name=comparison.investor_a.name,
                 investor_type=comparison.investor_a.investor_type,
-                total_holdings=comparison.investor_a.total_holdings
+                total_holdings=comparison.investor_a.total_holdings,
             ),
             investor_b=InvestorResponse(
                 id=comparison.investor_b.id,
                 name=comparison.investor_b.name,
                 investor_type=comparison.investor_b.investor_type,
-                total_holdings=comparison.investor_b.total_holdings
+                total_holdings=comparison.investor_b.total_holdings,
             ),
             overlap_count=comparison.overlap_count,
             overlap_percentage_a=comparison.overlap_percentage_a,
@@ -211,7 +222,7 @@ async def compare_portfolios(
                     company_name=h.company_name,
                     industry=h.industry,
                     market_value_usd=h.market_value_usd,
-                    shares_held=h.shares_held
+                    shares_held=h.shares_held,
                 )
                 for h in comparison.shared_holdings
             ],
@@ -221,7 +232,7 @@ async def compare_portfolios(
                     company_name=h.company_name,
                     industry=h.industry,
                     market_value_usd=h.market_value_usd,
-                    shares_held=h.shares_held
+                    shares_held=h.shares_held,
                 )
                 for h in comparison.unique_to_a
             ],
@@ -231,7 +242,7 @@ async def compare_portfolios(
                     company_name=h.company_name,
                     industry=h.industry,
                     market_value_usd=h.market_value_usd,
-                    shares_held=h.shares_held
+                    shares_held=h.shares_held,
                 )
                 for h in comparison.unique_to_b
             ],
@@ -241,7 +252,7 @@ async def compare_portfolios(
                     company_name=h.company_name,
                     industry=h.industry,
                     market_value_usd=h.market_value_usd,
-                    shares_held=h.shares_held
+                    shares_held=h.shares_held,
                 )
                 for h in comparison.top_holdings_a
             ],
@@ -251,7 +262,7 @@ async def compare_portfolios(
                     company_name=h.company_name,
                     industry=h.industry,
                     market_value_usd=h.market_value_usd,
-                    shares_held=h.shares_held
+                    shares_held=h.shares_held,
                 )
                 for h in comparison.top_holdings_b
             ],
@@ -261,18 +272,20 @@ async def compare_portfolios(
                     count_a=i.count_a,
                     count_b=i.count_b,
                     percentage_a=i.percentage_a,
-                    percentage_b=i.percentage_b
+                    percentage_b=i.percentage_b,
                 )
                 for i in comparison.industry_comparison
             ],
-            comparison_date=comparison.comparison_date
+            comparison_date=comparison.comparison_date,
         )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error comparing portfolios: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to compare portfolios: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to compare portfolios: {str(e)}"
+        )
 
 
 @router.get("/investor/{investor_id}/history", response_model=HistoricalDiffResponse)
@@ -280,7 +293,7 @@ async def compare_investor_history(
     investor_id: int,
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Compare an investor's portfolio over time.
@@ -308,10 +321,7 @@ async def compare_investor_history(
     # Validate investor exists
     investor = service.get_investor_info(investor_id)
     if not investor:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Investor {investor_id} not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Investor {investor_id} not found")
 
     # Parse dates
     parsed_start = None
@@ -322,8 +332,7 @@ async def compare_investor_history(
             parsed_start = datetime.strptime(start_date, "%Y-%m-%d")
         except ValueError:
             raise HTTPException(
-                status_code=400,
-                detail="Invalid start_date format. Use YYYY-MM-DD"
+                status_code=400, detail="Invalid start_date format. Use YYYY-MM-DD"
             )
 
     if end_date:
@@ -331,19 +340,18 @@ async def compare_investor_history(
             parsed_end = datetime.strptime(end_date, "%Y-%m-%d")
         except ValueError:
             raise HTTPException(
-                status_code=400,
-                detail="Invalid end_date format. Use YYYY-MM-DD"
+                status_code=400, detail="Invalid end_date format. Use YYYY-MM-DD"
             )
 
     try:
         diff = service.compare_history(
-            investor_id=investor_id,
-            start_date=parsed_start,
-            end_date=parsed_end
+            investor_id=investor_id, start_date=parsed_start, end_date=parsed_end
         )
 
         if not diff:
-            raise HTTPException(status_code=500, detail="Failed to generate historical diff")
+            raise HTTPException(
+                status_code=500, detail="Failed to generate historical diff"
+            )
 
         return HistoricalDiffResponse(
             investor_id=diff.investor_id,
@@ -356,7 +364,7 @@ async def compare_investor_history(
                     company_name=h.company_name,
                     industry=h.industry,
                     market_value_usd=h.market_value_usd,
-                    shares_held=h.shares_held
+                    shares_held=h.shares_held,
                 )
                 for h in diff.additions
             ],
@@ -366,28 +374,30 @@ async def compare_investor_history(
                     company_name=h.company_name,
                     industry=h.industry,
                     market_value_usd=h.market_value_usd,
-                    shares_held=h.shares_held
+                    shares_held=h.shares_held,
                 )
                 for h in diff.removals
             ],
             unchanged_count=diff.unchanged_count,
             holdings_start=diff.holdings_start,
             holdings_end=diff.holdings_end,
-            net_change=diff.net_change
+            net_change=diff.net_change,
         )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error generating historical diff: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to generate historical diff: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate historical diff: {str(e)}"
+        )
 
 
 @router.get("/industry", response_model=IndustryComparisonResponse)
 async def compare_industry_allocations(
     investor_a: int = Query(..., gt=0, description="First investor ID"),
     investor_b: int = Query(..., gt=0, description="Second investor ID"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Compare industry/sector allocations between two investors.
@@ -406,8 +416,7 @@ async def compare_industry_allocations(
     """
     if investor_a == investor_b:
         raise HTTPException(
-            status_code=400,
-            detail="Cannot compare an investor to itself"
+            status_code=400, detail="Cannot compare an investor to itself"
         )
 
     service = PortfolioComparisonService(db)
@@ -425,7 +434,9 @@ async def compare_industry_allocations(
         comparison = service.get_industry_comparison(investor_a, investor_b)
 
         if comparison is None:
-            raise HTTPException(status_code=500, detail="Failed to generate industry comparison")
+            raise HTTPException(
+                status_code=500, detail="Failed to generate industry comparison"
+            )
 
         return IndustryComparisonResponse(
             investor_a_id=investor_a,
@@ -438,14 +449,16 @@ async def compare_industry_allocations(
                     count_a=i.count_a,
                     count_b=i.count_b,
                     percentage_a=i.percentage_a,
-                    percentage_b=i.percentage_b
+                    percentage_b=i.percentage_b,
                 )
                 for i in comparison
-            ]
+            ],
         )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error comparing industries: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to compare industries: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to compare industries: {str(e)}"
+        )

@@ -30,10 +30,16 @@ class InvestorProfileTemplate:
         data = {
             "generated_at": datetime.utcnow().isoformat(),
             "investor": self._get_investor(db, investor_id, investor_type),
-            "portfolio_summary": self._get_portfolio_summary(db, investor_id, investor_type),
+            "portfolio_summary": self._get_portfolio_summary(
+                db, investor_id, investor_type
+            ),
             "top_holdings": self._get_top_holdings(db, investor_id, investor_type),
-            "sector_allocation": self._get_sector_allocation(db, investor_id, investor_type),
-            "recent_activity": self._get_recent_activity(db, investor_id, investor_type),
+            "sector_allocation": self._get_sector_allocation(
+                db, investor_id, investor_type
+            ),
+            "recent_activity": self._get_recent_activity(
+                db, investor_id, investor_type
+            ),
         }
 
         return data
@@ -41,10 +47,13 @@ class InvestorProfileTemplate:
     def _get_investor(self, db: Session, investor_id: int, investor_type: str) -> Dict:
         """Get investor details."""
         if investor_type == "lp":
-            result = db.execute(text("""
+            result = db.execute(
+                text("""
                 SELECT id, name, lp_type, jurisdiction, website_url
                 FROM lp_fund WHERE id = :id
-            """), {"id": investor_id})
+            """),
+                {"id": investor_id},
+            )
             row = result.fetchone()
             if row:
                 return {
@@ -56,11 +65,14 @@ class InvestorProfileTemplate:
                     "aum_millions": None,
                 }
         else:
-            result = db.execute(text("""
+            result = db.execute(
+                text("""
                 SELECT id, name, 'family_office' as lp_type, location as jurisdiction,
                        website, estimated_aum_millions
                 FROM family_offices WHERE id = :id
-            """), {"id": investor_id})
+            """),
+                {"id": investor_id},
+            )
             row = result.fetchone()
             if row:
                 return {
@@ -74,16 +86,21 @@ class InvestorProfileTemplate:
 
         return {"id": investor_id, "name": "Unknown", "type": investor_type}
 
-    def _get_portfolio_summary(self, db: Session, investor_id: int, investor_type: str) -> Dict:
+    def _get_portfolio_summary(
+        self, db: Session, investor_id: int, investor_type: str
+    ) -> Dict:
         """Get portfolio summary stats."""
-        result = db.execute(text("""
+        result = db.execute(
+            text("""
             SELECT
                 COUNT(*) as total_holdings,
                 COUNT(DISTINCT company_industry) as sectors,
                 COUNT(CASE WHEN current_holding = 1 THEN 1 END) as current_holdings
             FROM portfolio_companies
             WHERE investor_id = :investor_id AND investor_type = :investor_type
-        """), {"investor_id": investor_id, "investor_type": investor_type})
+        """),
+            {"investor_id": investor_id, "investor_type": investor_type},
+        )
 
         row = result.fetchone()
         return {
@@ -92,9 +109,12 @@ class InvestorProfileTemplate:
             "current_holdings": row[2] if row else 0,
         }
 
-    def _get_top_holdings(self, db: Session, investor_id: int, investor_type: str, limit: int = 10) -> list:
+    def _get_top_holdings(
+        self, db: Session, investor_id: int, investor_type: str, limit: int = 10
+    ) -> list:
         """Get top portfolio holdings."""
-        result = db.execute(text("""
+        result = db.execute(
+            text("""
             SELECT company_name, company_industry, company_location, company_stage
             FROM portfolio_companies
             WHERE investor_id = :investor_id
@@ -102,7 +122,13 @@ class InvestorProfileTemplate:
                 AND current_holding = 1
             ORDER BY company_name
             LIMIT :limit
-        """), {"investor_id": investor_id, "investor_type": investor_type, "limit": limit})
+        """),
+            {
+                "investor_id": investor_id,
+                "investor_type": investor_type,
+                "limit": limit,
+            },
+        )
 
         return [
             {
@@ -114,9 +140,12 @@ class InvestorProfileTemplate:
             for row in result.fetchall()
         ]
 
-    def _get_sector_allocation(self, db: Session, investor_id: int, investor_type: str) -> list:
+    def _get_sector_allocation(
+        self, db: Session, investor_id: int, investor_type: str
+    ) -> list:
         """Get sector allocation breakdown."""
-        result = db.execute(text("""
+        result = db.execute(
+            text("""
             SELECT
                 COALESCE(company_industry, 'Unknown') as sector,
                 COUNT(*) as count
@@ -127,7 +156,9 @@ class InvestorProfileTemplate:
             GROUP BY company_industry
             ORDER BY count DESC
             LIMIT 10
-        """), {"investor_id": investor_id, "investor_type": investor_type})
+        """),
+            {"investor_id": investor_id, "investor_type": investor_type},
+        )
 
         rows = result.fetchall()
         total = sum(r[1] for r in rows)
@@ -141,16 +172,25 @@ class InvestorProfileTemplate:
             for row in rows
         ]
 
-    def _get_recent_activity(self, db: Session, investor_id: int, investor_type: str, limit: int = 5) -> list:
+    def _get_recent_activity(
+        self, db: Session, investor_id: int, investor_type: str, limit: int = 5
+    ) -> list:
         """Get recent portfolio changes."""
-        result = db.execute(text("""
+        result = db.execute(
+            text("""
             SELECT company_name, company_industry, collected_date
             FROM portfolio_companies
             WHERE investor_id = :investor_id
                 AND investor_type = :investor_type
             ORDER BY collected_date DESC
             LIMIT :limit
-        """), {"investor_id": investor_id, "investor_type": investor_type, "limit": limit})
+        """),
+            {
+                "investor_id": investor_id,
+                "investor_type": investor_type,
+                "limit": limit,
+            },
+        )
 
         return [
             {
@@ -291,7 +331,9 @@ class InvestorProfileTemplate:
 
         # Header styling
         header_font = Font(bold=True, size=14)
-        header_fill = PatternFill(start_color="3498DB", end_color="3498DB", fill_type="solid")
+        header_fill = PatternFill(
+            start_color="3498DB", end_color="3498DB", fill_type="solid"
+        )
         header_font_white = Font(bold=True, color="FFFFFF")
 
         # Title

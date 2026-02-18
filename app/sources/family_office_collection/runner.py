@@ -205,22 +205,28 @@ class FoCollectionOrchestrator:
                     try:
                         persisted = self._persist_items(fo_db_id, result.items)
                         # Note: items_new is computed from item.is_new flags set during persist
-                        logger.info(f"Persisted {persisted} new items for {fo.name} from {source.value}")
+                        logger.info(
+                            f"Persisted {persisted} new items for {fo.name} from {source.value}"
+                        )
                     except Exception as persist_error:
-                        logger.error(f"Error persisting items for {fo.name}: {persist_error}")
+                        logger.error(
+                            f"Error persisting items for {fo.name}: {persist_error}"
+                        )
                         result.warnings.append(f"Failed to persist: {persist_error}")
 
                 results.append(result)
 
             except Exception as e:
                 logger.error(f"Error collecting {source.value} for {fo.name}: {e}")
-                results.append(FoCollectionResult(
-                    fo_id=fo_id,
-                    fo_name=fo.name,
-                    source=source,
-                    success=False,
-                    error_message=str(e),
-                ))
+                results.append(
+                    FoCollectionResult(
+                        fo_id=fo_id,
+                        fo_name=fo.name,
+                        source=source,
+                        success=False,
+                        error_message=str(e),
+                    )
+                )
 
         return results
 
@@ -302,10 +308,14 @@ class FoCollectionOrchestrator:
             return False
 
         # Check for existing
-        existing = self.db.query(FamilyOfficeInvestment).filter(
-            FamilyOfficeInvestment.family_office_id == fo_db_id,
-            FamilyOfficeInvestment.company_name == company_name,
-        ).first()
+        existing = (
+            self.db.query(FamilyOfficeInvestment)
+            .filter(
+                FamilyOfficeInvestment.family_office_id == fo_db_id,
+                FamilyOfficeInvestment.company_name == company_name,
+            )
+            .first()
+        )
 
         if existing:
             # Update if we have more info
@@ -326,10 +336,14 @@ class FoCollectionOrchestrator:
             family_office_id=fo_db_id,
             company_name=company_name,
             company_website=data.get("company_website"),
-            investment_date=self._parse_date(data.get("investment_date") or data.get("filing_date")),
+            investment_date=self._parse_date(
+                data.get("investment_date") or data.get("filing_date")
+            ),
             investment_type=data.get("investment_type"),
             investment_stage=data.get("investment_stage"),
-            investment_amount_usd=str(data["investment_amount_usd"]) if data.get("investment_amount_usd") else None,
+            investment_amount_usd=str(data["investment_amount_usd"])
+            if data.get("investment_amount_usd")
+            else None,
             lead_investor=data.get("lead_investor"),
             source_type=data.get("source_type", "news"),
             source_url=item.source_url,
@@ -351,10 +365,14 @@ class FoCollectionOrchestrator:
             return False
 
         # Check for existing
-        existing = self.db.query(FamilyOfficeContact).filter(
-            FamilyOfficeContact.family_office_id == fo_db_id,
-            FamilyOfficeContact.full_name == name,
-        ).first()
+        existing = (
+            self.db.query(FamilyOfficeContact)
+            .filter(
+                FamilyOfficeContact.family_office_id == fo_db_id,
+                FamilyOfficeContact.full_name == name,
+            )
+            .first()
+        )
 
         if existing:
             # Update with new info
@@ -392,6 +410,7 @@ class FoCollectionOrchestrator:
             return None
         try:
             from datetime import date
+
             if isinstance(date_str, date):
                 return date_str
             # Try ISO format
@@ -411,8 +430,6 @@ class FoCollectionOrchestrator:
 
         from app.core.family_office_models import FamilyOffice
 
-        fo = self.db.query(FamilyOffice).filter(
-            FamilyOffice.name == fo_name
-        ).first()
+        fo = self.db.query(FamilyOffice).filter(FamilyOffice.name == fo_name).first()
 
         return fo.id if fo else None

@@ -20,9 +20,13 @@ def get_client() -> OpenCorporatesClient:
 @router.get("/search")
 def search_companies(
     query: str = Query(..., min_length=1, description="Company name search query"),
-    jurisdiction: Optional[str] = Query(None, description="Jurisdiction code (e.g., us_de, gb)"),
+    jurisdiction: Optional[str] = Query(
+        None, description="Jurisdiction code (e.g., us_de, gb)"
+    ),
     company_type: Optional[str] = Query(None, description="Company type filter"),
-    status: Optional[str] = Query(None, description="Current status filter (e.g., Active, Dissolved)"),
+    status: Optional[str] = Query(
+        None, description="Current status filter (e.g., Active, Dissolved)"
+    ),
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(30, ge=1, le=100, description="Results per page"),
 ):
@@ -48,7 +52,9 @@ def search_companies(
             )
             return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OpenCorporates API error: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"OpenCorporates API error: {str(e)}"
+        )
 
 
 @router.get("/company/{jurisdiction}/{company_number}")
@@ -70,13 +76,15 @@ def get_company(
             if not company:
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Company not found: {jurisdiction}/{company_number}"
+                    detail=f"Company not found: {jurisdiction}/{company_number}",
                 )
             return company
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OpenCorporates API error: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"OpenCorporates API error: {str(e)}"
+        )
 
 
 @router.get("/company/{jurisdiction}/{company_number}/officers")
@@ -108,7 +116,9 @@ def get_company_officers(
             result["company_number"] = company_number
             return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OpenCorporates API error: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"OpenCorporates API error: {str(e)}"
+        )
 
 
 @router.get("/company/{jurisdiction}/{company_number}/filings")
@@ -140,7 +150,9 @@ def get_company_filings(
             result["company_number"] = company_number
             return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OpenCorporates API error: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"OpenCorporates API error: {str(e)}"
+        )
 
 
 @router.get("/officers/search")
@@ -170,7 +182,9 @@ def search_officers(
             )
             return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OpenCorporates API error: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"OpenCorporates API error: {str(e)}"
+        )
 
 
 @router.get("/jurisdictions")
@@ -191,4 +205,6 @@ def list_jurisdictions():
                 "count": len(jurisdictions),
             }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OpenCorporates API error: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"OpenCorporates API error: {str(e)}"
+        )

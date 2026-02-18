@@ -3,9 +3,21 @@ SQLAlchemy models for core tables.
 
 These tables are source-agnostic and used by all data source adapters.
 """
+
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Column, Integer, String, DateTime, Text, JSON, Enum, UniqueConstraint, Index, Numeric
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    DateTime,
+    Text,
+    JSON,
+    Enum,
+    UniqueConstraint,
+    Index,
+    Numeric,
+)
 from sqlalchemy.orm import declarative_base
 import enum
 
@@ -14,6 +26,7 @@ Base = declarative_base()
 
 class JobStatus(str, enum.Enum):
     """Job status enumeration - ONLY these values allowed."""
+
     PENDING = "pending"
     BLOCKED = "blocked"  # Waiting for dependencies
     RUNNING = "running"
@@ -23,6 +36,7 @@ class JobStatus(str, enum.Enum):
 
 class ScheduleFrequency(str, enum.Enum):
     """Schedule frequency options."""
+
     HOURLY = "hourly"
     DAILY = "daily"
     WEEKLY = "weekly"
@@ -37,6 +51,7 @@ class IngestionJob(Base):
 
     MANDATORY: Every ingestion operation MUST create and update a job record.
     """
+
     __tablename__ = "ingestion_jobs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -45,9 +60,11 @@ class IngestionJob(Base):
         Enum(JobStatus, native_enum=False, length=20),
         nullable=False,
         default=JobStatus.PENDING,
-        index=True
+        index=True,
     )
-    config = Column(JSON, nullable=False)  # Job configuration (survey, year, table, etc.)
+    config = Column(
+        JSON, nullable=False
+    )  # Job configuration (survey, year, table, etc.)
 
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -62,8 +79,12 @@ class IngestionJob(Base):
     # Retry tracking
     retry_count = Column(Integer, nullable=False, default=0)
     max_retries = Column(Integer, nullable=False, default=3)
-    next_retry_at = Column(DateTime, nullable=True)  # When to retry (for scheduled retries)
-    parent_job_id = Column(Integer, nullable=True, index=True)  # Link to original job if this is a retry
+    next_retry_at = Column(
+        DateTime, nullable=True
+    )  # When to retry (for scheduled retries)
+    parent_job_id = Column(
+        Integer, nullable=True, index=True
+    )  # Link to original job if this is a retry
 
     def __repr__(self) -> str:
         return (
@@ -83,21 +104,28 @@ class IngestionSchedule(Base):
 
     Allows automated data refresh on configurable schedules.
     """
+
     __tablename__ = "ingestion_schedules"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False, unique=True)  # Human-readable name
-    source = Column(String(50), nullable=False, index=True)  # Data source (fred, census, etc.)
+    source = Column(
+        String(50), nullable=False, index=True
+    )  # Data source (fred, census, etc.)
     config = Column(JSON, nullable=False)  # Source-specific configuration
 
     # Schedule configuration
     frequency = Column(
         Enum(ScheduleFrequency, native_enum=False, length=20),
         nullable=False,
-        default=ScheduleFrequency.DAILY
+        default=ScheduleFrequency.DAILY,
     )
-    cron_expression = Column(String(100), nullable=True)  # For custom schedules (e.g., "0 6 * * *")
-    hour = Column(Integer, nullable=True, default=6)  # Hour to run (0-23) for non-cron schedules
+    cron_expression = Column(
+        String(100), nullable=True
+    )  # For custom schedules (e.g., "0 6 * * *")
+    hour = Column(
+        Integer, nullable=True, default=6
+    )  # Hour to run (0-23) for non-cron schedules
     day_of_week = Column(Integer, nullable=True)  # Day of week (0=Monday) for weekly
     day_of_month = Column(Integer, nullable=True)  # Day of month (1-31) for monthly
 
@@ -109,7 +137,9 @@ class IngestionSchedule(Base):
 
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     # Metadata
     description = Column(Text, nullable=True)
@@ -129,6 +159,7 @@ class SourceConfig(Base):
     Missing rows fall back to global defaults. Allows sources like Census
     (long-running) to have different timeouts than Treasury (fast).
     """
+
     __tablename__ = "source_configs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -157,10 +188,13 @@ class CollectionAuditLog(Base):
 
     Records who/what triggered a collection, when, and with what config.
     """
+
     __tablename__ = "collection_audit_log"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    trigger_type = Column(String(20), nullable=False, index=True)  # api, schedule, retry
+    trigger_type = Column(
+        String(20), nullable=False, index=True
+    )  # api, schedule, retry
     trigger_source = Column(String(255), nullable=True)  # endpoint path or schedule_id
     domain = Column(String(50), nullable=True, index=True)
     source = Column(String(50), nullable=False, index=True)
@@ -169,9 +203,7 @@ class CollectionAuditLog(Base):
     config_snapshot = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
-    __table_args__ = (
-        Index('idx_audit_source_created', 'source', 'created_at'),
-    )
+    __table_args__ = (Index("idx_audit_source_created", "source", "created_at"),)
 
     def __repr__(self) -> str:
         return (
@@ -186,22 +218,31 @@ class DatasetRegistry(Base):
 
     Each unique dataset (source + identifier) gets one entry.
     """
+
     __tablename__ = "dataset_registry"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     source = Column(String(50), nullable=False, index=True)
-    dataset_id = Column(String(255), nullable=False, index=True)  # e.g., "acs5_2023_b01001"
-    table_name = Column(String(255), nullable=False, unique=True)  # Actual Postgres table name
-    
+    dataset_id = Column(
+        String(255), nullable=False, index=True
+    )  # e.g., "acs5_2023_b01001"
+    table_name = Column(
+        String(255), nullable=False, unique=True
+    )  # Actual Postgres table name
+
     # Metadata
     display_name = Column(String(500), nullable=True)
     description = Column(Text, nullable=True)
-    source_metadata = Column(JSON, nullable=True)  # Source-specific metadata (renamed from 'metadata' to avoid SQLAlchemy conflict)
-    
+    source_metadata = Column(
+        JSON, nullable=True
+    )  # Source-specific metadata (renamed from 'metadata' to avoid SQLAlchemy conflict)
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    last_updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+    last_updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
     def __repr__(self) -> str:
         return (
             f"<DatasetRegistry(id={self.id}, source={self.source}, "
@@ -212,29 +253,36 @@ class DatasetRegistry(Base):
 class GeoJSONBoundaries(Base):
     """
     Storage for GeoJSON boundary data.
-    
+
     Stores geographic boundaries for Census geographies.
     """
+
     __tablename__ = "geojson_boundaries"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    dataset_id = Column(String(255), nullable=False, index=True)  # Links to dataset_registry
-    geo_level = Column(String(50), nullable=False, index=True)  # state, county, tract, zip
-    geo_id = Column(String(50), nullable=False, index=True)  # FIPS code or other identifier
+    dataset_id = Column(
+        String(255), nullable=False, index=True
+    )  # Links to dataset_registry
+    geo_level = Column(
+        String(50), nullable=False, index=True
+    )  # state, county, tract, zip
+    geo_id = Column(
+        String(50), nullable=False, index=True
+    )  # FIPS code or other identifier
     geo_name = Column(String(255), nullable=True)  # Human-readable name
-    
+
     # GeoJSON data (Feature)
     geojson = Column(JSON, nullable=False)  # Complete GeoJSON Feature
-    
+
     # Bounding box for quick spatial queries
     bbox_minx = Column(String(50), nullable=True)
     bbox_miny = Column(String(50), nullable=True)
     bbox_maxx = Column(String(50), nullable=True)
     bbox_maxy = Column(String(50), nullable=True)
-    
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     def __repr__(self) -> str:
         return (
             f"<GeoJSONBoundaries(id={self.id}, dataset_id={self.dataset_id}, "
@@ -245,26 +293,33 @@ class GeoJSONBoundaries(Base):
 class CensusVariableMetadata(Base):
     """
     Storage for Census variable definitions/metadata.
-    
+
     Maps Census column names to human-readable descriptions.
     Census-specific because other sources have different metadata structures.
     """
+
     __tablename__ = "census_variable_metadata"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    dataset_id = Column(String(255), nullable=False, index=True)  # e.g., "acs5_2021_b01001"
-    variable_name = Column(String(100), nullable=False, index=True)  # e.g., "B01001_001E"
+    dataset_id = Column(
+        String(255), nullable=False, index=True
+    )  # e.g., "acs5_2021_b01001"
+    variable_name = Column(
+        String(100), nullable=False, index=True
+    )  # e.g., "B01001_001E"
     column_name = Column(String(100), nullable=False)  # e.g., "b01001_001e"
-    
+
     # Metadata from Census API
     label = Column(Text, nullable=False)  # e.g., "Estimate!!Total:"
     concept = Column(String(500), nullable=True)  # e.g., "SEX BY AGE"
     predicate_type = Column(String(50), nullable=True)  # e.g., "int", "float", "string"
-    postgres_type = Column(String(50), nullable=True)  # e.g., "INTEGER", "NUMERIC", "TEXT"
-    
+    postgres_type = Column(
+        String(50), nullable=True
+    )  # e.g., "INTEGER", "NUMERIC", "TEXT"
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     def __repr__(self) -> str:
         return (
             f"<CensusVariableMetadata(dataset_id={self.dataset_id}, "
@@ -284,22 +339,37 @@ class LpFund(Base):
     These are public pension funds, sovereign wealth funds, and endowments
     that publicly disclose their investment strategies.
     """
+
     __tablename__ = "lp_fund"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(255), nullable=False, unique=True, index=True)  # e.g., "CalPERS"
-    formal_name = Column(Text, nullable=True)  # e.g., "California Public Employees' Retirement System"
-    lp_type = Column(String(100), nullable=False, index=True)  # e.g., 'public_pension', 'sovereign_wealth', 'endowment'
+    name = Column(
+        String(255), nullable=False, unique=True, index=True
+    )  # e.g., "CalPERS"
+    formal_name = Column(
+        Text, nullable=True
+    )  # e.g., "California Public Employees' Retirement System"
+    lp_type = Column(
+        String(100), nullable=False, index=True
+    )  # e.g., 'public_pension', 'sovereign_wealth', 'endowment'
     jurisdiction = Column(String(100), nullable=True)  # e.g., 'CA', 'NY', 'TX'
     website_url = Column(Text, nullable=True)
 
     # Extended metadata for collection system
-    region = Column(String(50), nullable=True, index=True)  # us, europe, asia, middle_east, oceania
-    country_code = Column(String(10), nullable=True, index=True)  # ISO alpha-2 (US, GB, JP, etc.)
+    region = Column(
+        String(50), nullable=True, index=True
+    )  # us, europe, asia, middle_east, oceania
+    country_code = Column(
+        String(10), nullable=True, index=True
+    )  # ISO alpha-2 (US, GB, JP, etc.)
     aum_usd_billions = Column(String(50), nullable=True)  # AUM in billions USD
     has_cafr = Column(Integer, nullable=False, default=0)  # 1 = publishes annual report
-    sec_crd_number = Column(String(50), nullable=True, index=True)  # For Form ADV lookup
-    collection_priority = Column(Integer, nullable=False, default=5)  # 1=highest, 10=lowest
+    sec_crd_number = Column(
+        String(50), nullable=True, index=True
+    )  # For Form ADV lookup
+    collection_priority = Column(
+        Integer, nullable=False, default=5
+    )  # 1=highest, 10=lowest
     last_collection_at = Column(DateTime, nullable=True)  # Last successful collection
 
     # Timestamps
@@ -313,41 +383,46 @@ class LpFund(Base):
 class LpDocument(Base):
     """
     Represents a publicly available strategy document from an LP.
-    
+
     Documents include investment committee presentations, quarterly reports,
     policy statements, and pacing plans.
     """
+
     __tablename__ = "lp_document"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     lp_id = Column(Integer, nullable=False, index=True)  # FK to lp_fund.id
-    
+
     title = Column(Text, nullable=False)
     document_type = Column(String(100), nullable=False, index=True)
     # document_type values: 'investment_committee_presentation', 'quarterly_investment_report',
     #                       'policy_statement', 'pacing_plan'
-    
+
     program = Column(String(100), nullable=False, index=True)
     # program values: 'total_fund', 'private_equity', 'real_estate', 'infrastructure', 'fixed_income'
-    
+
     report_period_start = Column(DateTime, nullable=True)
     report_period_end = Column(DateTime, nullable=True)
     fiscal_year = Column(Integer, nullable=True, index=True)  # e.g., 2025
-    fiscal_quarter = Column(String(10), nullable=True, index=True)  # 'Q1', 'Q2', 'Q3', 'Q4'
-    
+    fiscal_quarter = Column(
+        String(10), nullable=True, index=True
+    )  # 'Q1', 'Q2', 'Q3', 'Q4'
+
     source_url = Column(Text, nullable=False)
     file_format = Column(String(50), nullable=False)  # 'pdf', 'pptx', 'html'
     raw_file_location = Column(Text, nullable=True)  # S3 path or blob identifier
-    
+
     # Timestamps
     ingested_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     __table_args__ = (
-        Index('idx_lp_document_lp_fiscal', 'lp_id', 'fiscal_year', 'fiscal_quarter'),
-        Index('idx_lp_document_program_fiscal', 'program', 'fiscal_year', 'fiscal_quarter'),
+        Index("idx_lp_document_lp_fiscal", "lp_id", "fiscal_year", "fiscal_quarter"),
+        Index(
+            "idx_lp_document_program_fiscal", "program", "fiscal_year", "fiscal_quarter"
+        ),
     )
-    
+
     def __repr__(self) -> str:
         return (
             f"<LpDocument(id={self.id}, lp_id={self.lp_id}, title='{self.title[:50]}...', "
@@ -358,33 +433,40 @@ class LpDocument(Base):
 class LpDocumentTextSection(Base):
     """
     Stores parsed text chunks from LP documents.
-    
+
     Sections are extracted during document processing and can be used for:
     - Full-text search
     - NLP/LLM analysis
     - Traceability (linking extractions back to source text)
     """
+
     __tablename__ = "lp_document_text_section"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     document_id = Column(Integer, nullable=False, index=True)  # FK to lp_document.id
-    
-    section_name = Column(Text, nullable=True)  # e.g., 'Executive Summary', 'Private Equity Strategy'
+
+    section_name = Column(
+        Text, nullable=True
+    )  # e.g., 'Executive Summary', 'Private Equity Strategy'
     page_start = Column(Integer, nullable=True)
     page_end = Column(Integer, nullable=True)
-    sequence_order = Column(Integer, nullable=False, index=True)  # For ordering sections
-    
+    sequence_order = Column(
+        Integer, nullable=False, index=True
+    )  # For ordering sections
+
     text = Column(Text, nullable=False)
-    embedding_vector = Column(JSON, nullable=True)  # Placeholder for vector embeddings (JSONB or specialized type)
-    language = Column(String(10), nullable=True, default='en')
-    
+    embedding_vector = Column(
+        JSON, nullable=True
+    )  # Placeholder for vector embeddings (JSONB or specialized type)
+    language = Column(String(10), nullable=True, default="en")
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     __table_args__ = (
-        Index('idx_lp_text_section_doc_order', 'document_id', 'sequence_order'),
+        Index("idx_lp_text_section_doc_order", "document_id", "sequence_order"),
     )
-    
+
     def __repr__(self) -> str:
         text_preview = self.text[:50] if self.text else ""
         return (
@@ -396,38 +478,56 @@ class LpDocumentTextSection(Base):
 class LpStrategySnapshot(Base):
     """
     Normalized LP strategy at a per-LP, per-program, per-quarter level.
-    
+
     This is the core "silver/gold" layer that represents the structured
     investment strategy extracted from documents.
-    
+
     One row per (LP, program, fiscal_year, fiscal_quarter).
     """
+
     __tablename__ = "lp_strategy_snapshot"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     lp_id = Column(Integer, nullable=False, index=True)  # FK to lp_fund.id
-    program = Column(String(100), nullable=False, index=True)  # Same values as lp_document.program
-    
+    program = Column(
+        String(100), nullable=False, index=True
+    )  # Same values as lp_document.program
+
     fiscal_year = Column(Integer, nullable=False, index=True)
-    fiscal_quarter = Column(String(10), nullable=False, index=True)  # 'Q1', 'Q2', 'Q3', 'Q4'
-    strategy_date = Column(DateTime, nullable=True)  # Board/IC date; fallback to report date
-    
-    primary_document_id = Column(Integer, nullable=True, index=True)  # FK to lp_document.id
-    
+    fiscal_quarter = Column(
+        String(10), nullable=False, index=True
+    )  # 'Q1', 'Q2', 'Q3', 'Q4'
+    strategy_date = Column(
+        DateTime, nullable=True
+    )  # Board/IC date; fallback to report date
+
+    primary_document_id = Column(
+        Integer, nullable=True, index=True
+    )  # FK to lp_document.id
+
     # Strategy summary fields
     summary_text = Column(Text, nullable=True)  # High-level summary
-    risk_positioning = Column(String(100), nullable=True)  # e.g., 'risk_on', 'defensive', 'neutral'
+    risk_positioning = Column(
+        String(100), nullable=True
+    )  # e.g., 'risk_on', 'defensive', 'neutral'
     liquidity_profile = Column(Text, nullable=True)  # Short description or categorical
-    tilt_description = Column(Text, nullable=True)  # e.g., 'overweight private markets, underweight public equity'
-    
+    tilt_description = Column(
+        Text, nullable=True
+    )  # e.g., 'overweight private markets, underweight public equity'
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     __table_args__ = (
-        UniqueConstraint('lp_id', 'program', 'fiscal_year', 'fiscal_quarter', 
-                        name='uq_lp_strategy_snapshot'),
+        UniqueConstraint(
+            "lp_id",
+            "program",
+            "fiscal_year",
+            "fiscal_quarter",
+            name="uq_lp_strategy_snapshot",
+        ),
     )
-    
+
     def __repr__(self) -> str:
         return (
             f"<LpStrategySnapshot(id={self.id}, lp_id={self.lp_id}, program='{self.program}', "
@@ -438,39 +538,46 @@ class LpStrategySnapshot(Base):
 class LpAssetClassTargetAllocation(Base):
     """
     Target, range, and current allocation by asset class for an LP strategy.
-    
+
     Captures the strategic asset allocation framework including:
     - Target weights
     - Min/max ranges
     - Current actual weights
     - Benchmark weights
     """
+
     __tablename__ = "lp_asset_class_target_allocation"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    strategy_id = Column(Integer, nullable=False, index=True)  # FK to lp_strategy_snapshot.id
-    
+    strategy_id = Column(
+        Integer, nullable=False, index=True
+    )  # FK to lp_strategy_snapshot.id
+
     asset_class = Column(String(100), nullable=False, index=True)
     # asset_class values: 'public_equity', 'private_equity', 'real_estate', 'fixed_income',
     #                     'infrastructure', 'cash', 'hedge_funds', 'other'
-    
+
     # Allocation percentages (stored as decimals, e.g., 25.5 for 25.5%)
-    target_weight_pct = Column(String(50), nullable=True)  # Using String for NUMERIC compatibility
+    target_weight_pct = Column(
+        String(50), nullable=True
+    )  # Using String for NUMERIC compatibility
     min_weight_pct = Column(String(50), nullable=True)
     max_weight_pct = Column(String(50), nullable=True)
     current_weight_pct = Column(String(50), nullable=True)
     benchmark_weight_pct = Column(String(50), nullable=True)
-    
+
     # Traceability
-    source_section_id = Column(Integer, nullable=True, index=True)  # FK to lp_document_text_section.id
-    
+    source_section_id = Column(
+        Integer, nullable=True, index=True
+    )  # FK to lp_document_text_section.id
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     __table_args__ = (
-        Index('idx_lp_allocation_strategy_asset', 'strategy_id', 'asset_class'),
+        Index("idx_lp_allocation_strategy_asset", "strategy_id", "asset_class"),
     )
-    
+
     def __repr__(self) -> str:
         return (
             f"<LpAssetClassTargetAllocation(id={self.id}, strategy_id={self.strategy_id}, "
@@ -481,36 +588,52 @@ class LpAssetClassTargetAllocation(Base):
 class LpAssetClassProjection(Base):
     """
     Forward-looking commitments, pacing plans, and projected flows by asset class.
-    
+
     Captures LP plans for future investment activity including:
     - Commitment plans (e.g., PE/VC commitments over next 3 years)
     - Net flow projections
     - Expected returns and volatility
     """
+
     __tablename__ = "lp_asset_class_projection"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    strategy_id = Column(Integer, nullable=False, index=True)  # FK to lp_strategy_snapshot.id
-    
+    strategy_id = Column(
+        Integer, nullable=False, index=True
+    )  # FK to lp_strategy_snapshot.id
+
     asset_class = Column(String(100), nullable=False, index=True)
-    projection_horizon = Column(String(50), nullable=False, index=True)  # e.g., '1_year', '3_year', '5_year'
-    
+    projection_horizon = Column(
+        String(50), nullable=False, index=True
+    )  # e.g., '1_year', '3_year', '5_year'
+
     # Financial projections (stored as strings for NUMERIC compatibility with SQLite)
-    net_flow_projection_amount = Column(String(50), nullable=True)  # Currency amount (e.g., USD)
-    commitment_plan_amount = Column(String(50), nullable=True)  # e.g., PE commitments over horizon
+    net_flow_projection_amount = Column(
+        String(50), nullable=True
+    )  # Currency amount (e.g., USD)
+    commitment_plan_amount = Column(
+        String(50), nullable=True
+    )  # e.g., PE commitments over horizon
     expected_return_pct = Column(String(50), nullable=True)
     expected_volatility_pct = Column(String(50), nullable=True)
-    
+
     # Traceability
-    source_section_id = Column(Integer, nullable=True, index=True)  # FK to lp_document_text_section.id
-    
+    source_section_id = Column(
+        Integer, nullable=True, index=True
+    )  # FK to lp_document_text_section.id
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     __table_args__ = (
-        Index('idx_lp_projection_strategy_asset_horizon', 'strategy_id', 'asset_class', 'projection_horizon'),
+        Index(
+            "idx_lp_projection_strategy_asset_horizon",
+            "strategy_id",
+            "asset_class",
+            "projection_horizon",
+        ),
     )
-    
+
     def __repr__(self) -> str:
         return (
             f"<LpAssetClassProjection(id={self.id}, strategy_id={self.strategy_id}, "
@@ -521,34 +644,45 @@ class LpAssetClassProjection(Base):
 class LpManagerOrVehicleExposure(Base):
     """
     Manager or fund-level exposures disclosed by LPs.
-    
+
     Optional table for capturing specific manager/vehicle allocations when
     documents disclose this level of detail (often only for largest positions).
     """
+
     __tablename__ = "lp_manager_or_vehicle_exposure"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    strategy_id = Column(Integer, nullable=False, index=True)  # FK to lp_strategy_snapshot.id
-    
+    strategy_id = Column(
+        Integer, nullable=False, index=True
+    )  # FK to lp_strategy_snapshot.id
+
     manager_name = Column(Text, nullable=True)
     vehicle_name = Column(Text, nullable=True)
-    vehicle_type = Column(String(100), nullable=True)  # e.g., 'separate_account', 'commingled', 'co_invest'
+    vehicle_type = Column(
+        String(100), nullable=True
+    )  # e.g., 'separate_account', 'commingled', 'co_invest'
     asset_class = Column(String(100), nullable=True, index=True)
-    
+
     # Position details (stored as strings for NUMERIC compatibility)
     market_value_amount = Column(String(50), nullable=True)
     weight_pct = Column(String(50), nullable=True)
-    
-    status = Column(String(100), nullable=True)  # e.g., 'active', 'redeeming', 'new_commitment'
-    geo_region = Column(String(100), nullable=True)  # e.g., 'US', 'Europe', 'Global', 'EM'
+
+    status = Column(
+        String(100), nullable=True
+    )  # e.g., 'active', 'redeeming', 'new_commitment'
+    geo_region = Column(
+        String(100), nullable=True
+    )  # e.g., 'US', 'Europe', 'Global', 'EM'
     sector_focus = Column(String(255), nullable=True)
-    
+
     # Traceability
-    source_section_id = Column(Integer, nullable=True, index=True)  # FK to lp_document_text_section.id
-    
+    source_section_id = Column(
+        Integer, nullable=True, index=True
+    )  # FK to lp_document_text_section.id
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     def __repr__(self) -> str:
         return (
             f"<LpManagerOrVehicleExposure(id={self.id}, strategy_id={self.strategy_id}, "
@@ -559,30 +693,35 @@ class LpManagerOrVehicleExposure(Base):
 class LpStrategyThematicTag(Base):
     """
     Thematic tags for LP strategies (AI, energy transition, climate, etc.).
-    
+
     Enables tracking of investment themes and priorities across LPs and time.
     Tags can be manually assigned or extracted via NLP/LLM analysis.
     """
+
     __tablename__ = "lp_strategy_thematic_tag"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    strategy_id = Column(Integer, nullable=False, index=True)  # FK to lp_strategy_snapshot.id
-    
+    strategy_id = Column(
+        Integer, nullable=False, index=True
+    )  # FK to lp_strategy_snapshot.id
+
     theme = Column(String(100), nullable=False, index=True)
     # theme values: 'ai', 'energy_transition', 'climate_resilience', 'reshoring', etc.
-    
-    relevance_score = Column(String(50), nullable=True)  # 0.0–1.0 scale (stored as string for compatibility)
-    
+
+    relevance_score = Column(
+        String(50), nullable=True
+    )  # 0.0–1.0 scale (stored as string for compatibility)
+
     # Traceability
-    source_section_id = Column(Integer, nullable=True, index=True)  # FK to lp_document_text_section.id
-    
+    source_section_id = Column(
+        Integer, nullable=True, index=True
+    )  # FK to lp_document_text_section.id
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
-    __table_args__ = (
-        Index('idx_lp_tag_strategy_theme', 'strategy_id', 'theme'),
-    )
-    
+
+    __table_args__ = (Index("idx_lp_tag_strategy_theme", "strategy_id", "theme"),)
+
     def __repr__(self) -> str:
         return (
             f"<LpStrategyThematicTag(id={self.id}, strategy_id={self.strategy_id}, "
@@ -593,61 +732,66 @@ class LpStrategyThematicTag(Base):
 class LpKeyContact(Base):
     """
     Key contacts at LP funds - public-facing individuals that GPs would contact.
-    
+
     IMPORTANT: Only public information from official LP websites, annual reports,
     investment committee minutes, SEC filings. No private/restricted data.
-    
+
     Data Collection Rules:
     - ✅ Official LP websites, SEC filings, annual reports
     - ✅ Publicly disclosed executive names and professional contact info
     - ❌ NO LinkedIn scraping (violates ToS)
     - ❌ NO authentication bypass or paywalls
     - ❌ NO personal emails (only professional/institutional)
-    
+
     Typical roles: CIO, CFO, CEO, Investment Directors, Board Members
     """
+
     __tablename__ = "lp_key_contact"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     lp_id = Column(Integer, nullable=False, index=True)  # FK to lp_fund.id
-    
+
     # Personal information (public only)
     full_name = Column(Text, nullable=False)
     title = Column(Text, nullable=True)  # e.g., "Chief Investment Officer"
-    
+
     # Role categorization (standardized)
     role_category = Column(String(100), nullable=True, index=True)
-    # role_category values: 'CIO', 'CFO', 'CEO', 'Investment Director', 
+    # role_category values: 'CIO', 'CFO', 'CEO', 'Investment Director',
     #                       'Board Member', 'Managing Director', 'IR Contact', 'Other'
-    
+
     # Contact information (public only - from official sources)
     email = Column(Text, nullable=True)  # Only if publicly listed
     phone = Column(Text, nullable=True)  # Only if publicly listed
-    
+
     # Professional profile (optional)
     linkedin_url = Column(Text, nullable=True)  # For manual research, no scraping
-    
+
     # Data provenance and quality
-    source_document_id = Column(Integer, nullable=True, index=True)  # FK to lp_document.id if from document
+    source_document_id = Column(
+        Integer, nullable=True, index=True
+    )  # FK to lp_document.id if from document
     source_type = Column(String(100), nullable=True, index=True)
     # source_type values: 'sec_adv', 'website', 'disclosure_doc', 'annual_report', 'manual'
-    
+
     source_url = Column(Text, nullable=True)  # Where this information was found
-    
+
     confidence_level = Column(String(50), nullable=True)  # 'high', 'medium', 'low'
     is_verified = Column(Integer, default=0)  # 0 or 1 (boolean) - manually verified
-    
+
     # Timestamps
     collected_date = Column(DateTime, nullable=False, default=datetime.utcnow)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
-    
+
     __table_args__ = (
-        Index('idx_lp_contact_role_category', 'role_category'),
-        Index('idx_lp_contact_source_type', 'source_type'),
-        UniqueConstraint('lp_id', 'full_name', 'email', name='uq_lp_contact_person_email'),
+        Index("idx_lp_contact_role_category", "role_category"),
+        Index("idx_lp_contact_source_type", "source_type"),
+        UniqueConstraint(
+            "lp_id", "full_name", "email", name="uq_lp_contact_person_email"
+        ),
     )
-    
+
     def __repr__(self) -> str:
         return (
             f"<LpKeyContact(id={self.id}, lp_id={self.lp_id}, "
@@ -666,6 +810,7 @@ class LpGovernanceMember(Base):
 
     Data from: Official websites, annual reports, SEC filings
     """
+
     __tablename__ = "lp_governance_member"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -698,13 +843,15 @@ class LpGovernanceMember(Base):
     bio_url = Column(Text, nullable=True)
 
     # Data provenance
-    source_type = Column(String(100), nullable=True)  # 'website', 'annual_report', 'sec_filing'
+    source_type = Column(
+        String(100), nullable=True
+    )  # 'website', 'annual_report', 'sec_filing'
     source_url = Column(Text, nullable=True)
     collected_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_lp_governance_role', 'governance_role'),
-        Index('idx_lp_governance_current', 'is_current'),
+        Index("idx_lp_governance_role", "governance_role"),
+        Index("idx_lp_governance_current", "is_current"),
     )
 
     def __repr__(self) -> str:
@@ -723,6 +870,7 @@ class LpBoardMeeting(Base):
     - Minutes (when publicly available)
     - Video recordings (for public meetings)
     """
+
     __tablename__ = "lp_board_meeting"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -734,7 +882,9 @@ class LpBoardMeeting(Base):
     # meeting_type values: 'board_regular', 'board_special', 'investment_committee',
     #                      'audit_committee', 'risk_committee', 'annual_meeting'
 
-    meeting_title = Column(Text, nullable=True)  # e.g., "Regular Board Meeting - January 2025"
+    meeting_title = Column(
+        Text, nullable=True
+    )  # e.g., "Regular Board Meeting - January 2025"
 
     # Document links
     agenda_url = Column(Text, nullable=True)
@@ -751,8 +901,8 @@ class LpBoardMeeting(Base):
     collected_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_lp_meeting_type', 'meeting_type'),
-        UniqueConstraint('lp_id', 'meeting_date', 'meeting_type', name='uq_lp_meeting'),
+        Index("idx_lp_meeting_type", "meeting_type"),
+        UniqueConstraint("lp_id", "meeting_date", "meeting_type", name="uq_lp_meeting"),
     )
 
     def __repr__(self) -> str:
@@ -769,6 +919,7 @@ class LpPerformanceReturn(Base):
     Tracks investment returns over time with benchmark comparisons.
     Data from CAFRs, annual reports, and official disclosures.
     """
+
     __tablename__ = "lp_performance_return"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -787,7 +938,9 @@ class LpPerformanceReturn(Base):
     since_inception_return_pct = Column(String(50), nullable=True)
 
     # Benchmark comparison
-    benchmark_name = Column(String(200), nullable=True)  # e.g., "60/40 Policy Benchmark"
+    benchmark_name = Column(
+        String(200), nullable=True
+    )  # e.g., "60/40 Policy Benchmark"
     benchmark_one_year_pct = Column(String(50), nullable=True)
     benchmark_three_year_pct = Column(String(50), nullable=True)
     benchmark_five_year_pct = Column(String(50), nullable=True)
@@ -799,16 +952,20 @@ class LpPerformanceReturn(Base):
 
     # Asset values
     total_fund_value_usd = Column(String(50), nullable=True)  # End of period value
-    net_cash_flow_usd = Column(String(50), nullable=True)  # Contributions - Distributions
+    net_cash_flow_usd = Column(
+        String(50), nullable=True
+    )  # Contributions - Distributions
 
     # Data provenance
-    source_type = Column(String(100), nullable=True)  # 'cafr', 'annual_report', 'website'
+    source_type = Column(
+        String(100), nullable=True
+    )  # 'cafr', 'annual_report', 'website'
     source_url = Column(Text, nullable=True)
     collected_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_lp_performance_year', 'fiscal_year'),
-        UniqueConstraint('lp_id', 'fiscal_year', name='uq_lp_performance_year'),
+        Index("idx_lp_performance_year", "fiscal_year"),
+        UniqueConstraint("lp_id", "fiscal_year", name="uq_lp_performance_year"),
     )
 
     def __repr__(self) -> str:
@@ -826,65 +983,85 @@ class LpPerformanceReturn(Base):
 class PortfolioCompany(Base):
     """
     Investment holdings discovered by the agentic portfolio research system.
-    
+
     Tracks portfolio companies, investments, and deal flow for LPs and FOs.
     Data is collected from multiple sources (SEC 13F, websites, annual reports,
     press releases) and synthesized/deduplicated.
     """
+
     __tablename__ = "portfolio_companies"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     investor_id = Column(Integer, nullable=False, index=True)
-    investor_type = Column(String(50), nullable=False, index=True)  # 'lp' or 'family_office'
-    
+    investor_type = Column(
+        String(50), nullable=False, index=True
+    )  # 'lp' or 'family_office'
+
     # Company Details
     company_name = Column(Text, nullable=False, index=True)
     company_website = Column(Text, nullable=True)
     company_industry = Column(String(255), nullable=True, index=True)
-    company_stage = Column(String(100), nullable=True)  # seed, series_a, growth, public, etc.
+    company_stage = Column(
+        String(100), nullable=True
+    )  # seed, series_a, growth, public, etc.
     company_location = Column(String(255), nullable=True)
-    company_ticker = Column(String(20), nullable=True, index=True)  # For public equities
+    company_ticker = Column(
+        String(20), nullable=True, index=True
+    )  # For public equities
     company_cusip = Column(String(20), nullable=True)  # CUSIP identifier
-    
+
     # Investment Details
-    investment_type = Column(String(100), nullable=True, index=True)  # equity, PE, VC, real_estate, etc.
+    investment_type = Column(
+        String(100), nullable=True, index=True
+    )  # equity, PE, VC, real_estate, etc.
     investment_date = Column(DateTime, nullable=True)
-    investment_amount_usd = Column(String(50), nullable=True)  # Stored as string for NUMERIC compatibility
+    investment_amount_usd = Column(
+        String(50), nullable=True
+    )  # Stored as string for NUMERIC compatibility
     shares_held = Column(String(50), nullable=True)  # Number of shares (for 13F)
     market_value_usd = Column(String(50), nullable=True)  # Market value (for 13F)
     ownership_percentage = Column(String(50), nullable=True)
     current_holding = Column(Integer, default=1)  # Boolean: 1 = current, 0 = exited
     exit_date = Column(DateTime, nullable=True)
     exit_type = Column(String(100), nullable=True)  # IPO, acquisition, secondary, etc.
-    
+
     # Data Provenance
     source_type = Column(String(100), nullable=False, index=True)
-    # source_type values: 'sec_13f', 'website', 'annual_report', 'news', 
+    # source_type values: 'sec_13f', 'website', 'annual_report', 'news',
     #                     'press_release', 'portfolio_company_website'
     source_url = Column(Text, nullable=True)
     source_urls = Column(JSON, nullable=True)  # Multiple sources for merged records
-    confidence_level = Column(String(50), nullable=False, default='medium')  # 'high', 'medium', 'low'
+    confidence_level = Column(
+        String(50), nullable=False, default="medium"
+    )  # 'high', 'medium', 'low'
     collected_date = Column(DateTime, nullable=False, default=datetime.utcnow)
     last_verified_date = Column(DateTime, nullable=True)
-    
+
     # Agent Metadata
-    collection_method = Column(String(100), default='agentic_search')
+    collection_method = Column(String(100), default="agentic_search")
     agent_reasoning = Column(Text, nullable=True)
-    collection_job_id = Column(Integer, nullable=True, index=True)  # FK to agentic_collection_jobs
-    
+    collection_job_id = Column(
+        Integer, nullable=True, index=True
+    )  # FK to agentic_collection_jobs
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
-    
+
     __table_args__ = (
-        Index('idx_portfolio_investor', 'investor_id', 'investor_type'),
-        Index('idx_portfolio_company_name', 'company_name'),
-        Index('idx_portfolio_current', 'current_holding'),
-        Index('idx_portfolio_source', 'source_type'),
-        UniqueConstraint('investor_id', 'investor_type', 'company_name', 'investment_date', 
-                        name='uq_portfolio_company'),
+        Index("idx_portfolio_investor", "investor_id", "investor_type"),
+        Index("idx_portfolio_company_name", "company_name"),
+        Index("idx_portfolio_current", "current_holding"),
+        Index("idx_portfolio_source", "source_type"),
+        UniqueConstraint(
+            "investor_id",
+            "investor_type",
+            "company_name",
+            "investment_date",
+            name="uq_portfolio_company",
+        ),
     )
-    
+
     def __repr__(self) -> str:
         return (
             f"<PortfolioCompany(id={self.id}, investor_id={self.investor_id}, "
@@ -895,41 +1072,53 @@ class PortfolioCompany(Base):
 class CoInvestment(Base):
     """
     Tracks co-investor relationships discovered during portfolio research.
-    
+
     When we find that two investors participated in the same deal,
     we record the relationship here for network analysis.
     """
+
     __tablename__ = "co_investments"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     primary_investor_id = Column(Integer, nullable=False, index=True)
-    primary_investor_type = Column(String(50), nullable=False)  # 'lp' or 'family_office'
+    primary_investor_type = Column(
+        String(50), nullable=False
+    )  # 'lp' or 'family_office'
     co_investor_name = Column(Text, nullable=False, index=True)
-    co_investor_type = Column(String(100), nullable=True)  # PE firm, VC, family office, etc.
-    
+    co_investor_type = Column(
+        String(100), nullable=True
+    )  # PE firm, VC, family office, etc.
+
     # Deal details
     deal_name = Column(Text, nullable=True)  # Company name or deal identifier
     deal_date = Column(DateTime, nullable=True)
     deal_size_usd = Column(String(50), nullable=True)
-    
+
     # Relationship strength
-    co_investment_count = Column(Integer, default=1)  # Number of times they've co-invested
-    
+    co_investment_count = Column(
+        Integer, default=1
+    )  # Number of times they've co-invested
+
     # Data provenance
     source_type = Column(String(100), nullable=True)
     source_url = Column(Text, nullable=True)
     collected_date = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     __table_args__ = (
-        Index('idx_coinvest_primary', 'primary_investor_id', 'primary_investor_type'),
-        Index('idx_coinvest_co_investor', 'co_investor_name'),
-        UniqueConstraint('primary_investor_id', 'primary_investor_type', 'co_investor_name', 'deal_name',
-                        name='uq_co_investment'),
+        Index("idx_coinvest_primary", "primary_investor_id", "primary_investor_type"),
+        Index("idx_coinvest_co_investor", "co_investor_name"),
+        UniqueConstraint(
+            "primary_investor_id",
+            "primary_investor_type",
+            "co_investor_name",
+            "deal_name",
+            name="uq_co_investment",
+        ),
     )
-    
+
     def __repr__(self) -> str:
         return (
             f"<CoInvestment(id={self.id}, primary={self.primary_investor_id}, "
@@ -940,16 +1129,17 @@ class CoInvestment(Base):
 class InvestorTheme(Base):
     """
     Investment themes and patterns identified from portfolio analysis.
-    
+
     Classifies investors by their investment preferences based on
     observed portfolio patterns (sectors, geography, stage, asset class).
     """
+
     __tablename__ = "investor_themes"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     investor_id = Column(Integer, nullable=False, index=True)
     investor_type = Column(String(50), nullable=False)  # 'lp' or 'family_office'
-    
+
     # Theme classification
     theme_category = Column(String(100), nullable=False, index=True)
     # theme_category values: 'sector', 'geography', 'stage', 'asset_class'
@@ -957,26 +1147,35 @@ class InvestorTheme(Base):
     # e.g., for sector: 'climate_tech', 'healthcare', 'fintech'
     # e.g., for geography: 'us', 'europe', 'asia', 'emerging_markets'
     # e.g., for stage: 'seed', 'growth', 'buyout', 'public_equity'
-    
+
     # Quantification
-    investment_count = Column(Integer, nullable=True)  # Number of investments in this theme
+    investment_count = Column(
+        Integer, nullable=True
+    )  # Number of investments in this theme
     percentage_of_portfolio = Column(String(50), nullable=True)  # % of portfolio
-    
+
     # Confidence
     confidence_level = Column(String(50), nullable=True)  # 'high', 'medium', 'low'
-    evidence_sources = Column(JSON, nullable=True)  # List of source types supporting this
-    
+    evidence_sources = Column(
+        JSON, nullable=True
+    )  # List of source types supporting this
+
     # Timestamps
     collected_date = Column(DateTime, nullable=False, default=datetime.utcnow)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     __table_args__ = (
-        Index('idx_theme_investor', 'investor_id', 'investor_type'),
-        Index('idx_theme_category_value', 'theme_category', 'theme_value'),
-        UniqueConstraint('investor_id', 'investor_type', 'theme_category', 'theme_value',
-                        name='uq_investor_theme'),
+        Index("idx_theme_investor", "investor_id", "investor_type"),
+        Index("idx_theme_category_value", "theme_category", "theme_value"),
+        UniqueConstraint(
+            "investor_id",
+            "investor_type",
+            "theme_category",
+            "theme_value",
+            name="uq_investor_theme",
+        ),
     )
-    
+
     def __repr__(self) -> str:
         return (
             f"<InvestorTheme(id={self.id}, investor_id={self.investor_id}, "
@@ -987,58 +1186,59 @@ class InvestorTheme(Base):
 class AgenticCollectionJob(Base):
     """
     Tracks agentic portfolio collection jobs with full reasoning trail.
-    
+
     Unlike regular ingestion_jobs, this tracks:
     - Which strategies were attempted
     - Agent's reasoning for strategy selection
     - Results per strategy
     - Resource usage (API calls, tokens, cost)
     """
+
     __tablename__ = "agentic_collection_jobs"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     job_type = Column(String(100), nullable=False, index=True)
     # job_type values: 'portfolio_discovery', 'deal_flow_update', 'co_investor_mapping', 'theme_analysis'
-    
+
     # Target investor
     target_investor_id = Column(Integer, nullable=True, index=True)
     target_investor_type = Column(String(50), nullable=True)  # 'lp' or 'family_office'
     target_investor_name = Column(Text, nullable=True)
-    
+
     # Job status
-    status = Column(String(50), nullable=False, default='pending', index=True)
+    status = Column(String(50), nullable=False, default="pending", index=True)
     # status values: 'pending', 'running', 'success', 'partial_success', 'failed'
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
-    
+
     # Results summary
     sources_checked = Column(Integer, nullable=True, default=0)
     sources_successful = Column(Integer, nullable=True, default=0)
     companies_found = Column(Integer, nullable=True, default=0)
     new_companies = Column(Integer, nullable=True, default=0)
     updated_companies = Column(Integer, nullable=True, default=0)
-    
+
     # Agent decision trail
     strategies_used = Column(JSON, nullable=True)  # List of strategy names
     reasoning_log = Column(JSON, nullable=True)  # Detailed reasoning for each decision
-    
+
     # Errors and warnings
     errors = Column(JSON, nullable=True)  # Structured error information
     warnings = Column(JSON, nullable=True)  # List of warning messages
-    
+
     # Resource tracking
     requests_made = Column(Integer, nullable=True, default=0)
     tokens_used = Column(Integer, nullable=True, default=0)
     cost_usd = Column(String(50), nullable=True)  # Estimated cost
-    
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     __table_args__ = (
-        Index('idx_agentic_job_status', 'status'),
-        Index('idx_agentic_job_target', 'target_investor_id', 'target_investor_type'),
+        Index("idx_agentic_job_status", "status"),
+        Index("idx_agentic_job_target", "target_investor_id", "target_investor_type"),
     )
-    
+
     def __repr__(self) -> str:
         return (
             f"<AgenticCollectionJob(id={self.id}, type='{self.job_type}', "
@@ -1054,62 +1254,75 @@ class AgenticCollectionJob(Base):
 class Location(Base):
     """
     Physical locations (stores, restaurants, offices, venues) for foot traffic tracking.
-    
+
     Represents Points of Interest (POIs) that can be linked to portfolio companies
     or tracked independently for competitive analysis.
     """
+
     __tablename__ = "locations"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    
+
     # Identifiers
     location_name = Column(Text, nullable=False, index=True)
-    brand_name = Column(String(255), nullable=True, index=True)  # e.g., "Starbucks" for "Starbucks #1234"
+    brand_name = Column(
+        String(255), nullable=True, index=True
+    )  # e.g., "Starbucks" for "Starbucks #1234"
     chain_id = Column(Integer, nullable=True, index=True)  # FK to private_companies.id
-    
+
     # Location Details
     street_address = Column(Text, nullable=True)
     city = Column(String(255), nullable=True, index=True)
     state = Column(String(50), nullable=True, index=True)
     postal_code = Column(String(20), nullable=True, index=True)
-    country = Column(String(100), nullable=True, default='United States')
+    country = Column(String(100), nullable=True, default="United States")
     latitude = Column(String(50), nullable=True)  # Stored as string for precision
     longitude = Column(String(50), nullable=True)
-    
+
     # POI Metadata
-    category = Column(String(100), nullable=True, index=True)  # restaurant, retail, office, venue
-    subcategory = Column(String(100), nullable=True)  # coffee_shop, fast_food, clothing_store
-    
-    hours_of_operation = Column(JSON, nullable=True)  # {"Monday": {"open": "0800", "close": "2000"}, ...}
+    category = Column(
+        String(100), nullable=True, index=True
+    )  # restaurant, retail, office, venue
+    subcategory = Column(
+        String(100), nullable=True
+    )  # coffee_shop, fast_food, clothing_store
+
+    hours_of_operation = Column(
+        JSON, nullable=True
+    )  # {"Monday": {"open": "0800", "close": "2000"}, ...}
     phone = Column(String(50), nullable=True)
     website = Column(Text, nullable=True)
-    
+
     # External IDs (for API mapping)
     google_place_id = Column(String(255), nullable=True, unique=True)
     safegraph_placekey = Column(String(255), nullable=True, unique=True)
     foursquare_fsq_id = Column(String(255), nullable=True)
     placer_venue_id = Column(String(255), nullable=True)
-    
+
     # Status
     is_active = Column(Integer, nullable=False, default=1)  # 1 = active, 0 = closed
     opened_date = Column(DateTime, nullable=True)
     closed_date = Column(DateTime, nullable=True)
-    
+
     # Linkage to portfolio tracking
-    portfolio_company_id = Column(Integer, nullable=True, index=True)  # FK to portfolio_companies.id
-    
+    portfolio_company_id = Column(
+        Integer, nullable=True, index=True
+    )  # FK to portfolio_companies.id
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    last_updated = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    __table_args__ = (
-        Index('idx_locations_brand', 'brand_name'),
-        Index('idx_locations_city_state', 'city', 'state'),
-        Index('idx_locations_category', 'category'),
-        Index('idx_locations_chain', 'chain_id'),
-        Index('idx_locations_coords', 'latitude', 'longitude'),
+    last_updated = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
     )
-    
+
+    __table_args__ = (
+        Index("idx_locations_brand", "brand_name"),
+        Index("idx_locations_city_state", "city", "state"),
+        Index("idx_locations_category", "category"),
+        Index("idx_locations_chain", "chain_id"),
+        Index("idx_locations_coords", "latitude", "longitude"),
+    )
+
     def __repr__(self) -> str:
         return (
             f"<Location(id={self.id}, name='{self.location_name}', "
@@ -1120,52 +1333,70 @@ class Location(Base):
 class FootTrafficObservation(Base):
     """
     Time-series foot traffic data for locations.
-    
+
     Captures visitor counts, patterns, and engagement metrics from multiple sources.
     Supports daily, weekly, and monthly aggregation levels.
     """
+
     __tablename__ = "foot_traffic_observations"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     location_id = Column(Integer, nullable=False, index=True)  # FK to locations.id
-    
+
     # Time Period
     observation_date = Column(DateTime, nullable=False, index=True)
-    observation_period = Column(String(20), nullable=False, index=True)  # daily, weekly, monthly, hourly
-    
+    observation_period = Column(
+        String(20), nullable=False, index=True
+    )  # daily, weekly, monthly, hourly
+
     # Traffic Metrics
-    visit_count = Column(Integer, nullable=True)  # Absolute visitor count (if available)
+    visit_count = Column(
+        Integer, nullable=True
+    )  # Absolute visitor count (if available)
     visitor_count = Column(Integer, nullable=True)  # Unique visitors (if available)
-    visit_count_relative = Column(Integer, nullable=True)  # 0-100 scale (Google Popular Times)
-    
+    visit_count_relative = Column(
+        Integer, nullable=True
+    )  # 0-100 scale (Google Popular Times)
+
     # Dwell & Engagement
     median_dwell_minutes = Column(String(50), nullable=True)  # NUMERIC stored as string
     avg_dwell_minutes = Column(String(50), nullable=True)
-    
+
     # Hourly Breakdown (for daily observations)
-    hourly_traffic = Column(JSON, nullable=True)  # {"00": 10, "01": 5, "02": 3, ..., "23": 15}
-    
+    hourly_traffic = Column(
+        JSON, nullable=True
+    )  # {"00": 10, "01": 5, "02": 3, ..., "23": 15}
+
     # Day of Week Patterns (for weekly observations)
-    daily_traffic = Column(JSON, nullable=True)  # {"Mon": 850, "Tue": 920, ..., "Sun": 650}
-    
+    daily_traffic = Column(
+        JSON, nullable=True
+    )  # {"Mon": 850, "Tue": 920, ..., "Sun": 650}
+
     # Visitor Demographics (if available from SafeGraph/Placer)
     visitor_demographics = Column(JSON, nullable=True)
     # {"age_ranges": {"18-24": 0.15, ...}, "median_income": 75000, "home_distance_mi": {...}}
-    
+
     # Data Provenance
-    source_type = Column(String(50), nullable=False, index=True)  # google, safegraph, placer, city_data, foursquare
+    source_type = Column(
+        String(50), nullable=False, index=True
+    )  # google, safegraph, placer, city_data, foursquare
     source_confidence = Column(String(20), nullable=True)  # high, medium, low
-    
+
     collected_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     __table_args__ = (
-        UniqueConstraint('location_id', 'observation_date', 'observation_period', 'source_type',
-                        name='uq_traffic_observation'),
-        Index('idx_traffic_location', 'location_id'),
-        Index('idx_traffic_date', 'observation_date'),
-        Index('idx_traffic_source', 'source_type'),
+        UniqueConstraint(
+            "location_id",
+            "observation_date",
+            "observation_period",
+            "source_type",
+            name="uq_traffic_observation",
+        ),
+        Index("idx_traffic_location", "location_id"),
+        Index("idx_traffic_date", "observation_date"),
+        Index("idx_traffic_source", "source_type"),
     )
-    
+
     def __repr__(self) -> str:
         return (
             f"<FootTrafficObservation(id={self.id}, location_id={self.location_id}, "
@@ -1176,41 +1407,42 @@ class FootTrafficObservation(Base):
 class LocationMetadata(Base):
     """
     Extended metadata for locations including trade area analysis and competitive data.
-    
+
     Stores enrichment data from Placer.ai, SafeGraph, and other sources.
     """
+
     __tablename__ = "location_metadata"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     location_id = Column(Integer, nullable=False, index=True)  # FK to locations.id
-    
+
     # Business Info
     square_footage = Column(Integer, nullable=True)
     employee_count_estimate = Column(Integer, nullable=True)
     parking_spots = Column(Integer, nullable=True)
-    
+
     # Trade Area (from Placer.ai)
     trade_area_5min_population = Column(Integer, nullable=True)
     trade_area_5min_median_income = Column(String(50), nullable=True)
     trade_area_10min_population = Column(Integer, nullable=True)
     trade_area_10min_median_income = Column(String(50), nullable=True)
-    
+
     # Competitive Set
     nearby_competitors = Column(JSON, nullable=True)
     # [{"name": "Panera #123", "distance_mi": 0.5, "category": "fast_casual"}, ...]
-    
+
     # Ratings & Reviews
     google_rating = Column(String(10), nullable=True)  # e.g., "4.5"
     google_review_count = Column(Integer, nullable=True)
     yelp_rating = Column(String(10), nullable=True)
     yelp_review_count = Column(Integer, nullable=True)
-    
-    last_updated = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    __table_args__ = (
-        Index('idx_metadata_location', 'location_id'),
+
+    last_updated = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
     )
-    
+
+    __table_args__ = (Index("idx_metadata_location", "location_id"),)
+
     def __repr__(self) -> str:
         return f"<LocationMetadata(id={self.id}, location_id={self.location_id})>"
 
@@ -1218,54 +1450,57 @@ class LocationMetadata(Base):
 class FootTrafficCollectionJob(Base):
     """
     Tracks foot traffic collection jobs with full agent reasoning trail.
-    
+
     Supports multiple job types:
     - discover_locations: Find locations for a brand
     - collect_traffic: Gather foot traffic data for locations
     - enrich_metadata: Add trade area and competitive data
     """
+
     __tablename__ = "foot_traffic_collection_jobs"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     job_type = Column(String(50), nullable=False, index=True)
     # job_type values: 'discover_locations', 'collect_traffic', 'enrich_metadata', 'analyze_trends'
-    
+
     # Target specification
     target_brand = Column(String(255), nullable=True, index=True)
     target_location_id = Column(Integer, nullable=True, index=True)
-    geographic_scope = Column(Text, nullable=True)  # city, state, national, specific_address
-    
+    geographic_scope = Column(
+        Text, nullable=True
+    )  # city, state, national, specific_address
+
     # Job status
-    status = Column(String(50), nullable=False, default='pending', index=True)
+    status = Column(String(50), nullable=False, default="pending", index=True)
     # status values: 'pending', 'running', 'success', 'partial_success', 'failed'
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
-    
+
     # Results
     locations_found = Column(Integer, nullable=True, default=0)
     locations_enriched = Column(Integer, nullable=True, default=0)
     observations_collected = Column(Integer, nullable=True, default=0)
     sources_checked = Column(JSON, nullable=True)  # List of source names checked
-    
+
     # Agent Reasoning
     reasoning_log = Column(JSON, nullable=True)  # Detailed reasoning for each decision
-    
+
     # Errors and Warnings
     errors = Column(JSON, nullable=True)
     warnings = Column(JSON, nullable=True)
-    
+
     # Resource tracking
     requests_made = Column(Integer, nullable=True, default=0)
     cost_usd = Column(String(50), nullable=True)  # Estimated API cost
-    
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     __table_args__ = (
-        Index('idx_ft_job_status', 'status'),
-        Index('idx_ft_job_brand', 'target_brand'),
+        Index("idx_ft_job_status", "status"),
+        Index("idx_ft_job_brand", "target_brand"),
     )
-    
+
     def __repr__(self) -> str:
         return (
             f"<FootTrafficCollectionJob(id={self.id}, type='{self.job_type}', "
@@ -1281,57 +1516,68 @@ class FootTrafficCollectionJob(Base):
 class PredictionMarket(Base):
     """
     Prediction market metadata from Kalshi, Polymarket, PredictIt.
-    
+
     Tracks market details, categories, and resolution status.
     Markets are uniquely identified by (source, market_id).
     """
+
     __tablename__ = "prediction_markets"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    
+
     # Source & Identifiers
-    source = Column(String(50), nullable=False, index=True)  # kalshi, polymarket, predictit
+    source = Column(
+        String(50), nullable=False, index=True
+    )  # kalshi, polymarket, predictit
     market_id = Column(String(255), nullable=False, index=True)  # platform-specific ID
     market_url = Column(Text, nullable=True)  # direct link to market
-    
+
     # Market Details
     question = Column(Text, nullable=False)
     description = Column(Text, nullable=True)
-    category = Column(String(100), nullable=True, index=True)  # economics, politics, sports, crypto, business
-    subcategory = Column(String(100), nullable=True, index=True)  # fed_rates, presidential_election, nfl, etc.
-    
+    category = Column(
+        String(100), nullable=True, index=True
+    )  # economics, politics, sports, crypto, business
+    subcategory = Column(
+        String(100), nullable=True, index=True
+    )  # fed_rates, presidential_election, nfl, etc.
+
     # Market Type
     outcome_type = Column(String(50), nullable=True)  # binary, multiple_choice, scalar
     possible_outcomes = Column(JSON, nullable=True)  # for multiple choice markets
-    
+
     # Timing
     created_date = Column(DateTime, nullable=True)
     close_date = Column(DateTime, nullable=True, index=True)  # when market resolves
     resolved_date = Column(DateTime, nullable=True)
-    
+
     # Resolution
-    resolved_outcome = Column(String(255), nullable=True)  # actual outcome when market closes
-    
+    resolved_outcome = Column(
+        String(255), nullable=True
+    )  # actual outcome when market closes
+
     # Status
-    is_active = Column(Integer, nullable=False, default=1, index=True)  # 1 = active, 0 = resolved/closed
+    is_active = Column(
+        Integer, nullable=False, default=1, index=True
+    )  # 1 = active, 0 = resolved/closed
     is_featured = Column(Integer, nullable=False, default=0)  # high-profile market
-    
+
     # Latest Values (for quick queries without joining observations)
     last_yes_probability = Column(String(20), nullable=True)  # 0.00 to 1.00
     last_volume_usd = Column(String(50), nullable=True)
     last_updated = Column(DateTime, nullable=True)
-    
+
     # Metadata
     first_observed = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     __table_args__ = (
-        UniqueConstraint('source', 'market_id', name='uq_prediction_market'),
-        Index('idx_pm_source', 'source'),
-        Index('idx_pm_category', 'category'),
-        Index('idx_pm_close_date', 'close_date'),
-        Index('idx_pm_active', 'is_active'),
+        UniqueConstraint("source", "market_id", name="uq_prediction_market"),
+        Index("idx_pm_source", "source"),
+        Index("idx_pm_category", "category"),
+        Index("idx_pm_close_date", "close_date"),
+        Index("idx_pm_active", "is_active"),
     )
-    
+
     def __repr__(self) -> str:
         return (
             f"<PredictionMarket(id={self.id}, source='{self.source}', "
@@ -1342,45 +1588,62 @@ class PredictionMarket(Base):
 class MarketObservation(Base):
     """
     Time-series probability and volume data for prediction markets.
-    
+
     Captures snapshots of market state at regular intervals for trend analysis.
     """
+
     __tablename__ = "market_observations"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    market_id = Column(Integer, nullable=False, index=True)  # FK to prediction_markets.id
-    
+    market_id = Column(
+        Integer, nullable=False, index=True
+    )  # FK to prediction_markets.id
+
     # Observation Time
-    observation_timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
-    
+    observation_timestamp = Column(
+        DateTime, nullable=False, default=datetime.utcnow, index=True
+    )
+
     # Probabilities (0.00 to 1.00)
-    yes_probability = Column(String(20), nullable=False)  # stored as string for precision
-    no_probability = Column(String(20), nullable=True)  # can be derived (1 - yes) for binary
-    
+    yes_probability = Column(
+        String(20), nullable=False
+    )  # stored as string for precision
+    no_probability = Column(
+        String(20), nullable=True
+    )  # can be derived (1 - yes) for binary
+
     # For Multiple Choice Markets
-    outcome_probabilities = Column(JSON, nullable=True)  # {"outcome_1": "0.45", "outcome_2": "0.35", ...}
-    
+    outcome_probabilities = Column(
+        JSON, nullable=True
+    )  # {"outcome_1": "0.45", "outcome_2": "0.35", ...}
+
     # Market Activity
     volume_usd = Column(String(50), nullable=True)  # total volume
     volume_24h_usd = Column(String(50), nullable=True)  # 24h volume
     liquidity_usd = Column(String(50), nullable=True)  # open interest / liquidity
     trade_count = Column(Integer, nullable=True)  # number of trades (if available)
-    
+
     # Price Movement (calculated)
     probability_change_1h = Column(String(20), nullable=True)  # change from 1 hour ago
-    probability_change_24h = Column(String(20), nullable=True)  # change from 24 hours ago
+    probability_change_24h = Column(
+        String(20), nullable=True
+    )  # change from 24 hours ago
     probability_change_7d = Column(String(20), nullable=True)  # change from 7 days ago
-    
+
     # Data Quality
-    data_source = Column(String(50), nullable=False, default='api')  # api, browser, manual
-    confidence_score = Column(String(10), nullable=True)  # 0-1, how confident in data quality
-    
+    data_source = Column(
+        String(50), nullable=False, default="api"
+    )  # api, browser, manual
+    confidence_score = Column(
+        String(10), nullable=True
+    )  # 0-1, how confident in data quality
+
     __table_args__ = (
-        Index('idx_mo_market', 'market_id'),
-        Index('idx_mo_timestamp', 'observation_timestamp'),
-        Index('idx_mo_market_time', 'market_id', 'observation_timestamp'),
+        Index("idx_mo_market", "market_id"),
+        Index("idx_mo_timestamp", "observation_timestamp"),
+        Index("idx_mo_market_time", "market_id", "observation_timestamp"),
     )
-    
+
     def __repr__(self) -> str:
         return (
             f"<MarketObservation(id={self.id}, market_id={self.market_id}, "
@@ -1391,29 +1654,32 @@ class MarketObservation(Base):
 class MarketCategory(Base):
     """
     Classification system for prediction markets.
-    
+
     Links market categories to relevant sectors and companies,
     and defines alert thresholds for monitoring.
     """
+
     __tablename__ = "market_categories"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    
+
     category_name = Column(String(100), nullable=False, unique=True, index=True)
     parent_category = Column(String(100), nullable=True)  # for hierarchical categories
     display_name = Column(String(255), nullable=True)  # human-readable name
-    
+
     # Relevance
     relevant_sectors = Column(JSON, nullable=True)  # which sectors this affects
     relevant_companies = Column(JSON, nullable=True)  # array of company IDs
     impact_level = Column(String(20), nullable=True)  # high, medium, low
-    
+
     # Monitoring
     monitoring_priority = Column(Integer, nullable=True)  # 1-5 (5 = highest)
-    alert_threshold = Column(String(10), nullable=True)  # probability change threshold (e.g., "0.10")
-    
+    alert_threshold = Column(
+        String(10), nullable=True
+    )  # probability change threshold (e.g., "0.10")
+
     description = Column(Text, nullable=True)
-    
+
     def __repr__(self) -> str:
         return f"<MarketCategory(name='{self.category_name}', priority={self.monitoring_priority})>"
 
@@ -1421,43 +1687,48 @@ class MarketCategory(Base):
 class MarketAlert(Base):
     """
     Alerts for significant probability shifts in prediction markets.
-    
+
     Generated when probability changes exceed configured thresholds.
     """
+
     __tablename__ = "market_alerts"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    market_id = Column(Integer, nullable=False, index=True)  # FK to prediction_markets.id
-    
+    market_id = Column(
+        Integer, nullable=False, index=True
+    )  # FK to prediction_markets.id
+
     # Alert Details
     alert_type = Column(String(50), nullable=False, index=True)
     # alert_type values: 'probability_spike', 'probability_drop', 'volume_surge', 'new_market', 'market_resolved'
-    alert_severity = Column(String(20), nullable=False, index=True)  # critical, high, medium, low
-    
+    alert_severity = Column(
+        String(20), nullable=False, index=True
+    )  # critical, high, medium, low
+
     # Trigger Conditions
     triggered_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     probability_before = Column(String(20), nullable=True)
     probability_after = Column(String(20), nullable=True)
     probability_change = Column(String(20), nullable=True)
     time_period = Column(String(20), nullable=True)  # 1h, 24h, 7d
-    
+
     # Context
     alert_message = Column(Text, nullable=True)
     affected_sectors = Column(JSON, nullable=True)
     affected_companies = Column(JSON, nullable=True)
-    
+
     # Status
     is_acknowledged = Column(Integer, nullable=False, default=0)  # 0 or 1
     acknowledged_at = Column(DateTime, nullable=True)
     acknowledged_by = Column(String(100), nullable=True)
-    
+
     __table_args__ = (
-        Index('idx_alert_market', 'market_id'),
-        Index('idx_alert_triggered', 'triggered_at'),
-        Index('idx_alert_severity', 'alert_severity'),
-        Index('idx_alert_acknowledged', 'is_acknowledged'),
+        Index("idx_alert_market", "market_id"),
+        Index("idx_alert_triggered", "triggered_at"),
+        Index("idx_alert_severity", "alert_severity"),
+        Index("idx_alert_acknowledged", "is_acknowledged"),
     )
-    
+
     def __repr__(self) -> str:
         return (
             f"<MarketAlert(id={self.id}, market_id={self.market_id}, "
@@ -1468,53 +1739,58 @@ class MarketAlert(Base):
 class PredictionMarketJob(Base):
     """
     Tracks prediction market monitoring jobs.
-    
+
     Each job monitors one or more platforms and captures:
     - Markets checked and updated
     - New markets discovered
     - Alerts generated
     """
+
     __tablename__ = "prediction_market_jobs"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     job_type = Column(String(50), nullable=False, index=True)
-    # job_type values: 'monitor_all', 'monitor_kalshi', 'monitor_polymarket', 
+    # job_type values: 'monitor_all', 'monitor_kalshi', 'monitor_polymarket',
     #                  'monitor_predictit', 'analyze_trends', 'generate_alerts'
-    
+
     # Target specification
-    target_platforms = Column(JSON, nullable=True)  # ['kalshi', 'polymarket', 'predictit']
-    target_categories = Column(JSON, nullable=True)  # ['economics', 'politics', 'sports']
-    
+    target_platforms = Column(
+        JSON, nullable=True
+    )  # ['kalshi', 'polymarket', 'predictit']
+    target_categories = Column(
+        JSON, nullable=True
+    )  # ['economics', 'politics', 'sports']
+
     # Job status
-    status = Column(String(50), nullable=False, default='pending', index=True)
+    status = Column(String(50), nullable=False, default="pending", index=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
-    
+
     # Results
     markets_checked = Column(Integer, nullable=True, default=0)
     markets_updated = Column(Integer, nullable=True, default=0)
     new_markets_found = Column(Integer, nullable=True, default=0)
     observations_stored = Column(Integer, nullable=True, default=0)
     alerts_generated = Column(Integer, nullable=True, default=0)
-    
+
     # Agent Reasoning
     reasoning_log = Column(JSON, nullable=True)
-    
+
     # Errors
     errors = Column(JSON, nullable=True)
     warnings = Column(JSON, nullable=True)
-    
+
     # Resource tracking
     requests_made = Column(Integer, nullable=True, default=0)
-    
+
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    
+
     __table_args__ = (
-        Index('idx_pm_job_status', 'status'),
-        Index('idx_pm_job_type', 'job_type'),
+        Index("idx_pm_job_status", "status"),
+        Index("idx_pm_job_type", "job_type"),
     )
-    
+
     def __repr__(self) -> str:
         return (
             f"<PredictionMarketJob(id={self.id}, type='{self.job_type}', "
@@ -1529,6 +1805,7 @@ class PredictionMarketJob(Base):
 
 class WebhookEventType(str, enum.Enum):
     """Types of events that can trigger webhooks."""
+
     JOB_FAILED = "job_failed"
     JOB_SUCCESS = "job_success"
     ALERT_HIGH_FAILURE_RATE = "alert_high_failure_rate"
@@ -1548,6 +1825,7 @@ class Webhook(Base):
     Webhooks can be configured to send HTTP POST requests to external
     services (Slack, Discord, custom endpoints) when events occur.
     """
+
     __tablename__ = "webhooks"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1556,7 +1834,9 @@ class Webhook(Base):
 
     # Event configuration
     event_types = Column(JSON, nullable=False)  # List of WebhookEventType values
-    source_filter = Column(String(50), nullable=True)  # Optional: only trigger for specific source
+    source_filter = Column(
+        String(50), nullable=True
+    )  # Optional: only trigger for specific source
 
     # Authentication (optional)
     secret = Column(String(255), nullable=True)  # For HMAC signature verification
@@ -1573,7 +1853,9 @@ class Webhook(Base):
 
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     def __repr__(self) -> str:
         return (
@@ -1588,6 +1870,7 @@ class WebhookDelivery(Base):
 
     Tracks each webhook notification sent, including success/failure status.
     """
+
     __tablename__ = "webhook_deliveries"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1611,9 +1894,9 @@ class WebhookDelivery(Base):
     attempt_number = Column(Integer, nullable=False, default=1)
 
     __table_args__ = (
-        Index('idx_webhook_delivery_webhook', 'webhook_id'),
-        Index('idx_webhook_delivery_status', 'status'),
-        Index('idx_webhook_delivery_created', 'created_at'),
+        Index("idx_webhook_delivery_webhook", "webhook_id"),
+        Index("idx_webhook_delivery_status", "status"),
+        Index("idx_webhook_delivery_created", "created_at"),
     )
 
     def __repr__(self) -> str:
@@ -1630,6 +1913,7 @@ class WebhookDelivery(Base):
 
 class DependencyCondition(str, enum.Enum):
     """Condition for when a dependency is satisfied."""
+
     ON_SUCCESS = "on_success"  # Parent must succeed
     ON_COMPLETE = "on_complete"  # Parent must complete (success or failure)
     ON_FAILURE = "on_failure"  # Parent must fail (for error handling jobs)
@@ -1642,6 +1926,7 @@ class JobDependency(Base):
     Supports DAG-style workflows where jobs can depend on other jobs.
     A job will not start until all its dependencies are satisfied.
     """
+
     __tablename__ = "job_dependencies"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1656,16 +1941,16 @@ class JobDependency(Base):
     condition = Column(
         Enum(DependencyCondition, native_enum=False, length=20),
         nullable=False,
-        default=DependencyCondition.ON_SUCCESS
+        default=DependencyCondition.ON_SUCCESS,
     )
 
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_job_dep_job', 'job_id'),
-        Index('idx_job_dep_parent', 'depends_on_job_id'),
-        UniqueConstraint('job_id', 'depends_on_job_id', name='uq_job_dependency'),
+        Index("idx_job_dep_job", "job_id"),
+        Index("idx_job_dep_parent", "depends_on_job_id"),
+        UniqueConstraint("job_id", "depends_on_job_id", name="uq_job_dependency"),
     )
 
     def __repr__(self) -> str:
@@ -1683,6 +1968,7 @@ class JobChain(Base):
     with their dependencies. Creating a chain instance creates all jobs
     and dependencies automatically.
     """
+
     __tablename__ = "job_chains"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1703,7 +1989,9 @@ class JobChain(Base):
 
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     def __repr__(self) -> str:
         return (
@@ -1719,13 +2007,14 @@ class JobChainExecution(Base):
     Each time a chain is executed, this records all the jobs created
     and tracks overall chain status.
     """
+
     __tablename__ = "job_chain_executions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     chain_id = Column(Integer, nullable=False, index=True)
 
     # Status
-    status = Column(String(20), nullable=False, default='running', index=True)
+    status = Column(String(20), nullable=False, default="running", index=True)
     # status values: 'running', 'success', 'partial_success', 'failed'
 
     # Job tracking
@@ -1740,8 +2029,8 @@ class JobChainExecution(Base):
     completed_at = Column(DateTime, nullable=True)
 
     __table_args__ = (
-        Index('idx_chain_exec_chain', 'chain_id'),
-        Index('idx_chain_exec_status', 'status'),
+        Index("idx_chain_exec_chain", "chain_id"),
+        Index("idx_chain_exec_status", "status"),
     )
 
     def __repr__(self) -> str:
@@ -1763,15 +2052,22 @@ class SourceRateLimit(Base):
     Stores rate limit configuration for each external API source.
     Supports token bucket algorithm with burst capacity.
     """
+
     __tablename__ = "source_rate_limits"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     source = Column(String(50), nullable=False, unique=True, index=True)
 
     # Rate limit configuration
-    requests_per_second = Column(String(20), nullable=False, default="1.0")  # Tokens added per second
-    burst_capacity = Column(Integer, nullable=False, default=10)  # Maximum tokens (burst size)
-    concurrent_limit = Column(Integer, nullable=False, default=5)  # Max concurrent requests
+    requests_per_second = Column(
+        String(20), nullable=False, default="1.0"
+    )  # Tokens added per second
+    burst_capacity = Column(
+        Integer, nullable=False, default=10
+    )  # Maximum tokens (burst size)
+    concurrent_limit = Column(
+        Integer, nullable=False, default=5
+    )  # Max concurrent requests
 
     # Current state (for distributed rate limiting)
     current_tokens = Column(String(20), nullable=True)  # Current token count
@@ -1788,7 +2084,9 @@ class SourceRateLimit(Base):
 
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     def __repr__(self) -> str:
         return (
@@ -1804,6 +2102,7 @@ class SourceRateLimit(Base):
 
 class RuleType(str, enum.Enum):
     """Types of data quality validation rules."""
+
     RANGE = "range"  # Value must be within min/max
     NOT_NULL = "not_null"  # Value must not be null
     UNIQUE = "unique"  # Values must be unique
@@ -1817,6 +2116,7 @@ class RuleType(str, enum.Enum):
 
 class RuleSeverity(str, enum.Enum):
     """Severity levels for rule violations."""
+
     ERROR = "error"  # Critical - fails validation
     WARNING = "warning"  # Non-critical - logged but doesn't fail
     INFO = "info"  # Informational only
@@ -1829,6 +2129,7 @@ class DataQualityRule(Base):
     Rules can be applied to specific sources, datasets, or columns.
     Supports various validation types with configurable thresholds.
     """
+
     __tablename__ = "data_quality_rules"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1837,18 +2138,19 @@ class DataQualityRule(Base):
 
     # Targeting
     source = Column(String(50), nullable=True, index=True)  # null = all sources
-    dataset_pattern = Column(String(255), nullable=True)  # Regex pattern for dataset/table names
-    column_name = Column(String(100), nullable=True)  # Specific column (null = table-level)
+    dataset_pattern = Column(
+        String(255), nullable=True
+    )  # Regex pattern for dataset/table names
+    column_name = Column(
+        String(100), nullable=True
+    )  # Specific column (null = table-level)
 
     # Rule configuration
-    rule_type = Column(
-        Enum(RuleType, native_enum=False, length=20),
-        nullable=False
-    )
+    rule_type = Column(Enum(RuleType, native_enum=False, length=20), nullable=False)
     severity = Column(
         Enum(RuleSeverity, native_enum=False, length=20),
         nullable=False,
-        default=RuleSeverity.ERROR
+        default=RuleSeverity.ERROR,
     )
 
     # Rule parameters (JSON for flexibility)
@@ -1875,12 +2177,14 @@ class DataQualityRule(Base):
 
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     __table_args__ = (
-        Index('idx_dq_rule_source', 'source'),
-        Index('idx_dq_rule_type', 'rule_type'),
-        Index('idx_dq_rule_enabled', 'is_enabled'),
+        Index("idx_dq_rule_source", "source"),
+        Index("idx_dq_rule_type", "rule_type"),
+        Index("idx_dq_rule_enabled", "is_enabled"),
     )
 
     def __repr__(self) -> str:
@@ -1896,6 +2200,7 @@ class DataQualityResult(Base):
 
     Stores the outcome of each rule check for audit and reporting.
     """
+
     __tablename__ = "data_quality_results"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1909,10 +2214,7 @@ class DataQualityResult(Base):
 
     # Result
     passed = Column(Integer, nullable=False)  # 1=passed, 0=failed
-    severity = Column(
-        Enum(RuleSeverity, native_enum=False, length=20),
-        nullable=False
-    )
+    severity = Column(Enum(RuleSeverity, native_enum=False, length=20), nullable=False)
 
     # Details
     message = Column(Text, nullable=True)  # Human-readable result
@@ -1930,10 +2232,10 @@ class DataQualityResult(Base):
     evaluated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_dq_result_rule', 'rule_id'),
-        Index('idx_dq_result_job', 'job_id'),
-        Index('idx_dq_result_passed', 'passed'),
-        Index('idx_dq_result_evaluated', 'evaluated_at'),
+        Index("idx_dq_result_rule", "rule_id"),
+        Index("idx_dq_result_job", "job_id"),
+        Index("idx_dq_result_passed", "passed"),
+        Index("idx_dq_result_evaluated", "evaluated_at"),
     )
 
     def __repr__(self) -> str:
@@ -1950,14 +2252,19 @@ class DataQualityReport(Base):
 
     Summarizes rule evaluations for easy monitoring and alerting.
     """
+
     __tablename__ = "data_quality_reports"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    job_id = Column(Integer, nullable=True, index=True)  # Associated job (null for scheduled reports)
+    job_id = Column(
+        Integer, nullable=True, index=True
+    )  # Associated job (null for scheduled reports)
 
     # Scope
     source = Column(String(50), nullable=True, index=True)
-    report_type = Column(String(50), nullable=False, default='job')  # job, daily, weekly
+    report_type = Column(
+        String(50), nullable=False, default="job"
+    )  # job, daily, weekly
 
     # Summary
     total_rules = Column(Integer, nullable=False, default=0)
@@ -1971,7 +2278,7 @@ class DataQualityReport(Base):
     info = Column(Integer, nullable=False, default=0)
 
     # Overall status
-    overall_status = Column(String(20), nullable=False, default='pending')
+    overall_status = Column(String(20), nullable=False, default="pending")
     # Values: 'passed', 'failed', 'warning', 'pending'
 
     # Details
@@ -1983,9 +2290,9 @@ class DataQualityReport(Base):
     completed_at = Column(DateTime, nullable=True)
 
     __table_args__ = (
-        Index('idx_dq_report_job', 'job_id'),
-        Index('idx_dq_report_status', 'overall_status'),
-        Index('idx_dq_report_started', 'started_at'),
+        Index("idx_dq_report_job", "job_id"),
+        Index("idx_dq_report_status", "overall_status"),
+        Index("idx_dq_report_started", "started_at"),
     )
 
     def __repr__(self) -> str:
@@ -2002,6 +2309,7 @@ class DataQualityReport(Base):
 
 class TemplateCategory(str, enum.Enum):
     """Categories for organizing templates."""
+
     DEMOGRAPHICS = "demographics"
     ECONOMIC = "economic"
     FINANCIAL = "financial"
@@ -2019,6 +2327,7 @@ class IngestionTemplate(Base):
     Templates define multiple jobs to run together with optional parameters.
     Supports variable substitution for customizable ingestion patterns.
     """
+
     __tablename__ = "ingestion_templates"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -2030,7 +2339,7 @@ class IngestionTemplate(Base):
     category = Column(
         Enum(TemplateCategory, native_enum=False, length=20),
         nullable=False,
-        default=TemplateCategory.CUSTOM
+        default=TemplateCategory.CUSTOM,
     )
     tags = Column(JSON, nullable=True)  # ["census", "state-level", "demographics"]
 
@@ -2045,7 +2354,9 @@ class IngestionTemplate(Base):
 
     # Execution settings
     use_chain = Column(Integer, nullable=False, default=0)  # 1 = create as job chain
-    parallel_execution = Column(Integer, nullable=False, default=1)  # 1 = run jobs in parallel
+    parallel_execution = Column(
+        Integer, nullable=False, default=1
+    )  # 1 = run jobs in parallel
 
     # State
     is_builtin = Column(Integer, nullable=False, default=0)  # 1 = system template
@@ -2057,11 +2368,13 @@ class IngestionTemplate(Base):
 
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     __table_args__ = (
-        Index('idx_template_category', 'category'),
-        Index('idx_template_enabled', 'is_enabled'),
+        Index("idx_template_category", "category"),
+        Index("idx_template_enabled", "is_enabled"),
     )
 
     def __repr__(self) -> str:
@@ -2077,6 +2390,7 @@ class TemplateExecution(Base):
 
     Records each time a template is run with the parameters used.
     """
+
     __tablename__ = "template_executions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -2087,7 +2401,7 @@ class TemplateExecution(Base):
     parameters = Column(JSON, nullable=True)  # Variables used for this execution
 
     # Status
-    status = Column(String(20), nullable=False, default='running', index=True)
+    status = Column(String(20), nullable=False, default="running", index=True)
     # Values: 'running', 'success', 'partial_success', 'failed'
 
     # Job tracking
@@ -2106,9 +2420,9 @@ class TemplateExecution(Base):
     errors = Column(JSON, nullable=True)
 
     __table_args__ = (
-        Index('idx_template_exec_template', 'template_id'),
-        Index('idx_template_exec_status', 'status'),
-        Index('idx_template_exec_started', 'started_at'),
+        Index("idx_template_exec_template", "template_id"),
+        Index("idx_template_exec_status", "status"),
+        Index("idx_template_exec_started", "started_at"),
     )
 
     def __repr__(self) -> str:
@@ -2122,8 +2436,10 @@ class TemplateExecution(Base):
 # Data Lineage Tracking
 # =============================================================================
 
+
 class LineageNodeType(str, enum.Enum):
     """Types of nodes in the lineage graph."""
+
     EXTERNAL_API = "external_api"  # External data source (Census, FRED, etc.)
     DATABASE_TABLE = "database_table"  # PostgreSQL table
     INGESTION_JOB = "ingestion_job"  # Job that moved/transformed data
@@ -2134,6 +2450,7 @@ class LineageNodeType(str, enum.Enum):
 
 class LineageEdgeType(str, enum.Enum):
     """Types of relationships between lineage nodes."""
+
     PRODUCES = "produces"  # Job produces dataset
     CONSUMES = "consumes"  # Job consumes from source
     DERIVES_FROM = "derives_from"  # Dataset derived from another
@@ -2147,15 +2464,14 @@ class LineageNode(Base):
 
     Nodes can be data sources, tables, jobs, or transformations.
     """
+
     __tablename__ = "lineage_nodes"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # Node identification
     node_type = Column(
-        Enum(LineageNodeType, native_enum=False, length=30),
-        nullable=False,
-        index=True
+        Enum(LineageNodeType, native_enum=False, length=30), nullable=False, index=True
     )
     node_id = Column(String(255), nullable=False)  # Unique identifier within type
     name = Column(String(255), nullable=False)  # Human-readable name
@@ -2172,16 +2488,20 @@ class LineageNode(Base):
 
     # Versioning
     version = Column(Integer, nullable=False, default=1)
-    is_current = Column(Integer, nullable=False, default=1)  # Is this the current version
+    is_current = Column(
+        Integer, nullable=False, default=1
+    )  # Is this the current version
 
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     __table_args__ = (
-        UniqueConstraint('node_type', 'node_id', 'version', name='uq_lineage_node'),
-        Index('idx_lineage_node_type_id', 'node_type', 'node_id'),
-        Index('idx_lineage_node_source', 'source'),
+        UniqueConstraint("node_type", "node_id", "version", name="uq_lineage_node"),
+        Index("idx_lineage_node_type_id", "node_type", "node_id"),
+        Index("idx_lineage_node_source", "source"),
     )
 
     def __repr__(self) -> str:
@@ -2194,18 +2514,22 @@ class LineageEdge(Base):
 
     Edges show data flow and dependencies.
     """
+
     __tablename__ = "lineage_edges"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # Edge endpoints
-    source_node_id = Column(Integer, nullable=False, index=True)  # FK to lineage_nodes.id
-    target_node_id = Column(Integer, nullable=False, index=True)  # FK to lineage_nodes.id
+    source_node_id = Column(
+        Integer, nullable=False, index=True
+    )  # FK to lineage_nodes.id
+    target_node_id = Column(
+        Integer, nullable=False, index=True
+    )  # FK to lineage_nodes.id
 
     # Relationship type
     edge_type = Column(
-        Enum(LineageEdgeType, native_enum=False, length=30),
-        nullable=False
+        Enum(LineageEdgeType, native_enum=False, length=30), nullable=False
     )
 
     # Metadata
@@ -2220,9 +2544,11 @@ class LineageEdge(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
-        UniqueConstraint('source_node_id', 'target_node_id', 'edge_type', name='uq_lineage_edge'),
-        Index('idx_lineage_edge_source', 'source_node_id'),
-        Index('idx_lineage_edge_target', 'target_node_id'),
+        UniqueConstraint(
+            "source_node_id", "target_node_id", "edge_type", name="uq_lineage_edge"
+        ),
+        Index("idx_lineage_edge_source", "source_node_id"),
+        Index("idx_lineage_edge_target", "target_node_id"),
     )
 
     def __repr__(self) -> str:
@@ -2235,6 +2561,7 @@ class LineageEvent(Base):
 
     Captures every data operation for complete history.
     """
+
     __tablename__ = "lineage_events"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -2266,9 +2593,9 @@ class LineageEvent(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_lineage_event_type', 'event_type'),
-        Index('idx_lineage_event_job', 'job_id'),
-        Index('idx_lineage_event_created', 'created_at'),
+        Index("idx_lineage_event_type", "event_type"),
+        Index("idx_lineage_event_job", "job_id"),
+        Index("idx_lineage_event_created", "created_at"),
     )
 
     def __repr__(self) -> str:
@@ -2281,12 +2608,15 @@ class DatasetVersion(Base):
 
     Each ingestion creates a new version snapshot.
     """
+
     __tablename__ = "dataset_versions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # Dataset identification
-    dataset_name = Column(String(255), nullable=False, index=True)  # e.g., "fred_gdp", "census_acs5_b01001"
+    dataset_name = Column(
+        String(255), nullable=False, index=True
+    )  # e.g., "fred_gdp", "census_acs5_b01001"
     source = Column(String(50), nullable=False, index=True)
     table_name = Column(String(255), nullable=False)  # Actual database table
 
@@ -2315,10 +2645,10 @@ class DatasetVersion(Base):
     superseded_at = Column(DateTime, nullable=True)  # When this version was replaced
 
     __table_args__ = (
-        UniqueConstraint('dataset_name', 'version', name='uq_dataset_version'),
-        Index('idx_dataset_version_name', 'dataset_name'),
-        Index('idx_dataset_version_source', 'source'),
-        Index('idx_dataset_version_current', 'is_current'),
+        UniqueConstraint("dataset_name", "version", name="uq_dataset_version"),
+        Index("idx_dataset_version_name", "dataset_name"),
+        Index("idx_dataset_version_source", "source"),
+        Index("idx_dataset_version_current", "is_current"),
     )
 
     def __repr__(self) -> str:
@@ -2331,29 +2661,38 @@ class ImpactAnalysis(Base):
 
     Shows which downstream datasets/jobs would be affected.
     """
+
     __tablename__ = "impact_analysis"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # Source of change
-    source_node_id = Column(Integer, nullable=False, index=True)  # FK to lineage_nodes.id
+    source_node_id = Column(
+        Integer, nullable=False, index=True
+    )  # FK to lineage_nodes.id
     source_node_name = Column(String(255), nullable=False)
 
     # Impacted entity
-    impacted_node_id = Column(Integer, nullable=False, index=True)  # FK to lineage_nodes.id
+    impacted_node_id = Column(
+        Integer, nullable=False, index=True
+    )  # FK to lineage_nodes.id
     impacted_node_name = Column(String(255), nullable=False)
     impacted_node_type = Column(String(30), nullable=False)
 
     # Impact details
-    impact_level = Column(Integer, nullable=False, default=1)  # Hops from source (1=direct, 2=indirect, etc.)
-    impact_path = Column(JSON, nullable=True)  # Path of node IDs from source to impacted
+    impact_level = Column(
+        Integer, nullable=False, default=1
+    )  # Hops from source (1=direct, 2=indirect, etc.)
+    impact_path = Column(
+        JSON, nullable=True
+    )  # Path of node IDs from source to impacted
 
     # Timestamps
     computed_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_impact_source', 'source_node_id'),
-        Index('idx_impact_impacted', 'impacted_node_id'),
+        Index("idx_impact_source", "source_node_id"),
+        Index("idx_impact_impacted", "impacted_node_id"),
     )
 
     def __repr__(self) -> str:
@@ -2364,8 +2703,10 @@ class ImpactAnalysis(Base):
 # Data Export
 # =============================================================================
 
+
 class ExportFormat(str, enum.Enum):
     """Supported export file formats."""
+
     CSV = "csv"
     JSON = "json"
     PARQUET = "parquet"
@@ -2373,6 +2714,7 @@ class ExportFormat(str, enum.Enum):
 
 class ExportStatus(str, enum.Enum):
     """Export job status."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -2386,21 +2728,19 @@ class ExportJob(Base):
 
     Allows async export of table data to files.
     """
+
     __tablename__ = "export_jobs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # What to export
     table_name = Column(String(255), nullable=False, index=True)
-    format = Column(
-        Enum(ExportFormat, native_enum=False, length=20),
-        nullable=False
-    )
+    format = Column(Enum(ExportFormat, native_enum=False, length=20), nullable=False)
     status = Column(
         Enum(ExportStatus, native_enum=False, length=20),
         nullable=False,
         default=ExportStatus.PENDING,
-        index=True
+        index=True,
     )
 
     # Export options
@@ -2423,9 +2763,9 @@ class ExportJob(Base):
     expires_at = Column(DateTime, nullable=True)
 
     __table_args__ = (
-        Index('idx_export_job_status', 'status'),
-        Index('idx_export_job_table', 'table_name'),
-        Index('idx_export_job_created', 'created_at'),
+        Index("idx_export_job_status", "status"),
+        Index("idx_export_job_table", "table_name"),
+        Index("idx_export_job_created", "created_at"),
     )
 
     def __repr__(self) -> str:
@@ -2439,6 +2779,7 @@ class ExportJob(Base):
 
 class LpCollectionSourceType(str, enum.Enum):
     """Types of data collection sources for LPs."""
+
     WEBSITE = "website"  # LP website crawl
     SEC_ADV = "sec_adv"  # SEC Form ADV
     SEC_13F = "sec_13f"  # SEC Form 13F institutional holdings
@@ -2451,6 +2792,7 @@ class LpCollectionSourceType(str, enum.Enum):
 
 class LpCollectionStatus(str, enum.Enum):
     """Status of a collection run."""
+
     PENDING = "pending"
     RUNNING = "running"
     SUCCESS = "success"
@@ -2464,6 +2806,7 @@ class LpCollectionRun(Base):
 
     Records collection metrics, errors, and timing for monitoring and debugging.
     """
+
     __tablename__ = "lp_collection_runs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -2471,16 +2814,18 @@ class LpCollectionRun(Base):
     source_type = Column(
         Enum(LpCollectionSourceType, native_enum=False, length=30),
         nullable=False,
-        index=True
+        index=True,
     )
-    job_id = Column(Integer, nullable=True, index=True)  # FK to ingestion_jobs.id (if part of batch)
+    job_id = Column(
+        Integer, nullable=True, index=True
+    )  # FK to ingestion_jobs.id (if part of batch)
 
     # Status
     status = Column(
         Enum(LpCollectionStatus, native_enum=False, length=20),
         nullable=False,
         default=LpCollectionStatus.PENDING,
-        index=True
+        index=True,
     )
 
     # Collection metrics
@@ -2507,9 +2852,9 @@ class LpCollectionRun(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_lp_collection_run_lp_source', 'lp_id', 'source_type'),
-        Index('idx_lp_collection_run_status', 'status'),
-        Index('idx_lp_collection_run_created', 'created_at'),
+        Index("idx_lp_collection_run_lp_source", "lp_id", "source_type"),
+        Index("idx_lp_collection_run_status", "status"),
+        Index("idx_lp_collection_run_created", "created_at"),
     )
 
     def __repr__(self) -> str:
@@ -2521,6 +2866,7 @@ class LpCollectionRun(Base):
 
 class LpCollectionFrequency(str, enum.Enum):
     """Frequency options for LP collection schedules."""
+
     DAILY = "daily"
     WEEKLY = "weekly"
     MONTHLY = "monthly"
@@ -2534,20 +2880,20 @@ class LpCollectionSchedule(Base):
     Supports different frequencies and source types with circuit-breaking
     for repeated failures.
     """
+
     __tablename__ = "lp_collection_schedules"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     lp_id = Column(Integer, nullable=False, index=True)  # FK to lp_fund.id
     source_type = Column(
-        Enum(LpCollectionSourceType, native_enum=False, length=30),
-        nullable=False
+        Enum(LpCollectionSourceType, native_enum=False, length=30), nullable=False
     )
 
     # Schedule configuration
     frequency = Column(
         Enum(LpCollectionFrequency, native_enum=False, length=20),
         nullable=False,
-        default=LpCollectionFrequency.WEEKLY
+        default=LpCollectionFrequency.WEEKLY,
     )
     day_of_week = Column(Integer, nullable=True)  # 0=Monday, for weekly
     day_of_month = Column(Integer, nullable=True)  # 1-31, for monthly
@@ -2566,12 +2912,14 @@ class LpCollectionSchedule(Base):
 
     # Timestamps
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     __table_args__ = (
-        UniqueConstraint('lp_id', 'source_type', name='uq_lp_collection_schedule'),
-        Index('idx_lp_collection_schedule_active', 'is_active'),
-        Index('idx_lp_collection_schedule_next_run', 'next_run_at'),
+        UniqueConstraint("lp_id", "source_type", name="uq_lp_collection_schedule"),
+        Index("idx_lp_collection_schedule_active", "is_active"),
+        Index("idx_lp_collection_schedule_next_run", "next_run_at"),
     )
 
     def __repr__(self) -> str:
@@ -2587,6 +2935,7 @@ class LpCollectionJob(Base):
 
     A single job can collect data for multiple LPs across multiple sources.
     """
+
     __tablename__ = "lp_collection_jobs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -2595,17 +2944,23 @@ class LpCollectionJob(Base):
     job_type = Column(String(50), nullable=False, index=True)
     # job_type values: 'single_lp', 'batch', 'stale_refresh', 'scheduled'
 
-    config = Column(JSON, nullable=False)  # Job configuration (lp_types, regions, sources, etc.)
+    config = Column(
+        JSON, nullable=False
+    )  # Job configuration (lp_types, regions, sources, etc.)
 
     # Filtering
     lp_types = Column(JSON, nullable=True)  # ["public_pension", "sovereign_wealth"]
     regions = Column(JSON, nullable=True)  # ["us", "europe"]
     sources = Column(JSON, nullable=True)  # ["website", "sec_adv"]
-    mode = Column(String(20), nullable=False, default='incremental')  # 'incremental' or 'full'
-    max_age_days = Column(Integer, nullable=True, default=90)  # Re-collect if older than
+    mode = Column(
+        String(20), nullable=False, default="incremental"
+    )  # 'incremental' or 'full'
+    max_age_days = Column(
+        Integer, nullable=True, default=90
+    )  # Re-collect if older than
 
     # Status
-    status = Column(String(20), nullable=False, default='pending', index=True)
+    status = Column(String(20), nullable=False, default="pending", index=True)
     # Values: 'pending', 'running', 'success', 'partial', 'failed'
 
     # Progress tracking
@@ -2633,9 +2988,9 @@ class LpCollectionJob(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
-        Index('idx_lp_collection_job_status', 'status'),
-        Index('idx_lp_collection_job_type', 'job_type'),
-        Index('idx_lp_collection_job_created', 'created_at'),
+        Index("idx_lp_collection_job_status", "status"),
+        Index("idx_lp_collection_job_type", "job_type"),
+        Index("idx_lp_collection_job_created", "created_at"),
     )
 
     def __repr__(self) -> str:
@@ -2651,6 +3006,7 @@ class LLMUsage(Base):
 
     Persisted to database for cost analysis across collection runs.
     """
+
     __tablename__ = "llm_usage"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -2660,16 +3016,18 @@ class LLMUsage(Base):
     input_tokens = Column(Integer, nullable=False, default=0)
     output_tokens = Column(Integer, nullable=False, default=0)
     cost_usd = Column(Numeric(10, 6), nullable=False, default=0)
-    source = Column(String(100), nullable=True)  # "people_collection", "org_chart", etc.
+    source = Column(
+        String(100), nullable=True
+    )  # "people_collection", "org_chart", etc.
     company_id = Column(Integer, nullable=True)
     job_id = Column(Integer, nullable=True)
     prompt_chars = Column(Integer, nullable=False, default=0)
 
     __table_args__ = (
-        Index('idx_llm_usage_source', 'source'),
-        Index('idx_llm_usage_model', 'model'),
-        Index('idx_llm_usage_created', 'created_at'),
-        Index('idx_llm_usage_job', 'job_id'),
+        Index("idx_llm_usage_source", "source"),
+        Index("idx_llm_usage_model", "model"),
+        Index("idx_llm_usage_created", "created_at"),
+        Index("idx_llm_usage_job", "job_id"),
     )
 
     def __repr__(self) -> str:
@@ -2687,13 +3045,18 @@ class SourceAPIKey(Base):
     Keys are Fernet-encrypted at rest and decrypted only when read.
     DB keys take priority over .env keys.
     """
+
     __tablename__ = "source_api_keys"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    source = Column(String(50), unique=True, nullable=False)  # "fred", "eia", "census", etc.
+    source = Column(
+        String(50), unique=True, nullable=False
+    )  # "fred", "eia", "census", etc.
     encrypted_key = Column(Text, nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     def __repr__(self) -> str:
         return f"<SourceAPIKey(source='{self.source}', updated_at={self.updated_at})>"

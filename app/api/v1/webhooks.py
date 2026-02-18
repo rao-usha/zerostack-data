@@ -3,6 +3,7 @@ Webhook management endpoints.
 
 Provides API for creating, updating, and managing webhook notifications.
 """
+
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -24,8 +25,10 @@ router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 # Pydantic Schemas
 # =============================================================================
 
+
 class WebhookCreate(BaseModel):
     """Request schema for creating a webhook."""
+
     name: str = Field(..., min_length=1, max_length=255)
     url: str = Field(..., min_length=1, max_length=2048)
     event_types: List[str] = Field(..., min_length=1)
@@ -37,6 +40,7 @@ class WebhookCreate(BaseModel):
 
 class WebhookUpdate(BaseModel):
     """Request schema for updating a webhook."""
+
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     url: Optional[str] = Field(None, min_length=1, max_length=2048)
     event_types: Optional[List[str]] = None
@@ -48,6 +52,7 @@ class WebhookUpdate(BaseModel):
 
 class WebhookResponse(BaseModel):
     """Response schema for webhook information."""
+
     id: int
     name: str
     url: str
@@ -82,12 +87,13 @@ class WebhookResponse(BaseModel):
             last_sent_at=obj.last_sent_at,
             last_error=obj.last_error,
             created_at=obj.created_at,
-            updated_at=obj.updated_at
+            updated_at=obj.updated_at,
         )
 
 
 class WebhookDeliveryResponse(BaseModel):
     """Response schema for webhook delivery information."""
+
     id: int
     webhook_id: int
     event_type: str
@@ -103,6 +109,7 @@ class WebhookDeliveryResponse(BaseModel):
 
 class WebhookTestResult(BaseModel):
     """Response schema for webhook test result."""
+
     webhook_id: int
     webhook_name: str
     test_successful: bool
@@ -113,6 +120,7 @@ class WebhookTestResult(BaseModel):
 # =============================================================================
 # Endpoints
 # =============================================================================
+
 
 @router.get("/event-types")
 def list_event_types():
@@ -126,7 +134,7 @@ def list_event_types():
             {
                 "value": event_type.value,
                 "name": event_type.name,
-                "description": _get_event_description(event_type)
+                "description": _get_event_description(event_type),
             }
             for event_type in WebhookEventType
         ]
@@ -149,8 +157,7 @@ def _get_event_description(event_type: WebhookEventType) -> str:
 
 @router.get("", response_model=List[WebhookResponse])
 def list_webhooks(
-    active_only: bool = False,
-    db: Session = Depends(get_db)
+    active_only: bool = False, db: Session = Depends(get_db)
 ) -> List[WebhookResponse]:
     """
     List all webhooks with optional filtering.
@@ -168,8 +175,7 @@ def list_webhooks(
 
 @router.post("", response_model=WebhookResponse, status_code=201)
 def create_webhook(
-    webhook_request: WebhookCreate,
-    db: Session = Depends(get_db)
+    webhook_request: WebhookCreate, db: Session = Depends(get_db)
 ) -> WebhookResponse:
     """
     Create a new webhook configuration.
@@ -185,13 +191,11 @@ def create_webhook(
         if event_type not in valid_event_types:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid event type: {event_type}. Valid types: {valid_event_types}"
+                detail=f"Invalid event type: {event_type}. Valid types: {valid_event_types}",
             )
 
     # Check for duplicate name
-    existing = db.query(Webhook).filter(
-        Webhook.name == webhook_request.name
-    ).first()
+    existing = db.query(Webhook).filter(Webhook.name == webhook_request.name).first()
     if existing:
         raise HTTPException(status_code=400, detail="Webhook name already exists")
 
@@ -203,7 +207,7 @@ def create_webhook(
         source_filter=webhook_request.source_filter,
         secret=webhook_request.secret,
         headers=webhook_request.headers,
-        is_active=webhook_request.is_active
+        is_active=webhook_request.is_active,
     )
 
     return WebhookResponse.from_orm_with_masked_secret(webhook)
@@ -224,9 +228,7 @@ def get_webhook(webhook_id: int, db: Session = Depends(get_db)) -> WebhookRespon
 
 @router.put("/{webhook_id}", response_model=WebhookResponse)
 def update_webhook(
-    webhook_id: int,
-    webhook_request: WebhookUpdate,
-    db: Session = Depends(get_db)
+    webhook_id: int, webhook_request: WebhookUpdate, db: Session = Depends(get_db)
 ) -> WebhookResponse:
     """
     Update an existing webhook.
@@ -244,7 +246,7 @@ def update_webhook(
             if event_type not in valid_event_types:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid event type: {event_type}. Valid types: {valid_event_types}"
+                    detail=f"Invalid event type: {event_type}. Valid types: {valid_event_types}",
                 )
 
     webhook = webhook_service.update_webhook(db, webhook_id, **update_data)
@@ -295,7 +297,9 @@ def pause_webhook(webhook_id: int, db: Session = Depends(get_db)) -> WebhookResp
 
 
 @router.post("/{webhook_id}/test", response_model=WebhookTestResult)
-async def test_webhook(webhook_id: int, db: Session = Depends(get_db)) -> WebhookTestResult:
+async def test_webhook(
+    webhook_id: int, db: Session = Depends(get_db)
+) -> WebhookTestResult:
     """
     Send a test notification to a webhook.
 
@@ -315,7 +319,7 @@ async def test_webhook(webhook_id: int, db: Session = Depends(get_db)) -> Webhoo
 def get_webhook_deliveries(
     webhook_id: int,
     limit: int = Query(default=50, ge=1, le=200),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> List[WebhookDeliveryResponse]:
     """
     Get recent delivery history for a webhook.
@@ -351,9 +355,11 @@ def get_webhook_stats(webhook_id: int, db: Session = Depends(get_db)):
         "total_failed": webhook.total_failed,
         "total_attempts": total,
         "success_rate": round(success_rate, 2),
-        "last_sent_at": webhook.last_sent_at.isoformat() if webhook.last_sent_at else None,
+        "last_sent_at": webhook.last_sent_at.isoformat()
+        if webhook.last_sent_at
+        else None,
         "last_error": webhook.last_error,
-        "is_active": bool(webhook.is_active)
+        "is_active": bool(webhook.is_active),
     }
 
 
@@ -361,11 +367,16 @@ def get_webhook_stats(webhook_id: int, db: Session = Depends(get_db)):
 # Alert Notification Endpoints
 # =============================================================================
 
+
 @router.post("/alerts/check")
 async def check_and_notify_alerts(
-    failure_threshold: int = Query(default=3, ge=1, description="Failures to trigger alert"),
-    time_window_hours: int = Query(default=1, ge=1, description="Time window for failure count"),
-    db: Session = Depends(get_db)
+    failure_threshold: int = Query(
+        default=3, ge=1, description="Failures to trigger alert"
+    ),
+    time_window_hours: int = Query(
+        default=1, ge=1, description="Time window for failure count"
+    ),
+    db: Session = Depends(get_db),
 ):
     """
     Check for monitoring alerts and send webhook notifications.
@@ -381,8 +392,6 @@ async def check_and_notify_alerts(
         Summary of alerts found and notifications sent
     """
     result = await monitoring.check_and_notify_alerts(
-        db=db,
-        failure_threshold=failure_threshold,
-        time_window_hours=time_window_hours
+        db=db, failure_threshold=failure_threshold, time_window_hours=time_window_hours
     )
     return result

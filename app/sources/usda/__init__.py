@@ -11,6 +11,7 @@ Provides access to agricultural statistics:
 API Key required - register free at: https://quickstats.nass.usda.gov/api
 Set USDA_API_KEY environment variable.
 """
+
 from .client import USDAClient, MAJOR_CROP_STATES, DATA_UNITS
 from .metadata import (
     generate_table_name,
@@ -33,14 +34,12 @@ __all__ = [
     "USDAClient",
     "MAJOR_CROP_STATES",
     "DATA_UNITS",
-    
     # Metadata
     "generate_table_name",
     "generate_create_table_sql",
     "parse_usda_record",
     "COMMODITY_CATEGORIES",
     "STATE_FIPS",
-    
     # Ingestion
     "ingest_crop_production",
     "ingest_crop_all_stats",

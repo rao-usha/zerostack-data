@@ -46,10 +46,14 @@ class ReportService:
             return {"error": "Company not found"}
 
         # Get current leadership
-        leadership = self.db.query(CompanyPerson).filter(
-            CompanyPerson.company_id == company_id,
-            CompanyPerson.is_current == True,
-        ).all()
+        leadership = (
+            self.db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.company_id == company_id,
+                CompanyPerson.is_current == True,
+            )
+            .all()
+        )
 
         # Build team structure
         c_suite = []
@@ -61,7 +65,8 @@ class ReportService:
             person = self.db.get(Person, cp.person_id) if cp.person_id else None
 
             profile = self._build_person_profile(
-                cp, person,
+                cp,
+                person,
                 include_bios=include_bios,
                 include_experience=include_experience,
                 include_education=include_education,
@@ -81,10 +86,16 @@ class ReportService:
 
         # Get recent changes
         one_year_ago = date.today() - timedelta(days=365)
-        recent_changes = self.db.query(LeadershipChange).filter(
-            LeadershipChange.company_id == company_id,
-            LeadershipChange.announced_date >= one_year_ago,
-        ).order_by(LeadershipChange.announced_date.desc()).limit(10).all()
+        recent_changes = (
+            self.db.query(LeadershipChange)
+            .filter(
+                LeadershipChange.company_id == company_id,
+                LeadershipChange.announced_date >= one_year_ago,
+            )
+            .order_by(LeadershipChange.announced_date.desc())
+            .limit(10)
+            .all()
+        )
 
         change_items = [
             {
@@ -155,15 +166,21 @@ class ReportService:
                 profile["bio"] = person.bio
 
             if include_experience:
-                experience = self.db.query(PersonExperience).filter(
-                    PersonExperience.person_id == person.id
-                ).order_by(PersonExperience.start_date.desc().nullslast()).limit(5).all()
+                experience = (
+                    self.db.query(PersonExperience)
+                    .filter(PersonExperience.person_id == person.id)
+                    .order_by(PersonExperience.start_date.desc().nullslast())
+                    .limit(5)
+                    .all()
+                )
 
                 profile["experience"] = [
                     {
                         "company": exp.company_name,
                         "title": exp.title,
-                        "start_date": exp.start_date.isoformat() if exp.start_date else None,
+                        "start_date": exp.start_date.isoformat()
+                        if exp.start_date
+                        else None,
                         "end_date": exp.end_date.isoformat() if exp.end_date else None,
                         "is_current": exp.is_current,
                     }
@@ -171,9 +188,11 @@ class ReportService:
                 ]
 
             if include_education:
-                education = self.db.query(PersonEducation).filter(
-                    PersonEducation.person_id == person.id
-                ).all()
+                education = (
+                    self.db.query(PersonEducation)
+                    .filter(PersonEducation.person_id == person.id)
+                    .all()
+                )
 
                 profile["education"] = [
                     {
@@ -194,7 +213,9 @@ class ReportService:
         days = (date.today() - start_date).days
         return int(days / 30.44)
 
-    def _calculate_team_metrics(self, leadership: List[CompanyPerson]) -> Dict[str, Any]:
+    def _calculate_team_metrics(
+        self, leadership: List[CompanyPerson]
+    ) -> Dict[str, Any]:
         """Calculate team-level metrics."""
         c_suite = [cp for cp in leadership if cp.title_level == "c_suite"]
 
@@ -220,7 +241,9 @@ class ReportService:
             "has_coo": any("coo" in t or "chief operating" in t for t in titles),
             "has_cto": any("cto" in t or "chief technology" in t for t in titles),
             "has_cmo": any("cmo" in t or "chief marketing" in t for t in titles),
-            "has_chro": any("chro" in t or "chief human" in t or "chief people" in t for t in titles),
+            "has_chro": any(
+                "chro" in t or "chief human" in t or "chief people" in t for t in titles
+            ),
         }
 
     def _identify_leadership_gaps(self, c_suite: List[Dict]) -> List[str]:
@@ -260,16 +283,23 @@ class ReportService:
 
         # Get peer companies
         if peer_set_id:
-            peer_members = self.db.query(PeoplePeerSetMember).filter(
-                PeoplePeerSetMember.peer_set_id == peer_set_id
-            ).all()
+            peer_members = (
+                self.db.query(PeoplePeerSetMember)
+                .filter(PeoplePeerSetMember.peer_set_id == peer_set_id)
+                .all()
+            )
             peer_company_ids = [m.company_id for m in peer_members]
         elif not peer_company_ids:
             # Auto-select peers from same industry
-            peers = self.db.query(IndustrialCompany).filter(
-                IndustrialCompany.industry_segment == company.industry_segment,
-                IndustrialCompany.id != company_id,
-            ).limit(5).all()
+            peers = (
+                self.db.query(IndustrialCompany)
+                .filter(
+                    IndustrialCompany.industry_segment == company.industry_segment,
+                    IndustrialCompany.id != company_id,
+                )
+                .limit(5)
+                .all()
+            )
             peer_company_ids = [p.id for p in peers]
 
         if not peer_company_ids:
@@ -281,10 +311,7 @@ class ReportService:
 
         # Build comparison data
         target_metrics = self._get_company_metrics(company_id)
-        peer_metrics = [
-            self._get_company_metrics(pid)
-            for pid in peer_company_ids
-        ]
+        peer_metrics = [self._get_company_metrics(pid) for pid in peer_company_ids]
 
         # Calculate peer averages
         peer_avg = self._calculate_peer_averages(peer_metrics)
@@ -311,10 +338,14 @@ class ReportService:
         if not company:
             return {"company_id": company_id, "error": "Not found"}
 
-        leadership = self.db.query(CompanyPerson).filter(
-            CompanyPerson.company_id == company_id,
-            CompanyPerson.is_current == True,
-        ).all()
+        leadership = (
+            self.db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.company_id == company_id,
+                CompanyPerson.is_current == True,
+            )
+            .all()
+        )
 
         c_suite_count = sum(1 for cp in leadership if cp.title_level == "c_suite")
         vp_count = sum(1 for cp in leadership if cp.title_level in ["vp", "svp", "evp"])
@@ -331,10 +362,14 @@ class ReportService:
 
         # Get recent changes
         one_year_ago = date.today() - timedelta(days=365)
-        changes_12m = self.db.query(LeadershipChange).filter(
-            LeadershipChange.company_id == company_id,
-            LeadershipChange.announced_date >= one_year_ago,
-        ).count()
+        changes_12m = (
+            self.db.query(LeadershipChange)
+            .filter(
+                LeadershipChange.company_id == company_id,
+                LeadershipChange.announced_date >= one_year_ago,
+            )
+            .count()
+        )
 
         return {
             "company_id": company_id,
@@ -378,49 +413,69 @@ class ReportService:
         if target.get("c_suite_count") and peer_avg.get("c_suite_count"):
             diff = target["c_suite_count"] - peer_avg["c_suite_count"]
             if diff > 1:
-                insights.append({
-                    "metric": "c_suite_count",
-                    "insight": "Larger C-suite than peers",
-                    "diff": round(diff, 1),
-                })
+                insights.append(
+                    {
+                        "metric": "c_suite_count",
+                        "insight": "Larger C-suite than peers",
+                        "diff": round(diff, 1),
+                    }
+                )
             elif diff < -1:
-                insights.append({
-                    "metric": "c_suite_count",
-                    "insight": "Smaller C-suite than peers",
-                    "diff": round(diff, 1),
-                })
+                insights.append(
+                    {
+                        "metric": "c_suite_count",
+                        "insight": "Smaller C-suite than peers",
+                        "diff": round(diff, 1),
+                    }
+                )
 
         # Tenure comparison
-        if target.get("avg_c_suite_tenure_months") and peer_avg.get("avg_c_suite_tenure_months"):
-            diff = target["avg_c_suite_tenure_months"] - peer_avg["avg_c_suite_tenure_months"]
+        if target.get("avg_c_suite_tenure_months") and peer_avg.get(
+            "avg_c_suite_tenure_months"
+        ):
+            diff = (
+                target["avg_c_suite_tenure_months"]
+                - peer_avg["avg_c_suite_tenure_months"]
+            )
             if diff > 12:
-                insights.append({
-                    "metric": "tenure",
-                    "insight": "More experienced (longer tenure) C-suite",
-                    "diff_months": round(diff, 1),
-                })
+                insights.append(
+                    {
+                        "metric": "tenure",
+                        "insight": "More experienced (longer tenure) C-suite",
+                        "diff_months": round(diff, 1),
+                    }
+                )
             elif diff < -12:
-                insights.append({
-                    "metric": "tenure",
-                    "insight": "Newer C-suite (shorter tenure)",
-                    "diff_months": round(diff, 1),
-                })
+                insights.append(
+                    {
+                        "metric": "tenure",
+                        "insight": "Newer C-suite (shorter tenure)",
+                        "diff_months": round(diff, 1),
+                    }
+                )
 
         # Turnover comparison
-        if target.get("changes_12m") is not None and peer_avg.get("changes_12m") is not None:
+        if (
+            target.get("changes_12m") is not None
+            and peer_avg.get("changes_12m") is not None
+        ):
             diff = target["changes_12m"] - peer_avg["changes_12m"]
             if diff > 2:
-                insights.append({
-                    "metric": "turnover",
-                    "insight": "Higher leadership turnover than peers",
-                    "diff": round(diff, 1),
-                })
+                insights.append(
+                    {
+                        "metric": "turnover",
+                        "insight": "Higher leadership turnover than peers",
+                        "diff": round(diff, 1),
+                    }
+                )
             elif diff < -2:
-                insights.append({
-                    "metric": "turnover",
-                    "insight": "Lower leadership turnover than peers",
-                    "diff": round(diff, 1),
-                })
+                insights.append(
+                    {
+                        "metric": "turnover",
+                        "insight": "Lower leadership turnover than peers",
+                        "diff": round(diff, 1),
+                    }
+                )
 
         return {
             "insights": insights,
@@ -454,55 +509,81 @@ class ReportService:
 
         if report.get("report_type") == "management_assessment":
             # Header
-            rows.append(["Name", "Title", "Department", "Start Date", "Tenure (months)", "Board Member"])
+            rows.append(
+                [
+                    "Name",
+                    "Title",
+                    "Department",
+                    "Start Date",
+                    "Tenure (months)",
+                    "Board Member",
+                ]
+            )
 
             # C-Suite
             for person in report.get("c_suite", []):
-                rows.append([
-                    person.get("name", ""),
-                    person.get("title", ""),
-                    person.get("department", ""),
-                    person.get("start_date", ""),
-                    str(person.get("tenure_months", "")),
-                    "Yes" if person.get("is_board_member") else "No",
-                ])
+                rows.append(
+                    [
+                        person.get("name", ""),
+                        person.get("title", ""),
+                        person.get("department", ""),
+                        person.get("start_date", ""),
+                        str(person.get("tenure_months", "")),
+                        "Yes" if person.get("is_board_member") else "No",
+                    ]
+                )
 
             # VP Level
             for person in report.get("vp_level", []):
-                rows.append([
-                    person.get("name", ""),
-                    person.get("title", ""),
-                    person.get("department", ""),
-                    person.get("start_date", ""),
-                    str(person.get("tenure_months", "")),
-                    "Yes" if person.get("is_board_member") else "No",
-                ])
+                rows.append(
+                    [
+                        person.get("name", ""),
+                        person.get("title", ""),
+                        person.get("department", ""),
+                        person.get("start_date", ""),
+                        str(person.get("tenure_months", "")),
+                        "Yes" if person.get("is_board_member") else "No",
+                    ]
+                )
 
         elif report.get("report_type") == "peer_comparison":
             # Header
-            rows.append(["Company", "C-Suite Count", "VP Count", "Board Size", "Avg Tenure", "Changes 12M"])
+            rows.append(
+                [
+                    "Company",
+                    "C-Suite Count",
+                    "VP Count",
+                    "Board Size",
+                    "Avg Tenure",
+                    "Changes 12M",
+                ]
+            )
 
             # Target company
             target = report.get("target_company", {})
             metrics = target.get("metrics", {})
-            rows.append([
-                target.get("name", ""),
-                str(metrics.get("c_suite_count", "")),
-                str(metrics.get("vp_count", "")),
-                str(metrics.get("board_size", "")),
-                str(metrics.get("avg_c_suite_tenure_months", "")),
-                str(metrics.get("changes_12m", "")),
-            ])
+            rows.append(
+                [
+                    target.get("name", ""),
+                    str(metrics.get("c_suite_count", "")),
+                    str(metrics.get("vp_count", "")),
+                    str(metrics.get("board_size", "")),
+                    str(metrics.get("avg_c_suite_tenure_months", "")),
+                    str(metrics.get("changes_12m", "")),
+                ]
+            )
 
             # Peer companies
             for peer in report.get("peer_companies", []):
-                rows.append([
-                    peer.get("company_name", ""),
-                    str(peer.get("c_suite_count", "")),
-                    str(peer.get("vp_count", "")),
-                    str(peer.get("board_size", "")),
-                    str(peer.get("avg_c_suite_tenure_months", "")),
-                    str(peer.get("changes_12m", "")),
-                ])
+                rows.append(
+                    [
+                        peer.get("company_name", ""),
+                        str(peer.get("c_suite_count", "")),
+                        str(peer.get("vp_count", "")),
+                        str(peer.get("board_size", "")),
+                        str(peer.get("avg_c_suite_tenure_months", "")),
+                        str(peer.get("changes_12m", "")),
+                    ]
+                )
 
         return rows

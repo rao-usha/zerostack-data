@@ -3,6 +3,7 @@ Site Intelligence Platform - Site Scoring & Collection API.
 
 Endpoints for scoring, comparing, searching, and triggering data collection.
 """
+
 import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -14,9 +15,15 @@ from pydantic import BaseModel, Field
 
 from app.core.database import get_db
 from app.core.models_site_intel import (
-    SiteScoreConfig, SiteScore,
-    PowerPlant, Substation, InternetExchange, DataCenterFacility,
-    IntermodalTerminal, Port, Airport,
+    SiteScoreConfig,
+    SiteScore,
+    PowerPlant,
+    Substation,
+    InternetExchange,
+    DataCenterFacility,
+    IntermodalTerminal,
+    Port,
+    Airport,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,10 +35,14 @@ router = APIRouter(prefix="/site-intel/sites", tags=["Site Intel - Scoring"])
 # REQUEST MODELS
 # =============================================================================
 
+
 class SiteScoreRequest(BaseModel):
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
-    use_case: str = Field(default="data_center", description="Use case: data_center, warehouse, manufacturing")
+    use_case: str = Field(
+        default="data_center",
+        description="Use case: data_center, warehouse, manufacturing",
+    )
     custom_weights: Optional[Dict[str, float]] = None
 
 
@@ -51,6 +62,7 @@ class SiteSearchRequest(BaseModel):
 
 class CollectionRequest(BaseModel):
     """Request to trigger site intel data collection."""
+
     domains: Optional[List[str]] = Field(
         default=None,
         description="Domains to collect (e.g. ['power', 'telecom']). None = all domains.",
@@ -69,16 +81,17 @@ class CollectionRequest(BaseModel):
 # COLLECTION ENDPOINTS
 # =============================================================================
 
+
 def _import_all_collectors():
     """Import all domain modules to trigger collector registration."""
-    import app.sources.site_intel.power           # noqa: F401
-    import app.sources.site_intel.telecom         # noqa: F401
-    import app.sources.site_intel.transport       # noqa: F401
-    import app.sources.site_intel.labor           # noqa: F401
-    import app.sources.site_intel.risk            # noqa: F401
-    import app.sources.site_intel.incentives      # noqa: F401
-    import app.sources.site_intel.logistics       # noqa: F401
-    import app.sources.site_intel.water_utilities # noqa: F401
+    import app.sources.site_intel.power  # noqa: F401
+    import app.sources.site_intel.telecom  # noqa: F401
+    import app.sources.site_intel.transport  # noqa: F401
+    import app.sources.site_intel.labor  # noqa: F401
+    import app.sources.site_intel.risk  # noqa: F401
+    import app.sources.site_intel.incentives  # noqa: F401
+    import app.sources.site_intel.logistics  # noqa: F401
+    import app.sources.site_intel.water_utilities  # noqa: F401
 
 
 async def _run_collection(
@@ -118,6 +131,7 @@ async def _run_collection(
         # Log audit trail entry
         try:
             from app.core import audit_service
+
             audit_service.log_collection(
                 db,
                 trigger_type="api",
@@ -125,7 +139,11 @@ async def _run_collection(
                 domain=",".join(domains) if domains else "all",
                 job_type="site_intel",
                 trigger_source="/site-intel/sites/collect",
-                config_snapshot={"domains": domains, "sources": sources, "states": states},
+                config_snapshot={
+                    "domains": domains,
+                    "sources": sources,
+                    "states": states,
+                },
             )
         except Exception as e:
             logger.debug(f"Audit log failed: {e}")
@@ -170,7 +188,9 @@ async def _run_collection(
                     logger.info(f"Collecting {domain.value}/{source.value}")
                     await orchestrator.collect(domain, source, **kwargs)
                 else:
-                    logger.warning(f"Could not determine domain for source: {source.value}")
+                    logger.warning(
+                        f"Could not determine domain for source: {source.value}"
+                    )
         elif target_domains:
             # Collect all sources for specified domains
             for domain in target_domains:
@@ -231,6 +251,7 @@ async def trigger_collection(
     total_collectors = sum(len(v) for v in targeted.values())
 
     from app.core.job_queue_service import submit_job
+
     result = submit_job(
         db=db,
         job_type="site_intel",
@@ -274,6 +295,7 @@ async def get_collection_status(db: Session = Depends(get_db)):
 # WATERMARK ENDPOINTS (Incremental Collection Tracking)
 # =============================================================================
 
+
 @router.get("/watermarks")
 async def list_watermarks(
     domain: Optional[str] = Query(None, description="Filter by domain"),
@@ -281,6 +303,7 @@ async def list_watermarks(
 ):
     """List all collection watermarks (last-collected timestamps)."""
     from app.core import watermark_service
+
     watermarks = watermark_service.get_all_watermarks(db, domain=domain)
     return {"watermarks": watermarks, "total": len(watermarks)}
 
@@ -294,6 +317,7 @@ async def get_watermark(
 ):
     """Get watermark for a specific domain/source."""
     from app.core import watermark_service
+
     ts = watermark_service.get_watermark(db, domain, source, state=state)
     return {
         "domain": domain,
@@ -313,6 +337,7 @@ async def clear_watermark(
 ):
     """Clear a watermark to force full re-sync on next collection."""
     from app.core import watermark_service
+
     cleared = watermark_service.clear_watermark(db, domain, source, state=state)
     if not cleared:
         raise HTTPException(status_code=404, detail="Watermark not found")
@@ -323,6 +348,7 @@ async def clear_watermark(
 # REAL-TIME PROGRESS (SSE)
 # =============================================================================
 
+
 @router.get("/collect/stream")
 async def stream_all_progress():
     """
@@ -332,6 +358,7 @@ async def stream_all_progress():
     Events: started, progress, completed, failed, domain_started, domain_completed
     """
     from app.core.event_bus import EventBus
+
     return StreamingResponse(
         EventBus.subscribe_stream("collection_all"),
         media_type="text/event-stream",
@@ -346,6 +373,7 @@ async def stream_all_progress():
 async def stream_job_progress(job_id: int):
     """SSE stream for a specific collection job."""
     from app.core.event_bus import EventBus
+
     return StreamingResponse(
         EventBus.subscribe_stream(f"collection_{job_id}"),
         media_type="text/event-stream",
@@ -359,6 +387,7 @@ async def stream_job_progress(job_id: int):
 # =============================================================================
 # JOB DEPENDENCIES
 # =============================================================================
+
 
 class DependencyPlanItem(BaseModel):
     domain: str
@@ -419,6 +448,7 @@ async def collect_with_dependencies(
             db_session.close()
 
     from app.core.job_queue_service import submit_job
+
     submit_job(
         db=db,
         job_type="site_intel",
@@ -438,6 +468,7 @@ async def collect_with_dependencies(
 # =============================================================================
 # SCORING ENDPOINTS
 # =============================================================================
+
 
 @router.post("/score")
 async def score_site(
@@ -461,25 +492,40 @@ async def score_site(
     factors = {}
 
     # Power score (0-100)
-    substation_count = db.query(func.count(Substation.id)).filter(
-        Substation.latitude.between(lat - 0.5, lat + 0.5),
-        Substation.longitude.between(lng - 0.5, lng + 0.5),
-        Substation.max_voltage_kv >= 69,
-    ).scalar() or 0
+    substation_count = (
+        db.query(func.count(Substation.id))
+        .filter(
+            Substation.latitude.between(lat - 0.5, lat + 0.5),
+            Substation.longitude.between(lng - 0.5, lng + 0.5),
+            Substation.max_voltage_kv >= 69,
+        )
+        .scalar()
+        or 0
+    )
     factors["power"] = {
         "substations_within_35mi": substation_count,
         "score": min(substation_count * 15 + 10, 100),
     }
 
     # Telecom score (0-100)
-    ix_count = db.query(func.count(InternetExchange.id)).filter(
-        InternetExchange.latitude.between(lat - 1.5, lat + 1.5),
-        InternetExchange.longitude.between(lng - 1.5, lng + 1.5),
-    ).scalar() or 0
-    dc_count = db.query(func.count(DataCenterFacility.id)).filter(
-        DataCenterFacility.latitude.between(lat - 0.75, lat + 0.75),
-        DataCenterFacility.longitude.between(lng - 0.75, lng + 0.75),
-    ).scalar() or 0
+    ix_count = (
+        db.query(func.count(InternetExchange.id))
+        .filter(
+            InternetExchange.latitude.between(lat - 1.5, lat + 1.5),
+            InternetExchange.longitude.between(lng - 1.5, lng + 1.5),
+        )
+        .scalar()
+        or 0
+    )
+    dc_count = (
+        db.query(func.count(DataCenterFacility.id))
+        .filter(
+            DataCenterFacility.latitude.between(lat - 0.75, lat + 0.75),
+            DataCenterFacility.longitude.between(lng - 0.75, lng + 0.75),
+        )
+        .scalar()
+        or 0
+    )
     factors["telecom"] = {
         "ix_within_100mi": ix_count,
         "dc_within_50mi": dc_count,
@@ -487,34 +533,74 @@ async def score_site(
     }
 
     # Transport score (0-100)
-    intermodal_count = db.query(func.count(IntermodalTerminal.id)).filter(
-        IntermodalTerminal.latitude.between(lat - 0.75, lat + 0.75),
-        IntermodalTerminal.longitude.between(lng - 0.75, lng + 0.75),
-    ).scalar() or 0
-    port_count = db.query(func.count(Port.id)).filter(
-        Port.latitude.between(lat - 1.5, lat + 1.5),
-        Port.longitude.between(lng - 1.5, lng + 1.5),
-    ).scalar() or 0
-    airport_count = db.query(func.count(Airport.id)).filter(
-        Airport.latitude.between(lat - 0.5, lat + 0.5),
-        Airport.longitude.between(lng - 0.5, lng + 0.5),
-        Airport.has_cargo_facility == True,
-    ).scalar() or 0
+    intermodal_count = (
+        db.query(func.count(IntermodalTerminal.id))
+        .filter(
+            IntermodalTerminal.latitude.between(lat - 0.75, lat + 0.75),
+            IntermodalTerminal.longitude.between(lng - 0.75, lng + 0.75),
+        )
+        .scalar()
+        or 0
+    )
+    port_count = (
+        db.query(func.count(Port.id))
+        .filter(
+            Port.latitude.between(lat - 1.5, lat + 1.5),
+            Port.longitude.between(lng - 1.5, lng + 1.5),
+        )
+        .scalar()
+        or 0
+    )
+    airport_count = (
+        db.query(func.count(Airport.id))
+        .filter(
+            Airport.latitude.between(lat - 0.5, lat + 0.5),
+            Airport.longitude.between(lng - 0.5, lng + 0.5),
+            Airport.has_cargo_facility == True,
+        )
+        .scalar()
+        or 0
+    )
     factors["transport"] = {
         "intermodal_within_50mi": intermodal_count,
         "ports_within_100mi": port_count,
         "cargo_airports_within_35mi": airport_count,
-        "score": min(intermodal_count * 15 + port_count * 10 + airport_count * 10 + 20, 100),
+        "score": min(
+            intermodal_count * 15 + port_count * 10 + airport_count * 10 + 20, 100
+        ),
     }
 
     # Default weights by use case
     default_weights = {
-        "data_center": {"power": 0.30, "telecom": 0.35, "transport": 0.10, "labor": 0.10, "risk": 0.10, "incentives": 0.05},
-        "warehouse": {"power": 0.10, "telecom": 0.05, "transport": 0.40, "labor": 0.20, "risk": 0.15, "incentives": 0.10},
-        "manufacturing": {"power": 0.20, "telecom": 0.05, "transport": 0.25, "labor": 0.25, "risk": 0.15, "incentives": 0.10},
+        "data_center": {
+            "power": 0.30,
+            "telecom": 0.35,
+            "transport": 0.10,
+            "labor": 0.10,
+            "risk": 0.10,
+            "incentives": 0.05,
+        },
+        "warehouse": {
+            "power": 0.10,
+            "telecom": 0.05,
+            "transport": 0.40,
+            "labor": 0.20,
+            "risk": 0.15,
+            "incentives": 0.10,
+        },
+        "manufacturing": {
+            "power": 0.20,
+            "telecom": 0.05,
+            "transport": 0.25,
+            "labor": 0.25,
+            "risk": 0.15,
+            "incentives": 0.10,
+        },
     }
 
-    weights = request.custom_weights or default_weights.get(request.use_case, default_weights["data_center"])
+    weights = request.custom_weights or default_weights.get(
+        request.use_case, default_weights["data_center"]
+    )
 
     # Calculate weighted overall score
     overall_score = 0
@@ -525,7 +611,10 @@ async def score_site(
     # Add placeholder scores for factors not yet calculated
     for factor_name in ["labor", "risk", "incentives"]:
         if factor_name not in factors:
-            factors[factor_name] = {"score": 50, "note": "Placeholder - full calculation pending"}
+            factors[factor_name] = {
+                "score": 50,
+                "note": "Placeholder - full calculation pending",
+            }
             overall_score += 50 * weights.get(factor_name, 0.1)
 
     return {
@@ -533,11 +622,15 @@ async def score_site(
         "use_case": request.use_case,
         "overall_score": round(overall_score, 1),
         "grade": (
-            "A" if overall_score >= 80 else
-            "B" if overall_score >= 65 else
-            "C" if overall_score >= 50 else
-            "D" if overall_score >= 35 else
-            "F"
+            "A"
+            if overall_score >= 80
+            else "B"
+            if overall_score >= 65
+            else "C"
+            if overall_score >= 50
+            else "D"
+            if overall_score >= 35
+            else "F"
         ),
         "factors": factors,
         "weights_used": weights,
@@ -556,9 +649,13 @@ async def compare_sites(
     Returns scores for each location and identifies the best option.
     """
     if len(request.locations) < 2:
-        raise HTTPException(status_code=400, detail="Need at least 2 locations to compare")
+        raise HTTPException(
+            status_code=400, detail="Need at least 2 locations to compare"
+        )
     if len(request.locations) > 10:
-        raise HTTPException(status_code=400, detail="Maximum 10 locations per comparison")
+        raise HTTPException(
+            status_code=400, detail="Maximum 10 locations per comparison"
+        )
 
     results = []
 
@@ -580,8 +677,7 @@ async def compare_sites(
     matrix = {}
     for factor in ["power", "telecom", "transport", "labor", "risk", "incentives"]:
         matrix[factor] = {
-            r["name"]: r["factors"].get(factor, {}).get("score", 0)
-            for r in results
+            r["name"]: r["factors"].get(factor, {}).get("score", 0) for r in results
         }
 
     return {
@@ -589,7 +685,9 @@ async def compare_sites(
         "sites": results,
         "best_overall": results[0]["name"] if results else None,
         "comparison_matrix": matrix,
-        "recommendation": f"Based on {request.use_case} criteria, {results[0]['name']} scores highest with {results[0]['overall_score']:.1f}/100" if results else None,
+        "recommendation": f"Based on {request.use_case} criteria, {results[0]['name']} scores highest with {results[0]['overall_score']:.1f}/100"
+        if results
+        else None,
     }
 
 
@@ -618,13 +716,14 @@ async def search_sites(
             "3. Check telecom: /telecom/data-centers/nearby",
             "4. Verify transport: /transport/intermodal/nearby",
             "5. Score final candidates: /sites/compare",
-        ]
+        ],
     }
 
 
 # =============================================================================
 # REPORT ENDPOINT
 # =============================================================================
+
 
 @router.post("/report")
 async def generate_site_report(
@@ -642,18 +741,35 @@ async def generate_site_report(
     score_result = await score_site(request, db)
 
     # Add detailed infrastructure analysis
-    nearby_substations = db.query(Substation).filter(
-        Substation.latitude.between(lat - 0.5, lat + 0.5),
-        Substation.longitude.between(lng - 0.5, lng + 0.5),
-    ).order_by(Substation.max_voltage_kv.desc()).limit(5).all()
+    nearby_substations = (
+        db.query(Substation)
+        .filter(
+            Substation.latitude.between(lat - 0.5, lat + 0.5),
+            Substation.longitude.between(lng - 0.5, lng + 0.5),
+        )
+        .order_by(Substation.max_voltage_kv.desc())
+        .limit(5)
+        .all()
+    )
 
-    nearby_ix = db.query(InternetExchange).filter(
-        InternetExchange.latitude.between(lat - 1.5, lat + 1.5),
-    ).order_by(InternetExchange.network_count.desc()).limit(5).all()
+    nearby_ix = (
+        db.query(InternetExchange)
+        .filter(
+            InternetExchange.latitude.between(lat - 1.5, lat + 1.5),
+        )
+        .order_by(InternetExchange.network_count.desc())
+        .limit(5)
+        .all()
+    )
 
-    nearby_intermodal = db.query(IntermodalTerminal).filter(
-        IntermodalTerminal.latitude.between(lat - 0.75, lat + 0.75),
-    ).limit(5).all()
+    nearby_intermodal = (
+        db.query(IntermodalTerminal)
+        .filter(
+            IntermodalTerminal.latitude.between(lat - 0.75, lat + 0.75),
+        )
+        .limit(5)
+        .all()
+    )
 
     return {
         "report_type": "Site Selection Analysis",
@@ -664,9 +780,11 @@ async def generate_site_report(
             "overall_score": score_result["overall_score"],
             "grade": score_result["grade"],
             "recommendation": (
-                "Highly suitable" if score_result["overall_score"] >= 70 else
-                "Suitable with considerations" if score_result["overall_score"] >= 50 else
-                "Marginal - significant improvements needed"
+                "Highly suitable"
+                if score_result["overall_score"] >= 70
+                else "Suitable with considerations"
+                if score_result["overall_score"] >= 50
+                else "Marginal - significant improvements needed"
             ),
         },
         "factor_analysis": score_result["factors"],
@@ -675,7 +793,9 @@ async def generate_site_report(
                 "nearest_substations": [
                     {
                         "name": s.name,
-                        "voltage_kv": float(s.max_voltage_kv) if s.max_voltage_kv else None,
+                        "voltage_kv": float(s.max_voltage_kv)
+                        if s.max_voltage_kv
+                        else None,
                         "owner": s.owner,
                     }
                     for s in nearby_substations
@@ -716,12 +836,11 @@ async def generate_site_report(
 # CONFIGURATION ENDPOINTS
 # =============================================================================
 
+
 @router.get("/configs")
 async def list_scoring_configs(db: Session = Depends(get_db)):
     """List available scoring configurations."""
-    configs = db.query(SiteScoreConfig).filter(
-        SiteScoreConfig.is_active == True
-    ).all()
+    configs = db.query(SiteScoreConfig).filter(SiteScoreConfig.is_active == True).all()
 
     return [
         {
@@ -742,10 +861,22 @@ async def get_sites_summary(db: Session = Depends(get_db)):
         "domain": "scoring",
         "available_use_cases": ["data_center", "warehouse", "manufacturing"],
         "scoring_factors": [
-            {"name": "power", "description": "Power infrastructure (substations, capacity)"},
-            {"name": "telecom", "description": "Telecom infrastructure (IX, fiber, data centers)"},
-            {"name": "transport", "description": "Transportation (intermodal, ports, airports)"},
-            {"name": "labor", "description": "Labor market (workforce, wages, education)"},
+            {
+                "name": "power",
+                "description": "Power infrastructure (substations, capacity)",
+            },
+            {
+                "name": "telecom",
+                "description": "Telecom infrastructure (IX, fiber, data centers)",
+            },
+            {
+                "name": "transport",
+                "description": "Transportation (intermodal, ports, airports)",
+            },
+            {
+                "name": "labor",
+                "description": "Labor market (workforce, wages, education)",
+            },
             {"name": "risk", "description": "Risk factors (flood, seismic, climate)"},
             {"name": "incentives", "description": "Incentives (OZ, FTZ, programs)"},
         ],

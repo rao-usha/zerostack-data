@@ -1,4 +1,5 @@
 """Family Office collection executor for the worker queue."""
+
 import logging
 
 from sqlalchemy.orm import Session
@@ -40,12 +41,16 @@ async def execute(job: JobQueue, db: Session):
     try:
         orchestrator = FoCollectionOrchestrator(config=config, db=work_db)
 
-        send_job_event(db, "job_progress", {
-            "job_id": job.id,
-            "job_type": "fo",
-            "progress_pct": 10.0,
-            "progress_message": "Running FO collection",
-        })
+        send_job_event(
+            db,
+            "job_progress",
+            {
+                "job_id": job.id,
+                "job_type": "fo",
+                "progress_pct": 10.0,
+                "progress_message": "Running FO collection",
+            },
+        )
         db.commit()
 
         result = await orchestrator.run_collection()

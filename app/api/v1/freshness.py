@@ -1,6 +1,7 @@
 """
 Freshness dashboard — shows which data sources are stale vs fresh.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional
@@ -10,7 +11,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.models import IngestionJob, IngestionSchedule, JobStatus, ScheduleFrequency
+from app.core.models import (
+    IngestionJob,
+    IngestionSchedule,
+    JobStatus,
+    ScheduleFrequency,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +28,9 @@ router = APIRouter(prefix="/datasets", tags=["freshness"])
 CADENCE_GRACE_HOURS = {
     ScheduleFrequency.HOURLY: 2,
     ScheduleFrequency.DAILY: 36,
-    ScheduleFrequency.WEEKLY: 8 * 24,       # 8 days
-    ScheduleFrequency.MONTHLY: 32 * 24,     # 32 days
-    ScheduleFrequency.QUARTERLY: 95 * 24,   # 95 days
+    ScheduleFrequency.WEEKLY: 8 * 24,  # 8 days
+    ScheduleFrequency.MONTHLY: 32 * 24,  # 32 days
+    ScheduleFrequency.QUARTERLY: 95 * 24,  # 95 days
 }
 
 DEFAULT_GRACE_HOURS = 48  # fallback for CUSTOM or unknown
@@ -84,14 +90,16 @@ def get_freshness_dashboard(db: Session = Depends(get_db)):
         expected = cadence_map.get(source)
         is_stale = (age_hours > expected) if expected else False
 
-        sources.append({
-            "source": source,
-            "last_success_at": last_at.isoformat(),
-            "age_hours": round(age_hours, 1),
-            "expected_cadence_hours": expected,
-            "is_stale": is_stale,
-            "freshness": "stale" if is_stale else "fresh",
-        })
+        sources.append(
+            {
+                "source": source,
+                "last_success_at": last_at.isoformat(),
+                "age_hours": round(age_hours, 1),
+                "expected_cadence_hours": expected,
+                "is_stale": is_stale,
+                "freshness": "stale" if is_stale else "fresh",
+            }
+        )
 
         if is_stale:
             stale_count += 1

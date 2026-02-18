@@ -15,6 +15,7 @@ Rate limits:
 - With API key (free): 120 requests per minute per IP
 - API key available at: https://fred.stlouisfed.org/docs/api/api_key.html
 """
+
 import logging
 from typing import Dict, List, Optional, Any
 
@@ -40,7 +41,7 @@ class FREDClient(BaseAPIClient):
         api_key: Optional[str] = None,
         max_concurrency: int = 2,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize FRED API client.
@@ -61,7 +62,7 @@ class FREDClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=config.timeout_seconds,
             connect_timeout=config.connect_timeout_seconds,
-            rate_limit_interval=config.get_rate_limit_interval()
+            rate_limit_interval=config.get_rate_limit_interval(),
         )
 
         if not api_key:
@@ -78,9 +79,7 @@ class FREDClient(BaseAPIClient):
         return params
 
     def _check_api_error(
-        self,
-        data: Dict[str, Any],
-        resource_id: str
+        self, data: Dict[str, Any], resource_id: str
     ) -> Optional[Exception]:
         """Check for FRED-specific API errors."""
         if "error_code" in data:
@@ -95,7 +94,7 @@ class FREDClient(BaseAPIClient):
                     message=f"FRED API error {error_code}: {error_message}",
                     source=self.SOURCE_NAME,
                     status_code=error_code,
-                    response_data=data
+                    response_data=data,
                 )
 
             # Retryable errors
@@ -103,7 +102,7 @@ class FREDClient(BaseAPIClient):
                 message=f"FRED API error {error_code}: {error_message}",
                 source=self.SOURCE_NAME,
                 status_code=error_code,
-                response_data=data
+                response_data=data,
             )
 
         return None
@@ -115,7 +114,7 @@ class FREDClient(BaseAPIClient):
         observation_end: Optional[str] = None,
         units: str = "lin",
         frequency: Optional[str] = None,
-        aggregation_method: str = "avg"
+        aggregation_method: str = "avg",
     ) -> Dict[str, Any]:
         """
         Fetch observations (data points) for a FRED series.
@@ -137,7 +136,7 @@ class FREDClient(BaseAPIClient):
         params: Dict[str, Any] = {
             "series_id": series_id,
             "units": units,
-            "aggregation_method": aggregation_method
+            "aggregation_method": aggregation_method,
         }
 
         if observation_start:
@@ -148,9 +147,7 @@ class FREDClient(BaseAPIClient):
             params["frequency"] = frequency
 
         return await self.get(
-            "series/observations",
-            params=params,
-            resource_id=f"series:{series_id}"
+            "series/observations", params=params, resource_id=f"series:{series_id}"
         )
 
     async def get_series_info(self, series_id: str) -> Dict[str, Any]:
@@ -170,7 +167,7 @@ class FREDClient(BaseAPIClient):
         self,
         series_ids: List[str],
         observation_start: Optional[str] = None,
-        observation_end: Optional[str] = None
+        observation_end: Optional[str] = None,
     ) -> Dict[str, List[Dict[str, Any]]]:
         """
         Fetch multiple series concurrently (with bounded concurrency).
@@ -183,18 +180,17 @@ class FREDClient(BaseAPIClient):
         Returns:
             Dict mapping series_id to list of observations
         """
+
         async def fetch_one(series_id: str) -> List[Dict[str, Any]]:
             response = await self.get_series_observations(
                 series_id=series_id,
                 observation_start=observation_start,
-                observation_end=observation_end
+                observation_end=observation_end,
             )
             return response.get("observations", [])
 
         return await self.fetch_multiple(
-            items=series_ids,
-            fetch_func=fetch_one,
-            item_id_func=lambda x: x
+            items=series_ids, fetch_func=fetch_one, item_id_func=lambda x: x
         )
 
 
@@ -229,5 +225,5 @@ COMMON_SERIES = {
         "cpi": "CPIAUCSL",  # Consumer Price Index for All Urban Consumers
         "pce": "PCE",  # Personal Consumption Expenditures
         "retail_sales": "RSXFS",  # Retail Sales
-    }
+    },
 }

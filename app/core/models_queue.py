@@ -4,6 +4,7 @@ SQLAlchemy model for the distributed job queue.
 Workers claim jobs via SELECT ... FOR UPDATE SKIP LOCKED.
 The API process listens for PG NOTIFY events to stream progress via SSE.
 """
+
 import enum
 from datetime import datetime
 
@@ -24,8 +25,9 @@ from app.core.models import Base
 
 class QueueJobStatus(str, enum.Enum):
     """Status values for queued jobs."""
+
     PENDING = "pending"
-    CLAIMED = "claimed"      # Worker picked it up, not yet running
+    CLAIMED = "claimed"  # Worker picked it up, not yet running
     RUNNING = "running"
     SUCCESS = "success"
     FAILED = "failed"
@@ -33,6 +35,7 @@ class QueueJobStatus(str, enum.Enum):
 
 class QueueJobType(str, enum.Enum):
     """Known job types routed to executors."""
+
     SITE_INTEL = "site_intel"
     PEOPLE = "people"
     LP = "lp"
@@ -57,6 +60,7 @@ class JobQueue(Base):
             LIMIT 1
         )
     """
+
     __tablename__ = "job_queue"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -67,7 +71,9 @@ class JobQueue(Base):
         nullable=False,
         index=True,
     )
-    job_table_id = Column(Integer, nullable=True)  # FK to domain-specific job table (optional)
+    job_table_id = Column(
+        Integer, nullable=True
+    )  # FK to domain-specific job table (optional)
 
     # Status lifecycle: pending -> claimed -> running -> success/failed
     status = Column(
@@ -89,7 +95,7 @@ class JobQueue(Base):
     payload = Column(JSON, nullable=False, default=dict)
 
     # Progress tracking (updated by workers via pg_notify)
-    progress_pct = Column(Float, nullable=True)         # 0.0 – 100.0
+    progress_pct = Column(Float, nullable=True)  # 0.0 – 100.0
     progress_message = Column(String(500), nullable=True)
 
     # Timestamps
@@ -112,10 +118,14 @@ class JobQueue(Base):
         Index(
             "ix_job_queue_heartbeat",
             "heartbeat_at",
-            postgresql_where=(status.in_([
-                QueueJobStatus.CLAIMED.value,
-                QueueJobStatus.RUNNING.value,
-            ])),
+            postgresql_where=(
+                status.in_(
+                    [
+                        QueueJobStatus.CLAIMED.value,
+                        QueueJobStatus.RUNNING.value,
+                    ]
+                )
+            ),
         ),
     )
 

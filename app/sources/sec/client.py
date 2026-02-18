@@ -16,6 +16,7 @@ Rate limits:
 - User-Agent header REQUIRED (must identify yourself)
 - Rate limit documentation: https://www.sec.gov/os/accessing-edgar-data
 """
+
 import logging
 from typing import Dict, List, Optional, Any
 
@@ -36,13 +37,15 @@ class SECClient(BaseAPIClient):
     BASE_URL = "https://data.sec.gov"
 
     # User-Agent is REQUIRED by SEC
-    USER_AGENT = "Nexdata External Data Ingestion Service (contact: compliance@nexdata.com)"
+    USER_AGENT = (
+        "Nexdata External Data Ingestion Service (contact: compliance@nexdata.com)"
+    )
 
     def __init__(
         self,
         max_concurrency: int = 2,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize SEC EDGAR API client.
@@ -61,15 +64,12 @@ class SECClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=config.timeout_seconds,
             connect_timeout=config.connect_timeout_seconds,
-            rate_limit_interval=config.get_rate_limit_interval()
+            rate_limit_interval=config.get_rate_limit_interval(),
         )
 
     def _build_headers(self) -> Dict[str, str]:
         """Build request headers with required User-Agent."""
-        return {
-            "User-Agent": self.USER_AGENT,
-            "Accept": "application/json"
-        }
+        return {"User-Agent": self.USER_AGENT, "Accept": "application/json"}
 
     async def get_company_submissions(self, cik: str) -> Dict[str, Any]:
         """
@@ -88,8 +88,7 @@ class SECClient(BaseAPIClient):
         cik_padded = str(cik).zfill(10)
 
         return await self.get(
-            f"submissions/CIK{cik_padded}.json",
-            resource_id=f"submissions:{cik_padded}"
+            f"submissions/CIK{cik_padded}.json", resource_id=f"submissions:{cik_padded}"
         )
 
     async def get_company_facts(self, cik: str) -> Dict[str, Any]:
@@ -106,12 +105,11 @@ class SECClient(BaseAPIClient):
 
         return await self.get(
             f"api/xbrl/companyfacts/CIK{cik_padded}.json",
-            resource_id=f"facts:{cik_padded}"
+            resource_id=f"facts:{cik_padded}",
         )
 
     async def get_multiple_companies(
-        self,
-        ciks: List[str]
+        self, ciks: List[str]
     ) -> Dict[str, Dict[str, Any]]:
         """
         Fetch multiple companies using the base class fetch_multiple method.
@@ -129,9 +127,7 @@ class SECClient(BaseAPIClient):
             return await self.get_company_submissions(cik)
 
         return await self.fetch_multiple(
-            items=items,
-            fetch_func=fetch_one,
-            item_id_func=lambda item: item[0]
+            items=items, fetch_func=fetch_one, item_id_func=lambda item: item[0]
         )
 
 
@@ -165,5 +161,5 @@ COMMON_COMPANIES = {
         "exxon": "0000034088",
         "chevron": "0000093410",
         "conocophillips": "0001163165",
-    }
+    },
 }

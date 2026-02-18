@@ -1,4 +1,5 @@
 """Standard data source ingestion executor for the worker queue."""
+
 import logging
 
 from sqlalchemy.orm import Session
@@ -26,12 +27,16 @@ async def execute(job: JobQueue, db: Session):
     job.progress_message = f"Starting ingestion for source={source}"
     db.commit()
 
-    send_job_event(db, "job_progress", {
-        "job_id": job.id,
-        "job_type": "ingestion",
-        "progress_pct": 5.0,
-        "progress_message": f"Ingesting {source}",
-    })
+    send_job_event(
+        db,
+        "job_progress",
+        {
+            "job_id": job.id,
+            "job_type": "ingestion",
+            "progress_pct": 5.0,
+            "progress_message": f"Ingesting {source}",
+        },
+    )
     db.commit()
 
     # The ingestion system is source-specific and uses BaseSourceIngestor.

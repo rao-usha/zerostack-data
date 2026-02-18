@@ -3,6 +3,7 @@ CFTC Commitments of Traders (COT) API endpoints.
 
 Provides access to weekly futures positioning data.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional
@@ -29,6 +30,7 @@ router = APIRouter(prefix="/cftc-cot", tags=["CFTC COT"])
 
 class ReportType(str, Enum):
     """COT report types."""
+
     LEGACY = "legacy"
     DISAGGREGATED = "disaggregated"
     TFF = "tff"
@@ -37,18 +39,26 @@ class ReportType(str, Enum):
 
 class COTIngestRequest(BaseModel):
     """Request model for COT data ingestion."""
-    year: int = Field(default_factory=lambda: datetime.now().year, description="Year to ingest")
-    report_type: ReportType = Field(default=ReportType.LEGACY, description="Type of COT report")
-    combined: bool = Field(default=True, description="Include futures + options combined (vs futures only)")
+
+    year: int = Field(
+        default_factory=lambda: datetime.now().year, description="Year to ingest"
+    )
+    report_type: ReportType = Field(
+        default=ReportType.LEGACY, description="Type of COT report"
+    )
+    combined: bool = Field(
+        default=True, description="Include futures + options combined (vs futures only)"
+    )
 
 
 # ========== Ingestion Endpoints ==========
+
 
 @router.post("/ingest")
 async def ingest_cot_data(
     request: COTIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest CFTC COT data for a given year.
@@ -71,7 +81,7 @@ async def ingest_cot_data(
                 "year": request.year,
                 "report_type": request.report_type.value,
                 "combined": request.combined,
-            }
+            },
         )
         db.add(job)
         db.commit()
@@ -82,14 +92,14 @@ async def ingest_cot_data(
             job.id,
             request.year,
             request.report_type.value,
-            request.combined
+            request.combined,
         )
 
         return {
             "job_id": job.id,
             "status": "pending",
             "message": f"CFTC COT {request.report_type.value} ingestion job created for {request.year}",
-            "check_status": f"/api/v1/jobs/{job.id}"
+            "check_status": f"/api/v1/jobs/{job.id}",
         }
 
     except Exception as e:
@@ -97,12 +107,7 @@ async def ingest_cot_data(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-async def _run_cot_ingestion(
-    job_id: int,
-    year: int,
-    report_type: str,
-    combined: bool
-):
+async def _run_cot_ingestion(job_id: int, year: int, report_type: str, combined: bool):
     """Background task to run COT ingestion."""
     SessionLocal = get_session_factory()
     db = SessionLocal()
@@ -152,6 +157,7 @@ async def _run_cot_ingestion(
 
 # ========== Reference Endpoints ==========
 
+
 @router.get("/reference/contracts")
 async def get_major_contracts():
     """
@@ -190,12 +196,22 @@ async def get_report_types():
             {
                 "type": "disaggregated",
                 "description": "Disaggregated report - Detailed trader categories",
-                "categories": ["Producer/Merchant", "Swap Dealers", "Managed Money", "Other Reportables"],
+                "categories": [
+                    "Producer/Merchant",
+                    "Swap Dealers",
+                    "Managed Money",
+                    "Other Reportables",
+                ],
             },
             {
                 "type": "tff",
                 "description": "Traders in Financial Futures - For financial contracts",
-                "categories": ["Dealer/Intermediary", "Asset Manager", "Leveraged Funds", "Other Reportables"],
+                "categories": [
+                    "Dealer/Intermediary",
+                    "Asset Manager",
+                    "Leveraged Funds",
+                    "Other Reportables",
+                ],
             },
         ]
     }

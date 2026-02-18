@@ -203,8 +203,7 @@ class NewsCollector(BaseCollector):
 
         # Find linked items that look like news
         link_pattern = re.compile(
-            r'href=["\']([^"\']+)["\'][^>]*>([^<]+)',
-            re.IGNORECASE
+            r'href=["\']([^"\']+)["\'][^>]*>([^<]+)', re.IGNORECASE
         )
 
         for match in link_pattern.finditer(html):
@@ -236,7 +235,9 @@ class NewsCollector(BaseCollector):
                     "lp_id": lp_id,
                     "lp_name": lp_name,
                     "title": link_text[:500],
-                    "url": href if href.startswith("http") else f"{source_url.rstrip('/')}/{href.lstrip('/')}",
+                    "url": href
+                    if href.startswith("http")
+                    else f"{source_url.rstrip('/')}/{href.lstrip('/')}",
                     "published_date": pub_date.isoformat() if pub_date else None,
                     "category": category,
                     "source_type": "news",

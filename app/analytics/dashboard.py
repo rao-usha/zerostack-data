@@ -4,6 +4,7 @@ Dashboard Analytics Engine (T13).
 Provides pre-computed analytics for frontend dashboards with portfolio insights,
 trends, data quality metrics, and system health statistics.
 """
+
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -18,9 +19,10 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DataQualityScore:
     """Data quality score breakdown."""
+
     overall_score: int  # 0-100
-    completeness: int   # % of fields populated
-    freshness: int      # Based on data age
+    completeness: int  # % of fields populated
+    freshness: int  # Based on data age
     source_diversity: int  # Multiple sources = higher
     confidence_avg: float
     issues: List[str]
@@ -50,33 +52,37 @@ class DashboardAnalytics:
         result = {}
 
         # Investor counts
-        lp_count = self.db.execute(
-            text("SELECT COUNT(*) FROM lp_fund")
-        ).scalar() or 0
+        lp_count = self.db.execute(text("SELECT COUNT(*) FROM lp_fund")).scalar() or 0
 
-        fo_count = self.db.execute(
-            text("SELECT COUNT(*) FROM family_offices")
-        ).scalar() or 0
+        fo_count = (
+            self.db.execute(text("SELECT COUNT(*) FROM family_offices")).scalar() or 0
+        )
 
         result["total_lps"] = lp_count
         result["total_family_offices"] = fo_count
 
         # Investors with portfolio data
-        lps_with_data = self.db.execute(
-            text("""
+        lps_with_data = (
+            self.db.execute(
+                text("""
                 SELECT COUNT(DISTINCT investor_id)
                 FROM portfolio_companies
                 WHERE investor_type = 'lp'
             """)
-        ).scalar() or 0
+            ).scalar()
+            or 0
+        )
 
-        fos_with_data = self.db.execute(
-            text("""
+        fos_with_data = (
+            self.db.execute(
+                text("""
                 SELECT COUNT(DISTINCT investor_id)
                 FROM portfolio_companies
                 WHERE investor_type = 'family_office'
             """)
-        ).scalar() or 0
+            ).scalar()
+            or 0
+        )
 
         result["lps_with_portfolio_data"] = lps_with_data
         result["fos_with_portfolio_data"] = fos_with_data
@@ -85,7 +91,8 @@ class DashboardAnalytics:
         investors_with_data = lps_with_data + fos_with_data
         result["coverage_percentage"] = (
             (investors_with_data / total_investors * 100)
-            if total_investors > 0 else 0.0
+            if total_investors > 0
+            else 0.0
         )
 
         # Portfolio totals (market_value_usd is VARCHAR, need to cast)
@@ -101,7 +108,9 @@ class DashboardAnalytics:
 
         result["total_portfolio_companies"] = portfolio_stats[0] or 0
         result["unique_companies"] = portfolio_stats[1] or 0
-        result["total_market_value_usd"] = float(portfolio_stats[2]) if portfolio_stats[2] else None
+        result["total_market_value_usd"] = (
+            float(portfolio_stats[2]) if portfolio_stats[2] else None
+        )
 
         # Source breakdown
         source_rows = self.db.execute(
@@ -139,12 +148,15 @@ class DashboardAnalytics:
 
     async def _get_collection_stats(self) -> dict:
         """Get collection job statistics."""
-        stats_24h = self.db.execute(
-            text("""
+        stats_24h = (
+            self.db.execute(
+                text("""
                 SELECT COUNT(*) FROM agentic_collection_jobs
                 WHERE created_at > NOW() - INTERVAL '1 day'
             """)
-        ).scalar() or 0
+            ).scalar()
+            or 0
+        )
 
         stats_7d = self.db.execute(
             text("""
@@ -158,12 +170,15 @@ class DashboardAnalytics:
             """)
         ).fetchone()
 
-        stats_30d = self.db.execute(
-            text("""
+        stats_30d = (
+            self.db.execute(
+                text("""
                 SELECT COUNT(*) FROM agentic_collection_jobs
                 WHERE created_at > NOW() - INTERVAL '30 days'
             """)
-        ).scalar() or 0
+            ).scalar()
+            or 0
+        )
 
         total_7d = stats_7d[0] or 0
         successful_7d = stats_7d[1] or 0
@@ -180,33 +195,45 @@ class DashboardAnalytics:
 
     async def _get_alert_stats(self) -> dict:
         """Get alert statistics."""
-        pending = self.db.execute(
-            text("""
+        pending = (
+            self.db.execute(
+                text("""
                 SELECT COUNT(*) FROM portfolio_alerts
                 WHERE status = 'pending'
             """)
-        ).scalar() or 0
+            ).scalar()
+            or 0
+        )
 
-        today = self.db.execute(
-            text("""
+        today = (
+            self.db.execute(
+                text("""
                 SELECT COUNT(*) FROM portfolio_alerts
                 WHERE created_at > NOW() - INTERVAL '1 day'
             """)
-        ).scalar() or 0
+            ).scalar()
+            or 0
+        )
 
-        week = self.db.execute(
-            text("""
+        week = (
+            self.db.execute(
+                text("""
                 SELECT COUNT(*) FROM portfolio_alerts
                 WHERE created_at > NOW() - INTERVAL '7 days'
             """)
-        ).scalar() or 0
+            ).scalar()
+            or 0
+        )
 
-        active_subs = self.db.execute(
-            text("""
+        active_subs = (
+            self.db.execute(
+                text("""
                 SELECT COUNT(*) FROM alert_subscriptions
                 WHERE is_active = TRUE
             """)
-        ).scalar() or 0
+            ).scalar()
+            or 0
+        )
 
         return {
             "pending_alerts": pending,
@@ -216,9 +243,7 @@ class DashboardAnalytics:
         }
 
     async def get_investor_analytics(
-        self,
-        investor_id: int,
-        investor_type: str
+        self, investor_id: int, investor_type: str
     ) -> dict:
         """
         Compute analytics for a single investor's portfolio.
@@ -229,13 +254,12 @@ class DashboardAnalytics:
         # Get investor name
         if investor_type == "lp":
             name_row = self.db.execute(
-                text("SELECT name FROM lp_fund WHERE id = :id"),
-                {"id": investor_id}
+                text("SELECT name FROM lp_fund WHERE id = :id"), {"id": investor_id}
             ).fetchone()
         else:
             name_row = self.db.execute(
                 text("SELECT name FROM family_offices WHERE id = :id"),
-                {"id": investor_id}
+                {"id": investor_id},
             ).fetchone()
 
         investor_name = name_row[0] if name_row else "Unknown"
@@ -257,14 +281,11 @@ class DashboardAnalytics:
                 FROM portfolio_companies
                 WHERE investor_id = :id AND investor_type = :type
             """),
-            {"id": investor_id, "type": investor_type}
+            {"id": investor_id, "type": investor_type},
         ).fetchone()
 
         last_updated = summary[3]
-        data_age_days = (
-            (datetime.now() - last_updated).days
-            if last_updated else 999
-        )
+        data_age_days = (datetime.now() - last_updated).days if last_updated else 999
 
         result["portfolio_summary"] = {
             "total_companies": summary[0] or 0,
@@ -286,7 +307,7 @@ class DashboardAnalytics:
                 GROUP BY company_industry
                 ORDER BY count DESC
             """),
-            {"id": investor_id, "type": investor_type}
+            {"id": investor_id, "type": investor_type},
         ).fetchall()
 
         total_companies = result["portfolio_summary"]["total_companies"]
@@ -294,7 +315,9 @@ class DashboardAnalytics:
             {
                 "industry": row[0],
                 "company_count": row[1],
-                "percentage": round(row[1] / total_companies * 100, 1) if total_companies > 0 else 0,
+                "percentage": round(row[1] / total_companies * 100, 1)
+                if total_companies > 0
+                else 0,
                 "total_value_usd": float(row[2]) if row[2] else None,
             }
             for row in industries
@@ -310,15 +333,19 @@ class DashboardAnalytics:
                 ORDER BY NULLIF(market_value_usd, '')::NUMERIC DESC NULLS LAST
                 LIMIT 10
             """),
-            {"id": investor_id, "type": investor_type}
+            {"id": investor_id, "type": investor_type},
         ).fetchall()
 
         result["top_holdings"] = [
             {
                 "company_name": row[0],
                 "industry": row[1],
-                "market_value_usd": float(row[2]) if row[2] and row[2].strip() else None,
-                "shares_held": int(row[3]) if row[3] and row[3].strip().isdigit() else None,
+                "market_value_usd": float(row[2])
+                if row[2] and row[2].strip()
+                else None,
+                "shares_held": int(row[3])
+                if row[3] and row[3].strip().isdigit()
+                else None,
                 "source_type": row[4],
                 "confidence_level": self._parse_confidence(row[5]),
             }
@@ -342,7 +369,7 @@ class DashboardAnalytics:
                 FROM portfolio_companies
                 WHERE investor_id = :id AND investor_type = :type
             """),
-            {"id": investor_id, "type": investor_type}
+            {"id": investor_id, "type": investor_type},
         ).fetchone()
 
         result["data_quality"] = self._calculate_data_quality_score(
@@ -363,7 +390,7 @@ class DashboardAnalytics:
                 ORDER BY created_at DESC
                 LIMIT 10
             """),
-            {"id": investor_id, "type": investor_type}
+            {"id": investor_id, "type": investor_type},
         ).fetchall()
 
         result["collection_history"] = [
@@ -400,7 +427,7 @@ class DashboardAnalytics:
         has_value: int,
         avg_confidence: float,
         source_count: int,
-        data_age_days: int
+        data_age_days: int,
     ) -> dict:
         """
         Calculate data quality score (0-100).
@@ -433,7 +460,9 @@ class DashboardAnalytics:
         elif industry_pct >= 50:
             completeness_score += 10
         else:
-            issues.append(f"Missing industry for {100 - industry_pct:.0f}% of companies")
+            issues.append(
+                f"Missing industry for {100 - industry_pct:.0f}% of companies"
+            )
 
         value_pct = (has_value / total) * 100
         if value_pct >= 50:
@@ -441,7 +470,9 @@ class DashboardAnalytics:
         elif value_pct >= 25:
             completeness_score += 10
         else:
-            issues.append(f"Missing market value for {100 - value_pct:.0f}% of companies")
+            issues.append(
+                f"Missing market value for {100 - value_pct:.0f}% of companies"
+            )
 
         # Confidence component of completeness
         if avg_confidence >= 0.7:
@@ -491,9 +522,7 @@ class DashboardAnalytics:
         }
 
     async def get_trends(
-        self,
-        period: str = "30d",
-        metric: str = "collections"
+        self, period: str = "30d", metric: str = "collections"
     ) -> dict:
         """
         Compute time-series trend data for charts.
@@ -525,7 +554,9 @@ class DashboardAnalytics:
             # Trend direction: compare first half to second half
             mid = len(values) // 2
             first_half_avg = sum(values[:mid]) / mid if mid > 0 else 0
-            second_half_avg = sum(values[mid:]) / (len(values) - mid) if len(values) > mid else 0
+            second_half_avg = (
+                sum(values[mid:]) / (len(values) - mid) if len(values) > mid else 0
+            )
 
             if second_half_avg > first_half_avg * 1.1:
                 trend_direction = "up"
@@ -536,7 +567,8 @@ class DashboardAnalytics:
 
             change_pct = (
                 ((second_half_avg - first_half_avg) / first_half_avg * 100)
-                if first_half_avg > 0 else 0.0
+                if first_half_avg > 0
+                else 0.0
             )
         else:
             total = 0
@@ -574,7 +606,7 @@ class DashboardAnalytics:
                 GROUP BY DATE(created_at)
                 ORDER BY date
             """),
-            {"days": f"{days} days"}
+            {"days": f"{days} days"},
         ).fetchall()
 
         return [
@@ -601,7 +633,7 @@ class DashboardAnalytics:
                 GROUP BY DATE(collected_date)
                 ORDER BY date
             """),
-            {"days": f"{days} days"}
+            {"days": f"{days} days"},
         ).fetchall()
 
         return [
@@ -625,7 +657,7 @@ class DashboardAnalytics:
                 GROUP BY DATE(created_at)
                 ORDER BY date
             """),
-            {"days": f"{days} days"}
+            {"days": f"{days} days"},
         ).fetchall()
 
         return [
@@ -638,9 +670,7 @@ class DashboardAnalytics:
         ]
 
     async def get_top_movers(
-        self,
-        limit: int = 20,
-        change_type: Optional[str] = None
+        self, limit: int = 20, change_type: Optional[str] = None
     ) -> dict:
         """
         Get recent significant portfolio changes for activity feed.
@@ -700,7 +730,7 @@ class DashboardAnalytics:
                     ORDER BY pc.collected_date DESC
                     LIMIT :limit
                 """),
-                {"limit": limit}
+                {"limit": limit},
             ).fetchall()
 
             movers = [
@@ -722,9 +752,7 @@ class DashboardAnalytics:
         }
 
     async def get_industry_breakdown(
-        self,
-        investor_type: Optional[str] = None,
-        limit: int = 20
+        self, investor_type: Optional[str] = None, limit: int = 20
     ) -> dict:
         """
         Compute aggregate industry distribution across all portfolios.
@@ -760,10 +788,13 @@ class DashboardAnalytics:
         total_query = "SELECT COUNT(*) FROM portfolio_companies"
         if investor_type:
             total_query += " WHERE investor_type = :investor_type"
-        total_companies = self.db.execute(
-            text(total_query),
-            {"investor_type": investor_type} if investor_type else {}
-        ).scalar() or 0
+        total_companies = (
+            self.db.execute(
+                text(total_query),
+                {"investor_type": investor_type} if investor_type else {},
+            ).scalar()
+            or 0
+        )
 
         # Calculate "other" count
         top_n_count = sum(row[1] for row in rows)
@@ -790,14 +821,18 @@ class DashboardAnalytics:
 
             top_companies = self.db.execute(text(top_query), top_params).fetchall()
 
-            industries.append({
-                "industry": industry_name,
-                "company_count": row[1],
-                "percentage": round(row[1] / total_companies * 100, 1) if total_companies > 0 else 0,
-                "investor_count": row[2],
-                "total_value_usd": float(row[3]) if row[3] else None,
-                "top_companies": [c[0] for c in top_companies],
-            })
+            industries.append(
+                {
+                    "industry": industry_name,
+                    "company_count": row[1],
+                    "percentage": round(row[1] / total_companies * 100, 1)
+                    if total_companies > 0
+                    else 0,
+                    "investor_count": row[2],
+                    "total_value_usd": float(row[3]) if row[3] else None,
+                    "top_companies": [c[0] for c in top_companies],
+                }
+            )
 
         return {
             "total_companies": total_companies,

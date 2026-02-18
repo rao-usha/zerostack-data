@@ -6,7 +6,9 @@ Collectors for gathering financial data:
 - Valuation estimation with LLM
 """
 
-from app.sources.pe_collection.financial_collectors.public_comps_collector import PublicCompsCollector
+from app.sources.pe_collection.financial_collectors.public_comps_collector import (
+    PublicCompsCollector,
+)
 
 __all__ = [
     "PublicCompsCollector",

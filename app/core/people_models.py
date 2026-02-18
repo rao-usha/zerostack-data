@@ -28,8 +28,19 @@ PE Feature Tables (6):
 """
 
 from sqlalchemy import (
-    Column, Integer, String, Text, Date, DateTime, Boolean,
-    Numeric, JSON, ForeignKey, Index, UniqueConstraint, CheckConstraint
+    Column,
+    Integer,
+    String,
+    Text,
+    Date,
+    DateTime,
+    Boolean,
+    Numeric,
+    JSON,
+    ForeignKey,
+    Index,
+    UniqueConstraint,
+    CheckConstraint,
 )
 from sqlalchemy.sql import func
 from app.core.models import Base
@@ -39,6 +50,7 @@ from app.core.models import Base
 # CORE PEOPLE TABLES
 # =============================================================================
 
+
 class Person(Base):
     """
     Master person records.
@@ -46,6 +58,7 @@ class Person(Base):
     Stores comprehensive information about executives, managers, and board members.
     LinkedIn URL is used as canonical identifier for deduplication.
     """
+
     __tablename__ = "people"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -89,7 +102,9 @@ class Person(Base):
     last_enriched_date = Column(Date)
 
     # Deduplication
-    canonical_id = Column(Integer, ForeignKey("people.id"))  # Points to master if duplicate
+    canonical_id = Column(
+        Integer, ForeignKey("people.id")
+    )  # Points to master if duplicate
     is_canonical = Column(Boolean, default=True)
 
     # Timestamps
@@ -113,6 +128,7 @@ class IndustrialCompany(Base):
     Stores comprehensive information about industrial distributors, manufacturers,
     and related companies. Supports public, private, and PE-backed companies.
     """
+
     __tablename__ = "industrial_companies"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -135,7 +151,9 @@ class IndustrialCompany(Base):
     headquarters_country = Column(String(100), default="USA")
 
     # Classification
-    industry_segment = Column(String(200), index=True)  # distribution, manufacturing, oem
+    industry_segment = Column(
+        String(200), index=True
+    )  # distribution, manufacturing, oem
     sub_segment = Column(String(200))  # fasteners, bearings, electrical, etc.
     naics_code = Column(String(10))
     sic_code = Column(String(10))
@@ -149,7 +167,9 @@ class IndustrialCompany(Base):
     revenue_source = Column(String(100))
 
     # Ownership
-    ownership_type = Column(String(50), index=True)  # public, private, pe_backed, employee_owned
+    ownership_type = Column(
+        String(50), index=True
+    )  # public, private, pe_backed, employee_owned
     ticker = Column(String(20), index=True)
     stock_exchange = Column(String(50))
     cik = Column(String(20), index=True)  # SEC identifier
@@ -161,7 +181,9 @@ class IndustrialCompany(Base):
     is_subsidiary = Column(Boolean, default=False)
 
     # Status
-    status = Column(String(50), default="active")  # active, acquired, bankrupt, inactive
+    status = Column(
+        String(50), default="active"
+    )  # active, acquired, bankrupt, inactive
     founded_year = Column(Integer)
 
     # Data Quality
@@ -189,18 +211,23 @@ class CompanyPerson(Base):
     Links people to their roles at companies, including reporting relationships,
     board memberships, and compensation data.
     """
+
     __tablename__ = "company_people"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # Foreign Keys
-    company_id = Column(Integer, ForeignKey("industrial_companies.id"), nullable=False, index=True)
+    company_id = Column(
+        Integer, ForeignKey("industrial_companies.id"), nullable=False, index=True
+    )
     person_id = Column(Integer, ForeignKey("people.id"), nullable=False, index=True)
 
     # Role
     title = Column(String(500), nullable=False)
     title_normalized = Column(String(200))  # Standardized: "CEO", "CFO", "VP Sales"
-    title_level = Column(String(50), index=True)  # c_suite, vp, director, manager, individual
+    title_level = Column(
+        String(50), index=True
+    )  # c_suite, vp, director, manager, individual
     department = Column(String(200))  # sales, operations, finance, hr, it, marketing
     function_area = Column(String(200))  # More specific: "inside sales", "field sales"
 
@@ -243,7 +270,9 @@ class CompanyPerson(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
-        UniqueConstraint("company_id", "person_id", "title", "is_current", name="uq_company_people"),
+        UniqueConstraint(
+            "company_id", "person_id", "title", "is_current", name="uq_company_people"
+        ),
         Index("ix_company_people_current", "company_id", "is_current"),
         Index("ix_company_people_level", "company_id", "title_level"),
         Index("ix_company_people_reports", "reports_to_id"),
@@ -259,6 +288,7 @@ class PersonExperience(Base):
 
     Tracks all positions held, including those at companies not in our database.
     """
+
     __tablename__ = "people_experience"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -294,7 +324,9 @@ class PersonExperience(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
-        UniqueConstraint("person_id", "company_name", "title", "start_year", name="uq_experience"),
+        UniqueConstraint(
+            "person_id", "company_name", "title", "start_year", name="uq_experience"
+        ),
         Index("ix_experience_person", "person_id"),
         Index("ix_experience_company", "company_name"),
         Index("ix_experience_current", "is_current"),
@@ -308,6 +340,7 @@ class PersonEducation(Base):
     """
     Education records for people.
     """
+
     __tablename__ = "people_education"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -355,18 +388,22 @@ class PersonEducation(Base):
 # ORG CHART TABLES
 # =============================================================================
 
+
 class OrgChartSnapshot(Base):
     """
     Point-in-time organizational structures.
 
     Stores complete org chart as JSON for historical tracking.
     """
+
     __tablename__ = "org_chart_snapshots"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # Foreign Key
-    company_id = Column(Integer, ForeignKey("industrial_companies.id"), nullable=False, index=True)
+    company_id = Column(
+        Integer, ForeignKey("industrial_companies.id"), nullable=False, index=True
+    )
 
     # Snapshot
     snapshot_date = Column(Date, nullable=False, index=True)
@@ -411,13 +448,18 @@ class LeadershipChange(Base):
 
     Records all leadership changes: hires, departures, promotions, etc.
     """
+
     __tablename__ = "leadership_changes"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # Foreign Keys
-    company_id = Column(Integer, ForeignKey("industrial_companies.id"), nullable=False, index=True)
-    person_id = Column(Integer, ForeignKey("people.id"), index=True)  # May be NULL if person not in DB yet
+    company_id = Column(
+        Integer, ForeignKey("industrial_companies.id"), nullable=False, index=True
+    )
+    person_id = Column(
+        Integer, ForeignKey("people.id"), index=True
+    )  # May be NULL if person not in DB yet
 
     # Person (denormalized for cases where person not in DB)
     person_name = Column(String(500), nullable=False)
@@ -455,7 +497,13 @@ class LeadershipChange(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
-        UniqueConstraint("company_id", "person_name", "change_type", "effective_date", name="uq_leadership_change"),
+        UniqueConstraint(
+            "company_id",
+            "person_name",
+            "change_type",
+            "effective_date",
+            name="uq_leadership_change",
+        ),
         Index("ix_leadership_changes_company", "company_id"),
         Index("ix_leadership_changes_date", "effective_date"),
         Index("ix_leadership_changes_type", "change_type"),
@@ -470,12 +518,15 @@ class PeopleCollectionJob(Base):
     """
     Track collection runs for people data.
     """
+
     __tablename__ = "people_collection_jobs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # Job Type
-    job_type = Column(String(100), nullable=False, index=True)  # website_crawl, sec_parse, news_scan
+    job_type = Column(
+        String(100), nullable=False, index=True
+    )  # website_crawl, sec_parse, news_scan
 
     # Target
     company_id = Column(Integer, ForeignKey("industrial_companies.id"))
@@ -485,7 +536,9 @@ class PeopleCollectionJob(Base):
     config = Column(JSON)
 
     # Status
-    status = Column(String(50), default="pending", index=True)  # pending, running, success, failed
+    status = Column(
+        String(50), default="pending", index=True
+    )  # pending, running, success, failed
 
     # Results
     started_at = Column(DateTime(timezone=True))
@@ -515,6 +568,7 @@ class PeopleCollectionJob(Base):
 # DEDUPLICATION TABLES
 # =============================================================================
 
+
 class PeopleMergeCandidate(Base):
     """
     Tracks potential duplicate person records for review and merge.
@@ -523,6 +577,7 @@ class PeopleMergeCandidate(Base):
     Auto-merged pairs go straight to 'auto_merged' status; ambiguous matches
     land in 'pending' for manual review.
     """
+
     __tablename__ = "people_merge_candidates"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -541,7 +596,9 @@ class PeopleMergeCandidate(Base):
     # Review workflow
     status = Column(String(20), nullable=False, default="pending", index=True)
     # Values: pending, auto_merged, approved, rejected
-    canonical_person_id = Column(Integer, ForeignKey("people.id"))  # Person kept after merge
+    canonical_person_id = Column(
+        Integer, ForeignKey("people.id")
+    )  # Person kept after merge
 
     # Timestamps
     reviewed_at = Column(DateTime(timezone=True))
@@ -562,12 +619,14 @@ class PeopleMergeCandidate(Base):
 # PE FEATURE TABLES
 # =============================================================================
 
+
 class PeoplePortfolio(Base):
     """
     PE portfolio definitions for people intelligence.
 
     Groups companies into portfolios for tracking leadership.
     """
+
     __tablename__ = "people_portfolios"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -576,7 +635,9 @@ class PeoplePortfolio(Base):
     name = Column(String(500), nullable=False, unique=True, index=True)
     pe_firm = Column(String(500))
     description = Column(Text)
-    portfolio_type = Column(String(50), default="pe_portfolio")  # pe_portfolio, watchlist, peer_group
+    portfolio_type = Column(
+        String(50), default="pe_portfolio"
+    )  # pe_portfolio, watchlist, peer_group
 
     # Status
     is_active = Column(Boolean, default=True)
@@ -595,13 +656,18 @@ class PeoplePortfolioCompany(Base):
 
     Links companies to portfolios.
     """
+
     __tablename__ = "people_portfolio_companies"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # Foreign Keys
-    portfolio_id = Column(Integer, ForeignKey("people_portfolios.id"), nullable=False, index=True)
-    company_id = Column(Integer, ForeignKey("industrial_companies.id"), nullable=False, index=True)
+    portfolio_id = Column(
+        Integer, ForeignKey("people_portfolios.id"), nullable=False, index=True
+    )
+    company_id = Column(
+        Integer, ForeignKey("industrial_companies.id"), nullable=False, index=True
+    )
 
     # Investment tracking
     investment_date = Column(Date)
@@ -613,7 +679,9 @@ class PeoplePortfolioCompany(Base):
     notes = Column(Text)
 
     __table_args__ = (
-        UniqueConstraint("portfolio_id", "company_id", name="uq_people_portfolio_company"),
+        UniqueConstraint(
+            "portfolio_id", "company_id", name="uq_people_portfolio_company"
+        ),
     )
 
     def __repr__(self):
@@ -626,6 +694,7 @@ class PeoplePeerSet(Base):
 
     Defines comparison sets for benchmarking leadership.
     """
+
     __tablename__ = "people_peer_sets"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -640,9 +709,7 @@ class PeoplePeerSet(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    __table_args__ = (
-        Index("ix_people_peer_sets_industry", "industry"),
-    )
+    __table_args__ = (Index("ix_people_peer_sets_industry", "industry"),)
 
     def __repr__(self):
         return f"<PeoplePeerSet {self.name}>"
@@ -652,16 +719,23 @@ class PeoplePeerSetMember(Base):
     """
     Peer set membership for people intelligence.
     """
+
     __tablename__ = "people_peer_set_members"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # Foreign Keys
-    peer_set_id = Column(Integer, ForeignKey("people_peer_sets.id"), nullable=False, index=True)
-    company_id = Column(Integer, ForeignKey("industrial_companies.id"), nullable=False, index=True)
+    peer_set_id = Column(
+        Integer, ForeignKey("people_peer_sets.id"), nullable=False, index=True
+    )
+    company_id = Column(
+        Integer, ForeignKey("industrial_companies.id"), nullable=False, index=True
+    )
 
     # Details
-    is_primary = Column(Boolean, default=False)  # Is this the primary company being compared
+    is_primary = Column(
+        Boolean, default=False
+    )  # Is this the primary company being compared
     added_at = Column(DateTime(timezone=True), server_default=func.now())
     notes = Column(Text)
 
@@ -670,13 +744,16 @@ class PeoplePeerSetMember(Base):
     )
 
     def __repr__(self):
-        return f"<PeoplePeerSetMember Set {self.peer_set_id} - Company {self.company_id}>"
+        return (
+            f"<PeoplePeerSetMember Set {self.peer_set_id} - Company {self.company_id}>"
+        )
 
 
 class PeopleWatchlist(Base):
     """
     User watchlists for exec tracking in people intelligence.
     """
+
     __tablename__ = "people_watchlists"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -698,12 +775,15 @@ class PeopleWatchlistPerson(Base):
     """
     People in watchlists for people intelligence.
     """
+
     __tablename__ = "people_watchlist_people"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # Foreign Keys
-    watchlist_id = Column(Integer, ForeignKey("people_watchlists.id"), nullable=False, index=True)
+    watchlist_id = Column(
+        Integer, ForeignKey("people_watchlists.id"), nullable=False, index=True
+    )
     person_id = Column(Integer, ForeignKey("people.id"), nullable=False, index=True)
 
     # Details
@@ -712,7 +792,9 @@ class PeopleWatchlistPerson(Base):
     tags = Column(JSON)  # ["potential_ceo", "cfo_candidate", "knows_well"]
 
     __table_args__ = (
-        UniqueConstraint("watchlist_id", "person_id", name="uq_people_watchlist_person"),
+        UniqueConstraint(
+            "watchlist_id", "person_id", name="uq_people_watchlist_person"
+        ),
     )
 
     def __repr__(self):

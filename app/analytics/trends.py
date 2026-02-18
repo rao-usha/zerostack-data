@@ -19,30 +19,92 @@ logger = logging.getLogger(__name__)
 # Region mapping for geographic normalization
 REGION_MAPPING = {
     # US States to Regions
-    "CA": "US West", "WA": "US West", "OR": "US West", "NV": "US West", "AZ": "US West",
-    "CO": "US West", "UT": "US West", "NM": "US West", "ID": "US West", "MT": "US West",
-    "WY": "US West", "AK": "US West", "HI": "US West",
-    "NY": "US Northeast", "MA": "US Northeast", "CT": "US Northeast", "NJ": "US Northeast",
-    "PA": "US Northeast", "NH": "US Northeast", "VT": "US Northeast", "ME": "US Northeast",
-    "RI": "US Northeast", "DE": "US Northeast", "MD": "US Northeast", "DC": "US Northeast",
-    "TX": "US South", "FL": "US South", "GA": "US South", "NC": "US South", "VA": "US South",
-    "TN": "US South", "SC": "US South", "AL": "US South", "LA": "US South", "KY": "US South",
-    "MS": "US South", "AR": "US South", "OK": "US South", "WV": "US South",
-    "IL": "US Midwest", "OH": "US Midwest", "MI": "US Midwest", "IN": "US Midwest",
-    "WI": "US Midwest", "MN": "US Midwest", "IA": "US Midwest", "MO": "US Midwest",
-    "KS": "US Midwest", "NE": "US Midwest", "SD": "US Midwest", "ND": "US Midwest",
+    "CA": "US West",
+    "WA": "US West",
+    "OR": "US West",
+    "NV": "US West",
+    "AZ": "US West",
+    "CO": "US West",
+    "UT": "US West",
+    "NM": "US West",
+    "ID": "US West",
+    "MT": "US West",
+    "WY": "US West",
+    "AK": "US West",
+    "HI": "US West",
+    "NY": "US Northeast",
+    "MA": "US Northeast",
+    "CT": "US Northeast",
+    "NJ": "US Northeast",
+    "PA": "US Northeast",
+    "NH": "US Northeast",
+    "VT": "US Northeast",
+    "ME": "US Northeast",
+    "RI": "US Northeast",
+    "DE": "US Northeast",
+    "MD": "US Northeast",
+    "DC": "US Northeast",
+    "TX": "US South",
+    "FL": "US South",
+    "GA": "US South",
+    "NC": "US South",
+    "VA": "US South",
+    "TN": "US South",
+    "SC": "US South",
+    "AL": "US South",
+    "LA": "US South",
+    "KY": "US South",
+    "MS": "US South",
+    "AR": "US South",
+    "OK": "US South",
+    "WV": "US South",
+    "IL": "US Midwest",
+    "OH": "US Midwest",
+    "MI": "US Midwest",
+    "IN": "US Midwest",
+    "WI": "US Midwest",
+    "MN": "US Midwest",
+    "IA": "US Midwest",
+    "MO": "US Midwest",
+    "KS": "US Midwest",
+    "NE": "US Midwest",
+    "SD": "US Midwest",
+    "ND": "US Midwest",
     # Countries/Regions
-    "UK": "Europe", "United Kingdom": "Europe", "Germany": "Europe", "France": "Europe",
-    "Netherlands": "Europe", "Switzerland": "Europe", "Sweden": "Europe", "Norway": "Europe",
-    "Denmark": "Europe", "Finland": "Europe", "Ireland": "Europe", "Spain": "Europe",
-    "Italy": "Europe", "Belgium": "Europe", "Austria": "Europe", "Luxembourg": "Europe",
-    "China": "Asia Pacific", "Japan": "Asia Pacific", "South Korea": "Asia Pacific",
-    "Singapore": "Asia Pacific", "Hong Kong": "Asia Pacific", "Taiwan": "Asia Pacific",
-    "Australia": "Asia Pacific", "New Zealand": "Asia Pacific", "India": "Asia Pacific",
+    "UK": "Europe",
+    "United Kingdom": "Europe",
+    "Germany": "Europe",
+    "France": "Europe",
+    "Netherlands": "Europe",
+    "Switzerland": "Europe",
+    "Sweden": "Europe",
+    "Norway": "Europe",
+    "Denmark": "Europe",
+    "Finland": "Europe",
+    "Ireland": "Europe",
+    "Spain": "Europe",
+    "Italy": "Europe",
+    "Belgium": "Europe",
+    "Austria": "Europe",
+    "Luxembourg": "Europe",
+    "China": "Asia Pacific",
+    "Japan": "Asia Pacific",
+    "South Korea": "Asia Pacific",
+    "Singapore": "Asia Pacific",
+    "Hong Kong": "Asia Pacific",
+    "Taiwan": "Asia Pacific",
+    "Australia": "Asia Pacific",
+    "New Zealand": "Asia Pacific",
+    "India": "Asia Pacific",
     "Canada": "Canada",
-    "Brazil": "Latin America", "Mexico": "Latin America", "Argentina": "Latin America",
-    "UAE": "Middle East", "Saudi Arabia": "Middle East", "Israel": "Middle East",
-    "Qatar": "Middle East", "Kuwait": "Middle East",
+    "Brazil": "Latin America",
+    "Mexico": "Latin America",
+    "Argentina": "Latin America",
+    "UAE": "Middle East",
+    "Saudi Arabia": "Middle East",
+    "Israel": "Middle East",
+    "Qatar": "Middle East",
+    "Kuwait": "Middle East",
 }
 
 
@@ -87,7 +149,7 @@ class TrendAnalysisService:
             return 0.0
 
         # Calculate period-over-period changes
-        changes = [values[i] - values[i-1] for i in range(1, len(values))]
+        changes = [values[i] - values[i - 1] for i in range(1, len(values))]
 
         if not changes:
             return 0.0
@@ -156,7 +218,9 @@ class TrendAnalysisService:
         result = self.db.execute(query, params)
 
         # Aggregate by sector and period
-        sector_periods: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        sector_periods: Dict[str, Dict[str, int]] = defaultdict(
+            lambda: defaultdict(int)
+        )
         all_periods: set = set()
 
         for row in result.mappings():
@@ -185,19 +249,27 @@ class TrendAnalysisService:
                 change_pct = 0
 
             momentum = self._calculate_momentum(values)
-            momentum_label = "accelerating" if momentum > 10 else "decelerating" if momentum < -10 else "stable"
+            momentum_label = (
+                "accelerating"
+                if momentum > 10
+                else "decelerating"
+                if momentum < -10
+                else "stable"
+            )
 
-            trends.append({
-                "sector": sector,
-                "periods": [
-                    {"period": p, "count": period_data.get(p, 0)}
-                    for p in sorted_periods
-                ],
-                "total": total,
-                "change_pct": round(change_pct, 1),
-                "momentum": momentum,
-                "momentum_label": momentum_label,
-            })
+            trends.append(
+                {
+                    "sector": sector,
+                    "periods": [
+                        {"period": p, "count": period_data.get(p, 0)}
+                        for p in sorted_periods
+                    ],
+                    "total": total,
+                    "change_pct": round(change_pct, 1),
+                    "momentum": momentum,
+                    "momentum_label": momentum_label,
+                }
+            )
 
         # Sort by total descending
         trends.sort(key=lambda x: x["total"], reverse=True)
@@ -223,10 +295,7 @@ class TrendAnalysisService:
         trends = self.get_sector_trends(period="quarter", periods=4, lp_type=lp_type)
 
         # Filter to positive momentum and sort
-        emerging = [
-            s for s in trends["sectors"]
-            if s["momentum"] > 0
-        ]
+        emerging = [s for s in trends["sectors"] if s["momentum"] > 0]
         emerging.sort(key=lambda x: x["momentum"], reverse=True)
 
         # Add rank and format
@@ -238,15 +307,17 @@ class TrendAnalysisService:
 
             qoq_change = ((current - previous) / previous * 100) if previous > 0 else 0
 
-            result.append({
-                "rank": i,
-                "sector": sector["sector"],
-                "current_count": current,
-                "total": sector["total"],
-                "momentum_score": sector["momentum"],
-                "qoq_change_pct": round(qoq_change, 1),
-                "trend": sector["momentum_label"],
-            })
+            result.append(
+                {
+                    "rank": i,
+                    "sector": sector["sector"],
+                    "current_count": current,
+                    "total": sector["total"],
+                    "momentum_score": sector["momentum"],
+                    "qoq_change_pct": round(qoq_change, 1),
+                    "trend": sector["momentum_label"],
+                }
+            )
 
         return result
 
@@ -298,17 +369,17 @@ class TrendAnalysisService:
         for region, data in region_data.items():
             # Get top sectors for this region
             top_sectors = sorted(
-                data["sectors"].items(),
-                key=lambda x: x[1],
-                reverse=True
+                data["sectors"].items(), key=lambda x: x[1], reverse=True
             )[:5]
 
-            regions.append({
-                "region": region,
-                "count": data["count"],
-                "pct": round(data["count"] / total * 100, 1) if total > 0 else 0,
-                "top_sectors": [s[0] for s in top_sectors],
-            })
+            regions.append(
+                {
+                    "region": region,
+                    "count": data["count"],
+                    "pct": round(data["count"] / total * 100, 1) if total > 0 else 0,
+                    "top_sectors": [s[0] for s in top_sectors],
+                }
+            )
 
         regions.sort(key=lambda x: x["count"], reverse=True)
 
@@ -350,10 +421,12 @@ class TrendAnalysisService:
         total = 0
 
         for row in result.mappings():
-            stages.append({
-                "stage": row["stage"],
-                "count": row["count"],
-            })
+            stages.append(
+                {
+                    "stage": row["stage"],
+                    "count": row["count"],
+                }
+            )
             total += row["count"]
 
         # Add percentages
@@ -399,18 +472,20 @@ class TrendAnalysisService:
             total = lp_type_totals[lp_type]
             top_sectors = sorted(sectors.items(), key=lambda x: x[1], reverse=True)[:10]
 
-            comparisons.append({
-                "lp_type": lp_type,
-                "total_holdings": total,
-                "top_sectors": [
-                    {
-                        "sector": s[0],
-                        "count": s[1],
-                        "pct": round(s[1] / total * 100, 1) if total > 0 else 0,
-                    }
-                    for s in top_sectors
-                ],
-            })
+            comparisons.append(
+                {
+                    "lp_type": lp_type,
+                    "total_holdings": total,
+                    "top_sectors": [
+                        {
+                            "sector": s[0],
+                            "count": s[1],
+                            "pct": round(s[1] / total * 100, 1) if total > 0 else 0,
+                        }
+                        for s in top_sectors
+                    ],
+                }
+            )
 
         comparisons.sort(key=lambda x: x["total_holdings"], reverse=True)
 
@@ -422,58 +497,80 @@ class TrendAnalysisService:
     def get_allocation_snapshot(self) -> Dict[str, Any]:
         """Get current allocation snapshot across all dimensions."""
         # Total holdings
-        total_result = self.db.execute(text("""
+        total_result = self.db.execute(
+            text("""
             SELECT COUNT(*) as total FROM portfolio_companies WHERE current_holding = 1
-        """))
+        """)
+        )
         total = total_result.fetchone()[0]
 
         # By sector
-        sector_result = self.db.execute(text("""
+        sector_result = self.db.execute(
+            text("""
             SELECT company_industry as sector, COUNT(*) as count
             FROM portfolio_companies
             WHERE current_holding = 1 AND company_industry IS NOT NULL
             GROUP BY company_industry
             ORDER BY count DESC
             LIMIT 20
-        """))
+        """)
+        )
         by_sector = [
-            {"sector": row[0], "count": row[1], "pct": round(row[1] / total * 100, 1) if total > 0 else 0}
+            {
+                "sector": row[0],
+                "count": row[1],
+                "pct": round(row[1] / total * 100, 1) if total > 0 else 0,
+            }
             for row in sector_result
         ]
 
         # By LP type
-        lp_type_result = self.db.execute(text("""
+        lp_type_result = self.db.execute(
+            text("""
             SELECT lf.lp_type, COUNT(*) as count
             FROM portfolio_companies pc
             JOIN lp_fund lf ON pc.investor_id = lf.id AND pc.investor_type = 'lp'
             WHERE pc.current_holding = 1
             GROUP BY lf.lp_type
             ORDER BY count DESC
-        """))
+        """)
+        )
         by_lp_type = [
-            {"lp_type": row[0], "count": row[1], "pct": round(row[1] / total * 100, 1) if total > 0 else 0}
+            {
+                "lp_type": row[0],
+                "count": row[1],
+                "pct": round(row[1] / total * 100, 1) if total > 0 else 0,
+            }
             for row in lp_type_result
         ]
 
         # By stage
-        stage_result = self.db.execute(text("""
+        stage_result = self.db.execute(
+            text("""
             SELECT COALESCE(company_stage, 'Unknown') as stage, COUNT(*) as count
             FROM portfolio_companies
             WHERE current_holding = 1
             GROUP BY company_stage
             ORDER BY count DESC
-        """))
+        """)
+        )
         by_stage = [
-            {"stage": row[0], "count": row[1], "pct": round(row[1] / total * 100, 1) if total > 0 else 0}
+            {
+                "stage": row[0],
+                "count": row[1],
+                "pct": round(row[1] / total * 100, 1) if total > 0 else 0,
+            }
             for row in stage_result
         ]
 
         # Investor counts
-        investor_result = self.db.execute(text("""
+        investor_result = self.db.execute(
+            text("""
             SELECT
                 (SELECT COUNT(DISTINCT id) FROM lp_fund) as lp_count,
                 (SELECT COUNT(DISTINCT id) FROM family_offices) as fo_count
-        """))
+        """)
+        )
         investor_row = investor_result.fetchone()
 
         return {

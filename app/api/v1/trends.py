@@ -17,10 +17,14 @@ router = APIRouter(prefix="/trends", tags=["Trends"])
 
 @router.get("/sectors")
 def get_sector_trends(
-    period: str = Query("quarter", description="Aggregation period: month, quarter, year"),
+    period: str = Query(
+        "quarter", description="Aggregation period: month, quarter, year"
+    ),
     periods: int = Query(4, ge=1, le=12, description="Number of periods to return"),
     lp_type: Optional[str] = Query(None, description="Filter by LP type"),
-    min_holdings: int = Query(5, ge=1, description="Minimum holdings for sector inclusion"),
+    min_holdings: int = Query(
+        5, ge=1, description="Minimum holdings for sector inclusion"
+    ),
     db: Session = Depends(get_db),
 ):
     """

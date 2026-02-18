@@ -53,6 +53,7 @@ class NewsItem(Base):
 @dataclass
 class NewsFilters:
     """Filters for news queries."""
+
     event_type: Optional[str] = None
     filing_type: Optional[str] = None
     source: Optional[str] = None
@@ -206,22 +207,25 @@ class NewsAggregator:
                     ON CONFLICT (source, source_id) DO NOTHING
                 """)
 
-                result = self.db.execute(insert_sql, {
-                    "source": item["source"],
-                    "source_id": item["source_id"],
-                    "title": item["title"],
-                    "summary": item.get("summary"),
-                    "url": item.get("url"),
-                    "published_at": item.get("published_at"),
-                    "event_type": item.get("event_type"),
-                    "filing_type": item.get("filing_type"),
-                    "company_name": item.get("company_name"),
-                    "company_ticker": item.get("company_ticker"),
-                    "investor_id": item.get("investor_id"),
-                    "investor_type": item.get("investor_type"),
-                    "relevance_score": item.get("relevance_score", 0.5),
-                    "fetched_at": datetime.utcnow(),
-                })
+                result = self.db.execute(
+                    insert_sql,
+                    {
+                        "source": item["source"],
+                        "source_id": item["source_id"],
+                        "title": item["title"],
+                        "summary": item.get("summary"),
+                        "url": item.get("url"),
+                        "published_at": item.get("published_at"),
+                        "event_type": item.get("event_type"),
+                        "filing_type": item.get("filing_type"),
+                        "company_name": item.get("company_name"),
+                        "company_ticker": item.get("company_ticker"),
+                        "investor_id": item.get("investor_id"),
+                        "investor_type": item.get("investor_type"),
+                        "relevance_score": item.get("relevance_score", 0.5),
+                        "fetched_at": datetime.utcnow(),
+                    },
+                )
 
                 if result.rowcount > 0:
                     new_count += 1
@@ -236,14 +240,16 @@ class NewsAggregator:
     def _get_portfolio_companies(self) -> List[str]:
         """Get company names from portfolio for targeted news search."""
         try:
-            result = self.db.execute(text("""
+            result = self.db.execute(
+                text("""
                 SELECT DISTINCT company_name
                 FROM portfolio_companies
                 WHERE company_name IS NOT NULL
                     AND company_name != ''
                 ORDER BY company_name
                 LIMIT 50
-            """))
+            """)
+            )
             return [row[0] for row in result.fetchall()]
         except Exception:
             return []
@@ -317,21 +323,25 @@ class NewsAggregator:
 
         items = []
         for row in result.mappings():
-            items.append({
-                "id": row["id"],
-                "source": row["source"],
-                "title": row["title"],
-                "summary": row["summary"],
-                "url": row["url"],
-                "published_at": row["published_at"].isoformat() if row["published_at"] else None,
-                "event_type": row["event_type"],
-                "filing_type": row["filing_type"],
-                "company_name": row["company_name"],
-                "company_ticker": row["company_ticker"],
-                "investor_id": row["investor_id"],
-                "investor_type": row["investor_type"],
-                "relevance_score": row["relevance_score"],
-            })
+            items.append(
+                {
+                    "id": row["id"],
+                    "source": row["source"],
+                    "title": row["title"],
+                    "summary": row["summary"],
+                    "url": row["url"],
+                    "published_at": row["published_at"].isoformat()
+                    if row["published_at"]
+                    else None,
+                    "event_type": row["event_type"],
+                    "filing_type": row["filing_type"],
+                    "company_name": row["company_name"],
+                    "company_ticker": row["company_ticker"],
+                    "investor_id": row["investor_id"],
+                    "investor_type": row["investor_type"],
+                    "relevance_score": row["relevance_score"],
+                }
+            )
 
         return {
             "items": items,
@@ -409,12 +419,18 @@ class NewsAggregator:
         try:
             result = self.db.execute(stats_sql)
             for row in result.mappings():
-                sources.append({
-                    "name": row["source"],
-                    "total_items": row["total_items"],
-                    "latest_item": row["latest_item"].isoformat() if row["latest_item"] else None,
-                    "last_fetch": row["last_fetch"].isoformat() if row["last_fetch"] else None,
-                })
+                sources.append(
+                    {
+                        "name": row["source"],
+                        "total_items": row["total_items"],
+                        "latest_item": row["latest_item"].isoformat()
+                        if row["latest_item"]
+                        else None,
+                        "last_fetch": row["last_fetch"].isoformat()
+                        if row["last_fetch"]
+                        else None,
+                    }
+                )
         except Exception as e:
             logger.error(f"Error getting source stats: {e}")
 
@@ -422,11 +438,13 @@ class NewsAggregator:
         known_sources = {"sec_edgar", "google_news"}
         existing = {s["name"] for s in sources}
         for source in known_sources - existing:
-            sources.append({
-                "name": source,
-                "total_items": 0,
-                "latest_item": None,
-                "last_fetch": None,
-            })
+            sources.append(
+                {
+                    "name": source,
+                    "total_items": 0,
+                    "latest_item": None,
+                    "last_fetch": None,
+                }
+            )
 
         return sources

@@ -3,6 +3,7 @@ CMS ingestion orchestration.
 
 High-level functions that coordinate data fetching, table creation, and data loading.
 """
+
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -25,7 +26,7 @@ async def ingest_medicare_utilization(
     job_id: int,
     year: Optional[int] = None,
     state: Optional[str] = None,
-    limit: Optional[int] = None
+    limit: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Ingest Medicare Provider Utilization and Payment Data.
@@ -98,7 +99,7 @@ async def ingest_medicare_utilization(
         client = CMSClient(
             max_concurrency=settings.max_concurrency,
             max_retries=settings.max_retries,
-            backoff_factor=settings.retry_backoff_factor
+            backoff_factor=settings.retry_backoff_factor,
         )
 
         try:
@@ -108,7 +109,7 @@ async def ingest_medicare_utilization(
                 dataset_id=dataset_id,
                 limit=1000,  # Records per page
                 where=where_clause,
-                max_records=limit
+                max_records=limit,
             )
 
             logger.info(f"Fetched {len(records)} records")
@@ -126,7 +127,9 @@ async def ingest_medicare_utilization(
                 if rows_inserted == 0:
                     job.status = JobStatus.FAILED
                     job.error_message = "Ingestion completed but no rows were inserted"
-                    logger.warning(f"Job {job_id}: No CMS Medicare utilization data returned")
+                    logger.warning(
+                        f"Job {job_id}: No CMS Medicare utilization data returned"
+                    )
                 else:
                     job.status = JobStatus.SUCCESS
                 job.completed_at = datetime.utcnow()
@@ -142,7 +145,7 @@ async def ingest_medicare_utilization(
                 "table_name": table_name,
                 "rows_inserted": rows_inserted,
                 "duration_seconds": duration,
-                "dataset_id": dataset_id
+                "dataset_id": dataset_id,
             }
 
         finally:
@@ -159,47 +162,44 @@ async def ingest_medicare_utilization(
 
 
 async def ingest_hospital_cost_reports(
-    db: Session,
-    job_id: int,
-    year: Optional[int] = None,
-    limit: Optional[int] = None
+    db: Session, job_id: int, year: Optional[int] = None, limit: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Ingest Hospital Cost Report (HCRIS) data.
-    
+
     Hospital Cost Reporting Information System data includes financial information,
     utilization data, and cost reports submitted by hospitals.
-    
+
     Note: HCRIS data is typically available as bulk CSV downloads.
     This implementation fetches a sample/recent extract.
-    
+
     Args:
         db: Database session
         job_id: Ingestion job ID for tracking
         year: Optional year filter
         limit: Optional limit on number of records
-        
+
     Returns:
         Dictionary with ingestion results
     """
     start_time = datetime.utcnow()
     dataset_type = "hospital_cost_reports"
-    
+
     settings = get_settings()
-    
+
     # 1. Get dataset metadata
     meta = metadata.get_dataset_metadata(dataset_type)
     table_name = meta["table_name"]
-    
+
     # 2. Create table if not exists
     logger.info(f"Preparing table {table_name}")
     create_sql = metadata.generate_create_table_sql(dataset_type)
     db.execute(text(create_sql))
     db.commit()
-    
+
     # 3. Register dataset
     _register_dataset(db, dataset_type, meta)
-    
+
     # Update job to RUNNING
     job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
     if job:
@@ -231,7 +231,9 @@ async def ingest_hospital_cost_reports(
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
             csv_names = [n for n in zf.namelist() if n.lower().endswith(".csv")]
             if not csv_names:
-                raise ValueError(f"No CSV files found in HCRIS ZIP archive: {zf.namelist()}")
+                raise ValueError(
+                    f"No CSV files found in HCRIS ZIP archive: {zf.namelist()}"
+                )
 
             for csv_name in csv_names:
                 logger.info(f"Parsing {csv_name}")
@@ -265,7 +267,9 @@ async def ingest_hospital_cost_reports(
             job.rows_inserted = rows_inserted
             db.commit()
 
-        logger.info(f"Ingested {rows_inserted} HCRIS rows into {table_name} in {duration:.2f}s")
+        logger.info(
+            f"Ingested {rows_inserted} HCRIS rows into {table_name} in {duration:.2f}s"
+        )
 
         return {
             "table_name": table_name,
@@ -288,7 +292,7 @@ async def ingest_drug_pricing(
     job_id: int,
     year: Optional[int] = None,
     brand_name: Optional[str] = None,
-    limit: Optional[int] = None
+    limit: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Ingest Medicare Part D Drug Spending data.
@@ -365,7 +369,7 @@ async def ingest_drug_pricing(
         client = CMSClient(
             max_concurrency=settings.max_concurrency,
             max_retries=settings.max_retries,
-            backoff_factor=settings.retry_backoff_factor
+            backoff_factor=settings.retry_backoff_factor,
         )
 
         try:
@@ -375,7 +379,7 @@ async def ingest_drug_pricing(
                 dataset_id=dataset_id,
                 limit=1000,  # Records per page
                 where=where_clause,
-                max_records=limit
+                max_records=limit,
             )
 
             logger.info(f"Fetched {len(records)} records")
@@ -409,7 +413,7 @@ async def ingest_drug_pricing(
                 "table_name": table_name,
                 "rows_inserted": rows_inserted,
                 "duration_seconds": duration,
-                "dataset_id": dataset_id
+                "dataset_id": dataset_id,
             }
 
         finally:
@@ -430,11 +434,11 @@ async def _batch_insert_data(
     table_name: str,
     records: list,
     column_defs: Dict[str, Dict[str, str]],
-    batch_size: int = 1000
+    batch_size: int = 1000,
 ) -> None:
     """
     Batch insert data into Postgres using parameterized queries.
-    
+
     Args:
         db: Database session
         table_name: Target table name
@@ -444,53 +448,55 @@ async def _batch_insert_data(
     """
     if not records:
         return
-    
+
     # Get column names from first record
     all_columns = list(column_defs.keys())
-    
+
     # Build INSERT statement with parameterized values
     columns_sql = ", ".join(all_columns)
     placeholders = ", ".join([f":{col}" for col in all_columns])
     insert_sql = f"INSERT INTO {table_name} ({columns_sql}) VALUES ({placeholders})"
-    
+
     # Process in batches
     for i in range(0, len(records), batch_size):
-        batch = records[i:i + batch_size]
-        
+        batch = records[i : i + batch_size]
+
         # Normalize batch data
         normalized_batch = []
         for record in batch:
             normalized = {}
-            
+
             for col_name in all_columns:
                 raw_value = record.get(col_name)
-                normalized[col_name] = _normalize_value(raw_value, column_defs[col_name]["type"])
-            
+                normalized[col_name] = _normalize_value(
+                    raw_value, column_defs[col_name]["type"]
+                )
+
             normalized_batch.append(normalized)
-        
+
         # Execute batch insert using parameterized query
         db.execute(text(insert_sql), normalized_batch)
         db.commit()
-        
+
         logger.debug(f"Inserted batch of {len(batch)} rows into {table_name}")
 
 
 def _normalize_value(value: Any, col_type: str) -> Any:
     """
     Normalize a CMS API value for database insertion.
-    
+
     Handles null values, empty strings, type conversions.
-    
+
     Args:
         value: Raw value from API
         col_type: PostgreSQL column type
-        
+
     Returns:
         Normalized value
     """
     if value is None or value == "" or value == "null":
         return None
-    
+
     # Handle numeric types
     if col_type in ("INTEGER", "NUMERIC"):
         try:
@@ -500,12 +506,13 @@ def _normalize_value(value: Any, col_type: str) -> Any:
                 return float(value)
         except (ValueError, TypeError):
             return None
-    
+
     # Handle date types
     if col_type == "DATE":
         try:
             # CMS dates are typically in format: YYYY-MM-DD or MM/DD/YYYY
             from dateutil import parser
+
             return parser.parse(str(value)).date()
         except (ValueError, TypeError):
             return None
@@ -514,26 +521,24 @@ def _normalize_value(value: Any, col_type: str) -> Any:
     return str(value)
 
 
-def _register_dataset(
-    db: Session,
-    dataset_type: str,
-    meta: Dict[str, Any]
-) -> None:
+def _register_dataset(db: Session, dataset_type: str, meta: Dict[str, Any]) -> None:
     """
     Register dataset in dataset_registry if not already registered.
-    
+
     Args:
         db: Database session
         dataset_type: Type of dataset
         meta: Dataset metadata
     """
     table_name = meta["table_name"]
-    
+
     # Check if already registered
-    existing = db.query(DatasetRegistry).filter(
-        DatasetRegistry.table_name == table_name
-    ).first()
-    
+    existing = (
+        db.query(DatasetRegistry)
+        .filter(DatasetRegistry.table_name == table_name)
+        .first()
+    )
+
     if existing:
         logger.info(f"Dataset {table_name} already registered")
         existing.last_updated_at = datetime.utcnow()
@@ -548,10 +553,9 @@ def _register_dataset(
             source_metadata={
                 "dataset_type": dataset_type,
                 "source_url": meta["source_url"],
-                "socrata_dataset_id": meta.get("socrata_dataset_id")
-            }
+                "socrata_dataset_id": meta.get("socrata_dataset_id"),
+            },
         )
         db.add(dataset)
         db.commit()
         logger.info(f"Registered dataset {table_name}")
-

@@ -30,16 +30,21 @@ router = APIRouter(prefix="/peer-sets", tags=["Peer Sets & Benchmarking"])
 # Request/Response Models
 # =============================================================================
 
+
 class PeerSetCreate(BaseModel):
     """Request to create a peer set."""
+
     name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
     industry: Optional[str] = None
-    criteria: Optional[dict] = Field(None, description="Selection criteria (revenue range, employee count, etc.)")
+    criteria: Optional[dict] = Field(
+        None, description="Selection criteria (revenue range, employee count, etc.)"
+    )
 
 
 class PeerSetUpdate(BaseModel):
     """Request to update a peer set."""
+
     name: Optional[str] = None
     description: Optional[str] = None
     criteria: Optional[dict] = None
@@ -47,12 +52,16 @@ class PeerSetUpdate(BaseModel):
 
 class PeerSetMemberAdd(BaseModel):
     """Request to add a company to peer set."""
+
     company_id: int
-    is_primary: bool = Field(False, description="Is this the primary company being compared")
+    is_primary: bool = Field(
+        False, description="Is this the primary company being compared"
+    )
 
 
 class PeerSetSummary(BaseModel):
     """Summary of a peer set."""
+
     id: int
     name: str
     description: Optional[str] = None
@@ -68,6 +77,7 @@ class PeerSetSummary(BaseModel):
 
 class PeerMemberItem(BaseModel):
     """A member of a peer set."""
+
     company_id: int
     company_name: str
     industry: Optional[str] = None
@@ -84,6 +94,7 @@ class PeerMemberItem(BaseModel):
 
 class PeerSetDetail(BaseModel):
     """Detailed peer set information."""
+
     id: int
     name: str
     description: Optional[str] = None
@@ -98,6 +109,7 @@ class PeerSetDetail(BaseModel):
 
 class BenchmarkMetric(BaseModel):
     """A single benchmark metric for a company."""
+
     company_id: int
     company_name: str
     is_primary: bool = False
@@ -108,6 +120,7 @@ class BenchmarkMetric(BaseModel):
 
 class BenchmarkResult(BaseModel):
     """Benchmark comparison result."""
+
     metric_name: str
     description: str
     metrics: List[BenchmarkMetric]
@@ -117,6 +130,7 @@ class BenchmarkResult(BaseModel):
 
 class BenchmarkResponse(BaseModel):
     """Full benchmark comparison response."""
+
     peer_set_id: int
     peer_set_name: str
     primary_company: Optional[str] = None
@@ -126,6 +140,7 @@ class BenchmarkResponse(BaseModel):
 # =============================================================================
 # Endpoints
 # =============================================================================
+
 
 @router.get("", response_model=List[PeerSetSummary])
 async def list_peer_sets(
@@ -147,15 +162,21 @@ async def list_peer_sets(
     results = []
     for ps in peer_sets:
         # Count members
-        member_count = db.query(PeoplePeerSetMember).filter(
-            PeoplePeerSetMember.peer_set_id == ps.id
-        ).count()
+        member_count = (
+            db.query(PeoplePeerSetMember)
+            .filter(PeoplePeerSetMember.peer_set_id == ps.id)
+            .count()
+        )
 
         # Find primary company
-        primary = db.query(PeoplePeerSetMember).filter(
-            PeoplePeerSetMember.peer_set_id == ps.id,
-            PeoplePeerSetMember.is_primary == True,
-        ).first()
+        primary = (
+            db.query(PeoplePeerSetMember)
+            .filter(
+                PeoplePeerSetMember.peer_set_id == ps.id,
+                PeoplePeerSetMember.is_primary == True,
+            )
+            .first()
+        )
 
         primary_name = None
         primary_id = None
@@ -165,16 +186,18 @@ async def list_peer_sets(
                 primary_name = company.name
                 primary_id = company.id
 
-        results.append(PeerSetSummary(
-            id=ps.id,
-            name=ps.name,
-            description=ps.description,
-            industry=ps.industry,
-            member_count=member_count,
-            primary_company_id=primary_id,
-            primary_company_name=primary_name,
-            created_at=ps.created_at.date() if ps.created_at else date.today(),
-        ))
+        results.append(
+            PeerSetSummary(
+                id=ps.id,
+                name=ps.name,
+                description=ps.description,
+                industry=ps.industry,
+                member_count=member_count,
+                primary_company_id=primary_id,
+                primary_company_name=primary_name,
+                created_at=ps.created_at.date() if ps.created_at else date.today(),
+            )
+        )
 
     return results
 
@@ -221,17 +244,17 @@ async def get_peer_set(
 
     Includes all member companies with leadership stats.
     """
-    peer_set = db.query(PeoplePeerSet).filter(
-        PeoplePeerSet.id == peer_set_id
-    ).first()
+    peer_set = db.query(PeoplePeerSet).filter(PeoplePeerSet.id == peer_set_id).first()
 
     if not peer_set:
         raise HTTPException(status_code=404, detail="Peer set not found")
 
     # Get members
-    members_db = db.query(PeoplePeerSetMember).filter(
-        PeoplePeerSetMember.peer_set_id == peer_set_id
-    ).all()
+    members_db = (
+        db.query(PeoplePeerSetMember)
+        .filter(PeoplePeerSetMember.peer_set_id == peer_set_id)
+        .all()
+    )
 
     members = []
     for member in members_db:
@@ -240,26 +263,32 @@ async def get_peer_set(
             continue
 
         # Get leadership stats
-        leadership = db.query(CompanyPerson).filter(
-            CompanyPerson.company_id == company.id,
-            CompanyPerson.is_current == True,
-        ).all()
+        leadership = (
+            db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.company_id == company.id,
+                CompanyPerson.is_current == True,
+            )
+            .all()
+        )
 
         exec_count = len(leadership)
-        c_suite_count = len([cp for cp in leadership if cp.title_level == 'c_suite'])
+        c_suite_count = len([cp for cp in leadership if cp.title_level == "c_suite"])
         board_size = len([cp for cp in leadership if cp.is_board_member])
 
-        members.append(PeerMemberItem(
-            company_id=company.id,
-            company_name=company.name,
-            industry=company.industry_segment,
-            revenue=company.revenue_usd,
-            employee_count=company.employee_count,
-            is_primary=member.is_primary,
-            executive_count=exec_count,
-            c_suite_count=c_suite_count,
-            board_size=board_size,
-        ))
+        members.append(
+            PeerMemberItem(
+                company_id=company.id,
+                company_name=company.name,
+                industry=company.industry_segment,
+                revenue=company.revenue_usd,
+                employee_count=company.employee_count,
+                is_primary=member.is_primary,
+                executive_count=exec_count,
+                c_suite_count=c_suite_count,
+                board_size=board_size,
+            )
+        )
 
     return PeerSetDetail(
         id=peer_set.id,
@@ -278,9 +307,7 @@ async def delete_peer_set(
     db: Session = Depends(get_db),
 ):
     """Delete a peer set and its members."""
-    peer_set = db.query(PeoplePeerSet).filter(
-        PeoplePeerSet.id == peer_set_id
-    ).first()
+    peer_set = db.query(PeoplePeerSet).filter(PeoplePeerSet.id == peer_set_id).first()
 
     if not peer_set:
         raise HTTPException(status_code=404, detail="Peer set not found")
@@ -303,25 +330,29 @@ async def add_peer_member(
     db: Session = Depends(get_db),
 ):
     """Add a company to a peer set."""
-    peer_set = db.query(PeoplePeerSet).filter(
-        PeoplePeerSet.id == peer_set_id
-    ).first()
+    peer_set = db.query(PeoplePeerSet).filter(PeoplePeerSet.id == peer_set_id).first()
 
     if not peer_set:
         raise HTTPException(status_code=404, detail="Peer set not found")
 
-    company = db.query(IndustrialCompany).filter(
-        IndustrialCompany.id == request.company_id
-    ).first()
+    company = (
+        db.query(IndustrialCompany)
+        .filter(IndustrialCompany.id == request.company_id)
+        .first()
+    )
 
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
     # Check if already in peer set
-    existing = db.query(PeoplePeerSetMember).filter(
-        PeoplePeerSetMember.peer_set_id == peer_set_id,
-        PeoplePeerSetMember.company_id == request.company_id,
-    ).first()
+    existing = (
+        db.query(PeoplePeerSetMember)
+        .filter(
+            PeoplePeerSetMember.peer_set_id == peer_set_id,
+            PeoplePeerSetMember.company_id == request.company_id,
+        )
+        .first()
+    )
 
     if existing:
         raise HTTPException(status_code=400, detail="Company already in peer set")
@@ -342,10 +373,14 @@ async def add_peer_member(
     db.commit()
 
     # Get stats
-    leadership = db.query(CompanyPerson).filter(
-        CompanyPerson.company_id == company.id,
-        CompanyPerson.is_current == True,
-    ).all()
+    leadership = (
+        db.query(CompanyPerson)
+        .filter(
+            CompanyPerson.company_id == company.id,
+            CompanyPerson.is_current == True,
+        )
+        .all()
+    )
 
     return PeerMemberItem(
         company_id=company.id,
@@ -355,7 +390,7 @@ async def add_peer_member(
         employee_count=company.employee_count,
         is_primary=request.is_primary,
         executive_count=len(leadership),
-        c_suite_count=len([cp for cp in leadership if cp.title_level == 'c_suite']),
+        c_suite_count=len([cp for cp in leadership if cp.title_level == "c_suite"]),
         board_size=len([cp for cp in leadership if cp.is_board_member]),
     )
 
@@ -367,10 +402,14 @@ async def remove_peer_member(
     db: Session = Depends(get_db),
 ):
     """Remove a company from a peer set."""
-    member = db.query(PeoplePeerSetMember).filter(
-        PeoplePeerSetMember.peer_set_id == peer_set_id,
-        PeoplePeerSetMember.company_id == company_id,
-    ).first()
+    member = (
+        db.query(PeoplePeerSetMember)
+        .filter(
+            PeoplePeerSetMember.peer_set_id == peer_set_id,
+            PeoplePeerSetMember.company_id == company_id,
+        )
+        .first()
+    )
 
     if not member:
         raise HTTPException(status_code=404, detail="Company not in peer set")
@@ -391,17 +430,17 @@ async def benchmark_peer_set(
 
     Compares executive team size, C-suite composition, board size, and turnover.
     """
-    peer_set = db.query(PeoplePeerSet).filter(
-        PeoplePeerSet.id == peer_set_id
-    ).first()
+    peer_set = db.query(PeoplePeerSet).filter(PeoplePeerSet.id == peer_set_id).first()
 
     if not peer_set:
         raise HTTPException(status_code=404, detail="Peer set not found")
 
     # Get members
-    members = db.query(PeoplePeerSetMember).filter(
-        PeoplePeerSetMember.peer_set_id == peer_set_id
-    ).all()
+    members = (
+        db.query(PeoplePeerSetMember)
+        .filter(PeoplePeerSetMember.peer_set_id == peer_set_id)
+        .all()
+    )
 
     if not members:
         raise HTTPException(status_code=400, detail="Peer set has no members")
@@ -415,27 +454,39 @@ async def benchmark_peer_set(
         if not company:
             continue
 
-        leadership = db.query(CompanyPerson).filter(
-            CompanyPerson.company_id == company.id,
-            CompanyPerson.is_current == True,
-        ).all()
+        leadership = (
+            db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.company_id == company.id,
+                CompanyPerson.is_current == True,
+            )
+            .all()
+        )
 
         # Count leadership changes in last year
         one_year_ago = date.today() - timedelta(days=365)
-        turnover = db.query(LeadershipChange).filter(
-            LeadershipChange.company_id == company.id,
-            LeadershipChange.announced_date >= one_year_ago,
-        ).count()
+        turnover = (
+            db.query(LeadershipChange)
+            .filter(
+                LeadershipChange.company_id == company.id,
+                LeadershipChange.announced_date >= one_year_ago,
+            )
+            .count()
+        )
 
         metrics = {
-            'company_id': company.id,
-            'company_name': company.name,
-            'is_primary': member.is_primary,
-            'executive_count': len(leadership),
-            'c_suite_count': len([cp for cp in leadership if cp.title_level == 'c_suite']),
-            'board_size': len([cp for cp in leadership if cp.is_board_member]),
-            'vp_count': len([cp for cp in leadership if cp.title_level in ['vp', 'svp', 'evp']]),
-            'turnover_12m': turnover,
+            "company_id": company.id,
+            "company_name": company.name,
+            "is_primary": member.is_primary,
+            "executive_count": len(leadership),
+            "c_suite_count": len(
+                [cp for cp in leadership if cp.title_level == "c_suite"]
+            ),
+            "board_size": len([cp for cp in leadership if cp.is_board_member]),
+            "vp_count": len(
+                [cp for cp in leadership if cp.title_level in ["vp", "svp", "evp"]]
+            ),
+            "turnover_12m": turnover,
         }
         company_metrics.append(metrics)
 
@@ -446,11 +497,23 @@ async def benchmark_peer_set(
     benchmarks = []
 
     metric_definitions = [
-        ('executive_count', 'Total Executives', 'Total number of executives in leadership team'),
-        ('c_suite_count', 'C-Suite Size', 'Number of C-level executives'),
-        ('board_size', 'Board Size', 'Number of board members'),
-        ('vp_count', 'VP-Level Executives', 'Number of VP, SVP, and EVP level executives'),
-        ('turnover_12m', 'Leadership Changes (12M)', 'Number of leadership changes in last 12 months'),
+        (
+            "executive_count",
+            "Total Executives",
+            "Total number of executives in leadership team",
+        ),
+        ("c_suite_count", "C-Suite Size", "Number of C-level executives"),
+        ("board_size", "Board Size", "Number of board members"),
+        (
+            "vp_count",
+            "VP-Level Executives",
+            "Number of VP, SVP, and EVP level executives",
+        ),
+        (
+            "turnover_12m",
+            "Leadership Changes (12M)",
+            "Number of leadership changes in last 12 months",
+        ),
     ]
 
     for metric_key, metric_name, description in metric_definitions:
@@ -460,32 +523,40 @@ async def benchmark_peer_set(
             continue
 
         # Sort and rank
-        sorted_companies = sorted(company_metrics, key=lambda x: x[metric_key], reverse=True)
+        sorted_companies = sorted(
+            company_metrics, key=lambda x: x[metric_key], reverse=True
+        )
 
         metrics = []
         for rank, m in enumerate(sorted_companies, 1):
-            percentile = ((len(sorted_companies) - rank + 1) / len(sorted_companies)) * 100
-            metrics.append(BenchmarkMetric(
-                company_id=m['company_id'],
-                company_name=m['company_name'],
-                is_primary=m['is_primary'],
-                value=m[metric_key],
-                rank=rank,
-                percentile=round(percentile, 1),
-            ))
+            percentile = (
+                (len(sorted_companies) - rank + 1) / len(sorted_companies)
+            ) * 100
+            metrics.append(
+                BenchmarkMetric(
+                    company_id=m["company_id"],
+                    company_name=m["company_name"],
+                    is_primary=m["is_primary"],
+                    value=m[metric_key],
+                    rank=rank,
+                    percentile=round(percentile, 1),
+                )
+            )
 
         # Calculate stats
         avg = sum(values) / len(values) if values else 0
         sorted_vals = sorted(values)
         median = sorted_vals[len(sorted_vals) // 2] if sorted_vals else 0
 
-        benchmarks.append(BenchmarkResult(
-            metric_name=metric_name,
-            description=description,
-            metrics=metrics,
-            peer_set_average=round(avg, 1),
-            peer_set_median=median,
-        ))
+        benchmarks.append(
+            BenchmarkResult(
+                metric_name=metric_name,
+                description=description,
+                metrics=metrics,
+                peer_set_average=round(avg, 1),
+                peer_set_median=median,
+            )
+        )
 
     return BenchmarkResponse(
         peer_set_id=peer_set.id,

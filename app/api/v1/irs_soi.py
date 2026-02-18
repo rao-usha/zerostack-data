@@ -9,6 +9,7 @@ Provides HTTP endpoints for ingesting IRS SOI data:
 
 No API key required - all data is public domain.
 """
+
 import logging
 from enum import Enum
 from typing import Optional
@@ -29,6 +30,7 @@ router = APIRouter(tags=["irs-soi"])
 
 # ========== Enums for validation ==========
 
+
 class FlowType(str, Enum):
     INFLOW = "inflow"
     OUTFLOW = "outflow"
@@ -37,82 +39,63 @@ class FlowType(str, Enum):
 
 # ========== Request Models ==========
 
+
 class ZipIncomeIngestRequest(BaseModel):
     """Request model for IRS SOI ZIP income ingestion."""
+
     year: Optional[int] = Field(
-        None,
-        description=f"Tax year (defaults to {DEFAULT_YEAR})",
-        examples=[2021]
+        None, description=f"Tax year (defaults to {DEFAULT_YEAR})", examples=[2021]
     )
-    use_cache: bool = Field(
-        True,
-        description="Use cached downloads if available"
-    )
+    use_cache: bool = Field(True, description="Use cached downloads if available")
 
 
 class CountyIncomeIngestRequest(BaseModel):
     """Request model for IRS SOI county income ingestion."""
+
     year: Optional[int] = Field(
-        None,
-        description=f"Tax year (defaults to {DEFAULT_YEAR})",
-        examples=[2021]
+        None, description=f"Tax year (defaults to {DEFAULT_YEAR})", examples=[2021]
     )
-    use_cache: bool = Field(
-        True,
-        description="Use cached downloads if available"
-    )
+    use_cache: bool = Field(True, description="Use cached downloads if available")
 
 
 class MigrationIngestRequest(BaseModel):
     """Request model for IRS SOI migration data ingestion."""
+
     year: Optional[int] = Field(
-        None,
-        description=f"Tax year (defaults to {DEFAULT_YEAR})",
-        examples=[2021]
+        None, description=f"Tax year (defaults to {DEFAULT_YEAR})", examples=[2021]
     )
     flow_type: FlowType = Field(
-        FlowType.BOTH,
-        description="Migration flow type: inflow, outflow, or both"
+        FlowType.BOTH, description="Migration flow type: inflow, outflow, or both"
     )
-    use_cache: bool = Field(
-        True,
-        description="Use cached downloads if available"
-    )
+    use_cache: bool = Field(True, description="Use cached downloads if available")
 
 
 class BusinessIncomeIngestRequest(BaseModel):
     """Request model for IRS SOI business income ingestion."""
+
     year: Optional[int] = Field(
-        None,
-        description=f"Tax year (defaults to {DEFAULT_YEAR})",
-        examples=[2021]
+        None, description=f"Tax year (defaults to {DEFAULT_YEAR})", examples=[2021]
     )
-    use_cache: bool = Field(
-        True,
-        description="Use cached downloads if available"
-    )
+    use_cache: bool = Field(True, description="Use cached downloads if available")
 
 
 class AllDatasetsIngestRequest(BaseModel):
     """Request model for ingesting all IRS SOI datasets."""
+
     year: Optional[int] = Field(
-        None,
-        description=f"Tax year (defaults to {DEFAULT_YEAR})",
-        examples=[2021]
+        None, description=f"Tax year (defaults to {DEFAULT_YEAR})", examples=[2021]
     )
-    use_cache: bool = Field(
-        True,
-        description="Use cached downloads if available"
-    )
+    use_cache: bool = Field(True, description="Use cached downloads if available")
 
 
 # ========== Endpoints ==========
+
 
 @router.post("/irs-soi/zip-income/ingest")
 async def ingest_zip_income_data(
     request: ZipIncomeIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest IRS SOI individual income by ZIP code data.
@@ -136,11 +119,13 @@ async def ingest_zip_income_data(
     if year not in AVAILABLE_YEARS["zip_income"]:
         raise HTTPException(
             status_code=400,
-            detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['zip_income']}"
+            detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['zip_income']}",
         )
 
     return create_and_dispatch_job(
-        db, background_tasks, source="irs_soi",
+        db,
+        background_tasks,
+        source="irs_soi",
         config={
             "dataset": "zip_income",
             "year": year,
@@ -154,7 +139,7 @@ async def ingest_zip_income_data(
 async def ingest_county_income_data(
     request: CountyIncomeIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest IRS SOI individual income by county data.
@@ -176,11 +161,13 @@ async def ingest_county_income_data(
     if year not in AVAILABLE_YEARS["county_income"]:
         raise HTTPException(
             status_code=400,
-            detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['county_income']}"
+            detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['county_income']}",
         )
 
     return create_and_dispatch_job(
-        db, background_tasks, source="irs_soi",
+        db,
+        background_tasks,
+        source="irs_soi",
         config={
             "dataset": "county_income",
             "year": year,
@@ -194,7 +181,7 @@ async def ingest_county_income_data(
 async def ingest_migration_data(
     request: MigrationIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest IRS SOI county-to-county migration data.
@@ -221,11 +208,13 @@ async def ingest_migration_data(
     if year not in AVAILABLE_YEARS["migration"]:
         raise HTTPException(
             status_code=400,
-            detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['migration']}"
+            detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['migration']}",
         )
 
     return create_and_dispatch_job(
-        db, background_tasks, source="irs_soi",
+        db,
+        background_tasks,
+        source="irs_soi",
         config={
             "dataset": "migration",
             "year": year,
@@ -240,7 +229,7 @@ async def ingest_migration_data(
 async def ingest_business_income_data(
     request: BusinessIncomeIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest IRS SOI business income by ZIP code data.
@@ -263,11 +252,13 @@ async def ingest_business_income_data(
     if year not in AVAILABLE_YEARS["business_income"]:
         raise HTTPException(
             status_code=400,
-            detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['business_income']}"
+            detail=f"Year {year} not available. Available: {AVAILABLE_YEARS['business_income']}",
         )
 
     return create_and_dispatch_job(
-        db, background_tasks, source="irs_soi",
+        db,
+        background_tasks,
+        source="irs_soi",
         config={
             "dataset": "business_income",
             "year": year,
@@ -281,7 +272,7 @@ async def ingest_business_income_data(
 async def ingest_all_soi_datasets(
     request: AllDatasetsIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest all IRS SOI datasets for a given year.
@@ -299,7 +290,9 @@ async def ingest_all_soi_datasets(
     year = request.year or DEFAULT_YEAR
 
     return create_and_dispatch_job(
-        db, background_tasks, source="irs_soi",
+        db,
+        background_tasks,
+        source="irs_soi",
         config={
             "dataset": "all",
             "year": year,
@@ -311,6 +304,7 @@ async def ingest_all_soi_datasets(
 
 # ========== Reference Endpoints ==========
 
+
 @router.get("/irs-soi/reference/agi-brackets")
 async def get_agi_brackets():
     """
@@ -320,7 +314,7 @@ async def get_agi_brackets():
     """
     return {
         "agi_brackets": AGI_BRACKETS,
-        "note": "Bracket '0' represents totals across all income levels."
+        "note": "Bracket '0' represents totals across all income levels.",
     }
 
 
@@ -332,7 +326,7 @@ async def get_available_years():
     return {
         "available_years": AVAILABLE_YEARS,
         "default_year": DEFAULT_YEAR,
-        "note": "Data typically lags 2-3 years from current date."
+        "note": "Data typically lags 2-3 years from current date.",
     }
 
 
@@ -349,7 +343,7 @@ async def list_soi_datasets():
                 "description": "Income statistics aggregated by ZIP code and AGI bracket",
                 "endpoint": "/irs-soi/zip-income/ingest",
                 "table_name": "irs_soi_zip_income",
-                "available_years": AVAILABLE_YEARS["zip_income"]
+                "available_years": AVAILABLE_YEARS["zip_income"],
             },
             {
                 "id": "county_income",
@@ -357,7 +351,7 @@ async def list_soi_datasets():
                 "description": "Income statistics aggregated by county FIPS and AGI bracket",
                 "endpoint": "/irs-soi/county-income/ingest",
                 "table_name": "irs_soi_county_income",
-                "available_years": AVAILABLE_YEARS["county_income"]
+                "available_years": AVAILABLE_YEARS["county_income"],
             },
             {
                 "id": "migration",
@@ -365,7 +359,7 @@ async def list_soi_datasets():
                 "description": "Migration flows derived from tax return address changes",
                 "endpoint": "/irs-soi/migration/ingest",
                 "table_name": "irs_soi_migration",
-                "available_years": AVAILABLE_YEARS["migration"]
+                "available_years": AVAILABLE_YEARS["migration"],
             },
             {
                 "id": "business_income",
@@ -373,8 +367,8 @@ async def list_soi_datasets():
                 "description": "Business/self-employment income (Schedule C, partnerships, rental)",
                 "endpoint": "/irs-soi/business-income/ingest",
                 "table_name": "irs_soi_business_income",
-                "available_years": AVAILABLE_YEARS["business_income"]
-            }
+                "available_years": AVAILABLE_YEARS["business_income"],
+            },
         ],
-        "note": "No API key required for any IRS SOI data (public domain)"
+        "note": "No API key required for any IRS SOI data (public domain)",
     }

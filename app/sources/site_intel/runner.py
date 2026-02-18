@@ -3,6 +3,7 @@ Site Intelligence Platform - Collection Orchestrator.
 
 Coordinates data collection across all domains and sources.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional, Dict, Any, List, Type
@@ -28,9 +29,11 @@ COLLECTOR_REGISTRY: Dict[SiteIntelSource, Type[BaseCollector]] = {}
 
 def register_collector(source: SiteIntelSource):
     """Decorator to register a collector class."""
+
     def decorator(cls: Type[BaseCollector]):
         COLLECTOR_REGISTRY[source] = cls
         return cls
+
     return decorator
 
 
@@ -160,7 +163,9 @@ class SiteIntelOrchestrator:
                 self.db.rollback()
                 collector.complete_job(error_result)
             except Exception as job_err:
-                logger.error(f"Could not record job failure for {source.value}: {job_err}")
+                logger.error(
+                    f"Could not record job failure for {source.value}: {job_err}"
+                )
                 try:
                     self.db.rollback()
                 except Exception:
@@ -197,27 +202,37 @@ class SiteIntelOrchestrator:
 
         skipped = [s.value for s in domain_sources if s not in COLLECTOR_REGISTRY]
         if skipped:
-            logger.info(f"Skipping unregistered collectors for {domain.value}: {skipped}")
+            logger.info(
+                f"Skipping unregistered collectors for {domain.value}: {skipped}"
+            )
 
         # Publish domain_started SSE event
-        self._publish_event("domain_started", {
-            "domain": domain.value,
-            "sources": [s.value for s in registered_sources],
-            "total_sources": len(registered_sources),
-        })
+        self._publish_event(
+            "domain_started",
+            {
+                "domain": domain.value,
+                "sources": [s.value for s in registered_sources],
+                "total_sources": len(registered_sources),
+            },
+        )
 
         for source in registered_sources:
             result = await self.collect(domain, source, **kwargs)
             results[source] = result
 
         # Publish domain_completed SSE event
-        success_count = sum(1 for r in results.values() if r.status == CollectionStatus.SUCCESS)
-        self._publish_event("domain_completed", {
-            "domain": domain.value,
-            "total_sources": len(registered_sources),
-            "success": success_count,
-            "failed": len(registered_sources) - success_count,
-        })
+        success_count = sum(
+            1 for r in results.values() if r.status == CollectionStatus.SUCCESS
+        )
+        self._publish_event(
+            "domain_completed",
+            {
+                "domain": domain.value,
+                "total_sources": len(registered_sources),
+                "success": success_count,
+                "failed": len(registered_sources) - success_count,
+            },
+        )
 
         return results
 
@@ -255,6 +270,7 @@ class SiteIntelOrchestrator:
         """Publish an SSE event to the event bus (best-effort)."""
         try:
             from app.core.event_bus import EventBus
+
             EventBus.publish("collection_all", event_type, data)
         except Exception:
             pass
@@ -279,15 +295,13 @@ class SiteIntelOrchestrator:
         completed_domains = set()
 
         # Build adjacency: domain -> set of dependencies
-        dep_map = {
-            item["domain"]: set(item.get("depends_on", []))
-            for item in plan
-        }
+        dep_map = {item["domain"]: set(item.get("depends_on", [])) for item in plan}
 
         while len(completed_domains) < len(plan):
             # Find domains whose dependencies are all completed
             ready = [
-                d for d, deps in dep_map.items()
+                d
+                for d, deps in dep_map.items()
                 if d not in completed_domains and deps.issubset(completed_domains)
             ]
 
@@ -300,7 +314,9 @@ class SiteIntelOrchestrator:
             for domain_name in ready:
                 try:
                     domain = SiteIntelDomain(domain_name)
-                    domain_results = await self.collect_domain(domain, bridge_to_ingestion=True)
+                    domain_results = await self.collect_domain(
+                        domain, bridge_to_ingestion=True
+                    )
                     for source, result in domain_results.items():
                         results[f"{domain_name}/{source.value}"] = result
                 except Exception as e:
@@ -398,10 +414,12 @@ class SiteIntelOrchestrator:
         # Get recent job counts by status
         status_counts = dict(
             self.db.query(
-                SiteIntelCollectionJob.status,
-                func.count(SiteIntelCollectionJob.id)
+                SiteIntelCollectionJob.status, func.count(SiteIntelCollectionJob.id)
             )
-            .filter(SiteIntelCollectionJob.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0))
+            .filter(
+                SiteIntelCollectionJob.created_at
+                >= datetime.utcnow().replace(hour=0, minute=0, second=0)
+            )
             .group_by(SiteIntelCollectionJob.status)
             .all()
         )
@@ -419,7 +437,9 @@ class SiteIntelOrchestrator:
                 latest_by_domain[domain.value] = {
                     "status": latest.status,
                     "source": latest.source,
-                    "completed_at": latest.completed_at.isoformat() if latest.completed_at else None,
+                    "completed_at": latest.completed_at.isoformat()
+                    if latest.completed_at
+                    else None,
                     "inserted": latest.inserted_items,
                 }
 

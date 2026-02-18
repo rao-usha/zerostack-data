@@ -3,6 +3,7 @@ Portfolio Change Alerts API (T11).
 
 Endpoints for subscribing to investor portfolio alerts and managing notifications.
 """
+
 import logging
 from typing import List, Optional
 
@@ -25,30 +26,37 @@ router = APIRouter(prefix="/alerts", tags=["Portfolio Alerts"])
 
 class AlertSubscriptionRequest(BaseModel):
     """Request to subscribe to portfolio alerts."""
+
     investor_id: int = Field(..., description="Investor ID to watch")
     investor_type: str = Field(..., description="'lp' or 'family_office'")
     user_id: str = Field(..., description="Email or user identifier for notifications")
     change_types: List[str] = Field(
         default=["new_holding", "removed_holding"],
-        description="Types of changes to alert on: new_holding, removed_holding, value_change, shares_change"
+        description="Types of changes to alert on: new_holding, removed_holding, value_change, shares_change",
     )
     value_threshold_pct: float = Field(
         default=10.0,
         ge=0.1,
         le=100.0,
-        description="Minimum % change to trigger value/shares alerts"
+        description="Minimum % change to trigger value/shares alerts",
     )
 
 
 class AlertSubscriptionUpdate(BaseModel):
     """Request to update subscription settings."""
-    change_types: Optional[List[str]] = Field(None, description="Types of changes to alert on")
-    value_threshold_pct: Optional[float] = Field(None, ge=0.1, le=100.0, description="Minimum % change threshold")
+
+    change_types: Optional[List[str]] = Field(
+        None, description="Types of changes to alert on"
+    )
+    value_threshold_pct: Optional[float] = Field(
+        None, ge=0.1, le=100.0, description="Minimum % change threshold"
+    )
     is_active: Optional[bool] = Field(None, description="Enable/disable subscription")
 
 
 class AlertSubscriptionResponse(BaseModel):
     """Response for subscription operations."""
+
     id: int
     investor_id: int
     investor_type: str
@@ -63,6 +71,7 @@ class AlertSubscriptionResponse(BaseModel):
 
 class AlertResponse(BaseModel):
     """Response for a single alert."""
+
     id: int
     investor_id: int
     investor_type: str
@@ -78,6 +87,7 @@ class AlertResponse(BaseModel):
 
 class AlertListResponse(BaseModel):
     """Response for alert list."""
+
     total: int
     limit: int
     offset: int
@@ -86,6 +96,7 @@ class AlertListResponse(BaseModel):
 
 class SubscriptionListResponse(BaseModel):
     """Response for subscription list."""
+
     total: int
     subscriptions: List[AlertSubscriptionResponse]
 
@@ -97,8 +108,7 @@ class SubscriptionListResponse(BaseModel):
 
 @router.post("/subscribe", response_model=AlertSubscriptionResponse)
 async def subscribe_to_alerts(
-    request: AlertSubscriptionRequest,
-    db: Session = Depends(get_db)
+    request: AlertSubscriptionRequest, db: Session = Depends(get_db)
 ):
     """
     🔔 Subscribe to portfolio change alerts for an investor.
@@ -127,8 +137,7 @@ async def subscribe_to_alerts(
         # Validate investor_type
         if request.investor_type not in ("lp", "family_office"):
             raise HTTPException(
-                status_code=400,
-                detail="investor_type must be 'lp' or 'family_office'"
+                status_code=400, detail="investor_type must be 'lp' or 'family_office'"
             )
 
         # Validate change_types
@@ -137,7 +146,7 @@ async def subscribe_to_alerts(
             if ct not in valid_types:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid change_type '{ct}'. Valid types: {valid_types}"
+                    detail=f"Invalid change_type '{ct}'. Valid types: {valid_types}",
                 )
 
         engine = get_alert_engine(db)
@@ -178,8 +187,10 @@ async def subscribe_to_alerts(
 @router.get("/subscriptions", response_model=SubscriptionListResponse)
 async def list_subscriptions(
     user_id: str = Query(..., description="User ID to get subscriptions for"),
-    include_inactive: bool = Query(False, description="Include deactivated subscriptions"),
-    db: Session = Depends(get_db)
+    include_inactive: bool = Query(
+        False, description="Include deactivated subscriptions"
+    ),
+    db: Session = Depends(get_db),
 ):
     """
     📋 List all alert subscriptions for a user.
@@ -189,8 +200,7 @@ async def list_subscriptions(
     try:
         engine = get_alert_engine(db)
         subscriptions = await engine.get_user_subscriptions(
-            user_id=user_id,
-            include_inactive=include_inactive
+            user_id=user_id, include_inactive=include_inactive
         )
 
         return SubscriptionListResponse(
@@ -209,7 +219,7 @@ async def list_subscriptions(
                     updated_at=sub["updated_at"],
                 )
                 for sub in subscriptions
-            ]
+            ],
         )
 
     except Exception as e:
@@ -221,7 +231,7 @@ async def list_subscriptions(
 async def unsubscribe(
     subscription_id: int,
     user_id: str = Query(..., description="User ID for verification"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     🔕 Unsubscribe from alerts for an investor.
@@ -235,12 +245,12 @@ async def unsubscribe(
         if not success:
             raise HTTPException(
                 status_code=404,
-                detail=f"Subscription {subscription_id} not found or not owned by user"
+                detail=f"Subscription {subscription_id} not found or not owned by user",
             )
 
         return {
             "message": "Subscription deactivated",
-            "subscription_id": subscription_id
+            "subscription_id": subscription_id,
         }
 
     except HTTPException:
@@ -255,7 +265,7 @@ async def update_subscription(
     subscription_id: int,
     request: AlertSubscriptionUpdate,
     user_id: str = Query(..., description="User ID for verification"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     ✏️ Update subscription settings.
@@ -270,7 +280,7 @@ async def update_subscription(
                 if ct not in valid_types:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Invalid change_type '{ct}'. Valid types: {valid_types}"
+                        detail=f"Invalid change_type '{ct}'. Valid types: {valid_types}",
                     )
 
         engine = get_alert_engine(db)
@@ -285,13 +295,10 @@ async def update_subscription(
         if not result:
             raise HTTPException(
                 status_code=404,
-                detail=f"Subscription {subscription_id} not found or not owned by user"
+                detail=f"Subscription {subscription_id} not found or not owned by user",
             )
 
-        return {
-            "message": "Subscription updated",
-            **result
-        }
+        return {"message": "Subscription updated", **result}
 
     except HTTPException:
         raise
@@ -305,7 +312,7 @@ async def get_pending_alerts(
     user_id: str = Query(..., description="User ID to get alerts for"),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     🔔 Get pending alerts for a user.
@@ -315,16 +322,14 @@ async def get_pending_alerts(
     try:
         engine = get_alert_engine(db)
         alerts, total = await engine.get_pending_alerts(
-            user_id=user_id,
-            limit=limit,
-            offset=offset
+            user_id=user_id, limit=limit, offset=offset
         )
 
         return AlertListResponse(
             total=total,
             limit=limit,
             offset=offset,
-            alerts=[AlertResponse(**alert) for alert in alerts]
+            alerts=[AlertResponse(**alert) for alert in alerts],
         )
 
     except Exception as e:
@@ -336,7 +341,7 @@ async def get_pending_alerts(
 async def acknowledge_alert(
     alert_id: int,
     user_id: str = Query(..., description="User ID for verification"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     ✅ Acknowledge (dismiss) an alert.
@@ -350,13 +355,10 @@ async def acknowledge_alert(
         if not success:
             raise HTTPException(
                 status_code=404,
-                detail=f"Alert {alert_id} not found, already acknowledged, or not owned by user"
+                detail=f"Alert {alert_id} not found, already acknowledged, or not owned by user",
             )
 
-        return {
-            "message": "Alert acknowledged",
-            "alert_id": alert_id
-        }
+        return {"message": "Alert acknowledged", "alert_id": alert_id}
 
     except HTTPException:
         raise
@@ -368,7 +370,7 @@ async def acknowledge_alert(
 @router.post("/acknowledge-all")
 async def acknowledge_all_alerts(
     user_id: str = Query(..., description="User ID to acknowledge alerts for"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     ✅ Acknowledge all pending alerts for a user.
@@ -379,10 +381,7 @@ async def acknowledge_all_alerts(
         engine = get_alert_engine(db)
         count = await engine.acknowledge_all_alerts(user_id)
 
-        return {
-            "message": f"Acknowledged {count} alerts",
-            "acknowledged_count": count
-        }
+        return {"message": f"Acknowledged {count} alerts", "acknowledged_count": count}
 
     except Exception as e:
         logger.error(f"Error acknowledging all alerts: {e}", exc_info=True)
@@ -396,7 +395,7 @@ async def get_alert_history(
     investor_type: Optional[str] = Query(None, description="Filter by investor type"),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     📜 Get alert history for a user.
@@ -417,7 +416,7 @@ async def get_alert_history(
             total=total,
             limit=limit,
             offset=offset,
-            alerts=[AlertResponse(**alert) for alert in alerts]
+            alerts=[AlertResponse(**alert) for alert in alerts],
         )
 
     except Exception as e:
@@ -431,9 +430,7 @@ async def get_alert_history(
 
 
 async def _get_investor_name(
-    db: Session,
-    investor_id: int,
-    investor_type: str
+    db: Session, investor_id: int, investor_type: str
 ) -> Optional[str]:
     """Get investor name from database."""
     from sqlalchemy import text

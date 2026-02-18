@@ -1,4 +1,5 @@
 """People collection executor for the worker queue."""
+
 import logging
 
 from sqlalchemy.orm import Session
@@ -20,12 +21,16 @@ async def execute(job: JobQueue, db: Session):
     job.progress_pct = 10.0
     job.progress_message = "Processing pending people collection jobs"
     db.commit()
-    send_job_event(db, "job_progress", {
-        "job_id": job.id,
-        "job_type": "people",
-        "progress_pct": 10.0,
-        "progress_message": "Processing pending jobs",
-    })
+    send_job_event(
+        db,
+        "job_progress",
+        {
+            "job_id": job.id,
+            "job_type": "people",
+            "progress_pct": 10.0,
+            "progress_message": "Processing pending jobs",
+        },
+    )
     db.commit()
 
     # Use a fresh session

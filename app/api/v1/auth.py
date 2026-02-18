@@ -16,6 +16,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 # Request/Response Models
 
+
 class RegisterRequest(BaseModel):
     email: EmailStr = Field(..., description="User email address")
     password: str = Field(..., min_length=8, description="Password (min 8 characters)")
@@ -33,7 +34,9 @@ class UpdateProfileRequest(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     old_password: str = Field(..., description="Current password")
-    new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
+    new_password: str = Field(
+        ..., min_length=8, description="New password (min 8 characters)"
+    )
 
 
 class PasswordResetRequest(BaseModel):
@@ -50,6 +53,7 @@ class RefreshTokenRequest(BaseModel):
 
 
 # Helper to extract token from header
+
 
 def get_current_user(authorization: Optional[str] = Header(None)):
     """Extract and validate JWT token from Authorization header."""
@@ -74,6 +78,7 @@ def get_current_user(authorization: Optional[str] = Header(None)):
 
 # Endpoints
 
+
 @router.post("/register")
 def register(request: RegisterRequest):
     """Register a new user account."""
@@ -81,9 +86,7 @@ def register(request: RegisterRequest):
     try:
         auth_service = AuthService(db)
         result = auth_service.register(
-            email=request.email,
-            password=request.password,
-            name=request.name
+            email=request.email, password=request.password, name=request.name
         )
         return result
     except ValueError as e:
@@ -98,10 +101,7 @@ def login(request: LoginRequest):
     db = next(get_db())
     try:
         auth_service = AuthService(db)
-        result = auth_service.login(
-            email=request.email,
-            password=request.password
-        )
+        result = auth_service.login(email=request.email, password=request.password)
         return result
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
@@ -150,7 +150,9 @@ def get_current_user_profile(current_user: dict = Depends(get_current_user)):
 
 
 @router.patch("/me")
-def update_profile(request: UpdateProfileRequest, current_user: dict = Depends(get_current_user)):
+def update_profile(
+    request: UpdateProfileRequest, current_user: dict = Depends(get_current_user)
+):
     """Update current user's profile."""
     db = next(get_db())
     try:
@@ -168,7 +170,9 @@ def update_profile(request: UpdateProfileRequest, current_user: dict = Depends(g
 
 
 @router.post("/password/change")
-def change_password(request: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
+def change_password(
+    request: ChangePasswordRequest, current_user: dict = Depends(get_current_user)
+):
     """Change current user's password."""
     db = next(get_db())
     try:
@@ -176,7 +180,7 @@ def change_password(request: ChangePasswordRequest, current_user: dict = Depends
         auth_service.change_password(
             user_id=current_user["user_id"],
             old_password=request.old_password,
-            new_password=request.new_password
+            new_password=request.new_password,
         )
         return {"message": "Password changed successfully"}
     except ValueError as e:
@@ -195,9 +199,7 @@ def request_password_reset(request: PasswordResetRequest):
 
         # Always return success to not reveal if email exists
         # Token is logged server-side only; in production, send via email
-        return {
-            "message": "If the email exists, a reset link has been sent"
-        }
+        return {"message": "If the email exists, a reset link has been sent"}
     finally:
         db.close()
 
@@ -209,8 +211,7 @@ def reset_password(request: PasswordResetConfirm):
     try:
         auth_service = AuthService(db)
         auth_service.reset_password(
-            token=request.token,
-            new_password=request.new_password
+            token=request.token, new_password=request.new_password
         )
         return {"message": "Password reset successfully"}
     except ValueError as e:

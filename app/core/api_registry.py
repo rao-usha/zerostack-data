@@ -9,6 +9,7 @@ Consolidates all API-specific settings in one place:
 
 This eliminates magic strings scattered across client files.
 """
+
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
 from enum import Enum
@@ -16,6 +17,7 @@ from enum import Enum
 
 class APIKeyRequirement(Enum):
     """Whether an API key is required, recommended, or not needed."""
+
     REQUIRED = "required"
     RECOMMENDED = "recommended"
     OPTIONAL = "optional"
@@ -24,6 +26,7 @@ class APIKeyRequirement(Enum):
 @dataclass
 class APIConfig:
     """Configuration for a single external API."""
+
     source_name: str
     base_url: str
     api_key_requirement: APIKeyRequirement
@@ -68,9 +71,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="https://fred.stlouisfed.org/docs/api/api_key.html",
         max_concurrency=2,
         rate_limit_per_minute=120,
-        notes="With key: 120 req/min. Without: limited and throttled."
+        notes="With key: 120 req/min. Without: limited and throttled.",
     ),
-
     "bea": APIConfig(
         source_name="bea",
         base_url="https://apps.bea.gov/api/data",
@@ -79,9 +81,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="https://apps.bea.gov/api/signup/",
         max_concurrency=2,
         rate_limit_per_minute=100,
-        notes="100 req/min, 100 MB/min limit"
+        notes="100 req/min, 100 MB/min limit",
     ),
-
     "bls": APIConfig(
         source_name="bls",
         base_url="https://api.bls.gov/publicAPI/v2/timeseries/data/",
@@ -90,9 +91,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="https://data.bls.gov/registrationEngine/",
         max_concurrency=2,
         rate_limit_interval=0.5,  # 2 req/sec to be safe
-        notes="Without key: 25 queries/day, 10 years. With key: 500/day, 20 years."
+        notes="Without key: 25 queries/day, 10 years. With key: 500/day, 20 years.",
     ),
-
     # -------------------------------------------------------------------------
     # ENERGY DATA
     # -------------------------------------------------------------------------
@@ -105,9 +105,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         max_concurrency=2,
         rate_limit_per_minute=83,  # 5000/hour = ~83/min
         timeout_seconds=60.0,
-        notes="5,000 requests/hour with API key"
+        notes="5,000 requests/hour with API key",
     ),
-
     # -------------------------------------------------------------------------
     # CENSUS & DEMOGRAPHICS
     # -------------------------------------------------------------------------
@@ -119,9 +118,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="https://api.census.gov/data/key_signup.html",
         max_concurrency=4,
         rate_limit_interval=0.2,  # 5 req/sec
-        notes="Required for production use"
+        notes="Required for production use",
     ),
-
     # -------------------------------------------------------------------------
     # WEATHER
     # -------------------------------------------------------------------------
@@ -134,9 +132,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         max_concurrency=2,
         rate_limit_per_minute=5,  # Very low limit
         timeout_seconds=60.0,
-        notes="5 requests/second, 10,000/day limit"
+        notes="5 requests/second, 10,000/day limit",
     ),
-
     # -------------------------------------------------------------------------
     # SEC / FINANCIAL
     # -------------------------------------------------------------------------
@@ -149,9 +146,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         max_concurrency=2,
         rate_limit_per_minute=10,  # SEC is strict
         timeout_seconds=60.0,
-        notes="No key required. 10 req/sec max. Must set User-Agent."
+        notes="No key required. 10 req/sec max. Must set User-Agent.",
     ),
-
     # -------------------------------------------------------------------------
     # TRANSPORTATION
     # -------------------------------------------------------------------------
@@ -163,9 +159,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="https://data.transportation.gov/profile/edit/developer_settings",
         max_concurrency=2,
         rate_limit_per_minute=60,
-        notes="Without token: ~1000/hr. With token: ~4000/hr."
+        notes="Without token: ~1000/hr. With token: ~4000/hr.",
     ),
-
     # -------------------------------------------------------------------------
     # CRIME DATA
     # -------------------------------------------------------------------------
@@ -177,9 +172,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="https://api.data.gov/signup/",
         max_concurrency=2,
         rate_limit_per_minute=60,
-        notes="Uses data.gov API key"
+        notes="Uses data.gov API key",
     ),
-
     # -------------------------------------------------------------------------
     # DISASTER / FEMA
     # -------------------------------------------------------------------------
@@ -192,9 +186,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         max_concurrency=2,
         rate_limit_per_minute=60,
         timeout_seconds=60.0,
-        notes="No key required. OpenFEMA API."
+        notes="No key required. OpenFEMA API.",
     ),
-
     # -------------------------------------------------------------------------
     # BANKING / FDIC
     # -------------------------------------------------------------------------
@@ -206,9 +199,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="",
         max_concurrency=2,
         rate_limit_per_minute=60,
-        notes="No key required. BankFind API."
+        notes="No key required. BankFind API.",
     ),
-
     # -------------------------------------------------------------------------
     # TREASURY
     # -------------------------------------------------------------------------
@@ -220,9 +212,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="",
         max_concurrency=2,
         rate_limit_per_minute=60,
-        notes="No key required. FiscalData API."
+        notes="No key required. FiscalData API.",
     ),
-
     # -------------------------------------------------------------------------
     # CFTC
     # -------------------------------------------------------------------------
@@ -234,9 +225,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="",
         max_concurrency=2,
         rate_limit_per_minute=30,
-        notes="Socrata-based API. No key required but rate limited."
+        notes="Socrata-based API. No key required but rate limited.",
     ),
-
     # -------------------------------------------------------------------------
     # INTERNATIONAL
     # -------------------------------------------------------------------------
@@ -248,9 +238,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="",
         max_concurrency=2,
         rate_limit_per_minute=60,
-        notes="No key required. Returns XML by default, add format=json."
+        notes="No key required. Returns XML by default, add format=json.",
     ),
-
     "oecd": APIConfig(
         source_name="oecd",
         base_url="https://sdmx.oecd.org/public/rest",
@@ -260,9 +249,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         max_concurrency=2,
         rate_limit_per_minute=30,
         timeout_seconds=120.0,  # OECD can be slow
-        notes="SDMX format API. No key required."
+        notes="SDMX format API. No key required.",
     ),
-
     # -------------------------------------------------------------------------
     # AGRICULTURE
     # -------------------------------------------------------------------------
@@ -274,9 +262,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="https://quickstats.nass.usda.gov/api",
         max_concurrency=2,
         rate_limit_per_minute=30,
-        notes="NASS QuickStats API"
+        notes="NASS QuickStats API",
     ),
-
     # -------------------------------------------------------------------------
     # BROADBAND / FCC
     # -------------------------------------------------------------------------
@@ -288,9 +275,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="",
         max_concurrency=2,
         rate_limit_per_minute=60,
-        notes="No key required. FCC Broadband Map API."
+        notes="No key required. FCC Broadband Map API.",
     ),
-
     # -------------------------------------------------------------------------
     # TAX / IRS
     # -------------------------------------------------------------------------
@@ -302,9 +288,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="",
         max_concurrency=2,
         rate_limit_per_minute=10,
-        notes="File downloads, not true API. Rate limit accordingly."
+        notes="File downloads, not true API. Rate limit accordingly.",
     ),
-
     # -------------------------------------------------------------------------
     # DATA AGGREGATORS
     # -------------------------------------------------------------------------
@@ -316,9 +301,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="https://console.cloud.google.com/apis/credentials",
         max_concurrency=2,
         rate_limit_per_minute=60,
-        notes="Google Data Commons. Optional key for higher limits."
+        notes="Google Data Commons. Optional key for higher limits.",
     ),
-
     # -------------------------------------------------------------------------
     # BUSINESS / LOCAL
     # -------------------------------------------------------------------------
@@ -330,9 +314,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="https://www.yelp.com/developers/v3/manage_app",
         max_concurrency=2,
         rate_limit_per_minute=300,  # 500 calls/day = spread over 8 hours
-        notes="Free tier: 500 calls/day"
+        notes="Free tier: 500 calls/day",
     ),
-
     # -------------------------------------------------------------------------
     # KAGGLE
     # -------------------------------------------------------------------------
@@ -344,9 +327,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="https://www.kaggle.com/account",
         max_concurrency=2,
         rate_limit_per_minute=30,
-        notes="Download datasets. Uses kaggle library."
+        notes="Download datasets. Uses kaggle library.",
     ),
-
     # -------------------------------------------------------------------------
     # FOOT TRAFFIC
     # -------------------------------------------------------------------------
@@ -358,9 +340,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="https://www.safegraph.com/",
         max_concurrency=2,
         rate_limit_per_minute=60,
-        notes="$100-500/month. Weekly foot traffic patterns."
+        notes="$100-500/month. Weekly foot traffic patterns.",
     ),
-
     "placer": APIConfig(
         source_name="placer",
         base_url="https://api.placer.ai",
@@ -369,9 +350,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="https://www.placer.ai/",
         max_concurrency=2,
         rate_limit_per_minute=30,
-        notes="Enterprise pricing. Retail analytics."
+        notes="Enterprise pricing. Retail analytics.",
     ),
-
     "foursquare": APIConfig(
         source_name="foursquare",
         base_url="https://api.foursquare.com/v3",
@@ -380,9 +360,8 @@ API_REGISTRY: Dict[str, APIConfig] = {
         signup_url="https://developer.foursquare.com/",
         max_concurrency=2,
         rate_limit_per_minute=100,
-        notes="POI data. Free tier available."
+        notes="POI data. Free tier available.",
     ),
-
     # -------------------------------------------------------------------------
     # PATENTS
     # -------------------------------------------------------------------------
@@ -395,7 +374,7 @@ API_REGISTRY: Dict[str, APIConfig] = {
         max_concurrency=2,
         rate_limit_per_minute=45,
         timeout_seconds=60.0,
-        notes="PatentsView API. 45 req/min, max 1000 records/request. Free API key required."
+        notes="PatentsView API. 45 req/min, max 1000 records/request. Free API key required.",
     ),
 }
 
@@ -417,8 +396,7 @@ def get_api_config(source: str) -> APIConfig:
     if source_lower not in API_REGISTRY:
         available = ", ".join(sorted(API_REGISTRY.keys()))
         raise KeyError(
-            f"Unknown API source: {source}. "
-            f"Available sources: {available}"
+            f"Unknown API source: {source}. " f"Available sources: {available}"
         )
     return API_REGISTRY[source_lower]
 
@@ -430,7 +408,10 @@ def get_all_sources() -> list[str]:
 
 def get_sources_by_requirement(requirement: APIKeyRequirement) -> list[str]:
     """Get list of sources with a specific key requirement."""
-    return sorted([
-        name for name, config in API_REGISTRY.items()
-        if config.api_key_requirement == requirement
-    ])
+    return sorted(
+        [
+            name
+            for name, config in API_REGISTRY.items()
+            if config.api_key_requirement == requirement
+        ]
+    )

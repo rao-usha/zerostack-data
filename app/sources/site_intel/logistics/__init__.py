@@ -20,14 +20,24 @@ from app.sources.site_intel.logistics.fmcsa_collector import FMCSACollector
 from app.sources.site_intel.logistics.freightos_collector import FreightosCollector
 from app.sources.site_intel.logistics.drewry_collector import DrewryCollector
 from app.sources.site_intel.logistics.scfi_collector import SCFICollector
-from app.sources.site_intel.logistics.port_throughput_collector import PortThroughputCollector
+from app.sources.site_intel.logistics.port_throughput_collector import (
+    PortThroughputCollector,
+)
 from app.sources.site_intel.logistics.air_cargo_collector import AirCargoCollector
 from app.sources.site_intel.logistics.census_trade_collector import CensusTradeCollector
-from app.sources.site_intel.logistics.warehouse_listing_collector import WarehouseListingCollector
+from app.sources.site_intel.logistics.warehouse_listing_collector import (
+    WarehouseListingCollector,
+)
 from app.sources.site_intel.logistics.three_pl_collector import ThreePLCollector
-from app.sources.site_intel.logistics.three_pl_website_enrichment import ThreePLWebsiteEnrichmentCollector
-from app.sources.site_intel.logistics.three_pl_sec_enrichment import ThreePLSECEnrichmentCollector
-from app.sources.site_intel.logistics.three_pl_fmcsa_enrichment import ThreePLFMCSAEnrichmentCollector
+from app.sources.site_intel.logistics.three_pl_website_enrichment import (
+    ThreePLWebsiteEnrichmentCollector,
+)
+from app.sources.site_intel.logistics.three_pl_sec_enrichment import (
+    ThreePLSECEnrichmentCollector,
+)
+from app.sources.site_intel.logistics.three_pl_fmcsa_enrichment import (
+    ThreePLFMCSAEnrichmentCollector,
+)
 
 __all__ = [
     "UsdaTruckCollector",

@@ -10,6 +10,7 @@ When WORKER_MODE is enabled:
 When WORKER_MODE is disabled (default):
     Falls back to FastAPI BackgroundTasks (existing behavior).
 """
+
 import logging
 import os
 from datetime import datetime, timedelta
@@ -66,9 +67,7 @@ def submit_job(
         db.commit()
         db.refresh(job)
 
-        logger.info(
-            f"Job queued: id={job.id} type={job_type} priority={priority}"
-        )
+        logger.info(f"Job queued: id={job.id} type={job_type} priority={priority}")
         return {"mode": "queued", "job_queue_id": job.id}
 
     else:
@@ -103,10 +102,12 @@ def reset_stale_jobs(max_age_minutes: int = 2) -> int:
         stale = (
             db.query(JobQueue)
             .filter(
-                JobQueue.status.in_([
-                    QueueJobStatus.CLAIMED,
-                    QueueJobStatus.RUNNING,
-                ]),
+                JobQueue.status.in_(
+                    [
+                        QueueJobStatus.CLAIMED,
+                        QueueJobStatus.RUNNING,
+                    ]
+                ),
                 JobQueue.heartbeat_at < cutoff,
             )
             .all()

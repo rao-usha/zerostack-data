@@ -3,6 +3,7 @@ Site Intelligence Platform - Incentives & Real Estate API.
 
 Endpoints for Opportunity Zones, FTZ, incentive programs, and industrial sites.
 """
+
 import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, Query
@@ -12,8 +13,12 @@ from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.models_site_intel import (
-    OpportunityZone, ForeignTradeZone, IncentiveProgram,
-    IncentiveDeal, IndustrialSite, ZoningDistrict,
+    OpportunityZone,
+    ForeignTradeZone,
+    IncentiveProgram,
+    IncentiveDeal,
+    IndustrialSite,
+    ZoningDistrict,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,6 +29,7 @@ router = APIRouter(prefix="/site-intel/incentives", tags=["Site Intel - Incentiv
 # =============================================================================
 # OPPORTUNITY ZONE ENDPOINTS
 # =============================================================================
+
 
 @router.get("/opportunity-zones")
 async def search_opportunity_zones(
@@ -49,7 +55,9 @@ async def search_opportunity_zones(
             "state": z.state,
             "county": z.county,
             "is_low_income": z.is_low_income,
-            "designation_date": z.designation_date.isoformat() if z.designation_date else None,
+            "designation_date": z.designation_date.isoformat()
+            if z.designation_date
+            else None,
         }
         for z in zones
     ]
@@ -75,14 +83,15 @@ async def check_opportunity_zone_at_location(
         "benefits": [
             "Temporary tax deferral on prior capital gains",
             "Step-up in basis for gains held 5+ years",
-            "Permanent exclusion of gains on OZ investments held 10+ years"
-        ]
+            "Permanent exclusion of gains on OZ investments held 10+ years",
+        ],
     }
 
 
 # =============================================================================
 # FOREIGN TRADE ZONE ENDPOINTS
 # =============================================================================
+
 
 @router.get("/ftz")
 async def search_foreign_trade_zones(
@@ -132,14 +141,15 @@ async def find_nearby_ftz(
     FTZ provides duty deferral, reduction, and elimination benefits.
     """
     distance_expr = (
-        3959 * func.acos(
-            func.cos(func.radians(lat)) *
-            func.cos(func.radians(ForeignTradeZone.latitude)) *
-            func.cos(func.radians(ForeignTradeZone.longitude) - func.radians(lng)) +
-            func.sin(func.radians(lat)) *
-            func.sin(func.radians(ForeignTradeZone.latitude))
+        3959
+        * func.acos(
+            func.cos(func.radians(lat))
+            * func.cos(func.radians(ForeignTradeZone.latitude))
+            * func.cos(func.radians(ForeignTradeZone.longitude) - func.radians(lng))
+            + func.sin(func.radians(lat))
+            * func.sin(func.radians(ForeignTradeZone.latitude))
         )
-    ).label('distance_miles')
+    ).label("distance_miles")
 
     query = db.query(ForeignTradeZone, distance_expr).filter(
         ForeignTradeZone.latitude.isnot(None),
@@ -150,19 +160,21 @@ async def find_nearby_ftz(
         ForeignTradeZone.latitude.between(lat - lat_range, lat + lat_range),
     )
 
-    results = query.order_by('distance_miles').limit(limit * 2).all()
+    results = query.order_by("distance_miles").limit(limit * 2).all()
 
     ftzs = []
     for ftz, distance in results:
         if distance and distance <= radius_miles:
-            ftzs.append({
-                "ftz_number": ftz.ftz_number,
-                "zone_name": ftz.zone_name,
-                "grantee": ftz.grantee,
-                "city": ftz.city,
-                "state": ftz.state,
-                "distance_miles": round(distance, 2),
-            })
+            ftzs.append(
+                {
+                    "ftz_number": ftz.ftz_number,
+                    "zone_name": ftz.zone_name,
+                    "grantee": ftz.grantee,
+                    "city": ftz.city,
+                    "state": ftz.state,
+                    "distance_miles": round(distance, 2),
+                }
+            )
             if len(ftzs) >= limit:
                 break
 
@@ -173,8 +185,8 @@ async def find_nearby_ftz(
             "Defer, reduce, or eliminate customs duties",
             "No duties on re-exported goods",
             "Inverted tariff benefits",
-            "Weekly customs entry vs per-shipment"
-        ]
+            "Weekly customs entry vs per-shipment",
+        ],
     }
 
 
@@ -182,11 +194,16 @@ async def find_nearby_ftz(
 # INCENTIVE PROGRAM ENDPOINTS
 # =============================================================================
 
+
 @router.get("/programs")
 async def search_incentive_programs(
     state: Optional[str] = Query(None),
-    program_type: Optional[str] = Query(None, description="Type: tax_credit, grant, abatement, financing"),
-    target: Optional[str] = Query(None, description="Target: data_center, manufacturing, warehouse"),
+    program_type: Optional[str] = Query(
+        None, description="Type: tax_credit, grant, abatement, financing"
+    ),
+    target: Optional[str] = Query(
+        None, description="Target: data_center, manufacturing, warehouse"
+    ),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
@@ -215,7 +232,9 @@ async def search_incentive_programs(
             "min_investment": p.min_investment,
             "min_jobs": p.min_jobs,
             "max_benefit": p.max_benefit,
-            "description": p.description[:200] + "..." if p.description and len(p.description) > 200 else p.description,
+            "description": p.description[:200] + "..."
+            if p.description and len(p.description) > 200
+            else p.description,
         }
         for p in programs
     ]
@@ -227,21 +246,23 @@ async def get_state_incentives(
     db: Session = Depends(get_db),
 ):
     """Get all incentive programs for a state."""
-    programs = db.query(IncentiveProgram).filter(
-        IncentiveProgram.state == state.upper()
-    ).all()
+    programs = (
+        db.query(IncentiveProgram).filter(IncentiveProgram.state == state.upper()).all()
+    )
 
     by_type = {}
     for p in programs:
         ptype = p.program_type or "other"
         if ptype not in by_type:
             by_type[ptype] = []
-        by_type[ptype].append({
-            "program_name": p.program_name,
-            "max_benefit": p.max_benefit,
-            "min_investment": p.min_investment,
-            "min_jobs": p.min_jobs,
-        })
+        by_type[ptype].append(
+            {
+                "program_name": p.program_name,
+                "max_benefit": p.max_benefit,
+                "min_investment": p.min_investment,
+                "min_jobs": p.min_jobs,
+            }
+        )
 
     return {
         "state": state.upper(),
@@ -253,6 +274,7 @@ async def get_state_incentives(
 # =============================================================================
 # INCENTIVE DEALS ENDPOINTS
 # =============================================================================
+
 
 @router.get("/deals")
 async def search_incentive_deals(
@@ -313,10 +335,14 @@ async def benchmark_incentive_deals(
 
     Shows typical deal sizes and terms for negotiation context.
     """
-    deals = db.query(IncentiveDeal).filter(
-        IncentiveDeal.industry.ilike(f"%{industry}%"),
-        IncentiveDeal.subsidy_value.isnot(None),
-    ).all()
+    deals = (
+        db.query(IncentiveDeal)
+        .filter(
+            IncentiveDeal.industry.ilike(f"%{industry}%"),
+            IncentiveDeal.subsidy_value.isnot(None),
+        )
+        .all()
+    )
 
     if not deals:
         return {"industry": industry, "deals_found": 0}
@@ -329,16 +355,18 @@ async def benchmark_incentive_deals(
         "industry": industry,
         "deals_analyzed": len(deals),
         "subsidy_value": {
-            "median": sorted(values)[len(values)//2] if values else None,
+            "median": sorted(values)[len(values) // 2] if values else None,
             "average": sum(values) / len(values) if values else None,
             "max": max(values) if values else None,
         },
         "jobs_announced": {
-            "median": sorted(jobs)[len(jobs)//2] if jobs else None,
+            "median": sorted(jobs)[len(jobs) // 2] if jobs else None,
             "average": sum(jobs) / len(jobs) if jobs else None,
         },
         "subsidy_per_job": {
-            "average": sum(values) / sum(jobs) if values and jobs and sum(jobs) > 0 else None,
+            "average": sum(values) / sum(jobs)
+            if values and jobs and sum(jobs) > 0
+            else None,
         },
         "top_states": list(set(d.state for d in deals[:20])),
     }
@@ -348,10 +376,13 @@ async def benchmark_incentive_deals(
 # INDUSTRIAL SITE ENDPOINTS
 # =============================================================================
 
+
 @router.get("/sites")
 async def search_industrial_sites(
     state: Optional[str] = Query(None),
-    site_type: Optional[str] = Query(None, description="Type: greenfield, building, spec_building"),
+    site_type: Optional[str] = Query(
+        None, description="Type: greenfield, building, spec_building"
+    ),
     min_acreage: Optional[float] = Query(None),
     rail_served: Optional[bool] = Query(None),
     limit: int = Query(50, ge=1, le=200),
@@ -400,14 +431,15 @@ async def find_nearby_industrial_sites(
 ):
     """Find industrial sites within radius."""
     distance_expr = (
-        3959 * func.acos(
-            func.cos(func.radians(lat)) *
-            func.cos(func.radians(IndustrialSite.latitude)) *
-            func.cos(func.radians(IndustrialSite.longitude) - func.radians(lng)) +
-            func.sin(func.radians(lat)) *
-            func.sin(func.radians(IndustrialSite.latitude))
+        3959
+        * func.acos(
+            func.cos(func.radians(lat))
+            * func.cos(func.radians(IndustrialSite.latitude))
+            * func.cos(func.radians(IndustrialSite.longitude) - func.radians(lng))
+            + func.sin(func.radians(lat))
+            * func.sin(func.radians(IndustrialSite.latitude))
         )
-    ).label('distance_miles')
+    ).label("distance_miles")
 
     query = db.query(IndustrialSite, distance_expr).filter(
         IndustrialSite.latitude.isnot(None),
@@ -418,20 +450,22 @@ async def find_nearby_industrial_sites(
         IndustrialSite.latitude.between(lat - lat_range, lat + lat_range),
     )
 
-    results = query.order_by('distance_miles').limit(limit * 2).all()
+    results = query.order_by("distance_miles").limit(limit * 2).all()
 
     sites = []
     for site, distance in results:
         if distance and distance <= radius_miles:
-            sites.append({
-                "id": site.id,
-                "site_name": site.site_name,
-                "site_type": site.site_type,
-                "city": site.city,
-                "state": site.state,
-                "acreage": float(site.acreage) if site.acreage else None,
-                "distance_miles": round(distance, 2),
-            })
+            sites.append(
+                {
+                    "id": site.id,
+                    "site_name": site.site_name,
+                    "site_type": site.site_type,
+                    "city": site.city,
+                    "state": site.state,
+                    "acreage": float(site.acreage) if site.acreage else None,
+                    "distance_miles": round(distance, 2),
+                }
+            )
             if len(sites) >= limit:
                 break
 
@@ -441,6 +475,7 @@ async def find_nearby_industrial_sites(
 # =============================================================================
 # ZONING ENDPOINTS
 # =============================================================================
+
 
 @router.get("/zoning/at-location")
 async def get_zoning_at_location(
@@ -457,7 +492,7 @@ async def get_zoning_at_location(
         "location": {"latitude": lat, "longitude": lng},
         "zoning": None,
         "note": "Full zoning lookup requires PostGIS or local jurisdiction API",
-        "recommendation": "Check with local planning department for official zoning determination"
+        "recommendation": "Check with local planning department for official zoning determination",
     }
 
 
@@ -484,5 +519,5 @@ async def get_incentives_summary(db: Session = Depends(get_db)):
             "/site-intel/incentives/deals/benchmark",
             "/site-intel/incentives/sites",
             "/site-intel/incentives/sites/nearby",
-        ]
+        ],
     }

@@ -51,34 +51,50 @@ class AnalyticsService:
         total_companies = len(company_ids)
 
         # Total executives
-        total_executives = self.db.query(CompanyPerson).filter(
-            CompanyPerson.company_id.in_(company_ids),
-            CompanyPerson.is_current == True,
-        ).count()
+        total_executives = (
+            self.db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.company_id.in_(company_ids),
+                CompanyPerson.is_current == True,
+            )
+            .count()
+        )
 
         # C-suite count
-        c_suite_count = self.db.query(CompanyPerson).filter(
-            CompanyPerson.company_id.in_(company_ids),
-            CompanyPerson.is_current == True,
-            CompanyPerson.title_level == "c_suite",
-        ).count()
+        c_suite_count = (
+            self.db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.company_id.in_(company_ids),
+                CompanyPerson.is_current == True,
+                CompanyPerson.title_level == "c_suite",
+            )
+            .count()
+        )
 
         # Board members
-        board_count = self.db.query(CompanyPerson).filter(
-            CompanyPerson.company_id.in_(company_ids),
-            CompanyPerson.is_current == True,
-            CompanyPerson.is_board_member == True,
-        ).count()
+        board_count = (
+            self.db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.company_id.in_(company_ids),
+                CompanyPerson.is_current == True,
+                CompanyPerson.is_board_member == True,
+            )
+            .count()
+        )
 
         # Changes in period
         cutoff_date = date.today() - timedelta(days=days)
-        changes = self.db.query(LeadershipChange).filter(
-            LeadershipChange.company_id.in_(company_ids),
-            or_(
-                LeadershipChange.announced_date >= cutoff_date,
-                LeadershipChange.effective_date >= cutoff_date,
-            ),
-        ).all()
+        changes = (
+            self.db.query(LeadershipChange)
+            .filter(
+                LeadershipChange.company_id.in_(company_ids),
+                or_(
+                    LeadershipChange.announced_date >= cutoff_date,
+                    LeadershipChange.effective_date >= cutoff_date,
+                ),
+            )
+            .all()
+        )
 
         # Changes by type
         changes_by_type = defaultdict(int)
@@ -105,12 +121,14 @@ class AnalyticsService:
             if count >= 3:
                 company = self.db.get(IndustrialCompany, company_id)
                 if company:
-                    instability_flags.append({
-                        "company_id": company_id,
-                        "company_name": company.name,
-                        "c_suite_changes": count,
-                        "flag": "high_turnover",
-                    })
+                    instability_flags.append(
+                        {
+                            "company_id": company_id,
+                            "company_name": company.name,
+                            "c_suite_changes": count,
+                            "flag": "high_turnover",
+                        }
+                    )
 
         return {
             "industry": industry or "all",
@@ -151,12 +169,16 @@ class AnalyticsService:
     def _calculate_tenure_stats(self, company_ids: List[int]) -> Dict[str, float]:
         """Calculate average tenure for C-suite roles."""
         # Get current C-suite with start dates
-        c_suite = self.db.query(CompanyPerson).filter(
-            CompanyPerson.company_id.in_(company_ids),
-            CompanyPerson.is_current == True,
-            CompanyPerson.title_level == "c_suite",
-            CompanyPerson.start_date.isnot(None),
-        ).all()
+        c_suite = (
+            self.db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.company_id.in_(company_ids),
+                CompanyPerson.is_current == True,
+                CompanyPerson.title_level == "c_suite",
+                CompanyPerson.start_date.isnot(None),
+            )
+            .all()
+        )
 
         ceo_tenures = []
         cfo_tenures = []
@@ -175,9 +197,15 @@ class AnalyticsService:
                     cfo_tenures.append(months)
 
         return {
-            "ceo_avg": round(sum(ceo_tenures) / len(ceo_tenures), 1) if ceo_tenures else None,
-            "cfo_avg": round(sum(cfo_tenures) / len(cfo_tenures), 1) if cfo_tenures else None,
-            "c_suite_avg": round(sum(all_tenures) / len(all_tenures), 1) if all_tenures else None,
+            "ceo_avg": round(sum(ceo_tenures) / len(ceo_tenures), 1)
+            if ceo_tenures
+            else None,
+            "cfo_avg": round(sum(cfo_tenures) / len(cfo_tenures), 1)
+            if cfo_tenures
+            else None,
+            "c_suite_avg": round(sum(all_tenures) / len(all_tenures), 1)
+            if all_tenures
+            else None,
         }
 
     def get_talent_flow(
@@ -210,13 +238,17 @@ class AnalyticsService:
 
         # Get changes in period
         cutoff_date = date.today() - timedelta(days=days)
-        changes = self.db.query(LeadershipChange).filter(
-            LeadershipChange.company_id.in_(company_ids),
-            or_(
-                LeadershipChange.announced_date >= cutoff_date,
-                LeadershipChange.effective_date >= cutoff_date,
-            ),
-        ).all()
+        changes = (
+            self.db.query(LeadershipChange)
+            .filter(
+                LeadershipChange.company_id.in_(company_ids),
+                or_(
+                    LeadershipChange.announced_date >= cutoff_date,
+                    LeadershipChange.effective_date >= cutoff_date,
+                ),
+            )
+            .all()
+        )
 
         # Count hires and departures per company
         company_flow = defaultdict(lambda: {"hires": 0, "departures": 0})
@@ -286,11 +318,15 @@ class AnalyticsService:
 
         # Get changes for the period
         start_date = date.today() - timedelta(days=months * 30)
-        changes = self.db.query(LeadershipChange).filter(
-            LeadershipChange.company_id.in_(company_ids),
-            LeadershipChange.announced_date >= start_date,
-            LeadershipChange.announced_date.isnot(None),
-        ).all()
+        changes = (
+            self.db.query(LeadershipChange)
+            .filter(
+                LeadershipChange.company_id.in_(company_ids),
+                LeadershipChange.announced_date >= start_date,
+                LeadershipChange.announced_date.isnot(None),
+            )
+            .all()
+        )
 
         # Group by month
         monthly_data = defaultdict(lambda: defaultdict(int))
@@ -304,14 +340,16 @@ class AnalyticsService:
         trends = []
         for month_key in sorted(monthly_data.keys()):
             data = monthly_data[month_key]
-            trends.append({
-                "month": month_key,
-                "total": data["total"],
-                "hires": data.get("hire", 0),
-                "departures": data.get("departure", 0),
-                "promotions": data.get("promotion", 0),
-                "retirements": data.get("retirement", 0),
-            })
+            trends.append(
+                {
+                    "month": month_key,
+                    "total": data["total"],
+                    "hires": data.get("hire", 0),
+                    "departures": data.get("departure", 0),
+                    "promotions": data.get("promotion", 0),
+                    "retirements": data.get("retirement", 0),
+                }
+            )
 
         return {
             "industry": industry or "all",
@@ -342,12 +380,16 @@ class AnalyticsService:
 
         # Get hires in period
         cutoff_date = date.today() - timedelta(days=days)
-        hires = self.db.query(LeadershipChange).filter(
-            LeadershipChange.company_id.in_(company_ids),
-            LeadershipChange.change_type == "hire",
-            LeadershipChange.announced_date >= cutoff_date,
-            LeadershipChange.new_title.isnot(None),
-        ).all()
+        hires = (
+            self.db.query(LeadershipChange)
+            .filter(
+                LeadershipChange.company_id.in_(company_ids),
+                LeadershipChange.change_type == "hire",
+                LeadershipChange.announced_date >= cutoff_date,
+                LeadershipChange.new_title.isnot(None),
+            )
+            .all()
+        )
 
         # Count by normalized title
         role_counts = defaultdict(int)
@@ -377,7 +419,9 @@ class AnalyticsService:
         # Sort by count
         hot_roles = [
             {"role": role, "hires": count}
-            for role, count in sorted(role_counts.items(), key=lambda x: x[1], reverse=True)
+            for role, count in sorted(
+                role_counts.items(), key=lambda x: x[1], reverse=True
+            )
         ]
 
         return hot_roles[:10]
@@ -396,10 +440,13 @@ class AnalyticsService:
 
         # Get portfolio company IDs
         company_ids = [
-            pc.company_id for pc in self.db.query(PeoplePortfolioCompany).filter(
+            pc.company_id
+            for pc in self.db.query(PeoplePortfolioCompany)
+            .filter(
                 PeoplePortfolioCompany.portfolio_id == portfolio_id,
                 PeoplePortfolioCompany.is_active == True,
-            ).all()
+            )
+            .all()
         ]
 
         if not company_ids:
@@ -418,23 +465,35 @@ class AnalyticsService:
         stats = self.get_industry_stats(industry=None, days=days)
 
         # Override with portfolio-specific data
-        total_executives = self.db.query(CompanyPerson).filter(
-            CompanyPerson.company_id.in_(company_ids),
-            CompanyPerson.is_current == True,
-        ).count()
+        total_executives = (
+            self.db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.company_id.in_(company_ids),
+                CompanyPerson.is_current == True,
+            )
+            .count()
+        )
 
-        c_suite_count = self.db.query(CompanyPerson).filter(
-            CompanyPerson.company_id.in_(company_ids),
-            CompanyPerson.is_current == True,
-            CompanyPerson.title_level == "c_suite",
-        ).count()
+        c_suite_count = (
+            self.db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.company_id.in_(company_ids),
+                CompanyPerson.is_current == True,
+                CompanyPerson.title_level == "c_suite",
+            )
+            .count()
+        )
 
         # Changes in period
         cutoff_date = date.today() - timedelta(days=days)
-        changes = self.db.query(LeadershipChange).filter(
-            LeadershipChange.company_id.in_(company_ids),
-            LeadershipChange.announced_date >= cutoff_date,
-        ).all()
+        changes = (
+            self.db.query(LeadershipChange)
+            .filter(
+                LeadershipChange.company_id.in_(company_ids),
+                LeadershipChange.announced_date >= cutoff_date,
+            )
+            .all()
+        )
 
         changes_by_type = defaultdict(int)
         for change in changes:
@@ -466,25 +525,29 @@ class AnalyticsService:
             return {"error": "Company not found"}
 
         # Get company's current leadership
-        leadership = self.db.query(CompanyPerson).filter(
-            CompanyPerson.company_id == company_id,
-            CompanyPerson.is_current == True,
-        ).all()
+        leadership = (
+            self.db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.company_id == company_id,
+                CompanyPerson.is_current == True,
+            )
+            .all()
+        )
 
         # Check for key roles
         has_ceo = any(
-            "ceo" in (cp.title_normalized or cp.title or "").lower() or
-            "chief executive" in (cp.title or "").lower()
+            "ceo" in (cp.title_normalized or cp.title or "").lower()
+            or "chief executive" in (cp.title or "").lower()
             for cp in leadership
         )
         has_cfo = any(
-            "cfo" in (cp.title_normalized or cp.title or "").lower() or
-            "chief financial" in (cp.title or "").lower()
+            "cfo" in (cp.title_normalized or cp.title or "").lower()
+            or "chief financial" in (cp.title or "").lower()
             for cp in leadership
         )
         has_coo = any(
-            "coo" in (cp.title_normalized or cp.title or "").lower() or
-            "chief operating" in (cp.title or "").lower()
+            "coo" in (cp.title_normalized or cp.title or "").lower()
+            or "chief operating" in (cp.title or "").lower()
             for cp in leadership
         )
 
@@ -548,6 +611,8 @@ class AnalyticsService:
                 "c_suite_count": c_suite_count,
                 "vp_count": vp_count,
                 "board_count": board_count,
-                "avg_c_suite_tenure_months": round(avg_c_suite_tenure, 1) if tenures else None,
+                "avg_c_suite_tenure_months": round(avg_c_suite_tenure, 1)
+                if tenures
+                else None,
             },
         }

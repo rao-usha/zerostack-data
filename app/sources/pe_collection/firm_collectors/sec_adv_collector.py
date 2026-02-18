@@ -46,7 +46,9 @@ class SECADVCollector(BasePECollector):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # SEC allows 10 requests/second, but we're conservative
-        self.rate_limit_delay = kwargs.get("rate_limit_delay", settings.sec_rate_limit_delay)
+        self.rate_limit_delay = kwargs.get(
+            "rate_limit_delay", settings.sec_rate_limit_delay
+        )
 
     async def collect(
         self,
@@ -147,7 +149,9 @@ class SECADVCollector(BasePECollector):
         cik_padded = cik.zfill(10)
         url = f"{SEC_FILINGS_URL}/CIK{cik_padded}.json"
 
-        data = await self._fetch_json(url, headers={"User-Agent": settings.sec_user_agent})
+        data = await self._fetch_json(
+            url, headers={"User-Agent": settings.sec_user_agent}
+        )
         return data
 
     def _parse_submissions(
@@ -220,7 +224,9 @@ class SECADVCollector(BasePECollector):
             if "ADV" in form.upper():
                 accession = accession_numbers[i] if i < len(accession_numbers) else None
                 filing_date = filing_dates[i] if i < len(filing_dates) else None
-                primary_doc = primary_documents[i] if i < len(primary_documents) else None
+                primary_doc = (
+                    primary_documents[i] if i < len(primary_documents) else None
+                )
 
                 if accession:
                     # Format accession number for URL
@@ -230,11 +236,13 @@ class SECADVCollector(BasePECollector):
                         f"{accession_clean}/{primary_doc}"
                     )
 
-                    adv_filings.append({
-                        "form_type": form,
-                        "filing_date": filing_date,
-                        "accession_number": accession,
-                        "filing_url": filing_url,
-                    })
+                    adv_filings.append(
+                        {
+                            "form_type": form,
+                            "filing_date": filing_date,
+                            "accession_number": accession,
+                            "filing_url": filing_url,
+                        }
+                    )
 
         return adv_filings[:5]  # Return only most recent 5

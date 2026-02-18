@@ -17,6 +17,7 @@ Rate limits:
 
 Time coverage: 2013 - present (monthly data)
 """
+
 import logging
 from typing import Dict, List, Optional, Any
 
@@ -49,7 +50,7 @@ class USTradeClient(BaseAPIClient):
         api_key: Optional[str] = None,
         max_concurrency: int = 2,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize US Trade API client.
@@ -69,7 +70,7 @@ class USTradeClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=120.0,
             connect_timeout=30.0,
-            rate_limit_interval=2.0  # Conservative without API key
+            rate_limit_interval=2.0,  # Conservative without API key
         )
 
     def _add_auth_to_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -84,23 +85,26 @@ class USTradeClient(BaseAPIClient):
         month: Optional[int] = None,
         hs_code: Optional[str] = None,
         country: Optional[str] = None,
-        fields: Optional[List[str]] = None
+        fields: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """Get US export data by Harmonized System (HS) code."""
         if fields is None:
             # Note: Export API does not have quantity fields (QTY_1_MO, etc.)
             # Those are only available in the imports API
             fields = [
-                "CTY_CODE", "CTY_NAME",
-                "E_COMMODITY", "E_COMMODITY_LDESC",
-                "ALL_VAL_MO", "ALL_VAL_YR"
+                "CTY_CODE",
+                "CTY_NAME",
+                "E_COMMODITY",
+                "E_COMMODITY_LDESC",
+                "ALL_VAL_MO",
+                "ALL_VAL_YR",
             ]
 
         params = self._build_export_params(year, month, hs_code, country, fields)
         data = await self.get(
             self.ENDPOINTS["exports_hs"],
             params=params,
-            resource_id=f"exports_hs:{year}"
+            resource_id=f"exports_hs:{year}",
         )
         return self._parse_census_response(data)
 
@@ -110,22 +114,26 @@ class USTradeClient(BaseAPIClient):
         month: Optional[int] = None,
         hs_code: Optional[str] = None,
         country: Optional[str] = None,
-        fields: Optional[List[str]] = None
+        fields: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """Get US import data by Harmonized System (HS) code."""
         if fields is None:
             fields = [
-                "CTY_CODE", "CTY_NAME",
-                "I_COMMODITY", "I_COMMODITY_LDESC",
-                "GEN_VAL_MO", "GEN_VAL_YR",
-                "CON_VAL_MO", "CON_VAL_YR",
+                "CTY_CODE",
+                "CTY_NAME",
+                "I_COMMODITY",
+                "I_COMMODITY_LDESC",
+                "GEN_VAL_MO",
+                "GEN_VAL_YR",
+                "CON_VAL_MO",
+                "CON_VAL_YR",
             ]
 
         params = self._build_import_params(year, month, hs_code, country, fields)
         data = await self.get(
             self.ENDPOINTS["imports_hs"],
             params=params,
-            resource_id=f"imports_hs:{year}"
+            resource_id=f"imports_hs:{year}",
         )
         return self._parse_census_response(data)
 
@@ -136,12 +144,20 @@ class USTradeClient(BaseAPIClient):
         state: Optional[str] = None,
         hs_code: Optional[str] = None,
         country: Optional[str] = None,
-        fields: Optional[List[str]] = None
+        fields: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """Get US state-level export data."""
         if fields is None:
             # Note: State exports API has limited fields compared to national data
-            fields = ["STATE", "CTY_CODE", "CTY_NAME", "E_COMMODITY", "E_COMMODITY_LDESC", "ALL_VAL_MO", "ALL_VAL_YR"]
+            fields = [
+                "STATE",
+                "CTY_CODE",
+                "CTY_NAME",
+                "E_COMMODITY",
+                "E_COMMODITY_LDESC",
+                "ALL_VAL_MO",
+                "ALL_VAL_YR",
+            ]
 
         params = self._build_export_params(year, month, hs_code, country, fields)
         if state:
@@ -150,7 +166,7 @@ class USTradeClient(BaseAPIClient):
         data = await self.get(
             self.ENDPOINTS["exports_state"],
             params=params,
-            resource_id=f"exports_state:{year}"
+            resource_id=f"exports_state:{year}",
         )
         return self._parse_census_response(data)
 
@@ -160,7 +176,7 @@ class USTradeClient(BaseAPIClient):
         month: Optional[int],
         hs_code: Optional[str],
         country: Optional[str],
-        fields: List[str]
+        fields: List[str],
     ) -> Dict[str, str]:
         """Build query parameters for Census Export API."""
         params = {"get": ",".join(fields)}
@@ -194,7 +210,7 @@ class USTradeClient(BaseAPIClient):
         month: Optional[int],
         hs_code: Optional[str],
         country: Optional[str],
-        fields: List[str]
+        fields: List[str],
     ) -> Dict[str, str]:
         """Build query parameters for Census Import API."""
         params = {"get": ",".join(fields)}

@@ -3,6 +3,7 @@ Setup script for family office tracking tables.
 
 Run this once to create the tables in your database.
 """
+
 from sqlalchemy import text
 from app.core.database import get_engine
 
@@ -10,11 +11,11 @@ from app.core.database import get_engine
 def create_family_office_tables():
     """
     Create family office tracking tables.
-    
+
     This is idempotent - safe to run multiple times.
     """
     engine = get_engine()
-    
+
     # Main family offices table
     create_fo_sql = """
     CREATE TABLE IF NOT EXISTS family_offices (
@@ -89,7 +90,7 @@ def create_family_office_tables():
     CREATE INDEX IF NOT EXISTS idx_fo_country ON family_offices(country);
     CREATE INDEX IF NOT EXISTS idx_fo_status ON family_offices(status);
     """
-    
+
     # Contacts table
     create_contacts_sql = """
     CREATE TABLE IF NOT EXISTS family_office_contacts (
@@ -136,7 +137,7 @@ def create_family_office_tables():
     CREATE INDEX IF NOT EXISTS idx_foc_name ON family_office_contacts(full_name);
     CREATE INDEX IF NOT EXISTS idx_foc_role ON family_office_contacts(role);
     """
-    
+
     # Interactions table
     create_interactions_sql = """
     CREATE TABLE IF NOT EXISTS family_office_interactions (
@@ -167,23 +168,22 @@ def create_family_office_tables():
     CREATE INDEX IF NOT EXISTS idx_foi_date ON family_office_interactions(interaction_date);
     CREATE INDEX IF NOT EXISTS idx_foi_type ON family_office_interactions(interaction_type);
     """
-    
+
     with engine.connect() as conn:
         print("Creating family_offices table...")
         conn.execute(text(create_fo_sql))
         conn.commit()
-        
+
         print("Creating family_office_contacts table...")
         conn.execute(text(create_contacts_sql))
         conn.commit()
-        
+
         print("Creating family_office_interactions table...")
         conn.execute(text(create_interactions_sql))
         conn.commit()
-        
+
         print("✅ Family office tables created successfully!")
 
 
 if __name__ == "__main__":
     create_family_office_tables()
-

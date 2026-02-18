@@ -9,6 +9,7 @@ Provides HTTP endpoints for ingesting Yelp business data:
 IMPORTANT: Yelp has strict daily API limits (500 calls/day for free tier).
 Plan your data collection accordingly.
 """
+
 import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -28,63 +29,57 @@ router = APIRouter(tags=["yelp"])
 
 # ========== Request Models ==========
 
+
 class BusinessSearchRequest(BaseModel):
     """Request model for business search ingestion."""
+
     location: str = Field(
         ...,
         description="Location string (e.g., 'San Francisco, CA', 'NYC')",
-        examples=["San Francisco, CA"]
+        examples=["San Francisco, CA"],
     )
     term: Optional[str] = Field(
         None,
         description="Search term (e.g., 'restaurants', 'coffee')",
-        examples=["restaurants"]
+        examples=["restaurants"],
     )
     categories: Optional[str] = Field(
         None,
         description="Category filter (comma-separated, e.g., 'restaurants,bars')",
-        examples=["restaurants"]
+        examples=["restaurants"],
     )
     limit: int = Field(
-        default=50,
-        ge=1,
-        le=50,
-        description="Number of results (max 50)"
+        default=50, ge=1, le=50, description="Number of results (max 50)"
     )
 
 
 class MultiLocationRequest(BaseModel):
     """Request model for multi-location business search."""
+
     locations: List[str] = Field(
         ...,
         description="List of location strings",
-        examples=[["San Francisco, CA", "Los Angeles, CA", "New York, NY"]]
+        examples=[["San Francisco, CA", "Los Angeles, CA", "New York, NY"]],
     )
     term: Optional[str] = Field(
-        None,
-        description="Search term",
-        examples=["restaurants"]
+        None, description="Search term", examples=["restaurants"]
     )
     categories: Optional[str] = Field(
-        None,
-        description="Category filter",
-        examples=["restaurants"]
+        None, description="Category filter", examples=["restaurants"]
     )
     limit_per_location: int = Field(
-        default=20,
-        ge=1,
-        le=50,
-        description="Results per location (max 50)"
+        default=20, ge=1, le=50, description="Results per location (max 50)"
     )
 
 
 # ========== Endpoints ==========
 
+
 @router.post("/yelp/businesses/ingest")
 async def ingest_businesses(
     request: BusinessSearchRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest Yelp business listings for a location.
@@ -107,7 +102,9 @@ async def ingest_businesses(
     settings = get_settings()
     api_key = settings.get_yelp_api_key()
     return create_and_dispatch_job(
-        db, background_tasks, source="yelp",
+        db,
+        background_tasks,
+        source="yelp",
         config={
             "dataset": "businesses",
             "location": request.location,
@@ -124,7 +121,7 @@ async def ingest_businesses(
 async def ingest_multi_location_businesses(
     request: MultiLocationRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest Yelp business listings for multiple locations.
@@ -140,13 +137,15 @@ async def ingest_multi_location_businesses(
         raise HTTPException(
             status_code=400,
             detail=f"Too many locations ({len(request.locations)}). "
-            f"Maximum 100 locations per request to stay within daily limits."
+            f"Maximum 100 locations per request to stay within daily limits.",
         )
 
     settings = get_settings()
     api_key = settings.get_yelp_api_key()
     return create_and_dispatch_job(
-        db, background_tasks, source="yelp",
+        db,
+        background_tasks,
+        source="yelp",
         config={
             "dataset": "multi_location",
             "locations": request.locations,
@@ -161,8 +160,7 @@ async def ingest_multi_location_businesses(
 
 @router.post("/yelp/categories/ingest")
 async def ingest_categories(
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ):
     """
     Ingest all Yelp business categories.
@@ -175,7 +173,9 @@ async def ingest_categories(
     settings = get_settings()
     api_key = settings.get_yelp_api_key()
     return create_and_dispatch_job(
-        db, background_tasks, source="yelp",
+        db,
+        background_tasks,
+        source="yelp",
         config={
             "dataset": "categories",
             "api_key": api_key,
@@ -193,29 +193,30 @@ async def list_categories():
         "categories": YELP_CATEGORIES,
         "category_groups": {
             "food_dining": [
-                "restaurants", "food", "bars", "coffee", "breakfast_brunch",
-                "pizza", "mexican", "chinese", "italian", "japanese"
+                "restaurants",
+                "food",
+                "bars",
+                "coffee",
+                "breakfast_brunch",
+                "pizza",
+                "mexican",
+                "chinese",
+                "italian",
+                "japanese",
             ],
-            "retail": [
-                "shopping", "grocery", "fashion", "electronics"
-            ],
+            "retail": ["shopping", "grocery", "fashion", "electronics"],
             "services": [
-                "localservices", "homeservices", "professional",
-                "financialservices", "realestate"
+                "localservices",
+                "homeservices",
+                "professional",
+                "financialservices",
+                "realestate",
             ],
-            "health": [
-                "health", "dentists", "physicians"
-            ],
-            "auto": [
-                "auto", "autorepair"
-            ],
-            "entertainment": [
-                "active", "arts", "nightlife"
-            ],
-            "travel": [
-                "hotels", "travel"
-            ]
-        }
+            "health": ["health", "dentists", "physicians"],
+            "auto": ["auto", "autorepair"],
+            "entertainment": ["active", "arts", "nightlife"],
+            "travel": ["hotels", "travel"],
+        },
     }
 
 
@@ -229,7 +230,7 @@ async def list_major_cities():
         "usage_note": (
             "Each city search uses 1 API call. "
             "Daily limit is 500 calls for free tier."
-        )
+        ),
     }
 
 
@@ -246,11 +247,11 @@ async def get_api_limits():
         "recommendations": {
             "conservative": "10-20 searches per day",
             "moderate": "50-100 searches per day",
-            "aggressive": "200-400 searches per day (use sparingly)"
+            "aggressive": "200-400 searches per day (use sparingly)",
         },
         "api_key_info": {
             "required": True,
             "env_variable": "YELP_API_KEY",
-            "signup_url": "https://www.yelp.com/developers/v3/manage_app"
-        }
+            "signup_url": "https://www.yelp.com/developers/v3/manage_app",
+        },
     }

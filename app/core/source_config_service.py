@@ -4,6 +4,7 @@ Per-source configuration service.
 Provides CRUD for source-specific timeouts, retry policies, and rate limits.
 Missing config rows fall back to global defaults.
 """
+
 import logging
 from typing import Dict, Any, Optional, List
 
@@ -15,9 +16,9 @@ logger = logging.getLogger(__name__)
 
 # Global defaults (match existing constants across the codebase)
 GLOBAL_DEFAULTS: Dict[str, Any] = {
-    "timeout_seconds": 21600,       # 6 hours (STUCK_JOB_TIMEOUT_HOURS * 3600)
+    "timeout_seconds": 21600,  # 6 hours (STUCK_JOB_TIMEOUT_HOURS * 3600)
     "max_retries": 3,
-    "retry_backoff_base_min": 5,    # BASE_DELAY_MINUTES
+    "retry_backoff_base_min": 5,  # BASE_DELAY_MINUTES
     "retry_backoff_max_min": 1440,  # MAX_DELAY_MINUTES (24 hours)
     "retry_backoff_multiplier": 2,  # BACKOFF_MULTIPLIER
     "rate_limit_rps": 5.0,
@@ -26,10 +27,27 @@ GLOBAL_DEFAULTS: Dict[str, Any] = {
 
 # Initial seed configs for known sources
 SEED_CONFIGS = [
-    {"source": "census", "timeout_seconds": 14400, "description": "Census ACS - runs 2-4 hours"},
-    {"source": "fcc", "timeout_seconds": 10800, "description": "FCC - large downloads, often 403"},
-    {"source": "eia", "timeout_seconds": 7200, "description": "EIA - rate limited, many endpoints"},
-    {"source": "treasury", "timeout_seconds": 300, "max_retries": 5, "description": "Fast source, retry aggressively"},
+    {
+        "source": "census",
+        "timeout_seconds": 14400,
+        "description": "Census ACS - runs 2-4 hours",
+    },
+    {
+        "source": "fcc",
+        "timeout_seconds": 10800,
+        "description": "FCC - large downloads, often 403",
+    },
+    {
+        "source": "eia",
+        "timeout_seconds": 7200,
+        "description": "EIA - rate limited, many endpoints",
+    },
+    {
+        "source": "treasury",
+        "timeout_seconds": 300,
+        "max_retries": 5,
+        "description": "Fast source, retry aggressively",
+    },
 ]
 
 
@@ -51,13 +69,27 @@ def get_source_config(db: Session, source: str) -> Dict[str, Any]:
 
     return {
         "source": row.source,
-        "timeout_seconds": row.timeout_seconds if row.timeout_seconds is not None else GLOBAL_DEFAULTS["timeout_seconds"],
-        "max_retries": row.max_retries if row.max_retries is not None else GLOBAL_DEFAULTS["max_retries"],
-        "retry_backoff_base_min": row.retry_backoff_base_min if row.retry_backoff_base_min is not None else GLOBAL_DEFAULTS["retry_backoff_base_min"],
-        "retry_backoff_max_min": row.retry_backoff_max_min if row.retry_backoff_max_min is not None else GLOBAL_DEFAULTS["retry_backoff_max_min"],
-        "retry_backoff_multiplier": row.retry_backoff_multiplier if row.retry_backoff_multiplier is not None else GLOBAL_DEFAULTS["retry_backoff_multiplier"],
-        "rate_limit_rps": float(row.rate_limit_rps) if row.rate_limit_rps is not None else GLOBAL_DEFAULTS["rate_limit_rps"],
-        "max_concurrent": row.max_concurrent if row.max_concurrent is not None else GLOBAL_DEFAULTS["max_concurrent"],
+        "timeout_seconds": row.timeout_seconds
+        if row.timeout_seconds is not None
+        else GLOBAL_DEFAULTS["timeout_seconds"],
+        "max_retries": row.max_retries
+        if row.max_retries is not None
+        else GLOBAL_DEFAULTS["max_retries"],
+        "retry_backoff_base_min": row.retry_backoff_base_min
+        if row.retry_backoff_base_min is not None
+        else GLOBAL_DEFAULTS["retry_backoff_base_min"],
+        "retry_backoff_max_min": row.retry_backoff_max_min
+        if row.retry_backoff_max_min is not None
+        else GLOBAL_DEFAULTS["retry_backoff_max_min"],
+        "retry_backoff_multiplier": row.retry_backoff_multiplier
+        if row.retry_backoff_multiplier is not None
+        else GLOBAL_DEFAULTS["retry_backoff_multiplier"],
+        "rate_limit_rps": float(row.rate_limit_rps)
+        if row.rate_limit_rps is not None
+        else GLOBAL_DEFAULTS["rate_limit_rps"],
+        "max_concurrent": row.max_concurrent
+        if row.max_concurrent is not None
+        else GLOBAL_DEFAULTS["max_concurrent"],
         "description": row.description,
         "is_default": False,
     }
@@ -85,19 +117,23 @@ def list_source_configs(db: Session) -> List[Dict[str, Any]]:
     rows = db.query(SourceConfig).order_by(SourceConfig.source).all()
     results = []
     for row in rows:
-        results.append({
-            "source": row.source,
-            "timeout_seconds": row.timeout_seconds,
-            "max_retries": row.max_retries,
-            "retry_backoff_base_min": row.retry_backoff_base_min,
-            "retry_backoff_max_min": row.retry_backoff_max_min,
-            "retry_backoff_multiplier": row.retry_backoff_multiplier,
-            "rate_limit_rps": float(row.rate_limit_rps) if row.rate_limit_rps is not None else None,
-            "max_concurrent": row.max_concurrent,
-            "description": row.description,
-            "created_at": row.created_at.isoformat() if row.created_at else None,
-            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
-        })
+        results.append(
+            {
+                "source": row.source,
+                "timeout_seconds": row.timeout_seconds,
+                "max_retries": row.max_retries,
+                "retry_backoff_base_min": row.retry_backoff_base_min,
+                "retry_backoff_max_min": row.retry_backoff_max_min,
+                "retry_backoff_multiplier": row.retry_backoff_multiplier,
+                "rate_limit_rps": float(row.rate_limit_rps)
+                if row.rate_limit_rps is not None
+                else None,
+                "max_concurrent": row.max_concurrent,
+                "description": row.description,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+            }
+        )
     return results
 
 

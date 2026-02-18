@@ -3,6 +3,7 @@ Rate limit management endpoints.
 
 Provides API for viewing and configuring per-source rate limits.
 """
+
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -16,7 +17,7 @@ from app.core.rate_limiter import (
     DEFAULT_RATE_LIMITS,
     save_rate_limit_to_db,
     init_default_rate_limits,
-    load_rate_limits_from_db
+    load_rate_limits_from_db,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,17 +29,26 @@ router = APIRouter(prefix="/rate-limits", tags=["rate-limits"])
 # Pydantic Schemas
 # =============================================================================
 
+
 class RateLimitConfig(BaseModel):
     """Rate limit configuration for a source."""
+
     source: str = Field(..., min_length=1, max_length=50)
-    requests_per_second: float = Field(..., gt=0, le=100, description="Tokens added per second")
-    burst_capacity: int = Field(..., ge=1, le=100, description="Maximum tokens (burst size)")
-    concurrent_limit: int = Field(..., ge=1, le=50, description="Maximum concurrent requests")
+    requests_per_second: float = Field(
+        ..., gt=0, le=100, description="Tokens added per second"
+    )
+    burst_capacity: int = Field(
+        ..., ge=1, le=100, description="Maximum tokens (burst size)"
+    )
+    concurrent_limit: int = Field(
+        ..., ge=1, le=50, description="Maximum concurrent requests"
+    )
     description: Optional[str] = None
 
 
 class RateLimitResponse(BaseModel):
     """Response schema for rate limit information."""
+
     source: str
     requests_per_second: float
     burst_capacity: int
@@ -53,6 +63,7 @@ class RateLimitResponse(BaseModel):
 
 class RateLimitStats(BaseModel):
     """Runtime statistics for a rate limit."""
+
     source: str
     requests_per_second: float
     burst_capacity: int
@@ -65,6 +76,7 @@ class RateLimitStats(BaseModel):
 
 class DefaultRateLimit(BaseModel):
     """Default rate limit configuration."""
+
     source: str
     requests_per_second: float
     burst_capacity: int
@@ -76,11 +88,12 @@ class DefaultRateLimit(BaseModel):
 # Endpoints
 # =============================================================================
 
+
 @router.get("", response_model=List[RateLimitResponse])
 def list_rate_limits(
     source: Optional[str] = Query(default=None, description="Filter by source"),
     enabled_only: bool = Query(default=False, description="Only show enabled limits"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> List[RateLimitResponse]:
     """
     List all configured rate limits.
@@ -108,7 +121,7 @@ def list_rate_limits(
             total_requests=rl.total_requests,
             total_throttled=rl.total_throttled,
             created_at=rl.created_at.isoformat() if rl.created_at else None,
-            updated_at=rl.updated_at.isoformat() if rl.updated_at else None
+            updated_at=rl.updated_at.isoformat() if rl.updated_at else None,
         )
         for rl in rate_limits
     ]
@@ -127,7 +140,7 @@ def list_default_rate_limits():
             requests_per_second=config["requests_per_second"],
             burst_capacity=config["burst_capacity"],
             concurrent_limit=config["concurrent_limit"],
-            description=config.get("description")
+            description=config.get("description"),
         )
         for source, config in sorted(DEFAULT_RATE_LIMITS.items())
         if source != "default"
@@ -144,7 +157,7 @@ def get_runtime_stats():
     limiter = get_rate_limiter()
     return {
         "active_sources": list(limiter._buckets.keys()),
-        "stats": limiter.get_all_stats()
+        "stats": limiter.get_all_stats(),
     }
 
 
@@ -163,9 +176,9 @@ def get_rate_limit(source: str, db: Session = Depends(get_db)) -> RateLimitRespo
     """
     Get rate limit configuration for a specific source.
     """
-    rate_limit = db.query(SourceRateLimit).filter(
-        SourceRateLimit.source == source
-    ).first()
+    rate_limit = (
+        db.query(SourceRateLimit).filter(SourceRateLimit.source == source).first()
+    )
 
     if not rate_limit:
         # Check if it's a known default
@@ -176,14 +189,18 @@ def get_rate_limit(source: str, db: Session = Depends(get_db)) -> RateLimitRespo
                 requests_per_second=default["requests_per_second"],
                 burst_capacity=default["burst_capacity"],
                 concurrent_limit=default["concurrent_limit"],
-                description=default.get("description", "Default configuration (not persisted)"),
+                description=default.get(
+                    "description", "Default configuration (not persisted)"
+                ),
                 is_enabled=True,
                 total_requests=0,
                 total_throttled=0,
                 created_at=None,
-                updated_at=None
+                updated_at=None,
             )
-        raise HTTPException(status_code=404, detail=f"Rate limit not found for source: {source}")
+        raise HTTPException(
+            status_code=404, detail=f"Rate limit not found for source: {source}"
+        )
 
     return RateLimitResponse(
         source=rate_limit.source,
@@ -195,14 +212,13 @@ def get_rate_limit(source: str, db: Session = Depends(get_db)) -> RateLimitRespo
         total_requests=rate_limit.total_requests,
         total_throttled=rate_limit.total_throttled,
         created_at=rate_limit.created_at.isoformat() if rate_limit.created_at else None,
-        updated_at=rate_limit.updated_at.isoformat() if rate_limit.updated_at else None
+        updated_at=rate_limit.updated_at.isoformat() if rate_limit.updated_at else None,
     )
 
 
 @router.post("", response_model=RateLimitResponse, status_code=201)
 def create_or_update_rate_limit(
-    config: RateLimitConfig,
-    db: Session = Depends(get_db)
+    config: RateLimitConfig, db: Session = Depends(get_db)
 ) -> RateLimitResponse:
     """
     Create or update rate limit configuration for a source.
@@ -216,7 +232,7 @@ def create_or_update_rate_limit(
         requests_per_second=config.requests_per_second,
         burst_capacity=config.burst_capacity,
         concurrent_limit=config.concurrent_limit,
-        description=config.description
+        description=config.description,
     )
 
     # Apply to runtime limiter
@@ -225,7 +241,7 @@ def create_or_update_rate_limit(
         source=config.source,
         requests_per_second=config.requests_per_second,
         burst_capacity=config.burst_capacity,
-        concurrent_limit=config.concurrent_limit
+        concurrent_limit=config.concurrent_limit,
     )
 
     return RateLimitResponse(
@@ -238,7 +254,7 @@ def create_or_update_rate_limit(
         total_requests=rate_limit.total_requests,
         total_throttled=rate_limit.total_throttled,
         created_at=rate_limit.created_at.isoformat() if rate_limit.created_at else None,
-        updated_at=rate_limit.updated_at.isoformat() if rate_limit.updated_at else None
+        updated_at=rate_limit.updated_at.isoformat() if rate_limit.updated_at else None,
     )
 
 
@@ -247,12 +263,14 @@ def enable_rate_limit(source: str, db: Session = Depends(get_db)):
     """
     Enable rate limiting for a source.
     """
-    rate_limit = db.query(SourceRateLimit).filter(
-        SourceRateLimit.source == source
-    ).first()
+    rate_limit = (
+        db.query(SourceRateLimit).filter(SourceRateLimit.source == source).first()
+    )
 
     if not rate_limit:
-        raise HTTPException(status_code=404, detail=f"Rate limit not found for source: {source}")
+        raise HTTPException(
+            status_code=404, detail=f"Rate limit not found for source: {source}"
+        )
 
     rate_limit.is_enabled = 1
     db.commit()
@@ -268,12 +286,14 @@ def disable_rate_limit(source: str, db: Session = Depends(get_db)):
     Note: This only affects the database record. The runtime limiter will
     continue using default limits. Use this to temporarily bypass custom limits.
     """
-    rate_limit = db.query(SourceRateLimit).filter(
-        SourceRateLimit.source == source
-    ).first()
+    rate_limit = (
+        db.query(SourceRateLimit).filter(SourceRateLimit.source == source).first()
+    )
 
     if not rate_limit:
-        raise HTTPException(status_code=404, detail=f"Rate limit not found for source: {source}")
+        raise HTTPException(
+            status_code=404, detail=f"Rate limit not found for source: {source}"
+        )
 
     rate_limit.is_enabled = 0
     db.commit()
@@ -302,12 +322,14 @@ def delete_rate_limit(source: str, db: Session = Depends(get_db)):
 
     The source will fall back to default rate limits after deletion.
     """
-    rate_limit = db.query(SourceRateLimit).filter(
-        SourceRateLimit.source == source
-    ).first()
+    rate_limit = (
+        db.query(SourceRateLimit).filter(SourceRateLimit.source == source).first()
+    )
 
     if not rate_limit:
-        raise HTTPException(status_code=404, detail=f"Rate limit not found for source: {source}")
+        raise HTTPException(
+            status_code=404, detail=f"Rate limit not found for source: {source}"
+        )
 
     db.delete(rate_limit)
     db.commit()
@@ -332,7 +354,7 @@ def initialize_default_rate_limits(db: Session = Depends(get_db)):
     return {
         "message": f"Initialized {count} new rate limits, {loaded} total loaded",
         "created": count,
-        "total_active": loaded
+        "total_active": loaded,
     }
 
 
@@ -346,7 +368,4 @@ def reload_rate_limits(db: Session = Depends(get_db)):
     limiter = get_rate_limiter()
     count = load_rate_limits_from_db(db, limiter)
 
-    return {
-        "message": f"Reloaded {count} rate limit configurations",
-        "loaded": count
-    }
+    return {"message": f"Reloaded {count} rate limit configurations", "loaded": count}

@@ -89,7 +89,9 @@ class SECAgent(BaseCollector):
 
         # Try to auto-discover CIK if not provided
         if not cik:
-            logger.info(f"[SECAgent] No CIK provided, attempting auto-discovery for '{company_name}'")
+            logger.info(
+                f"[SECAgent] No CIK provided, attempting auto-discovery for '{company_name}'"
+            )
             cik = await self.fetcher.get_cik_for_company(company_name, min_score=0.7)
 
             if cik:
@@ -103,7 +105,9 @@ class SECAgent(BaseCollector):
                 result.success = False
                 return self._finalize_result(result)
 
-        logger.info(f"[SECAgent] Collecting from SEC EDGAR for {company_name} (CIK: {cik})")
+        logger.info(
+            f"[SECAgent] Collecting from SEC EDGAR for {company_name} (CIK: {cik})"
+        )
 
         try:
             all_people: List[ExtractedPerson] = []
@@ -122,14 +126,18 @@ class SECAgent(BaseCollector):
             # 3. Get officers/directors from Form 4 filings
             if include_form4:
                 logger.info(f"[SECAgent] Step 3: Checking Form 4 filings")
-                form4_people = await self._collect_from_form4s(cik, company_name, result)
+                form4_people = await self._collect_from_form4s(
+                    cik, company_name, result
+                )
                 all_people.extend(form4_people)
 
             # 4. Check recent 8-K filings for leadership changes
             if include_8k:
                 logger.info(f"[SECAgent] Step 4: Checking 8-K filings")
                 since_date = date.today() - timedelta(days=days_back)
-                changes = await self._collect_from_8ks(cik, company_name, since_date, result)
+                changes = await self._collect_from_8ks(
+                    cik, company_name, since_date, result
+                )
                 all_changes.extend(changes)
 
             # 4. Deduplicate people
@@ -153,7 +161,9 @@ class SECAgent(BaseCollector):
             )
 
         except Exception as e:
-            logger.exception(f"[SECAgent] Error collecting SEC data for {company_name}: {e}")
+            logger.exception(
+                f"[SECAgent] Error collecting SEC data for {company_name}: {e}"
+            )
             result.errors.append(str(e))
             result.success = False
 
@@ -235,7 +245,9 @@ class SECAgent(BaseCollector):
 
             # 10-K filings are very large (5-10MB for Fortune 500); Item 10 is
             # often at 40-60% into the document. Request up to 5MB.
-            tenk_content = await self.fetcher.get_filing_content(tenk, max_length=5000000)
+            tenk_content = await self.fetcher.get_filing_content(
+                tenk, max_length=5000000
+            )
 
             if not tenk_content:
                 result.warnings.append("Failed to fetch 10-K content")
@@ -254,9 +266,7 @@ class SECAgent(BaseCollector):
 
             people.extend(executives)
 
-            logger.info(
-                f"[SECAgent] 10-K extraction: {len(people)} executives"
-            )
+            logger.info(f"[SECAgent] 10-K extraction: {len(people)} executives")
 
         except Exception as e:
             logger.warning(f"[SECAgent] 10-K extraction failed: {e}")
@@ -278,10 +288,10 @@ class SECAgent(BaseCollector):
             result.filings_checked += min(100, len(filers))
 
             for filer in filers:
-                name = filer.get('name', '')
-                title = filer.get('title', '')
-                is_officer = filer.get('is_officer', False)
-                is_director = filer.get('is_director', False)
+                name = filer.get("name", "")
+                title = filer.get("title", "")
+                is_officer = filer.get("is_officer", False)
+                is_director = filer.get("is_director", False)
 
                 if not name:
                     continue
@@ -323,7 +333,9 @@ class SECAgent(BaseCollector):
         changes = []
 
         filings_8k = await self.fetcher.get_recent_8ks(cik, since_date, limit=10)
-        logger.info(f"[SECAgent] Found {len(filings_8k)} 8-K filings since {since_date}")
+        logger.info(
+            f"[SECAgent] Found {len(filings_8k)} 8-K filings since {since_date}"
+        )
 
         leadership_8ks = 0
         for filing in filings_8k:
@@ -334,7 +346,9 @@ class SECAgent(BaseCollector):
 
             if has_leadership:
                 leadership_8ks += 1
-                logger.debug(f"[SECAgent] 8-K {filing.accession_number} has leadership content")
+                logger.debug(
+                    f"[SECAgent] 8-K {filing.accession_number} has leadership content"
+                )
 
                 content = await self.fetcher.get_filing_content(filing)
                 if content:
@@ -360,23 +374,23 @@ class SECAgent(BaseCollector):
         title_lower = title.lower()
 
         # C-Suite
-        if any(kw in title_lower for kw in ['chief', 'ceo', 'cfo', 'coo', 'cto']):
+        if any(kw in title_lower for kw in ["chief", "ceo", "cfo", "coo", "cto"]):
             return TitleLevel.C_SUITE
 
         # President
-        if 'president' in title_lower and 'vice' not in title_lower:
+        if "president" in title_lower and "vice" not in title_lower:
             return TitleLevel.PRESIDENT
 
         # VP levels
-        if 'executive vice president' in title_lower or 'evp' in title_lower:
+        if "executive vice president" in title_lower or "evp" in title_lower:
             return TitleLevel.EVP
-        if 'senior vice president' in title_lower or 'svp' in title_lower:
+        if "senior vice president" in title_lower or "svp" in title_lower:
             return TitleLevel.SVP
-        if 'vice president' in title_lower or ' vp ' in f' {title_lower} ':
+        if "vice president" in title_lower or " vp " in f" {title_lower} ":
             return TitleLevel.VP
 
         # Director
-        if 'director' in title_lower:
+        if "director" in title_lower:
             return TitleLevel.DIRECTOR
 
         return TitleLevel.UNKNOWN
@@ -407,8 +421,8 @@ class SECAgent(BaseCollector):
 
         # Lowercase and remove punctuation
         name = name.lower()
-        name = ''.join(c for c in name if c.isalnum() or c.isspace())
-        name = ' '.join(name.split())
+        name = "".join(c for c in name if c.isalnum() or c.isspace())
+        name = " ".join(name.split())
 
         return name
 
@@ -444,7 +458,9 @@ class SECAgent(BaseCollector):
             # Create a key for comparison
             key = (
                 self._normalize_name(change.person_name),
-                change.change_type.value if hasattr(change.change_type, 'value') else str(change.change_type),
+                change.change_type.value
+                if hasattr(change.change_type, "value")
+                else str(change.change_type),
                 str(change.announced_date or change.effective_date or ""),
             )
 
@@ -457,7 +473,9 @@ class SECAgent(BaseCollector):
     def _finalize_result(self, result: CollectionResult) -> CollectionResult:
         """Finalize collection result with timing."""
         result.completed_at = datetime.utcnow()
-        result.duration_seconds = (result.completed_at - result.started_at).total_seconds()
+        result.duration_seconds = (
+            result.completed_at - result.started_at
+        ).total_seconds()
         return result
 
 

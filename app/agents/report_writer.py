@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 # ENUMS AND CONSTANTS
 # =============================================================================
 
+
 class ReportType(str, Enum):
     COMPANY_PROFILE = "company_profile"
     DUE_DILIGENCE = "due_diligence"
@@ -63,7 +64,14 @@ DEFAULT_TEMPLATES = {
     "full_report": {
         "name": "full_report",
         "description": "Comprehensive detailed analysis",
-        "sections": ["executive_summary", "overview", "analysis", "metrics", "risks", "sources"],
+        "sections": [
+            "executive_summary",
+            "overview",
+            "analysis",
+            "metrics",
+            "risks",
+            "sources",
+        ],
         "tone": Tone.FORMAL.value,
         "detail_level": DetailLevel.DETAILED.value,
         "max_words": 5000,
@@ -71,7 +79,12 @@ DEFAULT_TEMPLATES = {
     "investor_memo": {
         "name": "investor_memo",
         "description": "Investment-focused analysis",
-        "sections": ["executive_summary", "investment_thesis", "risks", "recommendation"],
+        "sections": [
+            "executive_summary",
+            "investment_thesis",
+            "risks",
+            "recommendation",
+        ],
         "tone": Tone.PROFESSIONAL.value,
         "detail_level": DetailLevel.STANDARD.value,
         "max_words": 2000,
@@ -90,6 +103,7 @@ DEFAULT_TEMPLATES = {
 # =============================================================================
 # REPORT WRITER AGENT
 # =============================================================================
+
 
 class ReportWriterAgent:
     """AI agent for generating comprehensive reports."""
@@ -249,12 +263,15 @@ class ReportWriterAgent:
             (report_id, report_type, template, entity_name, entity_type, status, created_at)
             VALUES (:id, :type, :template, :entity, 'company', 'pending', NOW())
         """)
-        self.db.execute(query, {
-            "id": report_id,
-            "type": report_type,
-            "template": template,
-            "entity": entity_name,
-        })
+        self.db.execute(
+            query,
+            {
+                "id": report_id,
+                "type": report_type,
+                "template": template,
+                "entity": entity_name,
+            },
+        )
         self.db.commit()
 
     def _update_status(
@@ -283,7 +300,9 @@ class ReportWriterAgent:
                 WHERE report_id = :id
             """)
 
-        self.db.execute(query, {"id": report_id, "status": status.value, "error": error})
+        self.db.execute(
+            query, {"id": report_id, "status": status.value, "error": error}
+        )
         self.db.commit()
 
     def _update_progress(self, report_id: str, progress: int, section: str) -> None:
@@ -326,17 +345,20 @@ class ReportWriterAgent:
                 completed_at = NOW()
             WHERE report_id = :id
         """)
-        self.db.execute(query, {
-            "id": report_id,
-            "title": title,
-            "content": json.dumps(content),
-            "markdown": markdown,
-            "html": html,
-            "words": word_count,
-            "sections": sections_count,
-            "sources": json.dumps(data_sources),
-            "confidence": confidence,
-        })
+        self.db.execute(
+            query,
+            {
+                "id": report_id,
+                "title": title,
+                "content": json.dumps(content),
+                "markdown": markdown,
+                "html": html,
+                "words": word_count,
+                "sections": sections_count,
+                "sources": json.dumps(data_sources),
+                "confidence": confidence,
+            },
+        )
         self.db.commit()
 
     # -------------------------------------------------------------------------
@@ -558,7 +580,9 @@ class ReportWriterAgent:
         findings = []
 
         if profile.get("employee_count"):
-            findings.append(f"{entity} has approximately {profile['employee_count']:,} employees")
+            findings.append(
+                f"{entity} has approximately {profile['employee_count']:,} employees"
+            )
 
         if profile.get("total_funding"):
             funding_m = profile["total_funding"] / 1_000_000
@@ -608,7 +632,9 @@ class ReportWriterAgent:
             base = "Weak performance with significant concerns."
 
         # Add anomaly context
-        critical_count = sum(1 for a in anomalies if a.get("severity_level") == "critical")
+        critical_count = sum(
+            1 for a in anomalies if a.get("severity_level") == "critical"
+        )
         high_count = sum(1 for a in anomalies if a.get("severity_level") == "high")
 
         if critical_count > 0:
@@ -623,7 +649,9 @@ class ReportWriterAgent:
         profile = data.get("profile", {})
         entity = data.get("entity_name", "Company")
 
-        description = profile.get("description", f"{entity} is a company in the technology sector.")
+        description = profile.get(
+            "description", f"{entity} is a company in the technology sector."
+        )
 
         basic_info = {
             "name": profile.get("company_name", entity),
@@ -694,8 +722,12 @@ class ReportWriterAgent:
 
         # Competitive position
         if competitors:
-            analysis["competitive_position"] = f"Competing with {len(competitors)} similar companies"
-            analysis["top_competitors"] = [c.get("name", "Unknown") for c in competitors[:3]]
+            analysis["competitive_position"] = (
+                f"Competing with {len(competitors)} similar companies"
+            )
+            analysis["top_competitors"] = [
+                c.get("name", "Unknown") for c in competitors[:3]
+            ]
 
         return analysis
 
@@ -712,31 +744,39 @@ class ReportWriterAgent:
 
         # From anomalies
         for anomaly in anomalies:
-            risks.append({
-                "type": anomaly.get("anomaly_type", "unknown"),
-                "description": anomaly.get("description", "Unknown risk"),
-                "severity": anomaly.get("severity_level", "medium"),
-            })
+            risks.append(
+                {
+                    "type": anomaly.get("anomaly_type", "unknown"),
+                    "description": anomaly.get("description", "Unknown risk"),
+                    "severity": anomaly.get("severity_level", "medium"),
+                }
+            )
 
         # From low scores
         if scores:
             if scores.get("growth_score", 100) < 40:
-                risks.append({
-                    "type": "growth",
-                    "description": "Low growth score indicates potential stagnation",
-                    "severity": "medium",
-                })
+                risks.append(
+                    {
+                        "type": "growth",
+                        "description": "Low growth score indicates potential stagnation",
+                        "severity": "medium",
+                    }
+                )
             if scores.get("stability_score", 100) < 40:
-                risks.append({
-                    "type": "stability",
-                    "description": "Low stability score indicates operational concerns",
-                    "severity": "high",
-                })
+                risks.append(
+                    {
+                        "type": "stability",
+                        "description": "Low stability score indicates operational concerns",
+                        "severity": "high",
+                    }
+                )
 
         return {
             "risks": risks,
             "risk_count": len(risks),
-            "high_severity_count": sum(1 for r in risks if r["severity"] in ["high", "critical"]),
+            "high_severity_count": sum(
+                1 for r in risks if r["severity"] in ["high", "critical"]
+            ),
         }
 
     def _write_alerts(self, data: Dict, template: Dict) -> Dict:
@@ -746,11 +786,13 @@ class ReportWriterAgent:
         alerts = []
         for anomaly in anomalies:
             if anomaly.get("severity_level") in ["high", "critical"]:
-                alerts.append({
-                    "message": anomaly.get("description"),
-                    "severity": anomaly.get("severity_level"),
-                    "detected_at": str(anomaly.get("detected_at", "")),
-                })
+                alerts.append(
+                    {
+                        "message": anomaly.get("description"),
+                        "severity": anomaly.get("severity_level"),
+                        "detected_at": str(anomaly.get("detected_at", "")),
+                    }
+                )
 
         return {"alerts": alerts}
 
@@ -784,7 +826,13 @@ class ReportWriterAgent:
 
         return {
             "thesis_points": thesis_points,
-            "summary": f"{entity} presents " + ("a compelling" if scores.get("composite_score", 0) >= 70 else "a moderate") + " investment opportunity.",
+            "summary": f"{entity} presents "
+            + (
+                "a compelling"
+                if scores.get("composite_score", 0) >= 70
+                else "a moderate"
+            )
+            + " investment opportunity.",
         }
 
     def _write_recommendation(self, data: Dict, template: Dict) -> Dict:
@@ -793,7 +841,9 @@ class ReportWriterAgent:
         anomalies = data.get("anomalies", [])
 
         score = scores.get("composite_score", 50)
-        critical_issues = sum(1 for a in anomalies if a.get("severity_level") == "critical")
+        critical_issues = sum(
+            1 for a in anomalies if a.get("severity_level") == "critical"
+        )
 
         if critical_issues > 0:
             recommendation = "HOLD - Address critical issues before proceeding"
@@ -823,10 +873,12 @@ class ReportWriterAgent:
 
         source_details = []
         for source in sources:
-            source_details.append({
-                "name": source,
-                "type": "database",
-            })
+            source_details.append(
+                {
+                    "name": source,
+                    "type": "database",
+                }
+            )
 
         return {
             "sources": source_details,
@@ -844,7 +896,12 @@ class ReportWriterAgent:
 
     def _render_markdown(self, content: Dict, template: Dict, title: str) -> str:
         """Render report content to markdown."""
-        lines = [f"# {title}", "", f"*Generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}*", ""]
+        lines = [
+            f"# {title}",
+            "",
+            f"*Generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}*",
+            "",
+        ]
 
         # Executive Summary
         if "executive_summary" in content:
@@ -942,7 +999,9 @@ class ReportWriterAgent:
                 lines.append("")
                 for risk in risks_section["risks"]:
                     severity = risk.get("severity", "medium").upper()
-                    lines.append(f"- **[{severity}]** {risk.get('description', 'Unknown risk')}")
+                    lines.append(
+                        f"- **[{severity}]** {risk.get('description', 'Unknown risk')}"
+                    )
                 lines.append("")
 
         # Investment Thesis
@@ -987,21 +1046,22 @@ class ReportWriterAgent:
 
         # Headers
         import re
-        html = re.sub(r'^### (.+)$', r'<h3>\1</h3>', html, flags=re.MULTILINE)
-        html = re.sub(r'^## (.+)$', r'<h2>\1</h2>', html, flags=re.MULTILINE)
-        html = re.sub(r'^# (.+)$', r'<h1>\1</h1>', html, flags=re.MULTILINE)
+
+        html = re.sub(r"^### (.+)$", r"<h3>\1</h3>", html, flags=re.MULTILINE)
+        html = re.sub(r"^## (.+)$", r"<h2>\1</h2>", html, flags=re.MULTILINE)
+        html = re.sub(r"^# (.+)$", r"<h1>\1</h1>", html, flags=re.MULTILINE)
 
         # Bold
-        html = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', html)
+        html = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", html)
 
         # Italic
-        html = re.sub(r'\*(.+?)\*', r'<em>\1</em>', html)
+        html = re.sub(r"\*(.+?)\*", r"<em>\1</em>", html)
 
         # Lists
-        html = re.sub(r'^- (.+)$', r'<li>\1</li>', html, flags=re.MULTILINE)
+        html = re.sub(r"^- (.+)$", r"<li>\1</li>", html, flags=re.MULTILINE)
 
         # Tables (simplified)
-        html = re.sub(r'\|([^|]+)\|', r'<td>\1</td>', html)
+        html = re.sub(r"\|([^|]+)\|", r"<td>\1</td>", html)
 
         # Wrap in basic HTML structure
         html = f"""<!DOCTYPE html>
@@ -1054,8 +1114,12 @@ class ReportWriterAgent:
                 "confidence": row["confidence"],
                 "data_sources": row["data_sources"],
                 "error_message": row["error_message"],
-                "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-                "completed_at": row["completed_at"].isoformat() if row["completed_at"] else None,
+                "created_at": row["created_at"].isoformat()
+                if row["created_at"]
+                else None,
+                "completed_at": row["completed_at"].isoformat()
+                if row["completed_at"]
+                else None,
             }
         except Exception as e:
             logger.error(f"Error getting report: {e}")
@@ -1125,15 +1189,21 @@ class ReportWriterAgent:
             reports = []
 
             for row in result.mappings():
-                reports.append({
-                    "report_id": row["report_id"],
-                    "report_type": row["report_type"],
-                    "title": row["title"],
-                    "entity_name": row["entity_name"],
-                    "status": row["status"],
-                    "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-                    "completed_at": row["completed_at"].isoformat() if row["completed_at"] else None,
-                })
+                reports.append(
+                    {
+                        "report_id": row["report_id"],
+                        "report_type": row["report_type"],
+                        "title": row["title"],
+                        "entity_name": row["entity_name"],
+                        "status": row["status"],
+                        "created_at": row["created_at"].isoformat()
+                        if row["created_at"]
+                        else None,
+                        "completed_at": row["completed_at"].isoformat()
+                        if row["completed_at"]
+                        else None,
+                    }
+                )
 
             return {"reports": reports, "total": len(reports)}
 
@@ -1152,15 +1222,17 @@ class ReportWriterAgent:
 
         # Add default templates
         for name, config in DEFAULT_TEMPLATES.items():
-            templates.append({
-                "name": config["name"],
-                "description": config["description"],
-                "sections": config["sections"],
-                "tone": config["tone"],
-                "detail_level": config["detail_level"],
-                "max_words": config["max_words"],
-                "is_default": True,
-            })
+            templates.append(
+                {
+                    "name": config["name"],
+                    "description": config["description"],
+                    "sections": config["sections"],
+                    "tone": config["tone"],
+                    "detail_level": config["detail_level"],
+                    "max_words": config["max_words"],
+                    "is_default": True,
+                }
+            )
 
         # Add custom templates from database
         try:
@@ -1168,15 +1240,17 @@ class ReportWriterAgent:
             result = self.db.execute(query)
 
             for row in result.mappings():
-                templates.append({
-                    "name": row["name"],
-                    "description": row["description"],
-                    "sections": row["sections"],
-                    "tone": row["tone"],
-                    "detail_level": row["detail_level"],
-                    "max_words": row["max_words"],
-                    "is_default": row["is_default"],
-                })
+                templates.append(
+                    {
+                        "name": row["name"],
+                        "description": row["description"],
+                        "sections": row["sections"],
+                        "tone": row["tone"],
+                        "detail_level": row["detail_level"],
+                        "max_words": row["max_words"],
+                        "is_default": row["is_default"],
+                    }
+                )
         except Exception as e:
             logger.warning(f"Error loading custom templates: {e}")
             self.db.rollback()
@@ -1230,15 +1304,18 @@ class ReportWriterAgent:
                 RETURNING id, name, created_at
             """)
 
-            result = self.db.execute(query, {
-                "name": name,
-                "desc": description,
-                "type": report_type,
-                "sections": json.dumps(sections),
-                "tone": tone,
-                "detail": detail_level,
-                "words": max_words,
-            })
+            result = self.db.execute(
+                query,
+                {
+                    "name": name,
+                    "desc": description,
+                    "type": report_type,
+                    "sections": json.dumps(sections),
+                    "tone": tone,
+                    "detail": detail_level,
+                    "words": max_words,
+                },
+            )
             row = result.fetchone()
             self.db.commit()
 
@@ -1257,7 +1334,9 @@ class ReportWriterAgent:
     # EXPORT
     # -------------------------------------------------------------------------
 
-    def export_report(self, report_id: str, format: str = "markdown") -> Optional[bytes]:
+    def export_report(
+        self, report_id: str, format: str = "markdown"
+    ) -> Optional[bytes]:
         """Export report in specified format."""
         report = self.get_report(report_id)
 
@@ -1272,6 +1351,7 @@ class ReportWriterAgent:
 
         elif format == "json":
             import json
+
             return json.dumps(report.get("content", {}), indent=2).encode("utf-8")
 
         else:

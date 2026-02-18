@@ -68,13 +68,11 @@ KNOWN_CIKS = {
     "Massachusetts PRIM": "0001015002",
     "Minnesota State Board of Investment": "0001051449",
     "Connecticut Retirement Plans": "0001015099",
-
     # Sovereign Wealth Funds (those with 13F filings)
     "GIC Private Limited": "0001277537",
     "GIC": "0001277537",
     "Norges Bank": "0001273515",
     "Norway Government Pension Fund": "0001273515",
-
     # Endowments
     "Yale University": "0001056666",
     "Harvard Management Company": "0001082339",
@@ -84,7 +82,6 @@ KNOWN_CIKS = {
     "University of Texas Investment Management Company": "0001169536",
     "UTIMCO": "0001169536",
     "University of Michigan": "0001122624",
-
     # Foundations
     "Bill & Melinda Gates Foundation": "0001166559",
     "Gates Foundation": "0001166559",
@@ -215,9 +212,7 @@ class Sec13fCollector(BaseCollector):
             )
 
     async def _resolve_cik(
-        self,
-        lp_name: str,
-        provided_cik: Optional[str]
+        self, lp_name: str, provided_cik: Optional[str]
     ) -> Optional[str]:
         """
         Resolve CIK for an LP.
@@ -233,7 +228,10 @@ class Sec13fCollector(BaseCollector):
 
         # Check known CIKs
         for known_name, cik in KNOWN_CIKS.items():
-            if known_name.lower() in lp_name.lower() or lp_name.lower() in known_name.lower():
+            if (
+                known_name.lower() in lp_name.lower()
+                or lp_name.lower() in known_name.lower()
+            ):
                 logger.debug(f"Found known CIK {cik} for {lp_name}")
                 return cik
 
@@ -269,9 +267,7 @@ class Sec13fCollector(BaseCollector):
         return None
 
     async def _get_13f_filings(
-        self,
-        cik: str,
-        quarters_back: int = 4
+        self, cik: str, quarters_back: int = 4
     ) -> List[Dict[str, Any]]:
         """
         Get list of 13F filings for a CIK.
@@ -309,13 +305,23 @@ class Sec13fCollector(BaseCollector):
 
         for i, form in enumerate(forms):
             if form in FORM_13F_TYPES and len(filings) < quarters_back:
-                filings.append({
-                    "form": form,
-                    "accessionNumber": accessions[i] if i < len(accessions) else None,
-                    "filingDate": filing_dates[i] if i < len(filing_dates) else None,
-                    "reportDate": report_dates[i] if i < len(report_dates) else None,
-                    "primaryDocument": primary_docs[i] if i < len(primary_docs) else None,
-                })
+                filings.append(
+                    {
+                        "form": form,
+                        "accessionNumber": accessions[i]
+                        if i < len(accessions)
+                        else None,
+                        "filingDate": filing_dates[i]
+                        if i < len(filing_dates)
+                        else None,
+                        "reportDate": report_dates[i]
+                        if i < len(report_dates)
+                        else None,
+                        "primaryDocument": primary_docs[i]
+                        if i < len(primary_docs)
+                        else None,
+                    }
+                )
 
         return filings
 
@@ -386,35 +392,35 @@ class Sec13fCollector(BaseCollector):
         filing_date = filing.get("filingDate")
 
         for holding in holdings_data:
-            items.append(CollectedItem(
-                item_type="13f_holding",
-                data={
-                    "lp_id": lp_id,
-                    "lp_name": lp_name,
-                    "cusip": holding.get("cusip"),
-                    "issuer_name": holding.get("issuer"),
-                    "security_class": holding.get("class"),
-                    "shares": holding.get("shares"),
-                    "value_usd": holding.get("value"),
-                    "put_call": holding.get("putCall"),
-                    "investment_discretion": holding.get("investmentDiscretion"),
-                    "voting_authority_sole": holding.get("votingAuthoritySole"),
-                    "voting_authority_shared": holding.get("votingAuthorityShared"),
-                    "voting_authority_none": holding.get("votingAuthorityNone"),
-                    "report_date": report_date,
-                    "filing_date": filing_date,
-                    "accession_number": accession,
-                },
-                source_url=source_url,
-                confidence="high",  # SEC filings are authoritative
-            ))
+            items.append(
+                CollectedItem(
+                    item_type="13f_holding",
+                    data={
+                        "lp_id": lp_id,
+                        "lp_name": lp_name,
+                        "cusip": holding.get("cusip"),
+                        "issuer_name": holding.get("issuer"),
+                        "security_class": holding.get("class"),
+                        "shares": holding.get("shares"),
+                        "value_usd": holding.get("value"),
+                        "put_call": holding.get("putCall"),
+                        "investment_discretion": holding.get("investmentDiscretion"),
+                        "voting_authority_sole": holding.get("votingAuthoritySole"),
+                        "voting_authority_shared": holding.get("votingAuthorityShared"),
+                        "voting_authority_none": holding.get("votingAuthorityNone"),
+                        "report_date": report_date,
+                        "filing_date": filing_date,
+                        "accession_number": accession,
+                    },
+                    source_url=source_url,
+                    confidence="high",  # SEC filings are authoritative
+                )
+            )
 
         return items
 
     async def _fetch_infotable_from_index(
-        self,
-        cik: str,
-        accession: str
+        self, cik: str, accession: str
     ) -> Tuple[Optional[List[Dict]], Optional[str]]:
         """
         Fetch infotable by parsing filing index page.
@@ -427,7 +433,9 @@ class Sec13fCollector(BaseCollector):
         4. Tries to parse each as a 13F infotable
         """
         # Get filing index page
-        index_url = f"https://www.sec.gov/Archives/edgar/data/{cik.lstrip('0')}/{accession}/"
+        index_url = (
+            f"https://www.sec.gov/Archives/edgar/data/{cik.lstrip('0')}/{accession}/"
+        )
 
         response = await self._fetch_url(index_url)
 
@@ -443,7 +451,7 @@ class Sec13fCollector(BaseCollector):
         # Pattern to find XML file entries with size (handles <img> tags)
         file_pattern = re.compile(
             r'href="([^"]*?([^/"]+\.xml))"[^>]*>.*?</a></td>\s*<td[^>]*>(\d*)</td>',
-            re.IGNORECASE | re.DOTALL
+            re.IGNORECASE | re.DOTALL,
         )
         matches = file_pattern.findall(html)
 
@@ -468,7 +476,9 @@ class Sec13fCollector(BaseCollector):
                 try:
                     holdings = self._parse_13f_xml(xml_response.text)
                     if holdings:  # Found valid holdings data
-                        logger.debug(f"Successfully parsed infotable from {filename} ({len(holdings)} holdings)")
+                        logger.debug(
+                            f"Successfully parsed infotable from {filename} ({len(holdings)} holdings)"
+                        )
                         return holdings, xml_url
                 except Exception as e:
                     logger.debug(f"Could not parse {xml_url}: {e}")
@@ -495,7 +505,10 @@ class Sec13fCollector(BaseCollector):
 
         try:
             # Check if content looks like a 13F infotable
-            if "infoTable" not in xml_content.lower() and "infotable" not in xml_content.lower():
+            if (
+                "infoTable" not in xml_content.lower()
+                and "infotable" not in xml_content.lower()
+            ):
                 logger.debug("XML does not appear to be a 13F infotable")
                 return []
 
@@ -504,10 +517,10 @@ class Sec13fCollector(BaseCollector):
             clean_xml = xml_content
 
             # Remove namespace declarations
-            clean_xml = re.sub(r'\sxmlns(?::[^=]*)?\s*=\s*"[^"]*"', '', clean_xml)
+            clean_xml = re.sub(r'\sxmlns(?::[^=]*)?\s*=\s*"[^"]*"', "", clean_xml)
 
             # Remove namespace prefixes from tags (e.g., ns1:infoTable -> infoTable)
-            clean_xml = re.sub(r'<(/?)(\w+):', r'<\1', clean_xml)
+            clean_xml = re.sub(r"<(/?)(\w+):", r"<\1", clean_xml)
 
             try:
                 root = ET.fromstring(clean_xml)
@@ -565,7 +578,10 @@ class Sec13fCollector(BaseCollector):
             ("putCall", ["putCall"]),
             ("investmentDiscretion", ["investmentDiscretion"]),
             ("votingAuthoritySole", ["votingAuthority/Sole", "votingAuthSole", "Sole"]),
-            ("votingAuthorityShared", ["votingAuthority/Shared", "votingAuthShared", "Shared"]),
+            (
+                "votingAuthorityShared",
+                ["votingAuthority/Shared", "votingAuthShared", "Shared"],
+            ),
             ("votingAuthorityNone", ["votingAuthority/None", "votingAuthNone", "None"]),
         ]
 
@@ -577,7 +593,9 @@ class Sec13fCollector(BaseCollector):
                     target_tag = path.lower().split("/")[-1]
                     for child in entry.iter():
                         # Handle namespaced tags by taking only the local name
-                        local_tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+                        local_tag = (
+                            child.tag.split("}")[-1] if "}" in child.tag else child.tag
+                        )
                         if local_tag.lower() == target_tag:
                             elem = child
                             break

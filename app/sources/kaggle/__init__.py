@@ -29,4 +29,3 @@ __all__ = [
     "ingest_m5_dataset",
     "prepare_m5_tables",
 ]
-

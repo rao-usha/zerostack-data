@@ -32,21 +32,27 @@ router = APIRouter(prefix="/people-portfolios", tags=["People Portfolios"])
 # Request/Response Models
 # =============================================================================
 
+
 class PortfolioCreate(BaseModel):
     """Request to create a portfolio."""
+
     name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
-    portfolio_type: str = Field("pe_portfolio", description="pe_portfolio, watchlist, peer_group")
+    portfolio_type: str = Field(
+        "pe_portfolio", description="pe_portfolio, watchlist, peer_group"
+    )
 
 
 class PortfolioUpdate(BaseModel):
     """Request to update a portfolio."""
+
     name: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = None
 
 
 class PortfolioCompanyAdd(BaseModel):
     """Request to add a company to portfolio."""
+
     company_id: int
     investment_date: Optional[date] = None
     exit_date: Optional[date] = None
@@ -55,6 +61,7 @@ class PortfolioCompanyAdd(BaseModel):
 
 class PortfolioSummary(BaseModel):
     """Summary of a portfolio."""
+
     id: int
     name: str
     description: Optional[str] = None
@@ -70,6 +77,7 @@ class PortfolioSummary(BaseModel):
 
 class PortfolioCompanyItem(BaseModel):
     """Company in a portfolio."""
+
     company_id: int
     company_name: str
     industry: Optional[str] = None
@@ -87,6 +95,7 @@ class PortfolioCompanyItem(BaseModel):
 
 class PortfolioDetail(BaseModel):
     """Detailed portfolio information."""
+
     id: int
     name: str
     description: Optional[str] = None
@@ -105,6 +114,7 @@ class PortfolioDetail(BaseModel):
 
 class LeadershipChangeItem(BaseModel):
     """Leadership change in portfolio context."""
+
     id: int
     company_id: int
     company_name: str
@@ -122,6 +132,7 @@ class LeadershipChangeItem(BaseModel):
 
 class PortfolioChangesResponse(BaseModel):
     """Leadership changes across a portfolio."""
+
     portfolio_id: int
     portfolio_name: str
     changes: List[LeadershipChangeItem]
@@ -131,6 +142,7 @@ class PortfolioChangesResponse(BaseModel):
 # =============================================================================
 # Endpoints
 # =============================================================================
+
 
 @router.get("", response_model=List[PortfolioSummary])
 async def list_portfolios(
@@ -152,42 +164,63 @@ async def list_portfolios(
     results = []
     for portfolio in portfolios:
         # Count companies
-        company_count = db.query(PeoplePortfolioCompany).filter(
-            PeoplePortfolioCompany.portfolio_id == portfolio.id,
-            PeoplePortfolioCompany.is_active == True,
-        ).count()
+        company_count = (
+            db.query(PeoplePortfolioCompany)
+            .filter(
+                PeoplePortfolioCompany.portfolio_id == portfolio.id,
+                PeoplePortfolioCompany.is_active == True,
+            )
+            .count()
+        )
 
         # Count executives across portfolio
-        company_ids = [pc.company_id for pc in db.query(PeoplePortfolioCompany).filter(
-            PeoplePortfolioCompany.portfolio_id == portfolio.id,
-            PeoplePortfolioCompany.is_active == True,
-        ).all()]
+        company_ids = [
+            pc.company_id
+            for pc in db.query(PeoplePortfolioCompany)
+            .filter(
+                PeoplePortfolioCompany.portfolio_id == portfolio.id,
+                PeoplePortfolioCompany.is_active == True,
+            )
+            .all()
+        ]
 
         exec_count = 0
         recent_changes = 0
         if company_ids:
-            exec_count = db.query(CompanyPerson).filter(
-                CompanyPerson.company_id.in_(company_ids),
-                CompanyPerson.is_current == True,
-            ).count()
+            exec_count = (
+                db.query(CompanyPerson)
+                .filter(
+                    CompanyPerson.company_id.in_(company_ids),
+                    CompanyPerson.is_current == True,
+                )
+                .count()
+            )
 
             # Recent changes (30 days)
             thirty_days_ago = date.today() - timedelta(days=30)
-            recent_changes = db.query(LeadershipChange).filter(
-                LeadershipChange.company_id.in_(company_ids),
-                LeadershipChange.announced_date >= thirty_days_ago,
-            ).count()
+            recent_changes = (
+                db.query(LeadershipChange)
+                .filter(
+                    LeadershipChange.company_id.in_(company_ids),
+                    LeadershipChange.announced_date >= thirty_days_ago,
+                )
+                .count()
+            )
 
-        results.append(PortfolioSummary(
-            id=portfolio.id,
-            name=portfolio.name,
-            description=portfolio.description,
-            portfolio_type=portfolio.portfolio_type,
-            company_count=company_count,
-            total_executives=exec_count,
-            recent_changes=recent_changes,
-            created_at=portfolio.created_at.date() if portfolio.created_at else date.today(),
-        ))
+        results.append(
+            PortfolioSummary(
+                id=portfolio.id,
+                name=portfolio.name,
+                description=portfolio.description,
+                portfolio_type=portfolio.portfolio_type,
+                company_count=company_count,
+                total_executives=exec_count,
+                recent_changes=recent_changes,
+                created_at=portfolio.created_at.date()
+                if portfolio.created_at
+                else date.today(),
+            )
+        )
 
     return results
 
@@ -203,12 +236,14 @@ async def create_portfolio(
     Portfolios can be PE portfolios, watchlists, or peer groups.
     """
     # Check for duplicate name
-    existing = db.query(PeoplePortfolio).filter(
-        PeoplePortfolio.name == request.name
-    ).first()
+    existing = (
+        db.query(PeoplePortfolio).filter(PeoplePortfolio.name == request.name).first()
+    )
 
     if existing:
-        raise HTTPException(status_code=400, detail="Portfolio with this name already exists")
+        raise HTTPException(
+            status_code=400, detail="Portfolio with this name already exists"
+        )
 
     portfolio = PeoplePortfolio(
         name=request.name,
@@ -227,7 +262,9 @@ async def create_portfolio(
         company_count=0,
         total_executives=0,
         recent_changes=0,
-        created_at=portfolio.created_at.date() if portfolio.created_at else date.today(),
+        created_at=portfolio.created_at.date()
+        if portfolio.created_at
+        else date.today(),
     )
 
 
@@ -241,17 +278,21 @@ async def get_portfolio(
 
     Includes all companies and leadership statistics.
     """
-    portfolio = db.query(PeoplePortfolio).filter(
-        PeoplePortfolio.id == portfolio_id
-    ).first()
+    portfolio = (
+        db.query(PeoplePortfolio).filter(PeoplePortfolio.id == portfolio_id).first()
+    )
 
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
 
     # Get portfolio companies
-    portfolio_companies = db.query(PeoplePortfolioCompany).filter(
-        PeoplePortfolioCompany.portfolio_id == portfolio_id,
-    ).all()
+    portfolio_companies = (
+        db.query(PeoplePortfolioCompany)
+        .filter(
+            PeoplePortfolioCompany.portfolio_id == portfolio_id,
+        )
+        .all()
+    )
 
     companies = []
     total_executives = 0
@@ -265,41 +306,55 @@ async def get_portfolio(
             continue
 
         # Count executives for this company
-        exec_count = db.query(CompanyPerson).filter(
-            CompanyPerson.company_id == company.id,
-            CompanyPerson.is_current == True,
-        ).count()
+        exec_count = (
+            db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.company_id == company.id,
+                CompanyPerson.is_current == True,
+            )
+            .count()
+        )
 
         # Count recent changes
-        recent = db.query(LeadershipChange).filter(
-            LeadershipChange.company_id == company.id,
-            LeadershipChange.announced_date >= thirty_days_ago,
-        ).count()
+        recent = (
+            db.query(LeadershipChange)
+            .filter(
+                LeadershipChange.company_id == company.id,
+                LeadershipChange.announced_date >= thirty_days_ago,
+            )
+            .count()
+        )
 
-        companies.append(PortfolioCompanyItem(
-            company_id=company.id,
-            company_name=company.name,
-            industry=company.industry_segment,
-            website=company.website,
-            investment_date=pc.investment_date,
-            exit_date=pc.exit_date,
-            is_active=pc.is_active,
-            executive_count=exec_count,
-            recent_changes=recent,
-            notes=pc.notes,
-        ))
+        companies.append(
+            PortfolioCompanyItem(
+                company_id=company.id,
+                company_name=company.name,
+                industry=company.industry_segment,
+                website=company.website,
+                investment_date=pc.investment_date,
+                exit_date=pc.exit_date,
+                is_active=pc.is_active,
+                executive_count=exec_count,
+                recent_changes=recent,
+                notes=pc.notes,
+            )
+        )
 
         if pc.is_active:
             total_executives += exec_count
 
             # Count C-suite and board
-            leadership = db.query(CompanyPerson).filter(
-                CompanyPerson.company_id == company.id,
-                CompanyPerson.is_current == True,
-            ).all()
+            leadership = (
+                db.query(CompanyPerson)
+                .filter(
+                    CompanyPerson.company_id == company.id,
+                    CompanyPerson.is_current == True,
+                )
+                .all()
+            )
 
             for cp in leadership:
-                if cp.title_level == 'c_suite':
+                if cp.title_level == "c_suite":
                     c_suite_count += 1
                 if cp.is_board_member:
                     total_board += 1
@@ -308,10 +363,14 @@ async def get_portfolio(
     active_company_ids = [c.company_id for c in companies if c.is_active]
     recent_changes_30d = 0
     if active_company_ids:
-        recent_changes_30d = db.query(LeadershipChange).filter(
-            LeadershipChange.company_id.in_(active_company_ids),
-            LeadershipChange.announced_date >= thirty_days_ago,
-        ).count()
+        recent_changes_30d = (
+            db.query(LeadershipChange)
+            .filter(
+                LeadershipChange.company_id.in_(active_company_ids),
+                LeadershipChange.announced_date >= thirty_days_ago,
+            )
+            .count()
+        )
 
     return PortfolioDetail(
         id=portfolio.id,
@@ -323,8 +382,12 @@ async def get_portfolio(
         total_board_members=total_board,
         c_suite_count=c_suite_count,
         recent_changes_30d=recent_changes_30d,
-        created_at=portfolio.created_at.date() if portfolio.created_at else date.today(),
-        updated_at=portfolio.updated_at.date() if portfolio.updated_at else date.today(),
+        created_at=portfolio.created_at.date()
+        if portfolio.created_at
+        else date.today(),
+        updated_at=portfolio.updated_at.date()
+        if portfolio.updated_at
+        else date.today(),
     )
 
 
@@ -335,9 +398,9 @@ async def update_portfolio(
     db: Session = Depends(get_db),
 ):
     """Update portfolio name or description."""
-    portfolio = db.query(PeoplePortfolio).filter(
-        PeoplePortfolio.id == portfolio_id
-    ).first()
+    portfolio = (
+        db.query(PeoplePortfolio).filter(PeoplePortfolio.id == portfolio_id).first()
+    )
 
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
@@ -351,10 +414,14 @@ async def update_portfolio(
     db.refresh(portfolio)
 
     # Get counts
-    company_count = db.query(PeoplePortfolioCompany).filter(
-        PeoplePortfolioCompany.portfolio_id == portfolio.id,
-        PeoplePortfolioCompany.is_active == True,
-    ).count()
+    company_count = (
+        db.query(PeoplePortfolioCompany)
+        .filter(
+            PeoplePortfolioCompany.portfolio_id == portfolio.id,
+            PeoplePortfolioCompany.is_active == True,
+        )
+        .count()
+    )
 
     return PortfolioSummary(
         id=portfolio.id,
@@ -364,7 +431,9 @@ async def update_portfolio(
         company_count=company_count,
         total_executives=0,
         recent_changes=0,
-        created_at=portfolio.created_at.date() if portfolio.created_at else date.today(),
+        created_at=portfolio.created_at.date()
+        if portfolio.created_at
+        else date.today(),
     )
 
 
@@ -374,9 +443,9 @@ async def delete_portfolio(
     db: Session = Depends(get_db),
 ):
     """Delete a portfolio and its company associations."""
-    portfolio = db.query(PeoplePortfolio).filter(
-        PeoplePortfolio.id == portfolio_id
-    ).first()
+    portfolio = (
+        db.query(PeoplePortfolio).filter(PeoplePortfolio.id == portfolio_id).first()
+    )
 
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
@@ -400,25 +469,31 @@ async def add_company_to_portfolio(
     db: Session = Depends(get_db),
 ):
     """Add a company to a portfolio."""
-    portfolio = db.query(PeoplePortfolio).filter(
-        PeoplePortfolio.id == portfolio_id
-    ).first()
+    portfolio = (
+        db.query(PeoplePortfolio).filter(PeoplePortfolio.id == portfolio_id).first()
+    )
 
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
 
-    company = db.query(IndustrialCompany).filter(
-        IndustrialCompany.id == request.company_id
-    ).first()
+    company = (
+        db.query(IndustrialCompany)
+        .filter(IndustrialCompany.id == request.company_id)
+        .first()
+    )
 
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
     # Check if already in portfolio
-    existing = db.query(PeoplePortfolioCompany).filter(
-        PeoplePortfolioCompany.portfolio_id == portfolio_id,
-        PeoplePortfolioCompany.company_id == request.company_id,
-    ).first()
+    existing = (
+        db.query(PeoplePortfolioCompany)
+        .filter(
+            PeoplePortfolioCompany.portfolio_id == portfolio_id,
+            PeoplePortfolioCompany.company_id == request.company_id,
+        )
+        .first()
+    )
 
     if existing:
         raise HTTPException(status_code=400, detail="Company already in portfolio")
@@ -435,10 +510,14 @@ async def add_company_to_portfolio(
     db.commit()
 
     # Get executive count
-    exec_count = db.query(CompanyPerson).filter(
-        CompanyPerson.company_id == company.id,
-        CompanyPerson.is_current == True,
-    ).count()
+    exec_count = (
+        db.query(CompanyPerson)
+        .filter(
+            CompanyPerson.company_id == company.id,
+            CompanyPerson.is_current == True,
+        )
+        .count()
+    )
 
     return PortfolioCompanyItem(
         company_id=company.id,
@@ -461,10 +540,14 @@ async def remove_company_from_portfolio(
     db: Session = Depends(get_db),
 ):
     """Remove a company from a portfolio."""
-    pc = db.query(PeoplePortfolioCompany).filter(
-        PeoplePortfolioCompany.portfolio_id == portfolio_id,
-        PeoplePortfolioCompany.company_id == company_id,
-    ).first()
+    pc = (
+        db.query(PeoplePortfolioCompany)
+        .filter(
+            PeoplePortfolioCompany.portfolio_id == portfolio_id,
+            PeoplePortfolioCompany.company_id == company_id,
+        )
+        .first()
+    )
 
     if not pc:
         raise HTTPException(status_code=404, detail="Company not in portfolio")
@@ -487,18 +570,23 @@ async def get_portfolio_changes(
 
     Great for monitoring portfolio company leadership stability.
     """
-    portfolio = db.query(PeoplePortfolio).filter(
-        PeoplePortfolio.id == portfolio_id
-    ).first()
+    portfolio = (
+        db.query(PeoplePortfolio).filter(PeoplePortfolio.id == portfolio_id).first()
+    )
 
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
 
     # Get active company IDs
-    company_ids = [pc.company_id for pc in db.query(PeoplePortfolioCompany).filter(
-        PeoplePortfolioCompany.portfolio_id == portfolio_id,
-        PeoplePortfolioCompany.is_active == True,
-    ).all()]
+    company_ids = [
+        pc.company_id
+        for pc in db.query(PeoplePortfolioCompany)
+        .filter(
+            PeoplePortfolioCompany.portfolio_id == portfolio_id,
+            PeoplePortfolioCompany.is_active == True,
+        )
+        .all()
+    ]
 
     if not company_ids:
         return PortfolioChangesResponse(
@@ -527,18 +615,20 @@ async def get_portfolio_changes(
         company = db.get(IndustrialCompany, change.company_id)
         company_name = company.name if company else "Unknown"
 
-        items.append(LeadershipChangeItem(
-            id=change.id,
-            company_id=change.company_id,
-            company_name=company_name,
-            person_name=change.person_name,
-            change_type=change.change_type,
-            old_title=change.old_title,
-            new_title=change.new_title,
-            announced_date=change.announced_date,
-            is_c_suite=change.is_c_suite,
-            is_board=change.is_board,
-        ))
+        items.append(
+            LeadershipChangeItem(
+                id=change.id,
+                company_id=change.company_id,
+                company_name=company_name,
+                person_name=change.person_name,
+                change_type=change.change_type,
+                old_title=change.old_title,
+                new_title=change.new_title,
+                announced_date=change.announced_date,
+                is_c_suite=change.is_c_suite,
+                is_board=change.is_board,
+            )
+        )
 
     return PortfolioChangesResponse(
         portfolio_id=portfolio.id,

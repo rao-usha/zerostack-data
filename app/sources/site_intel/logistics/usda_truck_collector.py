@@ -12,6 +12,7 @@ Data sources:
 
 No API key required (Socrata app token optional for higher rate limits).
 """
+
 import logging
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any
@@ -21,7 +22,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import UsdaTruckRate
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -106,11 +111,21 @@ class UsdaTruckCollector(BaseCollector):
                 inserted, _ = self.bulk_upsert(
                     UsdaTruckRate,
                     records,
-                    unique_columns=["origin_region", "destination_city", "commodity", "report_date"],
+                    unique_columns=[
+                        "origin_region",
+                        "destination_city",
+                        "commodity",
+                        "report_date",
+                    ],
                     update_columns=[
-                        "origin_state", "destination_state", "mileage_band",
-                        "rate_per_mile", "rate_per_truckload", "fuel_price",
-                        "source", "collected_at"
+                        "origin_state",
+                        "destination_state",
+                        "mileage_band",
+                        "rate_per_mile",
+                        "rate_per_truckload",
+                        "fuel_price",
+                        "source",
+                        "collected_at",
                     ],
                 )
 
@@ -173,9 +188,13 @@ class UsdaTruckCollector(BaseCollector):
                         data = response.json()
                         records = self._parse_mars_report(data, slug)
                         all_records.extend(records)
-                        logger.info(f"Fetched {len(records)} records from report {slug}")
+                        logger.info(
+                            f"Fetched {len(records)} records from report {slug}"
+                        )
                     else:
-                        logger.warning(f"Failed to fetch report {slug}: {response.status_code}")
+                        logger.warning(
+                            f"Failed to fetch report {slug}: {response.status_code}"
+                        )
 
                 except Exception as e:
                     logger.warning(f"Error fetching report {slug}: {e}")
@@ -197,7 +216,9 @@ class UsdaTruckCollector(BaseCollector):
             logger.error(f"Failed to collect truck rates: {e}", exc_info=True)
             return {"records": [], "error": str(e)}
 
-    def _parse_mars_report(self, data: Dict[str, Any], slug: str) -> List[Dict[str, Any]]:
+    def _parse_mars_report(
+        self, data: Dict[str, Any], slug: str
+    ) -> List[Dict[str, Any]]:
         """Parse USDA MARS API report data."""
         records = []
 
@@ -208,13 +229,23 @@ class UsdaTruckCollector(BaseCollector):
 
         for item in results:
             record = {
-                "origin_region": item.get("origin") or item.get("origin_name") or "Unknown",
+                "origin_region": item.get("origin")
+                or item.get("origin_name")
+                or "Unknown",
                 "origin_state": item.get("origin_state"),
-                "destination_city": item.get("destination") or item.get("destination_name") or "Unknown",
+                "destination_city": item.get("destination")
+                or item.get("destination_name")
+                or "Unknown",
                 "destination_state": item.get("destination_state"),
-                "commodity": item.get("commodity") or item.get("commodity_name") or "General Produce",
-                "rate_per_mile": self._parse_rate(item.get("rate_per_mile") or item.get("low_price")),
-                "rate_per_truckload": self._parse_rate(item.get("rate") or item.get("avg_price")),
+                "commodity": item.get("commodity")
+                or item.get("commodity_name")
+                or "General Produce",
+                "rate_per_mile": self._parse_rate(
+                    item.get("rate_per_mile") or item.get("low_price")
+                ),
+                "rate_per_truckload": self._parse_rate(
+                    item.get("rate") or item.get("avg_price")
+                ),
                 "report_date": item.get("report_date") or item.get("date"),
                 "mileage": item.get("mileage") or item.get("distance"),
             }
@@ -224,7 +255,9 @@ class UsdaTruckCollector(BaseCollector):
 
         return records
 
-    async def _collect_from_socrata(self, config: CollectionConfig) -> List[Dict[str, Any]]:
+    async def _collect_from_socrata(
+        self, config: CollectionConfig
+    ) -> List[Dict[str, Any]]:
         """Collect from Socrata API as fallback."""
         try:
             client = await self.get_client()
@@ -236,7 +269,9 @@ class UsdaTruckCollector(BaseCollector):
 
             # Add date filter if specified
             if config.start_date:
-                params["$where"] = f"report_date >= '{config.start_date.strftime('%Y-%m-%d')}'"
+                params["$where"] = (
+                    f"report_date >= '{config.start_date.strftime('%Y-%m-%d')}'"
+                )
 
             response = await client.get(
                 f"/{self.DATASET_ID}.json",
@@ -259,11 +294,29 @@ class UsdaTruckCollector(BaseCollector):
         # Major agricultural shipping lanes
         lanes = [
             # California produce
-            ("Central Valley, CA", "CA", "Los Angeles", "CA", "Produce", 250, 2.85, 850),
+            (
+                "Central Valley, CA",
+                "CA",
+                "Los Angeles",
+                "CA",
+                "Produce",
+                250,
+                2.85,
+                850,
+            ),
             ("Central Valley, CA", "CA", "Chicago", "IL", "Produce", 2100, 2.45, 5145),
             ("Central Valley, CA", "CA", "New York", "NY", "Produce", 2800, 2.55, 7140),
             ("Central Valley, CA", "CA", "Dallas", "TX", "Produce", 1500, 2.50, 3750),
-            ("Imperial Valley, CA", "CA", "Phoenix", "AZ", "Vegetables", 180, 3.00, 540),
+            (
+                "Imperial Valley, CA",
+                "CA",
+                "Phoenix",
+                "AZ",
+                "Vegetables",
+                180,
+                3.00,
+                540,
+            ),
             ("Salinas Valley, CA", "CA", "Denver", "CO", "Lettuce", 1200, 2.60, 3120),
             # Florida citrus
             ("Central Florida", "FL", "Atlanta", "GA", "Citrus", 450, 2.70, 1215),
@@ -272,21 +325,66 @@ class UsdaTruckCollector(BaseCollector):
             ("South Florida", "FL", "Boston", "MA", "Produce", 1500, 2.60, 3900),
             # Texas/Mexico border
             ("Rio Grande Valley, TX", "TX", "Dallas", "TX", "Produce", 500, 2.65, 1325),
-            ("Rio Grande Valley, TX", "TX", "Chicago", "IL", "Produce", 1700, 2.45, 4165),
+            (
+                "Rio Grande Valley, TX",
+                "TX",
+                "Chicago",
+                "IL",
+                "Produce",
+                1700,
+                2.45,
+                4165,
+            ),
             ("Nogales, AZ", "AZ", "Los Angeles", "CA", "Produce", 500, 2.80, 1400),
             ("Nogales, AZ", "AZ", "Phoenix", "AZ", "Vegetables", 180, 3.10, 558),
             # Pacific Northwest
             ("Yakima Valley, WA", "WA", "Seattle", "WA", "Apples", 150, 3.20, 480),
             ("Yakima Valley, WA", "WA", "Portland", "OR", "Apples", 200, 3.00, 600),
-            ("Columbia Basin, WA", "WA", "Los Angeles", "CA", "Potatoes", 1100, 2.55, 2805),
+            (
+                "Columbia Basin, WA",
+                "WA",
+                "Los Angeles",
+                "CA",
+                "Potatoes",
+                1100,
+                2.55,
+                2805,
+            ),
             # Midwest
-            ("San Joaquin Valley, CA", "CA", "Kansas City", "MO", "Produce", 1700, 2.48, 4216),
+            (
+                "San Joaquin Valley, CA",
+                "CA",
+                "Kansas City",
+                "MO",
+                "Produce",
+                1700,
+                2.48,
+                4216,
+            ),
             ("Vidalia, GA", "GA", "Atlanta", "GA", "Onions", 200, 2.90, 580),
-            ("Eastern Shore, MD", "MD", "Philadelphia", "PA", "Produce", 120, 3.30, 396),
+            (
+                "Eastern Shore, MD",
+                "MD",
+                "Philadelphia",
+                "PA",
+                "Produce",
+                120,
+                3.30,
+                396,
+            ),
         ]
 
         records = []
-        for origin, origin_st, dest, dest_st, commodity, mileage, rate_mi, rate_tl in lanes:
+        for (
+            origin,
+            origin_st,
+            dest,
+            dest_st,
+            commodity,
+            mileage,
+            rate_mi,
+            rate_tl,
+        ) in lanes:
             # Determine mileage band
             if mileage < 200:
                 mileage_band = "local"
@@ -297,19 +395,21 @@ class UsdaTruckCollector(BaseCollector):
             else:
                 mileage_band = "long"
 
-            records.append({
-                "origin_region": origin,
-                "origin_state": origin_st,
-                "destination_city": dest,
-                "destination_state": dest_st,
-                "commodity": commodity,
-                "mileage": mileage,
-                "mileage_band": mileage_band,
-                "rate_per_mile": rate_mi,
-                "rate_per_truckload": rate_tl,
-                "fuel_price": 3.85,  # Current approximate diesel price
-                "report_date": today.isoformat(),
-            })
+            records.append(
+                {
+                    "origin_region": origin,
+                    "origin_state": origin_st,
+                    "destination_city": dest,
+                    "destination_state": dest_st,
+                    "commodity": commodity,
+                    "mileage": mileage,
+                    "mileage_band": mileage_band,
+                    "rate_per_mile": rate_mi,
+                    "rate_per_truckload": rate_tl,
+                    "fuel_price": 3.85,  # Current approximate diesel price
+                    "report_date": today.isoformat(),
+                }
+            )
 
         return records
 

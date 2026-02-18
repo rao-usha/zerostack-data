@@ -6,6 +6,7 @@ Provides HTTP endpoints for ingesting Data Commons data:
 - US state-level data for common variables
 - Custom variable/place combinations
 """
+
 import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, BackgroundTasks
@@ -23,50 +24,57 @@ router = APIRouter(tags=["data_commons"])
 
 # ========== Request Models ==========
 
+
 class StatVarIngestRequest(BaseModel):
     """Request model for statistical variable ingestion."""
+
     variable_dcid: str = Field(
         default="Count_Person",
         description="Statistical variable DCID (e.g., Count_Person, Median_Income_Household)",
-        examples=["Count_Person"]
+        examples=["Count_Person"],
     )
     places: List[str] = Field(
         default=["geoId/06", "geoId/48", "geoId/36"],
         description="List of place DCIDs to fetch data for",
-        examples=[["geoId/06", "geoId/48"]]
+        examples=[["geoId/06", "geoId/48"]],
     )
 
 
 class PlaceStatsIngestRequest(BaseModel):
     """Request model for place statistics ingestion."""
+
     place_dcid: str = Field(
         default="geoId/06",
         description="Place DCID (e.g., geoId/06 for California)",
-        examples=["geoId/06"]
+        examples=["geoId/06"],
     )
     variables: Optional[List[str]] = Field(
         None,
         description="List of variable DCIDs (defaults to common variables)",
-        examples=[["Count_Person", "Median_Income_Household"]]
+        examples=[["Count_Person", "Median_Income_Household"]],
     )
 
 
 class USStateDataRequest(BaseModel):
     """Request model for US state data ingestion."""
+
     variables: Optional[List[str]] = Field(
         None,
         description="List of variable DCIDs (defaults to common demographics)",
-        examples=[["Count_Person", "Median_Income_Household", "UnemploymentRate_Person"]]
+        examples=[
+            ["Count_Person", "Median_Income_Household", "UnemploymentRate_Person"]
+        ],
     )
 
 
 # ========== Endpoints ==========
 
+
 @router.post("/data-commons/stat-var/ingest")
 async def ingest_stat_var_data(
     request: StatVarIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest Data Commons statistical variable data for specified places.
@@ -90,7 +98,9 @@ async def ingest_stat_var_data(
     **API Key:** Optional but recommended for higher rate limits.
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="data_commons",
+        db,
+        background_tasks,
+        source="data_commons",
         config={
             "dataset": "observations",
             "variable_dcid": request.variable_dcid,
@@ -104,7 +114,7 @@ async def ingest_stat_var_data(
 async def ingest_place_stats_data(
     request: PlaceStatsIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest multiple statistical variables for a single place.
@@ -119,7 +129,9 @@ async def ingest_place_stats_data(
     - country/USA - United States
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="data_commons",
+        db,
+        background_tasks,
+        source="data_commons",
         config={
             "dataset": "place_stats",
             "place_dcid": request.place_dcid,
@@ -133,7 +145,7 @@ async def ingest_place_stats_data(
 async def ingest_us_state_data(
     request: USStateDataRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest statistical data for all US states.
@@ -149,7 +161,9 @@ async def ingest_us_state_data(
     - Count_Household
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="data_commons",
+        db,
+        background_tasks,
+        source="data_commons",
         config={
             "dataset": "us_states",
             "variables": request.variables,
@@ -167,30 +181,35 @@ async def list_statistical_variables():
         "variables": STATISTICAL_VARIABLES,
         "categories": {
             "demographics": [
-                "Count_Person", "Count_Person_Male", "Count_Person_Female",
-                "Median_Age_Person", "Count_Household", "Count_HousingUnit"
+                "Count_Person",
+                "Count_Person_Male",
+                "Count_Person_Female",
+                "Median_Age_Person",
+                "Count_Household",
+                "Count_HousingUnit",
             ],
             "income": [
-                "Median_Income_Person", "Median_Income_Household",
-                "Mean_Income_Person", "Count_Person_BelowPovertyLine"
+                "Median_Income_Person",
+                "Median_Income_Household",
+                "Mean_Income_Person",
+                "Count_Person_BelowPovertyLine",
             ],
             "employment": [
-                "Count_Person_Employed", "Count_Person_Unemployed",
-                "UnemploymentRate_Person"
+                "Count_Person_Employed",
+                "Count_Person_Unemployed",
+                "UnemploymentRate_Person",
             ],
             "crime": [
                 "Count_CriminalActivities_CombinedCrime",
                 "Count_CriminalActivities_ViolentCrime",
-                "Count_CriminalActivities_PropertyCrime"
+                "Count_CriminalActivities_PropertyCrime",
             ],
-            "health": [
-                "Count_Death", "LifeExpectancy_Person"
-            ],
+            "health": ["Count_Death", "LifeExpectancy_Person"],
             "economy": [
                 "Amount_EconomicActivity_GrossDomesticProduction_RealValue",
-                "GrowthRate_Amount_EconomicActivity_GrossDomesticProduction"
-            ]
-        }
+                "GrowthRate_Amount_EconomicActivity_GrossDomesticProduction",
+            ],
+        },
     }
 
 
@@ -251,7 +270,7 @@ async def list_common_places():
             "Washington": "geoId/53",
             "West Virginia": "geoId/54",
             "Wisconsin": "geoId/55",
-            "Wyoming": "geoId/56"
+            "Wyoming": "geoId/56",
         },
         "countries": {
             "United States": "country/USA",
@@ -263,11 +282,11 @@ async def list_common_places():
             "Japan": "country/JPN",
             "China": "country/CHN",
             "India": "country/IND",
-            "Brazil": "country/BRA"
+            "Brazil": "country/BRA",
         },
         "place_format_info": {
             "us_state": "geoId/XX (2-digit FIPS)",
             "us_county": "geoId/XXXXX (5-digit FIPS)",
-            "country": "country/XXX (ISO 3166-1 alpha-3)"
-        }
+            "country": "country/XXX (ISO 3166-1 alpha-3)",
+        },
     }

@@ -3,6 +3,7 @@ Dashboard Analytics API (T13).
 
 Endpoints providing pre-computed analytics for frontend dashboards.
 """
+
 import logging
 from typing import Optional, List, Dict, Any
 
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/analytics", tags=["Dashboard Analytics"])
 
 class CollectionStats(BaseModel):
     """Collection job statistics."""
+
     jobs_last_24h: int
     jobs_last_7d: int
     jobs_last_30d: int
@@ -35,6 +37,7 @@ class CollectionStats(BaseModel):
 
 class AlertStats(BaseModel):
     """Alert statistics."""
+
     pending_alerts: int
     alerts_triggered_today: int
     alerts_triggered_7d: int
@@ -43,6 +46,7 @@ class AlertStats(BaseModel):
 
 class SystemOverviewResponse(BaseModel):
     """System-wide statistics for main dashboard."""
+
     total_lps: int
     total_family_offices: int
     lps_with_portfolio_data: int
@@ -63,6 +67,7 @@ class SystemOverviewResponse(BaseModel):
 
 class PortfolioSummary(BaseModel):
     """Portfolio summary for an investor."""
+
     total_companies: int
     total_market_value_usd: Optional[float]
     sources_used: List[str]
@@ -72,6 +77,7 @@ class PortfolioSummary(BaseModel):
 
 class IndustryBreakdown(BaseModel):
     """Industry breakdown item."""
+
     industry: str
     company_count: int
     percentage: float
@@ -80,6 +86,7 @@ class IndustryBreakdown(BaseModel):
 
 class HoldingSummary(BaseModel):
     """Top holding summary."""
+
     company_name: str
     industry: Optional[str]
     market_value_usd: Optional[float]
@@ -90,6 +97,7 @@ class HoldingSummary(BaseModel):
 
 class DataQualityScore(BaseModel):
     """Data quality score breakdown."""
+
     overall_score: int
     completeness: int
     freshness: int
@@ -100,6 +108,7 @@ class DataQualityScore(BaseModel):
 
 class CollectionEvent(BaseModel):
     """Collection history event."""
+
     job_id: int
     date: Optional[str]
     status: Optional[str]
@@ -109,6 +118,7 @@ class CollectionEvent(BaseModel):
 
 class InvestorAnalyticsResponse(BaseModel):
     """Detailed analytics for a single investor."""
+
     investor_id: int
     investor_type: str
     investor_name: str
@@ -121,6 +131,7 @@ class InvestorAnalyticsResponse(BaseModel):
 
 class TrendDataPoint(BaseModel):
     """Single data point in a trend."""
+
     date: Optional[str]
     value: int
     details: Optional[Dict[str, Any]]
@@ -128,6 +139,7 @@ class TrendDataPoint(BaseModel):
 
 class TrendSummary(BaseModel):
     """Summary statistics for a trend."""
+
     total: int
     average: float
     min: int
@@ -138,6 +150,7 @@ class TrendSummary(BaseModel):
 
 class TrendsResponse(BaseModel):
     """Time-series trend data response."""
+
     period: str
     metric: str
     data_points: List[TrendDataPoint]
@@ -146,6 +159,7 @@ class TrendsResponse(BaseModel):
 
 class PortfolioMover(BaseModel):
     """Recent portfolio change/mover."""
+
     investor_id: int
     investor_type: str
     investor_name: Optional[str]
@@ -157,12 +171,14 @@ class PortfolioMover(BaseModel):
 
 class TopMoversResponse(BaseModel):
     """Recent portfolio changes response."""
+
     movers: List[PortfolioMover]
     generated_at: str
 
 
 class IndustryStats(BaseModel):
     """Industry statistics."""
+
     industry: str
     company_count: int
     percentage: float
@@ -173,6 +189,7 @@ class IndustryStats(BaseModel):
 
 class IndustryBreakdownResponse(BaseModel):
     """Aggregate industry breakdown response."""
+
     total_companies: int
     industries: List[IndustryStats]
     other_count: int
@@ -227,7 +244,7 @@ async def get_system_overview(db: Session = Depends(get_db)):
 async def get_investor_analytics(
     investor_id: int,
     investor_type: str = Query(..., description="'lp' or 'family_office'"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     📈 Get detailed analytics for a single investor.
@@ -248,8 +265,7 @@ async def get_investor_analytics(
     try:
         if investor_type not in ("lp", "family_office"):
             raise HTTPException(
-                status_code=400,
-                detail="investor_type must be 'lp' or 'family_office'"
+                status_code=400, detail="investor_type must be 'lp' or 'family_office'"
             )
 
         analytics = get_dashboard_analytics(db)
@@ -263,9 +279,7 @@ async def get_investor_analytics(
             industry_distribution=[
                 IndustryBreakdown(**ind) for ind in result["industry_distribution"]
             ],
-            top_holdings=[
-                HoldingSummary(**h) for h in result["top_holdings"]
-            ],
+            top_holdings=[HoldingSummary(**h) for h in result["top_holdings"]],
             data_quality=DataQualityScore(**result["data_quality"]),
             collection_history=[
                 CollectionEvent(**e) for e in result["collection_history"]
@@ -282,8 +296,10 @@ async def get_investor_analytics(
 @router.get("/trends", response_model=TrendsResponse)
 async def get_trends(
     period: str = Query("30d", description="Time period: 7d, 30d, or 90d"),
-    metric: str = Query("collections", description="Metric: collections, companies, or alerts"),
-    db: Session = Depends(get_db)
+    metric: str = Query(
+        "collections", description="Metric: collections, companies, or alerts"
+    ),
+    db: Session = Depends(get_db),
 ):
     """
     📉 Get time-series trend data for charts.
@@ -308,14 +324,13 @@ async def get_trends(
     try:
         if period not in ("7d", "30d", "90d"):
             raise HTTPException(
-                status_code=400,
-                detail="period must be '7d', '30d', or '90d'"
+                status_code=400, detail="period must be '7d', '30d', or '90d'"
             )
 
         if metric not in ("collections", "companies", "alerts"):
             raise HTTPException(
                 status_code=400,
-                detail="metric must be 'collections', 'companies', or 'alerts'"
+                detail="metric must be 'collections', 'companies', or 'alerts'",
             )
 
         analytics = get_dashboard_analytics(db)
@@ -340,9 +355,9 @@ async def get_top_movers(
     limit: int = Query(20, ge=1, le=100, description="Number of movers to return"),
     change_type: Optional[str] = Query(
         None,
-        description="Filter by change type: new_holding, removed_holding, value_change, shares_change"
+        description="Filter by change type: new_holding, removed_holding, value_change, shares_change",
     ),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     🔥 Get recent significant portfolio changes.
@@ -362,11 +377,15 @@ async def get_top_movers(
     - Detection timestamp
     """
     try:
-        valid_types = {"new_holding", "removed_holding", "value_change", "shares_change"}
+        valid_types = {
+            "new_holding",
+            "removed_holding",
+            "value_change",
+            "shares_change",
+        }
         if change_type and change_type not in valid_types:
             raise HTTPException(
-                status_code=400,
-                detail=f"change_type must be one of: {valid_types}"
+                status_code=400, detail=f"change_type must be one of: {valid_types}"
             )
 
         analytics = get_dashboard_analytics(db)
@@ -387,11 +406,10 @@ async def get_top_movers(
 @router.get("/industry-breakdown", response_model=IndustryBreakdownResponse)
 async def get_industry_breakdown(
     investor_type: Optional[str] = Query(
-        None,
-        description="Filter by investor type: 'lp' or 'family_office'"
+        None, description="Filter by investor type: 'lp' or 'family_office'"
     ),
     limit: int = Query(20, ge=1, le=100, description="Top N industries to return"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     🏭 Get aggregate industry distribution across all portfolios.
@@ -413,8 +431,7 @@ async def get_industry_breakdown(
     try:
         if investor_type and investor_type not in ("lp", "family_office"):
             raise HTTPException(
-                status_code=400,
-                detail="investor_type must be 'lp' or 'family_office'"
+                status_code=400, detail="investor_type must be 'lp' or 'family_office'"
             )
 
         analytics = get_dashboard_analytics(db)

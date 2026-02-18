@@ -16,6 +16,7 @@ Rate limits:
 - 1,000 requests per minute limit
 - Generous response size limits (up to 10,000 records per request)
 """
+
 import logging
 from typing import Dict, List, Optional, Any
 
@@ -39,7 +40,7 @@ class TreasuryClient(BaseAPIClient):
         self,
         max_concurrency: int = 5,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize Treasury FiscalData API client.
@@ -58,7 +59,7 @@ class TreasuryClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=config.timeout_seconds,
             connect_timeout=config.connect_timeout_seconds,
-            rate_limit_interval=config.get_rate_limit_interval()
+            rate_limit_interval=config.get_rate_limit_interval(),
         )
 
     async def get_daily_treasury_balance(
@@ -66,7 +67,7 @@ class TreasuryClient(BaseAPIClient):
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         page_size: int = 10000,
-        page_number: int = 1
+        page_number: int = 1,
     ) -> Dict[str, Any]:
         """
         Fetch Daily Treasury Statement - Deposits/Withdrawals/Operating Cash.
@@ -91,7 +92,7 @@ class TreasuryClient(BaseAPIClient):
         params = {
             "page[size]": page_size,
             "page[number]": page_number,
-            "sort": "-record_date"
+            "sort": "-record_date",
         }
 
         if filters:
@@ -100,7 +101,7 @@ class TreasuryClient(BaseAPIClient):
         return await self.get(
             "v1/accounting/dts/deposits_withdrawals_operating_cash",
             params=params,
-            resource_id="daily_treasury_balance"
+            resource_id="daily_treasury_balance",
         )
 
     async def get_debt_outstanding(
@@ -108,7 +109,7 @@ class TreasuryClient(BaseAPIClient):
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         page_size: int = 10000,
-        page_number: int = 1
+        page_number: int = 1,
     ) -> Dict[str, Any]:
         """
         Fetch Debt to the Penny - Total Public Debt Outstanding.
@@ -133,7 +134,7 @@ class TreasuryClient(BaseAPIClient):
         params = {
             "page[size]": page_size,
             "page[number]": page_number,
-            "sort": "-record_date"
+            "sort": "-record_date",
         }
 
         if filters:
@@ -142,7 +143,7 @@ class TreasuryClient(BaseAPIClient):
         return await self.get(
             "v2/accounting/od/debt_outstanding",
             params=params,
-            resource_id="debt_outstanding"
+            resource_id="debt_outstanding",
         )
 
     async def get_interest_rates(
@@ -151,7 +152,7 @@ class TreasuryClient(BaseAPIClient):
         end_date: Optional[str] = None,
         security_type: Optional[str] = None,
         page_size: int = 10000,
-        page_number: int = 1
+        page_number: int = 1,
     ) -> Dict[str, Any]:
         """
         Fetch Average Interest Rates on U.S. Treasury Securities.
@@ -179,7 +180,7 @@ class TreasuryClient(BaseAPIClient):
         params = {
             "page[size]": page_size,
             "page[number]": page_number,
-            "sort": "-record_date"
+            "sort": "-record_date",
         }
 
         if filters:
@@ -188,7 +189,7 @@ class TreasuryClient(BaseAPIClient):
         return await self.get(
             "v2/accounting/od/avg_interest_rates",
             params=params,
-            resource_id="interest_rates"
+            resource_id="interest_rates",
         )
 
     async def get_monthly_treasury_statement(
@@ -197,7 +198,7 @@ class TreasuryClient(BaseAPIClient):
         end_date: Optional[str] = None,
         classification: Optional[str] = None,
         page_size: int = 10000,
-        page_number: int = 1
+        page_number: int = 1,
     ) -> Dict[str, Any]:
         """
         Fetch Monthly Treasury Statement - Table 4 (Revenue & Spending).
@@ -225,7 +226,7 @@ class TreasuryClient(BaseAPIClient):
         params = {
             "page[size]": page_size,
             "page[number]": page_number,
-            "sort": "-record_date"
+            "sort": "-record_date",
         }
 
         if filters:
@@ -234,7 +235,7 @@ class TreasuryClient(BaseAPIClient):
         return await self.get(
             "v1/accounting/mts/mts_table_4",
             params=params,
-            resource_id="monthly_treasury_statement"
+            resource_id="monthly_treasury_statement",
         )
 
     async def get_auction_results(
@@ -243,7 +244,7 @@ class TreasuryClient(BaseAPIClient):
         end_date: Optional[str] = None,
         security_type: Optional[str] = None,
         page_size: int = 10000,
-        page_number: int = 1
+        page_number: int = 1,
     ) -> Dict[str, Any]:
         """
         Fetch Treasury Securities Auction Data.
@@ -271,7 +272,7 @@ class TreasuryClient(BaseAPIClient):
         params = {
             "page[size]": page_size,
             "page[number]": page_number,
-            "sort": "-auction_date"
+            "sort": "-auction_date",
         }
 
         if filters:
@@ -280,7 +281,7 @@ class TreasuryClient(BaseAPIClient):
         return await self.get(
             "v1/accounting/od/auctions_query",
             params=params,
-            resource_id="auction_results"
+            resource_id="auction_results",
         )
 
 
@@ -290,32 +291,32 @@ TREASURY_DATASETS = {
         "endpoint": "v1/accounting/dts/deposits_withdrawals_operating_cash",
         "table_name": "treasury_daily_balance",
         "description": "Daily Treasury Statement - Deposits, Withdrawals, and Operating Cash",
-        "date_field": "record_date"
+        "date_field": "record_date",
     },
     "debt_outstanding": {
         "endpoint": "v2/accounting/od/debt_outstanding",
         "table_name": "treasury_debt_outstanding",
         "description": "Total Public Debt Outstanding (Debt to the Penny)",
-        "date_field": "record_date"
+        "date_field": "record_date",
     },
     "interest_rates": {
         "endpoint": "v2/accounting/od/avg_interest_rates",
         "table_name": "treasury_interest_rates",
         "description": "Average Interest Rates on U.S. Treasury Securities",
-        "date_field": "record_date"
+        "date_field": "record_date",
     },
     "monthly_statement": {
         "endpoint": "v1/accounting/mts/mts_table_4",
         "table_name": "treasury_monthly_statement",
         "description": "Monthly Treasury Statement - Revenue and Spending",
-        "date_field": "record_date"
+        "date_field": "record_date",
     },
     "auctions": {
         "endpoint": "v1/accounting/od/auctions_query",
         "table_name": "treasury_auctions",
         "description": "Treasury Securities Auction Results",
-        "date_field": "auction_date"
-    }
+        "date_field": "auction_date",
+    },
 }
 
 
@@ -325,7 +326,7 @@ SECURITY_TYPES = [
     "Treasury Notes",
     "Treasury Bonds",
     "Treasury Inflation-Protected Securities (TIPS)",
-    "Treasury Floating Rate Notes (FRN)"
+    "Treasury Floating Rate Notes (FRN)",
 ]
 
 
@@ -336,5 +337,5 @@ AUCTION_SECURITY_TYPES = [
     "Bond",
     "TIPS",
     "FRN",
-    "CMB"  # Cash Management Bill
+    "CMB",  # Cash Management Bill
 ]

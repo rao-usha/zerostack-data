@@ -3,6 +3,7 @@ Job dependency service.
 
 Provides functionality for managing job dependencies and executing job chains.
 """
+
 import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
@@ -10,8 +11,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 from app.core.models import (
-    IngestionJob, JobStatus, JobDependency, DependencyCondition,
-    JobChain, JobChainExecution
+    IngestionJob,
+    JobStatus,
+    JobDependency,
+    DependencyCondition,
+    JobChain,
+    JobChainExecution,
 )
 
 logger = logging.getLogger(__name__)
@@ -20,6 +25,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Dependency Checking Functions
 # =============================================================================
+
 
 def get_job_dependencies(db: Session, job_id: int) -> List[JobDependency]:
     """
@@ -32,9 +38,7 @@ def get_job_dependencies(db: Session, job_id: int) -> List[JobDependency]:
     Returns:
         List of JobDependency objects
     """
-    return db.query(JobDependency).filter(
-        JobDependency.job_id == job_id
-    ).all()
+    return db.query(JobDependency).filter(JobDependency.job_id == job_id).all()
 
 
 def get_dependent_jobs(db: Session, job_id: int) -> List[JobDependency]:
@@ -48,15 +52,12 @@ def get_dependent_jobs(db: Session, job_id: int) -> List[JobDependency]:
     Returns:
         List of JobDependency objects where depends_on_job_id == job_id
     """
-    return db.query(JobDependency).filter(
-        JobDependency.depends_on_job_id == job_id
-    ).all()
+    return (
+        db.query(JobDependency).filter(JobDependency.depends_on_job_id == job_id).all()
+    )
 
 
-def is_dependency_satisfied(
-    db: Session,
-    dependency: JobDependency
-) -> bool:
+def is_dependency_satisfied(db: Session, dependency: JobDependency) -> bool:
     """
     Check if a single dependency is satisfied.
 
@@ -67,12 +68,16 @@ def is_dependency_satisfied(
     Returns:
         True if the dependency is satisfied
     """
-    parent_job = db.query(IngestionJob).filter(
-        IngestionJob.id == dependency.depends_on_job_id
-    ).first()
+    parent_job = (
+        db.query(IngestionJob)
+        .filter(IngestionJob.id == dependency.depends_on_job_id)
+        .first()
+    )
 
     if not parent_job:
-        logger.warning(f"Parent job {dependency.depends_on_job_id} not found for dependency")
+        logger.warning(
+            f"Parent job {dependency.depends_on_job_id} not found for dependency"
+        )
         return False
 
     if dependency.condition == DependencyCondition.ON_SUCCESS:
@@ -110,10 +115,7 @@ def are_all_dependencies_satisfied(db: Session, job_id: int) -> bool:
     return True
 
 
-def get_unsatisfied_dependencies(
-    db: Session,
-    job_id: int
-) -> List[Dict[str, Any]]:
+def get_unsatisfied_dependencies(db: Session, job_id: int) -> List[Dict[str, Any]]:
     """
     Get list of unsatisfied dependencies for a job.
 
@@ -129,17 +131,23 @@ def get_unsatisfied_dependencies(
 
     for dep in dependencies:
         if not is_dependency_satisfied(db, dep):
-            parent_job = db.query(IngestionJob).filter(
-                IngestionJob.id == dep.depends_on_job_id
-            ).first()
+            parent_job = (
+                db.query(IngestionJob)
+                .filter(IngestionJob.id == dep.depends_on_job_id)
+                .first()
+            )
 
-            unsatisfied.append({
-                "dependency_id": dep.id,
-                "parent_job_id": dep.depends_on_job_id,
-                "parent_status": parent_job.status.value if parent_job else "not_found",
-                "condition": dep.condition.value,
-                "source": parent_job.source if parent_job else None
-            })
+            unsatisfied.append(
+                {
+                    "dependency_id": dep.id,
+                    "parent_job_id": dep.depends_on_job_id,
+                    "parent_status": parent_job.status.value
+                    if parent_job
+                    else "not_found",
+                    "condition": dep.condition.value,
+                    "source": parent_job.source if parent_job else None,
+                }
+            )
 
     return unsatisfied
 
@@ -148,11 +156,12 @@ def get_unsatisfied_dependencies(
 # Job Dependency Management
 # =============================================================================
 
+
 def add_dependency(
     db: Session,
     job_id: int,
     depends_on_job_id: int,
-    condition: DependencyCondition = DependencyCondition.ON_SUCCESS
+    condition: DependencyCondition = DependencyCondition.ON_SUCCESS,
 ) -> JobDependency:
     """
     Add a dependency between two jobs.
@@ -167,15 +176,21 @@ def add_dependency(
         The created JobDependency
     """
     # Check if dependency already exists
-    existing = db.query(JobDependency).filter(
-        and_(
-            JobDependency.job_id == job_id,
-            JobDependency.depends_on_job_id == depends_on_job_id
+    existing = (
+        db.query(JobDependency)
+        .filter(
+            and_(
+                JobDependency.job_id == job_id,
+                JobDependency.depends_on_job_id == depends_on_job_id,
+            )
         )
-    ).first()
+        .first()
+    )
 
     if existing:
-        logger.warning(f"Dependency already exists: job {job_id} -> {depends_on_job_id}")
+        logger.warning(
+            f"Dependency already exists: job {job_id} -> {depends_on_job_id}"
+        )
         return existing
 
     # Check for circular dependency
@@ -183,16 +198,16 @@ def add_dependency(
         raise ValueError(f"Adding dependency would create circular reference")
 
     dependency = JobDependency(
-        job_id=job_id,
-        depends_on_job_id=depends_on_job_id,
-        condition=condition
+        job_id=job_id, depends_on_job_id=depends_on_job_id, condition=condition
     )
 
     db.add(dependency)
     db.commit()
     db.refresh(dependency)
 
-    logger.info(f"Added dependency: job {job_id} depends on job {depends_on_job_id} ({condition.value})")
+    logger.info(
+        f"Added dependency: job {job_id} depends on job {depends_on_job_id} ({condition.value})"
+    )
 
     # If job is PENDING and has unsatisfied dependencies, mark as BLOCKED
     job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
@@ -217,12 +232,16 @@ def remove_dependency(db: Session, job_id: int, depends_on_job_id: int) -> bool:
     Returns:
         True if dependency was removed
     """
-    dependency = db.query(JobDependency).filter(
-        and_(
-            JobDependency.job_id == job_id,
-            JobDependency.depends_on_job_id == depends_on_job_id
+    dependency = (
+        db.query(JobDependency)
+        .filter(
+            and_(
+                JobDependency.job_id == job_id,
+                JobDependency.depends_on_job_id == depends_on_job_id,
+            )
         )
-    ).first()
+        .first()
+    )
 
     if not dependency:
         return False
@@ -261,9 +280,7 @@ def would_create_cycle(db: Session, job_id: int, depends_on_job_id: int) -> bool
             return True
 
         # Get dependencies of current job
-        deps = db.query(JobDependency).filter(
-            JobDependency.job_id == current
-        ).all()
+        deps = db.query(JobDependency).filter(JobDependency.job_id == current).all()
 
         for dep in deps:
             to_check.append(dep.depends_on_job_id)
@@ -274,6 +291,7 @@ def would_create_cycle(db: Session, job_id: int, depends_on_job_id: int) -> bool
 # =============================================================================
 # Job Unblocking (Called when parent jobs complete)
 # =============================================================================
+
 
 def check_and_unblock_dependent_jobs(db: Session, completed_job_id: int) -> List[int]:
     """
@@ -297,9 +315,7 @@ def check_and_unblock_dependent_jobs(db: Session, completed_job_id: int) -> List
     unblocked = []
 
     for dep in dependent_deps:
-        job = db.query(IngestionJob).filter(
-            IngestionJob.id == dep.job_id
-        ).first()
+        job = db.query(IngestionJob).filter(IngestionJob.id == dep.job_id).first()
 
         if not job:
             continue
@@ -340,11 +356,12 @@ async def process_unblocked_jobs(db: Session, job_ids: List[int]):
 # Job Chain Functions
 # =============================================================================
 
+
 def create_chain(
     db: Session,
     name: str,
     chain_definition: List[Dict[str, Any]],
-    description: Optional[str] = None
+    description: Optional[str] = None,
 ) -> JobChain:
     """
     Create a new job chain definition.
@@ -385,9 +402,7 @@ def create_chain(
                 )
 
     chain = JobChain(
-        name=name,
-        description=description,
-        chain_definition=chain_definition
+        name=name, description=description, chain_definition=chain_definition
     )
 
     db.add(chain)
@@ -422,7 +437,7 @@ def execute_chain(db: Session, chain_id: int) -> JobChainExecution:
         chain_id=chain_id,
         status="running",
         job_ids=[],
-        total_jobs=len(chain.chain_definition)
+        total_jobs=len(chain.chain_definition),
     )
     db.add(execution)
     db.commit()
@@ -440,7 +455,7 @@ def execute_chain(db: Session, chain_id: int) -> JobChainExecution:
         job = IngestionJob(
             source=job_def["source"],
             status=initial_status,
-            config=job_def.get("config", {})
+            config=job_def.get("config", {}),
         )
         db.add(job)
         db.commit()
@@ -452,8 +467,7 @@ def execute_chain(db: Session, chain_id: int) -> JobChainExecution:
         for dep_idx in depends_on:
             # Find the job ID for the dependency index
             parent_job_id = next(
-                (jid for idx, jid in created_jobs if idx == dep_idx),
-                None
+                (jid for idx, jid in created_jobs if idx == dep_idx), None
             )
             if parent_job_id:
                 condition_str = job_def.get("condition", "on_success")
@@ -469,7 +483,9 @@ def execute_chain(db: Session, chain_id: int) -> JobChainExecution:
     chain.last_executed_at = datetime.utcnow()
     db.commit()
 
-    logger.info(f"Executed chain '{chain.name}' (execution {execution.id}), created {len(created_jobs)} jobs")
+    logger.info(
+        f"Executed chain '{chain.name}' (execution {execution.id}), created {len(created_jobs)} jobs"
+    )
 
     return execution
 
@@ -485,29 +501,29 @@ def get_chain_execution_status(db: Session, execution_id: int) -> Dict[str, Any]
     Returns:
         Dictionary with execution status and job details
     """
-    execution = db.query(JobChainExecution).filter(
-        JobChainExecution.id == execution_id
-    ).first()
+    execution = (
+        db.query(JobChainExecution).filter(JobChainExecution.id == execution_id).first()
+    )
 
     if not execution:
         return None
 
     # Get all jobs in this execution
-    jobs = db.query(IngestionJob).filter(
-        IngestionJob.id.in_(execution.job_ids)
-    ).all()
+    jobs = db.query(IngestionJob).filter(IngestionJob.id.in_(execution.job_ids)).all()
 
     job_details = []
     for job in jobs:
         deps = get_job_dependencies(db, job.id)
-        job_details.append({
-            "job_id": job.id,
-            "source": job.source,
-            "status": job.status.value,
-            "dependencies": [d.depends_on_job_id for d in deps],
-            "rows_inserted": job.rows_inserted,
-            "error_message": job.error_message[:200] if job.error_message else None
-        })
+        job_details.append(
+            {
+                "job_id": job.id,
+                "source": job.source,
+                "status": job.status.value,
+                "dependencies": [d.depends_on_job_id for d in deps],
+                "rows_inserted": job.rows_inserted,
+                "error_message": job.error_message[:200] if job.error_message else None,
+            }
+        )
 
     return {
         "execution_id": execution.id,
@@ -518,8 +534,10 @@ def get_chain_execution_status(db: Session, execution_id: int) -> Dict[str, Any]
         "successful_jobs": execution.successful_jobs,
         "failed_jobs": execution.failed_jobs,
         "started_at": execution.started_at.isoformat(),
-        "completed_at": execution.completed_at.isoformat() if execution.completed_at else None,
-        "jobs": job_details
+        "completed_at": execution.completed_at.isoformat()
+        if execution.completed_at
+        else None,
+        "jobs": job_details,
     }
 
 
@@ -533,20 +551,20 @@ def update_chain_execution_status(db: Session, execution_id: int):
         db: Database session
         execution_id: The execution ID to update
     """
-    execution = db.query(JobChainExecution).filter(
-        JobChainExecution.id == execution_id
-    ).first()
+    execution = (
+        db.query(JobChainExecution).filter(JobChainExecution.id == execution_id).first()
+    )
 
     if not execution:
         return
 
     # Get all jobs in this execution
-    jobs = db.query(IngestionJob).filter(
-        IngestionJob.id.in_(execution.job_ids)
-    ).all()
+    jobs = db.query(IngestionJob).filter(IngestionJob.id.in_(execution.job_ids)).all()
 
     # Count by status
-    completed = sum(1 for j in jobs if j.status in [JobStatus.SUCCESS, JobStatus.FAILED])
+    completed = sum(
+        1 for j in jobs if j.status in [JobStatus.SUCCESS, JobStatus.FAILED]
+    )
     successful = sum(1 for j in jobs if j.status == JobStatus.SUCCESS)
     failed = sum(1 for j in jobs if j.status == JobStatus.FAILED)
 
@@ -578,9 +596,9 @@ def get_execution_for_job(db: Session, job_id: int) -> Optional[JobChainExecutio
     Returns:
         The JobChainExecution if found, None otherwise
     """
-    executions = db.query(JobChainExecution).filter(
-        JobChainExecution.status == "running"
-    ).all()
+    executions = (
+        db.query(JobChainExecution).filter(JobChainExecution.status == "running").all()
+    )
 
     for execution in executions:
         if job_id in execution.job_ids:

@@ -30,8 +30,10 @@ router = APIRouter(prefix="/people", tags=["People & Leadership"])
 # Response Models
 # =============================================================================
 
+
 class PersonSummary(BaseModel):
     """Summary of a person for list views."""
+
     id: int
     full_name: str
     current_title: Optional[str] = None
@@ -48,6 +50,7 @@ class PersonSummary(BaseModel):
 
 class ExperienceItem(BaseModel):
     """Work experience entry."""
+
     id: int
     company_name: str
     title: str
@@ -62,6 +65,7 @@ class ExperienceItem(BaseModel):
 
 class EducationItem(BaseModel):
     """Education entry."""
+
     id: int
     institution: str
     degree: Optional[str] = None
@@ -74,6 +78,7 @@ class EducationItem(BaseModel):
 
 class CurrentRole(BaseModel):
     """Current role at a company."""
+
     company_id: int
     company_name: str
     title: str
@@ -90,6 +95,7 @@ class CurrentRole(BaseModel):
 
 class PersonDetail(BaseModel):
     """Full person details."""
+
     id: int
     full_name: str
     first_name: Optional[str] = None
@@ -111,6 +117,7 @@ class PersonDetail(BaseModel):
 
 class LeadershipChangeItem(BaseModel):
     """Leadership change entry."""
+
     id: int
     person_name: str
     person_id: Optional[int] = None
@@ -135,6 +142,7 @@ class LeadershipChangeItem(BaseModel):
 
 class PeopleListResponse(BaseModel):
     """Paginated list of people."""
+
     items: List[PersonSummary]
     total: int
     page: int
@@ -144,6 +152,7 @@ class PeopleListResponse(BaseModel):
 
 class ChangesListResponse(BaseModel):
     """Paginated list of leadership changes."""
+
     items: List[LeadershipChangeItem]
     total: int
     page: int
@@ -154,11 +163,14 @@ class ChangesListResponse(BaseModel):
 # Endpoints
 # =============================================================================
 
+
 @router.get("", response_model=PeopleListResponse)
 async def list_people(
     search: Optional[str] = Query(None, description="Search by name"),
     company_id: Optional[int] = Query(None, description="Filter by company"),
-    title_level: Optional[str] = Query(None, description="Filter by title level (c_suite, vp, director, etc.)"),
+    title_level: Optional[str] = Query(
+        None, description="Filter by title level (c_suite, vp, director, etc.)"
+    ),
     is_board_member: Optional[bool] = Query(None, description="Filter board members"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -199,22 +211,36 @@ async def list_people(
 
     # Get total count (use subquery to avoid DISTINCT on JSON)
     from sqlalchemy import func
+
     subquery = query.with_entities(Person.id).distinct().subquery()
     total = db.query(func.count()).select_from(subquery).scalar()
 
     # Paginate - get distinct person IDs first, then fetch full records
     offset = (page - 1) * page_size
-    person_ids = [p[0] for p in query.with_entities(Person.id).distinct().offset(offset).limit(page_size).all()]
-    people = db.query(Person).filter(Person.id.in_(person_ids)).all() if person_ids else []
+    person_ids = [
+        p[0]
+        for p in query.with_entities(Person.id)
+        .distinct()
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    ]
+    people = (
+        db.query(Person).filter(Person.id.in_(person_ids)).all() if person_ids else []
+    )
 
     # Build response
     items = []
     for person in people:
         # Get current role
-        current_role = db.query(CompanyPerson).filter(
-            CompanyPerson.person_id == person.id,
-            CompanyPerson.is_current == True,
-        ).first()
+        current_role = (
+            db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.person_id == person.id,
+                CompanyPerson.is_current == True,
+            )
+            .first()
+        )
 
         company_name = None
         company_id_val = None
@@ -224,17 +250,21 @@ async def list_people(
                 company_name = company.name
                 company_id_val = company.id
 
-        items.append(PersonSummary(
-            id=person.id,
-            full_name=person.full_name,
-            current_title=current_role.title if current_role else None,
-            current_company=company_name,
-            current_company_id=company_id_val,
-            linkedin_url=person.linkedin_url,
-            photo_url=person.photo_url,
-            is_board_member=current_role.is_board_member if current_role else False,
-            is_executive=not (current_role.is_board_member if current_role else False),
-        ))
+        items.append(
+            PersonSummary(
+                id=person.id,
+                full_name=person.full_name,
+                current_title=current_role.title if current_role else None,
+                current_company=company_name,
+                current_company_id=company_id_val,
+                linkedin_url=person.linkedin_url,
+                photo_url=person.photo_url,
+                is_board_member=current_role.is_board_member if current_role else False,
+                is_executive=not (
+                    current_role.is_board_member if current_role else False
+                ),
+            )
+        )
 
     pages = (total + page_size - 1) // page_size
 
@@ -264,57 +294,73 @@ async def get_person(
 
     # Get current roles
     current_roles = []
-    company_persons = db.query(CompanyPerson).filter(
-        CompanyPerson.person_id == person_id,
-        CompanyPerson.is_current == True,
-    ).all()
+    company_persons = (
+        db.query(CompanyPerson)
+        .filter(
+            CompanyPerson.person_id == person_id,
+            CompanyPerson.is_current == True,
+        )
+        .all()
+    )
 
     for cp in company_persons:
         company = db.get(IndustrialCompany, cp.company_id)
         if company:
-            current_roles.append(CurrentRole(
-                company_id=company.id,
-                company_name=company.name,
-                title=cp.title,
-                title_normalized=cp.title_normalized,
-                title_level=cp.title_level,
-                department=cp.department,
-                is_board_member=cp.is_board_member,
-                is_board_chair=cp.is_board_chair,
-                start_date=cp.start_date,
-            ))
+            current_roles.append(
+                CurrentRole(
+                    company_id=company.id,
+                    company_name=company.name,
+                    title=cp.title,
+                    title_normalized=cp.title_normalized,
+                    title_level=cp.title_level,
+                    department=cp.department,
+                    is_board_member=cp.is_board_member,
+                    is_board_chair=cp.is_board_chair,
+                    start_date=cp.start_date,
+                )
+            )
 
     # Get experience
     experience = []
-    exp_records = db.query(PersonExperience).filter(
-        PersonExperience.person_id == person_id
-    ).order_by(PersonExperience.start_date.desc().nullslast()).all()
+    exp_records = (
+        db.query(PersonExperience)
+        .filter(PersonExperience.person_id == person_id)
+        .order_by(PersonExperience.start_date.desc().nullslast())
+        .all()
+    )
 
     for exp in exp_records:
-        experience.append(ExperienceItem(
-            id=exp.id,
-            company_name=exp.company_name,
-            title=exp.title,
-            start_date=exp.start_date,
-            end_date=exp.end_date,
-            is_current=exp.is_current,
-            description=exp.description,
-        ))
+        experience.append(
+            ExperienceItem(
+                id=exp.id,
+                company_name=exp.company_name,
+                title=exp.title,
+                start_date=exp.start_date,
+                end_date=exp.end_date,
+                is_current=exp.is_current,
+                description=exp.description,
+            )
+        )
 
     # Get education
     education = []
-    edu_records = db.query(PersonEducation).filter(
-        PersonEducation.person_id == person_id
-    ).order_by(PersonEducation.graduation_year.desc().nullslast()).all()
+    edu_records = (
+        db.query(PersonEducation)
+        .filter(PersonEducation.person_id == person_id)
+        .order_by(PersonEducation.graduation_year.desc().nullslast())
+        .all()
+    )
 
     for edu in edu_records:
-        education.append(EducationItem(
-            id=edu.id,
-            institution=edu.institution,
-            degree=edu.degree,
-            field_of_study=edu.field_of_study,
-            graduation_year=edu.graduation_year,
-        ))
+        education.append(
+            EducationItem(
+                id=edu.id,
+                institution=edu.institution,
+                degree=edu.degree,
+                field_of_study=edu.field_of_study,
+                graduation_year=edu.graduation_year,
+            )
+        )
 
     return PersonDetail(
         id=person.id,
@@ -339,7 +385,9 @@ async def get_leadership_changes(
     company_id: Optional[int] = Query(None, description="Filter by company"),
     change_type: Optional[str] = Query(None, description="Filter by change type"),
     is_c_suite: Optional[bool] = Query(None, description="Filter C-suite changes"),
-    min_significance: Optional[int] = Query(None, ge=1, le=10, description="Minimum significance score"),
+    min_significance: Optional[int] = Query(
+        None, ge=1, le=10, description="Minimum significance score"
+    ),
     since_date: Optional[date] = Query(None, description="Changes since date"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -367,8 +415,8 @@ async def get_leadership_changes(
 
     if since_date:
         query = query.filter(
-            (LeadershipChange.announced_date >= since_date) |
-            (LeadershipChange.effective_date >= since_date)
+            (LeadershipChange.announced_date >= since_date)
+            | (LeadershipChange.effective_date >= since_date)
         )
 
     # Order by date (most recent first)
@@ -390,25 +438,27 @@ async def get_leadership_changes(
         company = db.get(IndustrialCompany, change.company_id)
         company_name = company.name if company else "Unknown"
 
-        items.append(LeadershipChangeItem(
-            id=change.id,
-            person_name=change.person_name,
-            person_id=change.person_id,
-            company_id=change.company_id,
-            company_name=company_name,
-            change_type=change.change_type,
-            old_title=change.old_title,
-            new_title=change.new_title,
-            old_company=change.old_company,
-            announced_date=change.announced_date,
-            effective_date=change.effective_date,
-            reason=change.reason,
-            is_c_suite=change.is_c_suite,
-            is_board=change.is_board,
-            significance_score=change.significance_score,
-            source_type=change.source_type,
-            source_url=change.source_url,
-        ))
+        items.append(
+            LeadershipChangeItem(
+                id=change.id,
+                person_name=change.person_name,
+                person_id=change.person_id,
+                company_id=change.company_id,
+                company_name=company_name,
+                change_type=change.change_type,
+                old_title=change.old_title,
+                new_title=change.new_title,
+                old_company=change.old_company,
+                announced_date=change.announced_date,
+                effective_date=change.effective_date,
+                reason=change.reason,
+                is_c_suite=change.is_c_suite,
+                is_board=change.is_board,
+                significance_score=change.significance_score,
+                source_type=change.source_type,
+                source_url=change.source_url,
+            )
+        )
 
     return ChangesListResponse(
         items=items,
@@ -432,17 +482,28 @@ async def search_executives(
     search_term = f"%{q}%"
 
     # Search people with current executive roles
-    results = db.query(Person).join(CompanyPerson).filter(
-        Person.full_name.ilike(search_term),
-        CompanyPerson.is_current == True,
-    ).distinct().limit(limit).all()
+    results = (
+        db.query(Person)
+        .join(CompanyPerson)
+        .filter(
+            Person.full_name.ilike(search_term),
+            CompanyPerson.is_current == True,
+        )
+        .distinct()
+        .limit(limit)
+        .all()
+    )
 
     items = []
     for person in results:
-        current_role = db.query(CompanyPerson).filter(
-            CompanyPerson.person_id == person.id,
-            CompanyPerson.is_current == True,
-        ).first()
+        current_role = (
+            db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.person_id == person.id,
+                CompanyPerson.is_current == True,
+            )
+            .first()
+        )
 
         company_name = None
         company_id = None
@@ -452,16 +513,18 @@ async def search_executives(
                 company_name = company.name
                 company_id = company.id
 
-        items.append(PersonSummary(
-            id=person.id,
-            full_name=person.full_name,
-            current_title=current_role.title if current_role else None,
-            current_company=company_name,
-            current_company_id=company_id,
-            linkedin_url=person.linkedin_url,
-            photo_url=person.photo_url,
-            is_board_member=current_role.is_board_member if current_role else False,
-            is_executive=True,
-        ))
+        items.append(
+            PersonSummary(
+                id=person.id,
+                full_name=person.full_name,
+                current_title=current_role.title if current_role else None,
+                current_company=company_name,
+                current_company_id=company_id,
+                linkedin_url=person.linkedin_url,
+                photo_url=person.photo_url,
+                is_board_member=current_role.is_board_member if current_role else False,
+                is_executive=True,
+            )
+        )
 
     return items

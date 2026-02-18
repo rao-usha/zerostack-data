@@ -11,6 +11,7 @@ Rate limit: 100 requests/minute for anonymous, higher with API key.
 
 No API key required for basic access.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -21,7 +22,11 @@ from app.core.config import get_settings
 from app.core.models_site_intel import InternetExchange, DataCenterFacility
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -49,7 +54,7 @@ class PeeringDBCollector(BaseCollector):
         super().__init__(db, api_key, **kwargs)
         if not self.api_key:
             settings = get_settings()
-            self.api_key = getattr(settings, 'peeringdb_api_key', None)
+            self.api_key = getattr(settings, "peeringdb_api_key", None)
 
     def get_default_base_url(self) -> str:
         return "https://www.peeringdb.com/api"
@@ -80,7 +85,9 @@ class PeeringDBCollector(BaseCollector):
             total_inserted += ix_result.get("inserted", 0)
             total_processed += ix_result.get("processed", 0)
             if ix_result.get("error"):
-                errors.append({"source": "internet_exchanges", "error": ix_result["error"]})
+                errors.append(
+                    {"source": "internet_exchanges", "error": ix_result["error"]}
+                )
 
             # Collect Data Center Facilities
             logger.info("Collecting PeeringDB Data Center facility data...")
@@ -90,7 +97,9 @@ class PeeringDBCollector(BaseCollector):
             if fac_result.get("error"):
                 errors.append({"source": "facilities", "error": fac_result["error"]})
 
-            status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            status = (
+                CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            )
 
             return self.create_result(
                 status=status,
@@ -107,7 +116,9 @@ class PeeringDBCollector(BaseCollector):
                 error_message=str(e),
             )
 
-    async def _collect_internet_exchanges(self, config: CollectionConfig) -> Dict[str, Any]:
+    async def _collect_internet_exchanges(
+        self, config: CollectionConfig
+    ) -> Dict[str, Any]:
         """
         Collect Internet Exchange points from PeeringDB.
 
@@ -146,9 +157,18 @@ class PeeringDBCollector(BaseCollector):
                     records,
                     unique_columns=["peeringdb_id"],
                     update_columns=[
-                        "name", "name_long", "city", "state", "country",
-                        "latitude", "longitude", "website", "network_count",
-                        "ipv4_prefixes", "ipv6_prefixes", "collected_at"
+                        "name",
+                        "name_long",
+                        "city",
+                        "state",
+                        "country",
+                        "latitude",
+                        "longitude",
+                        "website",
+                        "network_count",
+                        "ipv4_prefixes",
+                        "ipv6_prefixes",
+                        "collected_at",
                     ],
                 )
                 return {"processed": len(data), "inserted": inserted}
@@ -178,7 +198,9 @@ class PeeringDBCollector(BaseCollector):
             logger.warning(f"Could not fetch IX network counts: {e}")
             return {}
 
-    def _transform_ix_record(self, record: Dict[str, Any], net_counts: Dict[int, int]) -> Optional[Dict[str, Any]]:
+    def _transform_ix_record(
+        self, record: Dict[str, Any], net_counts: Dict[int, int]
+    ) -> Optional[Dict[str, Any]]:
         """Transform PeeringDB IX record to database format."""
         pdb_id = record.get("id")
         if not pdb_id:
@@ -195,11 +217,57 @@ class PeeringDBCollector(BaseCollector):
 
         # Common IX naming patterns include state abbreviation
         state_abbrevs = [
-            "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
-            "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-            "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-            "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
-            "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC"
+            "AL",
+            "AK",
+            "AZ",
+            "AR",
+            "CA",
+            "CO",
+            "CT",
+            "DE",
+            "FL",
+            "GA",
+            "HI",
+            "ID",
+            "IL",
+            "IN",
+            "IA",
+            "KS",
+            "KY",
+            "LA",
+            "ME",
+            "MD",
+            "MA",
+            "MI",
+            "MN",
+            "MS",
+            "MO",
+            "MT",
+            "NE",
+            "NV",
+            "NH",
+            "NJ",
+            "NM",
+            "NY",
+            "NC",
+            "ND",
+            "OH",
+            "OK",
+            "OR",
+            "PA",
+            "RI",
+            "SC",
+            "SD",
+            "TN",
+            "TX",
+            "UT",
+            "VT",
+            "VA",
+            "WA",
+            "WV",
+            "WI",
+            "WY",
+            "DC",
         ]
 
         # Try to find state in city field (e.g., "Ashburn, VA")
@@ -267,9 +335,16 @@ class PeeringDBCollector(BaseCollector):
                     records,
                     unique_columns=["peeringdb_id"],
                     update_columns=[
-                        "name", "city", "state", "country", "address",
-                        "latitude", "longitude", "website", "operator",
-                        "collected_at"
+                        "name",
+                        "city",
+                        "state",
+                        "country",
+                        "address",
+                        "latitude",
+                        "longitude",
+                        "website",
+                        "operator",
+                        "collected_at",
                     ],
                 )
                 return {"processed": len(data), "inserted": inserted}
@@ -280,7 +355,9 @@ class PeeringDBCollector(BaseCollector):
             logger.error(f"Failed to collect facilities: {e}", exc_info=True)
             return {"processed": 0, "inserted": 0, "error": str(e)}
 
-    def _transform_facility_record(self, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _transform_facility_record(
+        self, record: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """Transform PeeringDB facility record to database format."""
         pdb_id = record.get("id")
         if not pdb_id:

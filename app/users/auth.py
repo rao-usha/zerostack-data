@@ -27,9 +27,11 @@ def _get_secret_key() -> str:
     if not key:
         raise RuntimeError(
             "JWT_SECRET_KEY environment variable is required. "
-            "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+            'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
         )
     return key
+
+
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 PASSWORD_RESET_EXPIRE_HOURS = 24
@@ -44,7 +46,8 @@ class AuthService:
 
     def _ensure_tables(self):
         """Create tables if they don't exist."""
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
                 email VARCHAR(255) NOT NULL UNIQUE,
@@ -56,9 +59,11 @@ class AuthService:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_login_at TIMESTAMP
             )
-        """))
+        """)
+        )
 
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             CREATE TABLE IF NOT EXISTS password_reset_tokens (
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -67,9 +72,11 @@ class AuthService:
                 used_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """))
+        """)
+        )
 
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             CREATE TABLE IF NOT EXISTS refresh_tokens (
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -78,18 +85,25 @@ class AuthService:
                 revoked_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """))
+        """)
+        )
 
         # Create indexes
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)
-        """))
-        self.db.execute(text("""
+        """)
+        )
+        self.db.execute(
+            text("""
             CREATE INDEX IF NOT EXISTS idx_reset_tokens_token ON password_reset_tokens(token)
-        """))
-        self.db.execute(text("""
+        """)
+        )
+        self.db.execute(
+            text("""
             CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash ON refresh_tokens(token_hash)
-        """))
+        """)
+        )
 
         self.db.commit()
 
@@ -110,7 +124,7 @@ class AuthService:
             "email": email,
             "type": "access",
             "exp": expire,
-            "iat": datetime.utcnow()
+            "iat": datetime.utcnow(),
         }
         return jwt.encode(payload, _get_secret_key(), algorithm=ALGORITHM)
 
@@ -120,24 +134,28 @@ class AuthService:
         token_hash = secrets.token_hex(32)
         expires_at = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
             VALUES (:user_id, :token_hash, :expires_at)
-        """), {
-            "user_id": user_id,
-            "token_hash": token_hash,
-            "expires_at": expires_at
-        })
+        """),
+            {"user_id": user_id, "token_hash": token_hash, "expires_at": expires_at},
+        )
         self.db.commit()
 
         return token
 
-    def register(self, email: str, password: str, name: Optional[str] = None) -> Dict[str, Any]:
+    def register(
+        self, email: str, password: str, name: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Register a new user."""
         # Check if email already exists
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             SELECT id FROM users WHERE email = :email
-        """), {"email": email.lower()})
+        """),
+            {"email": email.lower()},
+        )
 
         if result.fetchone():
             raise ValueError("Email already registered")
@@ -149,15 +167,14 @@ class AuthService:
         # Hash password and create user
         password_hash = self._hash_password(password)
 
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             INSERT INTO users (email, password_hash, name)
             VALUES (:email, :password_hash, :name)
             RETURNING id, created_at
-        """), {
-            "email": email.lower(),
-            "password_hash": password_hash,
-            "name": name
-        })
+        """),
+            {"email": email.lower(), "password_hash": password_hash, "name": name},
+        )
 
         row = result.fetchone()
         self.db.commit()
@@ -177,16 +194,19 @@ class AuthService:
                 "id": user_id,
                 "email": email.lower(),
                 "name": name,
-                "created_at": row[1].isoformat() if row[1] else None
-            }
+                "created_at": row[1].isoformat() if row[1] else None,
+            },
         }
 
     def login(self, email: str, password: str) -> Dict[str, Any]:
         """Authenticate user and return tokens."""
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             SELECT id, email, password_hash, name, is_active
             FROM users WHERE email = :email
-        """), {"email": email.lower()})
+        """),
+            {"email": email.lower()},
+        )
 
         row = result.fetchone()
         if not row:
@@ -201,9 +221,12 @@ class AuthService:
             raise ValueError("Invalid email or password")
 
         # Update last login
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = :user_id
-        """), {"user_id": user_id})
+        """),
+            {"user_id": user_id},
+        )
         self.db.commit()
 
         # Generate tokens
@@ -215,11 +238,7 @@ class AuthService:
             "refresh_token": refresh_token,
             "token_type": "bearer",
             "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            "user": {
-                "id": user_id,
-                "email": user_email,
-                "name": name
-            }
+            "user": {"id": user_id, "email": user_email, "name": name},
         }
 
     def verify_token(self, token: str) -> Dict[str, Any]:
@@ -233,19 +252,18 @@ class AuthService:
             user_id = int(payload["sub"])
 
             # Get user
-            result = self.db.execute(text("""
+            result = self.db.execute(
+                text("""
                 SELECT id, email, name, is_active FROM users WHERE id = :user_id
-            """), {"user_id": user_id})
+            """),
+                {"user_id": user_id},
+            )
 
             row = result.fetchone()
             if not row or not row[3]:  # not active
                 raise ValueError("User not found or inactive")
 
-            return {
-                "user_id": row[0],
-                "email": row[1],
-                "name": row[2]
-            }
+            return {"user_id": row[0], "email": row[1], "name": row[2]}
 
         except jwt.ExpiredSignatureError:
             raise ValueError("Token has expired")
@@ -261,14 +279,16 @@ class AuthService:
         try:
             # Decode without verification to get user_id
             # In real implementation, look up the token in the database
-            result = self.db.execute(text("""
+            result = self.db.execute(
+                text("""
                 SELECT rt.user_id, u.email, u.name, u.is_active, rt.expires_at, rt.revoked_at
                 FROM refresh_tokens rt
                 JOIN users u ON rt.user_id = u.id
                 WHERE rt.revoked_at IS NULL
                 ORDER BY rt.created_at DESC
                 LIMIT 1
-            """))
+            """)
+            )
 
             row = result.fetchone()
             if not row:
@@ -291,7 +311,7 @@ class AuthService:
             return {
                 "access_token": access_token,
                 "token_type": "bearer",
-                "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
+                "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             }
 
         except Exception as e:
@@ -300,20 +320,26 @@ class AuthService:
 
     def logout(self, user_id: int) -> bool:
         """Revoke all refresh tokens for user."""
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             UPDATE refresh_tokens
             SET revoked_at = CURRENT_TIMESTAMP
             WHERE user_id = :user_id AND revoked_at IS NULL
-        """), {"user_id": user_id})
+        """),
+            {"user_id": user_id},
+        )
         self.db.commit()
         return True
 
     def get_user(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Get user by ID."""
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             SELECT id, email, name, is_active, is_verified, created_at, last_login_at
             FROM users WHERE id = :user_id
-        """), {"user_id": user_id})
+        """),
+            {"user_id": user_id},
+        )
 
         row = result.fetchone()
         if not row:
@@ -326,10 +352,12 @@ class AuthService:
             "is_active": row[3],
             "is_verified": row[4],
             "created_at": row[5].isoformat() if row[5] else None,
-            "last_login_at": row[6].isoformat() if row[6] else None
+            "last_login_at": row[6].isoformat() if row[6] else None,
         }
 
-    def update_user(self, user_id: int, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_user(
+        self, user_id: int, updates: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """Update user profile."""
         allowed_fields = ["name"]
         set_clauses = []
@@ -351,11 +379,16 @@ class AuthService:
 
         return self.get_user(user_id)
 
-    def change_password(self, user_id: int, old_password: str, new_password: str) -> bool:
+    def change_password(
+        self, user_id: int, old_password: str, new_password: str
+    ) -> bool:
         """Change user password."""
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             SELECT password_hash FROM users WHERE id = :user_id
-        """), {"user_id": user_id})
+        """),
+            {"user_id": user_id},
+        )
 
         row = result.fetchone()
         if not row:
@@ -369,19 +402,25 @@ class AuthService:
 
         new_hash = self._hash_password(new_password)
 
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             UPDATE users SET password_hash = :password_hash, updated_at = CURRENT_TIMESTAMP
             WHERE id = :user_id
-        """), {"user_id": user_id, "password_hash": new_hash})
+        """),
+            {"user_id": user_id, "password_hash": new_hash},
+        )
         self.db.commit()
 
         return True
 
     def request_password_reset(self, email: str) -> Optional[str]:
         """Create password reset token."""
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             SELECT id FROM users WHERE email = :email AND is_active = TRUE
-        """), {"email": email.lower()})
+        """),
+            {"email": email.lower()},
+        )
 
         row = result.fetchone()
         if not row:
@@ -392,14 +431,13 @@ class AuthService:
         token = secrets.token_urlsafe(32)
         expires_at = datetime.utcnow() + timedelta(hours=PASSWORD_RESET_EXPIRE_HOURS)
 
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             INSERT INTO password_reset_tokens (user_id, token, expires_at)
             VALUES (:user_id, :token, :expires_at)
-        """), {
-            "user_id": user_id,
-            "token": token,
-            "expires_at": expires_at
-        })
+        """),
+            {"user_id": user_id, "token": token, "expires_at": expires_at},
+        )
         self.db.commit()
 
         # In production, send email with token
@@ -408,11 +446,14 @@ class AuthService:
 
     def reset_password(self, token: str, new_password: str) -> bool:
         """Reset password using token."""
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             SELECT prt.id, prt.user_id, prt.expires_at, prt.used_at
             FROM password_reset_tokens prt
             WHERE prt.token = :token
-        """), {"token": token})
+        """),
+            {"token": token},
+        )
 
         row = result.fetchone()
         if not row:
@@ -432,22 +473,31 @@ class AuthService:
         # Update password
         new_hash = self._hash_password(new_password)
 
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             UPDATE users SET password_hash = :password_hash, updated_at = CURRENT_TIMESTAMP
             WHERE id = :user_id
-        """), {"user_id": user_id, "password_hash": new_hash})
+        """),
+            {"user_id": user_id, "password_hash": new_hash},
+        )
 
         # Mark token as used
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP
             WHERE id = :token_id
-        """), {"token_id": token_id})
+        """),
+            {"token_id": token_id},
+        )
 
         # Revoke all refresh tokens
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP
             WHERE user_id = :user_id AND revoked_at IS NULL
-        """), {"user_id": user_id})
+        """),
+            {"user_id": user_id},
+        )
 
         self.db.commit()
         return True

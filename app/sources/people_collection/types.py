@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, HttpUrl
 
 class ExtractionConfidence(str, Enum):
     """Confidence level of extracted data."""
+
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
@@ -20,6 +21,7 @@ class ExtractionConfidence(str, Enum):
 
 class TitleLevel(str, Enum):
     """Executive title hierarchy levels."""
+
     C_SUITE = "c_suite"
     PRESIDENT = "president"
     EVP = "evp"
@@ -34,6 +36,7 @@ class TitleLevel(str, Enum):
 
 class ChangeType(str, Enum):
     """Types of leadership changes."""
+
     HIRE = "hire"
     DEPARTURE = "departure"
     PROMOTION = "promotion"
@@ -48,6 +51,7 @@ class ChangeType(str, Enum):
 
 class Department(str, Enum):
     """Common corporate departments."""
+
     EXECUTIVE = "executive"
     FINANCE = "finance"
     OPERATIONS = "operations"
@@ -72,6 +76,7 @@ class ExtractedPerson(BaseModel):
 
     This is the intermediate format before database insertion.
     """
+
     # Identity
     full_name: str = Field(..., description="Full name as displayed")
     first_name: Optional[str] = Field(None, description="First name if parseable")
@@ -80,7 +85,9 @@ class ExtractedPerson(BaseModel):
 
     # Role
     title: str = Field(..., description="Exact title as displayed on source")
-    title_normalized: Optional[str] = Field(None, description="Standardized title (CEO, CFO, VP Sales)")
+    title_normalized: Optional[str] = Field(
+        None, description="Standardized title (CEO, CFO, VP Sales)"
+    )
     title_level: TitleLevel = Field(TitleLevel.UNKNOWN, description="Hierarchy level")
     department: Optional[str] = Field(None, description="Department if identifiable")
 
@@ -100,7 +107,9 @@ class ExtractedPerson(BaseModel):
     # Metadata
     confidence: ExtractionConfidence = Field(ExtractionConfidence.MEDIUM)
     source_url: Optional[str] = Field(None, description="URL where extracted from")
-    extraction_notes: Optional[str] = Field(None, description="Any extraction issues or notes")
+    extraction_notes: Optional[str] = Field(
+        None, description="Any extraction issues or notes"
+    )
 
     class Config:
         use_enum_values = True
@@ -108,6 +117,7 @@ class ExtractedPerson(BaseModel):
 
 class ExtractedExperience(BaseModel):
     """Work experience extracted from a bio or profile."""
+
     company_name: str
     title: str
     start_year: Optional[int] = None
@@ -118,6 +128,7 @@ class ExtractedExperience(BaseModel):
 
 class ExtractedEducation(BaseModel):
     """Education extracted from a bio or profile."""
+
     institution: str
     degree: Optional[str] = None
     field_of_study: Optional[str] = None
@@ -126,6 +137,7 @@ class ExtractedEducation(BaseModel):
 
 class ParsedBio(BaseModel):
     """Structured data parsed from an executive biography."""
+
     experience: List[ExtractedExperience] = Field(default_factory=list)
     education: List[ExtractedEducation] = Field(default_factory=list)
     board_positions: List[str] = Field(default_factory=list)
@@ -138,6 +150,7 @@ class LeadershipChange(BaseModel):
     """
     A leadership change detected from news or SEC filings.
     """
+
     # Person
     person_name: str = Field(..., description="Full name of person involved")
     person_id: Optional[int] = Field(None, description="Database ID if matched")
@@ -146,7 +159,9 @@ class LeadershipChange(BaseModel):
     change_type: ChangeType = Field(..., description="Type of change")
     old_title: Optional[str] = Field(None, description="Previous title")
     new_title: Optional[str] = Field(None, description="New title")
-    old_company: Optional[str] = Field(None, description="Previous company (for external hires)")
+    old_company: Optional[str] = Field(
+        None, description="Previous company (for external hires)"
+    )
 
     # Dates
     announced_date: Optional[date] = Field(None, description="Date announced")
@@ -155,7 +170,9 @@ class LeadershipChange(BaseModel):
     # Context
     reason: Optional[str] = Field(None, description="Reason if stated")
     successor_name: Optional[str] = Field(None, description="Successor if mentioned")
-    predecessor_name: Optional[str] = Field(None, description="Predecessor if mentioned")
+    predecessor_name: Optional[str] = Field(
+        None, description="Predecessor if mentioned"
+    )
 
     # Classification
     is_c_suite: bool = Field(False, description="Is C-suite level change")
@@ -163,7 +180,9 @@ class LeadershipChange(BaseModel):
     significance_score: int = Field(5, ge=1, le=10, description="1-10 significance")
 
     # Source
-    source_type: str = Field(..., description="press_release, 8k_filing, news, website_change")
+    source_type: str = Field(
+        ..., description="press_release, 8k_filing, news, website_change"
+    )
     source_url: Optional[str] = Field(None)
     source_headline: Optional[str] = Field(None)
 
@@ -176,6 +195,7 @@ class LeadershipChange(BaseModel):
 
 class LeadershipPageResult(BaseModel):
     """Result of extracting leadership from a company page."""
+
     company_name: str
     page_url: str
     page_type: str = Field(..., description="leadership, team, about, board")
@@ -192,6 +212,7 @@ class LeadershipPageResult(BaseModel):
 
 class SECFilingResult(BaseModel):
     """Result of parsing an SEC filing for executive data."""
+
     company_name: str
     cik: str
     filing_type: str  # DEF 14A, 10-K, 8-K
@@ -218,6 +239,7 @@ class CollectionResult(BaseModel):
 
     Returned by collection agents after processing.
     """
+
     company_id: int
     company_name: str
     source: str = Field(..., description="website, sec, news, linkedin")
@@ -244,7 +266,9 @@ class CollectionResult(BaseModel):
 
     # Diagnostic info (for debugging)
     pages_checked: int = Field(0, description="Number of pages crawled (website)")
-    page_urls: List[str] = Field(default_factory=list, description="URLs of pages checked")
+    page_urls: List[str] = Field(
+        default_factory=list, description="URLs of pages checked"
+    )
     filings_checked: int = Field(0, description="Number of SEC filings checked")
 
     # Timing
@@ -258,6 +282,7 @@ class CollectionResult(BaseModel):
 
 class BatchCollectionResult(BaseModel):
     """Result of collecting data for multiple companies."""
+
     total_companies: int
     successful: int
     failed: int

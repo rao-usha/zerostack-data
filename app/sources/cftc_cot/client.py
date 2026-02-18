@@ -12,6 +12,7 @@ Report Types:
 
 No API key required - public data released every Tuesday.
 """
+
 import logging
 import io
 import csv
@@ -49,7 +50,7 @@ class CFTCCOTClient(BaseAPIClient):
         self,
         max_concurrency: int = 2,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize CFTC COT client.
@@ -68,7 +69,7 @@ class CFTCCOTClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=120.0,  # Longer timeout for large downloads
             connect_timeout=30.0,
-            rate_limit_interval=config.get_rate_limit_interval()
+            rate_limit_interval=config.get_rate_limit_interval(),
         )
 
     async def get_legacy_futures(self, year: int = None) -> List[Dict[str, Any]]:
@@ -89,7 +90,9 @@ class CFTCCOTClient(BaseAPIClient):
             year = datetime.now().year
         return await self._download_cot_report("disaggregated_futures", year)
 
-    async def get_disaggregated_combined(self, year: int = None) -> List[Dict[str, Any]]:
+    async def get_disaggregated_combined(
+        self, year: int = None
+    ) -> List[Dict[str, Any]]:
         """Download Disaggregated COT report (Futures + Options Combined)."""
         if year is None:
             year = datetime.now().year
@@ -108,9 +111,7 @@ class CFTCCOTClient(BaseAPIClient):
         return await self._download_cot_report("tff_combined", year)
 
     async def _download_cot_report(
-        self,
-        report_type: str,
-        year: int
+        self, report_type: str, year: int
     ) -> List[Dict[str, Any]]:
         """Download and parse a COT report."""
         if report_type not in self.REPORT_URLS:
@@ -132,16 +133,13 @@ class CFTCCOTClient(BaseAPIClient):
         return []
 
     def _parse_cot_zip(
-        self,
-        zip_data: io.BytesIO,
-        report_type: str,
-        year: int
+        self, zip_data: io.BytesIO, report_type: str, year: int
     ) -> List[Dict[str, Any]]:
         """Parse COT ZIP file containing CSV/TXT data."""
         records = []
 
-        with zipfile.ZipFile(zip_data, 'r') as zf:
-            data_files = [f for f in zf.namelist() if f.endswith(('.csv', '.txt'))]
+        with zipfile.ZipFile(zip_data, "r") as zf:
+            data_files = [f for f in zf.namelist() if f.endswith((".csv", ".txt"))]
 
             if not data_files:
                 raise ValueError("No data files found in COT ZIP archive")
@@ -150,12 +148,14 @@ class CFTCCOTClient(BaseAPIClient):
             logger.info(f"Parsing COT file: {main_file}")
 
             with zf.open(main_file) as data_file:
-                text_wrapper = io.TextIOWrapper(data_file, encoding='utf-8', errors='replace')
+                text_wrapper = io.TextIOWrapper(
+                    data_file, encoding="utf-8", errors="replace"
+                )
 
                 first_line = text_wrapper.readline()
                 text_wrapper.seek(0)
 
-                delimiter = ',' if ',' in first_line else '\t'
+                delimiter = "," if "," in first_line else "\t"
 
                 reader = csv.DictReader(text_wrapper, delimiter=delimiter)
 
@@ -167,25 +167,22 @@ class CFTCCOTClient(BaseAPIClient):
         return records
 
     def _normalize_cot_record(
-        self,
-        row: Dict[str, str],
-        report_type: str,
-        year: int
+        self, row: Dict[str, str], report_type: str, year: int
     ) -> Optional[Dict[str, Any]]:
         """Normalize a COT record to standard format."""
         try:
             market_name = (
-                row.get("Market_and_Exchange_Names") or
-                row.get("Market and Exchange Names") or
-                row.get("market_and_exchange_names") or
-                ""
+                row.get("Market_and_Exchange_Names")
+                or row.get("Market and Exchange Names")
+                or row.get("market_and_exchange_names")
+                or ""
             )
 
             report_date_raw = (
-                row.get("As_of_Date_In_Form_YYMMDD") or
-                row.get("Report_Date_as_YYYY-MM-DD") or
-                row.get("As of Date in Form YYMMDD") or
-                ""
+                row.get("As_of_Date_In_Form_YYMMDD")
+                or row.get("Report_Date_as_YYYY-MM-DD")
+                or row.get("As of Date in Form YYMMDD")
+                or ""
             )
 
             report_date = self._parse_cot_date(report_date_raw)
@@ -195,21 +192,26 @@ class CFTCCOTClient(BaseAPIClient):
                 "year": year,
                 "report_date": report_date,
                 "market_name": market_name.strip() if market_name else None,
-                "cftc_contract_code": row.get("CFTC_Contract_Market_Code") or row.get("CFTC Contract Market Code"),
+                "cftc_contract_code": row.get("CFTC_Contract_Market_Code")
+                or row.get("CFTC Contract Market Code"),
                 "open_interest": self._safe_int(
                     row.get("Open_Interest_All") or row.get("Open Interest (All)")
                 ),
                 "noncomm_long": self._safe_int(
-                    row.get("NonComm_Positions_Long_All") or row.get("Noncommercial Positions-Long (All)")
+                    row.get("NonComm_Positions_Long_All")
+                    or row.get("Noncommercial Positions-Long (All)")
                 ),
                 "noncomm_short": self._safe_int(
-                    row.get("NonComm_Positions_Short_All") or row.get("Noncommercial Positions-Short (All)")
+                    row.get("NonComm_Positions_Short_All")
+                    or row.get("Noncommercial Positions-Short (All)")
                 ),
                 "comm_long": self._safe_int(
-                    row.get("Comm_Positions_Long_All") or row.get("Commercial Positions-Long (All)")
+                    row.get("Comm_Positions_Long_All")
+                    or row.get("Commercial Positions-Long (All)")
                 ),
                 "comm_short": self._safe_int(
-                    row.get("Comm_Positions_Short_All") or row.get("Commercial Positions-Short (All)")
+                    row.get("Comm_Positions_Short_All")
+                    or row.get("Commercial Positions-Short (All)")
                 ),
             }
 

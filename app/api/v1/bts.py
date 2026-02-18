@@ -6,6 +6,7 @@ Provides HTTP endpoints for ingesting BTS data:
 - Freight Analysis Framework (FAF5) regional data
 - Vehicle Miles Traveled (VMT)
 """
+
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, BackgroundTasks
@@ -23,6 +24,7 @@ router = APIRouter(tags=["bts"])
 
 
 # ========== Enums for validation ==========
+
 
 class BorderType(str, Enum):
     US_CANADA = "US-Canada Border"
@@ -52,67 +54,67 @@ class FAFVersion(str, Enum):
 
 # ========== Request Models ==========
 
+
 class BorderCrossingIngestRequest(BaseModel):
     """Request model for BTS border crossing ingestion."""
+
     start_date: Optional[str] = Field(
         None,
         description="Start date (YYYY-MM format). Defaults to 5 years ago.",
-        examples=["2020-01"]
+        examples=["2020-01"],
     )
     end_date: Optional[str] = Field(
         None,
         description="End date (YYYY-MM format). Defaults to current month.",
-        examples=["2024-12"]
+        examples=["2024-12"],
     )
     state: Optional[str] = Field(
         None,
         description="Filter by state code (e.g., 'TX', 'CA', 'NY')",
-        examples=["TX"]
+        examples=["TX"],
     )
-    border: Optional[BorderType] = Field(
-        None,
-        description="Filter by border type"
-    )
+    border: Optional[BorderType] = Field(None, description="Filter by border type")
     measure: Optional[BorderMeasure] = Field(
-        None,
-        description="Filter by measure type (Trucks, Containers, etc.)"
+        None, description="Filter by measure type (Trucks, Containers, etc.)"
     )
 
 
 class VMTIngestRequest(BaseModel):
     """Request model for BTS Vehicle Miles Traveled ingestion."""
+
     start_date: Optional[str] = Field(
         None,
         description="Start date (YYYY-MM format). Defaults to 3 years ago.",
-        examples=["2022-01"]
+        examples=["2022-01"],
     )
     end_date: Optional[str] = Field(
         None,
         description="End date (YYYY-MM format). Defaults to current month.",
-        examples=["2024-12"]
+        examples=["2024-12"],
     )
     state: Optional[str] = Field(
         None,
         description="Filter by state name (e.g., 'Texas', 'California')",
-        examples=["Texas"]
+        examples=["Texas"],
     )
 
 
 class FAFIngestRequest(BaseModel):
     """Request model for BTS FAF5 Freight data ingestion."""
+
     version: FAFVersion = Field(
-        default=FAFVersion.REGIONAL_2018_2024,
-        description="FAF version to download"
+        default=FAFVersion.REGIONAL_2018_2024, description="FAF version to download"
     )
 
 
 # ========== Endpoints ==========
 
+
 @router.post("/bts/border-crossing/ingest")
 async def ingest_border_crossing_data(
     request: BorderCrossingIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest BTS border crossing entry data.
@@ -135,7 +137,9 @@ async def ingest_border_crossing_data(
     settings = get_settings()
     app_token = settings.get_bts_app_token()
     return create_and_dispatch_job(
-        db, background_tasks, source="bts",
+        db,
+        background_tasks,
+        source="bts",
         config={
             "dataset": "border_crossing",
             "start_date": request.start_date,
@@ -153,7 +157,7 @@ async def ingest_border_crossing_data(
 async def ingest_vmt_data(
     request: VMTIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest BTS Vehicle Miles Traveled (VMT) data.
@@ -171,7 +175,9 @@ async def ingest_vmt_data(
     settings = get_settings()
     app_token = settings.get_bts_app_token()
     return create_and_dispatch_job(
-        db, background_tasks, source="bts",
+        db,
+        background_tasks,
+        source="bts",
         config={
             "dataset": "vmt",
             "start_date": request.start_date,
@@ -187,7 +193,7 @@ async def ingest_vmt_data(
 async def ingest_faf_data(
     request: FAFIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest BTS Freight Analysis Framework (FAF5) data.
@@ -211,7 +217,9 @@ async def ingest_faf_data(
     settings = get_settings()
     app_token = settings.get_bts_app_token()
     return create_and_dispatch_job(
-        db, background_tasks, source="bts",
+        db,
+        background_tasks,
+        source="bts",
         config={
             "dataset": "faf",
             "version": request.version.value,
@@ -234,7 +242,7 @@ async def list_bts_datasets():
                 "description": "Monthly statistics on crossings at US ports of entry",
                 "endpoint": "/bts/border-crossing/ingest",
                 "source": "Socrata API",
-                "filters": ["state", "border", "measure", "date_range"]
+                "filters": ["state", "border", "measure", "date_range"],
             },
             {
                 "id": "vmt",
@@ -242,7 +250,7 @@ async def list_bts_datasets():
                 "description": "Monthly traffic volume on all public roads by state",
                 "endpoint": "/bts/vmt/ingest",
                 "source": "Socrata API",
-                "filters": ["state", "date_range"]
+                "filters": ["state", "date_range"],
             },
             {
                 "id": "faf_regional",
@@ -250,8 +258,12 @@ async def list_bts_datasets():
                 "description": "Freight tonnage, value, ton-miles by O-D, commodity, mode",
                 "endpoint": "/bts/faf/ingest",
                 "source": "CSV Download",
-                "versions": ["regional_2018_2024", "regional_forecasts", "state_2018_2024"]
-            }
+                "versions": [
+                    "regional_2018_2024",
+                    "regional_forecasts",
+                    "state_2018_2024",
+                ],
+            },
         ],
-        "note": "No API key required for BTS public data"
+        "note": "No API key required for BTS public data",
     }

@@ -31,27 +31,34 @@ router = APIRouter(prefix="/people-watchlists", tags=["People Watchlists"])
 # Request/Response Models
 # =============================================================================
 
+
 class WatchlistCreate(BaseModel):
     """Request to create a watchlist."""
+
     name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
 
 
 class WatchlistUpdate(BaseModel):
     """Request to update a watchlist."""
+
     name: Optional[str] = None
     description: Optional[str] = None
 
 
 class WatchlistPersonAdd(BaseModel):
     """Request to add a person to watchlist."""
+
     person_id: int
     notes: Optional[str] = None
-    alert_on_change: bool = Field(True, description="Receive alerts when this person changes roles")
+    alert_on_change: bool = Field(
+        True, description="Receive alerts when this person changes roles"
+    )
 
 
 class WatchlistSummary(BaseModel):
     """Summary of a watchlist."""
+
     id: int
     name: str
     description: Optional[str] = None
@@ -65,6 +72,7 @@ class WatchlistSummary(BaseModel):
 
 class WatchlistPersonItem(BaseModel):
     """A person on a watchlist."""
+
     person_id: int
     full_name: str
     current_title: Optional[str] = None
@@ -83,6 +91,7 @@ class WatchlistPersonItem(BaseModel):
 
 class WatchlistDetail(BaseModel):
     """Detailed watchlist information."""
+
     id: int
     name: str
     description: Optional[str] = None
@@ -95,6 +104,7 @@ class WatchlistDetail(BaseModel):
 
 class PersonChangeAlert(BaseModel):
     """An alert for a tracked person."""
+
     person_id: int
     person_name: str
     change_type: str
@@ -112,6 +122,7 @@ class PersonChangeAlert(BaseModel):
 
 class WatchlistAlertsResponse(BaseModel):
     """Alerts for a watchlist."""
+
     watchlist_id: int
     watchlist_name: str
     alerts: List[PersonChangeAlert]
@@ -121,6 +132,7 @@ class WatchlistAlertsResponse(BaseModel):
 # =============================================================================
 # Endpoints
 # =============================================================================
+
 
 @router.get("", response_model=List[WatchlistSummary])
 async def list_watchlists(
@@ -138,14 +150,19 @@ async def list_watchlists(
 
     for wl in watchlists:
         # Count people
-        person_count = db.query(PeopleWatchlistPerson).filter(
-            PeopleWatchlistPerson.watchlist_id == wl.id
-        ).count()
+        person_count = (
+            db.query(PeopleWatchlistPerson)
+            .filter(PeopleWatchlistPerson.watchlist_id == wl.id)
+            .count()
+        )
 
         # Count recent changes for watched people
-        person_ids = [wp.person_id for wp in db.query(PeopleWatchlistPerson).filter(
-            PeopleWatchlistPerson.watchlist_id == wl.id
-        ).all()]
+        person_ids = [
+            wp.person_id
+            for wp in db.query(PeopleWatchlistPerson)
+            .filter(PeopleWatchlistPerson.watchlist_id == wl.id)
+            .all()
+        ]
 
         recent_changes = 0
         if person_ids:
@@ -154,19 +171,25 @@ async def list_watchlists(
             person_names = [p.full_name for p in people]
 
             if person_names:
-                recent_changes = db.query(LeadershipChange).filter(
-                    LeadershipChange.person_name.in_(person_names),
-                    LeadershipChange.announced_date >= thirty_days_ago,
-                ).count()
+                recent_changes = (
+                    db.query(LeadershipChange)
+                    .filter(
+                        LeadershipChange.person_name.in_(person_names),
+                        LeadershipChange.announced_date >= thirty_days_ago,
+                    )
+                    .count()
+                )
 
-        results.append(WatchlistSummary(
-            id=wl.id,
-            name=wl.name,
-            description=wl.description,
-            person_count=person_count,
-            recent_changes=recent_changes,
-            created_at=wl.created_at.date() if wl.created_at else date.today(),
-        ))
+        results.append(
+            WatchlistSummary(
+                id=wl.id,
+                name=wl.name,
+                description=wl.description,
+                person_count=person_count,
+                recent_changes=recent_changes,
+                created_at=wl.created_at.date() if wl.created_at else date.today(),
+            )
+        )
 
     return results
 
@@ -195,7 +218,9 @@ async def create_watchlist(
         description=watchlist.description,
         person_count=0,
         recent_changes=0,
-        created_at=watchlist.created_at.date() if watchlist.created_at else date.today(),
+        created_at=watchlist.created_at.date()
+        if watchlist.created_at
+        else date.today(),
     )
 
 
@@ -209,17 +234,19 @@ async def get_watchlist(
 
     Includes all tracked people with their current roles.
     """
-    watchlist = db.query(PeopleWatchlist).filter(
-        PeopleWatchlist.id == watchlist_id
-    ).first()
+    watchlist = (
+        db.query(PeopleWatchlist).filter(PeopleWatchlist.id == watchlist_id).first()
+    )
 
     if not watchlist:
         raise HTTPException(status_code=404, detail="Watchlist not found")
 
     # Get watched people
-    watched = db.query(PeopleWatchlistPerson).filter(
-        PeopleWatchlistPerson.watchlist_id == watchlist_id
-    ).all()
+    watched = (
+        db.query(PeopleWatchlistPerson)
+        .filter(PeopleWatchlistPerson.watchlist_id == watchlist_id)
+        .all()
+    )
 
     people = []
     for wp in watched:
@@ -228,10 +255,14 @@ async def get_watchlist(
             continue
 
         # Get current role
-        current_role = db.query(CompanyPerson).filter(
-            CompanyPerson.person_id == person.id,
-            CompanyPerson.is_current == True,
-        ).first()
+        current_role = (
+            db.query(CompanyPerson)
+            .filter(
+                CompanyPerson.person_id == person.id,
+                CompanyPerson.is_current == True,
+            )
+            .first()
+        )
 
         current_title = None
         current_company = None
@@ -244,30 +275,37 @@ async def get_watchlist(
                 current_company_id = company.id
 
         # Get last change date
-        last_change = db.query(LeadershipChange).filter(
-            LeadershipChange.person_name == person.full_name
-        ).order_by(LeadershipChange.announced_date.desc()).first()
+        last_change = (
+            db.query(LeadershipChange)
+            .filter(LeadershipChange.person_name == person.full_name)
+            .order_by(LeadershipChange.announced_date.desc())
+            .first()
+        )
 
-        people.append(WatchlistPersonItem(
-            person_id=person.id,
-            full_name=person.full_name,
-            current_title=current_title,
-            current_company=current_company,
-            current_company_id=current_company_id,
-            linkedin_url=person.linkedin_url,
-            photo_url=person.photo_url,
-            notes=wp.notes,
-            alert_on_change=wp.alert_on_change,
-            added_at=wp.added_at,
-            last_change_date=last_change.announced_date if last_change else None,
-        ))
+        people.append(
+            WatchlistPersonItem(
+                person_id=person.id,
+                full_name=person.full_name,
+                current_title=current_title,
+                current_company=current_company,
+                current_company_id=current_company_id,
+                linkedin_url=person.linkedin_url,
+                photo_url=person.photo_url,
+                notes=wp.notes,
+                alert_on_change=wp.alert_on_change,
+                added_at=wp.added_at,
+                last_change_date=last_change.announced_date if last_change else None,
+            )
+        )
 
     return WatchlistDetail(
         id=watchlist.id,
         name=watchlist.name,
         description=watchlist.description,
         people=people,
-        created_at=watchlist.created_at.date() if watchlist.created_at else date.today(),
+        created_at=watchlist.created_at.date()
+        if watchlist.created_at
+        else date.today(),
     )
 
 
@@ -278,9 +316,9 @@ async def update_watchlist(
     db: Session = Depends(get_db),
 ):
     """Update watchlist name or description."""
-    watchlist = db.query(PeopleWatchlist).filter(
-        PeopleWatchlist.id == watchlist_id
-    ).first()
+    watchlist = (
+        db.query(PeopleWatchlist).filter(PeopleWatchlist.id == watchlist_id).first()
+    )
 
     if not watchlist:
         raise HTTPException(status_code=404, detail="Watchlist not found")
@@ -293,9 +331,11 @@ async def update_watchlist(
     db.commit()
     db.refresh(watchlist)
 
-    person_count = db.query(PeopleWatchlistPerson).filter(
-        PeopleWatchlistPerson.watchlist_id == watchlist.id
-    ).count()
+    person_count = (
+        db.query(PeopleWatchlistPerson)
+        .filter(PeopleWatchlistPerson.watchlist_id == watchlist.id)
+        .count()
+    )
 
     return WatchlistSummary(
         id=watchlist.id,
@@ -303,7 +343,9 @@ async def update_watchlist(
         description=watchlist.description,
         person_count=person_count,
         recent_changes=0,
-        created_at=watchlist.created_at.date() if watchlist.created_at else date.today(),
+        created_at=watchlist.created_at.date()
+        if watchlist.created_at
+        else date.today(),
     )
 
 
@@ -313,9 +355,9 @@ async def delete_watchlist(
     db: Session = Depends(get_db),
 ):
     """Delete a watchlist and remove all tracked people."""
-    watchlist = db.query(PeopleWatchlist).filter(
-        PeopleWatchlist.id == watchlist_id
-    ).first()
+    watchlist = (
+        db.query(PeopleWatchlist).filter(PeopleWatchlist.id == watchlist_id).first()
+    )
 
     if not watchlist:
         raise HTTPException(status_code=404, detail="Watchlist not found")
@@ -338,25 +380,27 @@ async def add_person_to_watchlist(
     db: Session = Depends(get_db),
 ):
     """Add a person to a watchlist."""
-    watchlist = db.query(PeopleWatchlist).filter(
-        PeopleWatchlist.id == watchlist_id
-    ).first()
+    watchlist = (
+        db.query(PeopleWatchlist).filter(PeopleWatchlist.id == watchlist_id).first()
+    )
 
     if not watchlist:
         raise HTTPException(status_code=404, detail="Watchlist not found")
 
-    person = db.query(Person).filter(
-        Person.id == request.person_id
-    ).first()
+    person = db.query(Person).filter(Person.id == request.person_id).first()
 
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
 
     # Check if already watched
-    existing = db.query(PeopleWatchlistPerson).filter(
-        PeopleWatchlistPerson.watchlist_id == watchlist_id,
-        PeopleWatchlistPerson.person_id == request.person_id,
-    ).first()
+    existing = (
+        db.query(PeopleWatchlistPerson)
+        .filter(
+            PeopleWatchlistPerson.watchlist_id == watchlist_id,
+            PeopleWatchlistPerson.person_id == request.person_id,
+        )
+        .first()
+    )
 
     if existing:
         raise HTTPException(status_code=400, detail="Person already on watchlist")
@@ -372,10 +416,14 @@ async def add_person_to_watchlist(
     db.refresh(wp)
 
     # Get current role
-    current_role = db.query(CompanyPerson).filter(
-        CompanyPerson.person_id == person.id,
-        CompanyPerson.is_current == True,
-    ).first()
+    current_role = (
+        db.query(CompanyPerson)
+        .filter(
+            CompanyPerson.person_id == person.id,
+            CompanyPerson.is_current == True,
+        )
+        .first()
+    )
 
     current_title = None
     current_company = None
@@ -409,10 +457,14 @@ async def remove_person_from_watchlist(
     db: Session = Depends(get_db),
 ):
     """Remove a person from a watchlist."""
-    wp = db.query(PeopleWatchlistPerson).filter(
-        PeopleWatchlistPerson.watchlist_id == watchlist_id,
-        PeopleWatchlistPerson.person_id == person_id,
-    ).first()
+    wp = (
+        db.query(PeopleWatchlistPerson)
+        .filter(
+            PeopleWatchlistPerson.watchlist_id == watchlist_id,
+            PeopleWatchlistPerson.person_id == person_id,
+        )
+        .first()
+    )
 
     if not wp:
         raise HTTPException(status_code=404, detail="Person not on watchlist")
@@ -434,18 +486,22 @@ async def get_watchlist_alerts(
 
     Shows recent leadership changes for people on your watchlist.
     """
-    watchlist = db.query(PeopleWatchlist).filter(
-        PeopleWatchlist.id == watchlist_id
-    ).first()
+    watchlist = (
+        db.query(PeopleWatchlist).filter(PeopleWatchlist.id == watchlist_id).first()
+    )
 
     if not watchlist:
         raise HTTPException(status_code=404, detail="Watchlist not found")
 
     # Get watched people with alerts enabled
-    watched = db.query(PeopleWatchlistPerson).filter(
-        PeopleWatchlistPerson.watchlist_id == watchlist_id,
-        PeopleWatchlistPerson.alert_on_change == True,
-    ).all()
+    watched = (
+        db.query(PeopleWatchlistPerson)
+        .filter(
+            PeopleWatchlistPerson.watchlist_id == watchlist_id,
+            PeopleWatchlistPerson.alert_on_change == True,
+        )
+        .all()
+    )
 
     if not watched:
         return WatchlistAlertsResponse(
@@ -463,10 +519,15 @@ async def get_watchlist_alerts(
 
     # Find changes
     cutoff_date = date.today() - timedelta(days=days)
-    changes = db.query(LeadershipChange).filter(
-        LeadershipChange.person_name.in_(person_names),
-        LeadershipChange.announced_date >= cutoff_date,
-    ).order_by(LeadershipChange.announced_date.desc()).all()
+    changes = (
+        db.query(LeadershipChange)
+        .filter(
+            LeadershipChange.person_name.in_(person_names),
+            LeadershipChange.announced_date >= cutoff_date,
+        )
+        .order_by(LeadershipChange.announced_date.desc())
+        .all()
+    )
 
     alerts = []
     for change in changes:
@@ -482,18 +543,20 @@ async def get_watchlist_alerts(
             company = db.get(IndustrialCompany, change.company_id)
             new_company = company.name if company else None
 
-        alerts.append(PersonChangeAlert(
-            person_id=person.id if person else 0,
-            person_name=change.person_name,
-            change_type=change.change_type,
-            old_title=change.old_title,
-            new_title=change.new_title,
-            old_company=old_company,
-            new_company=new_company,
-            announced_date=change.announced_date,
-            watchlist_id=watchlist.id,
-            watchlist_name=watchlist.name,
-        ))
+        alerts.append(
+            PersonChangeAlert(
+                person_id=person.id if person else 0,
+                person_name=change.person_name,
+                change_type=change.change_type,
+                old_title=change.old_title,
+                new_title=change.new_title,
+                old_company=old_company,
+                new_company=new_company,
+                announced_date=change.announced_date,
+                watchlist_id=watchlist.id,
+                watchlist_name=watchlist.name,
+            )
+        )
 
     return WatchlistAlertsResponse(
         watchlist_id=watchlist.id,
@@ -514,9 +577,13 @@ async def get_all_alerts(
     Aggregated view of all tracked people who have changed roles.
     """
     # Get all watched people with alerts enabled
-    watched = db.query(PeopleWatchlistPerson).filter(
-        PeopleWatchlistPerson.alert_on_change == True,
-    ).all()
+    watched = (
+        db.query(PeopleWatchlistPerson)
+        .filter(
+            PeopleWatchlistPerson.alert_on_change == True,
+        )
+        .all()
+    )
 
     if not watched:
         return []
@@ -537,10 +604,15 @@ async def get_all_alerts(
 
     # Find changes
     cutoff_date = date.today() - timedelta(days=days)
-    changes = db.query(LeadershipChange).filter(
-        LeadershipChange.person_name.in_(person_names),
-        LeadershipChange.announced_date >= cutoff_date,
-    ).order_by(LeadershipChange.announced_date.desc()).all()
+    changes = (
+        db.query(LeadershipChange)
+        .filter(
+            LeadershipChange.person_name.in_(person_names),
+            LeadershipChange.announced_date >= cutoff_date,
+        )
+        .order_by(LeadershipChange.announced_date.desc())
+        .all()
+    )
 
     alerts = []
     for change in changes:
@@ -555,17 +627,19 @@ async def get_all_alerts(
         # Create alert for first watchlist (could expand to multiple)
         wl = watchlists[0]
 
-        alerts.append(PersonChangeAlert(
-            person_id=person.id,
-            person_name=change.person_name,
-            change_type=change.change_type,
-            old_title=change.old_title,
-            new_title=change.new_title,
-            old_company=change.old_company,
-            new_company=None,
-            announced_date=change.announced_date,
-            watchlist_id=wl.id,
-            watchlist_name=wl.name,
-        ))
+        alerts.append(
+            PersonChangeAlert(
+                person_id=person.id,
+                person_name=change.person_name,
+                change_type=change.change_type,
+                old_title=change.old_title,
+                new_title=change.new_title,
+                old_company=change.old_company,
+                new_company=None,
+                announced_date=change.announced_date,
+                watchlist_id=wl.id,
+                watchlist_name=wl.name,
+            )
+        )
 
     return alerts

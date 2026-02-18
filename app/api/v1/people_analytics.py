@@ -26,8 +26,10 @@ router = APIRouter(prefix="/people-analytics", tags=["People Analytics"])
 # Response Models
 # =============================================================================
 
+
 class InstabilityFlag(BaseModel):
     """Company with high leadership turnover."""
+
     company_id: int
     company_name: str
     c_suite_changes: int
@@ -36,6 +38,7 @@ class InstabilityFlag(BaseModel):
 
 class IndustryStatsResponse(BaseModel):
     """Industry-wide statistics for leadership data."""
+
     industry: str
     period_days: int
     total_companies: int
@@ -54,6 +57,7 @@ class IndustryStatsResponse(BaseModel):
 
 class TalentFlowEntry(BaseModel):
     """Single company's talent flow."""
+
     company_id: int
     company_name: str
     hires: int
@@ -63,6 +67,7 @@ class TalentFlowEntry(BaseModel):
 
 class TalentFlowResponse(BaseModel):
     """Talent flow analysis response."""
+
     industry: str
     period_days: int
     net_importers: List[TalentFlowEntry]
@@ -72,6 +77,7 @@ class TalentFlowResponse(BaseModel):
 
 class TrendDataPoint(BaseModel):
     """Single month's trend data."""
+
     month: str
     total: int
     hires: int = 0
@@ -82,6 +88,7 @@ class TrendDataPoint(BaseModel):
 
 class TrendsResponse(BaseModel):
     """Change trends over time."""
+
     industry: str
     months: int
     trends: List[TrendDataPoint]
@@ -89,12 +96,14 @@ class TrendsResponse(BaseModel):
 
 class HotRoleEntry(BaseModel):
     """Hot role with hiring count."""
+
     role: str
     hires: int
 
 
 class BenchmarkComponents(BaseModel):
     """Benchmark score components."""
+
     completeness: float
     depth: float
     tenure: float
@@ -103,6 +112,7 @@ class BenchmarkComponents(BaseModel):
 
 class BenchmarkDetails(BaseModel):
     """Benchmark detail metrics."""
+
     has_ceo: bool
     has_cfo: bool
     has_coo: bool
@@ -114,6 +124,7 @@ class BenchmarkDetails(BaseModel):
 
 class BenchmarkScoreResponse(BaseModel):
     """Company benchmark score."""
+
     company_id: int
     company_name: str
     team_score: float
@@ -123,6 +134,7 @@ class BenchmarkScoreResponse(BaseModel):
 
 class PortfolioAnalyticsResponse(BaseModel):
     """Portfolio analytics response."""
+
     portfolio_id: int
     portfolio_name: str
     total_companies: int
@@ -137,6 +149,7 @@ class PortfolioAnalyticsResponse(BaseModel):
 # Endpoints
 # =============================================================================
 
+
 @router.get("/industries", response_model=List[str])
 async def list_industries(
     db: Session = Depends(get_db),
@@ -148,9 +161,12 @@ async def list_industries(
     """
     from app.core.people_models import IndustrialCompany
 
-    industries = db.query(IndustrialCompany.industry_segment).distinct().filter(
-        IndustrialCompany.industry_segment.isnot(None)
-    ).all()
+    industries = (
+        db.query(IndustrialCompany.industry_segment)
+        .distinct()
+        .filter(IndustrialCompany.industry_segment.isnot(None))
+        .all()
+    )
 
     return [i[0] for i in industries if i[0]]
 

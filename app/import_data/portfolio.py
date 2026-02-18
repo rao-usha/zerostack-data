@@ -4,6 +4,7 @@ Bulk Portfolio Import Engine.
 Handles CSV/Excel file parsing, validation, and import
 of portfolio data into the database.
 """
+
 import csv
 import io
 import json
@@ -21,15 +22,23 @@ logger = logging.getLogger(__name__)
 # Required and optional columns
 REQUIRED_COLUMNS = {"company_name", "investor_name", "investor_type"}
 OPTIONAL_COLUMNS = {
-    "company_website", "company_industry", "company_stage", "company_location",
-    "investment_date", "investment_amount", "shares_held", "market_value",
-    "ownership_percentage", "investment_type"
+    "company_website",
+    "company_industry",
+    "company_stage",
+    "company_location",
+    "investment_date",
+    "investment_amount",
+    "shares_held",
+    "market_value",
+    "ownership_percentage",
+    "investment_type",
 }
 VALID_INVESTOR_TYPES = {"lp", "family_office"}
 
 
 class ValidationError:
     """Represents a validation error for a row."""
+
     def __init__(self, row: int, column: str, error: str):
         self.row = row
         self.column = column
@@ -41,6 +50,7 @@ class ValidationError:
 
 class ValidationWarning:
     """Represents a validation warning for a row."""
+
     def __init__(self, row: int, message: str):
         self.row = row
         self.message = message
@@ -98,11 +108,14 @@ class PortfolioImporter:
             VALUES (:filename, :file_size, :row_count, 'pending')
             RETURNING id
         """)
-        result = self.db.execute(query, {
-            "filename": filename,
-            "file_size": file_size,
-            "row_count": row_count,
-        })
+        result = self.db.execute(
+            query,
+            {
+                "filename": filename,
+                "file_size": file_size,
+                "row_count": row_count,
+            },
+        )
         self.db.commit()
         row = result.fetchone()
         return row[0] if row else 0
@@ -114,12 +127,23 @@ class PortfolioImporter:
         params = {"import_id": import_id}
 
         for key, value in kwargs.items():
-            if key in ("status", "valid_rows", "invalid_rows", "validation_errors",
-                       "imported_count", "skipped_count", "error_count", "rollback_data",
-                       "started_at", "completed_at"):
+            if key in (
+                "status",
+                "valid_rows",
+                "invalid_rows",
+                "validation_errors",
+                "imported_count",
+                "skipped_count",
+                "error_count",
+                "rollback_data",
+                "started_at",
+                "completed_at",
+            ):
                 set_clauses.append(f"{key} = :{key}")
                 # Handle JSONB fields
-                if key in ("validation_errors", "rollback_data") and isinstance(value, (dict, list)):
+                if key in ("validation_errors", "rollback_data") and isinstance(
+                    value, (dict, list)
+                ):
                     params[key] = json.dumps(value)
                 else:
                     params[key] = value
@@ -193,7 +217,9 @@ class PortfolioImporter:
                         normalized[normalized_key] = value.strip() if value else ""
                 normalized_rows.append(normalized)
 
-            return normalized_rows, [c.lower().strip().replace(" ", "_") for c in columns if c]
+            return normalized_rows, [
+                c.lower().strip().replace(" ", "_") for c in columns if c
+            ]
 
         except Exception as e:
             logger.error(f"CSV parsing error: {e}")
@@ -220,8 +246,10 @@ class PortfolioImporter:
                 raise ValueError("Excel file has no header row")
 
             # Normalize column names
-            columns = [str(c).lower().strip().replace(" ", "_") if c else f"col_{i}"
-                      for i, c in enumerate(header)]
+            columns = [
+                str(c).lower().strip().replace(" ", "_") if c else f"col_{i}"
+                for i, c in enumerate(header)
+            ]
 
             rows = []
             for row_values in rows_iter:
@@ -229,7 +257,9 @@ class PortfolioImporter:
                     row = {}
                     for i, value in enumerate(row_values):
                         if i < len(columns):
-                            row[columns[i]] = str(value).strip() if value is not None else ""
+                            row[columns[i]] = (
+                                str(value).strip() if value is not None else ""
+                            )
                     rows.append(row)
 
             return rows, columns
@@ -250,7 +280,9 @@ class PortfolioImporter:
         missing = REQUIRED_COLUMNS - columns_set
         return list(missing)
 
-    def validate_row(self, row: Dict, row_num: int) -> Tuple[List[ValidationError], List[ValidationWarning]]:
+    def validate_row(
+        self, row: Dict, row_num: int
+    ) -> Tuple[List[ValidationError], List[ValidationWarning]]:
         """
         Validate a single row.
 
@@ -268,37 +300,49 @@ class PortfolioImporter:
         # Validate investor_type
         investor_type = row.get("investor_type", "").lower()
         if investor_type and investor_type not in VALID_INVESTOR_TYPES:
-            errors.append(ValidationError(
-                row_num, "investor_type",
-                f"Invalid value '{investor_type}', must be 'lp' or 'family_office'"
-            ))
+            errors.append(
+                ValidationError(
+                    row_num,
+                    "investor_type",
+                    f"Invalid value '{investor_type}', must be 'lp' or 'family_office'",
+                )
+            )
 
         # Validate investment_date if present
         if row.get("investment_date"):
             try:
                 self._parse_date(row["investment_date"])
             except ValueError:
-                errors.append(ValidationError(
-                    row_num, "investment_date",
-                    f"Invalid date format '{row['investment_date']}'"
-                ))
+                errors.append(
+                    ValidationError(
+                        row_num,
+                        "investment_date",
+                        f"Invalid date format '{row['investment_date']}'",
+                    )
+                )
 
         # Check if investor exists (warning if not)
         if row.get("investor_name") and not errors:
             investor_match = self._match_investor(row["investor_name"], investor_type)
             if not investor_match:
-                warnings.append(ValidationWarning(
-                    row_num,
-                    f"Investor '{row['investor_name']}' not found, will create new record"
-                ))
+                warnings.append(
+                    ValidationWarning(
+                        row_num,
+                        f"Investor '{row['investor_name']}' not found, will create new record",
+                    )
+                )
 
         return errors, warnings
 
     def _parse_date(self, date_str: str) -> datetime:
         """Parse date string in various formats."""
         formats = [
-            "%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y",
-            "%Y/%m/%d", "%m-%d-%Y", "%d-%m-%Y"
+            "%Y-%m-%d",
+            "%m/%d/%Y",
+            "%d/%m/%Y",
+            "%Y/%m/%d",
+            "%m-%d-%Y",
+            "%d-%m-%Y",
         ]
         for fmt in formats:
             try:
@@ -330,7 +374,9 @@ class PortfolioImporter:
             key = row["name"].lower()
             self._investors_cache[key] = (row["id"], "family_office")
 
-    def _match_investor(self, name: str, investor_type: str) -> Optional[Tuple[int, str]]:
+    def _match_investor(
+        self, name: str, investor_type: str
+    ) -> Optional[Tuple[int, str]]:
         """
         Match investor name to existing record using fuzzy matching.
 
@@ -421,7 +467,7 @@ class PortfolioImporter:
             status="previewing",
             valid_rows=valid_count,
             invalid_rows=invalid_count,
-            validation_errors={"errors": all_errors, "warnings": all_warnings}
+            validation_errors={"errors": all_errors, "warnings": all_warnings},
         )
 
         return {
@@ -446,14 +492,16 @@ class PortfolioImporter:
                 status = "warning"
                 warning_msg = warnings[0].message
 
-            preview.append({
-                "row_num": i,
-                "company_name": row.get("company_name", ""),
-                "investor_name": row.get("investor_name", ""),
-                "investor_type": row.get("investor_type", ""),
-                "status": status,
-                "warning": warning_msg,
-            })
+            preview.append(
+                {
+                    "row_num": i,
+                    "company_name": row.get("company_name", ""),
+                    "investor_name": row.get("investor_name", ""),
+                    "investor_type": row.get("investor_type", ""),
+                    "status": status,
+                    "warning": warning_msg,
+                }
+            )
 
         return preview
 
@@ -494,7 +542,7 @@ class PortfolioImporter:
             skipped_count=skipped_count,
             error_count=error_count,
             rollback_data={"imported_ids": imported_ids},
-            completed_at=datetime.utcnow()
+            completed_at=datetime.utcnow(),
         )
 
         return {
@@ -547,21 +595,24 @@ class PortfolioImporter:
             RETURNING id
         """)
 
-        result = self.db.execute(query, {
-            "investor_id": investor_id,
-            "investor_type": matched_type,
-            "company_name": row.get("company_name", ""),
-            "website": row.get("company_website"),
-            "industry": row.get("company_industry"),
-            "stage": row.get("company_stage"),
-            "location": row.get("company_location"),
-            "investment_type": row.get("investment_type"),
-            "investment_date": investment_date,
-            "amount": row.get("investment_amount"),
-            "shares": row.get("shares_held"),
-            "market_value": row.get("market_value"),
-            "ownership": row.get("ownership_percentage"),
-        })
+        result = self.db.execute(
+            query,
+            {
+                "investor_id": investor_id,
+                "investor_type": matched_type,
+                "company_name": row.get("company_name", ""),
+                "website": row.get("company_website"),
+                "industry": row.get("company_industry"),
+                "stage": row.get("company_stage"),
+                "location": row.get("company_location"),
+                "investment_type": row.get("investment_type"),
+                "investment_date": investment_date,
+                "amount": row.get("investment_amount"),
+                "shares": row.get("shares_held"),
+                "market_value": row.get("market_value"),
+                "ownership": row.get("ownership_percentage"),
+            },
+        )
         self.db.commit()
 
         record = result.fetchone()

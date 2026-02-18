@@ -8,8 +8,14 @@ Data sources:
 - Good Jobs First: Disclosed deals
 """
 
-from app.sources.site_intel.incentives.cdfi_collector import CDFIOpportunityZoneCollector
+from app.sources.site_intel.incentives.cdfi_collector import (
+    CDFIOpportunityZoneCollector,
+)
 from app.sources.site_intel.incentives.ftz_collector import FTZBoardCollector
 from app.sources.site_intel.incentives.goodjobs_collector import GoodJobsFirstCollector
 
-__all__ = ["CDFIOpportunityZoneCollector", "FTZBoardCollector", "GoodJobsFirstCollector"]
+__all__ = [
+    "CDFIOpportunityZoneCollector",
+    "FTZBoardCollector",
+    "GoodJobsFirstCollector",
+]

@@ -7,6 +7,7 @@ Provides reusable utilities for batch INSERT operations with:
 - Progress tracking
 - Error handling
 """
+
 import logging
 from typing import List, Dict, Any, Optional, Tuple, Callable
 from datetime import datetime
@@ -51,7 +52,7 @@ class BatchInsertResult:
             "total_rows": self.total_rows,
             "batches_processed": self.batches_processed,
             "errors": self.errors,
-            "duration_seconds": self.duration_seconds
+            "duration_seconds": self.duration_seconds,
         }
 
 
@@ -64,7 +65,7 @@ def batch_insert(
     conflict_columns: Optional[List[str]] = None,
     update_columns: Optional[List[str]] = None,
     progress_callback: Optional[Callable[[int, int], None]] = None,
-    commit_per_batch: bool = True
+    commit_per_batch: bool = True,
 ) -> BatchInsertResult:
     """
     Batch insert rows into a table with optional upsert support.
@@ -108,7 +109,7 @@ def batch_insert(
         table_name=table_name,
         columns=columns,
         conflict_columns=conflict_columns,
-        update_columns=update_columns
+        update_columns=update_columns,
     )
 
     total_rows = len(rows)
@@ -119,7 +120,7 @@ def batch_insert(
 
     try:
         for i in range(0, total_rows, batch_size):
-            batch = rows[i:i + batch_size]
+            batch = rows[i : i + batch_size]
             batch_num = i // batch_size + 1
 
             try:
@@ -142,12 +143,14 @@ def batch_insert(
 
             except Exception as e:
                 logger.error(f"Error in batch {batch_num}: {e}")
-                result.errors.append({
-                    "batch": batch_num,
-                    "start_row": i,
-                    "end_row": i + len(batch),
-                    "error": str(e)
-                })
+                result.errors.append(
+                    {
+                        "batch": batch_num,
+                        "start_row": i,
+                        "end_row": i + len(batch),
+                        "error": str(e),
+                    }
+                )
 
                 if commit_per_batch:
                     db.rollback()
@@ -179,7 +182,7 @@ def batch_insert_with_returning(
     returning_columns: List[str],
     batch_size: int = 100,
     conflict_columns: Optional[List[str]] = None,
-    update_columns: Optional[List[str]] = None
+    update_columns: Optional[List[str]] = None,
 ) -> Tuple[BatchInsertResult, List[Dict[str, Any]]]:
     """
     Batch insert with RETURNING clause to get inserted/updated row IDs.
@@ -209,7 +212,7 @@ def batch_insert_with_returning(
         table_name=table_name,
         columns=columns,
         conflict_columns=conflict_columns,
-        update_columns=update_columns
+        update_columns=update_columns,
     )
     returning_clause = f" RETURNING {', '.join(returning_columns)}"
     sql = base_sql + returning_clause
@@ -218,7 +221,7 @@ def batch_insert_with_returning(
 
     try:
         for i in range(0, total_rows, batch_size):
-            batch = rows[i:i + batch_size]
+            batch = rows[i : i + batch_size]
 
             cursor = db.execute(text(sql), batch)
             batch_returned = [dict(row._mapping) for row in cursor.fetchall()]
@@ -244,7 +247,7 @@ def _build_insert_sql(
     table_name: str,
     columns: List[str],
     conflict_columns: Optional[List[str]] = None,
-    update_columns: Optional[List[str]] = None
+    update_columns: Optional[List[str]] = None,
 ) -> str:
     """
     Build parameterized INSERT SQL with optional ON CONFLICT.
@@ -277,9 +280,7 @@ def _build_insert_sql(
 
         if update_columns:
             # Build SET clause with EXCLUDED
-            set_clause = ", ".join(
-                f"{col} = EXCLUDED.{col}" for col in update_columns
-            )
+            set_clause = ", ".join(f"{col} = EXCLUDED.{col}" for col in update_columns)
             sql += f" ON CONFLICT ({conflict_cols}) DO UPDATE SET {set_clause}"
         else:
             # No columns to update, just ignore conflicts
@@ -296,7 +297,7 @@ def bulk_upsert(
     value_columns: List[str],
     batch_size: int = 1000,
     add_timestamp_column: Optional[str] = None,
-    progress_callback: Optional[Callable[[int, int], None]] = None
+    progress_callback: Optional[Callable[[int, int], None]] = None,
 ) -> BatchInsertResult:
     """
     Convenience wrapper for upsert operations.
@@ -330,15 +331,11 @@ def bulk_upsert(
         batch_size=batch_size,
         conflict_columns=key_columns,
         update_columns=update_cols,
-        progress_callback=progress_callback
+        progress_callback=progress_callback,
     )
 
 
-def create_table_if_not_exists(
-    db: Session,
-    create_sql: str,
-    table_name: str
-) -> bool:
+def create_table_if_not_exists(db: Session, create_sql: str, table_name: str) -> bool:
     """
     Execute CREATE TABLE IF NOT EXISTS.
 

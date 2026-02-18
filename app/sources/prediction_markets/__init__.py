@@ -9,6 +9,7 @@ Components:
 - ingest.py: Ingestion orchestration and job tracking
 - metadata.py: Market categories and classification
 """
+
 from app.sources.prediction_markets.client import (
     KalshiClient,
     PolymarketClient,

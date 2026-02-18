@@ -18,8 +18,12 @@ router = APIRouter(prefix="/news", tags=["News"])
 
 @router.get("/feed")
 def get_news_feed(
-    event_type: Optional[str] = Query(None, description="Filter: filing, funding, acquisition, ipo, news"),
-    filing_type: Optional[str] = Query(None, description="Filter: 13F, 13D, 8-K, 10-K, Form D"),
+    event_type: Optional[str] = Query(
+        None, description="Filter: filing, funding, acquisition, ipo, news"
+    ),
+    filing_type: Optional[str] = Query(
+        None, description="Filter: 13F, 13D, 8-K, 10-K, Form D"
+    ),
     source: Optional[str] = Query(None, description="Filter: sec_edgar, google_news"),
     company: Optional[str] = Query(None, description="Filter by company name"),
     days: int = Query(7, ge=1, le=90, description="News from last N days"),
@@ -105,7 +109,9 @@ def get_investor_news(
 
 @router.get("/filings")
 def get_sec_filings(
-    filing_type: Optional[str] = Query(None, description="Filter: 13F, 13D, 8-K, 10-K, 10-Q, Form D"),
+    filing_type: Optional[str] = Query(
+        None, description="Filter: 13F, 13D, 8-K, 10-K, 10-Q, Form D"
+    ),
     days: int = Query(7, ge=1, le=90, description="Filings from last N days"),
     limit: int = Query(50, ge=1, le=100, description="Max items to return"),
     db: Session = Depends(get_db),
@@ -125,7 +131,9 @@ def get_sec_filings(
 
 @router.post("/refresh")
 async def refresh_news(
-    source: Optional[str] = Query(None, description="Specific source to refresh (sec_edgar, google_news)"),
+    source: Optional[str] = Query(
+        None, description="Specific source to refresh (sec_edgar, google_news)"
+    ),
     background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db),
 ):

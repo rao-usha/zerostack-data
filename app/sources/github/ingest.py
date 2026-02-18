@@ -159,7 +159,9 @@ class GitHubAnalyticsService:
         total_forks = sum(r.get("forks_count", 0) for r in all_repos)
 
         # Get top repos by stars
-        sorted_repos = sorted(all_repos, key=lambda r: r.get("stargazers_count", 0), reverse=True)
+        sorted_repos = sorted(
+            all_repos, key=lambda r: r.get("stargazers_count", 0), reverse=True
+        )
         top_repos = [r["name"] for r in sorted_repos[:10]]
 
         # Get primary languages
@@ -168,7 +170,9 @@ class GitHubAnalyticsService:
             lang = repo.get("language")
             if lang:
                 language_counts[lang] = language_counts.get(lang, 0) + 1
-        primary_languages = sorted(language_counts.keys(), key=lambda l: language_counts[l], reverse=True)[:5]
+        primary_languages = sorted(
+            language_counts.keys(), key=lambda l: language_counts[l], reverse=True
+        )[:5]
 
         # Store repos
         for repo in all_repos:
@@ -210,7 +214,7 @@ class GitHubAnalyticsService:
                 "top_repos": top_repos,
                 "primary_languages": primary_languages,
             },
-            "velocity_score": velocity_score
+            "velocity_score": velocity_score,
         }
 
     async def _store_repository(self, org: str, repo: Dict):
@@ -240,29 +244,34 @@ class GitHubAnalyticsService:
         """)
 
         try:
-            self.db.execute(insert_sql, {
-                "github_id": repo.get("id"),
-                "org_login": org,
-                "name": repo.get("name"),
-                "full_name": repo.get("full_name"),
-                "description": repo.get("description"),
-                "homepage": repo.get("homepage"),
-                "language": repo.get("language"),
-                "stars": repo.get("stargazers_count", 0),
-                "forks": repo.get("forks_count", 0),
-                "watchers": repo.get("watchers_count", 0),
-                "open_issues": repo.get("open_issues_count", 0),
-                "size_kb": repo.get("size", 0),
-                "default_branch": repo.get("default_branch"),
-                "is_fork": repo.get("fork", False),
-                "is_archived": repo.get("archived", False),
-                "is_private": repo.get("private", False),
-                "topics": repo.get("topics", []),
-                "license_name": repo.get("license", {}).get("name") if repo.get("license") else None,
-                "github_created_at": repo.get("created_at"),
-                "github_updated_at": repo.get("updated_at"),
-                "pushed_at": repo.get("pushed_at"),
-            })
+            self.db.execute(
+                insert_sql,
+                {
+                    "github_id": repo.get("id"),
+                    "org_login": org,
+                    "name": repo.get("name"),
+                    "full_name": repo.get("full_name"),
+                    "description": repo.get("description"),
+                    "homepage": repo.get("homepage"),
+                    "language": repo.get("language"),
+                    "stars": repo.get("stargazers_count", 0),
+                    "forks": repo.get("forks_count", 0),
+                    "watchers": repo.get("watchers_count", 0),
+                    "open_issues": repo.get("open_issues_count", 0),
+                    "size_kb": repo.get("size", 0),
+                    "default_branch": repo.get("default_branch"),
+                    "is_fork": repo.get("fork", False),
+                    "is_archived": repo.get("archived", False),
+                    "is_private": repo.get("private", False),
+                    "topics": repo.get("topics", []),
+                    "license_name": repo.get("license", {}).get("name")
+                    if repo.get("license")
+                    else None,
+                    "github_created_at": repo.get("created_at"),
+                    "github_updated_at": repo.get("updated_at"),
+                    "pushed_at": repo.get("pushed_at"),
+                },
+            )
             self.db.commit()
         except Exception as e:
             logger.warning(f"Failed to store repo {repo.get('full_name')}: {e}")
@@ -301,11 +310,14 @@ class GitHubAnalyticsService:
         """)
 
         try:
-            self.db.execute(insert_sql, {
-                **org,
-                "primary_languages": json.dumps(org.get("primary_languages", [])),
-                "top_repos": json.dumps(org.get("top_repos", [])),
-            })
+            self.db.execute(
+                insert_sql,
+                {
+                    **org,
+                    "primary_languages": json.dumps(org.get("primary_languages", [])),
+                    "top_repos": json.dumps(org.get("top_repos", [])),
+                },
+            )
             self.db.commit()
         except Exception as e:
             logger.warning(f"Failed to store org {org.get('login')}: {e}")
@@ -328,8 +340,13 @@ class GitHubAnalyticsService:
         # Filter active repos (pushed in last 6 months)
         six_months_ago = datetime.now() - timedelta(days=180)
         active_repos = [
-            r for r in repos
-            if r.get("pushed_at") and datetime.fromisoformat(r["pushed_at"].replace("Z", "+00:00")).replace(tzinfo=None) > six_months_ago
+            r
+            for r in repos
+            if r.get("pushed_at")
+            and datetime.fromisoformat(r["pushed_at"].replace("Z", "+00:00")).replace(
+                tzinfo=None
+            )
+            > six_months_ago
         ]
 
         # Commit frequency score (30%) - based on active repos ratio
@@ -337,10 +354,17 @@ class GitHubAnalyticsService:
         commit_score = min(100, int(active_ratio * 100 * 1.2))
 
         # PR velocity score (25%) - based on recent push frequency
-        recent_pushes = len([
-            r for r in repos
-            if r.get("pushed_at") and datetime.fromisoformat(r["pushed_at"].replace("Z", "+00:00")).replace(tzinfo=None) > (datetime.now() - timedelta(days=30))
-        ])
+        recent_pushes = len(
+            [
+                r
+                for r in repos
+                if r.get("pushed_at")
+                and datetime.fromisoformat(
+                    r["pushed_at"].replace("Z", "+00:00")
+                ).replace(tzinfo=None)
+                > (datetime.now() - timedelta(days=30))
+            ]
+        )
         pr_score = min(100, int(recent_pushes * 5))
 
         # Issue resolution score (20%) - lower open issues is better
@@ -362,11 +386,11 @@ class GitHubAnalyticsService:
 
         # Weighted total
         velocity_score = int(
-            commit_score * 0.30 +
-            pr_score * 0.25 +
-            issue_score * 0.20 +
-            contributor_score * 0.15 +
-            release_score * 0.10
+            commit_score * 0.30
+            + pr_score * 0.25
+            + issue_score * 0.20
+            + contributor_score * 0.15
+            + release_score * 0.10
         )
 
         return min(100, max(0, velocity_score))
@@ -392,7 +416,9 @@ class GitHubAnalyticsService:
             "twitter_username": row["twitter_username"],
             "public_repos": row["public_repos"],
             "followers": row["followers"],
-            "github_created_at": row["github_created_at"].isoformat() if row["github_created_at"] else None,
+            "github_created_at": row["github_created_at"].isoformat()
+            if row["github_created_at"]
+            else None,
             "metrics": {
                 "total_stars": row["total_stars"],
                 "total_forks": row["total_forks"],
@@ -400,15 +426,13 @@ class GitHubAnalyticsService:
                 "primary_languages": row["primary_languages"],
             },
             "velocity_score": row["velocity_score"],
-            "last_fetched_at": row["last_fetched_at"].isoformat() if row["last_fetched_at"] else None,
+            "last_fetched_at": row["last_fetched_at"].isoformat()
+            if row["last_fetched_at"]
+            else None,
         }
 
     def get_org_repos(
-        self,
-        org: str,
-        limit: int = 50,
-        offset: int = 0,
-        sort_by: str = "stars"
+        self, org: str, limit: int = 50, offset: int = 0, sort_by: str = "stars"
     ) -> Dict[str, Any]:
         """Get repositories for an organization."""
         sort_column = {
@@ -433,27 +457,33 @@ class GitHubAnalyticsService:
         result = self.db.execute(query, {"org": org, "limit": limit, "offset": offset})
         repos = []
         for row in result.mappings():
-            repos.append({
-                "name": row["name"],
-                "full_name": row["full_name"],
-                "description": row["description"],
-                "language": row["language"],
-                "stars": row["stars"],
-                "forks": row["forks"],
-                "open_issues": row["open_issues"],
-                "is_fork": row["is_fork"],
-                "is_archived": row["is_archived"],
-                "topics": row["topics"],
-                "pushed_at": row["pushed_at"].isoformat() if row["pushed_at"] else None,
-                "github_created_at": row["github_created_at"].isoformat() if row["github_created_at"] else None,
-            })
+            repos.append(
+                {
+                    "name": row["name"],
+                    "full_name": row["full_name"],
+                    "description": row["description"],
+                    "language": row["language"],
+                    "stars": row["stars"],
+                    "forks": row["forks"],
+                    "open_issues": row["open_issues"],
+                    "is_fork": row["is_fork"],
+                    "is_archived": row["is_archived"],
+                    "topics": row["topics"],
+                    "pushed_at": row["pushed_at"].isoformat()
+                    if row["pushed_at"]
+                    else None,
+                    "github_created_at": row["github_created_at"].isoformat()
+                    if row["github_created_at"]
+                    else None,
+                }
+            )
 
         return {
             "org": org,
             "total": total,
             "limit": limit,
             "offset": offset,
-            "repositories": repos
+            "repositories": repos,
         }
 
     async def get_org_activity(self, org: str, weeks: int = 12) -> Dict[str, Any]:
@@ -484,23 +514,31 @@ class GitHubAnalyticsService:
                 for week_data in activity[-weeks:]:
                     total_commits += week_data.get("total", 0)
                 if activity:
-                    recent_commits += activity[-1].get("total", 0) if activity[-1] else 0
+                    recent_commits += (
+                        activity[-1].get("total", 0) if activity[-1] else 0
+                    )
 
         # Generate weekly summary (simplified without full API data)
         today = date.today()
         for i in range(weeks):
             week_start = today - timedelta(weeks=weeks - i - 1, days=today.weekday())
-            weekly_activity.append({
-                "week": week_start.isoformat(),
-                "commits": total_commits // weeks if total_commits else 0,
-                "repos_active": len(top_repos),
-            })
+            weekly_activity.append(
+                {
+                    "week": week_start.isoformat(),
+                    "commits": total_commits // weeks if total_commits else 0,
+                    "repos_active": len(top_repos),
+                }
+            )
 
         # Determine trends
         commit_trend = "stable"
         if len(weekly_activity) >= 4:
-            first_half = sum(w["commits"] for w in weekly_activity[:len(weekly_activity)//2])
-            second_half = sum(w["commits"] for w in weekly_activity[len(weekly_activity)//2:])
+            first_half = sum(
+                w["commits"] for w in weekly_activity[: len(weekly_activity) // 2]
+            )
+            second_half = sum(
+                w["commits"] for w in weekly_activity[len(weekly_activity) // 2 :]
+            )
             if second_half > first_half * 1.2:
                 commit_trend = "increasing"
             elif second_half < first_half * 0.8:
@@ -532,17 +570,19 @@ class GitHubAnalyticsService:
         result = self.db.execute(query, {"org": org, "limit": limit})
         contributors = []
         for row in result.mappings():
-            contributors.append({
-                "username": row["username"],
-                "avatar_url": row["avatar_url"],
-                "total_contributions": row["total_contributions"],
-                "repos_contributed": row["repos_contributed"],
-            })
+            contributors.append(
+                {
+                    "username": row["username"],
+                    "avatar_url": row["avatar_url"],
+                    "total_contributions": row["total_contributions"],
+                    "repos_contributed": row["repos_contributed"],
+                }
+            )
 
         return {
             "org": org,
             "total_contributors": len(contributors),
-            "contributors": contributors
+            "contributors": contributors,
         }
 
     def get_velocity_breakdown(self, org: str) -> Optional[Dict[str, Any]]:
@@ -631,16 +671,16 @@ class GitHubAnalyticsService:
             "is_archived": row["is_archived"],
             "topics": row["topics"],
             "license_name": row["license_name"],
-            "github_created_at": row["github_created_at"].isoformat() if row["github_created_at"] else None,
+            "github_created_at": row["github_created_at"].isoformat()
+            if row["github_created_at"]
+            else None,
             "pushed_at": row["pushed_at"].isoformat() if row["pushed_at"] else None,
-            "last_fetched_at": row["last_fetched_at"].isoformat() if row["last_fetched_at"] else None,
+            "last_fetched_at": row["last_fetched_at"].isoformat()
+            if row["last_fetched_at"]
+            else None,
         }
 
-    def search_repos(
-        self,
-        query: str,
-        limit: int = 20
-    ) -> Dict[str, Any]:
+    def search_repos(self, query: str, limit: int = 20) -> Dict[str, Any]:
         """Search repositories in database."""
         search_query = text("""
             SELECT * FROM github_repositories
@@ -652,20 +692,18 @@ class GitHubAnalyticsService:
         result = self.db.execute(search_query, {"query": f"%{query}%", "limit": limit})
         repos = []
         for row in result.mappings():
-            repos.append({
-                "name": row["name"],
-                "full_name": row["full_name"],
-                "description": row["description"],
-                "language": row["language"],
-                "stars": row["stars"],
-                "forks": row["forks"],
-            })
+            repos.append(
+                {
+                    "name": row["name"],
+                    "full_name": row["full_name"],
+                    "description": row["description"],
+                    "language": row["language"],
+                    "stars": row["stars"],
+                    "forks": row["forks"],
+                }
+            )
 
-        return {
-            "query": query,
-            "count": len(repos),
-            "repositories": repos
-        }
+        return {"query": query, "count": len(repos), "repositories": repos}
 
     def get_stats(self) -> Dict[str, Any]:
         """Get aggregate statistics."""
@@ -690,7 +728,10 @@ class GitHubAnalyticsService:
             LIMIT 10
         """)
         lang_result = self.db.execute(lang_query)
-        top_languages = [{"language": r[0], "count": r[1], "stars": r[2]} for r in lang_result.fetchall()]
+        top_languages = [
+            {"language": r[0], "count": r[1], "stars": r[2]}
+            for r in lang_result.fetchall()
+        ]
 
         return {
             "total_organizations": result["total_orgs"],

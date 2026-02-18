@@ -11,6 +11,7 @@ Features:
 - Manual override support
 - Merge/split with rollback capability
 """
+
 import logging
 import re
 from dataclasses import dataclass
@@ -21,8 +22,20 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from sqlalchemy import (
-    Column, Integer, String, Float, Boolean, Text, DateTime, JSON,
-    ForeignKey, Index, UniqueConstraint, and_, or_, func
+    Column,
+    Integer,
+    String,
+    Float,
+    Boolean,
+    Text,
+    DateTime,
+    JSON,
+    ForeignKey,
+    Index,
+    UniqueConstraint,
+    and_,
+    or_,
+    func,
 )
 from sqlalchemy.orm import Session
 
@@ -36,8 +49,10 @@ logger = logging.getLogger(__name__)
 # ENUMS
 # =============================================================================
 
+
 class EntityType(str, Enum):
     """Supported entity types."""
+
     COMPANY = "company"
     INVESTOR = "investor"
     PERSON = "person"
@@ -45,6 +60,7 @@ class EntityType(str, Enum):
 
 class MatchMethod(str, Enum):
     """How a match was determined."""
+
     EXACT_CIK = "exact_cik"
     EXACT_CRD = "exact_crd"
     EXACT_TICKER = "exact_ticker"
@@ -59,6 +75,7 @@ class MatchMethod(str, Enum):
 
 class MergeAction(str, Enum):
     """Types of merge history actions."""
+
     CREATE = "create"
     MERGE = "merge"
     SPLIT = "split"
@@ -70,6 +87,7 @@ class MergeAction(str, Enum):
 # DATABASE MODELS
 # =============================================================================
 
+
 class CanonicalEntity(Base):
     """
     Master entity records with canonical names and identifiers.
@@ -77,10 +95,13 @@ class CanonicalEntity(Base):
     Each unique real-world entity (company, investor) gets one record.
     All name variants are stored in entity_aliases.
     """
+
     __tablename__ = "canonical_entities"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    entity_type = Column(String(50), nullable=False, index=True)  # company, investor, person
+    entity_type = Column(
+        String(50), nullable=False, index=True
+    )  # company, investor, person
     canonical_name = Column(String(500), nullable=False)
     normalized_name = Column(String(500), nullable=False, index=True)
 
@@ -103,7 +124,9 @@ class CanonicalEntity(Base):
 
     # Classification
     industry = Column(String(255), nullable=True, index=True)
-    entity_subtype = Column(String(100), nullable=True)  # e.g., 'public_pension', 'startup'
+    entity_subtype = Column(
+        String(100), nullable=True
+    )  # e.g., 'public_pension', 'startup'
 
     # Statistics
     alias_count = Column(Integer, default=1)
@@ -112,12 +135,14 @@ class CanonicalEntity(Base):
     # Metadata
     is_verified = Column(Boolean, default=False)  # Human-verified
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
-    created_by = Column(String(100), default='system')
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+    created_by = Column(String(100), default="system")
 
     __table_args__ = (
-        Index('idx_canonical_type_name', 'entity_type', 'normalized_name'),
-        Index('idx_canonical_identifiers', 'cik', 'crd', 'ticker'),
+        Index("idx_canonical_type_name", "entity_type", "normalized_name"),
+        Index("idx_canonical_identifiers", "cik", "crd", "ticker"),
     )
 
     def __repr__(self) -> str:
@@ -130,17 +155,24 @@ class EntityAlias(Base):
 
     Tracks where each alias came from and match confidence.
     """
+
     __tablename__ = "entity_aliases"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    canonical_entity_id = Column(Integer, ForeignKey('canonical_entities.id', ondelete='CASCADE'),
-                                  nullable=False, index=True)
+    canonical_entity_id = Column(
+        Integer,
+        ForeignKey("canonical_entities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     alias_name = Column(String(500), nullable=False)
     normalized_alias = Column(String(500), nullable=False, index=True)
 
     # Source tracking
-    source_type = Column(String(100), nullable=True)  # sec_13f, form_d, form_adv, manual, etc.
+    source_type = Column(
+        String(100), nullable=True
+    )  # sec_13f, form_d, form_adv, manual, etc.
     source_id = Column(String(255), nullable=True)  # ID in source system
     source_table = Column(String(100), nullable=True)  # Source table name
 
@@ -151,11 +183,13 @@ class EntityAlias(Base):
     is_primary = Column(Boolean, default=False)  # Is this the canonical name?
 
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    created_by = Column(String(100), default='system')
+    created_by = Column(String(100), default="system")
 
     __table_args__ = (
-        UniqueConstraint('canonical_entity_id', 'normalized_alias', name='uq_entity_alias'),
-        Index('idx_alias_normalized', 'normalized_alias'),
+        UniqueConstraint(
+            "canonical_entity_id", "normalized_alias", name="uq_entity_alias"
+        ),
+        Index("idx_alias_normalized", "normalized_alias"),
     )
 
     def __repr__(self) -> str:
@@ -168,10 +202,13 @@ class EntityMergeHistory(Base):
 
     Tracks merges, splits, and updates for accountability and rollback.
     """
+
     __tablename__ = "entity_merge_history"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    action = Column(String(20), nullable=False, index=True)  # create, merge, split, update
+    action = Column(
+        String(20), nullable=False, index=True
+    )  # create, merge, split, update
 
     # For merges: source merged INTO target
     source_entity_id = Column(Integer, nullable=True)
@@ -182,15 +219,13 @@ class EntityMergeHistory(Base):
 
     # Metadata
     reason = Column(Text, nullable=True)
-    performed_by = Column(String(100), default='system')
+    performed_by = Column(String(100), default="system")
     performed_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     # Rollback support - snapshot before action
     previous_state = Column(JSON, nullable=True)
 
-    __table_args__ = (
-        Index('idx_merge_history_action', 'action', 'performed_at'),
-    )
+    __table_args__ = (Index("idx_merge_history_action", "action", "performed_at"),)
 
     def __repr__(self) -> str:
         return f"<EntityMergeHistory(id={self.id}, action={self.action}, at={self.performed_at})>"
@@ -200,9 +235,11 @@ class EntityMergeHistory(Base):
 # DATA CLASSES
 # =============================================================================
 
+
 @dataclass
 class ResolutionResult:
     """Result of entity resolution."""
+
     canonical_entity_id: int
     canonical_name: str
     entity_type: str
@@ -215,6 +252,7 @@ class ResolutionResult:
 @dataclass
 class DuplicateCandidate:
     """A potential duplicate pair."""
+
     entity_a_id: int
     entity_a_name: str
     entity_b_id: int
@@ -226,6 +264,7 @@ class DuplicateCandidate:
 @dataclass
 class MergeResult:
     """Result of a merge operation."""
+
     success: bool
     merged_entity_id: int
     aliases_transferred: int
@@ -236,6 +275,7 @@ class MergeResult:
 # =============================================================================
 # ENTITY RESOLVER
 # =============================================================================
+
 
 class EntityResolver:
     """
@@ -274,7 +314,7 @@ class EntityResolver:
         self,
         db: Session,
         name_matcher: Optional[CompanyNameMatcher] = None,
-        fuzzy_threshold: float = 0.85
+        fuzzy_threshold: float = 0.85,
     ):
         """
         Initialize the resolver.
@@ -305,20 +345,20 @@ class EntityResolver:
             return None
 
         # Add scheme if missing for parsing
-        if not url_or_domain.startswith(('http://', 'https://')):
-            url_or_domain = 'https://' + url_or_domain
+        if not url_or_domain.startswith(("http://", "https://")):
+            url_or_domain = "https://" + url_or_domain
 
         try:
             parsed = urlparse(url_or_domain)
             domain = parsed.netloc.lower()
 
             # Remove www prefix
-            if domain.startswith('www.'):
+            if domain.startswith("www."):
                 domain = domain[4:]
 
             # Remove port
-            if ':' in domain:
-                domain = domain.split(':')[0]
+            if ":" in domain:
+                domain = domain.split(":")[0]
 
             return domain if domain else None
         except Exception:
@@ -351,7 +391,7 @@ class EntityResolver:
         industry: Optional[str] = None,
         source_type: Optional[str] = None,
         source_id: Optional[str] = None,
-        auto_create: bool = True
+        auto_create: bool = True,
     ) -> ResolutionResult:
         """
         Resolve an entity name to a canonical entity.
@@ -395,8 +435,15 @@ class EntityResolver:
             )
             if match:
                 entity, method = match
-                self._add_alias_if_new(entity.id, name, normalized_name,
-                                       source_type, source_id, 1.0, method.value)
+                self._add_alias_if_new(
+                    entity.id,
+                    name,
+                    normalized_name,
+                    source_type,
+                    source_id,
+                    1.0,
+                    method.value,
+                )
                 return ResolutionResult(
                     canonical_entity_id=entity.id,
                     canonical_name=entity.canonical_name,
@@ -404,7 +451,7 @@ class EntityResolver:
                     match_confidence=1.0,
                     match_method=method.value,
                     is_new=False,
-                    alternatives=[]
+                    alternatives=[],
                 )
 
         # Stage 2: Domain match
@@ -412,9 +459,15 @@ class EntityResolver:
             match = self._match_by_domain(entity_type, domain)
             if match:
                 confidence = self.CONFIDENCE_SCORES[MatchMethod.DOMAIN_MATCH]
-                self._add_alias_if_new(match.id, name, normalized_name,
-                                       source_type, source_id, confidence,
-                                       MatchMethod.DOMAIN_MATCH.value)
+                self._add_alias_if_new(
+                    match.id,
+                    name,
+                    normalized_name,
+                    source_type,
+                    source_id,
+                    confidence,
+                    MatchMethod.DOMAIN_MATCH.value,
+                )
                 return ResolutionResult(
                     canonical_entity_id=match.id,
                     canonical_name=match.canonical_name,
@@ -422,7 +475,7 @@ class EntityResolver:
                     match_confidence=confidence,
                     match_method=MatchMethod.DOMAIN_MATCH.value,
                     is_new=False,
-                    alternatives=[]
+                    alternatives=[],
                 )
 
         # Stage 3: Name + location match
@@ -435,16 +488,24 @@ class EntityResolver:
 
                 # Collect alternatives
                 for alt_match, alt_conf in matches[1:4]:
-                    alternatives.append({
-                        'id': alt_match.id,
-                        'canonical_name': alt_match.canonical_name,
-                        'confidence': alt_conf
-                    })
+                    alternatives.append(
+                        {
+                            "id": alt_match.id,
+                            "canonical_name": alt_match.canonical_name,
+                            "confidence": alt_conf,
+                        }
+                    )
 
                 if confidence >= self.AUTO_MERGE_THRESHOLD:
-                    self._add_alias_if_new(best_match.id, name, normalized_name,
-                                           source_type, source_id, confidence,
-                                           MatchMethod.NAME_LOCATION_MATCH.value)
+                    self._add_alias_if_new(
+                        best_match.id,
+                        name,
+                        normalized_name,
+                        source_type,
+                        source_id,
+                        confidence,
+                        MatchMethod.NAME_LOCATION_MATCH.value,
+                    )
                     return ResolutionResult(
                         canonical_entity_id=best_match.id,
                         canonical_name=best_match.canonical_name,
@@ -452,7 +513,7 @@ class EntityResolver:
                         match_confidence=confidence,
                         match_method=MatchMethod.NAME_LOCATION_MATCH.value,
                         is_new=False,
-                        alternatives=alternatives
+                        alternatives=alternatives,
                     )
 
         # Stage 4: Name-only match
@@ -462,16 +523,24 @@ class EntityResolver:
 
             # Collect alternatives
             for alt_match, alt_conf in matches[1:4]:
-                alternatives.append({
-                    'id': alt_match.id,
-                    'canonical_name': alt_match.canonical_name,
-                    'confidence': alt_conf
-                })
+                alternatives.append(
+                    {
+                        "id": alt_match.id,
+                        "canonical_name": alt_match.canonical_name,
+                        "confidence": alt_conf,
+                    }
+                )
 
             if confidence >= self.AUTO_MERGE_THRESHOLD:
-                self._add_alias_if_new(best_match.id, name, normalized_name,
-                                       source_type, source_id, confidence,
-                                       MatchMethod.NAME_ONLY_MATCH.value)
+                self._add_alias_if_new(
+                    best_match.id,
+                    name,
+                    normalized_name,
+                    source_type,
+                    source_id,
+                    confidence,
+                    MatchMethod.NAME_ONLY_MATCH.value,
+                )
                 return ResolutionResult(
                     canonical_entity_id=best_match.id,
                     canonical_name=best_match.canonical_name,
@@ -479,17 +548,20 @@ class EntityResolver:
                     match_confidence=confidence,
                     match_method=MatchMethod.NAME_ONLY_MATCH.value,
                     is_new=False,
-                    alternatives=alternatives
+                    alternatives=alternatives,
                 )
             elif confidence >= self.REVIEW_THRESHOLD:
                 # Found potential match but below auto-merge threshold
                 # Still return it but note it needs review
-                alternatives.insert(0, {
-                    'id': best_match.id,
-                    'canonical_name': best_match.canonical_name,
-                    'confidence': confidence,
-                    'needs_review': True
-                })
+                alternatives.insert(
+                    0,
+                    {
+                        "id": best_match.id,
+                        "canonical_name": best_match.canonical_name,
+                        "confidence": confidence,
+                        "needs_review": True,
+                    },
+                )
 
         # No confident match found - create new entity if allowed
         if auto_create:
@@ -508,7 +580,7 @@ class EntityResolver:
                 country=country,
                 industry=industry,
                 source_type=source_type,
-                source_id=source_id
+                source_id=source_id,
             )
             return ResolutionResult(
                 canonical_entity_id=new_entity.id,
@@ -517,7 +589,7 @@ class EntityResolver:
                 match_confidence=1.0,
                 match_method=MatchMethod.NEW_ENTITY.value,
                 is_new=True,
-                alternatives=alternatives
+                alternatives=alternatives,
             )
 
         # No match and auto_create=False
@@ -528,7 +600,7 @@ class EntityResolver:
             match_confidence=0.0,
             match_method="no_match",
             is_new=False,
-            alternatives=alternatives
+            alternatives=alternatives,
         )
 
     # -------------------------------------------------------------------------
@@ -542,7 +614,7 @@ class EntityResolver:
         crd: Optional[str] = None,
         ticker: Optional[str] = None,
         cusip: Optional[str] = None,
-        lei: Optional[str] = None
+        lei: Optional[str] = None,
     ) -> Optional[Tuple[CanonicalEntity, MatchMethod]]:
         """Match by exact identifier."""
         query = self.db.query(CanonicalEntity).filter(
@@ -578,22 +650,24 @@ class EntityResolver:
         return None
 
     def _match_by_domain(
-        self,
-        entity_type: str,
-        domain: str
+        self, entity_type: str, domain: str
     ) -> Optional[CanonicalEntity]:
         """Match by website domain."""
-        return self.db.query(CanonicalEntity).filter(
-            CanonicalEntity.entity_type == entity_type,
-            CanonicalEntity.domain == domain
-        ).first()
+        return (
+            self.db.query(CanonicalEntity)
+            .filter(
+                CanonicalEntity.entity_type == entity_type,
+                CanonicalEntity.domain == domain,
+            )
+            .first()
+        )
 
     def _match_by_name_location(
         self,
         entity_type: str,
         normalized_name: str,
         state: Optional[str],
-        country: Optional[str]
+        country: Optional[str],
     ) -> List[Tuple[CanonicalEntity, float]]:
         """Match by fuzzy name + location."""
         # Get candidates with matching location
@@ -602,13 +676,9 @@ class EntityResolver:
         )
 
         if state:
-            query = query.filter(
-                func.upper(CanonicalEntity.state) == state.upper()
-            )
+            query = query.filter(func.upper(CanonicalEntity.state) == state.upper())
         if country:
-            query = query.filter(
-                func.upper(CanonicalEntity.country) == country.upper()
-            )
+            query = query.filter(func.upper(CanonicalEntity.country) == country.upper())
 
         candidates = query.limit(500).all()
 
@@ -626,18 +696,18 @@ class EntityResolver:
         return matches
 
     def _match_by_name_only(
-        self,
-        entity_type: str,
-        normalized_name: str
+        self, entity_type: str, normalized_name: str
     ) -> List[Tuple[CanonicalEntity, float]]:
         """Match by fuzzy name only."""
         # Check aliases first (more comprehensive)
-        alias_matches = self.db.query(EntityAlias, CanonicalEntity).join(
-            CanonicalEntity,
-            EntityAlias.canonical_entity_id == CanonicalEntity.id
-        ).filter(
-            CanonicalEntity.entity_type == entity_type
-        ).all()
+        alias_matches = (
+            self.db.query(EntityAlias, CanonicalEntity)
+            .join(
+                CanonicalEntity, EntityAlias.canonical_entity_id == CanonicalEntity.id
+            )
+            .filter(CanonicalEntity.entity_type == entity_type)
+            .all()
+        )
 
         matches = []
         seen_ids = set()
@@ -652,9 +722,11 @@ class EntityResolver:
                 seen_ids.add(entity.id)
 
         # Also check canonical names directly
-        entities = self.db.query(CanonicalEntity).filter(
-            CanonicalEntity.entity_type == entity_type
-        ).all()
+        entities = (
+            self.db.query(CanonicalEntity)
+            .filter(CanonicalEntity.entity_type == entity_type)
+            .all()
+        )
 
         for entity in entities:
             if entity.id in seen_ids:
@@ -674,29 +746,25 @@ class EntityResolver:
     # -------------------------------------------------------------------------
 
     def _create_entity(
-        self,
-        name: str,
-        normalized_name: str,
-        entity_type: str,
-        **kwargs
+        self, name: str, normalized_name: str, entity_type: str, **kwargs
     ) -> CanonicalEntity:
         """Create a new canonical entity."""
         entity = CanonicalEntity(
             entity_type=entity_type,
             canonical_name=name,
             normalized_name=normalized_name,
-            cik=kwargs.get('cik'),
-            crd=kwargs.get('crd'),
-            ticker=kwargs.get('ticker'),
-            cusip=kwargs.get('cusip'),
-            lei=kwargs.get('lei'),
-            website=kwargs.get('website'),
-            domain=kwargs.get('domain'),
-            state=kwargs.get('state'),
-            country=kwargs.get('country'),
-            industry=kwargs.get('industry'),
+            cik=kwargs.get("cik"),
+            crd=kwargs.get("crd"),
+            ticker=kwargs.get("ticker"),
+            cusip=kwargs.get("cusip"),
+            lei=kwargs.get("lei"),
+            website=kwargs.get("website"),
+            domain=kwargs.get("domain"),
+            state=kwargs.get("state"),
+            country=kwargs.get("country"),
+            industry=kwargs.get("industry"),
             alias_count=1,
-            source_count=1
+            source_count=1,
         )
         self.db.add(entity)
         self.db.flush()
@@ -706,11 +774,11 @@ class EntityResolver:
             canonical_entity_id=entity.id,
             alias_name=name,
             normalized_alias=normalized_name,
-            source_type=kwargs.get('source_type'),
-            source_id=kwargs.get('source_id'),
+            source_type=kwargs.get("source_type"),
+            source_id=kwargs.get("source_id"),
             match_confidence=1.0,
             match_method=MatchMethod.NEW_ENTITY.value,
-            is_primary=True
+            is_primary=True,
         )
         self.db.add(alias)
 
@@ -719,7 +787,7 @@ class EntityResolver:
             action=MergeAction.CREATE.value,
             target_entity_id=entity.id,
             reason=f"New entity created from source: {kwargs.get('source_type', 'unknown')}",
-            performed_by='system'
+            performed_by="system",
         )
         self.db.add(history)
 
@@ -736,13 +804,17 @@ class EntityResolver:
         source_type: Optional[str],
         source_id: Optional[str],
         confidence: float,
-        match_method: str
+        match_method: str,
     ) -> bool:
         """Add alias if it doesn't already exist for this entity."""
-        existing = self.db.query(EntityAlias).filter(
-            EntityAlias.canonical_entity_id == entity_id,
-            EntityAlias.normalized_alias == normalized_alias
-        ).first()
+        existing = (
+            self.db.query(EntityAlias)
+            .filter(
+                EntityAlias.canonical_entity_id == entity_id,
+                EntityAlias.normalized_alias == normalized_alias,
+            )
+            .first()
+        )
 
         if existing:
             return False
@@ -754,16 +826,14 @@ class EntityResolver:
             source_type=source_type,
             source_id=source_id,
             match_confidence=confidence,
-            match_method=match_method
+            match_method=match_method,
         )
         self.db.add(alias)
 
         # Update alias count
-        self.db.query(CanonicalEntity).filter(
-            CanonicalEntity.id == entity_id
-        ).update({
-            CanonicalEntity.alias_count: CanonicalEntity.alias_count + 1
-        })
+        self.db.query(CanonicalEntity).filter(CanonicalEntity.id == entity_id).update(
+            {CanonicalEntity.alias_count: CanonicalEntity.alias_count + 1}
+        )
 
         self.db.commit()
         logger.debug(f"Added alias '{alias_name}' to entity {entity_id}")
@@ -775,46 +845,50 @@ class EntityResolver:
 
     def get_aliases(self, entity_id: int) -> List[EntityAlias]:
         """Get all aliases for a canonical entity."""
-        return self.db.query(EntityAlias).filter(
-            EntityAlias.canonical_entity_id == entity_id
-        ).order_by(EntityAlias.is_primary.desc(), EntityAlias.created_at).all()
+        return (
+            self.db.query(EntityAlias)
+            .filter(EntityAlias.canonical_entity_id == entity_id)
+            .order_by(EntityAlias.is_primary.desc(), EntityAlias.created_at)
+            .all()
+        )
 
     def add_manual_alias(
-        self,
-        entity_id: int,
-        alias_name: str,
-        performed_by: str = 'manual'
+        self, entity_id: int, alias_name: str, performed_by: str = "manual"
     ) -> EntityAlias:
         """Manually add an alias to an entity."""
         normalized = self.normalize_name(alias_name)
 
         # Check if alias already exists
-        existing = self.db.query(EntityAlias).filter(
-            EntityAlias.canonical_entity_id == entity_id,
-            EntityAlias.normalized_alias == normalized
-        ).first()
+        existing = (
+            self.db.query(EntityAlias)
+            .filter(
+                EntityAlias.canonical_entity_id == entity_id,
+                EntityAlias.normalized_alias == normalized,
+            )
+            .first()
+        )
 
         if existing:
-            raise ValueError(f"Alias '{alias_name}' already exists for entity {entity_id}")
+            raise ValueError(
+                f"Alias '{alias_name}' already exists for entity {entity_id}"
+            )
 
         alias = EntityAlias(
             canonical_entity_id=entity_id,
             alias_name=alias_name,
             normalized_alias=normalized,
-            source_type='manual',
+            source_type="manual",
             match_confidence=1.0,
             match_method=MatchMethod.MANUAL.value,
             is_manual_override=True,
-            created_by=performed_by
+            created_by=performed_by,
         )
         self.db.add(alias)
 
         # Update alias count
-        self.db.query(CanonicalEntity).filter(
-            CanonicalEntity.id == entity_id
-        ).update({
-            CanonicalEntity.alias_count: CanonicalEntity.alias_count + 1
-        })
+        self.db.query(CanonicalEntity).filter(CanonicalEntity.id == entity_id).update(
+            {CanonicalEntity.alias_count: CanonicalEntity.alias_count + 1}
+        )
 
         # Record in history
         history = EntityMergeHistory(
@@ -822,7 +896,7 @@ class EntityResolver:
             target_entity_id=entity_id,
             affected_aliases=[alias_name],
             reason=f"Manual alias addition",
-            performed_by=performed_by
+            performed_by=performed_by,
         )
         self.db.add(history)
 
@@ -838,7 +912,7 @@ class EntityResolver:
         source_entity_id: int,
         target_entity_id: int,
         reason: Optional[str] = None,
-        performed_by: str = 'system'
+        performed_by: str = "system",
     ) -> MergeResult:
         """
         Merge source entity into target entity.
@@ -852,16 +926,20 @@ class EntityResolver:
                 merged_entity_id=0,
                 aliases_transferred=0,
                 merge_history_id=0,
-                error="Cannot merge entity into itself"
+                error="Cannot merge entity into itself",
             )
 
-        source = self.db.query(CanonicalEntity).filter(
-            CanonicalEntity.id == source_entity_id
-        ).first()
+        source = (
+            self.db.query(CanonicalEntity)
+            .filter(CanonicalEntity.id == source_entity_id)
+            .first()
+        )
 
-        target = self.db.query(CanonicalEntity).filter(
-            CanonicalEntity.id == target_entity_id
-        ).first()
+        target = (
+            self.db.query(CanonicalEntity)
+            .filter(CanonicalEntity.id == target_entity_id)
+            .first()
+        )
 
         if not source or not target:
             return MergeResult(
@@ -869,34 +947,38 @@ class EntityResolver:
                 merged_entity_id=0,
                 aliases_transferred=0,
                 merge_history_id=0,
-                error="Source or target entity not found"
+                error="Source or target entity not found",
             )
 
         # Snapshot source state for rollback
         source_aliases = self.get_aliases(source_entity_id)
         previous_state = {
-            'source_entity': {
-                'id': source.id,
-                'canonical_name': source.canonical_name,
-                'entity_type': source.entity_type,
-                'cik': source.cik,
-                'crd': source.crd,
-                'ticker': source.ticker
+            "source_entity": {
+                "id": source.id,
+                "canonical_name": source.canonical_name,
+                "entity_type": source.entity_type,
+                "cik": source.cik,
+                "crd": source.crd,
+                "ticker": source.ticker,
             },
-            'source_aliases': [
-                {'alias_name': a.alias_name, 'source_type': a.source_type}
+            "source_aliases": [
+                {"alias_name": a.alias_name, "source_type": a.source_type}
                 for a in source_aliases
-            ]
+            ],
         }
 
         # Transfer aliases
         transferred = 0
         for alias in source_aliases:
             # Check if alias already exists on target
-            existing = self.db.query(EntityAlias).filter(
-                EntityAlias.canonical_entity_id == target_entity_id,
-                EntityAlias.normalized_alias == alias.normalized_alias
-            ).first()
+            existing = (
+                self.db.query(EntityAlias)
+                .filter(
+                    EntityAlias.canonical_entity_id == target_entity_id,
+                    EntityAlias.normalized_alias == alias.normalized_alias,
+                )
+                .first()
+            )
 
             if existing:
                 # Delete duplicate
@@ -923,9 +1005,11 @@ class EntityResolver:
             target.domain = source.domain
 
         # Update counts
-        target.alias_count = self.db.query(EntityAlias).filter(
-            EntityAlias.canonical_entity_id == target_entity_id
-        ).count()
+        target.alias_count = (
+            self.db.query(EntityAlias)
+            .filter(EntityAlias.canonical_entity_id == target_entity_id)
+            .count()
+        )
         target.source_count += source.source_count
 
         # Record in history
@@ -933,9 +1017,10 @@ class EntityResolver:
             action=MergeAction.MERGE.value,
             source_entity_id=source_entity_id,
             target_entity_id=target_entity_id,
-            reason=reason or f"Merged {source.canonical_name} into {target.canonical_name}",
+            reason=reason
+            or f"Merged {source.canonical_name} into {target.canonical_name}",
             performed_by=performed_by,
-            previous_state=previous_state
+            previous_state=previous_state,
         )
         self.db.add(history)
         self.db.flush()
@@ -953,7 +1038,7 @@ class EntityResolver:
             success=True,
             merged_entity_id=target_entity_id,
             aliases_transferred=transferred,
-            merge_history_id=history.id
+            merge_history_id=history.id,
         )
 
     def split_entity(
@@ -962,7 +1047,7 @@ class EntityResolver:
         aliases_to_split: List[str],
         new_entity_name: str,
         reason: Optional[str] = None,
-        performed_by: str = 'system'
+        performed_by: str = "system",
     ) -> Tuple[CanonicalEntity, int]:
         """
         Split aliases from an entity into a new entity.
@@ -977,9 +1062,11 @@ class EntityResolver:
         Returns:
             Tuple of (new entity, history ID)
         """
-        source = self.db.query(CanonicalEntity).filter(
-            CanonicalEntity.id == entity_id
-        ).first()
+        source = (
+            self.db.query(CanonicalEntity)
+            .filter(CanonicalEntity.id == entity_id)
+            .first()
+        )
 
         if not source:
             raise ValueError(f"Entity {entity_id} not found")
@@ -990,8 +1077,7 @@ class EntityResolver:
         # Find matching aliases
         source_aliases = self.get_aliases(entity_id)
         aliases_to_move = [
-            a for a in source_aliases
-            if a.normalized_alias in normalized_to_split
+            a for a in source_aliases if a.normalized_alias in normalized_to_split
         ]
 
         if not aliases_to_move:
@@ -999,8 +1085,8 @@ class EntityResolver:
 
         # Snapshot for rollback
         previous_state = {
-            'source_entity_id': entity_id,
-            'aliases_moved': [a.alias_name for a in aliases_to_move]
+            "source_entity_id": entity_id,
+            "aliases_moved": [a.alias_name for a in aliases_to_move],
         }
 
         # Create new entity
@@ -1011,7 +1097,7 @@ class EntityResolver:
             normalized_name=normalized_new,
             alias_count=len(aliases_to_move),
             source_count=1,
-            created_by=performed_by
+            created_by=performed_by,
         )
         self.db.add(new_entity)
         self.db.flush()
@@ -1024,9 +1110,11 @@ class EntityResolver:
         aliases_to_move[0].is_primary = True
 
         # Update source alias count
-        source.alias_count = self.db.query(EntityAlias).filter(
-            EntityAlias.canonical_entity_id == entity_id
-        ).count()
+        source.alias_count = (
+            self.db.query(EntityAlias)
+            .filter(EntityAlias.canonical_entity_id == entity_id)
+            .count()
+        )
 
         # Record in history
         history = EntityMergeHistory(
@@ -1036,7 +1124,7 @@ class EntityResolver:
             affected_aliases=aliases_to_split,
             reason=reason or f"Split {len(aliases_to_move)} aliases into new entity",
             performed_by=performed_by,
-            previous_state=previous_state
+            previous_state=previous_state,
         )
         self.db.add(history)
 
@@ -1058,7 +1146,7 @@ class EntityResolver:
         entity_type: Optional[str] = None,
         min_confidence: float = 0.70,
         max_confidence: float = 0.90,
-        limit: int = 50
+        limit: int = 50,
     ) -> List[DuplicateCandidate]:
         """
         Find potential duplicate entities for review.
@@ -1079,37 +1167,45 @@ class EntityResolver:
             if len(duplicates) >= limit:
                 break
 
-            for entity_b in entities[i+1:]:
+            for entity_b in entities[i + 1 :]:
                 if len(duplicates) >= limit:
                     break
 
                 # Skip if already seen
-                pair_key = (min(entity_a.id, entity_b.id), max(entity_a.id, entity_b.id))
+                pair_key = (
+                    min(entity_a.id, entity_b.id),
+                    max(entity_a.id, entity_b.id),
+                )
                 if pair_key in seen_pairs:
                     continue
                 seen_pairs.add(pair_key)
 
                 # Calculate similarity
                 sim = similarity_ratio(
-                    entity_a.normalized_name,
-                    entity_b.normalized_name
+                    entity_a.normalized_name, entity_b.normalized_name
                 )
 
                 if min_confidence <= sim < max_confidence:
                     # Determine match method
-                    if entity_a.state and entity_b.state and entity_a.state == entity_b.state:
+                    if (
+                        entity_a.state
+                        and entity_b.state
+                        and entity_a.state == entity_b.state
+                    ):
                         method = MatchMethod.NAME_LOCATION_MATCH.value
                     else:
                         method = MatchMethod.NAME_ONLY_MATCH.value
 
-                    duplicates.append(DuplicateCandidate(
-                        entity_a_id=entity_a.id,
-                        entity_a_name=entity_a.canonical_name,
-                        entity_b_id=entity_b.id,
-                        entity_b_name=entity_b.canonical_name,
-                        confidence=sim,
-                        match_method=method
-                    ))
+                    duplicates.append(
+                        DuplicateCandidate(
+                            entity_a_id=entity_a.id,
+                            entity_a_name=entity_a.canonical_name,
+                            entity_b_id=entity_b.id,
+                            entity_b_name=entity_b.canonical_name,
+                            confidence=sim,
+                            match_method=method,
+                        )
+                    )
 
         # Sort by confidence descending
         duplicates.sort(key=lambda x: x.confidence, reverse=True)
@@ -1121,15 +1217,14 @@ class EntityResolver:
 
     def get_entity(self, entity_id: int) -> Optional[CanonicalEntity]:
         """Get a canonical entity by ID."""
-        return self.db.query(CanonicalEntity).filter(
-            CanonicalEntity.id == entity_id
-        ).first()
+        return (
+            self.db.query(CanonicalEntity)
+            .filter(CanonicalEntity.id == entity_id)
+            .first()
+        )
 
     def search_entities(
-        self,
-        query: str,
-        entity_type: Optional[str] = None,
-        limit: int = 20
+        self, query: str, entity_type: Optional[str] = None, limit: int = 20
     ) -> List[CanonicalEntity]:
         """Search entities by name."""
         normalized = self.normalize_name(query)
@@ -1150,7 +1245,7 @@ class EntityResolver:
         self,
         identifier_type: str,
         identifier_value: str,
-        entity_type: Optional[str] = None
+        entity_type: Optional[str] = None,
     ) -> Optional[CanonicalEntity]:
         """Get entity by a specific identifier."""
         query = self.db.query(CanonicalEntity)
@@ -1160,15 +1255,15 @@ class EntityResolver:
 
         identifier_value = self.normalize_identifier(identifier_value)
 
-        if identifier_type == 'cik':
+        if identifier_type == "cik":
             query = query.filter(CanonicalEntity.cik == identifier_value)
-        elif identifier_type == 'crd':
+        elif identifier_type == "crd":
             query = query.filter(CanonicalEntity.crd == identifier_value)
-        elif identifier_type == 'ticker':
+        elif identifier_type == "ticker":
             query = query.filter(CanonicalEntity.ticker == identifier_value)
-        elif identifier_type == 'cusip':
+        elif identifier_type == "cusip":
             query = query.filter(CanonicalEntity.cusip == identifier_value)
-        elif identifier_type == 'lei':
+        elif identifier_type == "lei":
             query = query.filter(CanonicalEntity.lei == identifier_value)
         else:
             raise ValueError(f"Unknown identifier type: {identifier_type}")
@@ -1183,21 +1278,24 @@ class EntityResolver:
         """Get entity resolution statistics."""
         total = self.db.query(CanonicalEntity).count()
 
-        by_type = self.db.query(
-            CanonicalEntity.entity_type,
-            func.count(CanonicalEntity.id)
-        ).group_by(CanonicalEntity.entity_type).all()
+        by_type = (
+            self.db.query(CanonicalEntity.entity_type, func.count(CanonicalEntity.id))
+            .group_by(CanonicalEntity.entity_type)
+            .all()
+        )
 
         total_aliases = self.db.query(EntityAlias).count()
 
-        recent_merges = self.db.query(EntityMergeHistory).filter(
-            EntityMergeHistory.action == MergeAction.MERGE.value
-        ).count()
+        recent_merges = (
+            self.db.query(EntityMergeHistory)
+            .filter(EntityMergeHistory.action == MergeAction.MERGE.value)
+            .count()
+        )
 
         return {
-            'total_entities': total,
-            'by_type': {t: c for t, c in by_type},
-            'total_aliases': total_aliases,
-            'total_merges': recent_merges,
-            'avg_aliases_per_entity': round(total_aliases / max(total, 1), 2)
+            "total_entities": total,
+            "by_type": {t: c for t, c in by_type},
+            "total_aliases": total_aliases,
+            "total_merges": recent_merges,
+            "avg_aliases_per_entity": round(total_aliases / max(total, 1), 2),
         }

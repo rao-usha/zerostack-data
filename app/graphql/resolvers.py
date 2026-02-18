@@ -3,6 +3,7 @@ GraphQL resolvers for Nexdata queries.
 
 Implements all query logic using synchronous database access.
 """
+
 from typing import Optional, List
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -26,7 +27,7 @@ def resolve_lp_fund(
     include_portfolio: bool = True,
     portfolio_limit: int = 50,
     include_coinvestors: bool = True,
-    coinvestor_limit: int = 50
+    coinvestor_limit: int = 50,
 ) -> Optional[LPFundType]:
     """Resolve a single LP fund by ID with optional nested data."""
     query = text("""
@@ -70,7 +71,7 @@ def resolve_lp_funds(
     lp_type: Optional[str] = None,
     jurisdiction: Optional[str] = None,
     include_portfolio: bool = False,
-    portfolio_limit: int = 10
+    portfolio_limit: int = 10,
 ) -> List[LPFundType]:
     """Resolve list of LP funds with optional filters."""
     conditions = []
@@ -125,7 +126,7 @@ def resolve_family_office(
     include_portfolio: bool = True,
     portfolio_limit: int = 50,
     include_coinvestors: bool = True,
-    coinvestor_limit: int = 50
+    coinvestor_limit: int = 50,
 ) -> Optional[FamilyOfficeType]:
     """Resolve a single family office by ID with optional nested data."""
     query = text("""
@@ -188,7 +189,7 @@ def resolve_family_offices(
     country: Optional[str] = None,
     type: Optional[str] = None,
     include_portfolio: bool = False,
-    portfolio_limit: int = 10
+    portfolio_limit: int = 10,
 ) -> List[FamilyOfficeType]:
     """Resolve list of family offices with optional filters."""
     conditions = []
@@ -259,10 +260,7 @@ def resolve_family_offices(
     return offices
 
 
-def resolve_portfolio_company(
-    db: Session,
-    id: int
-) -> Optional[PortfolioCompanyType]:
+def resolve_portfolio_company(db: Session, id: int) -> Optional[PortfolioCompanyType]:
     """Resolve a single portfolio company by ID."""
     query = text("""
         SELECT id, investor_id, investor_type, company_name, company_website,
@@ -311,7 +309,7 @@ def resolve_portfolio_companies(
     investor_type: Optional[str] = None,
     industry: Optional[str] = None,
     limit: int = 50,
-    offset: int = 0
+    offset: int = 0,
 ) -> List[PortfolioCompanyType]:
     """Resolve list of portfolio companies with optional filters."""
     conditions = []
@@ -347,39 +345,38 @@ def resolve_portfolio_companies(
     companies = []
 
     for row in result.mappings():
-        companies.append(PortfolioCompanyType(
-            id=row["id"],
-            investor_id=row["investor_id"],
-            investor_type=row["investor_type"],
-            company_name=row["company_name"],
-            company_website=row.get("company_website"),
-            company_industry=row.get("company_industry"),
-            company_stage=row.get("company_stage"),
-            company_location=row.get("company_location"),
-            company_ticker=row.get("company_ticker"),
-            company_cusip=row.get("company_cusip"),
-            investment_type=row.get("investment_type"),
-            investment_date=row.get("investment_date"),
-            investment_amount_usd=row.get("investment_amount_usd"),
-            shares_held=row.get("shares_held"),
-            market_value_usd=row.get("market_value_usd"),
-            ownership_percentage=row.get("ownership_percentage"),
-            current_holding=bool(row.get("current_holding", 1)),
-            confidence_level=row.get("confidence_level"),
-            source_type=row.get("source_type"),
-            source_url=row.get("source_url"),
-            collected_date=row.get("collected_date"),
-            created_at=row.get("created_at"),
-        ))
+        companies.append(
+            PortfolioCompanyType(
+                id=row["id"],
+                investor_id=row["investor_id"],
+                investor_type=row["investor_type"],
+                company_name=row["company_name"],
+                company_website=row.get("company_website"),
+                company_industry=row.get("company_industry"),
+                company_stage=row.get("company_stage"),
+                company_location=row.get("company_location"),
+                company_ticker=row.get("company_ticker"),
+                company_cusip=row.get("company_cusip"),
+                investment_type=row.get("investment_type"),
+                investment_date=row.get("investment_date"),
+                investment_amount_usd=row.get("investment_amount_usd"),
+                shares_held=row.get("shares_held"),
+                market_value_usd=row.get("market_value_usd"),
+                ownership_percentage=row.get("ownership_percentage"),
+                current_holding=bool(row.get("current_holding", 1)),
+                confidence_level=row.get("confidence_level"),
+                source_type=row.get("source_type"),
+                source_url=row.get("source_url"),
+                collected_date=row.get("collected_date"),
+                created_at=row.get("created_at"),
+            )
+        )
 
     return companies
 
 
 def resolve_search(
-    db: Session,
-    query_text: str,
-    type: Optional[str] = None,
-    limit: int = 20
+    db: Session, query_text: str, type: Optional[str] = None, limit: int = 20
 ) -> List[SearchResultType]:
     """
     Search investors and companies using full-text search.
@@ -408,13 +405,15 @@ def resolve_search(
     results = []
 
     for row in result.mappings():
-        results.append(SearchResultType(
-            id=row["entity_id"],
-            type=row["entity_type"],
-            name=row["name"],
-            description=row.get("description"),
-            score=float(row["score"]),
-        ))
+        results.append(
+            SearchResultType(
+                id=row["entity_id"],
+                type=row["entity_type"],
+                name=row["name"],
+                description=row.get("description"),
+                score=float(row["score"]),
+            )
+        )
 
     return results
 
@@ -428,24 +427,36 @@ def resolve_analytics_overview(db: Session) -> AnalyticsOverviewType:
     fo_count = db.execute(text("SELECT COUNT(*) FROM family_offices")).scalar() or 0
 
     # Count Portfolio Companies
-    pc_count = db.execute(text("SELECT COUNT(*) FROM portfolio_companies")).scalar() or 0
+    pc_count = (
+        db.execute(text("SELECT COUNT(*) FROM portfolio_companies")).scalar() or 0
+    )
 
     # Count Co-investments
     ci_count = db.execute(text("SELECT COUNT(*) FROM co_investments")).scalar() or 0
 
     # LPs with portfolio
-    lp_with_portfolio = db.execute(text("""
+    lp_with_portfolio = (
+        db.execute(
+            text("""
         SELECT COUNT(DISTINCT investor_id)
         FROM portfolio_companies
         WHERE investor_type = 'lp'
-    """)).scalar() or 0
+    """)
+        ).scalar()
+        or 0
+    )
 
     # FOs with portfolio
-    fo_with_portfolio = db.execute(text("""
+    fo_with_portfolio = (
+        db.execute(
+            text("""
         SELECT COUNT(DISTINCT investor_id)
         FROM portfolio_companies
         WHERE investor_type = 'family_office'
-    """)).scalar() or 0
+    """)
+        ).scalar()
+        or 0
+    )
 
     # Coverage percentage
     total_investors = lp_count + fo_count
@@ -467,7 +478,7 @@ def resolve_industry_breakdown(
     db: Session,
     investor_id: Optional[int] = None,
     investor_type: Optional[str] = None,
-    limit: int = 20
+    limit: int = 20,
 ) -> List[IndustryBreakdownType]:
     """Get industry distribution of portfolio companies."""
     conditions = ["company_industry IS NOT NULL", "company_industry != ''"]
@@ -501,19 +512,19 @@ def resolve_industry_breakdown(
 
     for row in result.mappings():
         count = row["count"]
-        breakdown.append(IndustryBreakdownType(
-            industry=row["industry"],
-            count=count,
-            percentage=round(count / total * 100, 1),
-        ))
+        breakdown.append(
+            IndustryBreakdownType(
+                industry=row["industry"],
+                count=count,
+                percentage=round(count / total * 100, 1),
+            )
+        )
 
     return breakdown
 
 
 def resolve_top_movers(
-    db: Session,
-    days: int = 30,
-    limit: int = 20
+    db: Session, days: int = 30, limit: int = 20
 ) -> List[TopMoverType]:
     """Get recent portfolio changes (new holdings, exits)."""
     query = text("""
@@ -557,13 +568,15 @@ def resolve_top_movers(
 
     for row in result.mappings():
         if row.get("investor_name"):  # Skip if investor not found
-            movers.append(TopMoverType(
-                investor_id=row["investor_id"],
-                investor_type=row["investor_type"],
-                investor_name=row["investor_name"],
-                company_name=row["company_name"],
-                change_type=row["change_type"],
-                collected_date=row["collected_date"],
-            ))
+            movers.append(
+                TopMoverType(
+                    investor_id=row["investor_id"],
+                    investor_type=row["investor_type"],
+                    investor_name=row["investor_name"],
+                    company_name=row["company_name"],
+                    change_type=row["change_type"],
+                    collected_date=row["collected_date"],
+                )
+            )
 
     return movers

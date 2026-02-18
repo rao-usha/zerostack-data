@@ -118,7 +118,7 @@ NICKNAME_MAP = {
 
 # Suffixes to strip
 SUFFIX_PATTERN = re.compile(
-    r',?\s+(jr|sr|ii|iii|iv|v|phd|md|esq|cpa|cfa|jd|mba|dds|dvm|pe|rn)\.?$',
+    r",?\s+(jr|sr|ii|iii|iv|v|phd|md|esq|cpa|cfa|jd|mba|dds|dvm|pe|rn)\.?$",
     re.IGNORECASE,
 )
 
@@ -126,6 +126,7 @@ SUFFIX_PATTERN = re.compile(
 @dataclass
 class PersonMatchResult:
     """Result of comparing two person names."""
+
     matched: bool
     similarity: float  # 0.0 to 1.0
     match_type: str  # "name_exact", "name_fuzzy", "nickname_match", "no_match"
@@ -173,10 +174,10 @@ class PersonNameMatcher:
                 name = f"{parts[1]} {parts[0]}"
 
         # Remove remaining punctuation (periods, hyphens kept for now)
-        name = re.sub(r'[^\w\s\-]', '', name)
+        name = re.sub(r"[^\w\s\-]", "", name)
 
         # Collapse whitespace
-        name = re.sub(r'\s+', ' ', name).strip()
+        name = re.sub(r"\s+", " ", name).strip()
 
         return name
 
@@ -208,14 +209,17 @@ class PersonNameMatcher:
 
         if not norm1 or not norm2:
             return PersonMatchResult(
-                matched=False, similarity=0.0,
-                match_type="no_match", notes="Empty name",
+                matched=False,
+                similarity=0.0,
+                match_type="no_match",
+                notes="Empty name",
             )
 
         # Exact match after normalization
         if norm1 == norm2:
             return PersonMatchResult(
-                matched=True, similarity=1.0,
+                matched=True,
+                similarity=1.0,
                 match_type="name_exact",
             )
 
@@ -226,7 +230,8 @@ class PersonNameMatcher:
         # First+last exact match
         if first1 == first2 and last1 == last2:
             return PersonMatchResult(
-                matched=True, similarity=1.0,
+                matched=True,
+                similarity=1.0,
                 match_type="name_exact",
                 notes="Exact match after dropping middle names",
             )
@@ -237,7 +242,8 @@ class PersonNameMatcher:
 
         if canonical1 == canonical2 and last1 == last2:
             return PersonMatchResult(
-                matched=True, similarity=0.95,
+                matched=True,
+                similarity=0.95,
                 match_type="nickname_match",
                 notes=f"Nickname match: {first1}={canonical1}, {first2}={canonical2}",
             )
@@ -258,7 +264,11 @@ class PersonNameMatcher:
         matched = best_similarity >= self.review_threshold
 
         if is_nickname and matched:
-            match_type = "nickname_match" if best_similarity >= self.auto_merge_threshold else "name_fuzzy"
+            match_type = (
+                "nickname_match"
+                if best_similarity >= self.auto_merge_threshold
+                else "name_fuzzy"
+            )
         else:
             match_type = "name_fuzzy" if matched else "no_match"
 
@@ -266,7 +276,8 @@ class PersonNameMatcher:
             matched=matched,
             similarity=round(best_similarity, 3),
             match_type=match_type if matched else "no_match",
-            notes=f"Fuzzy: {best_similarity:.3f}" + (f" (nickname-expanded)" if is_nickname else ""),
+            notes=f"Fuzzy: {best_similarity:.3f}"
+            + (f" (nickname-expanded)" if is_nickname else ""),
         )
 
     def classify_match(

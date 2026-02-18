@@ -125,7 +125,9 @@ class FirmWebsiteCollector(BasePECollector):
                 )
 
             # Find and scrape portfolio page
-            portfolio_url = self._find_section_url(main_html, website_url, self.PORTFOLIO_PATTERNS)
+            portfolio_url = self._find_section_url(
+                main_html, website_url, self.PORTFOLIO_PATTERNS
+            )
             if portfolio_url:
                 portfolio_data = await self._scrape_portfolio_page(portfolio_url)
                 for company in portfolio_data:
@@ -139,7 +141,9 @@ class FirmWebsiteCollector(BasePECollector):
                     )
 
             # Find and scrape team page
-            team_url = self._find_section_url(main_html, website_url, self.TEAM_PATTERNS)
+            team_url = self._find_section_url(
+                main_html, website_url, self.TEAM_PATTERNS
+            )
             if team_url:
                 team_data = await self._scrape_team_page(team_url)
                 for person in team_data:
@@ -201,9 +205,7 @@ class FirmWebsiteCollector(BasePECollector):
 
         return None
 
-    def _extract_main_page_data(
-        self, html: str, url: str
-    ) -> Dict[str, Any]:
+    def _extract_main_page_data(self, html: str, url: str) -> Dict[str, Any]:
         """
         Extract key data from the main page.
 
@@ -249,7 +251,7 @@ class FirmWebsiteCollector(BasePECollector):
 
         # Look for contact email
         email_match = re.search(
-            r'mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})',
+            r"mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
             html,
         )
         if email_match:
@@ -298,19 +300,25 @@ class FirmWebsiteCollector(BasePECollector):
                         name = name.strip()
                         if name and name not in seen_companies:
                             seen_companies.add(name)
-                            companies.append({
-                                "name": name,
-                                "website": f"https://{website}" if not website.startswith("http") else website,
-                                "source_type": "portfolio_page",
-                            })
+                            companies.append(
+                                {
+                                    "name": name,
+                                    "website": f"https://{website}"
+                                    if not website.startswith("http")
+                                    else website,
+                                    "source_type": "portfolio_page",
+                                }
+                            )
                 else:
                     name = match.strip()
                     if name and name not in seen_companies:
                         seen_companies.add(name)
-                        companies.append({
-                            "name": name,
-                            "source_type": "portfolio_page",
-                        })
+                        companies.append(
+                            {
+                                "name": name,
+                                "source_type": "portfolio_page",
+                            }
+                        )
 
         return companies[:50]  # Limit to 50 companies
 
@@ -338,7 +346,7 @@ class FirmWebsiteCollector(BasePECollector):
         # Look for people in common patterns
         # Pattern: Name followed by title
         person_patterns = [
-            r'<h[2-4][^>]*>([A-Z][a-z]+ (?:[A-Z]\. )?[A-Z][a-z]+(?:-[A-Z][a-z]+)?)</h[2-4]>\s*<(?:p|span|div)[^>]*>([^<]+)</(?:p|span|div)>',
+            r"<h[2-4][^>]*>([A-Z][a-z]+ (?:[A-Z]\. )?[A-Z][a-z]+(?:-[A-Z][a-z]+)?)</h[2-4]>\s*<(?:p|span|div)[^>]*>([^<]+)</(?:p|span|div)>",
         ]
 
         seen_people = set()
@@ -350,10 +358,12 @@ class FirmWebsiteCollector(BasePECollector):
                     title = match[1].strip()
                     if name and name not in seen_people:
                         seen_people.add(name)
-                        people.append({
-                            "full_name": name,
-                            "title": title,
-                            "source_type": "team_page",
-                        })
+                        people.append(
+                            {
+                                "full_name": name,
+                                "title": title,
+                                "source_type": "team_page",
+                            }
+                        )
 
         return people[:100]  # Limit to 100 people

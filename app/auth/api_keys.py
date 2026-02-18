@@ -20,18 +20,29 @@ from app.core.database import get_db
 # Pydantic Models
 # ============================================================================
 
+
 class APIKeyCreate(BaseModel):
     """Request model for creating an API key."""
+
     name: str = Field(..., min_length=1, max_length=255, description="Key name")
     owner_email: str = Field(..., description="Owner's email address")
-    scope: str = Field("read", pattern="^(read|write|admin)$", description="Access scope")
-    rate_limit_per_minute: int = Field(60, ge=1, le=1000, description="Requests per minute")
-    rate_limit_per_day: int = Field(10000, ge=1, le=1000000, description="Requests per day")
-    expires_in_days: Optional[int] = Field(None, ge=1, le=365, description="Expiration in days")
+    scope: str = Field(
+        "read", pattern="^(read|write|admin)$", description="Access scope"
+    )
+    rate_limit_per_minute: int = Field(
+        60, ge=1, le=1000, description="Requests per minute"
+    )
+    rate_limit_per_day: int = Field(
+        10000, ge=1, le=1000000, description="Requests per day"
+    )
+    expires_in_days: Optional[int] = Field(
+        None, ge=1, le=365, description="Expiration in days"
+    )
 
 
 class APIKeyUpdate(BaseModel):
     """Request model for updating an API key."""
+
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     rate_limit_per_minute: Optional[int] = Field(None, ge=1, le=1000)
     rate_limit_per_day: Optional[int] = Field(None, ge=1, le=1000000)
@@ -40,6 +51,7 @@ class APIKeyUpdate(BaseModel):
 
 class APIKeyResponse(BaseModel):
     """Response model for API key (without secret)."""
+
     id: int
     key_prefix: str
     name: str
@@ -55,11 +67,13 @@ class APIKeyResponse(BaseModel):
 
 class APIKeyCreatedResponse(APIKeyResponse):
     """Response model for newly created API key (includes secret)."""
+
     key: str  # Full key, shown only once
 
 
 class UsageStatsResponse(BaseModel):
     """Response model for usage statistics."""
+
     api_key_id: int
     total_requests: int
     requests_today: int
@@ -70,6 +84,7 @@ class UsageStatsResponse(BaseModel):
 
 class RateLimitInfo(BaseModel):
     """Rate limit information for headers."""
+
     limit: int
     remaining: int
     reset: int  # Unix timestamp
@@ -79,6 +94,7 @@ class RateLimitInfo(BaseModel):
 # ============================================================================
 # API Key Service
 # ============================================================================
+
 
 class APIKeyService:
     """Service for API key management."""
@@ -92,7 +108,8 @@ class APIKeyService:
 
     def _ensure_tables(self):
         """Create tables if they don't exist."""
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             CREATE TABLE IF NOT EXISTS api_keys (
                 id SERIAL PRIMARY KEY,
                 key_hash VARCHAR(64) NOT NULL UNIQUE,
@@ -107,9 +124,11 @@ class APIKeyService:
                 created_at TIMESTAMP DEFAULT NOW(),
                 last_used_at TIMESTAMP
             )
-        """))
+        """)
+        )
 
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             CREATE TABLE IF NOT EXISTS api_usage (
                 id SERIAL PRIMARY KEY,
                 api_key_id INTEGER NOT NULL REFERENCES api_keys(id),
@@ -119,9 +138,11 @@ class APIKeyService:
                 response_time_ms INTEGER,
                 requested_at TIMESTAMP DEFAULT NOW()
             )
-        """))
+        """)
+        )
 
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             CREATE TABLE IF NOT EXISTS rate_limit_buckets (
                 api_key_id INTEGER NOT NULL,
                 bucket_type VARCHAR(20) NOT NULL,
@@ -129,21 +150,30 @@ class APIKeyService:
                 request_count INTEGER DEFAULT 0,
                 PRIMARY KEY (api_key_id, bucket_type, bucket_key)
             )
-        """))
+        """)
+        )
 
         # Create indexes if they don't exist
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash)
-        """))
-        self.db.execute(text("""
+        """)
+        )
+        self.db.execute(
+            text("""
             CREATE INDEX IF NOT EXISTS idx_api_keys_owner ON api_keys(owner_email)
-        """))
-        self.db.execute(text("""
+        """)
+        )
+        self.db.execute(
+            text("""
             CREATE INDEX IF NOT EXISTS idx_api_usage_key ON api_usage(api_key_id)
-        """))
-        self.db.execute(text("""
+        """)
+        )
+        self.db.execute(
+            text("""
             CREATE INDEX IF NOT EXISTS idx_api_usage_date ON api_usage(requested_at)
-        """))
+        """)
+        )
 
         self.db.commit()
 
@@ -173,7 +203,8 @@ class APIKeyService:
             expires_at = datetime.utcnow() + timedelta(days=data.expires_in_days)
 
         # Insert into database
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             INSERT INTO api_keys (
                 key_hash, key_prefix, name, owner_email, scope,
                 rate_limit_per_minute, rate_limit_per_day, expires_at
@@ -182,16 +213,18 @@ class APIKeyService:
                 :rate_limit_per_minute, :rate_limit_per_day, :expires_at
             )
             RETURNING id, created_at
-        """), {
-            "key_hash": key_hash,
-            "key_prefix": key_prefix,
-            "name": data.name,
-            "owner_email": data.owner_email,
-            "scope": data.scope,
-            "rate_limit_per_minute": data.rate_limit_per_minute,
-            "rate_limit_per_day": data.rate_limit_per_day,
-            "expires_at": expires_at
-        })
+        """),
+            {
+                "key_hash": key_hash,
+                "key_prefix": key_prefix,
+                "name": data.name,
+                "owner_email": data.owner_email,
+                "scope": data.scope,
+                "rate_limit_per_minute": data.rate_limit_per_minute,
+                "rate_limit_per_day": data.rate_limit_per_day,
+                "expires_at": expires_at,
+            },
+        )
 
         row = result.fetchone()
         self.db.commit()
@@ -208,56 +241,66 @@ class APIKeyService:
             is_active=True,
             expires_at=expires_at.isoformat() if expires_at else None,
             created_at=row[1].isoformat(),
-            last_used_at=None
+            last_used_at=None,
         )
 
     def list_keys(self, owner_email: Optional[str] = None) -> List[APIKeyResponse]:
         """List API keys, optionally filtered by owner."""
         if owner_email:
-            result = self.db.execute(text("""
+            result = self.db.execute(
+                text("""
                 SELECT id, key_prefix, name, owner_email, scope,
                        rate_limit_per_minute, rate_limit_per_day, is_active,
                        expires_at, created_at, last_used_at
                 FROM api_keys
                 WHERE owner_email = :owner_email
                 ORDER BY created_at DESC
-            """), {"owner_email": owner_email})
+            """),
+                {"owner_email": owner_email},
+            )
         else:
-            result = self.db.execute(text("""
+            result = self.db.execute(
+                text("""
                 SELECT id, key_prefix, name, owner_email, scope,
                        rate_limit_per_minute, rate_limit_per_day, is_active,
                        expires_at, created_at, last_used_at
                 FROM api_keys
                 ORDER BY created_at DESC
-            """))
+            """)
+            )
 
         keys = []
         for row in result:
-            keys.append(APIKeyResponse(
-                id=row[0],
-                key_prefix=row[1],
-                name=row[2],
-                owner_email=row[3],
-                scope=row[4],
-                rate_limit_per_minute=row[5],
-                rate_limit_per_day=row[6],
-                is_active=row[7],
-                expires_at=row[8].isoformat() if row[8] else None,
-                created_at=row[9].isoformat(),
-                last_used_at=row[10].isoformat() if row[10] else None
-            ))
+            keys.append(
+                APIKeyResponse(
+                    id=row[0],
+                    key_prefix=row[1],
+                    name=row[2],
+                    owner_email=row[3],
+                    scope=row[4],
+                    rate_limit_per_minute=row[5],
+                    rate_limit_per_day=row[6],
+                    is_active=row[7],
+                    expires_at=row[8].isoformat() if row[8] else None,
+                    created_at=row[9].isoformat(),
+                    last_used_at=row[10].isoformat() if row[10] else None,
+                )
+            )
 
         return keys
 
     def get_key(self, key_id: int) -> Optional[APIKeyResponse]:
         """Get a single API key by ID."""
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             SELECT id, key_prefix, name, owner_email, scope,
                    rate_limit_per_minute, rate_limit_per_day, is_active,
                    expires_at, created_at, last_used_at
             FROM api_keys
             WHERE id = :key_id
-        """), {"key_id": key_id})
+        """),
+            {"key_id": key_id},
+        )
 
         row = result.fetchone()
         if not row:
@@ -274,7 +317,7 @@ class APIKeyService:
             is_active=row[7],
             expires_at=row[8].isoformat() if row[8] else None,
             created_at=row[9].isoformat(),
-            last_used_at=row[10].isoformat() if row[10] else None
+            last_used_at=row[10].isoformat() if row[10] else None,
         )
 
     def update_key(self, key_id: int, data: APIKeyUpdate) -> Optional[APIKeyResponse]:
@@ -307,10 +350,13 @@ class APIKeyService:
 
     def revoke_key(self, key_id: int) -> bool:
         """Revoke an API key."""
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             UPDATE api_keys SET is_active = FALSE WHERE id = :key_id
             RETURNING id
-        """), {"key_id": key_id})
+        """),
+            {"key_id": key_id},
+        )
 
         row = result.fetchone()
         self.db.commit()
@@ -323,13 +369,16 @@ class APIKeyService:
         """
         key_hash = self._hash_key(raw_key)
 
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             SELECT id, name, owner_email, scope,
                    rate_limit_per_minute, rate_limit_per_day,
                    is_active, expires_at
             FROM api_keys
             WHERE key_hash = :key_hash
-        """), {"key_hash": key_hash})
+        """),
+            {"key_hash": key_hash},
+        )
 
         row = result.fetchone()
         if not row:
@@ -343,7 +392,7 @@ class APIKeyService:
             "rate_limit_per_minute": row[4],
             "rate_limit_per_day": row[5],
             "is_active": row[6],
-            "expires_at": row[7]
+            "expires_at": row[7],
         }
 
         # Check if active
@@ -355,9 +404,12 @@ class APIKeyService:
             return None
 
         # Update last used timestamp
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             UPDATE api_keys SET last_used_at = NOW() WHERE id = :key_id
-        """), {"key_id": key_info["id"]})
+        """),
+            {"key_id": key_info["id"]},
+        )
         self.db.commit()
 
         return key_info
@@ -369,46 +421,63 @@ class APIKeyService:
             return None
 
         # Get total requests
-        total_result = self.db.execute(text("""
+        total_result = self.db.execute(
+            text("""
             SELECT COUNT(*) FROM api_usage WHERE api_key_id = :key_id
-        """), {"key_id": key_id})
+        """),
+            {"key_id": key_id},
+        )
         total_requests = total_result.fetchone()[0]
 
         # Get today's requests
-        today_result = self.db.execute(text("""
+        today_result = self.db.execute(
+            text("""
             SELECT COUNT(*) FROM api_usage
             WHERE api_key_id = :key_id
             AND requested_at >= CURRENT_DATE
-        """), {"key_id": key_id})
+        """),
+            {"key_id": key_id},
+        )
         requests_today = today_result.fetchone()[0]
 
         # Get this month's requests
-        month_result = self.db.execute(text("""
+        month_result = self.db.execute(
+            text("""
             SELECT COUNT(*) FROM api_usage
             WHERE api_key_id = :key_id
             AND requested_at >= DATE_TRUNC('month', CURRENT_DATE)
-        """), {"key_id": key_id})
+        """),
+            {"key_id": key_id},
+        )
         requests_this_month = month_result.fetchone()[0]
 
         # Get daily breakdown (last 30 days)
-        daily_result = self.db.execute(text("""
+        daily_result = self.db.execute(
+            text("""
             SELECT DATE(requested_at) as date, COUNT(*) as count
             FROM api_usage
             WHERE api_key_id = :key_id
             AND requested_at >= CURRENT_DATE - INTERVAL '30 days'
             GROUP BY DATE(requested_at)
             ORDER BY date DESC
-        """), {"key_id": key_id})
-        daily_breakdown = [{"date": str(row[0]), "count": row[1]} for row in daily_result]
+        """),
+            {"key_id": key_id},
+        )
+        daily_breakdown = [
+            {"date": str(row[0]), "count": row[1]} for row in daily_result
+        ]
 
         # Get by endpoint
-        endpoint_result = self.db.execute(text("""
+        endpoint_result = self.db.execute(
+            text("""
             SELECT endpoint, COUNT(*) as count
             FROM api_usage
             WHERE api_key_id = :key_id
             GROUP BY endpoint
             ORDER BY count DESC
-        """), {"key_id": key_id})
+        """),
+            {"key_id": key_id},
+        )
         by_endpoint = {row[0]: row[1] for row in endpoint_result}
 
         return UsageStatsResponse(
@@ -417,22 +486,31 @@ class APIKeyService:
             requests_today=requests_today,
             requests_this_month=requests_this_month,
             daily_breakdown=daily_breakdown,
-            by_endpoint=by_endpoint
+            by_endpoint=by_endpoint,
         )
 
-    def record_usage(self, key_id: int, endpoint: str, method: str,
-                     status_code: int, response_time_ms: int):
+    def record_usage(
+        self,
+        key_id: int,
+        endpoint: str,
+        method: str,
+        status_code: int,
+        response_time_ms: int,
+    ):
         """Record API usage for tracking."""
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             INSERT INTO api_usage (api_key_id, endpoint, method, status_code, response_time_ms)
             VALUES (:key_id, :endpoint, :method, :status_code, :response_time_ms)
-        """), {
-            "key_id": key_id,
-            "endpoint": endpoint,
-            "method": method,
-            "status_code": status_code,
-            "response_time_ms": response_time_ms
-        })
+        """),
+            {
+                "key_id": key_id,
+                "endpoint": endpoint,
+                "method": method,
+                "status_code": status_code,
+                "response_time_ms": response_time_ms,
+            },
+        )
         self.db.commit()
 
 
@@ -440,13 +518,16 @@ class APIKeyService:
 # Rate Limiter
 # ============================================================================
 
+
 class RateLimiter:
     """Token bucket rate limiter with per-minute and per-day limits."""
 
     def __init__(self, db: Session):
         self.db = db
 
-    def check_rate_limit(self, key_id: int, limits: Dict[str, int]) -> Tuple[bool, RateLimitInfo]:
+    def check_rate_limit(
+        self, key_id: int, limits: Dict[str, int]
+    ) -> Tuple[bool, RateLimitInfo]:
         """
         Check if a request is within rate limits.
 
@@ -470,19 +551,21 @@ class RateLimiter:
                 limit=limits["per_minute"],
                 remaining=0,
                 reset=int(reset_time.timestamp()),
-                limit_type="minute"
+                limit_type="minute",
             )
 
         # Check daily limit
         day_count = self._get_bucket_count(key_id, "day", day_key)
         if day_count >= limits["per_day"]:
             # Calculate reset time (next day)
-            reset_time = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+            reset_time = (now + timedelta(days=1)).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
             return False, RateLimitInfo(
                 limit=limits["per_day"],
                 remaining=0,
                 reset=int(reset_time.timestamp()),
-                limit_type="day"
+                limit_type="day",
             )
 
         # Increment counters
@@ -499,41 +582,50 @@ class RateLimiter:
                 limit=limits["per_minute"],
                 remaining=minute_remaining,
                 reset=int(reset_time.timestamp()),
-                limit_type="minute"
+                limit_type="minute",
             )
         else:
-            reset_time = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+            reset_time = (now + timedelta(days=1)).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
             return True, RateLimitInfo(
                 limit=limits["per_day"],
                 remaining=day_remaining,
                 reset=int(reset_time.timestamp()),
-                limit_type="day"
+                limit_type="day",
             )
 
     def _get_bucket_count(self, key_id: int, bucket_type: str, bucket_key: str) -> int:
         """Get current count for a rate limit bucket."""
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             SELECT request_count FROM rate_limit_buckets
             WHERE api_key_id = :key_id AND bucket_type = :bucket_type AND bucket_key = :bucket_key
-        """), {"key_id": key_id, "bucket_type": bucket_type, "bucket_key": bucket_key})
+        """),
+            {"key_id": key_id, "bucket_type": bucket_type, "bucket_key": bucket_key},
+        )
 
         row = result.fetchone()
         return row[0] if row else 0
 
     def _increment_bucket(self, key_id: int, bucket_type: str, bucket_key: str):
         """Increment a rate limit bucket counter."""
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             INSERT INTO rate_limit_buckets (api_key_id, bucket_type, bucket_key, request_count)
             VALUES (:key_id, :bucket_type, :bucket_key, 1)
             ON CONFLICT (api_key_id, bucket_type, bucket_key)
             DO UPDATE SET request_count = rate_limit_buckets.request_count + 1
-        """), {"key_id": key_id, "bucket_type": bucket_type, "bucket_key": bucket_key})
+        """),
+            {"key_id": key_id, "bucket_type": bucket_type, "bucket_key": bucket_key},
+        )
         self.db.commit()
 
 
 # ============================================================================
 # Dependency Injection
 # ============================================================================
+
 
 def get_api_key_service(db: Session = next(get_db())) -> APIKeyService:
     """Dependency for getting API key service."""

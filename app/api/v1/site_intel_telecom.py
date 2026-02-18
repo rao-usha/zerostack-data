@@ -3,6 +3,7 @@ Site Intelligence Platform - Telecom/Fiber Infrastructure API.
 
 Endpoints for broadband availability, internet exchanges, and data centers.
 """
+
 import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,8 +13,11 @@ from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.models_site_intel import (
-    BroadbandAvailability, InternetExchange, DataCenterFacility,
-    SubmarineCableLanding, NetworkLatency,
+    BroadbandAvailability,
+    InternetExchange,
+    DataCenterFacility,
+    SubmarineCableLanding,
+    NetworkLatency,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,6 +28,7 @@ router = APIRouter(prefix="/site-intel/telecom", tags=["Site Intel - Telecom"])
 # =============================================================================
 # RESPONSE MODELS
 # =============================================================================
+
 
 class InternetExchangeResponse(BaseModel):
     id: int
@@ -66,12 +71,19 @@ class DataCenterResponse(BaseModel):
 # BROADBAND ENDPOINTS
 # =============================================================================
 
+
 @router.get("/broadband")
 async def search_broadband_availability(
     state: Optional[str] = Query(None, description="Filter by state"),
-    technology: Optional[str] = Query(None, description="Technology: fiber, cable, fixed_wireless, dsl"),
-    min_download_mbps: Optional[int] = Query(None, description="Minimum download speed"),
-    is_business: Optional[bool] = Query(None, description="Filter business services only"),
+    technology: Optional[str] = Query(
+        None, description="Technology: fiber, cable, fixed_wireless, dsl"
+    ),
+    min_download_mbps: Optional[int] = Query(
+        None, description="Minimum download speed"
+    ),
+    is_business: Optional[bool] = Query(
+        None, description="Filter business services only"
+    ),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
@@ -87,7 +99,9 @@ async def search_broadband_availability(
     if technology:
         query = query.filter(BroadbandAvailability.technology == technology)
     if min_download_mbps:
-        query = query.filter(BroadbandAvailability.max_download_mbps >= min_download_mbps)
+        query = query.filter(
+            BroadbandAvailability.max_download_mbps >= min_download_mbps
+        )
     if is_business is not None:
         query = query.filter(BroadbandAvailability.is_business_service == is_business)
 
@@ -122,14 +136,17 @@ async def get_broadband_at_location(
     """
     # Find nearby broadband records
     distance_expr = (
-        3959 * func.acos(
-            func.cos(func.radians(lat)) *
-            func.cos(func.radians(BroadbandAvailability.latitude)) *
-            func.cos(func.radians(BroadbandAvailability.longitude) - func.radians(lng)) +
-            func.sin(func.radians(lat)) *
-            func.sin(func.radians(BroadbandAvailability.latitude))
+        3959
+        * func.acos(
+            func.cos(func.radians(lat))
+            * func.cos(func.radians(BroadbandAvailability.latitude))
+            * func.cos(
+                func.radians(BroadbandAvailability.longitude) - func.radians(lng)
+            )
+            + func.sin(func.radians(lat))
+            * func.sin(func.radians(BroadbandAvailability.latitude))
         )
-    ).label('distance_miles')
+    ).label("distance_miles")
 
     query = db.query(BroadbandAvailability, distance_expr).filter(
         BroadbandAvailability.latitude.isnot(None),
@@ -142,14 +159,17 @@ async def get_broadband_at_location(
         BroadbandAvailability.longitude.between(lng - lat_range, lng + lat_range),
     )
 
-    results = query.order_by('distance_miles').limit(20).all()
+    results = query.order_by("distance_miles").limit(20).all()
 
     providers = {}
     for record, distance in results:
         if distance > 5:  # Only within 5 miles
             continue
         provider = record.provider_name
-        if provider not in providers or record.max_download_mbps > providers[provider]["download_mbps"]:
+        if (
+            provider not in providers
+            or record.max_download_mbps > providers[provider]["download_mbps"]
+        ):
             providers[provider] = {
                 "provider": provider,
                 "technology": record.technology,
@@ -162,13 +182,16 @@ async def get_broadband_at_location(
         "location": {"latitude": lat, "longitude": lng},
         "providers": list(providers.values()),
         "has_fiber": any(p["technology"] == "fiber" for p in providers.values()),
-        "max_download_mbps": max((p["download_mbps"] or 0) for p in providers.values()) if providers else 0,
+        "max_download_mbps": max((p["download_mbps"] or 0) for p in providers.values())
+        if providers
+        else 0,
     }
 
 
 # =============================================================================
 # INTERNET EXCHANGE ENDPOINTS
 # =============================================================================
+
 
 @router.get("/ix", response_model=List[InternetExchangeResponse])
 async def search_internet_exchanges(
@@ -212,14 +235,15 @@ async def find_nearby_internet_exchanges(
     Data centers within 50 miles of major IX points have latency advantages.
     """
     distance_expr = (
-        3959 * func.acos(
-            func.cos(func.radians(lat)) *
-            func.cos(func.radians(InternetExchange.latitude)) *
-            func.cos(func.radians(InternetExchange.longitude) - func.radians(lng)) +
-            func.sin(func.radians(lat)) *
-            func.sin(func.radians(InternetExchange.latitude))
+        3959
+        * func.acos(
+            func.cos(func.radians(lat))
+            * func.cos(func.radians(InternetExchange.latitude))
+            * func.cos(func.radians(InternetExchange.longitude) - func.radians(lng))
+            + func.sin(func.radians(lat))
+            * func.sin(func.radians(InternetExchange.latitude))
         )
-    ).label('distance_miles')
+    ).label("distance_miles")
 
     query = db.query(InternetExchange, distance_expr).filter(
         InternetExchange.latitude.isnot(None),
@@ -230,7 +254,7 @@ async def find_nearby_internet_exchanges(
         InternetExchange.latitude.between(lat - lat_range, lat + lat_range),
     )
 
-    results = query.order_by('distance_miles').limit(limit * 2).all()
+    results = query.order_by("distance_miles").limit(limit * 2).all()
 
     exchanges = []
     for ix, distance in results:
@@ -247,6 +271,7 @@ async def find_nearby_internet_exchanges(
 # =============================================================================
 # DATA CENTER ENDPOINTS
 # =============================================================================
+
 
 @router.get("/data-centers", response_model=List[DataCenterResponse])
 async def search_data_centers(
@@ -293,14 +318,15 @@ async def find_nearby_data_centers(
     Proximity to existing data centers indicates good infrastructure.
     """
     distance_expr = (
-        3959 * func.acos(
-            func.cos(func.radians(lat)) *
-            func.cos(func.radians(DataCenterFacility.latitude)) *
-            func.cos(func.radians(DataCenterFacility.longitude) - func.radians(lng)) +
-            func.sin(func.radians(lat)) *
-            func.sin(func.radians(DataCenterFacility.latitude))
+        3959
+        * func.acos(
+            func.cos(func.radians(lat))
+            * func.cos(func.radians(DataCenterFacility.latitude))
+            * func.cos(func.radians(DataCenterFacility.longitude) - func.radians(lng))
+            + func.sin(func.radians(lat))
+            * func.sin(func.radians(DataCenterFacility.latitude))
         )
-    ).label('distance_miles')
+    ).label("distance_miles")
 
     query = db.query(DataCenterFacility, distance_expr).filter(
         DataCenterFacility.latitude.isnot(None),
@@ -311,7 +337,7 @@ async def find_nearby_data_centers(
         DataCenterFacility.latitude.between(lat - lat_range, lat + lat_range),
     )
 
-    results = query.order_by('distance_miles').limit(limit * 2).all()
+    results = query.order_by("distance_miles").limit(limit * 2).all()
 
     facilities = []
     for dc, distance in results:
@@ -328,6 +354,7 @@ async def find_nearby_data_centers(
 # =============================================================================
 # SUBMARINE CABLE ENDPOINTS
 # =============================================================================
+
 
 @router.get("/submarine-cables")
 async def list_submarine_cable_landings(
@@ -348,7 +375,11 @@ async def list_submarine_cable_landings(
     if state:
         query = query.filter(SubmarineCableLanding.state == state)
 
-    cables = query.order_by(SubmarineCableLanding.capacity_tbps.desc().nullslast()).limit(limit).all()
+    cables = (
+        query.order_by(SubmarineCableLanding.capacity_tbps.desc().nullslast())
+        .limit(limit)
+        .all()
+    )
 
     return [
         {
@@ -371,6 +402,7 @@ async def list_submarine_cable_landings(
 # CONNECTIVITY SCORE ENDPOINT
 # =============================================================================
 
+
 @router.get("/connectivity-score")
 async def get_connectivity_score(
     lat: float = Query(..., ge=-90, le=90),
@@ -383,20 +415,30 @@ async def get_connectivity_score(
     Factors in IX proximity, data center density, and fiber availability.
     """
     # Count nearby IXs (within 100 miles)
-    ix_count = db.query(func.count(InternetExchange.id)).filter(
-        InternetExchange.latitude.between(lat - 1.5, lat + 1.5),
-        InternetExchange.longitude.between(lng - 1.5, lng + 1.5),
-    ).scalar() or 0
+    ix_count = (
+        db.query(func.count(InternetExchange.id))
+        .filter(
+            InternetExchange.latitude.between(lat - 1.5, lat + 1.5),
+            InternetExchange.longitude.between(lng - 1.5, lng + 1.5),
+        )
+        .scalar()
+        or 0
+    )
 
     # Count nearby data centers (within 50 miles)
-    dc_count = db.query(func.count(DataCenterFacility.id)).filter(
-        DataCenterFacility.latitude.between(lat - 0.75, lat + 0.75),
-        DataCenterFacility.longitude.between(lng - 0.75, lng + 0.75),
-    ).scalar() or 0
+    dc_count = (
+        db.query(func.count(DataCenterFacility.id))
+        .filter(
+            DataCenterFacility.latitude.between(lat - 0.75, lat + 0.75),
+            DataCenterFacility.longitude.between(lng - 0.75, lng + 0.75),
+        )
+        .scalar()
+        or 0
+    )
 
     # Simple scoring algorithm
     ix_score = min(ix_count * 15, 40)  # Max 40 points
-    dc_score = min(dc_count * 3, 40)   # Max 40 points
+    dc_score = min(dc_count * 3, 40)  # Max 40 points
     # Fiber availability would add up to 20 points
 
     total_score = ix_score + dc_score
@@ -409,11 +451,14 @@ async def get_connectivity_score(
             "dc_density": {"count_within_50mi": dc_count, "score": dc_score},
         },
         "assessment": (
-            "Excellent" if total_score >= 70 else
-            "Good" if total_score >= 50 else
-            "Moderate" if total_score >= 30 else
-            "Limited"
-        )
+            "Excellent"
+            if total_score >= 70
+            else "Good"
+            if total_score >= 50
+            else "Moderate"
+            if total_score >= 30
+            else "Limited"
+        ),
     }
 
 
@@ -421,13 +466,16 @@ async def get_connectivity_score(
 # SUMMARY ENDPOINT
 # =============================================================================
 
+
 @router.get("/summary")
 async def get_telecom_summary(db: Session = Depends(get_db)):
     """Get summary statistics for telecom infrastructure data."""
     return {
         "domain": "telecom",
         "record_counts": {
-            "broadband_records": db.query(func.count(BroadbandAvailability.id)).scalar(),
+            "broadband_records": db.query(
+                func.count(BroadbandAvailability.id)
+            ).scalar(),
             "internet_exchanges": db.query(func.count(InternetExchange.id)).scalar(),
             "data_centers": db.query(func.count(DataCenterFacility.id)).scalar(),
             "submarine_cables": db.query(func.count(SubmarineCableLanding.id)).scalar(),
@@ -441,5 +489,5 @@ async def get_telecom_summary(db: Session = Depends(get_db)):
             "/site-intel/telecom/data-centers/nearby",
             "/site-intel/telecom/submarine-cables",
             "/site-intel/telecom/connectivity-score",
-        ]
+        ],
     }

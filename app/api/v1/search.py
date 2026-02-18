@@ -28,37 +28,53 @@ router = APIRouter(prefix="/search", tags=["Search"])
 
 class SearchResultResponse(BaseModel):
     """A single search result."""
+
     id: int = Field(..., description="Search index record ID")
     entity_id: int = Field(..., description="Original entity ID in source table")
     type: str = Field(..., description="Entity type: investor, company, co_investor")
     name: str = Field(..., description="Entity name")
     description: Optional[str] = Field(None, description="Entity description")
     relevance_score: float = Field(..., description="Relevance score (0-1+)")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional entity data")
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional entity data"
+    )
     highlight: Optional[str] = Field(None, description="Highlighted match text")
 
 
 class SearchFacetsResponse(BaseModel):
     """Aggregated facet counts for filtering."""
-    result_types: Dict[str, int] = Field(default_factory=dict, description="Count by entity type")
-    industries: Dict[str, int] = Field(default_factory=dict, description="Count by industry")
-    investor_types: Dict[str, int] = Field(default_factory=dict, description="Count by investor type")
-    locations: Dict[str, int] = Field(default_factory=dict, description="Count by location")
+
+    result_types: Dict[str, int] = Field(
+        default_factory=dict, description="Count by entity type"
+    )
+    industries: Dict[str, int] = Field(
+        default_factory=dict, description="Count by industry"
+    )
+    investor_types: Dict[str, int] = Field(
+        default_factory=dict, description="Count by investor type"
+    )
+    locations: Dict[str, int] = Field(
+        default_factory=dict, description="Count by location"
+    )
 
 
 class SearchResponse(BaseModel):
     """Complete search response."""
+
     results: List[SearchResultResponse] = Field(..., description="Search results")
     facets: SearchFacetsResponse = Field(..., description="Facet counts for filtering")
     total: int = Field(..., description="Total matching results")
     page: int = Field(..., description="Current page (1-indexed)")
     page_size: int = Field(..., description="Results per page")
     query: str = Field(..., description="Original search query")
-    search_time_ms: float = Field(..., description="Search execution time in milliseconds")
+    search_time_ms: float = Field(
+        ..., description="Search execution time in milliseconds"
+    )
 
 
 class SuggestionResponse(BaseModel):
     """An autocomplete suggestion."""
+
     text: str = Field(..., description="Suggested text")
     type: str = Field(..., description="Entity type")
     id: int = Field(..., description="Search index record ID")
@@ -68,12 +84,14 @@ class SuggestionResponse(BaseModel):
 
 class SuggestResponse(BaseModel):
     """Autocomplete suggestions response."""
+
     suggestions: List[SuggestionResponse]
     prefix: str
 
 
 class ReindexResponse(BaseModel):
     """Response from reindex operation."""
+
     success: bool
     counts: Dict[str, int] = Field(..., description="Records indexed per entity type")
     total: int = Field(..., description="Total records indexed")
@@ -81,6 +99,7 @@ class ReindexResponse(BaseModel):
 
 class SearchStatsResponse(BaseModel):
     """Search index statistics."""
+
     total_indexed: int
     by_type: Dict[str, int]
     last_updated: Optional[str]
@@ -95,14 +114,18 @@ class SearchStatsResponse(BaseModel):
 @router.get("", response_model=SearchResponse)
 async def search(
     q: str = Query(..., min_length=0, description="Search query"),
-    types: Optional[List[str]] = Query(None, description="Filter by entity types: investor, company, co_investor"),
+    types: Optional[List[str]] = Query(
+        None, description="Filter by entity types: investor, company, co_investor"
+    ),
     industry: Optional[str] = Query(None, description="Filter by industry"),
-    investor_type: Optional[str] = Query(None, description="Filter by investor type (e.g., public_pension)"),
+    investor_type: Optional[str] = Query(
+        None, description="Filter by investor type (e.g., public_pension)"
+    ),
     location: Optional[str] = Query(None, description="Filter by location"),
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(20, ge=1, le=100, description="Results per page"),
     fuzzy: bool = Query(True, description="Enable fuzzy matching for typos"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Search across investors, portfolio companies, and co-investors.
@@ -129,7 +152,7 @@ async def search(
             if invalid:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid types: {invalid}. Valid types: {valid_types}"
+                    detail=f"Invalid types: {invalid}. Valid types: {valid_types}",
                 )
 
         result = engine.search(
@@ -140,7 +163,7 @@ async def search(
             location=location,
             page=page,
             page_size=page_size,
-            fuzzy=fuzzy
+            fuzzy=fuzzy,
         )
 
         # Convert to response models
@@ -153,7 +176,7 @@ async def search(
                 description=r.description,
                 relevance_score=r.relevance_score,
                 metadata=r.metadata,
-                highlight=r.highlight
+                highlight=r.highlight,
             )
             for r in result.results
         ]
@@ -162,7 +185,7 @@ async def search(
             result_types=result.facets.result_types,
             industries=result.facets.industries,
             investor_types=result.facets.investor_types,
-            locations=result.facets.locations
+            locations=result.facets.locations,
         )
 
         return SearchResponse(
@@ -172,7 +195,7 @@ async def search(
             page=result.page,
             page_size=result.page_size,
             query=result.query,
-            search_time_ms=result.search_time_ms
+            search_time_ms=result.search_time_ms,
         )
 
     except HTTPException:
@@ -184,10 +207,12 @@ async def search(
 
 @router.get("/suggest", response_model=SuggestResponse)
 async def suggest(
-    prefix: str = Query(..., min_length=1, description="Search prefix for autocomplete"),
+    prefix: str = Query(
+        ..., min_length=1, description="Search prefix for autocomplete"
+    ),
     limit: int = Query(10, ge=1, le=50, description="Maximum suggestions to return"),
     types: Optional[List[str]] = Query(None, description="Filter by entity types"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get autocomplete suggestions for a search prefix.
@@ -206,30 +231,19 @@ async def suggest(
             if invalid:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid types: {invalid}. Valid types: {valid_types}"
+                    detail=f"Invalid types: {invalid}. Valid types: {valid_types}",
                 )
 
-        suggestions = engine.suggest(
-            prefix=prefix,
-            limit=limit,
-            result_types=types
-        )
+        suggestions = engine.suggest(prefix=prefix, limit=limit, result_types=types)
 
         suggestions_response = [
             SuggestionResponse(
-                text=s.text,
-                type=s.type,
-                id=s.id,
-                entity_id=s.entity_id,
-                score=s.score
+                text=s.text, type=s.type, id=s.id, entity_id=s.entity_id, score=s.score
             )
             for s in suggestions
         ]
 
-        return SuggestResponse(
-            suggestions=suggestions_response,
-            prefix=prefix
-        )
+        return SuggestResponse(suggestions=suggestions_response, prefix=prefix)
 
     except HTTPException:
         raise
@@ -240,8 +254,10 @@ async def suggest(
 
 @router.post("/reindex", response_model=ReindexResponse)
 async def reindex(
-    type: Optional[str] = Query(None, description="Reindex only specific type: investor, company, co_investor"),
-    db: Session = Depends(get_db)
+    type: Optional[str] = Query(
+        None, description="Reindex only specific type: investor, company, co_investor"
+    ),
+    db: Session = Depends(get_db),
 ):
     """
     Trigger reindexing of search data from source tables.
@@ -260,12 +276,12 @@ async def reindex(
             type_map = {
                 "investor": SearchResultType.INVESTOR,
                 "company": SearchResultType.COMPANY,
-                "co_investor": SearchResultType.CO_INVESTOR
+                "co_investor": SearchResultType.CO_INVESTOR,
             }
             if type not in type_map:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid type: {type}. Valid types: {list(type_map.keys())}"
+                    detail=f"Invalid type: {type}. Valid types: {list(type_map.keys())}",
                 )
             entity_type = type_map[type]
 
@@ -274,11 +290,7 @@ async def reindex(
 
         logger.info(f"Reindex complete: {counts}, total={total}")
 
-        return ReindexResponse(
-            success=True,
-            counts=counts,
-            total=total
-        )
+        return ReindexResponse(success=True, counts=counts, total=total)
 
     except HTTPException:
         raise
@@ -302,7 +314,7 @@ async def get_stats(db: Session = Depends(get_db)):
             total_indexed=stats.get("total_indexed", 0),
             by_type=stats.get("by_type", {}),
             last_updated=stats.get("last_updated"),
-            error=stats.get("error")
+            error=stats.get("error"),
         )
 
     except Exception as e:

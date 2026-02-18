@@ -11,6 +11,7 @@ Data source: https://www.irs.gov/statistics/soi-tax-stats
 API Key: NOT REQUIRED (bulk CSV/Excel downloads)
 License: Public domain (US government data)
 """
+
 from app.sources.irs_soi.client import IRSSOIClient
 from app.sources.irs_soi.metadata import (
     AGI_BRACKETS,

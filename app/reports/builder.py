@@ -107,19 +107,23 @@ class ReportBuilder:
 
         # Create report record
         import json
+
         insert_sql = text("""
             INSERT INTO reports (template, title, format, status, params, created_at)
             VALUES (:template, :title, :format, 'generating', :params, :created_at)
             RETURNING id
         """)
 
-        result = self.db.execute(insert_sql, {
-            "template": template_name,
-            "title": title or f"{template_name} Report",
-            "format": format,
-            "params": json.dumps(params),
-            "created_at": datetime.utcnow(),
-        })
+        result = self.db.execute(
+            insert_sql,
+            {
+                "template": template_name,
+                "title": title or f"{template_name} Report",
+                "format": format,
+                "params": json.dumps(params),
+                "created_at": datetime.utcnow(),
+            },
+        )
         report_id = result.fetchone()[0]
         self.db.commit()
 
@@ -154,12 +158,15 @@ class ReportBuilder:
                     completed_at = :completed_at
                 WHERE id = :id
             """)
-            self.db.execute(update_sql, {
-                "id": report_id,
-                "file_path": str(file_path),
-                "file_size": file_size,
-                "completed_at": datetime.utcnow(),
-            })
+            self.db.execute(
+                update_sql,
+                {
+                    "id": report_id,
+                    "file_path": str(file_path),
+                    "file_size": file_size,
+                    "completed_at": datetime.utcnow(),
+                },
+            )
             self.db.commit()
 
             return self.get_report(report_id)
@@ -180,12 +187,15 @@ class ReportBuilder:
 
     def get_report(self, report_id: int) -> Optional[Dict[str, Any]]:
         """Get report metadata."""
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             SELECT id, template, title, format, status,
                    params, file_path, file_size,
                    created_at, completed_at, error_message
             FROM reports WHERE id = :id
-        """), {"id": report_id})
+        """),
+            {"id": report_id},
+        )
 
         row = result.fetchone()
         if not row:
@@ -203,7 +213,9 @@ class ReportBuilder:
             "created_at": row[8].isoformat() if row[8] else None,
             "completed_at": row[9].isoformat() if row[9] else None,
             "error_message": row[10],
-            "download_url": f"/api/v1/reports/{row[0]}/download" if row[4] == "complete" else None,
+            "download_url": f"/api/v1/reports/{row[0]}/download"
+            if row[4] == "complete"
+            else None,
         }
 
     def get_download_path(self, report_id: int) -> Optional[str]:
@@ -238,8 +250,7 @@ class ReportBuilder:
 
         # Count
         count_result = self.db.execute(
-            text(f"SELECT COUNT(*) FROM reports WHERE {where_clause}"),
-            params
+            text(f"SELECT COUNT(*) FROM reports WHERE {where_clause}"), params
         )
         total = count_result.scalar() or 0
 
@@ -257,17 +268,21 @@ class ReportBuilder:
 
         reports = []
         for row in result.fetchall():
-            reports.append({
-                "id": row[0],
-                "template": row[1],
-                "title": row[2],
-                "format": row[3],
-                "status": row[4],
-                "file_size": row[5],
-                "created_at": row[6].isoformat() if row[6] else None,
-                "completed_at": row[7].isoformat() if row[7] else None,
-                "download_url": f"/api/v1/reports/{row[0]}/download" if row[4] == "complete" else None,
-            })
+            reports.append(
+                {
+                    "id": row[0],
+                    "template": row[1],
+                    "title": row[2],
+                    "format": row[3],
+                    "status": row[4],
+                    "file_size": row[5],
+                    "created_at": row[6].isoformat() if row[6] else None,
+                    "completed_at": row[7].isoformat() if row[7] else None,
+                    "download_url": f"/api/v1/reports/{row[0]}/download"
+                    if row[4] == "complete"
+                    else None,
+                }
+            )
 
         return {
             "reports": reports,

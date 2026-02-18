@@ -4,6 +4,7 @@ Centralized LLM cost tracking service.
 Records every LLM API call to the database with model, tokens, cost,
 and source context. Provides in-memory session totals and DB persistence.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional
@@ -27,7 +28,13 @@ MODEL_PRICING = {
 }
 
 # Provider detection from model name
-ANTHROPIC_MODELS = {"claude-3-5-sonnet", "claude-3-5-haiku", "claude-3-haiku", "claude-3-sonnet", "claude-3-opus"}
+ANTHROPIC_MODELS = {
+    "claude-3-5-sonnet",
+    "claude-3-5-haiku",
+    "claude-3-haiku",
+    "claude-3-sonnet",
+    "claude-3-opus",
+}
 
 
 def _detect_provider(model: str) -> str:

@@ -14,7 +14,9 @@ from app.sources.lp_collection.types import LpRegistryEntry
 logger = logging.getLogger(__name__)
 
 # Path to the expanded LP registry
-LP_REGISTRY_PATH = Path(__file__).parent.parent.parent / "data" / "expanded_lp_registry.json"
+LP_REGISTRY_PATH = (
+    Path(__file__).parent.parent.parent / "data" / "expanded_lp_registry.json"
+)
 
 # Valid LP types
 VALID_LP_TYPES = [
@@ -94,7 +96,9 @@ class LpRegistry:
             with open(LP_REGISTRY_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
-            self._registry = [LpRegistryEntry.from_dict(lp) for lp in data.get("lps", [])]
+            self._registry = [
+                LpRegistryEntry.from_dict(lp) for lp in data.get("lps", [])
+            ]
             self._registry_by_name = {lp.name: lp for lp in self._registry}
 
             logger.info(f"Loaded {len(self._registry)} LPs from registry")

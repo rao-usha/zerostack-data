@@ -3,6 +3,7 @@ Bulk Ingestion Template Service.
 
 Provides template management and execution for multi-source data ingestion.
 """
+
 import re
 import logging
 from datetime import datetime
@@ -10,8 +11,13 @@ from typing import Dict, List, Any, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from app.core.models import (
-    IngestionTemplate, TemplateExecution, TemplateCategory,
-    IngestionJob, JobStatus, JobDependency, DependencyCondition
+    IngestionTemplate,
+    TemplateExecution,
+    TemplateCategory,
+    IngestionJob,
+    JobStatus,
+    JobDependency,
+    DependencyCondition,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,15 +40,19 @@ BUILTIN_TEMPLATES = {
                     "dataset": "acs/acs5",
                     "year": "{{year}}",
                     "variables": ["B01003_001E", "B19013_001E", "B25077_001E"],
-                    "geography": "state:*"
-                }
+                    "geography": "state:*",
+                },
             }
         ],
         "variables": {
-            "year": {"type": "integer", "default": 2022, "description": "Census data year"}
+            "year": {
+                "type": "integer",
+                "default": 2022,
+                "description": "Census data year",
+            }
         },
         "use_chain": False,
-        "parallel_execution": True
+        "parallel_execution": True,
     },
     "economic_indicators": {
         "display_name": "Economic Indicators Bundle",
@@ -55,41 +65,53 @@ BUILTIN_TEMPLATES = {
                 "config": {
                     "series_id": "GDP",
                     "observation_start": "{{start_date}}",
-                    "observation_end": "{{end_date}}"
-                }
+                    "observation_end": "{{end_date}}",
+                },
             },
             {
                 "source": "fred",
                 "config": {
                     "series_id": "UNRATE",
                     "observation_start": "{{start_date}}",
-                    "observation_end": "{{end_date}}"
-                }
+                    "observation_end": "{{end_date}}",
+                },
             },
             {
                 "source": "fred",
                 "config": {
                     "series_id": "CPIAUCSL",
                     "observation_start": "{{start_date}}",
-                    "observation_end": "{{end_date}}"
-                }
+                    "observation_end": "{{end_date}}",
+                },
             },
             {
                 "source": "bea",
                 "config": {
                     "dataset": "NIPA",
                     "table_name": "T10101",
-                    "year": "{{year}}"
-                }
-            }
+                    "year": "{{year}}",
+                },
+            },
         ],
         "variables": {
-            "start_date": {"type": "string", "default": "2020-01-01", "description": "Start date (YYYY-MM-DD)"},
-            "end_date": {"type": "string", "default": "2024-01-01", "description": "End date (YYYY-MM-DD)"},
-            "year": {"type": "integer", "default": 2023, "description": "Year for annual data"}
+            "start_date": {
+                "type": "string",
+                "default": "2020-01-01",
+                "description": "Start date (YYYY-MM-DD)",
+            },
+            "end_date": {
+                "type": "string",
+                "default": "2024-01-01",
+                "description": "End date (YYYY-MM-DD)",
+            },
+            "year": {
+                "type": "integer",
+                "default": 2023,
+                "description": "Year for annual data",
+            },
         },
         "use_chain": False,
-        "parallel_execution": True
+        "parallel_execution": True,
     },
     "energy_markets": {
         "display_name": "Energy Markets Data",
@@ -103,8 +125,8 @@ BUILTIN_TEMPLATES = {
                     "route": "petroleum/pri/spt",
                     "frequency": "daily",
                     "start": "{{start_date}}",
-                    "end": "{{end_date}}"
-                }
+                    "end": "{{end_date}}",
+                },
             },
             {
                 "source": "eia",
@@ -112,8 +134,8 @@ BUILTIN_TEMPLATES = {
                     "route": "natural-gas/pri/sum",
                     "frequency": "monthly",
                     "start": "{{start_date}}",
-                    "end": "{{end_date}}"
-                }
+                    "end": "{{end_date}}",
+                },
             },
             {
                 "source": "eia",
@@ -121,16 +143,24 @@ BUILTIN_TEMPLATES = {
                     "route": "electricity/retail-sales",
                     "frequency": "monthly",
                     "start": "{{start_date}}",
-                    "end": "{{end_date}}"
-                }
-            }
+                    "end": "{{end_date}}",
+                },
+            },
         ],
         "variables": {
-            "start_date": {"type": "string", "default": "2023-01-01", "description": "Start date"},
-            "end_date": {"type": "string", "default": "2024-01-01", "description": "End date"}
+            "start_date": {
+                "type": "string",
+                "default": "2023-01-01",
+                "description": "Start date",
+            },
+            "end_date": {
+                "type": "string",
+                "default": "2024-01-01",
+                "description": "End date",
+            },
         },
         "use_chain": False,
-        "parallel_execution": True
+        "parallel_execution": True,
     },
     "financial_sec_filings": {
         "display_name": "SEC Financial Filings",
@@ -140,35 +170,31 @@ BUILTIN_TEMPLATES = {
         "jobs_definition": [
             {
                 "source": "sec",
-                "config": {
-                    "cik": "{{cik}}",
-                    "form_type": "10-K",
-                    "limit": "{{limit}}"
-                }
+                "config": {"cik": "{{cik}}", "form_type": "10-K", "limit": "{{limit}}"},
             },
             {
                 "source": "sec",
-                "config": {
-                    "cik": "{{cik}}",
-                    "form_type": "10-Q",
-                    "limit": "{{limit}}"
-                }
+                "config": {"cik": "{{cik}}", "form_type": "10-Q", "limit": "{{limit}}"},
             },
             {
                 "source": "sec",
-                "config": {
-                    "cik": "{{cik}}",
-                    "form_type": "8-K",
-                    "limit": "{{limit}}"
-                }
-            }
+                "config": {"cik": "{{cik}}", "form_type": "8-K", "limit": "{{limit}}"},
+            },
         ],
         "variables": {
-            "cik": {"type": "string", "required": True, "description": "Company CIK number"},
-            "limit": {"type": "integer", "default": 10, "description": "Number of filings per type"}
+            "cik": {
+                "type": "string",
+                "required": True,
+                "description": "Company CIK number",
+            },
+            "limit": {
+                "type": "integer",
+                "default": 10,
+                "description": "Number of filings per type",
+            },
         },
         "use_chain": False,
-        "parallel_execution": True
+        "parallel_execution": True,
     },
     "healthcare_cms_data": {
         "display_name": "CMS Healthcare Data",
@@ -178,24 +204,22 @@ BUILTIN_TEMPLATES = {
         "jobs_definition": [
             {
                 "source": "cms",
-                "config": {
-                    "dataset": "provider-data",
-                    "state": "{{state}}"
-                }
+                "config": {"dataset": "provider-data", "state": "{{state}}"},
             },
             {
                 "source": "cms",
-                "config": {
-                    "dataset": "hospital-compare",
-                    "state": "{{state}}"
-                }
-            }
+                "config": {"dataset": "hospital-compare", "state": "{{state}}"},
+            },
         ],
         "variables": {
-            "state": {"type": "string", "default": "CA", "description": "State code (e.g., CA, NY, TX)"}
+            "state": {
+                "type": "string",
+                "default": "CA",
+                "description": "State code (e.g., CA, NY, TX)",
+            }
         },
         "use_chain": False,
-        "parallel_execution": True
+        "parallel_execution": True,
     },
     "trade_statistics": {
         "display_name": "International Trade Statistics",
@@ -208,31 +232,33 @@ BUILTIN_TEMPLATES = {
                 "config": {
                     "dataset": "timeseries/intltrade/imports/hs",
                     "year": "{{year}}",
-                    "month": "{{month}}"
-                }
+                    "month": "{{month}}",
+                },
             },
             {
                 "source": "census",
                 "config": {
                     "dataset": "timeseries/intltrade/exports/hs",
                     "year": "{{year}}",
-                    "month": "{{month}}"
-                }
+                    "month": "{{month}}",
+                },
             },
-            {
-                "source": "bts",
-                "config": {
-                    "dataset": "freight",
-                    "year": "{{year}}"
-                }
-            }
+            {"source": "bts", "config": {"dataset": "freight", "year": "{{year}}"}},
         ],
         "variables": {
-            "year": {"type": "integer", "default": 2023, "description": "Trade data year"},
-            "month": {"type": "integer", "default": 12, "description": "Trade data month (1-12)"}
+            "year": {
+                "type": "integer",
+                "default": 2023,
+                "description": "Trade data year",
+            },
+            "month": {
+                "type": "integer",
+                "default": 12,
+                "description": "Trade data month (1-12)",
+            },
         },
         "use_chain": False,
-        "parallel_execution": True
+        "parallel_execution": True,
     },
     "real_estate_market": {
         "display_name": "Real Estate Market Data",
@@ -245,16 +271,16 @@ BUILTIN_TEMPLATES = {
                 "config": {
                     "series_id": "HOUST",
                     "observation_start": "{{start_date}}",
-                    "observation_end": "{{end_date}}"
-                }
+                    "observation_end": "{{end_date}}",
+                },
             },
             {
                 "source": "fred",
                 "config": {
                     "series_id": "CSUSHPISA",
                     "observation_start": "{{start_date}}",
-                    "observation_end": "{{end_date}}"
-                }
+                    "observation_end": "{{end_date}}",
+                },
             },
             {
                 "source": "census",
@@ -262,17 +288,29 @@ BUILTIN_TEMPLATES = {
                     "dataset": "acs/acs5",
                     "year": "{{year}}",
                     "variables": ["B25077_001E", "B25064_001E"],
-                    "geography": "state:*"
-                }
-            }
+                    "geography": "state:*",
+                },
+            },
         ],
         "variables": {
-            "start_date": {"type": "string", "default": "2020-01-01", "description": "Start date"},
-            "end_date": {"type": "string", "default": "2024-01-01", "description": "End date"},
-            "year": {"type": "integer", "default": 2022, "description": "Census ACS year"}
+            "start_date": {
+                "type": "string",
+                "default": "2020-01-01",
+                "description": "Start date",
+            },
+            "end_date": {
+                "type": "string",
+                "default": "2024-01-01",
+                "description": "End date",
+            },
+            "year": {
+                "type": "integer",
+                "default": 2022,
+                "description": "Census ACS year",
+            },
         },
         "use_chain": False,
-        "parallel_execution": True
+        "parallel_execution": True,
     },
     "weather_climate": {
         "display_name": "Weather and Climate Data",
@@ -287,17 +325,29 @@ BUILTIN_TEMPLATES = {
                     "station_id": "{{station_id}}",
                     "start_date": "{{start_date}}",
                     "end_date": "{{end_date}}",
-                    "data_types": ["TMAX", "TMIN", "PRCP"]
-                }
+                    "data_types": ["TMAX", "TMIN", "PRCP"],
+                },
             }
         ],
         "variables": {
-            "station_id": {"type": "string", "default": "GHCND:USW00094728", "description": "NOAA station ID"},
-            "start_date": {"type": "string", "default": "2023-01-01", "description": "Start date"},
-            "end_date": {"type": "string", "default": "2024-01-01", "description": "End date"}
+            "station_id": {
+                "type": "string",
+                "default": "GHCND:USW00094728",
+                "description": "NOAA station ID",
+            },
+            "start_date": {
+                "type": "string",
+                "default": "2023-01-01",
+                "description": "Start date",
+            },
+            "end_date": {
+                "type": "string",
+                "default": "2024-01-01",
+                "description": "End date",
+            },
         },
         "use_chain": False,
-        "parallel_execution": True
+        "parallel_execution": True,
     },
     "sequential_analysis_pipeline": {
         "display_name": "Sequential Analysis Pipeline",
@@ -310,40 +360,53 @@ BUILTIN_TEMPLATES = {
                 "config": {
                     "series_id": "GDP",
                     "observation_start": "{{start_date}}",
-                    "observation_end": "{{end_date}}"
-                }
+                    "observation_end": "{{end_date}}",
+                },
             },
             {
                 "source": "fred",
                 "config": {
                     "series_id": "PAYEMS",
                     "observation_start": "{{start_date}}",
-                    "observation_end": "{{end_date}}"
-                }
+                    "observation_end": "{{end_date}}",
+                },
             },
             {
                 "source": "bls",
                 "config": {
                     "series_id": "LNS14000000",
                     "start_year": "{{year}}",
-                    "end_year": "{{year}}"
-                }
-            }
+                    "end_year": "{{year}}",
+                },
+            },
         ],
         "variables": {
-            "start_date": {"type": "string", "default": "2020-01-01", "description": "Start date"},
-            "end_date": {"type": "string", "default": "2024-01-01", "description": "End date"},
-            "year": {"type": "integer", "default": 2023, "description": "BLS data year"}
+            "start_date": {
+                "type": "string",
+                "default": "2020-01-01",
+                "description": "Start date",
+            },
+            "end_date": {
+                "type": "string",
+                "default": "2024-01-01",
+                "description": "End date",
+            },
+            "year": {
+                "type": "integer",
+                "default": 2023,
+                "description": "BLS data year",
+            },
         },
         "use_chain": True,
-        "parallel_execution": False
-    }
+        "parallel_execution": False,
+    },
 }
 
 
 # =============================================================================
 # Variable Substitution
 # =============================================================================
+
 
 def substitute_variables(config: Any, variables: Dict[str, Any]) -> Any:
     """
@@ -388,8 +451,7 @@ def substitute_variables(config: Any, variables: Dict[str, Any]) -> Any:
 
 
 def validate_variables(
-    template: IngestionTemplate,
-    provided_variables: Dict[str, Any]
+    template: IngestionTemplate, provided_variables: Dict[str, Any]
 ) -> Tuple[Dict[str, Any], List[str]]:
     """
     Validate and merge provided variables with template defaults.
@@ -451,6 +513,7 @@ def validate_variables(
 # Template Service
 # =============================================================================
 
+
 class TemplateService:
     """Service for managing and executing ingestion templates."""
 
@@ -459,15 +522,17 @@ class TemplateService:
 
     def get_template(self, name: str) -> Optional[IngestionTemplate]:
         """Get a template by name."""
-        return self.db.query(IngestionTemplate).filter(
-            IngestionTemplate.name == name
-        ).first()
+        return (
+            self.db.query(IngestionTemplate)
+            .filter(IngestionTemplate.name == name)
+            .first()
+        )
 
     def list_templates(
         self,
         category: Optional[TemplateCategory] = None,
         tags: Optional[List[str]] = None,
-        enabled_only: bool = True
+        enabled_only: bool = True,
     ) -> List[IngestionTemplate]:
         """List templates with optional filtering."""
         query = self.db.query(IngestionTemplate)
@@ -483,8 +548,7 @@ class TemplateService:
         # Filter by tags if specified
         if tags:
             templates = [
-                t for t in templates
-                if t.tags and any(tag in t.tags for tag in tags)
+                t for t in templates if t.tags and any(tag in t.tags for tag in tags)
             ]
 
         return templates
@@ -499,7 +563,7 @@ class TemplateService:
         tags: Optional[List[str]] = None,
         variables: Optional[Dict] = None,
         use_chain: bool = False,
-        parallel_execution: bool = True
+        parallel_execution: bool = True,
     ) -> IngestionTemplate:
         """Create a new template."""
         template = IngestionTemplate(
@@ -513,7 +577,7 @@ class TemplateService:
             use_chain=1 if use_chain else 0,
             parallel_execution=1 if parallel_execution else 0,
             is_builtin=0,
-            is_enabled=1
+            is_enabled=1,
         )
 
         self.db.add(template)
@@ -522,11 +586,7 @@ class TemplateService:
 
         return template
 
-    def update_template(
-        self,
-        name: str,
-        **updates
-    ) -> Optional[IngestionTemplate]:
+    def update_template(self, name: str, **updates) -> Optional[IngestionTemplate]:
         """Update an existing template."""
         template = self.get_template(name)
         if not template:
@@ -537,9 +597,15 @@ class TemplateService:
             raise ValueError("Cannot modify built-in templates")
 
         allowed_fields = {
-            "display_name", "description", "category", "tags",
-            "jobs_definition", "variables", "use_chain",
-            "parallel_execution", "is_enabled"
+            "display_name",
+            "description",
+            "category",
+            "tags",
+            "jobs_definition",
+            "variables",
+            "use_chain",
+            "parallel_execution",
+            "is_enabled",
         }
 
         for field, value in updates.items():
@@ -567,9 +633,7 @@ class TemplateService:
         return True
 
     def execute_template(
-        self,
-        name: str,
-        variables: Optional[Dict[str, Any]] = None
+        self, name: str, variables: Optional[Dict[str, Any]] = None
     ) -> TemplateExecution:
         """
         Execute a template, creating ingestion jobs.
@@ -606,7 +670,7 @@ class TemplateService:
             total_jobs=len(jobs_config),
             completed_jobs=0,
             successful_jobs=0,
-            failed_jobs=0
+            failed_jobs=0,
         )
         self.db.add(execution)
         self.db.flush()  # Get execution ID
@@ -624,7 +688,7 @@ class TemplateService:
                     job = IngestionJob(
                         source=job_config["source"],
                         config=job_config.get("config", {}),
-                        status=initial_status
+                        status=initial_status,
                     )
                     self.db.add(job)
                     self.db.flush()
@@ -635,7 +699,7 @@ class TemplateService:
                         dependency = JobDependency(
                             job_id=job.id,
                             depends_on_job_id=prev_job_id,
-                            condition=DependencyCondition.ON_SUCCESS
+                            condition=DependencyCondition.ON_SUCCESS,
                         )
                         self.db.add(dependency)
 
@@ -647,7 +711,7 @@ class TemplateService:
                     job = IngestionJob(
                         source=job_config["source"],
                         config=job_config.get("config", {}),
-                        status=JobStatus.PENDING
+                        status=JobStatus.PENDING,
                     )
                     self.db.add(job)
                     self.db.flush()
@@ -672,15 +736,17 @@ class TemplateService:
 
     def get_execution(self, execution_id: int) -> Optional[TemplateExecution]:
         """Get a template execution by ID."""
-        return self.db.query(TemplateExecution).filter(
-            TemplateExecution.id == execution_id
-        ).first()
+        return (
+            self.db.query(TemplateExecution)
+            .filter(TemplateExecution.id == execution_id)
+            .first()
+        )
 
     def list_executions(
         self,
         template_name: Optional[str] = None,
         status: Optional[str] = None,
-        limit: int = 50
+        limit: int = 50,
     ) -> List[TemplateExecution]:
         """List template executions."""
         query = self.db.query(TemplateExecution)
@@ -707,9 +773,11 @@ class TemplateService:
             return execution
 
         # Query job statuses
-        jobs = self.db.query(IngestionJob).filter(
-            IngestionJob.id.in_(execution.job_ids)
-        ).all()
+        jobs = (
+            self.db.query(IngestionJob)
+            .filter(IngestionJob.id.in_(execution.job_ids))
+            .all()
+        )
 
         completed = 0
         successful = 0
@@ -749,6 +817,7 @@ class TemplateService:
 # Initialization
 # =============================================================================
 
+
 def init_builtin_templates(db: Session) -> int:
     """
     Initialize database with built-in templates.
@@ -761,9 +830,9 @@ def init_builtin_templates(db: Session) -> int:
     created = 0
 
     for name, config in BUILTIN_TEMPLATES.items():
-        existing = db.query(IngestionTemplate).filter(
-            IngestionTemplate.name == name
-        ).first()
+        existing = (
+            db.query(IngestionTemplate).filter(IngestionTemplate.name == name).first()
+        )
 
         if not existing:
             template = IngestionTemplate(
@@ -777,7 +846,7 @@ def init_builtin_templates(db: Session) -> int:
                 use_chain=1 if config["use_chain"] else 0,
                 parallel_execution=1 if config["parallel_execution"] else 0,
                 is_builtin=1,
-                is_enabled=1
+                is_enabled=1,
             )
             db.add(template)
             created += 1

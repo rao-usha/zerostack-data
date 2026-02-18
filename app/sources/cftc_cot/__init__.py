@@ -8,6 +8,7 @@ Provides weekly positioning data for futures markets:
 
 No API key required - public data.
 """
+
 from .client import CFTCCOTClient, MAJOR_CONTRACTS
 from .metadata import (
     generate_table_name,
@@ -28,14 +29,12 @@ __all__ = [
     # Client
     "CFTCCOTClient",
     "MAJOR_CONTRACTS",
-    
     # Metadata
     "generate_table_name",
     "generate_create_table_sql",
     "parse_cot_record",
     "COMMODITY_GROUPS",
     "categorize_contract",
-    
     # Ingestion
     "ingest_cot_legacy",
     "ingest_cot_disaggregated",

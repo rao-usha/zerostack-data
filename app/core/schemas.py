@@ -1,6 +1,7 @@
 """
 Pydantic schemas for API requests and responses.
 """
+
 from datetime import datetime
 from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator
@@ -9,17 +10,15 @@ from app.core.models import JobStatus
 
 class JobCreate(BaseModel):
     """Request schema for creating a new ingestion job."""
+
     source: str = Field(
         ...,
         description="Data source identifier (e.g., 'census', 'bls')",
         min_length=1,
-        max_length=50
+        max_length=50,
     )
-    config: Dict[str, Any] = Field(
-        ...,
-        description="Source-specific configuration"
-    )
-    
+    config: Dict[str, Any] = Field(..., description="Source-specific configuration")
+
     @field_validator("source")
     @classmethod
     def validate_source(cls, v: str) -> str:
@@ -33,6 +32,7 @@ class JobCreate(BaseModel):
 
 class JobResponse(BaseModel):
     """Response schema for job information."""
+
     id: int
     source: str
     status: JobStatus
@@ -58,6 +58,7 @@ class JobResponse(BaseModel):
 
 class DatasetInfo(BaseModel):
     """Response schema for dataset metadata."""
+
     id: int
     source: str
     dataset_id: str
@@ -67,6 +68,5 @@ class DatasetInfo(BaseModel):
     source_metadata: Optional[Dict[str, Any]] = None
     created_at: datetime
     last_updated_at: datetime
-    
-    model_config = {"from_attributes": True}
 
+    model_config = {"from_attributes": True}

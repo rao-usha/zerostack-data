@@ -9,6 +9,7 @@ Matches 3PL companies to FMCSA motor carrier records to enrich:
 
 First checks local motor_carrier table, then falls back to FMCSA web API.
 """
+
 import asyncio
 import logging
 import re
@@ -20,7 +21,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import ThreePLCompany, MotorCarrier
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -28,11 +33,30 @@ logger = logging.getLogger(__name__)
 
 # Words to strip from company names for fuzzy matching
 STRIP_WORDS = {
-    "inc", "llc", "corp", "corporation", "company", "co", "ltd",
-    "worldwide", "international", "intl", "group", "holdings",
-    "services", "logistics", "transport", "transportation",
-    "freight", "express", "lines", "system", "systems",
-    "the", "of", "and",
+    "inc",
+    "llc",
+    "corp",
+    "corporation",
+    "company",
+    "co",
+    "ltd",
+    "worldwide",
+    "international",
+    "intl",
+    "group",
+    "holdings",
+    "services",
+    "logistics",
+    "transport",
+    "transportation",
+    "freight",
+    "express",
+    "lines",
+    "system",
+    "systems",
+    "the",
+    "of",
+    "and",
 }
 
 
@@ -97,9 +121,9 @@ class ThreePLFMCSAEnrichmentCollector(BaseCollector):
                 )
 
             # Load all motor carriers from local DB
-            motor_carriers = self.db.query(MotorCarrier).filter(
-                MotorCarrier.is_active == True
-            ).all()
+            motor_carriers = (
+                self.db.query(MotorCarrier).filter(MotorCarrier.is_active == True).all()
+            )
 
             logger.info(
                 f"Cross-referencing {len(three_pl_companies)} 3PLs "
@@ -134,17 +158,21 @@ class ThreePLFMCSAEnrichmentCollector(BaseCollector):
                         match = await self._query_fmcsa_api(company.company_name)
 
                     if match:
-                        record = self._build_enrichment_record(company.company_name, match)
+                        record = self._build_enrichment_record(
+                            company.company_name, match
+                        )
                         if record:
                             records.append(record)
                             matched_count += 1
 
                 except Exception as e:
                     logger.debug(f"FMCSA match failed for {company.company_name}: {e}")
-                    errors.append({
-                        "company": company.company_name,
-                        "error": str(e),
-                    })
+                    errors.append(
+                        {
+                            "company": company.company_name,
+                            "error": str(e),
+                        }
+                    )
 
             logger.info(
                 f"Matched {matched_count}/{len(three_pl_companies)} companies to FMCSA records"
@@ -156,9 +184,13 @@ class ThreePLFMCSAEnrichmentCollector(BaseCollector):
                     records,
                     unique_columns=["company_name"],
                     update_columns=[
-                        "headquarters_city", "headquarters_state",
-                        "is_asset_based", "has_cold_chain", "has_hazmat",
-                        "source", "collected_at",
+                        "headquarters_city",
+                        "headquarters_state",
+                        "is_asset_based",
+                        "has_cold_chain",
+                        "has_hazmat",
+                        "source",
+                        "collected_at",
                     ],
                 )
 
@@ -228,6 +260,7 @@ class ThreePLFMCSAEnrichmentCollector(BaseCollector):
         try:
             # URL-encode the company name
             import urllib.parse
+
             encoded_name = urllib.parse.quote(company_name)
 
             await self.apply_rate_limit()

@@ -3,6 +3,7 @@ USPTO PatentsView ingestion orchestration.
 
 High-level functions that coordinate data fetching, table creation, and data loading.
 """
+
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
@@ -140,7 +141,7 @@ class USPTOIngestor(BaseSourceIngestor):
             "assignees_json": json.dumps(patent_data.get("assignees", [])),
             "cpc_codes_json": json.dumps(patent_data.get("cpc_current", [])),
             "ingested_at": datetime.utcnow(),
-            "source_api": "patentsview"
+            "source_api": "patentsview",
         }
 
     def _transform_inventor(self, inventor_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -155,7 +156,7 @@ class USPTOIngestor(BaseSourceIngestor):
             "patent_count": inventor_data.get("inventor_total_num_patents"),
             "first_patent_date": inventor_data.get("inventor_first_seen_date"),
             "last_patent_date": inventor_data.get("inventor_last_seen_date"),
-            "ingested_at": datetime.utcnow()
+            "ingested_at": datetime.utcnow(),
         }
 
     def _transform_assignee(self, assignee_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -172,7 +173,7 @@ class USPTOIngestor(BaseSourceIngestor):
             "patent_count": assignee_data.get("assignee_total_num_patents"),
             "first_patent_date": assignee_data.get("assignee_first_seen_date"),
             "last_patent_date": assignee_data.get("assignee_last_seen_date"),
-            "ingested_at": datetime.utcnow()
+            "ingested_at": datetime.utcnow(),
         }
 
     async def ingest_patents_by_assignee(
@@ -181,7 +182,7 @@ class USPTOIngestor(BaseSourceIngestor):
         assignee_name: str,
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
-        max_patents: int = 1000
+        max_patents: int = 1000,
     ) -> Dict[str, Any]:
         """
         Ingest all patents for an assignee.
@@ -200,7 +201,7 @@ class USPTOIngestor(BaseSourceIngestor):
             api_key=self.api_key,
             max_concurrency=self.settings.max_concurrency,
             max_retries=self.settings.max_retries,
-            backoff_factor=self.settings.retry_backoff_factor
+            backoff_factor=self.settings.retry_backoff_factor,
         )
 
         try:
@@ -212,7 +213,9 @@ class USPTOIngestor(BaseSourceIngestor):
 
             # 3. Validate dates if provided
             if date_from and not metadata.validate_date_format(date_from):
-                raise ValueError(f"Invalid date_from format: {date_from}. Use YYYY-MM-DD")
+                raise ValueError(
+                    f"Invalid date_from format: {date_from}. Use YYYY-MM-DD"
+                )
             if date_to and not metadata.validate_date_format(date_to):
                 raise ValueError(f"Invalid date_to format: {date_to}. Use YYYY-MM-DD")
 
@@ -231,7 +234,7 @@ class USPTOIngestor(BaseSourceIngestor):
                         date_from=date_from,
                         date_to=date_to,
                         size=batch_size,
-                        after=after_cursor
+                        after=after_cursor,
                     )
 
                     patents = response.get("patents", [])
@@ -260,7 +263,7 @@ class USPTOIngestor(BaseSourceIngestor):
                     "uspto_patents",
                     rows,
                     conflict_columns=["patent_id"],
-                    update_on_conflict=True
+                    update_on_conflict=True,
                 )
                 rows_inserted = result.inserted_count
             else:
@@ -274,7 +277,7 @@ class USPTOIngestor(BaseSourceIngestor):
                 "assignee": assignee_name,
                 "patents_found": len(all_patents),
                 "rows_inserted": rows_inserted,
-                "table": "uspto_patents"
+                "table": "uspto_patents",
             }
 
         except Exception as e:
@@ -291,7 +294,7 @@ class USPTOIngestor(BaseSourceIngestor):
         cpc_code: str,
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
-        max_patents: int = 1000
+        max_patents: int = 1000,
     ) -> Dict[str, Any]:
         """
         Ingest patents by CPC classification code.
@@ -310,7 +313,7 @@ class USPTOIngestor(BaseSourceIngestor):
             api_key=self.api_key,
             max_concurrency=self.settings.max_concurrency,
             max_retries=self.settings.max_retries,
-            backoff_factor=self.settings.retry_backoff_factor
+            backoff_factor=self.settings.retry_backoff_factor,
         )
 
         try:
@@ -335,7 +338,7 @@ class USPTOIngestor(BaseSourceIngestor):
                         date_from=date_from,
                         date_to=date_to,
                         size=batch_size,
-                        after=after_cursor
+                        after=after_cursor,
                     )
 
                     patents = response.get("patents", [])
@@ -362,7 +365,7 @@ class USPTOIngestor(BaseSourceIngestor):
                     "uspto_patents",
                     rows,
                     conflict_columns=["patent_id"],
-                    update_on_conflict=True
+                    update_on_conflict=True,
                 )
                 rows_inserted = result.inserted_count
             else:
@@ -377,7 +380,7 @@ class USPTOIngestor(BaseSourceIngestor):
                 "cpc_description": metadata.get_cpc_class_description(cpc_code),
                 "patents_found": len(all_patents),
                 "rows_inserted": rows_inserted,
-                "table": "uspto_patents"
+                "table": "uspto_patents",
             }
 
         except Exception as e:
@@ -394,7 +397,7 @@ class USPTOIngestor(BaseSourceIngestor):
         search_query: str,
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
-        max_patents: int = 1000
+        max_patents: int = 1000,
     ) -> Dict[str, Any]:
         """
         Ingest patents by text search.
@@ -413,7 +416,7 @@ class USPTOIngestor(BaseSourceIngestor):
             api_key=self.api_key,
             max_concurrency=self.settings.max_concurrency,
             max_retries=self.settings.max_retries,
-            backoff_factor=self.settings.retry_backoff_factor
+            backoff_factor=self.settings.retry_backoff_factor,
         )
 
         try:
@@ -425,10 +428,12 @@ class USPTOIngestor(BaseSourceIngestor):
 
             # 2. Build query
             conditions = [
-                {"_or": [
-                    {"patent_title": {"_text_any": search_query}},
-                    {"patent_abstract": {"_text_any": search_query}}
-                ]}
+                {
+                    "_or": [
+                        {"patent_title": {"_text_any": search_query}},
+                        {"patent_abstract": {"_text_any": search_query}},
+                    ]
+                }
             ]
 
             if date_from:
@@ -450,7 +455,7 @@ class USPTOIngestor(BaseSourceIngestor):
                         query=query,
                         fields=metadata.DEFAULT_PATENT_FIELDS,
                         size=batch_size,
-                        after=after_cursor
+                        after=after_cursor,
                     )
 
                     patents = response.get("patents", [])
@@ -467,7 +472,9 @@ class USPTOIngestor(BaseSourceIngestor):
                     if not after_cursor:
                         break
 
-            logger.info(f"Fetched {len(all_patents)} patents for search '{search_query}'")
+            logger.info(
+                f"Fetched {len(all_patents)} patents for search '{search_query}'"
+            )
 
             # 4. Transform and insert
             if all_patents:
@@ -477,7 +484,7 @@ class USPTOIngestor(BaseSourceIngestor):
                     "uspto_patents",
                     rows,
                     conflict_columns=["patent_id"],
-                    update_on_conflict=True
+                    update_on_conflict=True,
                 )
                 rows_inserted = result.inserted_count
             else:
@@ -491,7 +498,7 @@ class USPTOIngestor(BaseSourceIngestor):
                 "search_query": search_query,
                 "patents_found": len(all_patents),
                 "rows_inserted": rows_inserted,
-                "table": "uspto_patents"
+                "table": "uspto_patents",
             }
 
         except Exception as e:
@@ -505,6 +512,7 @@ class USPTOIngestor(BaseSourceIngestor):
 
 # Convenience functions for use in API endpoints
 
+
 async def ingest_patents_by_assignee(
     db: Session,
     job_id: int,
@@ -512,7 +520,7 @@ async def ingest_patents_by_assignee(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     max_patents: int = 1000,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Convenience wrapper for ingesting patents by assignee."""
     ingestor = USPTOIngestor(db, api_key=api_key)
@@ -521,7 +529,7 @@ async def ingest_patents_by_assignee(
         assignee_name=assignee_name,
         date_from=date_from,
         date_to=date_to,
-        max_patents=max_patents
+        max_patents=max_patents,
     )
 
 
@@ -532,7 +540,7 @@ async def ingest_patents_by_cpc(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     max_patents: int = 1000,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Convenience wrapper for ingesting patents by CPC code."""
     ingestor = USPTOIngestor(db, api_key=api_key)
@@ -541,7 +549,7 @@ async def ingest_patents_by_cpc(
         cpc_code=cpc_code,
         date_from=date_from,
         date_to=date_to,
-        max_patents=max_patents
+        max_patents=max_patents,
     )
 
 
@@ -552,7 +560,7 @@ async def ingest_patents_by_search(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     max_patents: int = 1000,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Convenience wrapper for ingesting patents by search query."""
     ingestor = USPTOIngestor(db, api_key=api_key)
@@ -561,5 +569,5 @@ async def ingest_patents_by_search(
         search_query=search_query,
         date_from=date_from,
         date_to=date_to,
-        max_patents=max_patents
+        max_patents=max_patents,
     )

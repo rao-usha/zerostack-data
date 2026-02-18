@@ -7,6 +7,7 @@ Provides reusable logic for:
 - Job status tracking
 - Common ingestion patterns
 """
+
 import logging
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List, Type
@@ -18,7 +19,7 @@ from app.core.models import DatasetRegistry, IngestionJob, JobStatus
 from app.core.batch_operations import (
     batch_insert,
     BatchInsertResult,
-    create_table_if_not_exists
+    create_table_if_not_exists,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ class BaseSourceIngestor(ABC):
         create_sql: str,
         display_name: Optional[str] = None,
         description: Optional[str] = None,
-        source_metadata: Optional[Dict[str, Any]] = None
+        source_metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Prepare database table for ingestion.
@@ -89,14 +90,14 @@ class BaseSourceIngestor(ABC):
                 table_name=table_name,
                 display_name=display_name,
                 description=description,
-                source_metadata=source_metadata
+                source_metadata=source_metadata,
             )
 
             return {
                 "table_name": table_name,
                 "dataset_id": dataset_id,
                 "created": created,
-                "source": self.SOURCE_NAME
+                "source": self.SOURCE_NAME,
             }
 
         except Exception as e:
@@ -109,7 +110,7 @@ class BaseSourceIngestor(ABC):
         table_name: str,
         display_name: Optional[str] = None,
         description: Optional[str] = None,
-        source_metadata: Optional[Dict[str, Any]] = None
+        source_metadata: Optional[Dict[str, Any]] = None,
     ) -> DatasetRegistry:
         """
         Create or update dataset registry entry.
@@ -124,9 +125,11 @@ class BaseSourceIngestor(ABC):
         Returns:
             DatasetRegistry instance
         """
-        existing = self.db.query(DatasetRegistry).filter(
-            DatasetRegistry.table_name == table_name
-        ).first()
+        existing = (
+            self.db.query(DatasetRegistry)
+            .filter(DatasetRegistry.table_name == table_name)
+            .first()
+        )
 
         if existing:
             logger.debug(f"Updating existing dataset registry: {dataset_id}")
@@ -147,7 +150,7 @@ class BaseSourceIngestor(ABC):
                 table_name=table_name,
                 display_name=display_name or dataset_id,
                 description=description,
-                source_metadata=source_metadata or {}
+                source_metadata=source_metadata or {},
             )
             self.db.add(entry)
             self.db.commit()
@@ -159,7 +162,7 @@ class BaseSourceIngestor(ABC):
         status: JobStatus,
         rows_inserted: Optional[int] = None,
         error_message: Optional[str] = None,
-        error_details: Optional[Dict[str, Any]] = None
+        error_details: Optional[Dict[str, Any]] = None,
     ) -> Optional[IngestionJob]:
         """
         Update ingestion job status.
@@ -206,7 +209,7 @@ class BaseSourceIngestor(ABC):
         job_id: int,
         rows_inserted: int,
         require_rows: bool = False,
-        warn_on_empty: bool = True
+        warn_on_empty: bool = True,
     ) -> Optional[IngestionJob]:
         """
         Mark job as successfully completed.
@@ -227,29 +230,27 @@ class BaseSourceIngestor(ABC):
                     job_id,
                     JobStatus.FAILED,
                     rows_inserted=0,
-                    error_message="Ingestion completed but no rows were inserted"
+                    error_message="Ingestion completed but no rows were inserted",
                 )
             elif warn_on_empty:
                 logger.warning(f"Job {job_id}: Completed with 0 rows inserted")
 
         return self.update_job_status(
-            job_id,
-            JobStatus.SUCCESS,
-            rows_inserted=rows_inserted
+            job_id, JobStatus.SUCCESS, rows_inserted=rows_inserted
         )
 
     def fail_job(
         self,
         job_id: int,
         error: Exception,
-        error_details: Optional[Dict[str, Any]] = None
+        error_details: Optional[Dict[str, Any]] = None,
     ) -> Optional[IngestionJob]:
         """Mark job as failed."""
         return self.update_job_status(
             job_id,
             JobStatus.FAILED,
             error_message=str(error),
-            error_details=error_details or {"exception_type": type(error).__name__}
+            error_details=error_details or {"exception_type": type(error).__name__},
         )
 
     def insert_rows(
@@ -259,7 +260,7 @@ class BaseSourceIngestor(ABC):
         columns: List[str],
         conflict_columns: Optional[List[str]] = None,
         update_columns: Optional[List[str]] = None,
-        batch_size: int = 1000
+        batch_size: int = 1000,
     ) -> BatchInsertResult:
         """
         Insert rows into table using batch operations.
@@ -290,7 +291,7 @@ class BaseSourceIngestor(ABC):
             columns=columns,
             batch_size=batch_size,
             conflict_columns=conflict_columns,
-            update_columns=update_columns
+            update_columns=update_columns,
         )
 
 
@@ -316,7 +317,7 @@ class SimpleIngestor(BaseSourceIngestor):
         display_name: Optional[str] = None,
         description: Optional[str] = None,
         source_metadata: Optional[Dict[str, Any]] = None,
-        batch_size: int = 1000
+        batch_size: int = 1000,
     ) -> Dict[str, Any]:
         """
         Run a complete ingestion workflow.
@@ -350,7 +351,7 @@ class SimpleIngestor(BaseSourceIngestor):
                 create_sql=create_sql,
                 display_name=display_name,
                 description=description,
-                source_metadata=source_metadata
+                source_metadata=source_metadata,
             )
 
             # 3. Fetch data
@@ -368,7 +369,7 @@ class SimpleIngestor(BaseSourceIngestor):
                 columns=columns,
                 conflict_columns=conflict_columns,
                 update_columns=update_columns,
-                batch_size=batch_size
+                batch_size=batch_size,
             )
 
             # 6. Complete job
@@ -380,7 +381,7 @@ class SimpleIngestor(BaseSourceIngestor):
                 "dataset_id": dataset_id,
                 "rows_inserted": result.rows_inserted,
                 "batches_processed": result.batches_processed,
-                "duration_seconds": result.duration_seconds
+                "duration_seconds": result.duration_seconds,
             }
 
         except Exception as e:
@@ -390,9 +391,7 @@ class SimpleIngestor(BaseSourceIngestor):
 
 
 def create_ingestion_job(
-    db: Session,
-    source: str,
-    config: Dict[str, Any]
+    db: Session, source: str, config: Dict[str, Any]
 ) -> IngestionJob:
     """
     Create a new ingestion job.
@@ -405,11 +404,7 @@ def create_ingestion_job(
     Returns:
         Created IngestionJob
     """
-    job = IngestionJob(
-        source=source,
-        status=JobStatus.PENDING,
-        config=config
-    )
+    job = IngestionJob(source=source, status=JobStatus.PENDING, config=config)
     db.add(job)
     db.commit()
     db.refresh(job)

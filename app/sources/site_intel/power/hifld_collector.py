@@ -10,6 +10,7 @@ ArcGIS REST API: Query endpoint with JSON output.
 
 No API key required - public data.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -19,7 +20,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import Substation
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -74,9 +79,13 @@ class HIFLDInfraCollector(BaseCollector):
             total_inserted += substations_result.get("inserted", 0)
             total_processed += substations_result.get("processed", 0)
             if substations_result.get("error"):
-                errors.append({"source": "substations", "error": substations_result["error"]})
+                errors.append(
+                    {"source": "substations", "error": substations_result["error"]}
+                )
 
-            status = CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            status = (
+                CollectionStatus.SUCCESS if not errors else CollectionStatus.PARTIAL
+            )
 
             return self.create_result(
                 status=status,
@@ -131,14 +140,20 @@ class HIFLDInfraCollector(BaseCollector):
                     break
 
                 all_substations.extend(features)
-                logger.info(f"Fetched {len(features)} substation records (total: {len(all_substations)})")
+                logger.info(
+                    f"Fetched {len(features)} substation records (total: {len(all_substations)})"
+                )
 
                 # Check if we've reached the end
                 if len(features) < page_size:
                     break
 
                 offset += page_size
-                self.update_progress(len(all_substations), len(all_substations) + page_size, "Fetching substations")
+                self.update_progress(
+                    len(all_substations),
+                    len(all_substations) + page_size,
+                    "Fetching substations",
+                )
 
             # Transform records
             records = []
@@ -154,9 +169,18 @@ class HIFLDInfraCollector(BaseCollector):
                     records,
                     unique_columns=["hifld_id"],
                     update_columns=[
-                        "name", "state", "county", "city", "latitude", "longitude",
-                        "max_voltage_kv", "min_voltage_kv", "owner",
-                        "substation_type", "status", "collected_at"
+                        "name",
+                        "state",
+                        "county",
+                        "city",
+                        "latitude",
+                        "longitude",
+                        "max_voltage_kv",
+                        "min_voltage_kv",
+                        "owner",
+                        "substation_type",
+                        "status",
+                        "collected_at",
                     ],
                 )
                 return {"processed": len(all_substations), "inserted": inserted}
@@ -167,7 +191,9 @@ class HIFLDInfraCollector(BaseCollector):
             logger.error(f"Failed to collect substations: {e}", exc_info=True)
             return {"processed": 0, "inserted": 0, "error": str(e)}
 
-    def _transform_substation(self, feature: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _transform_substation(
+        self, feature: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """Transform HIFLD substation feature to database format."""
         attrs = feature.get("attributes", {})
         geometry = feature.get("geometry", {})
@@ -207,7 +233,9 @@ class HIFLDInfraCollector(BaseCollector):
 
         return {
             "hifld_id": str(hifld_id),
-            "name": attrs.get("NAME") or attrs.get("SUBSTATIO") or f"Substation {hifld_id}",
+            "name": attrs.get("NAME")
+            or attrs.get("SUBSTATIO")
+            or f"Substation {hifld_id}",
             "state": attrs.get("STATE") or attrs.get("STATEABBR"),
             "county": attrs.get("COUNTY"),
             "city": attrs.get("CITY"),
@@ -215,7 +243,9 @@ class HIFLDInfraCollector(BaseCollector):
             "longitude": lng,
             "max_voltage_kv": max_voltage,
             "min_voltage_kv": min_voltage,
-            "owner": attrs.get("OWNER") or attrs.get("UTILITY") or attrs.get("OPERATOR"),
+            "owner": attrs.get("OWNER")
+            or attrs.get("UTILITY")
+            or attrs.get("OPERATOR"),
             "substation_type": sub_type,
             "status": attrs.get("STATUS") or "operational",
             "source": "hifld",
@@ -240,7 +270,7 @@ class HIFLDInfraCollector(BaseCollector):
         url: str,
         params: Optional[Dict] = None,
         use_base_url: bool = True,
-        **kwargs
+        **kwargs,
     ) -> Dict:
         """
         Fetch JSON from URL, with option to skip base URL.

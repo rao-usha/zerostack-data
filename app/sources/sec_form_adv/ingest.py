@@ -103,7 +103,7 @@ class FormADVIngestionService:
             "advisers_found": 0,
             "advisers_ingested": 0,
             "advisers_skipped": 0,
-            "errors": []
+            "errors": [],
         }
 
         sample_advisers = self.client.get_sample_advisers()
@@ -119,7 +119,9 @@ class FormADVIngestionService:
                 result["advisers_ingested"] += 1
 
             except Exception as e:
-                result["errors"].append(f"Error storing {adviser.get('legal_name')}: {str(e)}")
+                result["errors"].append(
+                    f"Error storing {adviser.get('legal_name')}: {str(e)}"
+                )
 
         return result
 
@@ -157,31 +159,40 @@ class FormADVIngestionService:
                 discretionary_aum = EXCLUDED.discretionary_aum
         """)
 
-        non_disc = adviser.get("regulatory_aum", 0) - adviser.get("discretionary_aum", 0)
+        non_disc = adviser.get("regulatory_aum", 0) - adviser.get(
+            "discretionary_aum", 0
+        )
         if non_disc < 0:
             non_disc = 0
 
-        self.db.execute(insert_sql, {
-            "crd_number": adviser.get("crd_number"),
-            "sec_number": adviser.get("sec_number"),
-            "legal_name": adviser.get("legal_name"),
-            "dba_name": adviser.get("dba_name"),
-            "main_office_city": adviser.get("main_office_city"),
-            "main_office_state": adviser.get("main_office_state"),
-            "regulatory_aum": adviser.get("regulatory_aum"),
-            "discretionary_aum": adviser.get("discretionary_aum"),
-            "non_discretionary_aum": non_disc,
-            "total_employees": adviser.get("total_employees"),
-            "employees_investment_advisory": adviser.get("employees_investment_advisory"),
-            "sec_registered": adviser.get("sec_registered", True),
-            "form_of_organization": adviser.get("form_of_organization"),
-            "pct_individuals": adviser.get("pct_individuals", 0),
-            "pct_high_net_worth": adviser.get("pct_high_net_worth", 0),
-            "pct_pension_plans": adviser.get("pct_pension_plans", 0),
-            "pct_pooled_investment_vehicles": adviser.get("pct_pooled_investment_vehicles", 0),
-            "pct_other": adviser.get("pct_other", 0),
-            "data_source": "sample",
-        })
+        self.db.execute(
+            insert_sql,
+            {
+                "crd_number": adviser.get("crd_number"),
+                "sec_number": adviser.get("sec_number"),
+                "legal_name": adviser.get("legal_name"),
+                "dba_name": adviser.get("dba_name"),
+                "main_office_city": adviser.get("main_office_city"),
+                "main_office_state": adviser.get("main_office_state"),
+                "regulatory_aum": adviser.get("regulatory_aum"),
+                "discretionary_aum": adviser.get("discretionary_aum"),
+                "non_discretionary_aum": non_disc,
+                "total_employees": adviser.get("total_employees"),
+                "employees_investment_advisory": adviser.get(
+                    "employees_investment_advisory"
+                ),
+                "sec_registered": adviser.get("sec_registered", True),
+                "form_of_organization": adviser.get("form_of_organization"),
+                "pct_individuals": adviser.get("pct_individuals", 0),
+                "pct_high_net_worth": adviser.get("pct_high_net_worth", 0),
+                "pct_pension_plans": adviser.get("pct_pension_plans", 0),
+                "pct_pooled_investment_vehicles": adviser.get(
+                    "pct_pooled_investment_vehicles", 0
+                ),
+                "pct_other": adviser.get("pct_other", 0),
+                "data_source": "sample",
+            },
+        )
         self.db.commit()
 
     def search_advisers(
@@ -191,7 +202,7 @@ class FormADVIngestionService:
         min_aum: Optional[int] = None,
         max_aum: Optional[int] = None,
         limit: int = 50,
-        offset: int = 0
+        offset: int = 0,
     ) -> Dict[str, Any]:
         """
         Search advisers in database.
@@ -221,7 +232,9 @@ class FormADVIngestionService:
         where_clause = " AND ".join(conditions)
 
         # Get total count
-        count_query = text(f"SELECT COUNT(*) FROM form_adv_advisers WHERE {where_clause}")
+        count_query = text(
+            f"SELECT COUNT(*) FROM form_adv_advisers WHERE {where_clause}"
+        )
         total = self.db.execute(count_query, params).scalar()
 
         # Get advisers
@@ -239,24 +252,23 @@ class FormADVIngestionService:
         result = self.db.execute(query, params)
         advisers = []
         for row in result.mappings():
-            advisers.append({
-                "crd_number": row["crd_number"],
-                "sec_number": row["sec_number"],
-                "legal_name": row["legal_name"],
-                "dba_name": row["dba_name"],
-                "location": f"{row['main_office_city']}, {row['main_office_state']}" if row["main_office_city"] else row["main_office_state"],
-                "regulatory_aum": row["regulatory_aum"],
-                "discretionary_aum": row["discretionary_aum"],
-                "total_employees": row["total_employees"],
-                "form_of_organization": row["form_of_organization"],
-            })
+            advisers.append(
+                {
+                    "crd_number": row["crd_number"],
+                    "sec_number": row["sec_number"],
+                    "legal_name": row["legal_name"],
+                    "dba_name": row["dba_name"],
+                    "location": f"{row['main_office_city']}, {row['main_office_state']}"
+                    if row["main_office_city"]
+                    else row["main_office_state"],
+                    "regulatory_aum": row["regulatory_aum"],
+                    "discretionary_aum": row["discretionary_aum"],
+                    "total_employees": row["total_employees"],
+                    "form_of_organization": row["form_of_organization"],
+                }
+            )
 
-        return {
-            "total": total,
-            "limit": limit,
-            "offset": offset,
-            "advisers": advisers
-        }
+        return {"total": total, "limit": limit, "offset": offset, "advisers": advisers}
 
     def get_adviser(self, crd_number: str) -> Optional[Dict]:
         """Get a specific adviser by CRD number."""
@@ -301,7 +313,7 @@ class FormADVIngestionService:
                     "corporations": row["pct_corporations"],
                     "state_municipal": row["pct_state_municipal"],
                     "other": row["pct_other"],
-                }
+                },
             },
             "employees": {
                 "total": row["total_employees"],
@@ -310,7 +322,9 @@ class FormADVIngestionService:
             },
             "registration": {
                 "sec_registered": row["sec_registered"],
-                "registration_date": row["registration_date"].isoformat() if row["registration_date"] else None,
+                "registration_date": row["registration_date"].isoformat()
+                if row["registration_date"]
+                else None,
                 "form_of_organization": row["form_of_organization"],
                 "state_of_organization": row["state_of_organization"],
             },
@@ -339,16 +353,18 @@ class FormADVIngestionService:
         result = self.db.execute(query, {"limit": limit})
         rankings = []
         for i, row in enumerate(result.mappings()):
-            rankings.append({
-                "rank": i + 1,
-                "crd_number": row["crd_number"],
-                "legal_name": row["legal_name"],
-                "dba_name": row["dba_name"],
-                "state": row["main_office_state"],
-                "regulatory_aum": row["regulatory_aum"],
-                "discretionary_aum": row["discretionary_aum"],
-                "total_employees": row["total_employees"],
-            })
+            rankings.append(
+                {
+                    "rank": i + 1,
+                    "crd_number": row["crd_number"],
+                    "legal_name": row["legal_name"],
+                    "dba_name": row["dba_name"],
+                    "state": row["main_office_state"],
+                    "regulatory_aum": row["regulatory_aum"],
+                    "discretionary_aum": row["discretionary_aum"],
+                    "total_employees": row["total_employees"],
+                }
+            )
 
         # Get totals
         totals_query = text("""
@@ -405,8 +421,13 @@ class FormADVIngestionService:
             "average_aum": int(result["avg_aum"]) if result["avg_aum"] else 0,
             "total_employees": result["total_employees"],
             "states_represented": result["states_represented"],
-            "by_state": [{"state": r["state"], "count": r["count"], "aum": r["total_aum"]} for r in states],
-            "by_organization": [{"type": r["org_type"], "count": r["count"]} for r in orgs],
+            "by_state": [
+                {"state": r["state"], "count": r["count"], "aum": r["total_aum"]}
+                for r in states
+            ],
+            "by_organization": [
+                {"type": r["org_type"], "count": r["count"]} for r in orgs
+            ],
         }
 
     def get_by_state(self, state: Optional[str] = None) -> Dict[str, Any]:
@@ -424,7 +445,7 @@ class FormADVIngestionService:
             return {
                 "state": state.upper(),
                 "count": len(advisers),
-                "advisers": advisers
+                "advisers": advisers,
             }
 
         # All states summary
@@ -438,10 +459,9 @@ class FormADVIngestionService:
             ORDER BY count DESC
         """)
         result = self.db.execute(query)
-        states = [{"state": r["state"], "count": r["count"], "total_aum": r["total_aum"]}
-                  for r in result.mappings()]
+        states = [
+            {"state": r["state"], "count": r["count"], "total_aum": r["total_aum"]}
+            for r in result.mappings()
+        ]
 
-        return {
-            "total_states": len(states),
-            "states": states
-        }
+        return {"total_states": len(states), "states": states}

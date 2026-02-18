@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SimilarInvestor:
     """A similar investor with similarity metrics."""
+
     investor_id: int
     investor_type: str
     name: str
@@ -31,6 +32,7 @@ class SimilarInvestor:
 @dataclass
 class CompanyRecommendation:
     """A recommended company based on similar investor holdings."""
+
     company_name: str
     company_industry: Optional[str]
     held_by_count: int
@@ -41,6 +43,7 @@ class CompanyRecommendation:
 @dataclass
 class PortfolioOverlap:
     """Overlap analysis between two investor portfolios."""
+
     investor_a_id: int
     investor_a_name: str
     investor_a_holdings: int
@@ -69,11 +72,14 @@ class RecommendationEngine:
 
     def get_investor_info(self, investor_id: int) -> Optional[Dict[str, Any]]:
         """Get basic investor information."""
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             SELECT id, name, lp_type, jurisdiction
             FROM lp_fund
             WHERE id = :investor_id
-        """), {"investor_id": investor_id})
+        """),
+            {"investor_id": investor_id},
+        )
 
         row = result.fetchone()
         if not row:
@@ -83,18 +89,21 @@ class RecommendationEngine:
             "id": row.id,
             "name": row.name,
             "investor_type": row.lp_type,
-            "location": row.jurisdiction
+            "location": row.jurisdiction,
         }
 
     def get_investor_holdings(self, investor_id: int) -> Set[str]:
         """Get set of company names held by an investor."""
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             SELECT DISTINCT company_name
             FROM portfolio_companies
             WHERE investor_id = :investor_id
               AND company_name IS NOT NULL
               AND company_name != ''
-        """), {"investor_id": investor_id})
+        """),
+            {"investor_id": investor_id},
+        )
 
         return {row.company_name for row in result}
 
@@ -122,7 +131,7 @@ class RecommendationEngine:
         investor_id: int,
         investor_type: Optional[str] = None,
         limit: int = 10,
-        min_overlap: int = 1
+        min_overlap: int = 1,
     ) -> List[SimilarInvestor]:
         """
         Find investors with similar portfolios based on Jaccard similarity.
@@ -148,7 +157,7 @@ class RecommendationEngine:
         params = {
             "investor_id": investor_id,
             "min_overlap": min_overlap,
-            "limit": limit
+            "limit": limit,
         }
 
         if investor_type:
@@ -157,7 +166,8 @@ class RecommendationEngine:
 
         # Use SQL to compute overlap efficiently
         # This query finds investors with at least min_overlap shared companies
-        result = self.db.execute(text(f"""
+        result = self.db.execute(
+            text(f"""
             WITH target_holdings AS (
                 SELECT DISTINCT company_name
                 FROM portfolio_companies
@@ -189,7 +199,9 @@ class RecommendationEngine:
             WHERE 1=1 {type_filter}
             ORDER BY io.overlap_count DESC
             LIMIT :limit
-        """), params)
+        """),
+            params,
+        )
 
         similar_investors = []
         target_holdings_count = len(target_holdings)
@@ -206,7 +218,8 @@ class RecommendationEngine:
                 jaccard = 0.0
 
             # Get sample of overlapping companies
-            overlap_result = self.db.execute(text("""
+            overlap_result = self.db.execute(
+                text("""
                 SELECT DISTINCT p.company_name
                 FROM portfolio_companies p
                 WHERE p.investor_id = :other_id
@@ -215,18 +228,22 @@ class RecommendationEngine:
                       WHERE investor_id = :target_id
                   )
                 LIMIT 5
-            """), {"other_id": row.investor_id, "target_id": investor_id})
+            """),
+                {"other_id": row.investor_id, "target_id": investor_id},
+            )
 
             overlap_companies = [r.company_name for r in overlap_result]
 
-            similar_investors.append(SimilarInvestor(
-                investor_id=row.investor_id,
-                investor_type=row.lp_type,
-                name=row.name,
-                similarity_score=jaccard,
-                overlap_count=row.overlap_count,
-                overlap_companies=overlap_companies
-            ))
+            similar_investors.append(
+                SimilarInvestor(
+                    investor_id=row.investor_id,
+                    investor_type=row.lp_type,
+                    name=row.name,
+                    similarity_score=jaccard,
+                    overlap_count=row.overlap_count,
+                    overlap_companies=overlap_companies,
+                )
+            )
 
         # Sort by Jaccard similarity (may differ from overlap count ordering)
         similar_investors.sort(key=lambda x: x.similarity_score, reverse=True)
@@ -234,10 +251,7 @@ class RecommendationEngine:
         return similar_investors[:limit]
 
     def get_recommended_companies(
-        self,
-        investor_id: int,
-        similar_count: int = 10,
-        limit: int = 20
+        self, investor_id: int, similar_count: int = 10, limit: int = 20
     ) -> List[CompanyRecommendation]:
         """
         Get company recommendations based on what similar investors hold.
@@ -254,9 +268,7 @@ class RecommendationEngine:
         """
         # Get similar investors
         similar_investors = self.get_similar_investors(
-            investor_id,
-            limit=similar_count,
-            min_overlap=1
+            investor_id, limit=similar_count, min_overlap=1
         )
 
         if not similar_investors:
@@ -273,7 +285,8 @@ class RecommendationEngine:
             return []
 
         # Find companies held by similar investors but not by target
-        result = self.db.execute(text("""
+        result = self.db.execute(
+            text("""
             SELECT
                 p.company_name,
                 p.company_industry,
@@ -291,11 +304,9 @@ class RecommendationEngine:
             GROUP BY p.company_name, p.company_industry
             ORDER BY held_by_count DESC, p.company_name
             LIMIT :limit
-        """), {
-            "similar_ids": similar_ids,
-            "target_id": investor_id,
-            "limit": limit
-        })
+        """),
+            {"similar_ids": similar_ids, "target_id": investor_id, "limit": limit},
+        )
 
         recommendations = []
         max_similar = len(similar_investors)
@@ -311,20 +322,20 @@ class RecommendationEngine:
                 if inv_id in similar_names
             ]
 
-            recommendations.append(CompanyRecommendation(
-                company_name=row.company_name,
-                company_industry=row.company_industry,
-                held_by_count=row.held_by_count,
-                held_by_names=held_by_names[:5],  # Limit to first 5 names
-                confidence=confidence
-            ))
+            recommendations.append(
+                CompanyRecommendation(
+                    company_name=row.company_name,
+                    company_industry=row.company_industry,
+                    held_by_count=row.held_by_count,
+                    held_by_names=held_by_names[:5],  # Limit to first 5 names
+                    confidence=confidence,
+                )
+            )
 
         return recommendations
 
     def get_portfolio_overlap(
-        self,
-        investor_a_id: int,
-        investor_b_id: int
+        self, investor_a_id: int, investor_b_id: int
     ) -> Optional[PortfolioOverlap]:
         """
         Analyze portfolio overlap between two investors.
@@ -372,5 +383,5 @@ class RecommendationEngine:
             overlap_percentage_a=round(pct_a, 2),
             overlap_percentage_b=round(pct_b, 2),
             jaccard_similarity=round(jaccard, 4),
-            shared_companies=shared_list
+            shared_companies=shared_list,
         )

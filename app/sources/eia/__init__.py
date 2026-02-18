@@ -12,4 +12,3 @@ The EIA API provides access to energy data including:
 
 API Key required: Get a free key at https://www.eia.gov/opendata/register.php
 """
-

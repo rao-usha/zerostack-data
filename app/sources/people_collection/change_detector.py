@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PersonSnapshot:
     """Snapshot of a person at a point in time."""
+
     full_name: str
     title: str
     title_level: TitleLevel = TitleLevel.UNKNOWN
@@ -38,9 +39,12 @@ class PersonSnapshot:
 @dataclass
 class ChangeDetectionResult:
     """Result of comparing leadership snapshots."""
+
     new_people: List[ExtractedPerson] = field(default_factory=list)
     departed_people: List[PersonSnapshot] = field(default_factory=list)
-    title_changes: List[Tuple[PersonSnapshot, ExtractedPerson]] = field(default_factory=list)
+    title_changes: List[Tuple[PersonSnapshot, ExtractedPerson]] = field(
+        default_factory=list
+    )
     detected_changes: List[LeadershipChange] = field(default_factory=list)
 
 
@@ -69,8 +73,8 @@ class ChangeDetector:
             return ""
         # Lowercase, remove punctuation, collapse spaces
         name = name.lower()
-        name = ''.join(c for c in name if c.isalnum() or c.isspace())
-        return ' '.join(name.split())
+        name = "".join(c for c in name if c.isalnum() or c.isspace())
+        return " ".join(name.split())
 
     def _name_similarity(self, name1: str, name2: str) -> float:
         """Calculate similarity between two names."""
@@ -125,13 +129,13 @@ class ChangeDetector:
         title = title.lower().strip()
         # Normalize common abbreviations
         replacements = {
-            'chief executive officer': 'ceo',
-            'chief financial officer': 'cfo',
-            'chief operating officer': 'coo',
-            'chief technology officer': 'cto',
-            'vice president': 'vp',
-            'senior vice president': 'svp',
-            'executive vice president': 'evp',
+            "chief executive officer": "ceo",
+            "chief financial officer": "cfo",
+            "chief operating officer": "coo",
+            "chief technology officer": "cto",
+            "vice president": "vp",
+            "senior vice president": "svp",
+            "executive vice president": "evp",
         }
         for full, abbrev in replacements.items():
             title = title.replace(full, abbrev)
@@ -161,7 +165,15 @@ class ChangeDetector:
         new_title = self._normalize_title(new.title)
 
         # Check for seniority changes
-        seniority_order = ['ceo', 'president', 'evp', 'svp', 'vp', 'director', 'manager']
+        seniority_order = [
+            "ceo",
+            "president",
+            "evp",
+            "svp",
+            "vp",
+            "director",
+            "manager",
+        ]
 
         old_level = 99
         new_level = 99
@@ -343,9 +355,9 @@ class ChangeDetector:
             score += 2
 
         # CEO changes are highest
-        if change.new_title and 'ceo' in change.new_title.lower():
+        if change.new_title and "ceo" in change.new_title.lower():
             score += 2
-        if change.old_title and 'ceo' in change.old_title.lower():
+        if change.old_title and "ceo" in change.old_title.lower():
             score += 2
 
         # Departures slightly less significant (might be false positive)
@@ -380,11 +392,11 @@ def detect_leadership_changes(
     # Convert existing to snapshots
     snapshots = [
         PersonSnapshot(
-            full_name=p.get('full_name', p.get('name', '')),
-            title=p.get('title', ''),
-            title_level=TitleLevel(p.get('title_level', 'unknown')),
-            is_board_member=p.get('is_board_member', False),
-            is_executive=p.get('is_executive', True),
+            full_name=p.get("full_name", p.get("name", "")),
+            title=p.get("title", ""),
+            title_level=TitleLevel(p.get("title_level", "unknown")),
+            is_board_member=p.get("is_board_member", False),
+            is_executive=p.get("is_executive", True),
         )
         for p in existing_people
     ]

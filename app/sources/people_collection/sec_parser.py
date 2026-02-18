@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CompensationData:
     """Executive compensation from proxy statement."""
+
     name: str
     title: str
     fiscal_year: int
@@ -47,6 +48,7 @@ class CompensationData:
 @dataclass
 class ProxyParseResult:
     """Result of parsing a DEF 14A proxy statement."""
+
     executives: List[ExtractedPerson] = field(default_factory=list)
     board_members: List[ExtractedPerson] = field(default_factory=list)
     compensation: List[CompensationData] = field(default_factory=list)
@@ -59,6 +61,7 @@ class ProxyParseResult:
 @dataclass
 class Form8KParseResult:
     """Result of parsing an 8-K filing."""
+
     changes: List[LeadershipChange] = field(default_factory=list)
     items_found: List[str] = field(default_factory=list)
     extraction_confidence: ExtractionConfidence = ExtractionConfidence.MEDIUM
@@ -79,17 +82,17 @@ class SECParser:
 
     def _clean_html(self, html: str) -> str:
         """Remove HTML tags and clean text."""
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, "html.parser")
 
         # Remove script and style elements
-        for element in soup.find_all(['script', 'style']):
+        for element in soup.find_all(["script", "style"]):
             element.decompose()
 
-        text = soup.get_text(separator='\n')
+        text = soup.get_text(separator="\n")
 
         # Clean up whitespace
-        text = re.sub(r'\n{3,}', '\n\n', text)
-        text = re.sub(r'[ \t]+', ' ', text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        text = re.sub(r"[ \t]+", " ", text)
 
         return text.strip()
 
@@ -148,7 +151,7 @@ class SECParser:
         result = ProxyParseResult(company_name=company_name)
 
         # Clean HTML if present
-        if '<html' in content.lower() or '<body' in content.lower():
+        if "<html" in content.lower() or "<body" in content.lower():
             text = self._clean_html(content)
         else:
             text = content
@@ -240,19 +243,29 @@ class SECParser:
             if llm_result:
                 # Parse LLM results
                 for exec_data in llm_result.get("executives", []):
-                    person = self._person_from_dict(exec_data, company_name, is_board=False)
-                    if person and person.full_name not in [e.full_name for e in result.executives]:
+                    person = self._person_from_dict(
+                        exec_data, company_name, is_board=False
+                    )
+                    if person and person.full_name not in [
+                        e.full_name for e in result.executives
+                    ]:
                         result.executives.append(person)
 
                 for board_data in llm_result.get("board_members", []):
-                    person = self._person_from_dict(board_data, company_name, is_board=True)
-                    if person and person.full_name not in [b.full_name for b in result.board_members]:
+                    person = self._person_from_dict(
+                        board_data, company_name, is_board=True
+                    )
+                    if person and person.full_name not in [
+                        b.full_name for b in result.board_members
+                    ]:
                         result.board_members.append(person)
 
         result.extraction_notes = sections_found
         result.extraction_confidence = (
-            ExtractionConfidence.HIGH if len(sections_found) >= 2
-            else ExtractionConfidence.MEDIUM if sections_found
+            ExtractionConfidence.HIGH
+            if len(sections_found) >= 2
+            else ExtractionConfidence.MEDIUM
+            if sections_found
             else ExtractionConfidence.LOW
         )
 
@@ -277,10 +290,9 @@ class SECParser:
         # Pattern: "NAME, AGE, TITLE" or "NAME - TITLE"
         patterns = [
             # "John Smith, 55, Chief Executive Officer"
-            r'([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),?\s*(?:age\s*)?(\d{2,3})?,?\s*(?:has served as|serves as|is our|is the)?\s*([A-Z][^.]{10,100}?)(?:\.|since|\()',
-
+            r"([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),?\s*(?:age\s*)?(\d{2,3})?,?\s*(?:has served as|serves as|is our|is the)?\s*([A-Z][^.]{10,100}?)(?:\.|since|\()",
             # "Mr. Smith has served as CEO"
-            r'(?:Mr\.|Ms\.|Mrs\.)\s+([A-Z][a-z]+)\s+(?:has served|serves|is)\s+(?:as\s+)?(?:our\s+)?([A-Z][^.]{10,80}?)(?:\s+since|\s+from|\.)',
+            r"(?:Mr\.|Ms\.|Mrs\.)\s+([A-Z][a-z]+)\s+(?:has served|serves|is)\s+(?:as\s+)?(?:our\s+)?([A-Z][^.]{10,80}?)(?:\s+since|\s+from|\.)",
         ]
 
         for pattern in patterns:
@@ -334,8 +346,14 @@ class SECParser:
 
         # Common false positives
         false_positives = [
-            'fiscal year', 'annual report', 'form 10', 'item',
-            'table of', 'part', 'section', 'pursuant',
+            "fiscal year",
+            "annual report",
+            "form 10",
+            "item",
+            "table of",
+            "part",
+            "section",
+            "pursuant",
         ]
         if any(fp in name.lower() for fp in false_positives):
             return False
@@ -346,9 +364,18 @@ class SECParser:
         """Clean and normalize a title string."""
         # Remove common noise
         noise = [
-            'and has', 'he has', 'she has', 'who has',
-            'and is', 'and was', 'and will', 'effective',
-            'prior to', 'before', 'after', 'during',
+            "and has",
+            "he has",
+            "she has",
+            "who has",
+            "and is",
+            "and was",
+            "and will",
+            "effective",
+            "prior to",
+            "before",
+            "after",
+            "during",
         ]
 
         title_clean = title
@@ -357,7 +384,7 @@ class SECParser:
                 idx = title_clean.lower().find(n)
                 title_clean = title_clean[:idx]
 
-        return title_clean.strip().rstrip(',').strip()
+        return title_clean.strip().rstrip(",").strip()
 
     def _infer_title_level(self, title: str) -> TitleLevel:
         """Infer title level from title string."""
@@ -365,31 +392,33 @@ class SECParser:
             return TitleLevel.UNKNOWN
 
         title_lower = title.lower()
-        title_spaced = f' {title_lower} '
+        title_spaced = f" {title_lower} "
 
         # C-Suite
-        if any(kw in title_spaced for kw in [' chief ', ' ceo ', ' cfo ', ' coo ', ' cto ']):
+        if any(
+            kw in title_spaced for kw in [" chief ", " ceo ", " cfo ", " coo ", " cto "]
+        ):
             return TitleLevel.C_SUITE
 
         # EVP
-        if 'executive vice president' in title_lower or ' evp ' in title_spaced:
+        if "executive vice president" in title_lower or " evp " in title_spaced:
             return TitleLevel.EVP
 
         # SVP
-        if 'senior vice president' in title_lower or ' svp ' in title_spaced:
+        if "senior vice president" in title_lower or " svp " in title_spaced:
             return TitleLevel.SVP
 
         # VP
-        if 'vice president' in title_lower:
+        if "vice president" in title_lower:
             return TitleLevel.VP
 
         # President
-        if 'president' in title_lower:
+        if "president" in title_lower:
             return TitleLevel.PRESIDENT
 
         # Board
-        if 'director' in title_lower or 'chairman' in title_lower:
-            if 'director of' not in title_lower:
+        if "director" in title_lower or "chairman" in title_lower:
+            if "director of" not in title_lower:
                 return TitleLevel.BOARD
 
         return TitleLevel.UNKNOWN
@@ -426,7 +455,7 @@ class SECParser:
 
         # Look for table rows with compensation data
         # Pattern: NAME | YEAR | SALARY | BONUS | STOCK | OPTIONS | TOTAL
-        lines = section.split('\n')
+        lines = section.split("\n")
 
         current_name = ""
         for line in lines:
@@ -443,17 +472,17 @@ class SECParser:
             if words[0][0].isupper() and len(words[0]) > 2:
                 potential_name = []
                 for w in words[:4]:
-                    if w[0].isupper() and w.replace('.', '').replace(',', '').isalpha():
+                    if w[0].isupper() and w.replace(".", "").replace(",", "").isalpha():
                         potential_name.append(w)
                     else:
                         break
 
                 if len(potential_name) >= 2:
-                    current_name = ' '.join(potential_name)
+                    current_name = " ".join(potential_name)
 
             # Try to extract numbers (compensation values)
             if current_name:
-                numbers = re.findall(r'\$?([\d,]+(?:\.\d{2})?)', line)
+                numbers = re.findall(r"\$?([\d,]+(?:\.\d{2})?)", line)
                 if len(numbers) >= 3:
                     try:
                         # Assume order: salary, bonus, stock, options, other, total
@@ -463,7 +492,7 @@ class SECParser:
                             fiscal_year=date.today().year - 1,
                         )
 
-                        values = [float(n.replace(',', '')) for n in numbers]
+                        values = [float(n.replace(",", "")) for n in numbers]
 
                         if len(values) >= 1:
                             comp.base_salary = values[0]
@@ -503,7 +532,7 @@ class SECParser:
             List of extracted executive officers
         """
         # Clean HTML if present
-        if '<html' in content.lower() or '<body' in content.lower():
+        if "<html" in content.lower() or "<body" in content.lower():
             text = self._clean_html(content)
         else:
             text = content
@@ -532,8 +561,10 @@ class SECParser:
                     end_pos = text_lower.find(end_term, idx + 200)
                     if end_pos > 0 and end_pos < end_idx:
                         end_idx = end_pos
-                item10_section = text[idx:min(idx + 50000, end_idx)]
-                logger.info(f"[SECParser] Found exec listing via pattern '{pattern}' at position {idx}")
+                item10_section = text[idx : min(idx + 50000, end_idx)]
+                logger.info(
+                    f"[SECParser] Found exec listing via pattern '{pattern}' at position {idx}"
+                )
                 break
 
         # Strategy 2: Fall back to standard Item 10 section extraction
@@ -556,7 +587,9 @@ class SECParser:
             )
 
         if not item10_section:
-            logger.warning(f"[SECParser] No Item 10 section found in 10-K for {company_name}")
+            logger.warning(
+                f"[SECParser] No Item 10 section found in 10-K for {company_name}"
+            )
             return []
 
         logger.info(f"[SECParser] Found Item 10 section: {len(item10_section)} chars")
@@ -584,7 +617,9 @@ class SECParser:
                 parsed = self.llm_extractor._parse_json_response(response)
                 if parsed and isinstance(parsed, dict):
                     for exec_data in parsed.get("executives", []):
-                        person = self._person_from_dict(exec_data, company_name, is_board=False)
+                        person = self._person_from_dict(
+                            exec_data, company_name, is_board=False
+                        )
                         if person:
                             person.extraction_notes = "From 10-K Item 10 (LLM)"
                             person.confidence = ExtractionConfidence.HIGH
@@ -604,7 +639,9 @@ class SECParser:
             if not person.extraction_notes:
                 person.extraction_notes = "From 10-K Item 10"
 
-        logger.info(f"[SECParser] 10-K extraction: {len(people)} executives for {company_name}")
+        logger.info(
+            f"[SECParser] 10-K extraction: {len(people)} executives for {company_name}"
+        )
         return people
 
     async def parse_8k_filing(
@@ -621,7 +658,7 @@ class SECParser:
         result = Form8KParseResult()
 
         # Clean HTML if present
-        if '<html' in content.lower():
+        if "<html" in content.lower():
             text = self._clean_html(content)
         else:
             text = content
@@ -630,12 +667,12 @@ class SECParser:
 
         # Check for relevant items
         items_found = []
-        if 'item 5.02' in text_lower:
-            items_found.append('5.02')
-        if 'item 5.03' in text_lower:
-            items_found.append('5.03')
-        if 'item 5.01' in text_lower:
-            items_found.append('5.01')
+        if "item 5.02" in text_lower:
+            items_found.append("5.02")
+        if "item 5.03" in text_lower:
+            items_found.append("5.03")
+        if "item 5.01" in text_lower:
+            items_found.append("5.01")
 
         result.items_found = items_found
 
@@ -647,7 +684,14 @@ class SECParser:
         section_502 = self._extract_section(
             text,
             start_patterns=["item 5.02"],
-            end_patterns=["item 5.03", "item 6", "item 7", "item 8", "item 9", "signature"],
+            end_patterns=[
+                "item 5.03",
+                "item 6",
+                "item 7",
+                "item 8",
+                "item 9",
+                "signature",
+            ],
             max_length=20000,
         )
 
@@ -658,8 +702,10 @@ class SECParser:
             result.changes.extend(changes)
 
         result.extraction_confidence = (
-            ExtractionConfidence.HIGH if result.changes
-            else ExtractionConfidence.MEDIUM if items_found
+            ExtractionConfidence.HIGH
+            if result.changes
+            else ExtractionConfidence.MEDIUM
+            if items_found
             else ExtractionConfidence.LOW
         )
 
@@ -689,16 +735,20 @@ class SECParser:
         # Also try pattern matching for common announcements
         patterns = [
             # Resignation
-            (r'(\w+\s+\w+(?:\s+\w+)?)\s+(?:has\s+)?resign(?:ed|ing)\s+(?:from\s+)?(?:the\s+)?(?:position\s+of\s+)?([^.]+)',
-             ChangeType.DEPARTURE),
-
+            (
+                r"(\w+\s+\w+(?:\s+\w+)?)\s+(?:has\s+)?resign(?:ed|ing)\s+(?:from\s+)?(?:the\s+)?(?:position\s+of\s+)?([^.]+)",
+                ChangeType.DEPARTURE,
+            ),
             # Appointment
-            (r'(?:appointed|named)\s+(\w+\s+\w+(?:\s+\w+)?)\s+(?:as\s+)?(?:the\s+)?([^.]+)',
-             ChangeType.HIRE),
-
+            (
+                r"(?:appointed|named)\s+(\w+\s+\w+(?:\s+\w+)?)\s+(?:as\s+)?(?:the\s+)?([^.]+)",
+                ChangeType.HIRE,
+            ),
             # Retirement
-            (r'(\w+\s+\w+(?:\s+\w+)?)\s+(?:has\s+)?(?:announced|will)\s+(?:his|her|their)\s+retire',
-             ChangeType.RETIREMENT),
+            (
+                r"(\w+\s+\w+(?:\s+\w+)?)\s+(?:has\s+)?(?:announced|will)\s+(?:his|her|their)\s+retire",
+                ChangeType.RETIREMENT,
+            ),
         ]
 
         for pattern, change_type in patterns:
@@ -719,7 +769,9 @@ class SECParser:
                         person_name=name,
                         change_type=change_type,
                         new_title=title if change_type == ChangeType.HIRE else None,
-                        old_title=title if change_type == ChangeType.DEPARTURE else None,
+                        old_title=title
+                        if change_type == ChangeType.DEPARTURE
+                        else None,
                         announced_date=filing_date,
                         source_type="8k_filing",
                         confidence=ExtractionConfidence.MEDIUM,

@@ -46,12 +46,10 @@ from app.sources.us_trade.ingest import (
 __all__ = [
     # Client
     "USTradeClient",
-    
     # Reference data
     "HS_CHAPTERS",
     "TOP_TRADING_PARTNERS",
     "MAJOR_COMMODITY_CHAPTERS",
-    
     # Metadata functions
     "generate_table_name",
     "generate_create_table_sql",
@@ -66,7 +64,6 @@ __all__ = [
     "get_hs_chapter",
     "get_hs_heading",
     "get_hs_subheading",
-    
     # Ingestion functions
     "prepare_table_for_trade_data",
     "ingest_exports_by_hs",

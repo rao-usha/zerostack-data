@@ -26,6 +26,7 @@ router = APIRouter(prefix="/llm-costs", tags=["LLM Costs"])
 # Response Models
 # =============================================================================
 
+
 class ModelCostBreakdown(BaseModel):
     model: str
     provider: Optional[str] = None
@@ -79,6 +80,7 @@ class DailyCostResponse(BaseModel):
 # Endpoints
 # =============================================================================
 
+
 @router.get("/summary", response_model=CostSummaryResponse)
 def get_cost_summary(
     since: Optional[date] = Query(None, description="Filter costs since this date"),
@@ -91,7 +93,9 @@ def get_cost_summary(
     """
     query = db.query(LLMUsage)
     if since:
-        query = query.filter(LLMUsage.created_at >= datetime.combine(since, datetime.min.time()))
+        query = query.filter(
+            LLMUsage.created_at >= datetime.combine(since, datetime.min.time())
+        )
 
     # Overall totals
     totals = db.query(
@@ -101,7 +105,9 @@ def get_cost_summary(
         func.coalesce(func.sum(LLMUsage.cost_usd), 0).label("total_cost_usd"),
     )
     if since:
-        totals = totals.filter(LLMUsage.created_at >= datetime.combine(since, datetime.min.time()))
+        totals = totals.filter(
+            LLMUsage.created_at >= datetime.combine(since, datetime.min.time())
+        )
     totals = totals.first()
 
     # By model
@@ -114,7 +120,9 @@ def get_cost_summary(
         func.coalesce(func.sum(LLMUsage.cost_usd), 0).label("total_cost_usd"),
     ).group_by(LLMUsage.model, LLMUsage.provider)
     if since:
-        model_query = model_query.filter(LLMUsage.created_at >= datetime.combine(since, datetime.min.time()))
+        model_query = model_query.filter(
+            LLMUsage.created_at >= datetime.combine(since, datetime.min.time())
+        )
     model_rows = model_query.order_by(func.sum(LLMUsage.cost_usd).desc()).all()
 
     # By source
@@ -126,12 +134,15 @@ def get_cost_summary(
         func.coalesce(func.sum(LLMUsage.cost_usd), 0).label("total_cost_usd"),
     ).group_by(LLMUsage.source)
     if since:
-        source_query = source_query.filter(LLMUsage.created_at >= datetime.combine(since, datetime.min.time()))
+        source_query = source_query.filter(
+            LLMUsage.created_at >= datetime.combine(since, datetime.min.time())
+        )
     source_rows = source_query.order_by(func.sum(LLMUsage.cost_usd).desc()).all()
 
     # Session totals
     try:
         from app.core.llm_cost_tracker import get_cost_tracker
+
         session_totals = get_cost_tracker().get_session_totals()
     except Exception:
         session_totals = None
@@ -215,21 +226,26 @@ def get_daily_costs(
 ):
     """Get daily LLM cost breakdown."""
     from datetime import timedelta
+
     cutoff = datetime.utcnow() - timedelta(days=days)
 
-    daily_rows = db.query(
-        cast(LLMUsage.created_at, Date).label("day"),
-        func.count(LLMUsage.id).label("total_calls"),
-        func.coalesce(func.sum(LLMUsage.input_tokens), 0).label("total_input_tokens"),
-        func.coalesce(func.sum(LLMUsage.output_tokens), 0).label("total_output_tokens"),
-        func.coalesce(func.sum(LLMUsage.cost_usd), 0).label("total_cost_usd"),
-    ).filter(
-        LLMUsage.created_at >= cutoff
-    ).group_by(
-        cast(LLMUsage.created_at, Date)
-    ).order_by(
-        cast(LLMUsage.created_at, Date).desc()
-    ).all()
+    daily_rows = (
+        db.query(
+            cast(LLMUsage.created_at, Date).label("day"),
+            func.count(LLMUsage.id).label("total_calls"),
+            func.coalesce(func.sum(LLMUsage.input_tokens), 0).label(
+                "total_input_tokens"
+            ),
+            func.coalesce(func.sum(LLMUsage.output_tokens), 0).label(
+                "total_output_tokens"
+            ),
+            func.coalesce(func.sum(LLMUsage.cost_usd), 0).label("total_cost_usd"),
+        )
+        .filter(LLMUsage.created_at >= cutoff)
+        .group_by(cast(LLMUsage.created_at, Date))
+        .order_by(cast(LLMUsage.created_at, Date).desc())
+        .all()
+    )
 
     entries = [
         DailyCostEntry(

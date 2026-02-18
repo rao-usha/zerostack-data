@@ -134,8 +134,7 @@ class CafrCollector(BaseCollector):
 
         # Find PDF links that look like CAFRs
         pdf_pattern = re.compile(
-            r'href=["\']([^"\']*\.pdf)["\'][^>]*>([^<]*)',
-            re.IGNORECASE
+            r'href=["\']([^"\']*\.pdf)["\'][^>]*>([^<]*)', re.IGNORECASE
         )
 
         for match in pdf_pattern.finditer(html):
@@ -144,7 +143,10 @@ class CafrCollector(BaseCollector):
 
             # Check if matches CAFR pattern
             combined_text = f"{href} {link_text}".lower()
-            if any(re.search(pattern, combined_text, re.IGNORECASE) for pattern in CAFR_PATTERNS):
+            if any(
+                re.search(pattern, combined_text, re.IGNORECASE)
+                for pattern in CAFR_PATTERNS
+            ):
                 # Try to extract year
                 year_match = re.search(r"20\d{2}", combined_text)
                 year = int(year_match.group()) if year_match else None
@@ -152,17 +154,20 @@ class CafrCollector(BaseCollector):
                 # Make absolute URL
                 if href.startswith("/"):
                     from urllib.parse import urljoin
+
                     full_url = urljoin(website_url, href)
                 elif href.startswith("http"):
                     full_url = href
                 else:
                     full_url = f"{website_url.rstrip('/')}/{href}"
 
-                cafr_links.append({
-                    "url": full_url,
-                    "title": link_text,
-                    "fiscal_year": year,
-                })
+                cafr_links.append(
+                    {
+                        "url": full_url,
+                        "title": link_text,
+                        "fiscal_year": year,
+                    }
+                )
 
         # Sort by year (most recent first)
         cafr_links.sort(key=lambda x: x.get("fiscal_year") or 0, reverse=True)
@@ -178,20 +183,22 @@ class CafrCollector(BaseCollector):
         items = []
 
         # Document link item
-        items.append(CollectedItem(
-            item_type="document_link",
-            data={
-                "lp_id": lp_id,
-                "url": cafr_info["url"],
-                "title": cafr_info.get("title", "CAFR"),
-                "document_type": "cafr",
-                "file_format": "pdf",
-                "fiscal_year": cafr_info.get("fiscal_year"),
-                "source_type": "cafr",
-            },
-            source_url=cafr_info["url"],
-            confidence="high",
-        ))
+        items.append(
+            CollectedItem(
+                item_type="document_link",
+                data={
+                    "lp_id": lp_id,
+                    "url": cafr_info["url"],
+                    "title": cafr_info.get("title", "CAFR"),
+                    "document_type": "cafr",
+                    "file_format": "pdf",
+                    "fiscal_year": cafr_info.get("fiscal_year"),
+                    "source_type": "cafr",
+                },
+                source_url=cafr_info["url"],
+                confidence="high",
+            )
+        )
 
         return items
 

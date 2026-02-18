@@ -4,6 +4,7 @@ Company Data Enrichment Engine.
 Enriches portfolio company data with financials, funding,
 employee counts, and industry classification.
 """
+
 import json
 import logging
 from typing import Dict, List, Optional
@@ -19,13 +20,29 @@ logger = logging.getLogger(__name__)
 # Industry classification mapping (simplified)
 INDUSTRY_KEYWORDS = {
     "technology": {
-        "keywords": ["software", "saas", "cloud", "tech", "data", "ai", "ml", "platform"],
+        "keywords": [
+            "software",
+            "saas",
+            "cloud",
+            "tech",
+            "data",
+            "ai",
+            "ml",
+            "platform",
+        ],
         "sector": "Technology",
         "sic": "7372",
         "naics": "541512",
     },
     "fintech": {
-        "keywords": ["fintech", "payment", "banking", "financial", "lending", "insurance"],
+        "keywords": [
+            "fintech",
+            "payment",
+            "banking",
+            "financial",
+            "lending",
+            "insurance",
+        ],
         "sector": "Financial Services",
         "sic": "6199",
         "naics": "522320",
@@ -130,10 +147,13 @@ class CompanyEnrichmentEngine:
             VALUES (:job_type, :company_name, 'pending', NOW())
             RETURNING id
         """)
-        result = self.db.execute(query, {
-            "job_type": job_type,
-            "company_name": company_name,
-        })
+        result = self.db.execute(
+            query,
+            {
+                "job_type": job_type,
+                "company_name": company_name,
+            },
+        )
         self.db.commit()
         row = result.fetchone()
         return row[0] if row else 0
@@ -169,12 +189,15 @@ class CompanyEnrichmentEngine:
                 WHERE id = :job_id
             """)
 
-        self.db.execute(query, {
-            "job_id": job_id,
-            "status": status,
-            "results": results_json,
-            "error": error,
-        })
+        self.db.execute(
+            query,
+            {
+                "job_id": job_id,
+                "status": status,
+                "results": results_json,
+                "error": error,
+            },
+        )
         self.db.commit()
 
     def get_job_status(self, company_name: str) -> Optional[Dict]:
@@ -201,7 +224,9 @@ class CompanyEnrichmentEngine:
             "company_name": row["company_name"],
             "status": row["status"],
             "started_at": row["started_at"].isoformat() if row["started_at"] else None,
-            "completed_at": row["completed_at"].isoformat() if row["completed_at"] else None,
+            "completed_at": row["completed_at"].isoformat()
+            if row["completed_at"]
+            else None,
             "error_message": row["error_message"],
             "results": row["results"],
         }
@@ -251,7 +276,9 @@ class CompanyEnrichmentEngine:
                     "found": True,
                     "total_funding": None,  # Would aggregate all rounds
                     "last_funding_amount": amount_str,
-                    "last_funding_date": row["investment_date"].isoformat() if row.get("investment_date") else None,
+                    "last_funding_date": row["investment_date"].isoformat()
+                    if row.get("investment_date")
+                    else None,
                 }
         except Exception as e:
             logger.warning(f"Error querying funding data: {e}")
@@ -281,7 +308,9 @@ class CompanyEnrichmentEngine:
             "note": "Employee data requires LinkedIn integration",
         }
 
-    def classify_industry(self, company_name: str, description: Optional[str] = None) -> Dict:
+    def classify_industry(
+        self, company_name: str, description: Optional[str] = None
+    ) -> Dict:
         """
         Classify company industry based on name and description.
 
@@ -407,13 +436,21 @@ class CompanyEnrichmentEngine:
             # Save enrichment data
             self._save_enrichment(company_name, results, confidence)
 
-            self.update_job(job_id, "completed", results={
-                "sec_edgar": "success" if sec_data.get("found") else "not_found",
-                "funding": "success" if funding_data.get("found") else "placeholder",
-                "employees": "placeholder",
-                "classification": "success" if classification.get("found") else "no_match",
-                "status": "placeholder",
-            })
+            self.update_job(
+                job_id,
+                "completed",
+                results={
+                    "sec_edgar": "success" if sec_data.get("found") else "not_found",
+                    "funding": "success"
+                    if funding_data.get("found")
+                    else "placeholder",
+                    "employees": "placeholder",
+                    "classification": "success"
+                    if classification.get("found")
+                    else "no_match",
+                    "status": "placeholder",
+                },
+            )
 
             results["confidence_score"] = confidence
             return results
@@ -423,7 +460,9 @@ class CompanyEnrichmentEngine:
             self.update_job(job_id, "failed", error=str(e))
             raise
 
-    def _save_enrichment(self, company_name: str, results: Dict, confidence: float) -> None:
+    def _save_enrichment(
+        self, company_name: str, results: Dict, confidence: float
+    ) -> None:
         """Save enrichment results to database."""
         sec = results.get("sec_edgar", {})
         funding = results.get("funding", {})
@@ -480,31 +519,36 @@ class CompanyEnrichmentEngine:
         funding_date = None
         if funding.get("last_funding_date"):
             try:
-                funding_date = datetime.strptime(funding["last_funding_date"], "%Y-%m-%d").date()
+                funding_date = datetime.strptime(
+                    funding["last_funding_date"], "%Y-%m-%d"
+                ).date()
             except (ValueError, TypeError):
                 pass
 
-        self.db.execute(query, {
-            "company_name": company_name,
-            "sec_cik": sec.get("cik"),
-            "sec_ticker": sec.get("ticker"),
-            "revenue": sec.get("revenue"),
-            "assets": sec.get("assets"),
-            "net_income": sec.get("net_income"),
-            "filing_date": filing_date,
-            "total_funding": funding.get("total_funding"),
-            "last_funding": funding.get("last_funding_amount"),
-            "funding_date": funding_date,
-            "employees": employees.get("count"),
-            "emp_date": None,
-            "emp_growth": employees.get("growth_yoy"),
-            "industry": classification.get("industry"),
-            "sector": classification.get("sector"),
-            "sic": classification.get("sic_code"),
-            "naics": classification.get("naics_code"),
-            "status": status.get("status", "active"),
-            "confidence": confidence,
-        })
+        self.db.execute(
+            query,
+            {
+                "company_name": company_name,
+                "sec_cik": sec.get("cik"),
+                "sec_ticker": sec.get("ticker"),
+                "revenue": sec.get("revenue"),
+                "assets": sec.get("assets"),
+                "net_income": sec.get("net_income"),
+                "filing_date": filing_date,
+                "total_funding": funding.get("total_funding"),
+                "last_funding": funding.get("last_funding_amount"),
+                "funding_date": funding_date,
+                "employees": employees.get("count"),
+                "emp_date": None,
+                "emp_growth": employees.get("growth_yoy"),
+                "industry": classification.get("industry"),
+                "sector": classification.get("sector"),
+                "sic": classification.get("sic_code"),
+                "naics": classification.get("naics_code"),
+                "status": status.get("status", "active"),
+                "confidence": confidence,
+            },
+        )
         self.db.commit()
 
     def get_enriched_company(self, company_name: str) -> Optional[Dict]:
@@ -529,17 +573,23 @@ class CompanyEnrichmentEngine:
                 "revenue": row["latest_revenue"],
                 "assets": row["latest_assets"],
                 "net_income": row["latest_net_income"],
-                "filing_date": row["latest_filing_date"].isoformat() if row["latest_filing_date"] else None,
+                "filing_date": row["latest_filing_date"].isoformat()
+                if row["latest_filing_date"]
+                else None,
             },
             "funding": {
                 "total_funding": row["total_funding"],
                 "last_amount": row["last_funding_amount"],
-                "last_date": row["last_funding_date"].isoformat() if row["last_funding_date"] else None,
+                "last_date": row["last_funding_date"].isoformat()
+                if row["last_funding_date"]
+                else None,
                 "valuation": row["valuation"],
             },
             "employees": {
                 "count": row["employee_count"],
-                "date": row["employee_count_date"].isoformat() if row["employee_count_date"] else None,
+                "date": row["employee_count_date"].isoformat()
+                if row["employee_count_date"]
+                else None,
                 "growth_yoy": row["employee_growth_yoy"],
             },
             "classification": {
@@ -554,7 +604,9 @@ class CompanyEnrichmentEngine:
                 "ipo_date": row["ipo_date"].isoformat() if row["ipo_date"] else None,
                 "stock_symbol": row["stock_symbol"],
             },
-            "enriched_at": row["enriched_at"].isoformat() if row["enriched_at"] else None,
+            "enriched_at": row["enriched_at"].isoformat()
+            if row["enriched_at"]
+            else None,
             "confidence_score": row["confidence_score"],
         }
 
@@ -575,11 +627,14 @@ class CompanyEnrichmentEngine:
             ORDER BY enriched_at DESC
             LIMIT :limit OFFSET :offset
         """)
-        result = self.db.execute(query, {
-            "min_confidence": min_confidence,
-            "limit": limit,
-            "offset": offset,
-        })
+        result = self.db.execute(
+            query,
+            {
+                "min_confidence": min_confidence,
+                "limit": limit,
+                "offset": offset,
+            },
+        )
 
         return [
             {
@@ -588,7 +643,9 @@ class CompanyEnrichmentEngine:
                 "sector": row["sector"],
                 "status": row["company_status"],
                 "confidence_score": row["confidence_score"],
-                "enriched_at": row["enriched_at"].isoformat() if row["enriched_at"] else None,
+                "enriched_at": row["enriched_at"].isoformat()
+                if row["enriched_at"]
+                else None,
             }
             for row in result.mappings()
         ]
@@ -614,17 +671,21 @@ class CompanyEnrichmentEngine:
             try:
                 enrichment = await self.enrich_company(name)
                 results["completed"] += 1
-                results["companies"].append({
-                    "company_name": name,
-                    "status": "completed",
-                    "confidence": enrichment.get("confidence_score", 0),
-                })
+                results["companies"].append(
+                    {
+                        "company_name": name,
+                        "status": "completed",
+                        "confidence": enrichment.get("confidence_score", 0),
+                    }
+                )
             except Exception as e:
                 results["failed"] += 1
-                results["companies"].append({
-                    "company_name": name,
-                    "status": "failed",
-                    "error": str(e),
-                })
+                results["companies"].append(
+                    {
+                        "company_name": name,
+                        "status": "failed",
+                        "error": str(e),
+                    }
+                )
 
         return results

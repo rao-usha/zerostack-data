@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CIKSearchResult:
     """Result of a CIK search."""
+
     cik: str
     company_name: str
     ticker: Optional[str] = None
@@ -35,6 +36,7 @@ class CIKSearchResult:
 @dataclass
 class SECFiling:
     """Represents an SEC filing."""
+
     accession_number: str
     filing_type: str
     filing_date: date
@@ -59,7 +61,9 @@ class FilingFetcher(BaseCollector):
     # SEC EDGAR API endpoints
     SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
     FILING_URL = "https://www.sec.gov/Archives/edgar/data/{cik}/{accession}/"
-    FULL_TEXT_URL = "https://www.sec.gov/Archives/edgar/data/{cik}/{accession}/{document}"
+    FULL_TEXT_URL = (
+        "https://www.sec.gov/Archives/edgar/data/{cik}/{accession}/{document}"
+    )
 
     # Company search endpoint (tickers and company names)
     COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
@@ -86,7 +90,7 @@ class FilingFetcher(BaseCollector):
     def _normalize_cik(self, cik: str) -> str:
         """Normalize CIK to 10-digit zero-padded format."""
         # Remove any non-numeric characters
-        cik_clean = re.sub(r'\D', '', str(cik))
+        cik_clean = re.sub(r"\D", "", str(cik))
         # Pad to 10 digits
         return cik_clean.zfill(10)
 
@@ -133,16 +137,20 @@ class FilingFetcher(BaseCollector):
 
             # Calculate similarity score
             normalized_sec_name = self._normalize_company_name(sec_name)
-            score = self._calculate_name_similarity(search_name, normalized_sec_name, search_words)
+            score = self._calculate_name_similarity(
+                search_name, normalized_sec_name, search_words
+            )
 
             if score > 0.4:  # Minimum threshold
                 cik = str(entry.get("cik_str", ""))
-                results.append(CIKSearchResult(
-                    cik=cik,
-                    company_name=sec_name,
-                    ticker=entry.get("ticker"),
-                    match_score=score,
-                ))
+                results.append(
+                    CIKSearchResult(
+                        cik=cik,
+                        company_name=sec_name,
+                        ticker=entry.get("ticker"),
+                        match_score=score,
+                    )
+                )
 
         # Sort by score descending
         results.sort(key=lambda x: x.match_score, reverse=True)
@@ -223,7 +231,8 @@ class FilingFetcher(BaseCollector):
         if (
             self._company_tickers_cache is not None
             and self._company_tickers_cache_time is not None
-            and (datetime.now() - self._company_tickers_cache_time).total_seconds() < 86400
+            and (datetime.now() - self._company_tickers_cache_time).total_seconds()
+            < 86400
         ):
             return self._company_tickers_cache
 
@@ -247,22 +256,41 @@ class FilingFetcher(BaseCollector):
 
         # Remove common suffixes
         suffixes = [
-            ' inc.', ' inc', ' incorporated', ' corp.', ' corp', ' corporation',
-            ' llc', ' l.l.c.', ' ltd', ' ltd.', ' limited', ' plc', ' plc.',
-            ' co.', ' co', ' company', ' companies',
-            ' group', ' holdings', ' holding',
-            ' international', ' intl', ' intl.',
-            ' &', ' and',
+            " inc.",
+            " inc",
+            " incorporated",
+            " corp.",
+            " corp",
+            " corporation",
+            " llc",
+            " l.l.c.",
+            " ltd",
+            " ltd.",
+            " limited",
+            " plc",
+            " plc.",
+            " co.",
+            " co",
+            " company",
+            " companies",
+            " group",
+            " holdings",
+            " holding",
+            " international",
+            " intl",
+            " intl.",
+            " &",
+            " and",
         ]
         for suffix in suffixes:
             if name.endswith(suffix):
-                name = name[:-len(suffix)]
+                name = name[: -len(suffix)]
 
         # Remove punctuation
-        name = re.sub(r'[^\w\s]', ' ', name)
+        name = re.sub(r"[^\w\s]", " ", name)
 
         # Collapse whitespace
-        name = ' '.join(name.split())
+        name = " ".join(name.split())
 
         return name.strip()
 
@@ -613,44 +641,49 @@ class FilingFetcher(BaseCollector):
             from bs4 import BeautifulSoup
 
             # Check if it's XML
-            if '<?xml' not in content[:100].lower() and '<ownershipDocument' not in content[:500]:
+            if (
+                "<?xml" not in content[:100].lower()
+                and "<ownershipDocument" not in content[:500]
+            ):
                 return None
 
-            soup = BeautifulSoup(content, 'xml')
+            soup = BeautifulSoup(content, "xml")
 
             # Find reporting owner
-            owner = soup.find('reportingOwner')
+            owner = soup.find("reportingOwner")
             if not owner:
                 return None
 
             # Get name
-            name_el = owner.find('rptOwnerName')
+            name_el = owner.find("rptOwnerName")
             if not name_el:
                 return None
             name = name_el.get_text(strip=True)
 
             # Get relationship
-            relationship = owner.find('reportingOwnerRelationship')
+            relationship = owner.find("reportingOwnerRelationship")
             is_director = False
             is_officer = False
             title = None
 
             if relationship:
-                is_director_el = relationship.find('isDirector')
-                is_officer_el = relationship.find('isOfficer')
-                title_el = relationship.find('officerTitle')
+                is_director_el = relationship.find("isDirector")
+                is_officer_el = relationship.find("isOfficer")
+                title_el = relationship.find("officerTitle")
 
-                is_director = is_director_el and is_director_el.get_text(strip=True) == '1'
-                is_officer = is_officer_el and is_officer_el.get_text(strip=True) == '1'
+                is_director = (
+                    is_director_el and is_director_el.get_text(strip=True) == "1"
+                )
+                is_officer = is_officer_el and is_officer_el.get_text(strip=True) == "1"
                 title = title_el.get_text(strip=True) if title_el else None
 
             return {
-                'name': name,
-                'title': title,
-                'is_director': is_director,
-                'is_officer': is_officer,
-                'filing_date': filing.filing_date,
-                'source': 'form4',
+                "name": name,
+                "title": title,
+                "is_director": is_director,
+                "is_officer": is_officer,
+                "filing_date": filing.filing_date,
+                "source": "form4",
             }
 
         except Exception as e:

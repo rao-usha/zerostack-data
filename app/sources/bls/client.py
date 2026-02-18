@@ -17,11 +17,17 @@ Rate limits:
 - With API key (free): 500 queries/day, 20 years per query, 50 series per query
 - API key available at: https://data.bls.gov/registrationEngine/
 """
+
 import logging
 from typing import Dict, List, Optional, Any
 
 from app.core.http_client import BaseAPIClient
-from app.core.api_errors import FatalError, RetryableError, ValidationError, RateLimitError
+from app.core.api_errors import (
+    FatalError,
+    RetryableError,
+    ValidationError,
+    RateLimitError,
+)
 from app.core.api_registry import get_api_config
 
 logger = logging.getLogger(__name__)
@@ -49,7 +55,7 @@ class BLSClient(BaseAPIClient):
         api_key: Optional[str] = None,
         max_concurrency: int = 2,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize BLS API client.
@@ -70,12 +76,16 @@ class BLSClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=60.0,  # BLS can be slow
             connect_timeout=15.0,
-            rate_limit_interval=config.rate_limit_interval or 0.5
+            rate_limit_interval=config.rate_limit_interval or 0.5,
         )
 
         # Determine max series per request based on API key presence
-        self.max_series_per_request = self.MAX_SERIES_WITH_KEY if api_key else self.MAX_SERIES_WITHOUT_KEY
-        self.max_years = self.MAX_YEARS_WITH_KEY if api_key else self.MAX_YEARS_WITHOUT_KEY
+        self.max_series_per_request = (
+            self.MAX_SERIES_WITH_KEY if api_key else self.MAX_SERIES_WITHOUT_KEY
+        )
+        self.max_years = (
+            self.MAX_YEARS_WITH_KEY if api_key else self.MAX_YEARS_WITHOUT_KEY
+        )
 
         if not api_key:
             logger.warning(
@@ -90,9 +100,7 @@ class BLSClient(BaseAPIClient):
         )
 
     def _check_api_error(
-        self,
-        data: Dict[str, Any],
-        resource_id: str
+        self, data: Dict[str, Any], resource_id: str
     ) -> Optional[Exception]:
         """Check for BLS-specific API errors."""
         status = data.get("status")
@@ -112,7 +120,7 @@ class BLSClient(BaseAPIClient):
                 return ValidationError(
                     message=f"Invalid series ID: {message}",
                     source=self.SOURCE_NAME,
-                    response_data=data
+                    response_data=data,
                 )
 
             if "rate limit" in message_lower:
@@ -120,13 +128,13 @@ class BLSClient(BaseAPIClient):
                     message=f"Rate limited by BLS: {message}",
                     source=self.SOURCE_NAME,
                     retry_after=30,
-                    response_data=data
+                    response_data=data,
                 )
 
             return FatalError(
                 message=f"BLS API error: {message}",
                 source=self.SOURCE_NAME,
-                response_data=data
+                response_data=data,
             )
 
         # Unknown status - log but don't fail
@@ -141,7 +149,7 @@ class BLSClient(BaseAPIClient):
         start_year: int,
         end_year: int,
         calculations: bool = False,
-        annual_average: bool = False
+        annual_average: bool = False,
     ) -> Dict[str, Any]:
         """
         Fetch time series data for one or more BLS series.
@@ -194,16 +202,11 @@ class BLSClient(BaseAPIClient):
             series_list += f"... ({len(series_ids)} total)"
 
         return await self.post(
-            self.BASE_URL,
-            json_body=payload,
-            resource_id=f"series:[{series_list}]"
+            self.BASE_URL, json_body=payload, resource_id=f"series:[{series_list}]"
         )
 
     async def fetch_multiple_batches(
-        self,
-        series_ids: List[str],
-        start_year: int,
-        end_year: int
+        self, series_ids: List[str], start_year: int, end_year: int
     ) -> Dict[str, List[Dict[str, Any]]]:
         """
         Fetch multiple series, splitting into batches if necessary.
@@ -221,18 +224,18 @@ class BLSClient(BaseAPIClient):
         # Split into batches
         batch_size = self.max_series_per_request
         batches = [
-            series_ids[i:i + batch_size]
+            series_ids[i : i + batch_size]
             for i in range(0, len(series_ids), batch_size)
         ]
 
         for batch_num, batch in enumerate(batches, 1):
-            logger.info(f"Fetching batch {batch_num}/{len(batches)}: {len(batch)} series")
+            logger.info(
+                f"Fetching batch {batch_num}/{len(batches)}: {len(batch)} series"
+            )
 
             try:
                 response = await self.fetch_series(
-                    series_ids=batch,
-                    start_year=start_year,
-                    end_year=end_year
+                    series_ids=batch, start_year=start_year, end_year=end_year
                 )
 
                 # Parse response
@@ -373,8 +376,7 @@ def get_series_for_dataset(dataset: str) -> List[str]:
     if dataset_lower not in COMMON_SERIES:
         available = ", ".join(COMMON_SERIES.keys())
         raise ValueError(
-            f"Unknown BLS dataset: {dataset}. "
-            f"Available datasets: {available}"
+            f"Unknown BLS dataset: {dataset}. " f"Available datasets: {available}"
         )
 
     return list(COMMON_SERIES[dataset_lower].values())

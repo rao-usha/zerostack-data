@@ -1,6 +1,3 @@
 # External Data Ingestion Service
 
 
-
-
-

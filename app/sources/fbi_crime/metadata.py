@@ -7,6 +7,7 @@ Handles:
 - CREATE TABLE SQL generation
 - Data parsing and transformation
 """
+
 import logging
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
@@ -18,16 +19,17 @@ logger = logging.getLogger(__name__)
 # Table Name Generation
 # ============================================
 
+
 def generate_table_name(dataset_type: str, scope: str = "national") -> str:
     """
     Generate table name for FBI crime dataset.
-    
+
     Convention: fbi_crime_{dataset_type}_{scope}
-    
+
     Args:
         dataset_type: Type of data (estimates, summarized, nibrs, hate_crime, leoka)
         scope: Scope of data (national, state, regional)
-        
+
     Returns:
         Table name (e.g., "fbi_crime_estimates_national")
     """
@@ -40,10 +42,11 @@ def generate_table_name(dataset_type: str, scope: str = "national") -> str:
 # CREATE TABLE SQL Generation
 # ============================================
 
+
 def generate_estimates_table_sql(table_name: str) -> str:
     """
     Generate CREATE TABLE SQL for FBI crime estimates data.
-    
+
     Table schema designed for national and state estimates data.
     """
     sql = f"""
@@ -102,7 +105,7 @@ def generate_estimates_table_sql(table_name: str) -> str:
 def generate_summarized_table_sql(table_name: str) -> str:
     """
     Generate CREATE TABLE SQL for FBI summarized crime data.
-    
+
     Summarized data is aggregated by state/agency over time.
     """
     sql = f"""
@@ -141,7 +144,7 @@ def generate_summarized_table_sql(table_name: str) -> str:
 def generate_nibrs_table_sql(table_name: str) -> str:
     """
     Generate CREATE TABLE SQL for NIBRS data.
-    
+
     NIBRS provides detailed incident-based reporting.
     """
     sql = f"""
@@ -292,17 +295,15 @@ def generate_participation_table_sql(table_name: str) -> str:
 # Data Parsing Functions
 # ============================================
 
-def parse_national_estimates(
-    api_response: Any,
-    offense: str
-) -> List[Dict[str, Any]]:
+
+def parse_national_estimates(api_response: Any, offense: str) -> List[Dict[str, Any]]:
     """
     Parse national estimates API response into database rows.
-    
+
     Args:
         api_response: Raw API response (can be list or dict)
         offense: Offense type being queried
-        
+
     Returns:
         List of dictionaries suitable for database insertion
     """
@@ -315,14 +316,16 @@ def parse_national_estimates(
             # Single result in root
             results = [api_response]
     else:
-        logger.warning(f"Unexpected response format for {offense}: {type(api_response)}")
+        logger.warning(
+            f"Unexpected response format for {offense}: {type(api_response)}"
+        )
         return []
-    
+
     parsed_rows = []
     for item in results:
         if not isinstance(item, dict):
             continue
-            
+
         row = {
             "year": item.get("year") or item.get("data_year"),
             "state_abbr": None,  # National data
@@ -350,28 +353,28 @@ def parse_national_estimates(
             "property_crime_rate": _safe_float(item.get("property_crime_rate")),
             "burglary_rate": _safe_float(item.get("burglary_rate")),
             "larceny_rate": _safe_float(item.get("larceny_rate")),
-            "motor_vehicle_theft_rate": _safe_float(item.get("motor_vehicle_theft_rate")),
+            "motor_vehicle_theft_rate": _safe_float(
+                item.get("motor_vehicle_theft_rate")
+            ),
         }
-        
+
         if row.get("year"):
             parsed_rows.append(row)
-    
+
     return parsed_rows
 
 
 def parse_state_estimates(
-    api_response: Any,
-    state_abbr: str,
-    offense: str
+    api_response: Any, state_abbr: str, offense: str
 ) -> List[Dict[str, Any]]:
     """
     Parse state estimates API response into database rows.
-    
+
     Args:
         api_response: Raw API response
         state_abbr: State abbreviation
         offense: Offense type being queried
-        
+
     Returns:
         List of dictionaries suitable for database insertion
     """
@@ -383,12 +386,12 @@ def parse_state_estimates(
             results = [api_response]
     else:
         return []
-    
+
     parsed_rows = []
     for item in results:
         if not isinstance(item, dict):
             continue
-            
+
         row = {
             "year": item.get("year") or item.get("data_year"),
             "state_abbr": state_abbr.upper(),
@@ -416,19 +419,19 @@ def parse_state_estimates(
             "property_crime_rate": _safe_float(item.get("property_crime_rate")),
             "burglary_rate": _safe_float(item.get("burglary_rate")),
             "larceny_rate": _safe_float(item.get("larceny_rate")),
-            "motor_vehicle_theft_rate": _safe_float(item.get("motor_vehicle_theft_rate")),
+            "motor_vehicle_theft_rate": _safe_float(
+                item.get("motor_vehicle_theft_rate")
+            ),
         }
-        
+
         if row.get("year"):
             parsed_rows.append(row)
-    
+
     return parsed_rows
 
 
 def parse_summarized_data(
-    api_response: Any,
-    state_abbr: str,
-    offense: str
+    api_response: Any, state_abbr: str, offense: str
 ) -> List[Dict[str, Any]]:
     """
     Parse summarized crime data API response into database rows.
@@ -439,12 +442,12 @@ def parse_summarized_data(
         results = api_response.get("results", api_response.get("data", []))
     else:
         return []
-    
+
     parsed_rows = []
     for item in results:
         if not isinstance(item, dict):
             continue
-            
+
         row = {
             "year": item.get("year") or item.get("data_year"),
             "month": item.get("month"),
@@ -457,17 +460,15 @@ def parse_summarized_data(
             "cleared_18_under": item.get("cleared_18_under"),
             "data_year": item.get("data_year"),
         }
-        
+
         if row.get("year"):
             parsed_rows.append(row)
-    
+
     return parsed_rows
 
 
 def parse_nibrs_data(
-    api_response: Any,
-    state_abbr: str,
-    variable: str
+    api_response: Any, state_abbr: str, variable: str
 ) -> List[Dict[str, Any]]:
     """
     Parse NIBRS data API response into database rows.
@@ -478,15 +479,15 @@ def parse_nibrs_data(
         results = api_response.get("results", api_response.get("data", []))
     else:
         return []
-    
+
     parsed_rows = []
     for item in results:
         if not isinstance(item, dict):
             continue
-        
+
         # NIBRS data can have nested structure
         data_year = item.get("data_year") or item.get("year")
-        
+
         row = {
             "data_year": data_year,
             "state_abbr": state_abbr.upper(),
@@ -494,21 +495,22 @@ def parse_nibrs_data(
             "offense_name": item.get("offense_name") or item.get("offense"),
             "offense_category": item.get("offense_category"),
             "variable_name": variable,
-            "variable_value": item.get("range") or item.get("key") or str(item.get("value", "")),
+            "variable_value": item.get("range")
+            or item.get("key")
+            or str(item.get("value", "")),
             "count": item.get("count") or item.get("value"),
             "victim_count": item.get("victim_count"),
             "offender_count": item.get("offender_count"),
         }
-        
+
         if row.get("data_year"):
             parsed_rows.append(row)
-    
+
     return parsed_rows
 
 
 def parse_hate_crime_data(
-    api_response: Any,
-    state_abbr: Optional[str] = None
+    api_response: Any, state_abbr: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Parse hate crime data API response into database rows.
@@ -519,12 +521,12 @@ def parse_hate_crime_data(
         results = api_response.get("results", api_response.get("data", []))
     else:
         return []
-    
+
     parsed_rows = []
     for item in results:
         if not isinstance(item, dict):
             continue
-            
+
         row = {
             "data_year": item.get("data_year") or item.get("year"),
             "state_abbr": state_abbr,
@@ -536,16 +538,15 @@ def parse_hate_crime_data(
             "offense_count": item.get("offense_count") or item.get("total_offenses"),
             "victim_count": item.get("victim_count") or item.get("total_victims"),
         }
-        
+
         if row.get("data_year"):
             parsed_rows.append(row)
-    
+
     return parsed_rows
 
 
 def parse_leoka_data(
-    api_response: Any,
-    state_abbr: Optional[str] = None
+    api_response: Any, state_abbr: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Parse LEOKA data API response into database rows.
@@ -556,12 +557,12 @@ def parse_leoka_data(
         results = api_response.get("results", api_response.get("data", []))
     else:
         return []
-    
+
     parsed_rows = []
     for item in results:
         if not isinstance(item, dict):
             continue
-            
+
         row = {
             "data_year": item.get("data_year") or item.get("year"),
             "state_abbr": state_abbr,
@@ -576,16 +577,15 @@ def parse_leoka_data(
             "activity_type": item.get("activity_type") or item.get("circumstance"),
             "activity_count": item.get("activity_count"),
         }
-        
+
         if row.get("data_year"):
             parsed_rows.append(row)
-    
+
     return parsed_rows
 
 
 def parse_participation_data(
-    api_response: Any,
-    state_abbr: Optional[str] = None
+    api_response: Any, state_abbr: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Parse participation data API response into database rows.
@@ -600,32 +600,36 @@ def parse_participation_data(
                 results = [api_response]
     else:
         return []
-    
+
     parsed_rows = []
     for item in results:
         if not isinstance(item, dict):
             continue
-            
+
         row = {
             "data_year": item.get("data_year") or item.get("year"),
             "state_abbr": state_abbr,
             "state_name": item.get("state_name"),
             "total_agencies": item.get("total_agencies"),
-            "participating_agencies": item.get("participating_agencies") or item.get("participating_agency_count"),
+            "participating_agencies": item.get("participating_agencies")
+            or item.get("participating_agency_count"),
             "participation_rate": _safe_float(item.get("participation_rate")),
-            "population_covered": item.get("population_covered") or item.get("population"),
-            "nibrs_participating": item.get("nibrs_participating") or item.get("nibrs_agency_count"),
+            "population_covered": item.get("population_covered")
+            or item.get("population"),
+            "nibrs_participating": item.get("nibrs_participating")
+            or item.get("nibrs_agency_count"),
         }
-        
+
         if row.get("data_year"):
             parsed_rows.append(row)
-    
+
     return parsed_rows
 
 
 # ============================================
 # Helper Functions
 # ============================================
+
 
 def _safe_float(value: Any) -> Optional[float]:
     """Safely convert value to float."""
@@ -640,10 +644,10 @@ def _safe_float(value: Any) -> Optional[float]:
 def get_default_year_range() -> Tuple[int, int]:
     """
     Get default year range for FBI crime data ingestion.
-    
+
     Returns:
         Tuple of (start_year, end_year)
-        
+
     Default: 1985 to current year (full available range)
     """
     current_year = datetime.now().year
@@ -663,7 +667,9 @@ def get_dataset_display_name(dataset_type: str) -> str:
         "leoka": "Law Enforcement Officers Killed and Assaulted",
         "participation": "Agency Participation Rates",
     }
-    return display_names.get(dataset_type.lower(), dataset_type.replace("_", " ").title())
+    return display_names.get(
+        dataset_type.lower(), dataset_type.replace("_", " ").title()
+    )
 
 
 def get_dataset_description(dataset_type: str) -> str:
@@ -698,8 +704,7 @@ def get_dataset_description(dataset_type: str) -> str:
         ),
     }
     return descriptions.get(
-        dataset_type.lower(),
-        f"FBI Crime Data - {dataset_type.replace('_', ' ')}"
+        dataset_type.lower(), f"FBI Crime Data - {dataset_type.replace('_', ' ')}"
     )
 
 

@@ -54,7 +54,11 @@ ROLE_KEYWORDS = {
     "CIO": ["chief investment officer", "cio", "investment officer"],
     "CEO": ["chief executive officer", "ceo", "executive director"],
     "CFO": ["chief financial officer", "cfo", "treasurer"],
-    "Investment Director": ["investment director", "director of investments", "portfolio director"],
+    "Investment Director": [
+        "investment director",
+        "director of investments",
+        "portfolio director",
+    ],
     "Board Member": ["board member", "trustee", "board chair", "chairman"],
     "Managing Director": ["managing director", "md"],
     "IR Contact": ["investor relations", "ir contact"],
@@ -130,7 +134,9 @@ class WebsiteCollector(BaseCollector):
             homepage_html = homepage_response.text
 
             # Find team/contact pages
-            team_links = self._find_matching_links(homepage_html, website_url, TEAM_PAGE_PATTERNS)
+            team_links = self._find_matching_links(
+                homepage_html, website_url, TEAM_PAGE_PATTERNS
+            )
             logger.debug(f"Found {len(team_links)} potential team page links")
 
             # Collect contacts from team pages
@@ -141,15 +147,21 @@ class WebsiteCollector(BaseCollector):
                 items.extend(contact_items)
 
             # Find investment/strategy pages
-            investment_links = self._find_matching_links(homepage_html, website_url, INVESTMENT_PAGE_PATTERNS)
-            logger.debug(f"Found {len(investment_links)} potential investment page links")
+            investment_links = self._find_matching_links(
+                homepage_html, website_url, INVESTMENT_PAGE_PATTERNS
+            )
+            logger.debug(
+                f"Found {len(investment_links)} potential investment page links"
+            )
 
             # Extract document links
             doc_items = self._extract_document_links(homepage_html, website_url, lp_id)
             items.extend(doc_items)
 
             # Basic strategy extraction from homepage
-            strategy_item = self._extract_basic_strategy(homepage_html, lp_id, website_url)
+            strategy_item = self._extract_basic_strategy(
+                homepage_html, lp_id, website_url
+            )
             if strategy_item:
                 items.append(strategy_item)
 
@@ -279,7 +291,7 @@ class WebsiteCollector(BaseCollector):
         name_title_pattern = re.compile(
             r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*[,\-]?\s*"
             r"((?:Chief|Director|Managing|Vice|Senior|Executive|Board|Trustee)[^<\n]{5,60})",
-            re.IGNORECASE
+            re.IGNORECASE,
         )
 
         for match in name_title_pattern.finditer(html):
@@ -385,7 +397,7 @@ class WebsiteCollector(BaseCollector):
         # Look for AUM mentions
         aum_pattern = re.compile(
             r"\$?\s*(\d+(?:\.\d+)?)\s*(billion|million|B|M)\s*(?:in\s+)?(?:assets|AUM|under management)",
-            re.IGNORECASE
+            re.IGNORECASE,
         )
 
         match = aum_pattern.search(html)

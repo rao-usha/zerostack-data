@@ -38,8 +38,10 @@ router = APIRouter(prefix="/fo-collection", tags=["Family Office Collection"])
 # Request/Response Models
 # ============================================================================
 
+
 class FoCollectionJobRequest(BaseModel):
     """Request to start a FO collection job."""
+
     fo_types: Optional[List[str]] = None
     regions: Optional[List[str]] = None
     sources: List[str] = ["website", "news", "deals"]
@@ -49,6 +51,7 @@ class FoCollectionJobRequest(BaseModel):
 
 class FoCollectionJobResponse(BaseModel):
     """Response from a collection job."""
+
     status: str
     total_fos: int
     completed_fos: int
@@ -60,6 +63,7 @@ class FoCollectionJobResponse(BaseModel):
 
 class FoCoverageResponse(BaseModel):
     """Family Office coverage statistics."""
+
     total_in_registry: int
     total_in_database: int
     coverage_pct: float
@@ -69,6 +73,7 @@ class FoCoverageResponse(BaseModel):
 
 class FoSeedResponse(BaseModel):
     """Response from seeding FOs."""
+
     status: str
     total_in_registry: int
     created: int
@@ -80,6 +85,7 @@ class FoSeedResponse(BaseModel):
 # ============================================================================
 # Seed Endpoints
 # ============================================================================
+
 
 @router.post("/seed-fos", response_model=FoSeedResponse)
 async def seed_fos_from_registry(
@@ -102,9 +108,9 @@ async def seed_fos_from_registry(
     for entry in registry:
         try:
             # Check if FO already exists
-            existing = db.query(FamilyOffice).filter(
-                FamilyOffice.name == entry.name
-            ).first()
+            existing = (
+                db.query(FamilyOffice).filter(FamilyOffice.name == entry.name).first()
+            )
 
             # Convert AUM to string for estimated_wealth field
             estimated_wealth = None
@@ -118,7 +124,9 @@ async def seed_fos_from_registry(
                 existing.website = entry.website_url
                 existing.type = entry.fo_type
                 existing.region = entry.region
-                existing.country = entry.country_code  # FoRegistryEntry uses country_code
+                existing.country = (
+                    entry.country_code
+                )  # FoRegistryEntry uses country_code
                 existing.city = entry.city
                 existing.state_province = entry.state_province
                 existing.estimated_wealth = estimated_wealth
@@ -174,6 +182,7 @@ async def seed_fos_from_registry(
 # Collection Job Endpoints
 # ============================================================================
 
+
 @router.post("/jobs", response_model=FoCollectionJobResponse)
 async def create_collection_job(
     request: FoCollectionJobRequest,
@@ -193,7 +202,7 @@ async def create_collection_job(
         except ValueError:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid source: {s}. Valid: website, news, deals"
+                detail=f"Invalid source: {s}. Valid: website, news, deals",
             )
 
     config = FoCollectionConfig(
@@ -205,6 +214,7 @@ async def create_collection_job(
     )
 
     from app.core.job_queue_service import submit_job, WORKER_MODE
+
     if WORKER_MODE:
         submit_result = submit_job(
             db=db,
@@ -252,8 +262,7 @@ async def collect_single_fo(
     fo = get_fo_by_name(fo_name)
     if not fo:
         raise HTTPException(
-            status_code=404,
-            detail=f"FO not found in registry: {fo_name}"
+            status_code=404, detail=f"FO not found in registry: {fo_name}"
         )
 
     # Build config
@@ -262,10 +271,7 @@ async def collect_single_fo(
         try:
             source_enums.append(FoCollectionSource(s))
         except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid source: {s}"
-            )
+            raise HTTPException(status_code=400, detail=f"Invalid source: {s}")
 
     config = FoCollectionConfig(sources=source_enums)
     orchestrator = FoCollectionOrchestrator(config=config, db=db)
@@ -282,6 +288,7 @@ async def collect_single_fo(
 # ============================================================================
 # Coverage & Status Endpoints
 # ============================================================================
+
 
 @router.get("/coverage", response_model=FoCoverageResponse)
 async def get_fo_coverage(
@@ -302,19 +309,21 @@ async def get_fo_coverage(
 
     # By type in database
     db_by_type = {}
-    type_counts = db.query(
-        FamilyOffice.type,
-        func.count(FamilyOffice.id)
-    ).group_by(FamilyOffice.type).all()
+    type_counts = (
+        db.query(FamilyOffice.type, func.count(FamilyOffice.id))
+        .group_by(FamilyOffice.type)
+        .all()
+    )
     for fo_type, count in type_counts:
         db_by_type[fo_type or "unknown"] = count
 
     # By region in database
     db_by_region = {}
-    region_counts = db.query(
-        FamilyOffice.region,
-        func.count(FamilyOffice.id)
-    ).group_by(FamilyOffice.region).all()
+    region_counts = (
+        db.query(FamilyOffice.region, func.count(FamilyOffice.id))
+        .group_by(FamilyOffice.region)
+        .all()
+    )
     for region, count in region_counts:
         db_by_region[region or "unknown"] = count
 
@@ -361,7 +370,7 @@ async def list_registry_fos(
 
     # Paginate
     total = len(registry)
-    registry = registry[offset:offset + limit]
+    registry = registry[offset : offset + limit]
 
     return {
         "total": total,
@@ -386,6 +395,7 @@ async def list_registry_fos(
 # FO Query Endpoints
 # ============================================================================
 
+
 @router.get("/family-offices/{fo_id}/contacts")
 async def get_fo_contacts(
     fo_id: int,
@@ -402,9 +412,11 @@ async def get_fo_contacts(
     if not fo:
         raise HTTPException(status_code=404, detail="Family Office not found")
 
-    contacts = db.query(FamilyOfficeContact).filter(
-        FamilyOfficeContact.family_office_id == fo_id
-    ).all()
+    contacts = (
+        db.query(FamilyOfficeContact)
+        .filter(FamilyOfficeContact.family_office_id == fo_id)
+        .all()
+    )
 
     return {
         "fo_id": fo_id,
@@ -429,7 +441,9 @@ async def get_fo_contacts(
 
 @router.get("/family-offices/by-sector")
 async def get_fos_by_sector(
-    sector: str = Query(..., description="Sector of interest (e.g., 'AI', 'Healthcare', 'Fintech')"),
+    sector: str = Query(
+        ..., description="Sector of interest (e.g., 'AI', 'Healthcare', 'Fintech')"
+    ),
     limit: int = Query(default=50, le=200),
     db: Session = Depends(get_db),
 ):
@@ -441,9 +455,12 @@ async def get_fos_by_sector(
     from sqlalchemy import any_
 
     # Search for FOs with matching sector in their sectors_of_interest array
-    fos = db.query(FamilyOffice).filter(
-        FamilyOffice.sectors_of_interest.any(sector)
-    ).limit(limit).all()
+    fos = (
+        db.query(FamilyOffice)
+        .filter(FamilyOffice.sectors_of_interest.any(sector))
+        .limit(limit)
+        .all()
+    )
 
     return {
         "sector": sector,
@@ -465,8 +482,13 @@ async def get_fos_by_sector(
 
 @router.get("/family-offices/active-investors")
 async def get_active_fo_investors(
-    investment_focus: Optional[str] = Query(None, description="Filter by investment focus (e.g., 'Venture Capital', 'Real Estate')"),
-    min_aum_billions: Optional[float] = Query(None, description="Minimum estimated AUM in billions"),
+    investment_focus: Optional[str] = Query(
+        None,
+        description="Filter by investment focus (e.g., 'Venture Capital', 'Real Estate')",
+    ),
+    min_aum_billions: Optional[float] = Query(
+        None, description="Minimum estimated AUM in billions"
+    ),
     region: Optional[str] = Query(None, description="Filter by region"),
     limit: int = Query(default=50, le=200),
     db: Session = Depends(get_db),
@@ -477,8 +499,7 @@ async def get_active_fo_investors(
     Returns FOs marked as actively investing with optional filters.
     """
     query = db.query(FamilyOffice).filter(
-        FamilyOffice.actively_investing == True,
-        FamilyOffice.status == "Active"
+        FamilyOffice.actively_investing == True, FamilyOffice.status == "Active"
     )
 
     if investment_focus:

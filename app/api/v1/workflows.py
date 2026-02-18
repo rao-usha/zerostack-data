@@ -20,17 +20,26 @@ router = APIRouter(prefix="/workflows", tags=["workflows"])
 # REQUEST/RESPONSE MODELS
 # =============================================================================
 
+
 class WorkflowStep(BaseModel):
     """Step definition for custom workflows."""
+
     id: str = Field(..., description="Unique step identifier")
     agent: str = Field(..., description="Agent type to execute")
-    parallel_group: Optional[int] = Field(None, description="Group for parallel execution")
-    depends_on: List[str] = Field(default_factory=list, description="Step IDs this depends on")
+    parallel_group: Optional[int] = Field(
+        None, description="Group for parallel execution"
+    )
+    depends_on: List[str] = Field(
+        default_factory=list, description="Step IDs this depends on"
+    )
 
 
 class StartWorkflowRequest(BaseModel):
     """Request to start a workflow."""
-    workflow_type: str = Field(..., description="Workflow template ID", examples=["full_due_diligence"])
+
+    workflow_type: str = Field(
+        ..., description="Workflow template ID", examples=["full_due_diligence"]
+    )
     entity_name: str = Field(..., description="Target entity name", examples=["Stripe"])
     entity_type: str = Field("company", description="Entity type", examples=["company"])
     domain: Optional[str] = Field(None, description="Company domain for enrichment")
@@ -39,6 +48,7 @@ class StartWorkflowRequest(BaseModel):
 
 class CreateCustomWorkflowRequest(BaseModel):
     """Request to create a custom workflow template."""
+
     name: str = Field(..., description="Workflow name", min_length=1, max_length=100)
     description: str = Field(..., description="Workflow description")
     steps: List[WorkflowStep] = Field(..., description="Workflow steps", min_length=1)
@@ -46,6 +56,7 @@ class CreateCustomWorkflowRequest(BaseModel):
 
 class WorkflowStepResponse(BaseModel):
     """Response for a workflow step."""
+
     step_id: str
     agent_type: str
     status: str
@@ -57,6 +68,7 @@ class WorkflowStepResponse(BaseModel):
 
 class WorkflowResponse(BaseModel):
     """Response for workflow status."""
+
     workflow_id: str
     workflow_type: str
     workflow_name: Optional[str] = None
@@ -78,6 +90,7 @@ class WorkflowResponse(BaseModel):
 
 class WorkflowListItem(BaseModel):
     """Summary item for workflow list."""
+
     workflow_id: str
     workflow_type: str
     workflow_name: Optional[str] = None
@@ -93,6 +106,7 @@ class WorkflowListItem(BaseModel):
 
 class TemplateStepResponse(BaseModel):
     """Step in a workflow template."""
+
     id: str
     agent: str
     parallel_group: Optional[int] = None
@@ -101,6 +115,7 @@ class TemplateStepResponse(BaseModel):
 
 class TemplateResponse(BaseModel):
     """Response for workflow template."""
+
     id: str
     name: str
     description: Optional[str] = None
@@ -112,6 +127,7 @@ class TemplateResponse(BaseModel):
 
 class AgentResponse(BaseModel):
     """Response for available agent."""
+
     id: str
     name: str
     description: str
@@ -119,6 +135,7 @@ class AgentResponse(BaseModel):
 
 class StatsResponse(BaseModel):
     """Response for workflow statistics."""
+
     workflows: dict
     by_type: dict
     available_agents: List[str]
@@ -128,6 +145,7 @@ class StatsResponse(BaseModel):
 # =============================================================================
 # API ENDPOINTS
 # =============================================================================
+
 
 @router.post("/start", response_model=dict, summary="Start a workflow")
 def start_workflow(
@@ -174,7 +192,9 @@ def start_workflow(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/{workflow_id}", response_model=WorkflowResponse, summary="Get workflow status")
+@router.get(
+    "/{workflow_id}", response_model=WorkflowResponse, summary="Get workflow status"
+)
 def get_workflow_status(
     workflow_id: str,
     db: Session = Depends(get_db),
@@ -188,7 +208,9 @@ def get_workflow_status(
     result = orchestrator.get_workflow_status(workflow_id)
 
     if not result:
-        raise HTTPException(status_code=404, detail=f"Workflow not found: {workflow_id}")
+        raise HTTPException(
+            status_code=404, detail=f"Workflow not found: {workflow_id}"
+        )
 
     return result
 
@@ -206,7 +228,9 @@ def list_workflows(
     **Status values:** pending, running, completed, partial, failed, cancelled
     """
     orchestrator = MultiAgentOrchestrator(db)
-    return orchestrator.list_workflows(status=status, entity_name=entity_name, limit=limit)
+    return orchestrator.list_workflows(
+        status=status, entity_name=entity_name, limit=limit
+    )
 
 
 @router.delete("/{workflow_id}", summary="Cancel workflow")
@@ -225,13 +249,17 @@ def cancel_workflow(
     if not success:
         raise HTTPException(
             status_code=400,
-            detail="Cannot cancel workflow - either not found or already completed"
+            detail="Cannot cancel workflow - either not found or already completed",
         )
 
     return {"message": f"Workflow {workflow_id} cancelled", "status": "cancelled"}
 
 
-@router.get("/templates/list", response_model=List[TemplateResponse], summary="List workflow templates")
+@router.get(
+    "/templates/list",
+    response_model=List[TemplateResponse],
+    summary="List workflow templates",
+)
 def get_templates(
     db: Session = Depends(get_db),
 ):
@@ -248,21 +276,25 @@ def get_templates(
     for t in templates:
         steps = []
         for step in t.get("steps", []):
-            steps.append(TemplateStepResponse(
-                id=step.get("id"),
-                agent=step.get("agent"),
-                parallel_group=step.get("parallel_group"),
-                depends_on=step.get("depends_on", []),
-            ))
-        result.append(TemplateResponse(
-            id=t["id"],
-            name=t["name"],
-            description=t.get("description"),
-            steps=steps,
-            estimated_duration_minutes=t.get("estimated_duration_minutes"),
-            is_custom=t.get("is_custom", False),
-            created_at=t.get("created_at"),
-        ))
+            steps.append(
+                TemplateStepResponse(
+                    id=step.get("id"),
+                    agent=step.get("agent"),
+                    parallel_group=step.get("parallel_group"),
+                    depends_on=step.get("depends_on", []),
+                )
+            )
+        result.append(
+            TemplateResponse(
+                id=t["id"],
+                name=t["name"],
+                description=t.get("description"),
+                steps=steps,
+                estimated_duration_minutes=t.get("estimated_duration_minutes"),
+                is_custom=t.get("is_custom", False),
+                created_at=t.get("created_at"),
+            )
+        )
 
     return result
 
@@ -328,7 +360,11 @@ def create_custom_workflow(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/agents/available", response_model=List[AgentResponse], summary="List available agents")
+@router.get(
+    "/agents/available",
+    response_model=List[AgentResponse],
+    summary="List available agents",
+)
 def get_available_agents(
     db: Session = Depends(get_db),
 ):
@@ -341,7 +377,9 @@ def get_available_agents(
     return orchestrator.get_available_agents()
 
 
-@router.get("/stats/summary", response_model=StatsResponse, summary="Get workflow statistics")
+@router.get(
+    "/stats/summary", response_model=StatsResponse, summary="Get workflow statistics"
+)
 def get_stats(
     db: Session = Depends(get_db),
 ):

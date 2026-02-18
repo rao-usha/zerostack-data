@@ -3,6 +3,7 @@ Data quality rules management endpoints.
 
 Provides API for creating, managing, and evaluating data quality rules.
 """
+
 import logging
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,8 +13,12 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.core.models import (
-    DataQualityRule, DataQualityResult, DataQualityReport,
-    RuleType, RuleSeverity, IngestionJob
+    DataQualityRule,
+    DataQualityResult,
+    DataQualityReport,
+    RuleType,
+    RuleSeverity,
+    IngestionJob,
 )
 from app.core import data_quality_service
 
@@ -26,21 +31,37 @@ router = APIRouter(prefix="/data-quality", tags=["data-quality"])
 # Pydantic Schemas
 # =============================================================================
 
+
 class RuleCreate(BaseModel):
     """Request schema for creating a data quality rule."""
+
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
-    source: Optional[str] = Field(default=None, description="Data source (null = all sources)")
-    dataset_pattern: Optional[str] = Field(default=None, description="Regex pattern for dataset names")
-    column_name: Optional[str] = Field(default=None, description="Column to check (null = table-level)")
-    rule_type: str = Field(..., description="Rule type: range, not_null, unique, regex, freshness, row_count, enum")
+    source: Optional[str] = Field(
+        default=None, description="Data source (null = all sources)"
+    )
+    dataset_pattern: Optional[str] = Field(
+        default=None, description="Regex pattern for dataset names"
+    )
+    column_name: Optional[str] = Field(
+        default=None, description="Column to check (null = table-level)"
+    )
+    rule_type: str = Field(
+        ...,
+        description="Rule type: range, not_null, unique, regex, freshness, row_count, enum",
+    )
     severity: str = Field(default="error", description="Severity: error, warning, info")
-    parameters: Dict[str, Any] = Field(default_factory=dict, description="Rule-specific parameters")
-    priority: int = Field(default=5, ge=1, le=10, description="Priority (1=highest, 10=lowest)")
+    parameters: Dict[str, Any] = Field(
+        default_factory=dict, description="Rule-specific parameters"
+    )
+    priority: int = Field(
+        default=5, ge=1, le=10, description="Priority (1=highest, 10=lowest)"
+    )
 
 
 class RuleUpdate(BaseModel):
     """Request schema for updating a data quality rule."""
+
     name: Optional[str] = Field(default=None, min_length=1, max_length=255)
     description: Optional[str] = None
     source: Optional[str] = None
@@ -54,6 +75,7 @@ class RuleUpdate(BaseModel):
 
 class RuleResponse(BaseModel):
     """Response schema for data quality rule."""
+
     id: int
     name: str
     description: Optional[str]
@@ -75,6 +97,7 @@ class RuleResponse(BaseModel):
 
 class ResultResponse(BaseModel):
     """Response schema for rule evaluation result."""
+
     id: int
     rule_id: int
     job_id: Optional[int]
@@ -96,6 +119,7 @@ class ResultResponse(BaseModel):
 
 class ReportResponse(BaseModel):
     """Response schema for data quality report."""
+
     id: int
     job_id: Optional[int]
     source: Optional[str]
@@ -116,6 +140,7 @@ class ReportResponse(BaseModel):
 
 class EvaluateRequest(BaseModel):
     """Request schema for manual rule evaluation."""
+
     table_name: str = Field(..., description="Table name to evaluate")
     source: str = Field(..., description="Data source")
 
@@ -124,12 +149,13 @@ class EvaluateRequest(BaseModel):
 # Rule CRUD Endpoints
 # =============================================================================
 
+
 @router.get("/rules", response_model=List[RuleResponse])
 def list_rules(
     source: Optional[str] = Query(default=None, description="Filter by source"),
     rule_type: Optional[str] = Query(default=None, description="Filter by rule type"),
     enabled_only: bool = Query(default=False, description="Only show enabled rules"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> List[RuleResponse]:
     """
     List all data quality rules.
@@ -161,9 +187,11 @@ def list_rules(
             times_evaluated=r.times_evaluated,
             times_passed=r.times_passed,
             times_failed=r.times_failed,
-            last_evaluated_at=r.last_evaluated_at.isoformat() if r.last_evaluated_at else None,
+            last_evaluated_at=r.last_evaluated_at.isoformat()
+            if r.last_evaluated_at
+            else None,
             created_at=r.created_at.isoformat(),
-            updated_at=r.updated_at.isoformat()
+            updated_at=r.updated_at.isoformat(),
         )
         for r in rules
     ]
@@ -181,59 +209,61 @@ def list_rule_types():
                 "description": "Value must be within min/max range",
                 "parameters": {"min": "number (optional)", "max": "number (optional)"},
                 "requires_column": True,
-                "example": {"min": 0, "max": 100}
+                "example": {"min": 0, "max": 100},
             },
             {
                 "type": "not_null",
                 "description": "Value must not be null",
                 "parameters": {},
                 "requires_column": True,
-                "example": {}
+                "example": {},
             },
             {
                 "type": "unique",
                 "description": "Values must be unique (no duplicates)",
                 "parameters": {},
                 "requires_column": True,
-                "example": {}
+                "example": {},
             },
             {
                 "type": "regex",
                 "description": "Value must match regex pattern",
                 "parameters": {"pattern": "regex string"},
                 "requires_column": True,
-                "example": {"pattern": "^[A-Z]{2}$"}
+                "example": {"pattern": "^[A-Z]{2}$"},
             },
             {
                 "type": "freshness",
                 "description": "Data must be recent (date/timestamp column)",
-                "parameters": {"max_age_hours": "number", "max_age_days": "number (alternative)"},
+                "parameters": {
+                    "max_age_hours": "number",
+                    "max_age_days": "number (alternative)",
+                },
                 "requires_column": True,
-                "example": {"max_age_hours": 24}
+                "example": {"max_age_hours": 24},
             },
             {
                 "type": "row_count",
                 "description": "Table must have min/max row count",
                 "parameters": {"min": "number (optional)", "max": "number (optional)"},
                 "requires_column": False,
-                "example": {"min": 1, "max": 1000000}
+                "example": {"min": 1, "max": 1000000},
             },
             {
                 "type": "enum",
                 "description": "Value must be in allowed list",
                 "parameters": {"allowed": "array of values"},
                 "requires_column": True,
-                "example": {"allowed": ["A", "B", "C"]}
-            }
+                "example": {"allowed": ["A", "B", "C"]},
+            },
         ],
-        "severities": ["error", "warning", "info"]
+        "severities": ["error", "warning", "info"],
     }
 
 
 @router.post("/rules", response_model=RuleResponse, status_code=201)
 def create_rule(
-    rule_request: RuleCreate,
-    db: Session = Depends(get_db)
+    rule_request: RuleCreate, db: Session = Depends(get_db)
 ) -> RuleResponse:
     """
     Create a new data quality rule.
@@ -249,8 +279,7 @@ def create_rule(
     except ValueError:
         valid_types = [t.value for t in RuleType]
         raise HTTPException(
-            status_code=400,
-            detail=f"Invalid rule_type. Must be one of: {valid_types}"
+            status_code=400, detail=f"Invalid rule_type. Must be one of: {valid_types}"
         )
 
     # Validate severity
@@ -260,15 +289,19 @@ def create_rule(
         valid_severities = [s.value for s in RuleSeverity]
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid severity. Must be one of: {valid_severities}"
+            detail=f"Invalid severity. Must be one of: {valid_severities}",
         )
 
     # Check for duplicate name
-    existing = db.query(DataQualityRule).filter(
-        DataQualityRule.name == rule_request.name
-    ).first()
+    existing = (
+        db.query(DataQualityRule)
+        .filter(DataQualityRule.name == rule_request.name)
+        .first()
+    )
     if existing:
-        raise HTTPException(status_code=400, detail="Rule with this name already exists")
+        raise HTTPException(
+            status_code=400, detail="Rule with this name already exists"
+        )
 
     rule = data_quality_service.create_rule(
         db=db,
@@ -280,7 +313,7 @@ def create_rule(
         column_name=rule_request.column_name,
         parameters=rule_request.parameters,
         description=rule_request.description,
-        priority=rule_request.priority
+        priority=rule_request.priority,
     )
 
     return RuleResponse(
@@ -298,9 +331,11 @@ def create_rule(
         times_evaluated=rule.times_evaluated,
         times_passed=rule.times_passed,
         times_failed=rule.times_failed,
-        last_evaluated_at=rule.last_evaluated_at.isoformat() if rule.last_evaluated_at else None,
+        last_evaluated_at=rule.last_evaluated_at.isoformat()
+        if rule.last_evaluated_at
+        else None,
         created_at=rule.created_at.isoformat(),
-        updated_at=rule.updated_at.isoformat()
+        updated_at=rule.updated_at.isoformat(),
     )
 
 
@@ -327,17 +362,17 @@ def get_rule(rule_id: int, db: Session = Depends(get_db)) -> RuleResponse:
         times_evaluated=rule.times_evaluated,
         times_passed=rule.times_passed,
         times_failed=rule.times_failed,
-        last_evaluated_at=rule.last_evaluated_at.isoformat() if rule.last_evaluated_at else None,
+        last_evaluated_at=rule.last_evaluated_at.isoformat()
+        if rule.last_evaluated_at
+        else None,
         created_at=rule.created_at.isoformat(),
-        updated_at=rule.updated_at.isoformat()
+        updated_at=rule.updated_at.isoformat(),
     )
 
 
 @router.patch("/rules/{rule_id}", response_model=RuleResponse)
 def update_rule(
-    rule_id: int,
-    rule_update: RuleUpdate,
-    db: Session = Depends(get_db)
+    rule_id: int, rule_update: RuleUpdate, db: Session = Depends(get_db)
 ) -> RuleResponse:
     """Update a data quality rule."""
     rule = db.query(DataQualityRule).filter(DataQualityRule.id == rule_id).first()
@@ -386,9 +421,11 @@ def update_rule(
         times_evaluated=rule.times_evaluated,
         times_passed=rule.times_passed,
         times_failed=rule.times_failed,
-        last_evaluated_at=rule.last_evaluated_at.isoformat() if rule.last_evaluated_at else None,
+        last_evaluated_at=rule.last_evaluated_at.isoformat()
+        if rule.last_evaluated_at
+        else None,
         created_at=rule.created_at.isoformat(),
-        updated_at=rule.updated_at.isoformat()
+        updated_at=rule.updated_at.isoformat(),
     )
 
 
@@ -438,10 +475,10 @@ def disable_rule(rule_id: int, db: Session = Depends(get_db)):
 # Evaluation Endpoints
 # =============================================================================
 
+
 @router.post("/evaluate", response_model=ReportResponse)
 def evaluate_table(
-    request: EvaluateRequest,
-    db: Session = Depends(get_db)
+    request: EvaluateRequest, db: Session = Depends(get_db)
 ) -> ReportResponse:
     """
     Manually evaluate data quality rules against a table.
@@ -452,7 +489,7 @@ def evaluate_table(
     job = IngestionJob(
         source=request.source,
         status="success",  # Pretend it's a completed job
-        config={"table_name": request.table_name, "manual_evaluation": True}
+        config={"table_name": request.table_name, "manual_evaluation": True},
     )
     db.add(job)
     db.commit()
@@ -460,9 +497,7 @@ def evaluate_table(
 
     try:
         report = data_quality_service.evaluate_rules_for_job(
-            db=db,
-            job=job,
-            table_name=request.table_name
+            db=db, job=job, table_name=request.table_name
         )
 
         return ReportResponse(
@@ -481,7 +516,9 @@ def evaluate_table(
             failed_rules=report.failed_rules,
             execution_time_ms=report.execution_time_ms,
             started_at=report.started_at.isoformat(),
-            completed_at=report.completed_at.isoformat() if report.completed_at else None
+            completed_at=report.completed_at.isoformat()
+            if report.completed_at
+            else None,
         )
 
     except Exception as e:
@@ -491,9 +528,7 @@ def evaluate_table(
 
 @router.post("/rules/{rule_id}/evaluate")
 def evaluate_single_rule(
-    rule_id: int,
-    request: EvaluateRequest,
-    db: Session = Depends(get_db)
+    rule_id: int, request: EvaluateRequest, db: Session = Depends(get_db)
 ):
     """
     Evaluate a single rule against a table.
@@ -518,7 +553,7 @@ def evaluate_single_rule(
             "rows_passed": result.rows_passed,
             "rows_failed": result.rows_failed,
             "sample_failures": result.sample_failures,
-            "execution_time_ms": result.execution_time_ms
+            "execution_time_ms": result.execution_time_ms,
         }
 
     except Exception as e:
@@ -530,23 +565,20 @@ def evaluate_single_rule(
 # Results & Reports Endpoints
 # =============================================================================
 
+
 @router.get("/results", response_model=List[ResultResponse])
 def list_results(
     rule_id: Optional[int] = Query(default=None, description="Filter by rule ID"),
     job_id: Optional[int] = Query(default=None, description="Filter by job ID"),
     passed: Optional[bool] = Query(default=None, description="Filter by passed status"),
     limit: int = Query(default=100, ge=1, le=1000),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> List[ResultResponse]:
     """
     List rule evaluation results.
     """
     results = data_quality_service.get_rule_results(
-        db=db,
-        rule_id=rule_id,
-        job_id=job_id,
-        passed_only=passed,
-        limit=limit
+        db=db, rule_id=rule_id, job_id=job_id, passed_only=passed, limit=limit
     )
 
     return [
@@ -567,7 +599,7 @@ def list_results(
             rows_passed=r.rows_passed,
             rows_failed=r.rows_failed,
             execution_time_ms=r.execution_time_ms,
-            evaluated_at=r.evaluated_at.isoformat()
+            evaluated_at=r.evaluated_at.isoformat(),
         )
         for r in results
     ]
@@ -579,7 +611,7 @@ def list_reports(
     source: Optional[str] = Query(default=None, description="Filter by source"),
     status: Optional[str] = Query(default=None, description="Filter by status"),
     limit: int = Query(default=50, ge=1, le=500),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> List[ReportResponse]:
     """
     List data quality reports.
@@ -612,7 +644,7 @@ def list_reports(
             failed_rules=r.failed_rules,
             execution_time_ms=r.execution_time_ms,
             started_at=r.started_at.isoformat(),
-            completed_at=r.completed_at.isoformat() if r.completed_at else None
+            completed_at=r.completed_at.isoformat() if r.completed_at else None,
         )
         for r in reports
     ]
@@ -642,7 +674,7 @@ def get_report(report_id: int, db: Session = Depends(get_db)) -> ReportResponse:
         failed_rules=report.failed_rules,
         execution_time_ms=report.execution_time_ms,
         started_at=report.started_at.isoformat(),
-        completed_at=report.completed_at.isoformat() if report.completed_at else None
+        completed_at=report.completed_at.isoformat() if report.completed_at else None,
     )
 
 
@@ -670,14 +702,13 @@ def get_job_report(job_id: int, db: Session = Depends(get_db)) -> ReportResponse
         failed_rules=report.failed_rules,
         execution_time_ms=report.execution_time_ms,
         started_at=report.started_at.isoformat(),
-        completed_at=report.completed_at.isoformat() if report.completed_at else None
+        completed_at=report.completed_at.isoformat() if report.completed_at else None,
     )
 
 
 @router.get("/reports/{report_id}/results", response_model=List[ResultResponse])
 def get_report_results(
-    report_id: int,
-    db: Session = Depends(get_db)
+    report_id: int, db: Session = Depends(get_db)
 ) -> List[ResultResponse]:
     """Get all rule results for a specific report."""
     report = data_quality_service.get_report(db, report_id)
@@ -685,9 +716,11 @@ def get_report_results(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
 
-    results = db.query(DataQualityResult).filter(
-        DataQualityResult.job_id == report.job_id
-    ).all()
+    results = (
+        db.query(DataQualityResult)
+        .filter(DataQualityResult.job_id == report.job_id)
+        .all()
+    )
 
     return [
         ResultResponse(
@@ -707,7 +740,7 @@ def get_report_results(
             rows_passed=r.rows_passed,
             rows_failed=r.rows_failed,
             execution_time_ms=r.execution_time_ms,
-            evaluated_at=r.evaluated_at.isoformat()
+            evaluated_at=r.evaluated_at.isoformat(),
         )
         for r in results
     ]

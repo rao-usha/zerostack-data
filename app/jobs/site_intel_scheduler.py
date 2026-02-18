@@ -136,8 +136,14 @@ class SiteIntelScheduler:
             Summary across all domains
         """
         domains = [
-            "power", "telecom", "transport", "risk",
-            "water_utilities", "incentives", "logistics", "labor",
+            "power",
+            "telecom",
+            "transport",
+            "risk",
+            "water_utilities",
+            "incentives",
+            "logistics",
+            "labor",
         ]
 
         results = {
@@ -171,6 +177,7 @@ class SiteIntelScheduler:
 # APScheduler Wrappers (called by scheduler)
 # =============================================================================
 
+
 async def _run_quarterly_site_intel_refresh():
     """APScheduler wrapper for quarterly full refresh."""
     from app.core.database import get_session_factory
@@ -181,7 +188,9 @@ async def _run_quarterly_site_intel_refresh():
     try:
         scheduler = SiteIntelScheduler(db)
         result = await scheduler.run_quarterly_refresh()
-        logger.info(f"Quarterly site intel refresh completed: {result.get('total_successful', 0)} domains succeeded")
+        logger.info(
+            f"Quarterly site intel refresh completed: {result.get('total_successful', 0)} domains succeeded"
+        )
         return result
     except Exception as e:
         logger.error(f"Quarterly site intel refresh failed: {e}", exc_info=True)
@@ -213,6 +222,7 @@ async def _run_monthly_logistics_update():
 # APScheduler Registration
 # =============================================================================
 
+
 def register_site_intel_schedules() -> Dict[str, bool]:
     """
     Register all site intel scheduled jobs with APScheduler.
@@ -236,7 +246,9 @@ def register_site_intel_schedules() -> Dict[str, bool]:
             replace_existing=True,
         )
         results["site_intel_quarterly_refresh"] = True
-        logger.info("Registered quarterly site intel refresh (2nd of Jan/Apr/Jul/Oct, 1 AM UTC)")
+        logger.info(
+            "Registered quarterly site intel refresh (2nd of Jan/Apr/Jul/Oct, 1 AM UTC)"
+        )
     except Exception as e:
         logger.error(f"Failed to register quarterly site intel refresh: {e}")
         results["site_intel_quarterly_refresh"] = False
@@ -298,21 +310,27 @@ def get_site_intel_schedule_status() -> Dict[str, Any]:
     for job_id in job_ids:
         job = scheduler.get_job(job_id)
         if job:
-            jobs.append({
-                "id": job.id,
-                "name": job.name,
-                "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
-                "trigger": str(job.trigger),
-                "active": True,
-            })
+            jobs.append(
+                {
+                    "id": job.id,
+                    "name": job.name,
+                    "next_run": job.next_run_time.isoformat()
+                    if job.next_run_time
+                    else None,
+                    "trigger": str(job.trigger),
+                    "active": True,
+                }
+            )
         else:
-            jobs.append({
-                "id": job_id,
-                "name": job_id.replace("site_intel_", "").replace("_", " ").title(),
-                "next_run": None,
-                "trigger": None,
-                "active": False,
-            })
+            jobs.append(
+                {
+                    "id": job_id,
+                    "name": job_id.replace("site_intel_", "").replace("_", " ").title(),
+                    "next_run": None,
+                    "trigger": None,
+                    "active": False,
+                }
+            )
 
     return {
         "scheduler_running": scheduler.running,

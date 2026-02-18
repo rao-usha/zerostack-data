@@ -139,13 +139,21 @@ class BaseCollector(ABC):
             try:
                 self._last_request_time = datetime.utcnow()
 
-                async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
+                async with httpx.AsyncClient(
+                    timeout=self.timeout, follow_redirects=True
+                ) as client:
                     if method.upper() == "GET":
-                        response = await client.get(url, headers=default_headers, params=params)
+                        response = await client.get(
+                            url, headers=default_headers, params=params
+                        )
                     elif method.upper() == "POST":
-                        response = await client.post(url, headers=default_headers, params=params)
+                        response = await client.post(
+                            url, headers=default_headers, params=params
+                        )
                     else:
-                        response = await client.request(method, url, headers=default_headers, params=params)
+                        response = await client.request(
+                            method, url, headers=default_headers, params=params
+                        )
 
                 self._requests_made += 1
                 self._bytes_downloaded += len(response.content)
@@ -155,34 +163,40 @@ class BaseCollector(ABC):
 
                 # Rate limited - exponential backoff
                 if response.status_code == 429:
-                    wait_time = (2 ** attempt) + random.uniform(0, 1)
+                    wait_time = (2**attempt) + random.uniform(0, 1)
                     logger.warning(f"Rate limited on {url}, waiting {wait_time:.1f}s")
                     await asyncio.sleep(wait_time)
                     continue
 
                 # Client error - don't retry
                 if 400 <= response.status_code < 500:
-                    logger.warning(f"Client error {response.status_code} fetching {url}")
+                    logger.warning(
+                        f"Client error {response.status_code} fetching {url}"
+                    )
                     return response
 
                 # Server error - retry with backoff
                 if response.status_code >= 500:
-                    wait_time = (2 ** attempt) + random.uniform(0, 1)
-                    logger.warning(f"Server error {response.status_code} on {url}, retry in {wait_time:.1f}s")
+                    wait_time = (2**attempt) + random.uniform(0, 1)
+                    logger.warning(
+                        f"Server error {response.status_code} on {url}, retry in {wait_time:.1f}s"
+                    )
                     await asyncio.sleep(wait_time)
                     continue
 
                 return response
 
             except httpx.TimeoutException:
-                wait_time = (2 ** attempt) + random.uniform(0, 1)
-                logger.warning(f"Timeout fetching {url}, retry {attempt + 1}/{self.max_retries}")
+                wait_time = (2**attempt) + random.uniform(0, 1)
+                logger.warning(
+                    f"Timeout fetching {url}, retry {attempt + 1}/{self.max_retries}"
+                )
                 await asyncio.sleep(wait_time)
 
             except httpx.RequestError as e:
                 logger.error(f"Request error fetching {url}: {e}")
                 if attempt < self.max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
                 else:
                     return None
 

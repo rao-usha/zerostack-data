@@ -4,6 +4,7 @@ USDA NASS QuickStats API endpoints.
 Provides access to agricultural statistics.
 Requires USDA_API_KEY environment variable.
 """
+
 import logging
 from datetime import datetime
 from typing import Optional
@@ -32,30 +33,48 @@ router = APIRouter(prefix="/usda", tags=["USDA Agriculture"])
 
 class CropIngestRequest(BaseModel):
     """Request model for crop data ingestion."""
-    commodity: str = Field(..., description="Commodity name (CORN, SOYBEANS, WHEAT, etc.)")
-    year: int = Field(default_factory=lambda: datetime.now().year, description="Year to ingest")
+
+    commodity: str = Field(
+        ..., description="Commodity name (CORN, SOYBEANS, WHEAT, etc.)"
+    )
+    year: int = Field(
+        default_factory=lambda: datetime.now().year, description="Year to ingest"
+    )
     state: Optional[str] = Field(None, description="State name (optional, e.g., IOWA)")
-    all_stats: bool = Field(default=True, description="Include all statistics (production, yield, area, prices)")
+    all_stats: bool = Field(
+        default=True,
+        description="Include all statistics (production, yield, area, prices)",
+    )
 
 
 class LivestockIngestRequest(BaseModel):
     """Request model for livestock data ingestion."""
+
     commodity: str = Field(..., description="Livestock type (CATTLE, HOGS, etc.)")
-    year: int = Field(default_factory=lambda: datetime.now().year, description="Year to ingest")
+    year: int = Field(
+        default_factory=lambda: datetime.now().year, description="Year to ingest"
+    )
     state: Optional[str] = Field(None, description="State name (optional)")
 
 
 class AnnualCropsIngestRequest(BaseModel):
     """Request model for annual crops summary."""
-    year: int = Field(default_factory=lambda: datetime.now().year, description="Year to ingest")
+
+    year: int = Field(
+        default_factory=lambda: datetime.now().year, description="Year to ingest"
+    )
 
 
 class AllMajorCropsIngestRequest(BaseModel):
     """Request model for all major crops."""
-    year: int = Field(default_factory=lambda: datetime.now().year, description="Year to ingest")
+
+    year: int = Field(
+        default_factory=lambda: datetime.now().year, description="Year to ingest"
+    )
 
 
 # ========== Ingestion Endpoints ==========
+
 
 def _create_usda_job(db, background_tasks, config, run_func, run_args, message):
     """Helper to create a USDA ingestion job with custom background task."""
@@ -80,7 +99,7 @@ def _create_usda_job(db, background_tasks, config, run_func, run_args, message):
 async def ingest_crop_data(
     request: CropIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest crop data for a specific commodity.
@@ -90,7 +109,8 @@ async def ingest_crop_data(
     **Requires USDA_API_KEY environment variable.**
     """
     return _create_usda_job(
-        db, background_tasks,
+        db,
+        background_tasks,
         config={
             "dataset": "crop",
             "commodity": request.commodity.upper(),
@@ -99,7 +119,12 @@ async def ingest_crop_data(
             "all_stats": request.all_stats,
         },
         run_func=_run_crop_ingestion,
-        run_args=(request.commodity.upper(), request.year, request.state, request.all_stats),
+        run_args=(
+            request.commodity.upper(),
+            request.year,
+            request.state,
+            request.all_stats,
+        ),
         message=f"USDA {request.commodity.upper()} ingestion job created for {request.year}",
     )
 
@@ -108,7 +133,7 @@ async def ingest_crop_data(
 async def ingest_livestock_data(
     request: LivestockIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest livestock inventory data.
@@ -118,7 +143,8 @@ async def ingest_livestock_data(
     **Requires USDA_API_KEY environment variable.**
     """
     return _create_usda_job(
-        db, background_tasks,
+        db,
+        background_tasks,
         config={
             "dataset": "livestock",
             "commodity": request.commodity.upper(),
@@ -135,7 +161,7 @@ async def ingest_livestock_data(
 async def ingest_annual_summary(
     request: AnnualCropsIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest annual crop production summary for all crops.
@@ -143,7 +169,8 @@ async def ingest_annual_summary(
     **Requires USDA_API_KEY environment variable.**
     """
     return _create_usda_job(
-        db, background_tasks,
+        db,
+        background_tasks,
         config={"dataset": "annual_summary", "year": request.year},
         run_func=_run_annual_ingestion,
         run_args=(request.year,),
@@ -155,7 +182,7 @@ async def ingest_annual_summary(
 async def ingest_all_major_crops_endpoint(
     request: AllMajorCropsIngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest data for all major crops (CORN, SOYBEANS, WHEAT, COTTON, RICE).
@@ -163,7 +190,8 @@ async def ingest_all_major_crops_endpoint(
     **Requires USDA_API_KEY environment variable.**
     """
     return _create_usda_job(
-        db, background_tasks,
+        db,
+        background_tasks,
         config={"dataset": "all_major_crops", "year": request.year},
         run_func=_run_all_crops_ingestion,
         run_args=(request.year,),
@@ -172,6 +200,7 @@ async def ingest_all_major_crops_endpoint(
 
 
 # ========== Background Tasks ==========
+
 
 async def _run_crop_ingestion(job_id, commodity, year, state, all_stats):
     """Background task for crop ingestion."""
@@ -310,6 +339,7 @@ async def _run_all_crops_ingestion(job_id, year):
 
 
 # ========== Reference Endpoints ==========
+
 
 @router.get("/reference/commodities")
 async def get_commodities():

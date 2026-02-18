@@ -30,8 +30,10 @@ logger = logging.getLogger(__name__)
 # ENUMS AND CONSTANTS
 # =============================================================================
 
+
 class WorkflowStatus(str, Enum):
     """Workflow execution status."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -42,6 +44,7 @@ class WorkflowStatus(str, Enum):
 
 class StepStatus(str, Enum):
     """Individual step status."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -51,6 +54,7 @@ class StepStatus(str, Enum):
 
 class AgentType(str, Enum):
     """Available agent types."""
+
     COMPANY_RESEARCHER = "company_researcher"
     DUE_DILIGENCE = "due_diligence"
     NEWS_MONITOR = "news_monitor"
@@ -67,11 +71,27 @@ DEFAULT_WORKFLOWS = {
         "name": "Full Due Diligence",
         "description": "Comprehensive DD combining research, competitive analysis, news, and final report",
         "steps": [
-            {"id": "research", "agent": AgentType.COMPANY_RESEARCHER.value, "parallel_group": 1},
-            {"id": "competitive", "agent": AgentType.COMPETITIVE_INTEL.value, "parallel_group": 1},
+            {
+                "id": "research",
+                "agent": AgentType.COMPANY_RESEARCHER.value,
+                "parallel_group": 1,
+            },
+            {
+                "id": "competitive",
+                "agent": AgentType.COMPETITIVE_INTEL.value,
+                "parallel_group": 1,
+            },
             {"id": "news", "agent": AgentType.NEWS_MONITOR.value, "parallel_group": 1},
-            {"id": "diligence", "agent": AgentType.DUE_DILIGENCE.value, "depends_on": ["research"]},
-            {"id": "report", "agent": AgentType.REPORT_WRITER.value, "depends_on": ["diligence", "competitive", "news"]},
+            {
+                "id": "diligence",
+                "agent": AgentType.DUE_DILIGENCE.value,
+                "depends_on": ["research"],
+            },
+            {
+                "id": "report",
+                "agent": AgentType.REPORT_WRITER.value,
+                "depends_on": ["diligence", "competitive", "news"],
+            },
         ],
         "estimated_duration_minutes": 5,
     },
@@ -79,7 +99,11 @@ DEFAULT_WORKFLOWS = {
         "name": "Quick Company Scan",
         "description": "Fast company research with scoring",
         "steps": [
-            {"id": "research", "agent": AgentType.COMPANY_RESEARCHER.value, "parallel_group": 1},
+            {
+                "id": "research",
+                "agent": AgentType.COMPANY_RESEARCHER.value,
+                "parallel_group": 1,
+            },
         ],
         "estimated_duration_minutes": 2,
     },
@@ -87,10 +111,22 @@ DEFAULT_WORKFLOWS = {
         "name": "Competitive Landscape",
         "description": "Deep competitive analysis with market context",
         "steps": [
-            {"id": "research", "agent": AgentType.COMPANY_RESEARCHER.value, "parallel_group": 1},
-            {"id": "competitive", "agent": AgentType.COMPETITIVE_INTEL.value, "depends_on": ["research"]},
+            {
+                "id": "research",
+                "agent": AgentType.COMPANY_RESEARCHER.value,
+                "parallel_group": 1,
+            },
+            {
+                "id": "competitive",
+                "agent": AgentType.COMPETITIVE_INTEL.value,
+                "depends_on": ["research"],
+            },
             {"id": "news", "agent": AgentType.NEWS_MONITOR.value, "parallel_group": 1},
-            {"id": "report", "agent": AgentType.REPORT_WRITER.value, "depends_on": ["competitive", "news"]},
+            {
+                "id": "report",
+                "agent": AgentType.REPORT_WRITER.value,
+                "depends_on": ["competitive", "news"],
+            },
         ],
         "estimated_duration_minutes": 4,
     },
@@ -98,7 +134,11 @@ DEFAULT_WORKFLOWS = {
         "name": "Market Intelligence",
         "description": "Market scanning with trend analysis and news",
         "steps": [
-            {"id": "market", "agent": AgentType.MARKET_SCANNER.value, "parallel_group": 1},
+            {
+                "id": "market",
+                "agent": AgentType.MARKET_SCANNER.value,
+                "parallel_group": 1,
+            },
             {"id": "news", "agent": AgentType.NEWS_MONITOR.value, "parallel_group": 1},
         ],
         "estimated_duration_minutes": 3,
@@ -107,9 +147,21 @@ DEFAULT_WORKFLOWS = {
         "name": "Data Enrichment",
         "description": "Hunt for missing data and detect anomalies",
         "steps": [
-            {"id": "research", "agent": AgentType.COMPANY_RESEARCHER.value, "parallel_group": 1},
-            {"id": "hunter", "agent": AgentType.DATA_HUNTER.value, "depends_on": ["research"]},
-            {"id": "anomaly", "agent": AgentType.ANOMALY_DETECTOR.value, "depends_on": ["research"]},
+            {
+                "id": "research",
+                "agent": AgentType.COMPANY_RESEARCHER.value,
+                "parallel_group": 1,
+            },
+            {
+                "id": "hunter",
+                "agent": AgentType.DATA_HUNTER.value,
+                "depends_on": ["research"],
+            },
+            {
+                "id": "anomaly",
+                "agent": AgentType.ANOMALY_DETECTOR.value,
+                "depends_on": ["research"],
+            },
         ],
         "estimated_duration_minutes": 4,
     },
@@ -117,9 +169,17 @@ DEFAULT_WORKFLOWS = {
         "name": "Investor Brief",
         "description": "Quick research with executive report",
         "steps": [
-            {"id": "research", "agent": AgentType.COMPANY_RESEARCHER.value, "parallel_group": 1},
+            {
+                "id": "research",
+                "agent": AgentType.COMPANY_RESEARCHER.value,
+                "parallel_group": 1,
+            },
             {"id": "news", "agent": AgentType.NEWS_MONITOR.value, "parallel_group": 1},
-            {"id": "report", "agent": AgentType.REPORT_WRITER.value, "depends_on": ["research", "news"]},
+            {
+                "id": "report",
+                "agent": AgentType.REPORT_WRITER.value,
+                "depends_on": ["research", "news"],
+            },
         ],
         "estimated_duration_minutes": 3,
     },
@@ -129,6 +189,7 @@ DEFAULT_WORKFLOWS = {
 # =============================================================================
 # MULTI-AGENT ORCHESTRATOR
 # =============================================================================
+
 
 class MultiAgentOrchestrator:
     """
@@ -236,13 +297,16 @@ class MultiAgentOrchestrator:
                     VALUES (:tid, :name, :desc, :steps, :duration, false)
                     ON CONFLICT (template_id) DO NOTHING
                 """)
-                self.db.execute(insert, {
-                    "tid": template_id,
-                    "name": template["name"],
-                    "desc": template["description"],
-                    "steps": json.dumps(template["steps"]),
-                    "duration": template.get("estimated_duration_minutes", 5),
-                })
+                self.db.execute(
+                    insert,
+                    {
+                        "tid": template_id,
+                        "name": template["name"],
+                        "desc": template["description"],
+                        "steps": json.dumps(template["steps"]),
+                        "duration": template.get("estimated_duration_minutes", 5),
+                    },
+                )
             except Exception:
                 pass
 
@@ -294,16 +358,19 @@ class MultiAgentOrchestrator:
             )
         """)
 
-        self.db.execute(insert_workflow, {
-            "wid": workflow_id,
-            "wtype": workflow_type,
-            "wname": template["name"],
-            "etype": entity_type,
-            "ename": entity_name,
-            "eparams": json.dumps(entity_params or {}),
-            "total": total_steps,
-            "requested_by": requested_by,
-        })
+        self.db.execute(
+            insert_workflow,
+            {
+                "wid": workflow_id,
+                "wtype": workflow_type,
+                "wname": template["name"],
+                "etype": entity_type,
+                "ename": entity_name,
+                "eparams": json.dumps(entity_params or {}),
+                "total": total_steps,
+                "requested_by": requested_by,
+            },
+        )
 
         # Create step records
         for step in steps:
@@ -311,20 +378,23 @@ class MultiAgentOrchestrator:
                 INSERT INTO workflow_steps (workflow_id, step_id, agent_type, parallel_group, depends_on)
                 VALUES (:wid, :sid, :agent, :pgroup, :deps)
             """)
-            self.db.execute(insert_step, {
-                "wid": workflow_id,
-                "sid": step["id"],
-                "agent": step["agent"],
-                "pgroup": step.get("parallel_group"),
-                "deps": json.dumps(step.get("depends_on", [])),
-            })
+            self.db.execute(
+                insert_step,
+                {
+                    "wid": workflow_id,
+                    "sid": step["id"],
+                    "agent": step["agent"],
+                    "pgroup": step.get("parallel_group"),
+                    "deps": json.dumps(step.get("depends_on", [])),
+                },
+            )
 
         self.db.commit()
 
         # Start execution in background thread
         thread = threading.Thread(
             target=self._run_workflow_sync,
-            args=(workflow_id, entity_name, entity_type, entity_params or {})
+            args=(workflow_id, entity_name, entity_type, entity_params or {}),
         )
         thread.daemon = True
         thread.start()
@@ -354,18 +424,23 @@ class MultiAgentOrchestrator:
             asyncio.set_event_loop(loop)
             try:
                 loop.run_until_complete(
-                    thread_orchestrator._run_workflow(workflow_id, entity_name, entity_type, entity_params)
+                    thread_orchestrator._run_workflow(
+                        workflow_id, entity_name, entity_type, entity_params
+                    )
                 )
             finally:
                 loop.close()
         except Exception as e:
             logger.error(f"Workflow thread failed: {e}")
             try:
-                db.execute(text("""
+                db.execute(
+                    text("""
                     UPDATE workflow_executions
                     SET status = 'failed', error_message = :error, completed_at = NOW()
                     WHERE workflow_id = :wid
-                """), {"wid": workflow_id, "error": str(e)})
+                """),
+                    {"wid": workflow_id, "error": str(e)},
+                )
                 db.commit()
             except Exception:
                 pass
@@ -381,11 +456,14 @@ class MultiAgentOrchestrator:
     ) -> None:
         """Execute the workflow asynchronously."""
         # Update status to running
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             UPDATE workflow_executions
             SET status = 'running', started_at = NOW()
             WHERE workflow_id = :wid
-        """), {"wid": workflow_id})
+        """),
+            {"wid": workflow_id},
+        )
         self.db.commit()
 
         # Get steps
@@ -415,14 +493,21 @@ class MultiAgentOrchestrator:
 
             if not ready_steps:
                 # No progress possible, check for deadlock
-                pending = [s for s in steps if s["step_id"] not in completed_steps and s["step_id"] not in failed_steps]
+                pending = [
+                    s
+                    for s in steps
+                    if s["step_id"] not in completed_steps
+                    and s["step_id"] not in failed_steps
+                ]
                 if pending:
                     # Some steps blocked by failed dependencies
                     for s in pending:
                         deps = step_deps.get(s["step_id"], set())
                         if deps & failed_steps:
                             # Skip steps with failed dependencies
-                            self._mark_step_skipped(workflow_id, s["step_id"], "Dependency failed")
+                            self._mark_step_skipped(
+                                workflow_id, s["step_id"], "Dependency failed"
+                            )
                             failed_steps.add(s["step_id"])
                 break
 
@@ -439,7 +524,14 @@ class MultiAgentOrchestrator:
                 if pgroup is not None:
                     # Run in parallel
                     tasks = [
-                        self._execute_step(workflow_id, s, entity_name, entity_type, entity_params, step_results)
+                        self._execute_step(
+                            workflow_id,
+                            s,
+                            entity_name,
+                            entity_type,
+                            entity_params,
+                            step_results,
+                        )
                         for s in group_steps
                     ]
                     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -460,7 +552,12 @@ class MultiAgentOrchestrator:
                         sid = step["step_id"]
                         try:
                             result = await self._execute_step(
-                                workflow_id, step, entity_name, entity_type, entity_params, step_results
+                                workflow_id,
+                                step,
+                                entity_name,
+                                entity_type,
+                                entity_params,
+                                step_results,
                             )
                             if result:
                                 step_results[sid] = result
@@ -476,18 +573,21 @@ class MultiAgentOrchestrator:
             done = len(completed_steps) + len(failed_steps)
             progress = done / total if total > 0 else 0
 
-            self.db.execute(text("""
+            self.db.execute(
+                text("""
                 UPDATE workflow_executions
                 SET progress = :progress, completed_steps = :completed, failed_steps = :failed,
                     step_results = :results
                 WHERE workflow_id = :wid
-            """), {
-                "wid": workflow_id,
-                "progress": progress,
-                "completed": len(completed_steps),
-                "failed": len(failed_steps),
-                "results": json.dumps(step_results),
-            })
+            """),
+                {
+                    "wid": workflow_id,
+                    "progress": progress,
+                    "completed": len(completed_steps),
+                    "failed": len(failed_steps),
+                    "results": json.dumps(step_results),
+                },
+            )
             self.db.commit()
 
         # Aggregate results
@@ -502,20 +602,23 @@ class MultiAgentOrchestrator:
             status = WorkflowStatus.FAILED
 
         # Final update
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             UPDATE workflow_executions
             SET status = :status, progress = 1.0, completed_steps = :completed,
                 failed_steps = :failed, step_results = :results,
                 aggregated_results = :aggregated, completed_at = NOW()
             WHERE workflow_id = :wid
-        """), {
-            "wid": workflow_id,
-            "status": status.value,
-            "completed": len(completed_steps),
-            "failed": len(failed_steps),
-            "results": json.dumps(step_results),
-            "aggregated": json.dumps(aggregated),
-        })
+        """),
+            {
+                "wid": workflow_id,
+                "status": status.value,
+                "completed": len(completed_steps),
+                "failed": len(failed_steps),
+                "results": json.dumps(step_results),
+                "aggregated": json.dumps(aggregated),
+            },
+        )
         self.db.commit()
 
     async def _execute_step(
@@ -532,11 +635,14 @@ class MultiAgentOrchestrator:
         agent_type = step["agent_type"]
 
         # Mark step as running
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             UPDATE workflow_steps
             SET status = 'running', started_at = NOW()
             WHERE workflow_id = :wid AND step_id = :sid
-        """), {"wid": workflow_id, "sid": step_id})
+        """),
+            {"wid": workflow_id, "sid": step_id},
+        )
         self.db.commit()
 
         start_time = datetime.utcnow()
@@ -550,17 +656,20 @@ class MultiAgentOrchestrator:
             duration = (datetime.utcnow() - start_time).total_seconds()
 
             # Mark step as completed
-            self.db.execute(text("""
+            self.db.execute(
+                text("""
                 UPDATE workflow_steps
                 SET status = 'completed', result = :result, completed_at = NOW(),
                     duration_seconds = :duration
                 WHERE workflow_id = :wid AND step_id = :sid
-            """), {
-                "wid": workflow_id,
-                "sid": step_id,
-                "result": json.dumps(result) if result else None,
-                "duration": duration,
-            })
+            """),
+                {
+                    "wid": workflow_id,
+                    "sid": step_id,
+                    "result": json.dumps(result) if result else None,
+                    "duration": duration,
+                },
+            )
             self.db.commit()
 
             return result
@@ -570,17 +679,20 @@ class MultiAgentOrchestrator:
             error_msg = str(e)
 
             # Mark step as failed
-            self.db.execute(text("""
+            self.db.execute(
+                text("""
                 UPDATE workflow_steps
                 SET status = 'failed', error_message = :error, completed_at = NOW(),
                     duration_seconds = :duration
                 WHERE workflow_id = :wid AND step_id = :sid
-            """), {
-                "wid": workflow_id,
-                "sid": step_id,
-                "error": error_msg,
-                "duration": duration,
-            })
+            """),
+                {
+                    "wid": workflow_id,
+                    "sid": step_id,
+                    "error": error_msg,
+                    "duration": duration,
+                },
+            )
             self.db.commit()
 
             logger.error(f"Step {step_id} failed: {e}")
@@ -628,7 +740,9 @@ class MultiAgentOrchestrator:
     # AGENT RUNNERS
     # -------------------------------------------------------------------------
 
-    async def _run_company_researcher(self, company_name: str, domain: Optional[str]) -> Optional[Dict]:
+    async def _run_company_researcher(
+        self, company_name: str, domain: Optional[str]
+    ) -> Optional[Dict]:
         """Run company research agent."""
         try:
             from app.agents.company_researcher import CompanyResearchAgent
@@ -638,8 +752,7 @@ class MultiAgentOrchestrator:
 
             # Wait for completion (poll)
             result = await self._wait_for_job(
-                lambda: agent.get_job_status(job_id),
-                timeout=120
+                lambda: agent.get_job_status(job_id), timeout=120
             )
 
             if result and result.get("status") in ("completed", "partial"):
@@ -650,7 +763,9 @@ class MultiAgentOrchestrator:
             logger.error(f"Company researcher failed: {e}")
             raise
 
-    async def _run_due_diligence(self, company_name: str, domain: Optional[str]) -> Optional[Dict]:
+    async def _run_due_diligence(
+        self, company_name: str, domain: Optional[str]
+    ) -> Optional[Dict]:
         """Run due diligence agent."""
         try:
             from app.agents.due_diligence import DueDiligenceAgent
@@ -660,8 +775,7 @@ class MultiAgentOrchestrator:
 
             # Wait for completion
             result = await self._wait_for_job(
-                lambda: agent.get_job_status(job_id),
-                timeout=180
+                lambda: agent.get_job_status(job_id), timeout=180
             )
 
             if result and result.get("status") == "completed":
@@ -691,12 +805,14 @@ class MultiAgentOrchestrator:
             articles = []
             for match in result.get("matches", []):
                 if entity_name.lower() in (match.get("title", "") or "").lower():
-                    articles.append({
-                        "title": match.get("title"),
-                        "source": match.get("source"),
-                        "date": match.get("published_at"),
-                        "event_type": match.get("event_type"),
-                    })
+                    articles.append(
+                        {
+                            "title": match.get("title"),
+                            "source": match.get("source"),
+                            "date": match.get("published_at"),
+                            "event_type": match.get("event_type"),
+                        }
+                    )
 
             return {
                 "article_count": len(articles),
@@ -722,7 +838,9 @@ class MultiAgentOrchestrator:
                 return {
                     "competitors": analysis.get("competitors", [])[:5],
                     "market_position": analysis.get("market_position"),
-                    "moat_score": analysis.get("moat_assessment", {}).get("overall_score"),
+                    "moat_score": analysis.get("moat_assessment", {}).get(
+                        "overall_score"
+                    ),
                     "comparison_matrix": analysis.get("comparison_matrix"),
                 }
 
@@ -796,14 +914,16 @@ class MultiAgentOrchestrator:
                     "employee": len(emp_anomalies),
                     "traffic": len(traffic_anomalies),
                     "rating": len(rating_anomalies),
-                }
+                },
             }
 
         except Exception as e:
             logger.error(f"Anomaly detector failed: {e}")
             raise
 
-    async def _run_report_writer(self, entity_name: str, prior_results: Dict) -> Optional[Dict]:
+    async def _run_report_writer(
+        self, entity_name: str, prior_results: Dict
+    ) -> Optional[Dict]:
         """Run report writer agent."""
         try:
             from app.agents.report_writer import ReportWriterAgent
@@ -815,7 +935,7 @@ class MultiAgentOrchestrator:
                 report_type="company_profile",
                 entity_name=entity_name,
                 template_name="executive_brief",
-                options={"workflow_data": prior_results}
+                options={"workflow_data": prior_results},
             )
 
             if report and report.get("status") == "completed":
@@ -823,7 +943,9 @@ class MultiAgentOrchestrator:
                     "report_id": report.get("report_id"),
                     "title": report.get("title"),
                     "word_count": report.get("word_count"),
-                    "sections": list(report.get("content", {}).keys()) if report.get("content") else [],
+                    "sections": list(report.get("content", {}).keys())
+                    if report.get("content")
+                    else [],
                 }
 
             return {
@@ -896,11 +1018,14 @@ class MultiAgentOrchestrator:
 
     def _mark_step_skipped(self, workflow_id: str, step_id: str, reason: str) -> None:
         """Mark a step as skipped."""
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             UPDATE workflow_steps
             SET status = 'skipped', error_message = :reason, completed_at = NOW()
             WHERE workflow_id = :wid AND step_id = :sid
-        """), {"wid": workflow_id, "sid": step_id, "reason": reason})
+        """),
+            {"wid": workflow_id, "sid": step_id, "reason": reason},
+        )
         self.db.commit()
 
     def _get_workflow_steps(self, workflow_id: str) -> List[Dict]:
@@ -917,7 +1042,9 @@ class MultiAgentOrchestrator:
                 "step_id": row["step_id"],
                 "agent_type": row["agent_type"],
                 "parallel_group": row["parallel_group"],
-                "depends_on": row["depends_on"] if isinstance(row["depends_on"], list) else json.loads(row["depends_on"] or "[]"),
+                "depends_on": row["depends_on"]
+                if isinstance(row["depends_on"], list)
+                else json.loads(row["depends_on"] or "[]"),
                 "status": row["status"],
             }
             for row in result.mappings()
@@ -938,16 +1065,15 @@ class MultiAgentOrchestrator:
                 "id": row["template_id"],
                 "name": row["name"],
                 "description": row["description"],
-                "steps": row["steps"] if isinstance(row["steps"], list) else json.loads(row["steps"]),
+                "steps": row["steps"]
+                if isinstance(row["steps"], list)
+                else json.loads(row["steps"]),
                 "estimated_duration_minutes": row["estimated_duration_minutes"],
             }
 
         # Check built-in templates
         if template_id in DEFAULT_WORKFLOWS:
-            return {
-                "id": template_id,
-                **DEFAULT_WORKFLOWS[template_id]
-            }
+            return {"id": template_id, **DEFAULT_WORKFLOWS[template_id]}
 
         return None
 
@@ -987,7 +1113,9 @@ class MultiAgentOrchestrator:
             aggregated["news_summary"] = {
                 "article_count": news.get("article_count", 0),
                 "sentiment": news.get("sentiment"),
-                "recent_headlines": [a.get("title") for a in news.get("articles", [])[:3]],
+                "recent_headlines": [
+                    a.get("title") for a in news.get("articles", [])[:3]
+                ],
             }
 
         # Market context
@@ -1034,9 +1162,15 @@ class MultiAgentOrchestrator:
             "total_steps": row["total_steps"],
             "completed_steps": row["completed_steps"],
             "failed_steps": row["failed_steps"],
-            "created_at": row["created_at"].isoformat() + "Z" if row["created_at"] else None,
-            "started_at": row["started_at"].isoformat() + "Z" if row["started_at"] else None,
-            "completed_at": row["completed_at"].isoformat() + "Z" if row["completed_at"] else None,
+            "created_at": row["created_at"].isoformat() + "Z"
+            if row["created_at"]
+            else None,
+            "started_at": row["started_at"].isoformat() + "Z"
+            if row["started_at"]
+            else None,
+            "completed_at": row["completed_at"].isoformat() + "Z"
+            if row["completed_at"]
+            else None,
         }
 
         # Include step details
@@ -1067,8 +1201,12 @@ class MultiAgentOrchestrator:
                 "step_id": row["step_id"],
                 "agent_type": row["agent_type"],
                 "status": row["status"],
-                "started_at": row["started_at"].isoformat() + "Z" if row["started_at"] else None,
-                "completed_at": row["completed_at"].isoformat() + "Z" if row["completed_at"] else None,
+                "started_at": row["started_at"].isoformat() + "Z"
+                if row["started_at"]
+                else None,
+                "completed_at": row["completed_at"].isoformat() + "Z"
+                if row["completed_at"]
+                else None,
                 "duration_seconds": row["duration_seconds"],
                 "error": row["error_message"],
             }
@@ -1089,10 +1227,14 @@ class MultiAgentOrchestrator:
                 "id": row["template_id"],
                 "name": row["name"],
                 "description": row["description"],
-                "steps": row["steps"] if isinstance(row["steps"], list) else json.loads(row["steps"]),
+                "steps": row["steps"]
+                if isinstance(row["steps"], list)
+                else json.loads(row["steps"]),
                 "estimated_duration_minutes": row["estimated_duration_minutes"],
                 "is_custom": row["is_custom"],
-                "created_at": row["created_at"].isoformat() + "Z" if row["created_at"] else None,
+                "created_at": row["created_at"].isoformat() + "Z"
+                if row["created_at"]
+                else None,
             }
             for row in result.mappings()
         ]
@@ -1119,13 +1261,16 @@ class MultiAgentOrchestrator:
             VALUES (:tid, :name, :desc, :steps, true, :created_by)
         """)
 
-        self.db.execute(insert, {
-            "tid": template_id,
-            "name": name,
-            "desc": description,
-            "steps": json.dumps(steps),
-            "created_by": created_by,
-        })
+        self.db.execute(
+            insert,
+            {
+                "tid": template_id,
+                "name": name,
+                "desc": description,
+                "steps": json.dumps(steps),
+                "created_by": created_by,
+            },
+        )
         self.db.commit()
 
         return template_id
@@ -1173,8 +1318,12 @@ class MultiAgentOrchestrator:
                 "total_steps": row["total_steps"],
                 "completed_steps": row["completed_steps"],
                 "failed_steps": row["failed_steps"],
-                "created_at": row["created_at"].isoformat() + "Z" if row["created_at"] else None,
-                "completed_at": row["completed_at"].isoformat() + "Z" if row["completed_at"] else None,
+                "created_at": row["created_at"].isoformat() + "Z"
+                if row["created_at"]
+                else None,
+                "completed_at": row["completed_at"].isoformat() + "Z"
+                if row["completed_at"]
+                else None,
             }
             for row in result.mappings()
         ]
@@ -1193,18 +1342,24 @@ class MultiAgentOrchestrator:
             return False
 
         # Update to cancelled
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             UPDATE workflow_executions
             SET status = 'cancelled', completed_at = NOW()
             WHERE workflow_id = :wid AND status IN ('pending', 'running')
-        """), {"wid": workflow_id})
+        """),
+            {"wid": workflow_id},
+        )
 
         # Cancel pending steps
-        self.db.execute(text("""
+        self.db.execute(
+            text("""
             UPDATE workflow_steps
             SET status = 'skipped', error_message = 'Workflow cancelled'
             WHERE workflow_id = :wid AND status = 'pending'
-        """), {"wid": workflow_id})
+        """),
+            {"wid": workflow_id},
+        )
 
         self.db.commit()
         return True
@@ -1241,7 +1396,9 @@ class MultiAgentOrchestrator:
                 "partial": stats["partial"],
                 "failed": stats["failed"],
                 "running": stats["running"],
-                "avg_duration_seconds": round(stats["avg_duration"], 2) if stats["avg_duration"] else None,
+                "avg_duration_seconds": round(stats["avg_duration"], 2)
+                if stats["avg_duration"]
+                else None,
             },
             "by_type": {r["workflow_type"]: r["count"] for r in type_dist},
             "available_agents": [a.value for a in AgentType],

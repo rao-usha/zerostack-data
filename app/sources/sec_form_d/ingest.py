@@ -100,7 +100,7 @@ class FormDIngestionService:
             "filings_found": 0,
             "filings_ingested": 0,
             "filings_skipped": 0,
-            "errors": []
+            "errors": [],
         }
 
         try:
@@ -117,17 +117,19 @@ class FormDIngestionService:
 
                     # Get and parse XML
                     xml_content = await self.client.get_filing_xml(
-                        cik,
-                        filing["accession_number"],
-                        filing.get("primary_document")
+                        cik, filing["accession_number"], filing.get("primary_document")
                     )
                     if not xml_content:
-                        result["errors"].append(f"Failed to fetch XML for {filing['accession_number']}")
+                        result["errors"].append(
+                            f"Failed to fetch XML for {filing['accession_number']}"
+                        )
                         continue
 
                     parsed = self.parser.parse(xml_content)
                     if not parsed:
-                        result["errors"].append(f"Failed to parse XML for {filing['accession_number']}")
+                        result["errors"].append(
+                            f"Failed to parse XML for {filing['accession_number']}"
+                        )
                         continue
 
                     # Store in database
@@ -135,12 +137,14 @@ class FormDIngestionService:
                         accession_number=filing["accession_number"],
                         cik=cik,
                         filed_at=filing["filing_date"],
-                        parsed_data=parsed
+                        parsed_data=parsed,
                     )
                     result["filings_ingested"] += 1
 
                 except Exception as e:
-                    result["errors"].append(f"Error processing {filing.get('accession_number')}: {str(e)}")
+                    result["errors"].append(
+                        f"Error processing {filing.get('accession_number')}: {str(e)}"
+                    )
 
         except Exception as e:
             result["errors"].append(f"Failed to fetch submissions: {str(e)}")
@@ -149,16 +153,14 @@ class FormDIngestionService:
 
     def _filing_exists(self, accession_number: str) -> bool:
         """Check if filing already exists in database."""
-        query = text("SELECT 1 FROM form_d_filings WHERE accession_number = :acc LIMIT 1")
+        query = text(
+            "SELECT 1 FROM form_d_filings WHERE accession_number = :acc LIMIT 1"
+        )
         result = self.db.execute(query, {"acc": accession_number})
         return result.fetchone() is not None
 
     def _store_filing(
-        self,
-        accession_number: str,
-        cik: str,
-        filed_at: str,
-        parsed_data: Dict
+        self, accession_number: str, cik: str, filed_at: str, parsed_data: Dict
     ):
         """Store a parsed Form D filing in the database."""
         issuer = parsed_data.get("issuer", {})
@@ -214,41 +216,52 @@ class FormDIngestionService:
                 updated_at = CURRENT_TIMESTAMP
         """)
 
-        self.db.execute(insert_sql, {
-            "accession_number": accession_number,
-            "cik": cik,
-            "submission_type": parsed_data.get("submission_type", "D"),
-            "filed_at": filed_at_dt,
-            "issuer_name": issuer.get("name", "Unknown"),
-            "issuer_street": issuer.get("street"),
-            "issuer_city": issuer.get("city"),
-            "issuer_state": issuer.get("state"),
-            "issuer_zip": issuer.get("zip"),
-            "issuer_phone": issuer.get("phone"),
-            "entity_type": issuer.get("entity_type"),
-            "jurisdiction": issuer.get("jurisdiction"),
-            "year_of_incorporation": issuer.get("year_incorporated"),
-            "industry_group": offering.get("industry_group"),
-            "revenue_range": offering.get("revenue_range"),
-            "related_persons": json.dumps(parsed_data.get("related_persons", [])),
-            "federal_exemptions": json.dumps(offering.get("exemptions", [])),
-            "date_of_first_sale": first_sale_date,
-            "more_than_one_year": offering.get("more_than_one_year", False),
-            "is_equity": offering.get("is_equity", False),
-            "is_debt": offering.get("is_debt", False),
-            "is_option": offering.get("is_option", False),
-            "is_security_to_be_acquired": offering.get("is_security_to_be_acquired", False),
-            "is_pooled_investment_fund": offering.get("is_pooled_investment_fund", False),
-            "is_business_combination": offering.get("is_business_combination", False),
-            "minimum_investment": offering.get("minimum_investment"),
-            "total_offering_amount": offering.get("total_offering_amount"),
-            "total_amount_sold": offering.get("total_amount_sold"),
-            "total_remaining": offering.get("total_remaining"),
-            "total_number_already_invested": investors.get("total"),
-            "accredited_investors": investors.get("accredited"),
-            "non_accredited_investors": investors.get("non_accredited"),
-            "sales_compensation": json.dumps(parsed_data.get("sales_compensation", [])),
-        })
+        self.db.execute(
+            insert_sql,
+            {
+                "accession_number": accession_number,
+                "cik": cik,
+                "submission_type": parsed_data.get("submission_type", "D"),
+                "filed_at": filed_at_dt,
+                "issuer_name": issuer.get("name", "Unknown"),
+                "issuer_street": issuer.get("street"),
+                "issuer_city": issuer.get("city"),
+                "issuer_state": issuer.get("state"),
+                "issuer_zip": issuer.get("zip"),
+                "issuer_phone": issuer.get("phone"),
+                "entity_type": issuer.get("entity_type"),
+                "jurisdiction": issuer.get("jurisdiction"),
+                "year_of_incorporation": issuer.get("year_incorporated"),
+                "industry_group": offering.get("industry_group"),
+                "revenue_range": offering.get("revenue_range"),
+                "related_persons": json.dumps(parsed_data.get("related_persons", [])),
+                "federal_exemptions": json.dumps(offering.get("exemptions", [])),
+                "date_of_first_sale": first_sale_date,
+                "more_than_one_year": offering.get("more_than_one_year", False),
+                "is_equity": offering.get("is_equity", False),
+                "is_debt": offering.get("is_debt", False),
+                "is_option": offering.get("is_option", False),
+                "is_security_to_be_acquired": offering.get(
+                    "is_security_to_be_acquired", False
+                ),
+                "is_pooled_investment_fund": offering.get(
+                    "is_pooled_investment_fund", False
+                ),
+                "is_business_combination": offering.get(
+                    "is_business_combination", False
+                ),
+                "minimum_investment": offering.get("minimum_investment"),
+                "total_offering_amount": offering.get("total_offering_amount"),
+                "total_amount_sold": offering.get("total_amount_sold"),
+                "total_remaining": offering.get("total_remaining"),
+                "total_number_already_invested": investors.get("total"),
+                "accredited_investors": investors.get("accredited"),
+                "non_accredited_investors": investors.get("non_accredited"),
+                "sales_compensation": json.dumps(
+                    parsed_data.get("sales_compensation", [])
+                ),
+            },
+        )
         self.db.commit()
 
     def search_filings(
@@ -260,7 +273,7 @@ class FormDIngestionService:
         exemption: Optional[str] = None,
         min_amount: Optional[int] = None,
         limit: int = 50,
-        offset: int = 0
+        offset: int = 0,
     ) -> Dict[str, Any]:
         """
         Search Form D filings in database.
@@ -316,25 +329,28 @@ class FormDIngestionService:
         result = self.db.execute(query, params)
         filings = []
         for row in result.mappings():
-            filings.append({
-                "accession_number": row["accession_number"],
-                "cik": row["cik"],
-                "submission_type": row["submission_type"],
-                "filed_at": row["filed_at"].isoformat() if row["filed_at"] else None,
-                "issuer_name": row["issuer_name"],
-                "location": f"{row['issuer_city']}, {row['issuer_state']}" if row["issuer_city"] else row["issuer_state"],
-                "industry_group": row["industry_group"],
-                "exemptions": json.loads(row["federal_exemptions"]) if row["federal_exemptions"] else [],
-                "total_offering_amount": row["total_offering_amount"],
-                "total_amount_sold": row["total_amount_sold"],
-            })
+            filings.append(
+                {
+                    "accession_number": row["accession_number"],
+                    "cik": row["cik"],
+                    "submission_type": row["submission_type"],
+                    "filed_at": row["filed_at"].isoformat()
+                    if row["filed_at"]
+                    else None,
+                    "issuer_name": row["issuer_name"],
+                    "location": f"{row['issuer_city']}, {row['issuer_state']}"
+                    if row["issuer_city"]
+                    else row["issuer_state"],
+                    "industry_group": row["industry_group"],
+                    "exemptions": json.loads(row["federal_exemptions"])
+                    if row["federal_exemptions"]
+                    else [],
+                    "total_offering_amount": row["total_offering_amount"],
+                    "total_amount_sold": row["total_amount_sold"],
+                }
+            )
 
-        return {
-            "total": total,
-            "limit": limit,
-            "offset": offset,
-            "filings": filings
-        }
+        return {"total": total, "limit": limit, "offset": offset, "filings": filings}
 
     def get_filing(self, accession_number: str) -> Optional[Dict]:
         """Get a specific filing by accession number."""
@@ -368,8 +384,12 @@ class FormDIngestionService:
             "industry": row["industry_group"],
             "revenue_range": row["revenue_range"],
             "offering": {
-                "exemptions": json.loads(row["federal_exemptions"]) if row["federal_exemptions"] else [],
-                "date_of_first_sale": row["date_of_first_sale"].isoformat() if row["date_of_first_sale"] else None,
+                "exemptions": json.loads(row["federal_exemptions"])
+                if row["federal_exemptions"]
+                else [],
+                "date_of_first_sale": row["date_of_first_sale"].isoformat()
+                if row["date_of_first_sale"]
+                else None,
                 "more_than_one_year": row["more_than_one_year"],
                 "securities": {
                     "is_equity": row["is_equity"],
@@ -389,8 +409,12 @@ class FormDIngestionService:
                 "accredited": row["accredited_investors"],
                 "non_accredited": row["non_accredited_investors"],
             },
-            "related_persons": json.loads(row["related_persons"]) if row["related_persons"] else [],
-            "sales_compensation": json.loads(row["sales_compensation"]) if row["sales_compensation"] else [],
+            "related_persons": json.loads(row["related_persons"])
+            if row["related_persons"]
+            else [],
+            "sales_compensation": json.loads(row["sales_compensation"])
+            if row["sales_compensation"]
+            else [],
         }
 
     def get_filings_by_cik(self, cik: str) -> List[Dict]:
@@ -407,16 +431,22 @@ class FormDIngestionService:
 
         filings = []
         for row in result.mappings():
-            filings.append({
-                "accession_number": row["accession_number"],
-                "submission_type": row["submission_type"],
-                "filed_at": row["filed_at"].isoformat() if row["filed_at"] else None,
-                "issuer_name": row["issuer_name"],
-                "industry_group": row["industry_group"],
-                "exemptions": json.loads(row["federal_exemptions"]) if row["federal_exemptions"] else [],
-                "total_offering_amount": row["total_offering_amount"],
-                "total_amount_sold": row["total_amount_sold"],
-            })
+            filings.append(
+                {
+                    "accession_number": row["accession_number"],
+                    "submission_type": row["submission_type"],
+                    "filed_at": row["filed_at"].isoformat()
+                    if row["filed_at"]
+                    else None,
+                    "issuer_name": row["issuer_name"],
+                    "industry_group": row["industry_group"],
+                    "exemptions": json.loads(row["federal_exemptions"])
+                    if row["federal_exemptions"]
+                    else [],
+                    "total_offering_amount": row["total_offering_amount"],
+                    "total_amount_sold": row["total_amount_sold"],
+                }
+            )
 
         return filings
 
@@ -462,9 +492,18 @@ class FormDIngestionService:
             "total_sold_volume": result["total_sold_volume"],
             "fund_filings": result["fund_filings"],
             "date_range": {
-                "earliest": result["earliest_filing"].isoformat() if result["earliest_filing"] else None,
-                "latest": result["latest_filing"].isoformat() if result["latest_filing"] else None,
+                "earliest": result["earliest_filing"].isoformat()
+                if result["earliest_filing"]
+                else None,
+                "latest": result["latest_filing"].isoformat()
+                if result["latest_filing"]
+                else None,
             },
-            "by_industry": [{"industry": r["industry_group"], "count": r["count"]} for r in industries],
-            "by_exemption": [{"exemption": r["exemption"], "count": r["count"]} for r in exemptions],
+            "by_industry": [
+                {"industry": r["industry_group"], "count": r["count"]}
+                for r in industries
+            ],
+            "by_exemption": [
+                {"exemption": r["exemption"], "count": r["count"]} for r in exemptions
+            ],
         }

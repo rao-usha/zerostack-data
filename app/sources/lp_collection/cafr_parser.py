@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 # Try to import PDF libraries
 try:
     import pdfplumber
+
     PDFPLUMBER_AVAILABLE = True
 except ImportError:
     PDFPLUMBER_AVAILABLE = False
@@ -36,6 +37,7 @@ except ImportError:
 
 try:
     from PyPDF2 import PdfReader
+
     PYPDF2_AVAILABLE = True
 except ImportError:
     PYPDF2_AVAILABLE = False
@@ -274,21 +276,23 @@ class CafrParser(BaseCollector):
                 items.extend(regex_items)
 
             # Add document item
-            items.append(CollectedItem(
-                item_type="document_link",
-                data={
-                    "lp_id": lp_id,
-                    "url": cafr_url,
-                    "title": f"CAFR {fiscal_year}" if fiscal_year else "CAFR",
-                    "document_type": "cafr",
-                    "file_format": "pdf",
-                    "fiscal_year": fiscal_year,
-                    "text_length": len(text),
-                    "source_type": "cafr",
-                },
-                source_url=cafr_url,
-                confidence="high",
-            ))
+            items.append(
+                CollectedItem(
+                    item_type="document_link",
+                    data={
+                        "lp_id": lp_id,
+                        "url": cafr_url,
+                        "title": f"CAFR {fiscal_year}" if fiscal_year else "CAFR",
+                        "document_type": "cafr",
+                        "file_format": "pdf",
+                        "fiscal_year": fiscal_year,
+                        "text_length": len(text),
+                        "source_type": "cafr",
+                    },
+                    source_url=cafr_url,
+                    confidence="high",
+                )
+            )
 
             success = len(items) > 0
 
@@ -326,8 +330,7 @@ class CafrParser(BaseCollector):
         ]
 
         cafr_pattern = re.compile(
-            r'cafr|acfr|comprehensive.*annual.*financial|annual.*report',
-            re.IGNORECASE
+            r"cafr|acfr|comprehensive.*annual.*financial|annual.*report", re.IGNORECASE
         )
 
         # Try main website first
@@ -343,24 +346,22 @@ class CafrParser(BaseCollector):
             response = await self._fetch_url(page_url)
 
             if response and response.status_code == 200:
-                pdf_url = self._find_cafr_pdf_link(response.text, page_url, cafr_pattern)
+                pdf_url = self._find_cafr_pdf_link(
+                    response.text, page_url, cafr_pattern
+                )
                 if pdf_url:
                     return pdf_url
 
         return None
 
     def _find_cafr_pdf_link(
-        self,
-        html: str,
-        base_url: str,
-        cafr_pattern: re.Pattern
+        self, html: str, base_url: str, cafr_pattern: re.Pattern
     ) -> Optional[str]:
         """Find CAFR PDF link in HTML."""
         from urllib.parse import urljoin
 
         pdf_pattern = re.compile(
-            r'href=["\']([^"\']*\.pdf)["\'][^>]*>([^<]*)',
-            re.IGNORECASE
+            r'href=["\']([^"\']*\.pdf)["\'][^>]*>([^<]*)', re.IGNORECASE
         )
 
         best_match = None
@@ -395,10 +396,7 @@ class CafrParser(BaseCollector):
 
         return None
 
-    def _extract_pdf_text(
-        self,
-        pdf_content: bytes
-    ) -> Tuple[str, List[str]]:
+    def _extract_pdf_text(self, pdf_content: bytes) -> Tuple[str, List[str]]:
         """
         Extract text from PDF content.
 
@@ -412,7 +410,7 @@ class CafrParser(BaseCollector):
         if PDFPLUMBER_AVAILABLE:
             try:
                 with pdfplumber.open(io.BytesIO(pdf_content)) as pdf:
-                    for i, page in enumerate(pdf.pages[:self.MAX_PAGES_TO_EXTRACT]):
+                    for i, page in enumerate(pdf.pages[: self.MAX_PAGES_TO_EXTRACT]):
                         page_text = page.extract_text()
                         if page_text:
                             text_parts.append(page_text)
@@ -433,7 +431,7 @@ class CafrParser(BaseCollector):
         if PYPDF2_AVAILABLE:
             try:
                 reader = PdfReader(io.BytesIO(pdf_content))
-                for i, page in enumerate(reader.pages[:self.MAX_PAGES_TO_EXTRACT]):
+                for i, page in enumerate(reader.pages[: self.MAX_PAGES_TO_EXTRACT]):
                     page_text = page.extract_text()
                     if page_text:
                         text_parts.append(page_text)
@@ -450,8 +448,7 @@ class CafrParser(BaseCollector):
         """Detect fiscal year from CAFR text."""
         # Look for explicit fiscal year mentions
         fy_pattern = re.compile(
-            r"fiscal\s+year\s+(?:ended?\s+)?(?:june\s+30,?\s+)?(\d{4})",
-            re.IGNORECASE
+            r"fiscal\s+year\s+(?:ended?\s+)?(?:june\s+30,?\s+)?(\d{4})", re.IGNORECASE
         )
         match = fy_pattern.search(text)
         if match:
@@ -467,6 +464,7 @@ class CafrParser(BaseCollector):
         years = re.findall(r"20\d{2}", text)
         if years:
             from collections import Counter
+
             year_counts = Counter(int(y) for y in years if 2015 <= int(y) <= 2030)
             if year_counts:
                 return year_counts.most_common(1)[0][0]
@@ -487,13 +485,17 @@ class CafrParser(BaseCollector):
 
         # Find relevant text chunks (look for allocation-related content)
         allocation_keywords = [
-            "asset allocation", "investment policy", "target allocation",
-            "actual allocation", "strategic allocation", "policy benchmark",
+            "asset allocation",
+            "investment policy",
+            "target allocation",
+            "actual allocation",
+            "strategic allocation",
+            "policy benchmark",
         ]
 
         chunk = self._find_relevant_chunk(text, allocation_keywords)
         if not chunk:
-            chunk = text[:self.TEXT_CHUNK_SIZE]
+            chunk = text[: self.TEXT_CHUNK_SIZE]
 
         try:
             prompt = ALLOCATION_EXTRACTION_PROMPT.format(text=chunk)
@@ -510,37 +512,43 @@ class CafrParser(BaseCollector):
                 fy = data.get("fiscal_year") or fiscal_year
 
                 for alloc in allocations:
-                    items.append(CollectedItem(
-                        item_type="allocation",
-                        data={
-                            "lp_id": lp_id,
-                            "lp_name": lp_name,
-                            "fiscal_year": fy,
-                            "asset_class": alloc.get("asset_class"),
-                            "current_pct": alloc.get("current_pct"),
-                            "target_pct": alloc.get("target_pct"),
-                            "min_pct": alloc.get("min_pct"),
-                            "max_pct": alloc.get("max_pct"),
-                            "source_type": "cafr",
-                        },
-                        source_url=source_url,
-                        confidence="high",
-                    ))
+                    items.append(
+                        CollectedItem(
+                            item_type="allocation",
+                            data={
+                                "lp_id": lp_id,
+                                "lp_name": lp_name,
+                                "fiscal_year": fy,
+                                "asset_class": alloc.get("asset_class"),
+                                "current_pct": alloc.get("current_pct"),
+                                "target_pct": alloc.get("target_pct"),
+                                "min_pct": alloc.get("min_pct"),
+                                "max_pct": alloc.get("max_pct"),
+                                "source_type": "cafr",
+                            },
+                            source_url=source_url,
+                            confidence="high",
+                        )
+                    )
 
                 # Add total fund value if extracted
                 if data.get("total_fund_value_usd"):
-                    items.append(CollectedItem(
-                        item_type="strategy_info",
-                        data={
-                            "lp_id": lp_id,
-                            "fiscal_year": fy,
-                            "total_fund_value_usd": data.get("total_fund_value_usd"),
-                            "benchmark_name": data.get("benchmark_name"),
-                            "source_type": "cafr",
-                        },
-                        source_url=source_url,
-                        confidence="high",
-                    ))
+                    items.append(
+                        CollectedItem(
+                            item_type="strategy_info",
+                            data={
+                                "lp_id": lp_id,
+                                "fiscal_year": fy,
+                                "total_fund_value_usd": data.get(
+                                    "total_fund_value_usd"
+                                ),
+                                "benchmark_name": data.get("benchmark_name"),
+                                "source_type": "cafr",
+                            },
+                            source_url=source_url,
+                            confidence="high",
+                        )
+                    )
 
         except Exception as e:
             logger.warning(f"LLM allocation extraction failed: {e}")
@@ -561,13 +569,17 @@ class CafrParser(BaseCollector):
 
         # Find relevant text chunks
         perf_keywords = [
-            "investment performance", "rate of return", "annualized return",
-            "total fund return", "benchmark", "value added",
+            "investment performance",
+            "rate of return",
+            "annualized return",
+            "total fund return",
+            "benchmark",
+            "value added",
         ]
 
         chunk = self._find_relevant_chunk(text, perf_keywords)
         if not chunk:
-            chunk = text[:self.TEXT_CHUNK_SIZE]
+            chunk = text[: self.TEXT_CHUNK_SIZE]
 
         try:
             prompt = PERFORMANCE_EXTRACTION_PROMPT.format(text=chunk)
@@ -583,26 +595,34 @@ class CafrParser(BaseCollector):
                 benchmark = data.get("benchmark_returns", {})
 
                 if any(returns.values()):
-                    items.append(CollectedItem(
-                        item_type="performance_return",
-                        data={
-                            "lp_id": lp_id,
-                            "lp_name": lp_name,
-                            "fiscal_year": fy,
-                            "one_year_return_pct": returns.get("one_year_pct"),
-                            "three_year_return_pct": returns.get("three_year_pct"),
-                            "five_year_return_pct": returns.get("five_year_pct"),
-                            "ten_year_return_pct": returns.get("ten_year_pct"),
-                            "since_inception_return_pct": returns.get("since_inception_pct"),
-                            "benchmark_name": benchmark.get("benchmark_name"),
-                            "benchmark_one_year_pct": benchmark.get("one_year_pct"),
-                            "benchmark_three_year_pct": benchmark.get("three_year_pct"),
-                            "benchmark_five_year_pct": benchmark.get("five_year_pct"),
-                            "source_type": "cafr",
-                        },
-                        source_url=source_url,
-                        confidence="high",
-                    ))
+                    items.append(
+                        CollectedItem(
+                            item_type="performance_return",
+                            data={
+                                "lp_id": lp_id,
+                                "lp_name": lp_name,
+                                "fiscal_year": fy,
+                                "one_year_return_pct": returns.get("one_year_pct"),
+                                "three_year_return_pct": returns.get("three_year_pct"),
+                                "five_year_return_pct": returns.get("five_year_pct"),
+                                "ten_year_return_pct": returns.get("ten_year_pct"),
+                                "since_inception_return_pct": returns.get(
+                                    "since_inception_pct"
+                                ),
+                                "benchmark_name": benchmark.get("benchmark_name"),
+                                "benchmark_one_year_pct": benchmark.get("one_year_pct"),
+                                "benchmark_three_year_pct": benchmark.get(
+                                    "three_year_pct"
+                                ),
+                                "benchmark_five_year_pct": benchmark.get(
+                                    "five_year_pct"
+                                ),
+                                "source_type": "cafr",
+                            },
+                            source_url=source_url,
+                            confidence="high",
+                        )
+                    )
 
         except Exception as e:
             logger.warning(f"LLM performance extraction failed: {e}")
@@ -622,8 +642,12 @@ class CafrParser(BaseCollector):
 
         # Find relevant text chunks
         manager_keywords = [
-            "investment manager", "external manager", "investment adviser",
-            "mandate", "portfolio manager", "sub-adviser",
+            "investment manager",
+            "external manager",
+            "investment adviser",
+            "mandate",
+            "portfolio manager",
+            "sub-adviser",
         ]
 
         chunk = self._find_relevant_chunk(text, manager_keywords)
@@ -642,20 +666,22 @@ class CafrParser(BaseCollector):
                 managers = data.get("managers", [])
 
                 for mgr in managers[:50]:  # Limit
-                    items.append(CollectedItem(
-                        item_type="manager_relationship",
-                        data={
-                            "lp_id": lp_id,
-                            "lp_name": lp_name,
-                            "manager_name": mgr.get("name"),
-                            "asset_class": mgr.get("asset_class"),
-                            "mandate_type": mgr.get("mandate_type"),
-                            "commitment_usd": mgr.get("commitment_usd"),
-                            "source_type": "cafr",
-                        },
-                        source_url=source_url,
-                        confidence="medium",  # LLM extraction is less certain
-                    ))
+                    items.append(
+                        CollectedItem(
+                            item_type="manager_relationship",
+                            data={
+                                "lp_id": lp_id,
+                                "lp_name": lp_name,
+                                "manager_name": mgr.get("name"),
+                                "asset_class": mgr.get("asset_class"),
+                                "mandate_type": mgr.get("mandate_type"),
+                                "commitment_usd": mgr.get("commitment_usd"),
+                                "source_type": "cafr",
+                            },
+                            source_url=source_url,
+                            confidence="medium",  # LLM extraction is less certain
+                        )
+                    )
 
         except Exception as e:
             logger.warning(f"LLM manager extraction failed: {e}")
@@ -726,11 +752,13 @@ class CafrParser(BaseCollector):
                 returns[field] = match.group(1)
 
         if any(v for k, v in returns.items() if k.endswith("_pct")):
-            items.append(CollectedItem(
-                item_type="performance_return",
-                data=returns,
-                source_url=source_url,
-                confidence="medium",  # Regex is less reliable
-            ))
+            items.append(
+                CollectedItem(
+                    item_type="performance_return",
+                    data=returns,
+                    source_url=source_url,
+                    confidence="medium",  # Regex is less reliable
+                )
+            )
 
         return items

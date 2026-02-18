@@ -30,7 +30,7 @@ TIER_THRESHOLDS = [
     (60, "B"),  # 60-79
     (40, "C"),  # 40-59
     (20, "D"),  # 20-39
-    (0, "F"),   # 0-19
+    (0, "F"),  # 0-19
 ]
 
 
@@ -140,9 +140,7 @@ class CompanyScorer:
         return None
 
     def _calculate_growth_score(
-        self,
-        enrichment: Optional[Dict],
-        github: Optional[Dict]
+        self, enrichment: Optional[Dict], github: Optional[Dict]
     ) -> tuple[float, List[str], List[str]]:
         """
         Calculate growth score (0-100).
@@ -199,8 +197,7 @@ class CompanyScorer:
         return sum(scores) / len(scores), strengths, improvements
 
     def _calculate_stability_score(
-        self,
-        enrichment: Optional[Dict]
+        self, enrichment: Optional[Dict]
     ) -> tuple[float, List[str], List[str]]:
         """
         Calculate stability score (0-100).
@@ -220,6 +217,7 @@ class CompanyScorer:
             # Normalize revenue: $1M = 20, $100M = 60, $1B+ = 100
             if revenue > 0:
                 import math
+
                 log_revenue = math.log10(max(revenue, 1))
                 rev_score = self._normalize_score(log_revenue, 5, 10)  # $100K to $10B
                 scores.append(rev_score)
@@ -260,7 +258,7 @@ class CompanyScorer:
         self,
         enrichment: Optional[Dict],
         github: Optional[Dict],
-        tranco_rank: Optional[int]
+        tranco_rank: Optional[int],
     ) -> tuple[float, List[str], List[str]]:
         """
         Calculate market position score (0-100).
@@ -278,6 +276,7 @@ class CompanyScorer:
         if tranco_rank:
             # Top 1000 = 100, Top 10K = 80, Top 100K = 60, Top 1M = 40
             import math
+
             log_rank = math.log10(max(tranco_rank, 1))
             rank_score = self._normalize_score(6 - log_rank, 0, 6)  # 1 to 1M
             scores.append(rank_score)
@@ -288,6 +287,7 @@ class CompanyScorer:
         if github and github.get("total_stars"):
             stars = github["total_stars"]
             import math
+
             # 100 stars = 40, 1K = 60, 10K = 80, 100K+ = 100
             log_stars = math.log10(max(stars, 1))
             star_score = self._normalize_score(log_stars, 1, 5)
@@ -305,8 +305,7 @@ class CompanyScorer:
         return sum(scores) / len(scores), strengths, improvements
 
     def _calculate_tech_score(
-        self,
-        github: Optional[Dict]
+        self, github: Optional[Dict]
     ) -> tuple[float, List[str], List[str]]:
         """
         Calculate tech velocity score (0-100).
@@ -355,7 +354,7 @@ class CompanyScorer:
         self,
         enrichment: Optional[Dict],
         github: Optional[Dict],
-        tranco_rank: Optional[int]
+        tranco_rank: Optional[int],
     ) -> tuple[float, List[str]]:
         """
         Calculate confidence score based on data availability.
@@ -388,7 +387,9 @@ class CompanyScorer:
 
         return min(confidence, 1.0), sources
 
-    def score_company(self, company_name: str, force_refresh: bool = False) -> Dict[str, Any]:
+    def score_company(
+        self, company_name: str, force_refresh: bool = False
+    ) -> Dict[str, Any]:
         """
         Calculate comprehensive score for a company.
 
@@ -411,31 +412,42 @@ class CompanyScorer:
         tranco_rank = self._get_web_traffic_rank(company_name)
 
         # Calculate category scores
-        growth_score, growth_strengths, growth_improvements = self._calculate_growth_score(
-            enrichment, github
+        growth_score, growth_strengths, growth_improvements = (
+            self._calculate_growth_score(enrichment, github)
         )
-        stability_score, stability_strengths, stability_improvements = self._calculate_stability_score(
-            enrichment
+        stability_score, stability_strengths, stability_improvements = (
+            self._calculate_stability_score(enrichment)
         )
-        market_score, market_strengths, market_improvements = self._calculate_market_score(
-            enrichment, github, tranco_rank
+        market_score, market_strengths, market_improvements = (
+            self._calculate_market_score(enrichment, github, tranco_rank)
         )
-        tech_score, tech_strengths, tech_improvements = self._calculate_tech_score(github)
+        tech_score, tech_strengths, tech_improvements = self._calculate_tech_score(
+            github
+        )
 
         # Calculate composite score
         composite = (
-            growth_score * WEIGHTS["growth"] +
-            stability_score * WEIGHTS["stability"] +
-            market_score * WEIGHTS["market_position"] +
-            tech_score * WEIGHTS["tech_velocity"]
+            growth_score * WEIGHTS["growth"]
+            + stability_score * WEIGHTS["stability"]
+            + market_score * WEIGHTS["market_position"]
+            + tech_score * WEIGHTS["tech_velocity"]
         )
 
         # Calculate confidence
-        confidence, sources = self._calculate_confidence(enrichment, github, tranco_rank)
+        confidence, sources = self._calculate_confidence(
+            enrichment, github, tranco_rank
+        )
 
         # Compile explanation
-        all_strengths = growth_strengths + stability_strengths + market_strengths + tech_strengths
-        all_improvements = growth_improvements + stability_improvements + market_improvements + tech_improvements
+        all_strengths = (
+            growth_strengths + stability_strengths + market_strengths + tech_strengths
+        )
+        all_improvements = (
+            growth_improvements
+            + stability_improvements
+            + market_improvements
+            + tech_improvements
+        )
 
         result = {
             "company_name": company_name,
@@ -474,7 +486,9 @@ class CompanyScorer:
         """)
 
         try:
-            result = self.db.execute(query, {"name": company_name, "version": MODEL_VERSION})
+            result = self.db.execute(
+                query, {"name": company_name, "version": MODEL_VERSION}
+            )
             row = result.mappings().fetchone()
 
             if row:
@@ -490,7 +504,9 @@ class CompanyScorer:
                     },
                     "confidence": row["confidence"],
                     "explanation": row["explanation"],
-                    "scored_at": row["scored_at"].isoformat() + "Z" if row["scored_at"] else None,
+                    "scored_at": row["scored_at"].isoformat() + "Z"
+                    if row["scored_at"]
+                    else None,
                     "model_version": row["model_version"],
                     "cached": True,
                 }
@@ -527,19 +543,22 @@ class CompanyScorer:
         """)
 
         try:
-            self.db.execute(query, {
-                "name": result["company_name"],
-                "composite": result["composite_score"],
-                "growth": result["category_scores"]["growth"],
-                "stability": result["category_scores"]["stability"],
-                "market": result["category_scores"]["market_position"],
-                "tech": result["category_scores"]["tech_velocity"],
-                "confidence": result["confidence"],
-                "tier": result["tier"],
-                "explanation": json.dumps(result["explanation"]),
-                "sources": json.dumps(result["explanation"]["data_sources_used"]),
-                "version": MODEL_VERSION,
-            })
+            self.db.execute(
+                query,
+                {
+                    "name": result["company_name"],
+                    "composite": result["composite_score"],
+                    "growth": result["category_scores"]["growth"],
+                    "stability": result["category_scores"]["stability"],
+                    "market": result["category_scores"]["market_position"],
+                    "tech": result["category_scores"]["tech_velocity"],
+                    "confidence": result["confidence"],
+                    "tier": result["tier"],
+                    "explanation": json.dumps(result["explanation"]),
+                    "sources": json.dumps(result["explanation"]["data_sources_used"]),
+                    "version": MODEL_VERSION,
+                },
+            )
             self.db.commit()
         except Exception as e:
             logger.warning(f"Error saving score: {e}")
@@ -549,7 +568,7 @@ class CompanyScorer:
         self,
         investor_id: int,
         min_score: Optional[float] = None,
-        tier: Optional[str] = None
+        tier: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Score all companies in an investor's portfolio.
@@ -609,11 +628,13 @@ class CompanyScorer:
             if tier and company_tier != tier:
                 continue
 
-            scored_companies.append({
-                "company_name": company_name,
-                "score": company_score,
-                "tier": company_tier,
-            })
+            scored_companies.append(
+                {
+                    "company_name": company_name,
+                    "score": company_score,
+                    "tier": company_tier,
+                }
+            )
 
         # Sort by score descending
         scored_companies.sort(key=lambda x: x["score"], reverse=True)
@@ -637,7 +658,7 @@ class CompanyScorer:
         order: str = "top",
         limit: int = 20,
         sector: Optional[str] = None,
-        min_confidence: float = 0.0
+        min_confidence: float = 0.0,
     ) -> Dict[str, Any]:
         """
         Get top or bottom scored companies.
@@ -680,14 +701,16 @@ class CompanyScorer:
 
             rankings = []
             for i, row in enumerate(rows, 1):
-                rankings.append({
-                    "rank": i,
-                    "company_name": row["company_name"],
-                    "score": row["composite_score"],
-                    "tier": row["tier"],
-                    "sector": row["sector"],
-                    "confidence": row["confidence"],
-                })
+                rankings.append(
+                    {
+                        "rank": i,
+                        "company_name": row["company_name"],
+                        "score": row["composite_score"],
+                        "tier": row["tier"],
+                        "sector": row["sector"],
+                        "confidence": row["confidence"],
+                    }
+                )
 
             return {
                 "order": order,
@@ -753,10 +776,22 @@ class CompanyScorer:
                 },
             ],
             "tier_definitions": {
-                "A": {"range": "80-100", "interpretation": "Strong performance across all metrics"},
-                "B": {"range": "60-79", "interpretation": "Solid fundamentals, some areas for improvement"},
-                "C": {"range": "40-59", "interpretation": "Average performance, mixed signals"},
-                "D": {"range": "20-39", "interpretation": "Weak performance, concerns present"},
+                "A": {
+                    "range": "80-100",
+                    "interpretation": "Strong performance across all metrics",
+                },
+                "B": {
+                    "range": "60-79",
+                    "interpretation": "Solid fundamentals, some areas for improvement",
+                },
+                "C": {
+                    "range": "40-59",
+                    "interpretation": "Average performance, mixed signals",
+                },
+                "D": {
+                    "range": "20-39",
+                    "interpretation": "Weak performance, concerns present",
+                },
                 "F": {"range": "0-19", "interpretation": "Critical issues, high risk"},
             },
             "confidence_calculation": {
@@ -769,6 +804,9 @@ class CompanyScorer:
             },
             "caching": {
                 "ttl_days": 7,
-                "refresh_triggers": ["Manual refresh request", "Underlying data update"],
+                "refresh_triggers": [
+                    "Manual refresh request",
+                    "Underlying data update",
+                ],
             },
         }

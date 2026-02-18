@@ -1,6 +1,7 @@
 """
 Job management endpoints.
 """
+
 import importlib
 import logging
 from typing import List, Dict, Tuple, Any, Optional
@@ -481,7 +482,9 @@ async def _run_quality_gate(db, job: IngestionJob):
             .first()
         )
         if not registry:
-            logger.debug(f"Quality gate: no dataset registry entry for {job.source}, skipping")
+            logger.debug(
+                f"Quality gate: no dataset registry entry for {job.source}, skipping"
+            )
             return
 
         report = evaluate_rules_for_job(db, job, registry.table_name)
@@ -512,7 +515,9 @@ async def _handle_job_completion(db, job: IngestionJob):
     unblocked_jobs = dependency_service.check_and_unblock_dependent_jobs(db, job.id)
 
     if unblocked_jobs:
-        logger.info(f"Job {job.id} completion unblocked {len(unblocked_jobs)} dependent jobs: {unblocked_jobs}")
+        logger.info(
+            f"Job {job.id} completion unblocked {len(unblocked_jobs)} dependent jobs: {unblocked_jobs}"
+        )
         # Start the unblocked jobs
         await dependency_service.process_unblocked_jobs(db, unblocked_jobs)
 
@@ -524,10 +529,7 @@ async def _handle_job_completion(db, job: IngestionJob):
 
 
 async def _handle_job_failure(
-    db,
-    job: IngestionJob,
-    error_message: str,
-    error_type: str = None
+    db, job: IngestionJob, error_message: str, error_type: str = None
 ):
     """
     Handle job failure: set status, schedule retry, send notifications.
@@ -553,17 +555,21 @@ async def _handle_job_failure(
     retry_scheduled = auto_schedule_retry(db, job)
 
     if retry_scheduled:
-        logger.info(f"Job {job.id} failed, retry scheduled (attempt {job.retry_count + 1}/{job.max_retries})")
+        logger.info(
+            f"Job {job.id} failed, retry scheduled (attempt {job.retry_count + 1}/{job.max_retries})"
+        )
     else:
         # No more retries - send webhook notification and handle completion
-        logger.warning(f"Job {job.id} failed permanently (exhausted {job.retry_count}/{job.max_retries} retries)")
+        logger.warning(
+            f"Job {job.id} failed permanently (exhausted {job.retry_count}/{job.max_retries} retries)"
+        )
         try:
             await monitoring.notify_job_completion(
                 job_id=job.id,
                 source=job.source,
                 status=JobStatus.FAILED,
                 error_message=error_message,
-                config=job.config
+                config=job.config,
             )
         except Exception as e:
             logger.error(f"Failed to send failure notification for job {job.id}: {e}")
@@ -578,7 +584,11 @@ async def _run_dispatched_job(db, job, job_id, source, config, monitoring):
 
     # Resolve dispatch key: try "source:dataset" first, then "source"
     dataset = config.get("dataset") if config else None
-    dispatch_key = f"{source}:{dataset}" if dataset and f"{source}:{dataset}" in SOURCE_DISPATCH else source
+    dispatch_key = (
+        f"{source}:{dataset}"
+        if dataset and f"{source}:{dataset}" in SOURCE_DISPATCH
+        else source
+    )
     module_path, func_name, config_keys = SOURCE_DISPATCH[dispatch_key]
 
     try:
@@ -586,7 +596,8 @@ async def _run_dispatched_job(db, job, job_id, source, config, monitoring):
         func = getattr(module, func_name)
     except (ImportError, AttributeError) as e:
         await _handle_job_failure(
-            db, job,
+            db,
+            job,
             f"Failed to load ingest function for {source}: {e}",
             type(e).__name__,
         )
@@ -606,7 +617,9 @@ async def _run_dispatched_job(db, job, job_id, source, config, monitoring):
         job.status = JobStatus.SUCCESS
         rows_inserted = 0
         if isinstance(result, dict):
-            rows_inserted = result.get("rows_inserted", 0) or result.get("total_records", 0) or 0
+            rows_inserted = (
+                result.get("rows_inserted", 0) or result.get("total_records", 0) or 0
+            )
         job.rows_inserted = rows_inserted
         job.completed_at = datetime.utcnow()
         db.commit()
@@ -656,7 +669,8 @@ async def _run_census_job(db, job, job_id, config, monitoring):
 
     if not year or not table_id:
         await _handle_job_failure(
-            db, job,
+            db,
+            job,
             "Missing required config: 'year' and 'table_id' are required",
             "ValidationError",
         )
@@ -665,9 +679,14 @@ async def _run_census_job(db, job, job_id, config, monitoring):
     try:
         include_geojson = config.get("include_geojson", False)
         result = await ingest_acs_table(
-            db=db, job_id=job_id, survey=survey, year=year,
-            table_id=table_id, geo_level=geo_level,
-            geo_filter=geo_filter, include_geojson=include_geojson,
+            db=db,
+            job_id=job_id,
+            survey=survey,
+            year=year,
+            table_id=table_id,
+            geo_level=geo_level,
+            geo_filter=geo_filter,
+            include_geojson=include_geojson,
         )
 
         job.status = JobStatus.SUCCESS
@@ -683,8 +702,10 @@ async def _run_census_job(db, job, job_id, config, monitoring):
 
         try:
             await monitoring.notify_job_completion(
-                job_id=job.id, source=job.source,
-                status=JobStatus.SUCCESS, rows_inserted=rows_inserted,
+                job_id=job.id,
+                source=job.source,
+                status=JobStatus.SUCCESS,
+                rows_inserted=rows_inserted,
                 config=job.config,
             )
         except Exception as e:
@@ -702,9 +723,12 @@ async def _run_public_lp_strategies_job(db, job, job_id, config, monitoring):
     from datetime import datetime
     from app.sources.public_lp_strategies.ingest import ingest_lp_strategy_document
     from app.sources.public_lp_strategies.types import (
-        LpDocumentInput, DocumentTextSectionInput,
-        StrategySnapshotInput, AssetClassAllocationInput,
-        AssetClassProjectionInput, ThematicTagInput,
+        LpDocumentInput,
+        DocumentTextSectionInput,
+        StrategySnapshotInput,
+        AssetClassAllocationInput,
+        AssetClassProjectionInput,
+        ThematicTagInput,
     )
 
     lp_name = config.get("lp_name")
@@ -717,7 +741,8 @@ async def _run_public_lp_strategies_job(db, job, job_id, config, monitoring):
 
     if not all([lp_name, program, fiscal_year, fiscal_quarter]):
         await _handle_job_failure(
-            db, job,
+            db,
+            job,
             "Missing required config: 'lp_name', 'program', 'fiscal_year', 'fiscal_quarter'",
             "ValidationError",
         )
@@ -727,23 +752,39 @@ async def _run_public_lp_strategies_job(db, job, job_id, config, monitoring):
         document_input = LpDocumentInput(lp_id=0, **document_metadata)
         text_sections = [DocumentTextSectionInput(**s) for s in parsed_sections]
         strategy_input = StrategySnapshotInput(
-            lp_id=0, program=program,
-            fiscal_year=fiscal_year, fiscal_quarter=fiscal_quarter,
+            lp_id=0,
+            program=program,
+            fiscal_year=fiscal_year,
+            fiscal_quarter=fiscal_quarter,
             **extracted_strategy.get("strategy", {}),
         )
-        allocations = [AssetClassAllocationInput(**a) for a in extracted_strategy.get("allocations", [])]
-        projections = [AssetClassProjectionInput(**p) for p in extracted_strategy.get("projections", [])]
-        thematic_tags = [ThematicTagInput(**t) for t in extracted_strategy.get("thematic_tags", [])]
+        allocations = [
+            AssetClassAllocationInput(**a)
+            for a in extracted_strategy.get("allocations", [])
+        ]
+        projections = [
+            AssetClassProjectionInput(**p)
+            for p in extracted_strategy.get("projections", [])
+        ]
+        thematic_tags = [
+            ThematicTagInput(**t) for t in extracted_strategy.get("thematic_tags", [])
+        ]
 
         result = ingest_lp_strategy_document(
-            db=db, lp_name=lp_name, document_input=document_input,
-            text_sections=text_sections, strategy_input=strategy_input,
-            allocations=allocations, projections=projections,
+            db=db,
+            lp_name=lp_name,
+            document_input=document_input,
+            text_sections=text_sections,
+            strategy_input=strategy_input,
+            allocations=allocations,
+            projections=projections,
             thematic_tags=thematic_tags,
         )
 
         job.status = JobStatus.SUCCESS
-        rows_inserted = result.get("sections_count", 0) + result.get("allocations_count", 0)
+        rows_inserted = result.get("sections_count", 0) + result.get(
+            "allocations_count", 0
+        )
         job.rows_inserted = rows_inserted
         job.completed_at = datetime.utcnow()
         db.commit()
@@ -755,8 +796,10 @@ async def _run_public_lp_strategies_job(db, job, job_id, config, monitoring):
 
         try:
             await monitoring.notify_job_completion(
-                job_id=job.id, source=job.source,
-                status=JobStatus.SUCCESS, rows_inserted=rows_inserted,
+                job_id=job.id,
+                source=job.source,
+                status=JobStatus.SUCCESS,
+                rows_inserted=rows_inserted,
                 config=job.config,
             )
         except Exception as e:
@@ -765,7 +808,9 @@ async def _run_public_lp_strategies_job(db, job, job_id, config, monitoring):
         await _handle_job_completion(db, job)
 
     except Exception as e:
-        logger.exception(f"Error during public_lp_strategies ingestion for job {job_id}")
+        logger.exception(
+            f"Error during public_lp_strategies ingestion for job {job_id}"
+        )
         await _handle_job_failure(db, job, str(e), type(e).__name__)
 
 
@@ -783,18 +828,18 @@ async def run_ingestion_job(job_id: int, source: str, config: dict):
 
     SessionLocal = get_session_factory()
     db = SessionLocal()
-    
+
     try:
         # Update job status to running
         job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
         if not job:
             logger.error(f"Job {job_id} not found")
             return
-        
+
         job.status = JobStatus.RUNNING
         job.started_at = datetime.utcnow()
         db.commit()
-        
+
         # Route to appropriate source adapter
         if source == "census":
             await _run_census_job(db, job, job_id, config, monitoring)
@@ -802,12 +847,16 @@ async def run_ingestion_job(job_id: int, source: str, config: dict):
         elif source == "public_lp_strategies":
             await _run_public_lp_strategies_job(db, job, job_id, config, monitoring)
 
-        elif source in SOURCE_DISPATCH or any(k.startswith(f"{source}:") for k in SOURCE_DISPATCH):
+        elif source in SOURCE_DISPATCH or any(
+            k.startswith(f"{source}:") for k in SOURCE_DISPATCH
+        ):
             await _run_dispatched_job(db, job, job_id, source, config, monitoring)
 
         else:
-            await _handle_job_failure(db, job, f"Unknown source: {source}", "UnknownSourceError")
-    
+            await _handle_job_failure(
+                db, job, f"Unknown source: {source}", "UnknownSourceError"
+            )
+
     except Exception as e:
         logger.exception(f"Error running job {job_id}")
         job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
@@ -822,11 +871,11 @@ async def run_ingestion_job(job_id: int, source: str, config: dict):
 async def create_job(
     job_request: JobCreate,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> JobResponse:
     """
     Create a new ingestion job.
-    
+
     The job will run asynchronously in the background.
     """
     # Validate source
@@ -835,15 +884,12 @@ async def create_job(
     valid_sources = sorted({"census", "public_lp_strategies"} | _base_sources)
     if job_request.source not in valid_sources:
         raise HTTPException(
-            status_code=400,
-            detail=f"Invalid source. Must be one of: {valid_sources}"
+            status_code=400, detail=f"Invalid source. Must be one of: {valid_sources}"
         )
-    
+
     # Create job record
     job = IngestionJob(
-        source=job_request.source,
-        status=JobStatus.PENDING,
-        config=job_request.config
+        source=job_request.source, status=JobStatus.PENDING, config=job_request.config
     )
     db.add(job)
     db.commit()
@@ -854,6 +900,7 @@ async def create_job(
     # Audit trail
     try:
         from app.core import audit_service
+
         audit_service.log_collection(
             db,
             trigger_type="api",
@@ -867,13 +914,8 @@ async def create_job(
         logger.debug("Audit trail logging failed: %s", e)
 
     # Start background ingestion
-    background_tasks.add_task(
-        run_ingestion_job,
-        job.id,
-        job.source,
-        job.config
-    )
-    
+    background_tasks.add_task(run_ingestion_job, job.id, job.source, job.config)
+
     return JobResponse.model_validate(job)
 
 
@@ -885,7 +927,7 @@ def get_job(job_id: int, db: Session = Depends(get_db)) -> JobResponse:
     job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     return JobResponse.model_validate(job)
 
 
@@ -894,7 +936,7 @@ def list_jobs(
     source: str = None,
     status: JobStatus = None,
     limit: int = 100,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> List[JobResponse]:
     """
     List ingestion jobs with optional filtering.
@@ -916,6 +958,7 @@ def list_jobs(
 # Retry Endpoints
 # =============================================================================
 
+
 @router.get("/failed/summary")
 def get_failed_jobs_summary(db: Session = Depends(get_db)):
     """
@@ -924,14 +967,13 @@ def get_failed_jobs_summary(db: Session = Depends(get_db)):
     Returns counts of retryable vs exhausted jobs.
     """
     from app.core.retry_service import get_failed_jobs_summary as get_summary
+
     return get_summary(db)
 
 
 @router.post("/{job_id}/retry", response_model=JobResponse)
 async def retry_job(
-    job_id: int,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    job_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ) -> JobResponse:
     """
     Retry a failed job.
@@ -947,13 +989,13 @@ async def retry_job(
     if job.status != JobStatus.FAILED:
         raise HTTPException(
             status_code=400,
-            detail=f"Job is not in failed status (current: {job.status.value})"
+            detail=f"Job is not in failed status (current: {job.status.value})",
         )
 
     if not job.can_retry:
         raise HTTPException(
             status_code=400,
-            detail=f"Job has exhausted all retries ({job.retry_count}/{job.max_retries})"
+            detail=f"Job has exhausted all retries ({job.retry_count}/{job.max_retries})",
         )
 
     # Mark job for retry
@@ -963,13 +1005,12 @@ async def retry_job(
 
     # Start background ingestion
     background_tasks.add_task(
-        run_ingestion_job,
-        updated_job.id,
-        updated_job.source,
-        updated_job.config
+        run_ingestion_job, updated_job.id, updated_job.source, updated_job.config
     )
 
-    logger.info(f"Retrying job {job_id} (attempt {updated_job.retry_count}/{updated_job.max_retries})")
+    logger.info(
+        f"Retrying job {job_id} (attempt {updated_job.retry_count}/{updated_job.max_retries})"
+    )
 
     return JobResponse.model_validate(updated_job)
 
@@ -979,7 +1020,7 @@ async def retry_all_failed_jobs(
     background_tasks: BackgroundTasks,
     source: str = None,
     limit: int = 10,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Retry all eligible failed jobs.
@@ -996,31 +1037,26 @@ async def retry_all_failed_jobs(
 
     # Schedule background tasks for retried jobs
     for job_info in results["retried"]:
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_info["job_id"]).first()
+        job = (
+            db.query(IngestionJob).filter(IngestionJob.id == job_info["job_id"]).first()
+        )
         if job:
-            background_tasks.add_task(
-                run_ingestion_job,
-                job.id,
-                job.source,
-                job.config
-            )
+            background_tasks.add_task(run_ingestion_job, job.id, job.source, job.config)
 
-    return {
-        "message": f"Scheduled {len(results['retried'])} jobs for retry",
-        **results
-    }
+    return {"message": f"Scheduled {len(results['retried'])} jobs for retry", **results}
 
 
 # =============================================================================
 # Data Quality Validation Endpoints
 # =============================================================================
 
+
 @router.get("/{job_id}/validate")
 def validate_job_data(
     job_id: int,
     table_name: str,
     expected_min_rows: int = 1,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Validate data quality for a completed ingestion job.
@@ -1039,7 +1075,10 @@ def validate_job_data(
     Returns:
         Validation results with pass/fail status for each check
     """
-    from app.core.data_quality import validate_ingestion_job, get_default_validation_config
+    from app.core.data_quality import (
+        validate_ingestion_job,
+        get_default_validation_config,
+    )
 
     # Get job to determine source
     job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
@@ -1049,7 +1088,7 @@ def validate_job_data(
     if job.status != JobStatus.SUCCESS:
         raise HTTPException(
             status_code=400,
-            detail=f"Job is not in success status (current: {job.status.value})"
+            detail=f"Job is not in success status (current: {job.status.value})",
         )
 
     # Get default validation config for source
@@ -1057,17 +1096,14 @@ def validate_job_data(
     default_config = get_default_validation_config(job.source, dataset)
 
     # Override with provided parameters
-    validation_config = {
-        **default_config,
-        "expected_min_rows": expected_min_rows
-    }
+    validation_config = {**default_config, "expected_min_rows": expected_min_rows}
 
     try:
         results = validate_ingestion_job(
             db=db,
             job_id=job_id,
             table_name=table_name,
-            validation_config=validation_config
+            validation_config=validation_config,
         )
         return results
     except Exception as e:
@@ -1079,12 +1115,9 @@ def validate_job_data(
 # Monitoring Endpoints
 # =============================================================================
 
+
 @router.get("/monitoring/metrics")
-def get_job_metrics(
-    hours: int = 24,
-    source: str = None,
-    db: Session = Depends(get_db)
-):
+def get_job_metrics(hours: int = 24, source: str = None, db: Session = Depends(get_db)):
     """
     Get job metrics for monitoring.
 
@@ -1122,7 +1155,7 @@ def get_source_health(db: Session = Depends(get_db)):
 def get_active_alerts(
     failure_threshold: int = 3,
     time_window_hours: int = 1,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get active alerts for job failures.
@@ -1140,8 +1173,7 @@ def get_active_alerts(
 
     monitor = JobMonitor(db)
     return monitor.check_alerts(
-        failure_threshold=failure_threshold,
-        time_window_hours=time_window_hours
+        failure_threshold=failure_threshold, time_window_hours=time_window_hours
     )
 
 

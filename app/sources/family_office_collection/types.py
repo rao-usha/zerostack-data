@@ -15,6 +15,7 @@ from typing import List, Optional, Dict, Any
 
 class FoCollectionSource(str, Enum):
     """Available data collection sources for family offices."""
+
     WEBSITE = "website"
     SEC_13F = "sec_13f"
     SEC_ADV = "sec_adv"
@@ -25,6 +26,7 @@ class FoCollectionSource(str, Enum):
 
 class FoCollectionMode(str, Enum):
     """Collection mode options."""
+
     INCREMENTAL = "incremental"  # Only collect if stale
     FULL = "full"  # Force full re-collection
 
@@ -44,6 +46,7 @@ class FoCollectionConfig:
         rate_limit_delay: Delay between requests in seconds
         max_retries: Maximum retry attempts per FO
     """
+
     fo_types: Optional[List[str]] = None
     regions: Optional[List[str]] = None
     sources: List[FoCollectionSource] = field(
@@ -105,6 +108,7 @@ class FoCollectedItem:
         confidence: Confidence level (high, medium, low)
         is_new: Whether this is a new item (not update)
     """
+
     item_type: str  # contact, investment, deal, portfolio_company, etc.
     data: Dict[str, Any]
     source_url: Optional[str] = None
@@ -140,6 +144,7 @@ class FoCollectionResult:
         started_at: When collection started
         completed_at: When collection completed
     """
+
     fo_id: int
     fo_name: str
     source: FoCollectionSource
@@ -197,6 +202,7 @@ class FoJobProgress:
     """
     Progress tracking for a collection job.
     """
+
     job_id: int
     total_fos: int = 0
     completed_fos: int = 0
@@ -224,6 +230,7 @@ class FoRegistryEntry:
 
     Mirrors the structure in expanded_family_office_registry.json.
     """
+
     name: str
     fo_type: str  # single_family, multi_family
     principal_family: Optional[str]

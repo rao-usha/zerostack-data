@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 # ENUMS AND CONSTANTS
 # =============================================================================
 
+
 class SeverityLevel(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
@@ -62,7 +63,7 @@ BASE_SEVERITY = {
 # Thresholds for detection
 THRESHOLDS = {
     "score_drop_points": 10,  # Score drop > 10 points
-    "score_drop_pct": 0.12,   # Score drop > 12%
+    "score_drop_pct": 0.12,  # Score drop > 12%
     "employee_change_pct": 0.20,  # Employee change > 20%
     "traffic_change_pct": 0.50,  # Traffic rank change > 50%
     "rating_drop": 0.5,  # Rating drop > 0.5
@@ -73,6 +74,7 @@ THRESHOLDS = {
 # =============================================================================
 # ANOMALY DETECTOR AGENT
 # =============================================================================
+
 
 class AnomalyDetectorAgent:
     """AI agent for detecting anomalies in company data."""
@@ -188,7 +190,7 @@ class AnomalyDetectorAgent:
                 INSERT INTO anomaly_scans (scan_id, scan_type, target_filter, status, started_at)
                 VALUES (:scan_id, :scan_type, :target, 'running', NOW())
             """),
-            {"scan_id": scan_id, "scan_type": scan_type, "target": target}
+            {"scan_id": scan_id, "scan_type": scan_type, "target": target},
         )
         self.db.commit()
 
@@ -232,7 +234,7 @@ class AnomalyDetectorAgent:
                         completed_at = NOW()
                     WHERE scan_id = :scan_id
                 """),
-                {"scanned": records_scanned, "found": new_count, "scan_id": scan_id}
+                {"scanned": records_scanned, "found": new_count, "scan_id": scan_id},
             )
             self.db.commit()
 
@@ -249,7 +251,7 @@ class AnomalyDetectorAgent:
             self.db.rollback()
             self.db.execute(
                 text("UPDATE anomaly_scans SET status = 'failed' WHERE scan_id = :id"),
-                {"id": scan_id}
+                {"id": scan_id},
             )
             self.db.commit()
             return {"scan_id": scan_id, "status": "failed", "error": str(e)}
@@ -270,8 +272,12 @@ class AnomalyDetectorAgent:
                 "status": row["status"],
                 "records_scanned": row["records_scanned"],
                 "anomalies_found": row["anomalies_found"],
-                "started_at": row["started_at"].isoformat() if row["started_at"] else None,
-                "completed_at": row["completed_at"].isoformat() if row["completed_at"] else None,
+                "started_at": row["started_at"].isoformat()
+                if row["started_at"]
+                else None,
+                "completed_at": row["completed_at"].isoformat()
+                if row["completed_at"]
+                else None,
             }
         except Exception as e:
             logger.error(f"Error getting scan status: {e}")
@@ -321,44 +327,47 @@ class AnomalyDetectorAgent:
                 pct_change = change / previous if previous else 0
 
                 # Detect significant drops
-                if change < -THRESHOLDS["score_drop_points"] or pct_change < -THRESHOLDS["score_drop_pct"]:
+                if (
+                    change < -THRESHOLDS["score_drop_points"]
+                    or pct_change < -THRESHOLDS["score_drop_pct"]
+                ):
                     severity = self._calculate_severity(
-                        AnomalyType.SCORE_DROP,
-                        abs(pct_change),
-                        row[3]
+                        AnomalyType.SCORE_DROP, abs(pct_change), row[3]
                     )
-                    anomalies.append({
-                        "company_name": row[0],
-                        "anomaly_type": AnomalyType.SCORE_DROP.value,
-                        "description": f"Health score dropped from {previous:.1f} to {current:.1f}",
-                        "previous_value": str(previous),
-                        "current_value": str(current),
-                        "change_magnitude": pct_change,
-                        "severity_score": severity,
-                        "severity_level": self._get_severity_level(severity),
-                        "confidence": 0.9,
-                        "data_source": "company_scores",
-                    })
+                    anomalies.append(
+                        {
+                            "company_name": row[0],
+                            "anomaly_type": AnomalyType.SCORE_DROP.value,
+                            "description": f"Health score dropped from {previous:.1f} to {current:.1f}",
+                            "previous_value": str(previous),
+                            "current_value": str(current),
+                            "change_magnitude": pct_change,
+                            "severity_score": severity,
+                            "severity_level": self._get_severity_level(severity),
+                            "confidence": 0.9,
+                            "data_source": "company_scores",
+                        }
+                    )
 
                 # Detect significant spikes (unusual improvement)
                 elif change > 20 or pct_change > 0.25:
                     severity = self._calculate_severity(
-                        AnomalyType.SCORE_SPIKE,
-                        abs(pct_change),
-                        row[3]
+                        AnomalyType.SCORE_SPIKE, abs(pct_change), row[3]
                     )
-                    anomalies.append({
-                        "company_name": row[0],
-                        "anomaly_type": AnomalyType.SCORE_SPIKE.value,
-                        "description": f"Health score spiked from {previous:.1f} to {current:.1f}",
-                        "previous_value": str(previous),
-                        "current_value": str(current),
-                        "change_magnitude": pct_change,
-                        "severity_score": severity,
-                        "severity_level": self._get_severity_level(severity),
-                        "confidence": 0.8,
-                        "data_source": "company_scores",
-                    })
+                    anomalies.append(
+                        {
+                            "company_name": row[0],
+                            "anomaly_type": AnomalyType.SCORE_SPIKE.value,
+                            "description": f"Health score spiked from {previous:.1f} to {current:.1f}",
+                            "previous_value": str(previous),
+                            "current_value": str(current),
+                            "change_magnitude": pct_change,
+                            "severity_score": severity,
+                            "severity_level": self._get_severity_level(severity),
+                            "confidence": 0.8,
+                            "data_source": "company_scores",
+                        }
+                    )
 
         except Exception as e:
             logger.warning(f"Error detecting score anomalies: {e}")
@@ -399,23 +408,23 @@ class AnomalyDetectorAgent:
                 if abs(pct_change) >= THRESHOLDS["employee_change_pct"]:
                     direction = "increased" if change > 0 else "decreased"
                     severity = self._calculate_severity(
-                        AnomalyType.EMPLOYEE_CHANGE,
-                        abs(pct_change),
-                        datetime.now()
+                        AnomalyType.EMPLOYEE_CHANGE, abs(pct_change), datetime.now()
                     )
 
-                    anomalies.append({
-                        "company_name": row[0],
-                        "anomaly_type": AnomalyType.EMPLOYEE_CHANGE.value,
-                        "description": f"Employee count {direction} from {previous:,} to {current:,} ({pct_change*100:.1f}%)",
-                        "previous_value": str(previous),
-                        "current_value": str(current),
-                        "change_magnitude": pct_change,
-                        "severity_score": severity,
-                        "severity_level": self._get_severity_level(severity),
-                        "confidence": 0.75,
-                        "data_source": "company_enrichment",
-                    })
+                    anomalies.append(
+                        {
+                            "company_name": row[0],
+                            "anomaly_type": AnomalyType.EMPLOYEE_CHANGE.value,
+                            "description": f"Employee count {direction} from {previous:,} to {current:,} ({pct_change*100:.1f}%)",
+                            "previous_value": str(previous),
+                            "current_value": str(current),
+                            "change_magnitude": pct_change,
+                            "severity_score": severity,
+                            "severity_level": self._get_severity_level(severity),
+                            "confidence": 0.75,
+                            "data_source": "company_enrichment",
+                        }
+                    )
 
         except Exception as e:
             logger.warning(f"Error detecting employee anomalies: {e}")
@@ -459,23 +468,23 @@ class AnomalyDetectorAgent:
                 if abs(pct_change) >= THRESHOLDS["traffic_change_pct"]:
                     direction = "improved" if change > 0 else "dropped"
                     severity = self._calculate_severity(
-                        AnomalyType.TRAFFIC_ANOMALY,
-                        abs(pct_change),
-                        datetime.now()
+                        AnomalyType.TRAFFIC_ANOMALY, abs(pct_change), datetime.now()
                     )
 
-                    anomalies.append({
-                        "company_name": row[0],
-                        "anomaly_type": AnomalyType.TRAFFIC_ANOMALY.value,
-                        "description": f"Traffic rank {direction} from {previous:,} to {current:,}",
-                        "previous_value": str(previous),
-                        "current_value": str(current),
-                        "change_magnitude": pct_change,
-                        "severity_score": severity,
-                        "severity_level": self._get_severity_level(severity),
-                        "confidence": 0.7,
-                        "data_source": "web_traffic",
-                    })
+                    anomalies.append(
+                        {
+                            "company_name": row[0],
+                            "anomaly_type": AnomalyType.TRAFFIC_ANOMALY.value,
+                            "description": f"Traffic rank {direction} from {previous:,} to {current:,}",
+                            "previous_value": str(previous),
+                            "current_value": str(current),
+                            "change_magnitude": pct_change,
+                            "severity_score": severity,
+                            "severity_level": self._get_severity_level(severity),
+                            "confidence": 0.7,
+                            "data_source": "web_traffic",
+                        }
+                    )
 
         except Exception as e:
             logger.warning(f"Error detecting traffic anomalies: {e}")
@@ -515,21 +524,23 @@ class AnomalyDetectorAgent:
                     severity = self._calculate_severity(
                         AnomalyType.RATING_DROP,
                         drop / 5.0,  # Normalize to 0-1
-                        datetime.now()
+                        datetime.now(),
                     )
 
-                    anomalies.append({
-                        "company_name": row[0],
-                        "anomaly_type": AnomalyType.RATING_DROP.value,
-                        "description": f"Glassdoor rating dropped from {previous:.1f} to {current:.1f}",
-                        "previous_value": str(previous),
-                        "current_value": str(current),
-                        "change_magnitude": -drop,
-                        "severity_score": severity,
-                        "severity_level": self._get_severity_level(severity),
-                        "confidence": 0.85,
-                        "data_source": "glassdoor_data",
-                    })
+                    anomalies.append(
+                        {
+                            "company_name": row[0],
+                            "anomaly_type": AnomalyType.RATING_DROP.value,
+                            "description": f"Glassdoor rating dropped from {previous:.1f} to {current:.1f}",
+                            "previous_value": str(previous),
+                            "current_value": str(current),
+                            "change_magnitude": -drop,
+                            "severity_score": severity,
+                            "severity_level": self._get_severity_level(severity),
+                            "confidence": 0.85,
+                            "data_source": "glassdoor_data",
+                        }
+                    )
 
         except Exception as e:
             logger.warning(f"Error detecting rating anomalies: {e}")
@@ -569,23 +580,23 @@ class AnomalyDetectorAgent:
                 # Detect activity stall
                 if pct_change <= -THRESHOLDS["github_activity_drop_pct"]:
                     severity = self._calculate_severity(
-                        AnomalyType.GITHUB_STALL,
-                        abs(pct_change),
-                        datetime.now()
+                        AnomalyType.GITHUB_STALL, abs(pct_change), datetime.now()
                     )
 
-                    anomalies.append({
-                        "company_name": row[0],
-                        "anomaly_type": AnomalyType.GITHUB_STALL.value,
-                        "description": f"GitHub activity dropped from {previous} to {current} commits/month ({pct_change*100:.0f}%)",
-                        "previous_value": str(previous),
-                        "current_value": str(current),
-                        "change_magnitude": pct_change,
-                        "severity_score": severity,
-                        "severity_level": self._get_severity_level(severity),
-                        "confidence": 0.7,
-                        "data_source": "github_analytics",
-                    })
+                    anomalies.append(
+                        {
+                            "company_name": row[0],
+                            "anomaly_type": AnomalyType.GITHUB_STALL.value,
+                            "description": f"GitHub activity dropped from {previous} to {current} commits/month ({pct_change*100:.0f}%)",
+                            "previous_value": str(previous),
+                            "current_value": str(current),
+                            "change_magnitude": pct_change,
+                            "severity_score": severity,
+                            "severity_level": self._get_severity_level(severity),
+                            "confidence": 0.7,
+                            "data_source": "github_analytics",
+                        }
+                    )
 
         except Exception as e:
             logger.warning(f"Error detecting GitHub anomalies: {e}")
@@ -647,10 +658,13 @@ class AnomalyDetectorAgent:
                   AND detected_at > NOW() - INTERVAL '24 hours'
                 LIMIT 1
             """)
-            existing = self.db.execute(check_query, {
-                "company": anomaly["company_name"],
-                "type": anomaly["anomaly_type"],
-            }).fetchone()
+            existing = self.db.execute(
+                check_query,
+                {
+                    "company": anomaly["company_name"],
+                    "type": anomaly["anomaly_type"],
+                },
+            ).fetchone()
 
             if existing:
                 return False
@@ -669,18 +683,21 @@ class AnomalyDetectorAgent:
                     :source, 'new'
                 )
             """)
-            self.db.execute(insert_query, {
-                "company": anomaly["company_name"],
-                "type": anomaly["anomaly_type"],
-                "description": anomaly.get("description"),
-                "prev": anomaly.get("previous_value"),
-                "curr": anomaly.get("current_value"),
-                "magnitude": anomaly.get("change_magnitude"),
-                "severity": anomaly.get("severity_score"),
-                "level": anomaly.get("severity_level"),
-                "confidence": anomaly.get("confidence"),
-                "source": anomaly.get("data_source"),
-            })
+            self.db.execute(
+                insert_query,
+                {
+                    "company": anomaly["company_name"],
+                    "type": anomaly["anomaly_type"],
+                    "description": anomaly.get("description"),
+                    "prev": anomaly.get("previous_value"),
+                    "curr": anomaly.get("current_value"),
+                    "magnitude": anomaly.get("change_magnitude"),
+                    "severity": anomaly.get("severity_score"),
+                    "level": anomaly.get("severity_level"),
+                    "confidence": anomaly.get("confidence"),
+                    "source": anomaly.get("data_source"),
+                },
+            )
             self.db.commit()
             return True
 
@@ -731,21 +748,23 @@ class AnomalyDetectorAgent:
             anomalies = []
 
             for row in result:
-                anomalies.append({
-                    "id": row[0],
-                    "company_name": row[1],
-                    "anomaly_type": row[2],
-                    "description": row[3],
-                    "previous_value": row[4],
-                    "current_value": row[5],
-                    "change_magnitude": row[6],
-                    "severity_score": row[7],
-                    "severity_level": row[8],
-                    "confidence": row[9],
-                    "data_source": row[10],
-                    "status": row[11],
-                    "detected_at": row[12].isoformat() if row[12] else None,
-                })
+                anomalies.append(
+                    {
+                        "id": row[0],
+                        "company_name": row[1],
+                        "anomaly_type": row[2],
+                        "description": row[3],
+                        "previous_value": row[4],
+                        "current_value": row[5],
+                        "change_magnitude": row[6],
+                        "severity_score": row[7],
+                        "severity_level": row[8],
+                        "confidence": row[9],
+                        "data_source": row[10],
+                        "status": row[11],
+                        "detected_at": row[12].isoformat() if row[12] else None,
+                    }
+                )
 
             # Get counts by severity and type
             severity_query = text(f"""
@@ -785,7 +804,7 @@ class AnomalyDetectorAgent:
         try:
             where_parts = [
                 "LOWER(company_name) LIKE LOWER(:pattern)",
-                f"detected_at > NOW() - INTERVAL '{days} days'"
+                f"detected_at > NOW() - INTERVAL '{days} days'",
             ]
             params = {"pattern": f"%{company_name}%"}
 
@@ -812,26 +831,30 @@ class AnomalyDetectorAgent:
             anomalies = []
 
             for row in result:
-                anomalies.append({
-                    "id": row[0],
-                    "company_name": row[1],
-                    "anomaly_type": row[2],
-                    "description": row[3],
-                    "previous_value": row[4],
-                    "current_value": row[5],
-                    "change_magnitude": row[6],
-                    "severity_score": row[7],
-                    "severity_level": row[8],
-                    "confidence": row[9],
-                    "data_source": row[10],
-                    "status": row[11],
-                    "detected_at": row[12].isoformat() if row[12] else None,
-                    "resolved_at": row[13].isoformat() if row[13] else None,
-                })
+                anomalies.append(
+                    {
+                        "id": row[0],
+                        "company_name": row[1],
+                        "anomaly_type": row[2],
+                        "description": row[3],
+                        "previous_value": row[4],
+                        "current_value": row[5],
+                        "change_magnitude": row[6],
+                        "severity_score": row[7],
+                        "severity_level": row[8],
+                        "confidence": row[9],
+                        "data_source": row[10],
+                        "status": row[11],
+                        "detected_at": row[12].isoformat() if row[12] else None,
+                        "resolved_at": row[13].isoformat() if row[13] else None,
+                    }
+                )
 
             # Calculate risk summary
             unresolved = [a for a in anomalies if a["status"] != "resolved"]
-            critical_count = sum(1 for a in unresolved if a["severity_level"] == "critical")
+            critical_count = sum(
+                1 for a in unresolved if a["severity_level"] == "critical"
+            )
             high_count = sum(1 for a in unresolved if a["severity_level"] == "high")
 
             overall_risk = "low"
@@ -851,7 +874,7 @@ class AnomalyDetectorAgent:
                     "overall_risk": overall_risk,
                     "active_critical": critical_count,
                     "active_high": high_count,
-                }
+                },
             }
 
         except Exception as e:
@@ -885,8 +908,12 @@ class AnomalyDetectorAgent:
 
             # Deep investigation adds more context
             if depth == "deep":
-                investigation["company_profile"] = self._get_company_context(anomaly["company_name"])
-                investigation["sector_comparison"] = self._get_sector_context(anomaly["company_name"])
+                investigation["company_profile"] = self._get_company_context(
+                    anomaly["company_name"]
+                )
+                investigation["sector_comparison"] = self._get_sector_context(
+                    anomaly["company_name"]
+                )
 
             return {
                 "anomaly": {
@@ -917,10 +944,14 @@ class AnomalyDetectorAgent:
             if any(r["anomaly_type"] == "employee_change" for r in related):
                 causes.append({"cause": "Recent workforce changes", "confidence": 0.8})
             if any(r["anomaly_type"] == "rating_drop" for r in related):
-                causes.append({"cause": "Employee satisfaction decline", "confidence": 0.75})
+                causes.append(
+                    {"cause": "Employee satisfaction decline", "confidence": 0.75}
+                )
 
             # Generic causes
-            causes.append({"cause": "Market conditions affecting sector", "confidence": 0.5})
+            causes.append(
+                {"cause": "Market conditions affecting sector", "confidence": 0.5}
+            )
             causes.append({"cause": "Recent negative news coverage", "confidence": 0.4})
 
         elif anomaly_type == AnomalyType.EMPLOYEE_CHANGE.value:
@@ -929,12 +960,16 @@ class AnomalyDetectorAgent:
                 causes.append({"cause": "Layoffs or restructuring", "confidence": 0.85})
                 causes.append({"cause": "Natural attrition spike", "confidence": 0.4})
             else:
-                causes.append({"cause": "Rapid hiring / growth phase", "confidence": 0.8})
+                causes.append(
+                    {"cause": "Rapid hiring / growth phase", "confidence": 0.8}
+                )
                 causes.append({"cause": "Acquisition or merger", "confidence": 0.5})
 
         elif anomaly_type == AnomalyType.RATING_DROP.value:
             causes.append({"cause": "Management or culture issues", "confidence": 0.7})
-            causes.append({"cause": "Recent layoffs affecting morale", "confidence": 0.6})
+            causes.append(
+                {"cause": "Recent layoffs affecting morale", "confidence": 0.6}
+            )
             causes.append({"cause": "Compensation concerns", "confidence": 0.5})
 
         elif anomaly_type == AnomalyType.TRAFFIC_ANOMALY.value:
@@ -949,7 +984,9 @@ class AnomalyDetectorAgent:
         elif anomaly_type == AnomalyType.GITHUB_STALL.value:
             causes.append({"cause": "Team restructuring", "confidence": 0.6})
             causes.append({"cause": "Pivot to private repos", "confidence": 0.5})
-            causes.append({"cause": "Project completion/maintenance mode", "confidence": 0.4})
+            causes.append(
+                {"cause": "Project completion/maintenance mode", "confidence": 0.4}
+            )
 
         # Sort by confidence
         causes.sort(key=lambda x: x["confidence"], reverse=True)
@@ -975,25 +1012,34 @@ class AnomalyDetectorAgent:
                 LIMIT 10
             """)
 
-            start = detected - timedelta(days=7) if detected else datetime.now() - timedelta(days=14)
+            start = (
+                detected - timedelta(days=7)
+                if detected
+                else datetime.now() - timedelta(days=14)
+            )
             end = detected + timedelta(days=7) if detected else datetime.now()
 
-            result = self.db.execute(query, {
-                "company": f"%{company}%",
-                "id": anomaly.get("id", 0),
-                "start": start,
-                "end": end,
-            })
+            result = self.db.execute(
+                query,
+                {
+                    "company": f"%{company}%",
+                    "id": anomaly.get("id", 0),
+                    "start": start,
+                    "end": end,
+                },
+            )
 
             correlated = []
             for row in result:
-                correlated.append({
-                    "id": row[0],
-                    "anomaly_type": row[1],
-                    "description": row[2],
-                    "severity_score": row[3],
-                    "correlation": 0.7,  # Simplified correlation score
-                })
+                correlated.append(
+                    {
+                        "id": row[0],
+                        "anomaly_type": row[1],
+                        "description": row[2],
+                        "severity_score": row[3],
+                        "correlation": 0.7,  # Simplified correlation score
+                    }
+                )
 
             return correlated
 
@@ -1019,10 +1065,13 @@ class AnomalyDetectorAgent:
                   AND detected_at < NOW() - INTERVAL '7 days'
             """)
 
-            result = self.db.execute(query, {
-                "company": f"%{company}%",
-                "type": anomaly_type,
-            }).fetchone()
+            result = self.db.execute(
+                query,
+                {
+                    "company": f"%{company}%",
+                    "type": anomaly_type,
+                },
+            ).fetchone()
 
             similar = result[0] if result else 0
             avg_days = result[1] if result and result[1] else None
@@ -1212,20 +1261,22 @@ class AnomalyDetectorAgent:
             patterns = []
 
             for row in result:
-                patterns.append({
-                    "entity_type": row[0],
-                    "entity_name": row[1],
-                    "metric": row[2],
-                    "baseline": row[3],
-                    "mean": row[4],
-                    "std_deviation": row[5],
-                    "min": row[6],
-                    "max": row[7],
-                    "sample_count": row[8],
-                    "lower_threshold": row[9],
-                    "upper_threshold": row[10],
-                    "last_updated": row[11].isoformat() if row[11] else None,
-                })
+                patterns.append(
+                    {
+                        "entity_type": row[0],
+                        "entity_name": row[1],
+                        "metric": row[2],
+                        "baseline": row[3],
+                        "mean": row[4],
+                        "std_deviation": row[5],
+                        "min": row[6],
+                        "max": row[7],
+                        "sample_count": row[8],
+                        "lower_threshold": row[9],
+                        "upper_threshold": row[10],
+                        "last_updated": row[11].isoformat() if row[11] else None,
+                    }
+                )
 
             return {
                 "patterns": patterns,
@@ -1284,19 +1335,22 @@ class AnomalyDetectorAgent:
                     last_updated = NOW()
             """)
 
-            self.db.execute(query, {
-                "type": entity_type,
-                "name": entity_name,
-                "metric": metric,
-                "baseline": mean_val,
-                "mean": mean_val,
-                "std": std_val,
-                "min": min_val,
-                "max": max_val,
-                "count": len(values),
-                "lower": lower,
-                "upper": upper,
-            })
+            self.db.execute(
+                query,
+                {
+                    "type": entity_type,
+                    "name": entity_name,
+                    "metric": metric,
+                    "baseline": mean_val,
+                    "mean": mean_val,
+                    "std": std_val,
+                    "min": min_val,
+                    "max": max_val,
+                    "count": len(values),
+                    "lower": lower,
+                    "upper": upper,
+                },
+            )
             self.db.commit()
 
             return {

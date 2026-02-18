@@ -7,6 +7,7 @@ Handles:
 - Data parsing and transformation
 - Schema definitions for disasters, grants, flood insurance
 """
+
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -110,10 +111,10 @@ NFIP_CLAIMS_COLUMNS = {
 def generate_table_name(dataset: str) -> str:
     """
     Generate PostgreSQL table name for FEMA data.
-    
+
     Args:
         dataset: Dataset identifier
-        
+
     Returns:
         PostgreSQL table name
     """
@@ -124,11 +125,11 @@ def generate_table_name(dataset: str) -> str:
 def generate_create_table_sql(table_name: str, dataset: str) -> str:
     """
     Generate CREATE TABLE SQL for FEMA data.
-    
+
     Args:
         table_name: PostgreSQL table name
         dataset: Dataset type to determine schema
-        
+
     Returns:
         CREATE TABLE SQL statement
     """
@@ -177,18 +178,18 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
         ]
     else:
         raise ValueError(f"Unknown FEMA dataset: {dataset}")
-    
+
     # Build column definitions
     column_defs = []
     column_defs.append("id SERIAL PRIMARY KEY")
-    
+
     for col_name, (col_type, _) in columns.items():
         column_defs.append(f"{col_name} {col_type}")
-    
+
     column_defs.append("ingested_at TIMESTAMP DEFAULT NOW()")
-    
+
     columns_sql = ",\n        ".join(column_defs)
-    
+
     # Build indexes
     index_sql_parts = []
     for idx_name, idx_cols in indexes:
@@ -196,15 +197,15 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
             f"CREATE INDEX IF NOT EXISTS idx_{table_name}_{idx_name} "
             f"ON {table_name} ({idx_cols});"
         )
-    
+
     # Add unique index (supports expressions, unlike UNIQUE constraint)
     index_sql_parts.append(
         f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{table_name}_unique "
         f"ON {table_name} ({unique_index_expr});"
     )
-    
+
     indexes_sql = "\n    ".join(index_sql_parts)
-    
+
     sql = f"""
     CREATE TABLE IF NOT EXISTS {table_name} (
         {columns_sql}
@@ -212,22 +213,22 @@ def generate_create_table_sql(table_name: str, dataset: str) -> str:
     
     {indexes_sql}
     """
-    
+
     return sql
 
 
 def parse_disaster_declarations(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Parse disaster declaration records from OpenFEMA API.
-    
+
     Args:
         records: Raw API response records
-        
+
     Returns:
         List of parsed records ready for insertion
     """
     parsed_records = []
-    
+
     for record in records:
         try:
             parsed = {
@@ -238,7 +239,8 @@ def parse_disaster_declarations(records: List[Dict[str, Any]]) -> List[Dict[str,
                 "incident_type": record.get("incidentType"),
                 "declaration_title": record.get("declarationTitle"),
                 "state": record.get("state"),
-                "state_name": record.get("stateName") or _get_state_name(record.get("state")),
+                "state_name": record.get("stateName")
+                or _get_state_name(record.get("state")),
                 "county": record.get("designatedArea"),
                 "fips_state_code": record.get("fipsStateCode"),
                 "fips_county_code": record.get("fipsCountyCode"),
@@ -252,12 +254,12 @@ def parse_disaster_declarations(records: List[Dict[str, Any]]) -> List[Dict[str,
                 "place_code": record.get("placeCode"),
                 "region": record.get("region"),
             }
-            
+
             if parsed["disaster_number"]:
                 parsed_records.append(parsed)
         except Exception as e:
             logger.warning(f"Failed to parse disaster record: {e}")
-    
+
     logger.info(f"Parsed {len(parsed_records)} disaster declaration records")
     return parsed_records
 
@@ -265,7 +267,7 @@ def parse_disaster_declarations(records: List[Dict[str, Any]]) -> List[Dict[str,
 def parse_pa_projects(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Parse Public Assistance project records."""
     parsed_records = []
-    
+
     for record in records:
         try:
             parsed = {
@@ -276,18 +278,21 @@ def parse_pa_projects(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "applicant_id": record.get("applicantId"),
                 "damage_category": record.get("damageCategory"),
                 "project_size": record.get("projectSize"),
-                "project_title": record.get("projectTitle") or record.get("damageDescription"),
+                "project_title": record.get("projectTitle")
+                or record.get("damageDescription"),
                 "total_obligated": _safe_float(record.get("totalObligated")),
-                "federal_share_obligated": _safe_float(record.get("federalShareObligated")),
+                "federal_share_obligated": _safe_float(
+                    record.get("federalShareObligated")
+                ),
                 "project_amount": _safe_float(record.get("projectAmount")),
                 "obligation_date": _parse_date(record.get("obligatedDate")),
             }
-            
+
             if parsed["disaster_number"] and parsed["project_number"]:
                 parsed_records.append(parsed)
         except Exception as e:
             logger.warning(f"Failed to parse PA project record: {e}")
-    
+
     logger.info(f"Parsed {len(parsed_records)} PA project records")
     return parsed_records
 
@@ -295,11 +300,12 @@ def parse_pa_projects(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def parse_hma_projects(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Parse Hazard Mitigation Assistance project records (v4 API)."""
     parsed_records = []
-    
+
     for record in records:
         try:
             parsed = {
-                "project_identifier": record.get("projectIdentifier") or record.get("id"),
+                "project_identifier": record.get("projectIdentifier")
+                or record.get("id"),
                 "disaster_number": record.get("disasterNumber"),
                 "state": record.get("state"),
                 "state_code": record.get("stateNumberCode"),
@@ -313,18 +319,20 @@ def parse_hma_projects(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "recipient": record.get("recipient"),
                 "subrecipient": record.get("subrecipient"),
                 "project_amount": _safe_float(record.get("projectAmount")),
-                "federal_share_obligated": _safe_float(record.get("federalShareObligated")),
+                "federal_share_obligated": _safe_float(
+                    record.get("federalShareObligated")
+                ),
                 "cost_share_percentage": _safe_float(record.get("costSharePercentage")),
                 "benefit_cost_ratio": _safe_float(record.get("benefitCostRatio")),
                 "date_approved": _parse_date(record.get("dateApproved")),
                 "date_closed": _parse_date(record.get("dateClosed")),
             }
-            
+
             if parsed["project_identifier"]:
                 parsed_records.append(parsed)
         except Exception as e:
             logger.warning(f"Failed to parse HMA project record: {e}")
-    
+
     logger.info(f"Parsed {len(parsed_records)} HMA project records")
     return parsed_records
 
@@ -332,7 +340,7 @@ def parse_hma_projects(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def parse_nfip_claims(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Parse NFIP claims records."""
     parsed_records = []
-    
+
     for record in records:
         try:
             parsed = {
@@ -341,18 +349,24 @@ def parse_nfip_claims(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 "county": record.get("countyCode") or record.get("county"),
                 "census_tract": record.get("censusTract"),
                 "flood_zone": record.get("floodZone"),
-                "amount_paid_on_building_claim": _safe_float(record.get("amountPaidOnBuildingClaim")),
-                "amount_paid_on_contents_claim": _safe_float(record.get("amountPaidOnContentsClaim")),
-                "total_amount_paid": _safe_float(record.get("totalBuildingInsuranceCoverage")),
+                "amount_paid_on_building_claim": _safe_float(
+                    record.get("amountPaidOnBuildingClaim")
+                ),
+                "amount_paid_on_contents_claim": _safe_float(
+                    record.get("amountPaidOnContentsClaim")
+                ),
+                "total_amount_paid": _safe_float(
+                    record.get("totalBuildingInsuranceCoverage")
+                ),
                 "date_of_loss": _parse_date(record.get("dateOfLoss")),
                 "reported_zip_code": record.get("reportedZipCode"),
             }
-            
+
             if parsed["year_of_loss"] and parsed["state"]:
                 parsed_records.append(parsed)
         except Exception as e:
             logger.warning(f"Failed to parse NFIP claim record: {e}")
-    
+
     logger.info(f"Parsed {len(parsed_records)} NFIP claim records")
     return parsed_records
 
@@ -385,21 +399,62 @@ def _safe_float(value: Any) -> Optional[float]:
 def _get_state_name(state_code: Optional[str]) -> Optional[str]:
     """Get full state name from code."""
     state_names = {
-        "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas",
-        "CA": "California", "CO": "Colorado", "CT": "Connecticut", "DE": "Delaware",
-        "FL": "Florida", "GA": "Georgia", "HI": "Hawaii", "ID": "Idaho",
-        "IL": "Illinois", "IN": "Indiana", "IA": "Iowa", "KS": "Kansas",
-        "KY": "Kentucky", "LA": "Louisiana", "ME": "Maine", "MD": "Maryland",
-        "MA": "Massachusetts", "MI": "Michigan", "MN": "Minnesota", "MS": "Mississippi",
-        "MO": "Missouri", "MT": "Montana", "NE": "Nebraska", "NV": "Nevada",
-        "NH": "New Hampshire", "NJ": "New Jersey", "NM": "New Mexico", "NY": "New York",
-        "NC": "North Carolina", "ND": "North Dakota", "OH": "Ohio", "OK": "Oklahoma",
-        "OR": "Oregon", "PA": "Pennsylvania", "RI": "Rhode Island", "SC": "South Carolina",
-        "SD": "South Dakota", "TN": "Tennessee", "TX": "Texas", "UT": "Utah",
-        "VT": "Vermont", "VA": "Virginia", "WA": "Washington", "WV": "West Virginia",
-        "WI": "Wisconsin", "WY": "Wyoming", "DC": "District of Columbia",
-        "PR": "Puerto Rico", "VI": "Virgin Islands", "GU": "Guam",
-        "AS": "American Samoa", "MP": "Northern Mariana Islands"
+        "AL": "Alabama",
+        "AK": "Alaska",
+        "AZ": "Arizona",
+        "AR": "Arkansas",
+        "CA": "California",
+        "CO": "Colorado",
+        "CT": "Connecticut",
+        "DE": "Delaware",
+        "FL": "Florida",
+        "GA": "Georgia",
+        "HI": "Hawaii",
+        "ID": "Idaho",
+        "IL": "Illinois",
+        "IN": "Indiana",
+        "IA": "Iowa",
+        "KS": "Kansas",
+        "KY": "Kentucky",
+        "LA": "Louisiana",
+        "ME": "Maine",
+        "MD": "Maryland",
+        "MA": "Massachusetts",
+        "MI": "Michigan",
+        "MN": "Minnesota",
+        "MS": "Mississippi",
+        "MO": "Missouri",
+        "MT": "Montana",
+        "NE": "Nebraska",
+        "NV": "Nevada",
+        "NH": "New Hampshire",
+        "NJ": "New Jersey",
+        "NM": "New Mexico",
+        "NY": "New York",
+        "NC": "North Carolina",
+        "ND": "North Dakota",
+        "OH": "Ohio",
+        "OK": "Oklahoma",
+        "OR": "Oregon",
+        "PA": "Pennsylvania",
+        "RI": "Rhode Island",
+        "SC": "South Carolina",
+        "SD": "South Dakota",
+        "TN": "Tennessee",
+        "TX": "Texas",
+        "UT": "Utah",
+        "VT": "Vermont",
+        "VA": "Virginia",
+        "WA": "Washington",
+        "WV": "West Virginia",
+        "WI": "Wisconsin",
+        "WY": "Wyoming",
+        "DC": "District of Columbia",
+        "PR": "Puerto Rico",
+        "VI": "Virgin Islands",
+        "GU": "Guam",
+        "AS": "American Samoa",
+        "MP": "Northern Mariana Islands",
     }
     return state_names.get(state_code)
 

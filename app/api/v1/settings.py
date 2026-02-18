@@ -4,6 +4,7 @@ Settings API — manage external source API keys.
 Separate from api_keys.py which handles Nexdata's own nxd_* API keys.
 This manages the keys used to call external data sources (FRED, EIA, Census, etc.).
 """
+
 import hashlib
 import logging
 import os
@@ -28,12 +29,14 @@ router = APIRouter(prefix="/settings", tags=["Settings"])
 # Encryption helpers
 # ---------------------------------------------------------------------------
 
+
 def _get_fernet() -> Fernet:
     """
     Derive a Fernet key from ENCRYPTION_KEY env var, falling back to DATABASE_URL.
     The key is derived via SHA-256 and base64-encoded to 32 bytes (Fernet requirement).
     """
     import base64
+
     secret = os.environ.get("ENCRYPTION_KEY") or get_settings().database_url
     key_bytes = hashlib.sha256(secret.encode()).digest()
     fernet_key = base64.urlsafe_b64encode(key_bytes)
@@ -65,12 +68,54 @@ def _mask_key(key: str) -> str:
 
 # Category groupings for UI display
 SOURCE_CATEGORIES = {
-    "Government Data": ["census", "fred", "eia", "bls", "noaa", "bea", "bts", "fbi_crime", "data_commons", "usda", "uspto"],
-    "LLM / AI": ["openai", "anthropic", "gemini", "xai", "deepseek", "groq", "mistral", "cohere", "perplexity"],
-    "Financial & Market Data": ["fmp", "alpha_vantage", "polygon", "finnhub", "tiingo", "quandl"],
-    "Location & Foot Traffic": ["safegraph", "placer", "foursquare", "yelp", "peeringdb"],
+    "Government Data": [
+        "census",
+        "fred",
+        "eia",
+        "bls",
+        "noaa",
+        "bea",
+        "bts",
+        "fbi_crime",
+        "data_commons",
+        "usda",
+        "uspto",
+    ],
+    "LLM / AI": [
+        "openai",
+        "anthropic",
+        "gemini",
+        "xai",
+        "deepseek",
+        "groq",
+        "mistral",
+        "cohere",
+        "perplexity",
+    ],
+    "Financial & Market Data": [
+        "fmp",
+        "alpha_vantage",
+        "polygon",
+        "finnhub",
+        "tiingo",
+        "quandl",
+    ],
+    "Location & Foot Traffic": [
+        "safegraph",
+        "placer",
+        "foursquare",
+        "yelp",
+        "peeringdb",
+    ],
     "Search & Web Data": ["google_search", "google_cse", "similarweb", "github"],
-    "Business Intelligence": ["crunchbase", "newsapi", "linkedin", "opencorporates", "kaggle_username", "kaggle_key"],
+    "Business Intelligence": [
+        "crunchbase",
+        "newsapi",
+        "linkedin",
+        "opencorporates",
+        "kaggle_username",
+        "kaggle_key",
+    ],
     "Enrichment": ["hunter", "clearbit", "zoominfo", "pitchbook"],
 }
 
@@ -134,6 +179,7 @@ SOURCE_DESCRIPTIONS = {
 # Pydantic schemas
 # ---------------------------------------------------------------------------
 
+
 class APIKeyInfo(BaseModel):
     source: str
     description: str
@@ -194,6 +240,7 @@ def get_cached_db_key(source: str, db: Session) -> Optional[str]:
 # Endpoints
 # ---------------------------------------------------------------------------
 
+
 @router.get("/api-keys", response_model=list[APIKeyInfo])
 def list_api_keys(db: Session = Depends(get_db)):
     """
@@ -235,15 +282,17 @@ def list_api_keys(db: Session = Depends(get_db)):
                 configured = True
                 source_type = "env"
 
-        results.append(APIKeyInfo(
-            source=source,
-            description=SOURCE_DESCRIPTIONS.get(source, f"API key for {source}"),
-            signup_url=signup_url,
-            category=source_to_category.get(source, "Other"),
-            masked_key=masked,
-            configured=configured,
-            source_type=source_type,
-        ))
+        results.append(
+            APIKeyInfo(
+                source=source,
+                description=SOURCE_DESCRIPTIONS.get(source, f"API key for {source}"),
+                signup_url=signup_url,
+                category=source_to_category.get(source, "Other"),
+                masked_key=masked,
+                configured=configured,
+                source_type=source_type,
+            )
+        )
 
     return results
 
@@ -304,16 +353,21 @@ async def test_api_key(source: str, db: Session = Depends(get_db)):
         key = getattr(settings, field_name, None)
 
     if not key:
-        return APIKeyTestResult(source=source, success=False, message="No API key configured")
+        return APIKeyTestResult(
+            source=source, success=False, message="No API key configured"
+        )
 
     # Source-specific test calls
     import httpx
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             result = await _test_source_key(client, source, key)
             return result
     except httpx.TimeoutException:
-        return APIKeyTestResult(source=source, success=False, message="Request timed out")
+        return APIKeyTestResult(
+            source=source, success=False, message="Request timed out"
+        )
     except Exception as e:
         return APIKeyTestResult(source=source, success=False, message=str(e))
 
@@ -322,34 +376,73 @@ async def _test_source_key(client, source: str, key: str) -> APIKeyTestResult:
     """Run a lightweight test request for a specific source."""
     tests = {
         # Government Data
-        "fred": ("https://api.stlouisfed.org/fred/series?series_id=GNPCA&api_key={key}&file_type=json", 200),
+        "fred": (
+            "https://api.stlouisfed.org/fred/series?series_id=GNPCA&api_key={key}&file_type=json",
+            200,
+        ),
         "eia": ("https://api.eia.gov/v2/?api_key={key}", 200),
-        "census": ("https://api.census.gov/data/2023/acs/acs5?get=NAME&for=state:01&key={key}", 200),
-        "bls": ("https://api.bls.gov/publicAPI/v2/timeseries/data/LNS14000000?registrationkey={key}&latest=true", 200),
+        "census": (
+            "https://api.census.gov/data/2023/acs/acs5?get=NAME&for=state:01&key={key}",
+            200,
+        ),
+        "bls": (
+            "https://api.bls.gov/publicAPI/v2/timeseries/data/LNS14000000?registrationkey={key}&latest=true",
+            200,
+        ),
         "noaa": ("https://www.ncdc.noaa.gov/cdo-web/api/v2/datasets?limit=1", 200),
-        "bea": ("https://apps.bea.gov/api/data/?method=GETDATASETLIST&UserID={key}&ResultFormat=JSON", 200),
-        "data_commons": ("https://api.datacommons.org/v2/node?key={key}&nodes=country/USA&property=name", 200),
-        "usda": ("https://api.nal.usda.gov/fdc/v1/foods/search?api_key={key}&query=apple&pageSize=1", 200),
+        "bea": (
+            "https://apps.bea.gov/api/data/?method=GETDATASETLIST&UserID={key}&ResultFormat=JSON",
+            200,
+        ),
+        "data_commons": (
+            "https://api.datacommons.org/v2/node?key={key}&nodes=country/USA&property=name",
+            200,
+        ),
+        "usda": (
+            "https://api.nal.usda.gov/fdc/v1/foods/search?api_key={key}&query=apple&pageSize=1",
+            200,
+        ),
         # LLM / AI
         "openai": ("https://api.openai.com/v1/models", 200),
         "anthropic": ("https://api.anthropic.com/v1/models", 200),
-        "gemini": ("https://generativelanguage.googleapis.com/v1/models?key={key}", 200),
+        "gemini": (
+            "https://generativelanguage.googleapis.com/v1/models?key={key}",
+            200,
+        ),
         "groq": ("https://api.groq.com/openai/v1/models", 200),
         "mistral": ("https://api.mistral.ai/v1/models", 200),
         "deepseek": ("https://api.deepseek.com/models", 200),
         "cohere": ("https://api.cohere.com/v1/models", 200),
         "perplexity": ("https://api.perplexity.ai/chat/completions", 200),
         # Financial & Market Data
-        "fmp": ("https://financialmodelingprep.com/api/v3/profile/AAPL?apikey={key}", 200),
-        "alpha_vantage": ("https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=IBM&interval=5min&apikey={key}", 200),
-        "polygon": ("https://api.polygon.io/v2/aggs/ticker/AAPL/prev?apiKey={key}", 200),
-        "finnhub": ("https://finnhub.io/api/v1/stock/profile2?symbol=AAPL&token={key}", 200),
+        "fmp": (
+            "https://financialmodelingprep.com/api/v3/profile/AAPL?apikey={key}",
+            200,
+        ),
+        "alpha_vantage": (
+            "https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=IBM&interval=5min&apikey={key}",
+            200,
+        ),
+        "polygon": (
+            "https://api.polygon.io/v2/aggs/ticker/AAPL/prev?apiKey={key}",
+            200,
+        ),
+        "finnhub": (
+            "https://finnhub.io/api/v1/stock/profile2?symbol=AAPL&token={key}",
+            200,
+        ),
         "tiingo": ("https://api.tiingo.com/api/test?token={key}", 200),
-        "quandl": ("https://data.nasdaq.com/api/v3/datasets/WIKI/AAPL/metadata.json?api_key={key}", 200),
+        "quandl": (
+            "https://data.nasdaq.com/api/v3/datasets/WIKI/AAPL/metadata.json?api_key={key}",
+            200,
+        ),
         # Search & Web Data
         "github": ("https://api.github.com/user", 200),
         # Business Intelligence
-        "newsapi": ("https://newsapi.org/v2/top-headlines?country=us&pageSize=1&apiKey={key}", 200),
+        "newsapi": (
+            "https://newsapi.org/v2/top-headlines?country=us&pageSize=1&apiKey={key}",
+            200,
+        ),
     }
 
     if source in tests:
@@ -379,11 +472,21 @@ async def _test_source_key(client, source: str, key: str) -> APIKeyTestResult:
         if resp.status_code == expected:
             return APIKeyTestResult(source=source, success=True, message="Key is valid")
         elif resp.status_code in (401, 403):
-            return APIKeyTestResult(source=source, success=False, message="Invalid or expired key")
+            return APIKeyTestResult(
+                source=source, success=False, message="Invalid or expired key"
+            )
         elif resp.status_code == 429:
-            return APIKeyTestResult(source=source, success=True, message="Key is valid (rate limited)")
+            return APIKeyTestResult(
+                source=source, success=True, message="Key is valid (rate limited)"
+            )
         else:
-            return APIKeyTestResult(source=source, success=False, message=f"Unexpected status: {resp.status_code}")
+            return APIKeyTestResult(
+                source=source,
+                success=False,
+                message=f"Unexpected status: {resp.status_code}",
+            )
 
     # Sources without a quick test endpoint
-    return APIKeyTestResult(source=source, success=True, message="Key saved (no test endpoint available)")
+    return APIKeyTestResult(
+        source=source, success=True, message="Key saved (no test endpoint available)"
+    )

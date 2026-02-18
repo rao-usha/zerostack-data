@@ -31,8 +31,10 @@ router = APIRouter(prefix="/people-jobs", tags=["People Collection Jobs"])
 # Response Models
 # =============================================================================
 
+
 class JobSummary(BaseModel):
     """Summary of a collection job."""
+
     id: int
     job_type: str
     company_id: Optional[int] = None
@@ -48,6 +50,7 @@ class JobSummary(BaseModel):
 
 class JobDetail(BaseModel):
     """Detailed job information."""
+
     id: int
     job_type: str
     company_id: Optional[int] = None
@@ -67,6 +70,7 @@ class JobDetail(BaseModel):
 
 class JobStatsResponse(BaseModel):
     """Job statistics."""
+
     period_days: int
     total_jobs: int
     by_status: dict
@@ -79,6 +83,7 @@ class JobStatsResponse(BaseModel):
 
 class AgentMetrics(BaseModel):
     """Metrics for a single collection agent."""
+
     agent: str
     total_jobs: int
     successful_jobs: int
@@ -92,6 +97,7 @@ class AgentMetrics(BaseModel):
 
 class CollectionMetricsResponse(BaseModel):
     """Aggregate collection metrics across all agents."""
+
     period_days: int
     generated_at: str
     summary: dict
@@ -102,14 +108,18 @@ class CollectionMetricsResponse(BaseModel):
 
 class ScheduleJobRequest(BaseModel):
     """Request to schedule a collection job."""
+
     job_type: str = Field(..., description="website_crawl, sec_parse, news_scan")
-    company_ids: Optional[List[int]] = Field(None, description="Specific companies to collect")
+    company_ids: Optional[List[int]] = Field(
+        None, description="Specific companies to collect"
+    )
     priority: str = Field("all", description="all, portfolio, public")
     limit: int = Field(50, ge=1, le=200, description="Max companies to process")
 
 
 class ChangeAlertItem(BaseModel):
     """A change alert."""
+
     change_id: int
     person_name: str
     company_id: int
@@ -125,6 +135,7 @@ class ChangeAlertItem(BaseModel):
 
 class AlertsResponse(BaseModel):
     """Change alerts response."""
+
     filter_type: Optional[str] = None
     filter_id: Optional[int] = None
     period_days: int
@@ -134,6 +145,7 @@ class AlertsResponse(BaseModel):
 
 class DigestSummary(BaseModel):
     """Summary stats in digest."""
+
     period_days: int
     total_changes: int
     by_type: dict
@@ -145,6 +157,7 @@ class DigestSummary(BaseModel):
 
 class DigestResponse(BaseModel):
     """Weekly digest response."""
+
     generated_at: str
     period: str
     filter: Optional[dict] = None
@@ -156,6 +169,7 @@ class DigestResponse(BaseModel):
 # =============================================================================
 # Endpoints
 # =============================================================================
+
 
 @router.get("/", response_model=List[JobSummary])
 async def list_jobs(
@@ -183,7 +197,9 @@ async def list_jobs(
             id=job.id,
             job_type=job.job_type,
             company_id=job.company_id,
-            company_count=len(job.company_ids) if job.company_ids else (1 if job.company_id else 0),
+            company_count=len(job.company_ids)
+            if job.company_ids
+            else (1 if job.company_id else 0),
             status=job.status,
             created_at=job.created_at,
             started_at=job.started_at,
@@ -233,9 +249,11 @@ async def get_collection_metrics(
     cutoff = datetime.utcnow() - timedelta(days=days)
 
     # Query all jobs in period
-    jobs = db.query(PeopleCollectionJob).filter(
-        PeopleCollectionJob.created_at >= cutoff
-    ).all()
+    jobs = (
+        db.query(PeopleCollectionJob)
+        .filter(PeopleCollectionJob.created_at >= cutoff)
+        .all()
+    )
 
     if not jobs:
         return CollectionMetricsResponse(
@@ -296,21 +314,29 @@ async def get_collection_metrics(
             for err, count in error_counts.most_common(5)
         ]
 
-        agent_metrics.append(AgentMetrics(
-            agent=agent,
-            total_jobs=stats["total"],
-            successful_jobs=stats["success"],
-            failed_jobs=stats["failed"],
-            zero_people_jobs=stats["zero_people"],
-            success_rate=round(stats["success"] / stats["total"] * 100, 1) if stats["total"] > 0 else 0,
-            avg_people_found=round(stats["people_found"] / stats["total"], 1) if stats["total"] > 0 else 0,
-            total_people_found=stats["people_found"],
-            common_errors=common_errors,
-        ))
+        agent_metrics.append(
+            AgentMetrics(
+                agent=agent,
+                total_jobs=stats["total"],
+                successful_jobs=stats["success"],
+                failed_jobs=stats["failed"],
+                zero_people_jobs=stats["zero_people"],
+                success_rate=round(stats["success"] / stats["total"] * 100, 1)
+                if stats["total"] > 0
+                else 0,
+                avg_people_found=round(stats["people_found"] / stats["total"], 1)
+                if stats["total"] > 0
+                else 0,
+                total_people_found=stats["people_found"],
+                common_errors=common_errors,
+            )
+        )
 
     # Overall failure analysis
     total_jobs = len(jobs)
-    total_zero_people = sum(1 for j in jobs if (j.people_found or 0) == 0 and j.status != "pending")
+    total_zero_people = sum(
+        1 for j in jobs if (j.people_found or 0) == 0 and j.status != "pending"
+    )
     total_failed = sum(1 for j in jobs if j.status == "failed")
 
     # Categorize error types
@@ -366,17 +392,23 @@ async def get_collection_metrics(
         )
 
     if not recommendations:
-        recommendations.append("Collection metrics look healthy - no urgent issues detected")
+        recommendations.append(
+            "Collection metrics look healthy - no urgent issues detected"
+        )
 
     return CollectionMetricsResponse(
         period_days=days,
         generated_at=datetime.utcnow().isoformat(),
         summary={
             "total_jobs": total_jobs,
-            "total_successful": sum(1 for j in jobs if j.status in ("success", "completed_with_errors")),
+            "total_successful": sum(
+                1 for j in jobs if j.status in ("success", "completed_with_errors")
+            ),
             "total_failed": total_failed,
             "total_zero_people": total_zero_people,
-            "zero_people_rate": round(total_zero_people / total_jobs * 100, 1) if total_jobs > 0 else 0,
+            "zero_people_rate": round(total_zero_people / total_jobs * 100, 1)
+            if total_jobs > 0
+            else 0,
             "total_people_found": sum(j.people_found or 0 for j in jobs),
         },
         by_agent=agent_metrics,
@@ -429,8 +461,7 @@ async def schedule_job(
     valid_types = {"website_crawl", "sec_parse", "news_scan", "sec_8k_check"}
     if request.job_type not in valid_types:
         raise HTTPException(
-            status_code=400,
-            detail=f"job_type must be one of: {valid_types}"
+            status_code=400, detail=f"job_type must be one of: {valid_types}"
         )
 
     scheduler = PeopleCollectionScheduler(db)
@@ -448,8 +479,7 @@ async def schedule_job(
 
     if not company_ids:
         raise HTTPException(
-            status_code=400,
-            detail="No companies found for the specified criteria"
+            status_code=400, detail="No companies found for the specified criteria"
         )
 
     job = scheduler.create_batch_job(
@@ -486,8 +516,7 @@ async def cancel_job(
 
     if job.status != "pending":
         raise HTTPException(
-            status_code=400,
-            detail=f"Cannot cancel job with status: {job.status}"
+            status_code=400, detail=f"Cannot cancel job with status: {job.status}"
         )
 
     job.status = "cancelled"
@@ -565,6 +594,7 @@ async def register_schedules():
 # Alert Endpoints
 # =============================================================================
 
+
 @router.get("/alerts/recent", response_model=AlertsResponse)
 async def get_recent_alerts(
     days: int = Query(7, ge=1, le=90),
@@ -578,22 +608,29 @@ async def get_recent_alerts(
     changes = monitor.get_recent_changes(days=days, c_suite_only=c_suite_only)
 
     from app.core.people_models import IndustrialCompany
+
     alerts = []
     for change in changes:
         company = db.get(IndustrialCompany, change.company_id)
-        alerts.append(ChangeAlertItem(
-            change_id=change.id,
-            person_name=change.person_name,
-            company_id=change.company_id,
-            company_name=company.name if company else "Unknown",
-            change_type=change.change_type,
-            old_title=change.old_title,
-            new_title=change.new_title,
-            announced_date=change.announced_date.isoformat() if change.announced_date else None,
-            detected_date=change.detected_date.isoformat() if change.detected_date else None,
-            is_c_suite=change.is_c_suite,
-            significance_score=change.significance_score,
-        ))
+        alerts.append(
+            ChangeAlertItem(
+                change_id=change.id,
+                person_name=change.person_name,
+                company_id=change.company_id,
+                company_name=company.name if company else "Unknown",
+                change_type=change.change_type,
+                old_title=change.old_title,
+                new_title=change.new_title,
+                announced_date=change.announced_date.isoformat()
+                if change.announced_date
+                else None,
+                detected_date=change.detected_date.isoformat()
+                if change.detected_date
+                else None,
+                is_c_suite=change.is_c_suite,
+                significance_score=change.significance_score,
+            )
+        )
 
     return AlertsResponse(
         period_days=days,
@@ -678,6 +715,7 @@ async def get_industry_alerts(
 # Digest Endpoints
 # =============================================================================
 
+
 @router.get("/digest/weekly")
 async def get_weekly_digest(
     portfolio_id: Optional[int] = Query(None, description="Filter to portfolio"),
@@ -737,37 +775,61 @@ async def get_change_summary(
 # Deep Collection Endpoint
 # =============================================================================
 
+
 class RecursiveCollectRequest(BaseModel):
     """Request body for recursive collection."""
+
     # Structure discovery
-    discover_structure: bool = Field(True, description="Auto-discover subsidiaries and divisions")
+    discover_structure: bool = Field(
+        True, description="Auto-discover subsidiaries and divisions"
+    )
     max_units: int = Field(25, ge=1, le=50, description="Max business units to process")
 
     # Per-unit collection
-    run_sec_per_unit: bool = Field(True, description="Run SEC EDGAR per public subsidiary")
+    run_sec_per_unit: bool = Field(
+        True, description="Run SEC EDGAR per public subsidiary"
+    )
     run_website_per_unit: bool = Field(True, description="Run website crawl per unit")
     run_news_per_unit: bool = Field(False, description="Run news scan per unit (slow)")
-    max_crawl_pages_per_unit: int = Field(20, ge=5, le=100, description="Max pages per unit")
+    max_crawl_pages_per_unit: int = Field(
+        20, ge=5, le=100, description="Max pages per unit"
+    )
 
     # LinkedIn discovery
     run_linkedin: bool = Field(True, description="Run LinkedIn Google search discovery")
-    max_linkedin_searches: int = Field(100, ge=0, le=500, description="Total LinkedIn searches")
+    max_linkedin_searches: int = Field(
+        100, ge=0, le=500, description="Total LinkedIn searches"
+    )
 
     # Functional org mapping
-    map_functions: List[str] = Field(default=["technology"], description="Functions to map (technology, finance, legal)")
-    function_depth: int = Field(3, ge=1, le=5, description="Levels below C-suite to map")
+    map_functions: List[str] = Field(
+        default=["technology"],
+        description="Functions to map (technology, finance, legal)",
+    )
+    function_depth: int = Field(
+        3, ge=1, le=5, description="Levels below C-suite to map"
+    )
 
     # Org chart
-    build_master_org_chart: bool = Field(True, description="Build master org chart after collection")
+    build_master_org_chart: bool = Field(
+        True, description="Build master org chart after collection"
+    )
 
 
 class DeepCollectRequest(BaseModel):
     """Request body for deep collection."""
+
     seed_urls: Optional[List[str]] = Field(None, description="Seed URLs for deep crawl")
-    allowed_domains: Optional[List[str]] = Field(None, description="Allowed domains for crawling")
-    subsidiary_names: Optional[List[str]] = Field(None, description="Subsidiary names for news search")
+    allowed_domains: Optional[List[str]] = Field(
+        None, description="Allowed domains for crawling"
+    )
+    subsidiary_names: Optional[List[str]] = Field(
+        None, description="Subsidiary names for news search"
+    )
     newsroom_url: Optional[str] = Field(None, description="Direct newsroom URL")
-    division_context: Optional[str] = Field(None, description="Context about company divisions for org chart")
+    division_context: Optional[str] = Field(
+        None, description="Context about company divisions for org chart"
+    )
     run_sec: bool = Field(True, description="Run SEC EDGAR collection")
     run_website: bool = Field(True, description="Run deep website crawl")
     run_news: bool = Field(True, description="Run deep news scan")
@@ -876,10 +938,13 @@ async def deep_collect(
 # Diagnostic Endpoints
 # =============================================================================
 
+
 @router.post("/test/{company_id}")
 async def test_collection(
     company_id: int,
-    sources: str = Query("website", description="Comma-separated sources: website,sec,news"),
+    sources: str = Query(
+        "website", description="Comma-separated sources: website,sec,news"
+    ),
     db: Session = Depends(get_db),
 ):
     """
@@ -923,9 +988,9 @@ async def check_company_data(
     """
     from app.core.people_models import IndustrialCompany
 
-    company = db.query(IndustrialCompany).filter(
-        IndustrialCompany.id == company_id
-    ).first()
+    company = (
+        db.query(IndustrialCompany).filter(IndustrialCompany.id == company_id).first()
+    )
 
     if not company:
         return {
@@ -945,8 +1010,12 @@ async def check_company_data(
             "cik": company.cik,
         },
         "crawl_history": {
-            "last_crawled_date": company.last_crawled_date.isoformat() if company.last_crawled_date else None,
-            "leadership_last_updated": company.leadership_last_updated.isoformat() if company.leadership_last_updated else None,
+            "last_crawled_date": company.last_crawled_date.isoformat()
+            if company.last_crawled_date
+            else None,
+            "leadership_last_updated": company.leadership_last_updated.isoformat()
+            if company.leadership_last_updated
+            else None,
         },
         "collection_ready": {
             "website_collection": bool(company.website),
@@ -970,9 +1039,7 @@ def _get_collection_recommendations(company) -> List[str]:
             "Add SEC CIK to enable SEC filing-based leadership collection"
         )
     if company.website and company.last_crawled_date is None:
-        recommendations.append(
-            "Website configured but never crawled - run collection"
-        )
+        recommendations.append("Website configured but never crawled - run collection")
     if company.cik and company.leadership_last_updated is None:
         recommendations.append(
             "CIK configured but SEC filings never parsed - run SEC collection"
@@ -999,22 +1066,39 @@ async def check_batch_readiness(
 
     # Count totals
     total = db.query(func.count(IndustrialCompany.id)).scalar()
-    with_website = db.query(func.count(IndustrialCompany.id)).filter(
-        IndustrialCompany.website.isnot(None),
-        IndustrialCompany.website != "",
-    ).scalar()
-    with_cik = db.query(func.count(IndustrialCompany.id)).filter(
-        IndustrialCompany.cik.isnot(None),
-        IndustrialCompany.cik != "",
-    ).scalar()
-    never_crawled = db.query(func.count(IndustrialCompany.id)).filter(
-        IndustrialCompany.last_crawled_date.is_(None),
-    ).scalar()
+    with_website = (
+        db.query(func.count(IndustrialCompany.id))
+        .filter(
+            IndustrialCompany.website.isnot(None),
+            IndustrialCompany.website != "",
+        )
+        .scalar()
+    )
+    with_cik = (
+        db.query(func.count(IndustrialCompany.id))
+        .filter(
+            IndustrialCompany.cik.isnot(None),
+            IndustrialCompany.cik != "",
+        )
+        .scalar()
+    )
+    never_crawled = (
+        db.query(func.count(IndustrialCompany.id))
+        .filter(
+            IndustrialCompany.last_crawled_date.is_(None),
+        )
+        .scalar()
+    )
 
     # Get sample companies without website
-    missing_website = db.query(IndustrialCompany).filter(
-        IndustrialCompany.website.is_(None) | (IndustrialCompany.website == ""),
-    ).limit(5).all()
+    missing_website = (
+        db.query(IndustrialCompany)
+        .filter(
+            IndustrialCompany.website.is_(None) | (IndustrialCompany.website == ""),
+        )
+        .limit(5)
+        .all()
+    )
 
     return {
         "summary": {

@@ -11,6 +11,7 @@ IMPORTANT:
 - Some competitions require accepting terms on kaggle.com first
 - Large datasets (like M5) may take significant time to download and ingest
 """
+
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -31,20 +32,22 @@ router = APIRouter(tags=["kaggle"])
 # REQUEST/RESPONSE MODELS
 # =============================================================================
 
+
 class M5IngestRequest(BaseModel):
     """Request model for M5 dataset ingestion."""
+
     force_download: bool = Field(
-        False,
-        description="Force re-download even if files exist locally"
+        False, description="Force re-download even if files exist locally"
     )
     limit_items: Optional[int] = Field(
         None,
-        description="Limit number of items to process (for testing). None = all items (~30K)"
+        description="Limit number of items to process (for testing). None = all items (~30K)",
     )
 
 
 class M5StatusResponse(BaseModel):
     """Response model for M5 dataset status."""
+
     dataset: str
     competition: str
     description: str
@@ -56,6 +59,7 @@ class M5StatusResponse(BaseModel):
 
 class KaggleFilesResponse(BaseModel):
     """Response model for listing competition files."""
+
     competition: str
     files: list
 
@@ -63,6 +67,7 @@ class KaggleFilesResponse(BaseModel):
 # =============================================================================
 # ENDPOINTS
 # =============================================================================
+
 
 @router.get("/kaggle/m5/info", response_model=M5StatusResponse)
 async def get_m5_info():
@@ -86,7 +91,7 @@ async def get_m5_info():
             "tables": summary["tables"],
             "hierarchy": summary["hierarchy"],
             "date_range": summary["date_range"],
-            "license": summary["license"]
+            "license": summary["license"],
         }
     except Exception as e:
         logger.error(f"Failed to get M5 info: {e}")
@@ -118,9 +123,7 @@ async def list_m5_files():
             username, key = None, None
 
         client = KaggleClient(
-            username=username,
-            key=key,
-            data_dir=settings.kaggle_data_dir
+            username=username, key=key, data_dir=settings.kaggle_data_dir
         )
 
         files = await client.list_competition_files(KaggleClient.M5_COMPETITION)
@@ -128,7 +131,7 @@ async def list_m5_files():
         return {
             "competition": KaggleClient.M5_COMPETITION,
             "files": files,
-            "note": "Accept competition rules at kaggle.com before downloading"
+            "note": "Accept competition rules at kaggle.com before downloading",
         }
 
     except Exception as e:
@@ -137,12 +140,12 @@ async def list_m5_files():
         if "403" in str(e).lower() or "forbidden" in str(e).lower():
             raise HTTPException(
                 status_code=403,
-                detail="Access forbidden. Have you accepted the competition rules at kaggle.com?"
+                detail="Access forbidden. Have you accepted the competition rules at kaggle.com?",
             )
         elif "401" in str(e).lower() or "unauthorized" in str(e).lower():
             raise HTTPException(
                 status_code=401,
-                detail="Kaggle authentication failed. Check KAGGLE_USERNAME and KAGGLE_KEY."
+                detail="Kaggle authentication failed. Check KAGGLE_USERNAME and KAGGLE_KEY.",
             )
         else:
             raise HTTPException(status_code=500, detail=str(e))
@@ -152,7 +155,7 @@ async def list_m5_files():
 async def ingest_m5_dataset(
     request: M5IngestRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest the M5 Forecasting dataset.
@@ -185,7 +188,9 @@ async def ingest_m5_dataset(
     Set `limit_items` to null (or omit) to process all ~30K items.
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="kaggle",
+        db,
+        background_tasks,
+        source="kaggle",
         config={
             "dataset": "m5-forecasting",
             "competition": KaggleClient.M5_COMPETITION,
@@ -217,11 +222,7 @@ async def prepare_m5_tables_endpoint(db: Session = Depends(get_db)):
     try:
         result = await ingest.prepare_m5_tables(db)
 
-        return {
-            "status": "success",
-            "message": "M5 tables created/verified",
-            **result
-        }
+        return {"status": "success", "message": "M5 tables created/verified", **result}
 
     except Exception as e:
         logger.error(f"Failed to prepare M5 tables: {e}", exc_info=True)
@@ -253,7 +254,7 @@ async def get_m5_schema():
                 "m5_items": m5_metadata.M5_ITEMS_SCHEMA,
                 "m5_prices": m5_metadata.M5_PRICES_SCHEMA,
                 "m5_sales": m5_metadata.M5_SALES_SCHEMA,
-            }
+            },
         }
 
     except Exception as e:

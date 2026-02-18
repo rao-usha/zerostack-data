@@ -96,6 +96,7 @@ class BioExtractor(BasePECollector):
         """Lazily initialize LLM client."""
         if self._llm_client is None:
             from app.agentic.llm_client import get_llm_client
+
             self._llm_client = get_llm_client(model="gpt-4o-mini")
         return self._llm_client
 
@@ -161,7 +162,11 @@ class BioExtractor(BasePECollector):
             profile_texts = await self._fetch_profile_pages(team_url, page_text)
             if profile_texts:
                 # Combine team listing + individual profiles for richer bios
-                page_text = page_text + "\n\n--- Individual Profiles ---\n\n" + "\n\n".join(profile_texts)
+                page_text = (
+                    page_text
+                    + "\n\n--- Individual Profiles ---\n\n"
+                    + "\n\n".join(profile_texts)
+                )
 
             # Step 4: Extract bios with LLM
             llm_client = self._get_llm_client()
@@ -214,9 +219,7 @@ class BioExtractor(BasePECollector):
                     )
                 )
 
-            logger.info(
-                f"Extracted {len(items)} bios from {entity_name} team page"
-            )
+            logger.info(f"Extracted {len(items)} bios from {entity_name} team page")
 
             return self._create_result(
                 entity_id=entity_id,
@@ -252,7 +255,16 @@ class BioExtractor(BasePECollector):
             if response and response.status_code == 200:
                 # Verify it's actually a team page (not a redirect to homepage)
                 text = response.text.lower()
-                if any(kw in text for kw in ["team", "people", "professional", "leadership", "managing"]):
+                if any(
+                    kw in text
+                    for kw in [
+                        "team",
+                        "people",
+                        "professional",
+                        "leadership",
+                        "managing",
+                    ]
+                ):
                     return url
 
         # Fall back: fetch homepage and look for team links
@@ -270,7 +282,14 @@ class BioExtractor(BasePECollector):
             return None
 
         soup = BeautifulSoup(html, "html.parser")
-        team_keywords = ["team", "people", "leadership", "professionals", "our team", "who we are"]
+        team_keywords = [
+            "team",
+            "people",
+            "leadership",
+            "professionals",
+            "our team",
+            "who we are",
+        ]
 
         for link in soup.find_all("a", href=True):
             href = link.get("href", "")
@@ -378,7 +397,9 @@ class BioExtractor(BasePECollector):
             # Try standard parse first; falls back to JSON repair on None
             result = response.parse_json()
             if result is None:
-                raw = response.content if hasattr(response, "content") else str(response)
+                raw = (
+                    response.content if hasattr(response, "content") else str(response)
+                )
                 result = self._repair_json_array(raw)
 
             # Handle both list and dict with a "people" key
@@ -442,11 +463,11 @@ class BioExtractor(BasePECollector):
                         last_complete = i
 
             if last_complete > 0:
-                candidate = candidate[:last_complete + 1] + "]"
+                candidate = candidate[: last_complete + 1] + "]"
             else:
                 candidate = "[]"
         else:
-            candidate = raw[start:end + 1]
+            candidate = raw[start : end + 1]
 
         # Fix common JSON issues: trailing commas before ] or }
         candidate = re.sub(r",\s*([}\]])", r"\1", candidate)

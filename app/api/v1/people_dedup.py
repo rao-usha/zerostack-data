@@ -24,14 +24,19 @@ router = APIRouter(prefix="/people-dedup", tags=["People Deduplication"])
 # Request/Response Models
 # =============================================================================
 
+
 class ScanRequest(BaseModel):
     """Request to trigger a dedup scan."""
-    company_id: Optional[int] = Field(None, description="Scope scan to a specific company")
+
+    company_id: Optional[int] = Field(
+        None, description="Scope scan to a specific company"
+    )
     limit: Optional[int] = Field(1000, ge=1, le=10000, description="Max people to scan")
 
 
 class MergeRequest(BaseModel):
     """Request to approve a merge."""
+
     candidate_id: int = Field(..., description="The merge candidate record ID")
     canonical_person_id: int = Field(..., description="Which person ID to keep")
 
@@ -39,6 +44,7 @@ class MergeRequest(BaseModel):
 # =============================================================================
 # Endpoints
 # =============================================================================
+
 
 @router.post("/scan")
 async def scan_for_duplicates(
@@ -62,7 +68,10 @@ async def scan_for_duplicates(
 
 @router.get("/candidates")
 async def get_candidates(
-    status: str = Query("pending", description="Filter by status: pending, auto_merged, approved, rejected"),
+    status: str = Query(
+        "pending",
+        description="Filter by status: pending, auto_merged, approved, rejected",
+    ),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),

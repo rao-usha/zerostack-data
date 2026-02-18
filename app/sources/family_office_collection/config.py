@@ -15,7 +15,11 @@ from app.sources.family_office_collection.types import FoRegistryEntry
 logger = logging.getLogger(__name__)
 
 # Path to expanded FO registry
-FO_REGISTRY_PATH = Path(__file__).parent.parent.parent / "data" / "expanded_family_office_registry.json"
+FO_REGISTRY_PATH = (
+    Path(__file__).parent.parent.parent
+    / "data"
+    / "expanded_family_office_registry.json"
+)
 
 # Cached registry
 _fo_registry: Optional[Dict[str, Any]] = None
@@ -40,7 +44,9 @@ def load_fo_registry() -> Dict[str, Any]:
     try:
         with open(FO_REGISTRY_PATH, "r", encoding="utf-8") as f:
             _fo_registry = json.load(f)
-        logger.info(f"Loaded FO registry with {_fo_registry.get('fo_count', 0)} family offices")
+        logger.info(
+            f"Loaded FO registry with {_fo_registry.get('fo_count', 0)} family offices"
+        )
         return _fo_registry
     except Exception as e:
         logger.error(f"Error loading FO registry: {e}")

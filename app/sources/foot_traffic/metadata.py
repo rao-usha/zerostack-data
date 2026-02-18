@@ -3,6 +3,7 @@ Metadata and configuration for foot traffic data collection.
 
 Defines location categories, source confidence levels, and data mappings.
 """
+
 from typing import Dict, List, Any
 
 # =============================================================================
@@ -30,7 +31,7 @@ LOCATION_CATEGORIES = {
             "steakhouse",
             "ice_cream",
             "juice_bar",
-        ]
+        ],
     },
     "retail": {
         "name": "Retail Store",
@@ -51,7 +52,7 @@ LOCATION_CATEGORIES = {
             "pet_store",
             "bookstore",
             "toy_store",
-        ]
+        ],
     },
     "office": {
         "name": "Office Building",
@@ -62,7 +63,7 @@ LOCATION_CATEGORIES = {
             "tech_office",
             "medical_office",
             "government",
-        ]
+        ],
     },
     "venue": {
         "name": "Entertainment Venue",
@@ -76,7 +77,7 @@ LOCATION_CATEGORIES = {
             "arcade",
             "nightclub",
             "casino",
-        ]
+        ],
     },
     "fitness": {
         "name": "Fitness & Wellness",
@@ -88,7 +89,7 @@ LOCATION_CATEGORIES = {
             "martial_arts",
             "spa",
             "salon",
-        ]
+        ],
     },
     "hospitality": {
         "name": "Hospitality",
@@ -97,7 +98,7 @@ LOCATION_CATEGORIES = {
             "motel",
             "resort",
             "vacation_rental",
-        ]
+        ],
     },
     "healthcare": {
         "name": "Healthcare",
@@ -107,7 +108,7 @@ LOCATION_CATEGORIES = {
             "clinic",
             "dental",
             "pharmacy",
-        ]
+        ],
     },
     "automotive": {
         "name": "Automotive",
@@ -117,7 +118,7 @@ LOCATION_CATEGORIES = {
             "auto_repair",
             "car_wash",
             "ev_charging",
-        ]
+        ],
     },
     "financial": {
         "name": "Financial Services",
@@ -126,7 +127,7 @@ LOCATION_CATEGORIES = {
             "credit_union",
             "insurance",
             "atm",
-        ]
+        ],
     },
 }
 
@@ -186,36 +187,91 @@ SOURCE_CONFIDENCE_LEVELS = {
 
 MAJOR_RETAIL_CHAINS = {
     "fast_food": [
-        "McDonald's", "Wendy's", "Burger King", "Taco Bell", "Chick-fil-A",
-        "KFC", "Subway", "Domino's", "Pizza Hut", "Dunkin'", "Popeyes",
-        "Sonic Drive-In", "Jack in the Box", "Arby's", "Hardee's",
+        "McDonald's",
+        "Wendy's",
+        "Burger King",
+        "Taco Bell",
+        "Chick-fil-A",
+        "KFC",
+        "Subway",
+        "Domino's",
+        "Pizza Hut",
+        "Dunkin'",
+        "Popeyes",
+        "Sonic Drive-In",
+        "Jack in the Box",
+        "Arby's",
+        "Hardee's",
     ],
     "fast_casual": [
-        "Chipotle", "Panera Bread", "Sweetgreen", "Five Guys", "Shake Shack",
-        "Noodles & Company", "Qdoba", "Wingstop", "Mod Pizza", "Blaze Pizza",
-        "Jersey Mike's", "Jimmy John's", "Firehouse Subs", "Potbelly",
+        "Chipotle",
+        "Panera Bread",
+        "Sweetgreen",
+        "Five Guys",
+        "Shake Shack",
+        "Noodles & Company",
+        "Qdoba",
+        "Wingstop",
+        "Mod Pizza",
+        "Blaze Pizza",
+        "Jersey Mike's",
+        "Jimmy John's",
+        "Firehouse Subs",
+        "Potbelly",
     ],
     "coffee": [
-        "Starbucks", "Dunkin'", "Peet's Coffee", "Dutch Bros", "Caribou Coffee",
-        "Tim Hortons", "The Coffee Bean & Tea Leaf",
+        "Starbucks",
+        "Dunkin'",
+        "Peet's Coffee",
+        "Dutch Bros",
+        "Caribou Coffee",
+        "Tim Hortons",
+        "The Coffee Bean & Tea Leaf",
     ],
     "grocery": [
-        "Walmart", "Kroger", "Costco", "Target", "Albertsons", "Safeway",
-        "Publix", "H-E-B", "Aldi", "Trader Joe's", "Whole Foods", "Sprouts",
+        "Walmart",
+        "Kroger",
+        "Costco",
+        "Target",
+        "Albertsons",
+        "Safeway",
+        "Publix",
+        "H-E-B",
+        "Aldi",
+        "Trader Joe's",
+        "Whole Foods",
+        "Sprouts",
     ],
     "department_store": [
-        "Target", "Walmart", "Kohl's", "JCPenney", "Macy's", "Nordstrom",
-        "Belk", "Dillard's",
+        "Target",
+        "Walmart",
+        "Kohl's",
+        "JCPenney",
+        "Macy's",
+        "Nordstrom",
+        "Belk",
+        "Dillard's",
     ],
     "home_improvement": [
-        "Home Depot", "Lowe's", "Menards", "Ace Hardware",
+        "Home Depot",
+        "Lowe's",
+        "Menards",
+        "Ace Hardware",
     ],
     "pharmacy": [
-        "CVS", "Walgreens", "Rite Aid",
+        "CVS",
+        "Walgreens",
+        "Rite Aid",
     ],
     "fitness": [
-        "Planet Fitness", "LA Fitness", "24 Hour Fitness", "Gold's Gym",
-        "Anytime Fitness", "Equinox", "Orangetheory", "CrossFit",
+        "Planet Fitness",
+        "LA Fitness",
+        "24 Hour Fitness",
+        "Gold's Gym",
+        "Anytime Fitness",
+        "Equinox",
+        "Orangetheory",
+        "CrossFit",
     ],
 }
 
@@ -274,20 +330,17 @@ FOURSQUARE_CATEGORY_MAP = {
     "13004": "restaurant",  # Fine Dining
     "13034": "restaurant",  # Coffee Shop
     "13035": "restaurant",  # Bar
-    
     # Retail
     "17000": "retail",
     "17001": "retail",  # Clothing Store
     "17002": "retail",  # Electronics
     "17003": "retail",  # Grocery
     "17004": "retail",  # Department Store
-    
     # Entertainment
     "10000": "venue",
     "10001": "venue",  # Movie Theater
     "10002": "venue",  # Concert Hall
     "10003": "venue",  # Sports Arena
-    
     # Fitness
     "18000": "fitness",
     "18001": "fitness",  # Gym

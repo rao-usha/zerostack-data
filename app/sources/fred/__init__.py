@@ -11,4 +11,3 @@ All data is public domain and does not require an API key.
 """
 
 __all__ = ["client", "ingest", "metadata"]
-

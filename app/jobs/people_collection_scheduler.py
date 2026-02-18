@@ -53,9 +53,10 @@ class PeopleCollectionScheduler:
         if priority == "portfolio":
             # Only companies in active portfolios
             portfolio_company_ids = [
-                pc.company_id for pc in self.db.query(PeoplePortfolioCompany).filter(
-                    PeoplePortfolioCompany.is_active == True
-                ).all()
+                pc.company_id
+                for pc in self.db.query(PeoplePortfolioCompany)
+                .filter(PeoplePortfolioCompany.is_active == True)
+                .all()
             ]
             if portfolio_company_ids:
                 query = query.filter(IndustrialCompany.id.in_(portfolio_company_ids))
@@ -92,7 +93,9 @@ class PeopleCollectionScheduler:
         logger.info(f"Created batch job {job.id} for {len(company_ids)} companies")
         return job
 
-    def get_pending_jobs(self, job_type: Optional[str] = None) -> List[PeopleCollectionJob]:
+    def get_pending_jobs(
+        self, job_type: Optional[str] = None
+    ) -> List[PeopleCollectionJob]:
         """Get all pending collection jobs."""
         query = self.db.query(PeopleCollectionJob).filter(
             PeopleCollectionJob.status == "pending"
@@ -103,9 +106,11 @@ class PeopleCollectionScheduler:
 
     def get_running_jobs(self) -> List[PeopleCollectionJob]:
         """Get all currently running jobs."""
-        return self.db.query(PeopleCollectionJob).filter(
-            PeopleCollectionJob.status == "running"
-        ).all()
+        return (
+            self.db.query(PeopleCollectionJob)
+            .filter(PeopleCollectionJob.status == "running")
+            .all()
+        )
 
     def mark_job_running(self, job_id: int) -> bool:
         """Mark a job as running."""
@@ -143,7 +148,9 @@ class PeopleCollectionScheduler:
         job.warnings = warnings or []
 
         self.db.commit()
-        logger.info(f"Job {job_id} completed: found={people_found}, created={people_created}")
+        logger.info(
+            f"Job {job_id} completed: found={people_found}, created={people_created}"
+        )
         return True
 
     def mark_job_failed(
@@ -172,10 +179,14 @@ class PeopleCollectionScheduler:
         """
         cutoff = datetime.utcnow() - timedelta(hours=max_age_hours)
 
-        stuck_jobs = self.db.query(PeopleCollectionJob).filter(
-            PeopleCollectionJob.status == "running",
-            PeopleCollectionJob.started_at < cutoff,
-        ).all()
+        stuck_jobs = (
+            self.db.query(PeopleCollectionJob)
+            .filter(
+                PeopleCollectionJob.status == "running",
+                PeopleCollectionJob.started_at < cutoff,
+            )
+            .all()
+        )
 
         for job in stuck_jobs:
             job.status = "failed"
@@ -190,9 +201,11 @@ class PeopleCollectionScheduler:
         """Get collection job statistics."""
         cutoff = datetime.utcnow() - timedelta(days=days)
 
-        jobs = self.db.query(PeopleCollectionJob).filter(
-            PeopleCollectionJob.created_at >= cutoff
-        ).all()
+        jobs = (
+            self.db.query(PeopleCollectionJob)
+            .filter(PeopleCollectionJob.created_at >= cutoff)
+            .all()
+        )
 
         stats = {
             "period_days": days,
@@ -319,6 +332,7 @@ def schedule_news_scan(db: Session, limit: int = 50) -> Optional[int]:
 # Job Processor - Executes Pending Jobs
 # =============================================================================
 
+
 async def process_pending_jobs(max_jobs: int = 5) -> Dict[str, Any]:
     """
     Process pending people collection jobs.
@@ -374,10 +388,14 @@ async def process_pending_jobs(max_jobs: int = 5) -> Dict[str, Any]:
                 sources = _get_sources_for_job_type(job.job_type)
 
                 # Get company IDs
-                company_ids = job.company_ids or ([job.company_id] if job.company_id else [])
+                company_ids = job.company_ids or (
+                    [job.company_id] if job.company_id else []
+                )
 
                 if not company_ids:
-                    scheduler.mark_job_failed(job.id, ["No companies specified for job"])
+                    scheduler.mark_job_failed(
+                        job.id, ["No companies specified for job"]
+                    )
                     job_result["status"] = "failed"
                     job_result["error"] = "No companies specified"
                     results["failed"] += 1
@@ -397,7 +415,11 @@ async def process_pending_jobs(max_jobs: int = 5) -> Dict[str, Any]:
                     people_created=batch_result.total_people_created,
                     people_updated=0,  # TODO: track this in batch result
                     changes_detected=batch_result.total_changes_detected,
-                    errors=[r.errors[0] if r.errors else None for r in batch_result.results if not r.success],
+                    errors=[
+                        r.errors[0] if r.errors else None
+                        for r in batch_result.results
+                        if not r.success
+                    ],
                 )
 
                 job_result["status"] = "success"
@@ -446,6 +468,7 @@ def _get_sources_for_job_type(job_type: str) -> List[str]:
 # =============================================================================
 # APScheduler Registration
 # =============================================================================
+
 
 def register_people_collection_schedules() -> Dict[str, bool]:
     """
@@ -583,21 +606,27 @@ def get_people_schedule_status() -> Dict[str, Any]:
     for job_id in job_ids:
         job = scheduler.get_job(job_id)
         if job:
-            jobs.append({
-                "id": job.id,
-                "name": job.name,
-                "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
-                "trigger": str(job.trigger),
-                "active": True,
-            })
+            jobs.append(
+                {
+                    "id": job.id,
+                    "name": job.name,
+                    "next_run": job.next_run_time.isoformat()
+                    if job.next_run_time
+                    else None,
+                    "trigger": str(job.trigger),
+                    "active": True,
+                }
+            )
         else:
-            jobs.append({
-                "id": job_id,
-                "name": job_id.replace("people_", "").replace("_", " ").title(),
-                "next_run": None,
-                "trigger": None,
-                "active": False,
-            })
+            jobs.append(
+                {
+                    "id": job_id,
+                    "name": job_id.replace("people_", "").replace("_", " ").title(),
+                    "next_run": None,
+                    "trigger": None,
+                    "active": False,
+                }
+            )
 
     return {
         "scheduler_running": scheduler.running,
@@ -609,6 +638,7 @@ def get_people_schedule_status() -> Dict[str, Any]:
 # =============================================================================
 # Scheduled Job Wrappers (called by APScheduler)
 # =============================================================================
+
 
 async def _scheduled_website_refresh():
     """APScheduler wrapper for website refresh."""

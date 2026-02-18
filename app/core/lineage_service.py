@@ -8,6 +8,7 @@ Provides comprehensive data lineage tracking including:
 - Dataset versioning
 - Impact analysis
 """
+
 import hashlib
 import logging
 from datetime import datetime
@@ -16,8 +17,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.core.models import (
-    LineageNode, LineageEdge, LineageEvent, DatasetVersion, ImpactAnalysis,
-    LineageNodeType, LineageEdgeType, IngestionJob
+    LineageNode,
+    LineageEdge,
+    LineageEvent,
+    DatasetVersion,
+    ImpactAnalysis,
+    LineageNodeType,
+    LineageEdgeType,
+    IngestionJob,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,6 +33,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Lineage Service
 # =============================================================================
+
 
 class LineageService:
     """Service for managing data lineage tracking."""
@@ -44,18 +52,22 @@ class LineageService:
         name: str,
         source: Optional[str] = None,
         description: Optional[str] = None,
-        properties: Optional[Dict] = None
+        properties: Optional[Dict] = None,
     ) -> LineageNode:
         """
         Get existing node or create new one.
 
         Returns the current version of the node.
         """
-        existing = self.db.query(LineageNode).filter(
-            LineageNode.node_type == node_type,
-            LineageNode.node_id == node_id,
-            LineageNode.is_current == 1
-        ).first()
+        existing = (
+            self.db.query(LineageNode)
+            .filter(
+                LineageNode.node_type == node_type,
+                LineageNode.node_id == node_id,
+                LineageNode.is_current == 1,
+            )
+            .first()
+        )
 
         if existing:
             return existing
@@ -68,7 +80,7 @@ class LineageService:
             description=description,
             properties=properties,
             version=1,
-            is_current=1
+            is_current=1,
         )
         self.db.add(node)
         self.db.commit()
@@ -79,27 +91,24 @@ class LineageService:
 
     def get_node(self, node_id: int) -> Optional[LineageNode]:
         """Get a node by its database ID."""
-        return self.db.query(LineageNode).filter(
-            LineageNode.id == node_id
-        ).first()
+        return self.db.query(LineageNode).filter(LineageNode.id == node_id).first()
 
     def get_node_by_type_and_id(
-        self,
-        node_type: LineageNodeType,
-        node_id: str
+        self, node_type: LineageNodeType, node_id: str
     ) -> Optional[LineageNode]:
         """Get current version of a node by type and ID."""
-        return self.db.query(LineageNode).filter(
-            LineageNode.node_type == node_type,
-            LineageNode.node_id == node_id,
-            LineageNode.is_current == 1
-        ).first()
+        return (
+            self.db.query(LineageNode)
+            .filter(
+                LineageNode.node_type == node_type,
+                LineageNode.node_id == node_id,
+                LineageNode.is_current == 1,
+            )
+            .first()
+        )
 
     def update_node(
-        self,
-        node: LineageNode,
-        create_version: bool = False,
-        **updates
+        self, node: LineageNode, create_version: bool = False, **updates
     ) -> LineageNode:
         """
         Update a node, optionally creating a new version.
@@ -119,7 +128,7 @@ class LineageService:
                 description=updates.get("description", node.description),
                 properties=updates.get("properties", node.properties),
                 version=node.version + 1,
-                is_current=1
+                is_current=1,
             )
             self.db.add(new_node)
             self.db.commit()
@@ -139,7 +148,7 @@ class LineageService:
         node_type: Optional[LineageNodeType] = None,
         source: Optional[str] = None,
         current_only: bool = True,
-        limit: int = 100
+        limit: int = 100,
     ) -> List[LineageNode]:
         """List nodes with optional filtering."""
         query = self.db.query(LineageNode)
@@ -165,15 +174,19 @@ class LineageService:
         target_node_id: int,
         edge_type: LineageEdgeType,
         job_id: Optional[int] = None,
-        properties: Optional[Dict] = None
+        properties: Optional[Dict] = None,
     ) -> LineageEdge:
         """Create an edge between two nodes."""
         # Check if edge already exists
-        existing = self.db.query(LineageEdge).filter(
-            LineageEdge.source_node_id == source_node_id,
-            LineageEdge.target_node_id == target_node_id,
-            LineageEdge.edge_type == edge_type
-        ).first()
+        existing = (
+            self.db.query(LineageEdge)
+            .filter(
+                LineageEdge.source_node_id == source_node_id,
+                LineageEdge.target_node_id == target_node_id,
+                LineageEdge.edge_type == edge_type,
+            )
+            .first()
+        )
 
         if existing:
             # Update properties if provided
@@ -188,13 +201,15 @@ class LineageService:
             target_node_id=target_node_id,
             edge_type=edge_type,
             job_id=job_id,
-            properties=properties
+            properties=properties,
         )
         self.db.add(edge)
         self.db.commit()
         self.db.refresh(edge)
 
-        logger.debug(f"Created lineage edge: {source_node_id} --{edge_type.value}--> {target_node_id}")
+        logger.debug(
+            f"Created lineage edge: {source_node_id} --{edge_type.value}--> {target_node_id}"
+        )
         return edge
 
     def get_upstream(self, node_id: int, max_depth: int = 10) -> List[Dict]:
@@ -211,18 +226,22 @@ class LineageService:
                 return
             visited.add(current_id)
 
-            edges = self.db.query(LineageEdge).filter(
-                LineageEdge.target_node_id == current_id
-            ).all()
+            edges = (
+                self.db.query(LineageEdge)
+                .filter(LineageEdge.target_node_id == current_id)
+                .all()
+            )
 
             for edge in edges:
                 source_node = self.get_node(edge.source_node_id)
                 if source_node:
-                    result.append({
-                        "node": source_node,
-                        "edge_type": edge.edge_type.value,
-                        "depth": depth
-                    })
+                    result.append(
+                        {
+                            "node": source_node,
+                            "edge_type": edge.edge_type.value,
+                            "depth": depth,
+                        }
+                    )
                     traverse(edge.source_node_id, depth + 1)
 
         traverse(node_id, 1)
@@ -242,18 +261,22 @@ class LineageService:
                 return
             visited.add(current_id)
 
-            edges = self.db.query(LineageEdge).filter(
-                LineageEdge.source_node_id == current_id
-            ).all()
+            edges = (
+                self.db.query(LineageEdge)
+                .filter(LineageEdge.source_node_id == current_id)
+                .all()
+            )
 
             for edge in edges:
                 target_node = self.get_node(edge.target_node_id)
                 if target_node:
-                    result.append({
-                        "node": target_node,
-                        "edge_type": edge.edge_type.value,
-                        "depth": depth
-                    })
+                    result.append(
+                        {
+                            "node": target_node,
+                            "edge_type": edge.edge_type.value,
+                            "depth": depth,
+                        }
+                    )
                     traverse(edge.target_node_id, depth + 1)
 
         traverse(node_id, 1)
@@ -271,7 +294,7 @@ class LineageService:
                 "type": node.node_type.value,
                 "node_id": node.node_id,
                 "name": node.name,
-                "source": node.source
+                "source": node.source,
             },
             "upstream": [
                 {
@@ -279,7 +302,7 @@ class LineageService:
                     "type": item["node"].node_type.value,
                     "name": item["node"].name,
                     "edge_type": item["edge_type"],
-                    "depth": item["depth"]
+                    "depth": item["depth"],
                 }
                 for item in self.get_upstream(node_id)
             ],
@@ -289,10 +312,10 @@ class LineageService:
                     "type": item["node"].node_type.value,
                     "name": item["node"].name,
                     "edge_type": item["edge_type"],
-                    "depth": item["depth"]
+                    "depth": item["depth"],
                 }
                 for item in self.get_downstream(node_id)
-            ]
+            ],
         }
 
     # -------------------------------------------------------------------------
@@ -310,7 +333,7 @@ class LineageService:
         rows_affected: Optional[int] = None,
         bytes_processed: Optional[int] = None,
         success: bool = True,
-        error_message: Optional[str] = None
+        error_message: Optional[str] = None,
     ) -> LineageEvent:
         """Log a lineage event."""
         event = LineageEvent(
@@ -323,7 +346,7 @@ class LineageService:
             rows_affected=rows_affected,
             bytes_processed=bytes_processed,
             success=1 if success else 0,
-            error_message=error_message
+            error_message=error_message,
         )
         self.db.add(event)
         self.db.commit()
@@ -338,7 +361,7 @@ class LineageService:
         job_id: Optional[int] = None,
         source: Optional[str] = None,
         since: Optional[datetime] = None,
-        limit: int = 100
+        limit: int = 100,
     ) -> List[LineageEvent]:
         """Get lineage events with filtering."""
         query = self.db.query(LineageEvent)
@@ -368,7 +391,7 @@ class LineageService:
         row_count: Optional[int] = None,
         size_bytes: Optional[int] = None,
         min_date: Optional[datetime] = None,
-        max_date: Optional[datetime] = None
+        max_date: Optional[datetime] = None,
     ) -> DatasetVersion:
         """
         Create a new version of a dataset.
@@ -376,10 +399,14 @@ class LineageService:
         Marks previous version as superseded.
         """
         # Get current version number
-        current = self.db.query(DatasetVersion).filter(
-            DatasetVersion.dataset_name == dataset_name,
-            DatasetVersion.is_current == 1
-        ).first()
+        current = (
+            self.db.query(DatasetVersion)
+            .filter(
+                DatasetVersion.dataset_name == dataset_name,
+                DatasetVersion.is_current == 1,
+            )
+            .first()
+        )
 
         if current:
             new_version = current.version + 1
@@ -406,7 +433,7 @@ class LineageService:
             size_bytes=size_bytes,
             min_date=min_date,
             max_date=max_date,
-            job_id=job_id
+            job_id=job_id,
         )
         self.db.add(version)
         self.db.commit()
@@ -416,9 +443,7 @@ class LineageService:
         return version
 
     def get_dataset_version(
-        self,
-        dataset_name: str,
-        version: Optional[int] = None
+        self, dataset_name: str, version: Optional[int] = None
     ) -> Optional[DatasetVersion]:
         """Get a specific version of a dataset (or current if version is None)."""
         query = self.db.query(DatasetVersion).filter(
@@ -433,24 +458,22 @@ class LineageService:
         return query.first()
 
     def get_dataset_history(
-        self,
-        dataset_name: str,
-        limit: int = 20
+        self, dataset_name: str, limit: int = 20
     ) -> List[DatasetVersion]:
         """Get version history for a dataset."""
-        return self.db.query(DatasetVersion).filter(
-            DatasetVersion.dataset_name == dataset_name
-        ).order_by(DatasetVersion.version.desc()).limit(limit).all()
+        return (
+            self.db.query(DatasetVersion)
+            .filter(DatasetVersion.dataset_name == dataset_name)
+            .order_by(DatasetVersion.version.desc())
+            .limit(limit)
+            .all()
+        )
 
     def list_datasets(
-        self,
-        source: Optional[str] = None,
-        limit: int = 100
+        self, source: Optional[str] = None, limit: int = 100
     ) -> List[DatasetVersion]:
         """List current versions of all datasets."""
-        query = self.db.query(DatasetVersion).filter(
-            DatasetVersion.is_current == 1
-        )
+        query = self.db.query(DatasetVersion).filter(DatasetVersion.is_current == 1)
 
         if source:
             query = query.filter(DatasetVersion.source == source)
@@ -487,23 +510,25 @@ class LineageService:
                 impacted_node_id=impacted_node.id,
                 impacted_node_name=impacted_node.name,
                 impacted_node_type=impacted_node.node_type.value,
-                impact_level=item["depth"]
+                impact_level=item["depth"],
             )
             self.db.add(impact)
             results.append(impact)
 
         self.db.commit()
-        logger.info(f"Computed impact analysis for node {source_node_id}: {len(results)} impacts")
+        logger.info(
+            f"Computed impact analysis for node {source_node_id}: {len(results)} impacts"
+        )
         return results
 
-    def get_impact_analysis(
-        self,
-        source_node_id: int
-    ) -> List[ImpactAnalysis]:
+    def get_impact_analysis(self, source_node_id: int) -> List[ImpactAnalysis]:
         """Get cached impact analysis for a node."""
-        return self.db.query(ImpactAnalysis).filter(
-            ImpactAnalysis.source_node_id == source_node_id
-        ).order_by(ImpactAnalysis.impact_level).all()
+        return (
+            self.db.query(ImpactAnalysis)
+            .filter(ImpactAnalysis.source_node_id == source_node_id)
+            .order_by(ImpactAnalysis.impact_level)
+            .all()
+        )
 
     # -------------------------------------------------------------------------
     # Job Lineage Integration
@@ -515,7 +540,7 @@ class LineageService:
         table_name: str,
         rows_inserted: int,
         source_api_url: Optional[str] = None,
-        schema_definition: Optional[Dict] = None
+        schema_definition: Optional[Dict] = None,
     ) -> Dict:
         """
         Record complete lineage for a job execution.
@@ -528,7 +553,7 @@ class LineageService:
             node_id=f"{job.source}_api",
             name=f"{job.source.upper()} API",
             source=job.source,
-            properties={"api_url": source_api_url} if source_api_url else None
+            properties={"api_url": source_api_url} if source_api_url else None,
         )
 
         # 2. Create job node
@@ -540,8 +565,10 @@ class LineageService:
             properties={
                 "job_id": job.id,
                 "config": job.config,
-                "status": job.status.value if hasattr(job.status, 'value') else str(job.status)
-            }
+                "status": job.status.value
+                if hasattr(job.status, "value")
+                else str(job.status),
+            },
         )
 
         # 3. Create/get table node
@@ -550,7 +577,7 @@ class LineageService:
             node_id=table_name,
             name=table_name,
             source=job.source,
-            properties={"table": table_name, "schema": "public"}
+            properties={"table": table_name, "schema": "public"},
         )
 
         # 4. Create edges: API -> Job -> Table
@@ -559,7 +586,7 @@ class LineageService:
             target_node_id=job_node.id,
             edge_type=LineageEdgeType.CONSUMES,
             job_id=job.id,
-            properties={"config": job.config}
+            properties={"config": job.config},
         )
 
         self.create_edge(
@@ -567,7 +594,7 @@ class LineageService:
             target_node_id=table_node.id,
             edge_type=LineageEdgeType.PRODUCES,
             job_id=job.id,
-            properties={"rows": rows_inserted}
+            properties={"rows": rows_inserted},
         )
 
         # 5. Log ingestion event
@@ -580,10 +607,10 @@ class LineageService:
             properties={
                 "table": table_name,
                 "config": job.config,
-                "api_url": source_api_url
+                "api_url": source_api_url,
             },
             rows_affected=rows_inserted,
-            success=True
+            success=True,
         )
 
         # 6. Create dataset version
@@ -594,7 +621,7 @@ class LineageService:
             table_name=table_name,
             job_id=job.id,
             schema_definition=schema_definition,
-            row_count=rows_inserted
+            row_count=rows_inserted,
         )
 
         return {
@@ -602,14 +629,10 @@ class LineageService:
             "job_node_id": job_node.id,
             "table_node_id": table_node.id,
             "event_id": event.id,
-            "dataset_version": version.version
+            "dataset_version": version.version,
         }
 
-    def record_job_failure(
-        self,
-        job: IngestionJob,
-        error_message: str
-    ) -> LineageEvent:
+    def record_job_failure(self, job: IngestionJob, error_message: str) -> LineageEvent:
         """Record a failed job in lineage."""
         return self.log_event(
             event_type="ingest",
@@ -618,7 +641,7 @@ class LineageService:
             description=f"Job {job.id} failed",
             properties={"config": job.config},
             success=False,
-            error_message=error_message
+            error_message=error_message,
         )
 
 
@@ -626,23 +649,25 @@ class LineageService:
 # Helper Functions
 # =============================================================================
 
+
 def get_table_schema(db: Session, table_name: str) -> Optional[Dict]:
     """Get schema definition for a table."""
     try:
-        result = db.execute(text(f"""
+        result = db.execute(
+            text(f"""
             SELECT column_name, data_type, is_nullable
             FROM information_schema.columns
             WHERE table_name = :table_name
             ORDER BY ordinal_position
-        """), {"table_name": table_name})
+        """),
+            {"table_name": table_name},
+        )
 
         columns = []
         for row in result:
-            columns.append({
-                "name": row[0],
-                "type": row[1],
-                "nullable": row[2] == "YES"
-            })
+            columns.append(
+                {"name": row[0], "type": row[1], "nullable": row[2] == "YES"}
+            )
 
         return {"columns": columns} if columns else None
     except Exception as e:
@@ -653,16 +678,16 @@ def get_table_schema(db: Session, table_name: str) -> Optional[Dict]:
 def get_table_stats(db: Session, table_name: str) -> Dict:
     """Get row count and size for a table."""
     try:
-        result = db.execute(text(f"""
+        result = db.execute(
+            text(f"""
             SELECT
                 (SELECT COUNT(*) FROM {table_name}) as row_count,
                 pg_total_relation_size(:table_name) as size_bytes
-        """), {"table_name": table_name})
+        """),
+            {"table_name": table_name},
+        )
         row = result.fetchone()
-        return {
-            "row_count": row[0] if row else 0,
-            "size_bytes": row[1] if row else 0
-        }
+        return {"row_count": row[0] if row else 0, "size_bytes": row[1] if row else 0}
     except Exception as e:
         logger.warning(f"Failed to get stats for {table_name}: {e}")
         return {"row_count": 0, "size_bytes": 0}

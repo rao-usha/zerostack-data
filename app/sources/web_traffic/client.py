@@ -47,19 +47,23 @@ class WebTrafficClient:
         ]
 
         if self.similarweb_key:
-            providers.append({
-                "name": "similarweb",
-                "available": True,
-                "features": ["traffic", "sources", "geography", "history"],
-                "description": "Full traffic analytics (requires API key)",
-            })
+            providers.append(
+                {
+                    "name": "similarweb",
+                    "available": True,
+                    "features": ["traffic", "sources", "geography", "history"],
+                    "description": "Full traffic analytics (requires API key)",
+                }
+            )
         else:
-            providers.append({
-                "name": "similarweb",
-                "available": False,
-                "features": ["traffic", "sources", "geography", "history"],
-                "description": "Full traffic analytics (API key not configured)",
-            })
+            providers.append(
+                {
+                    "name": "similarweb",
+                    "available": False,
+                    "features": ["traffic", "sources", "geography", "history"],
+                    "description": "Full traffic analytics (API key not configured)",
+                }
+            )
 
         return providers
 
@@ -165,7 +169,9 @@ class WebTrafficClient:
 
             # Add SimilarWeb data if available
             if "metrics" in traffic:
-                comparison_entry["monthly_visits"] = traffic["metrics"].get("monthly_visits")
+                comparison_entry["monthly_visits"] = traffic["metrics"].get(
+                    "monthly_visits"
+                )
                 comparison_entry["global_rank"] = traffic["metrics"].get("global_rank")
 
             result["comparison"].append(comparison_entry)
@@ -243,7 +249,11 @@ class WebTrafficClient:
         try:
             # Get total traffic
             visits_url = f"{self.SIMILARWEB_BASE_URL}/website/{domain}/total-traffic-and-engagement/visits"
-            params = {"api_key": self.similarweb_key, "granularity": "monthly", "main_domain_only": "false"}
+            params = {
+                "api_key": self.similarweb_key,
+                "granularity": "monthly",
+                "main_domain_only": "false",
+            }
 
             response = self.http_client.get(visits_url, params=params)
             response.raise_for_status()
@@ -252,15 +262,21 @@ class WebTrafficClient:
             # Get traffic sources
             sources_url = f"{self.SIMILARWEB_BASE_URL}/website/{domain}/traffic-sources/overview-share"
             sources_response = self.http_client.get(sources_url, params=params)
-            sources_data = sources_response.json() if sources_response.status_code == 200 else {}
+            sources_data = (
+                sources_response.json() if sources_response.status_code == 200 else {}
+            )
 
             # Get geography
-            geo_url = f"{self.SIMILARWEB_BASE_URL}/website/{domain}/geo/traffic-by-country"
+            geo_url = (
+                f"{self.SIMILARWEB_BASE_URL}/website/{domain}/geo/traffic-by-country"
+            )
             geo_response = self.http_client.get(geo_url, params=params)
             geo_data = geo_response.json() if geo_response.status_code == 200 else {}
 
             # Parse and return
-            latest_visits = visits_data.get("visits", [{}])[-1] if visits_data.get("visits") else {}
+            latest_visits = (
+                visits_data.get("visits", [{}])[-1] if visits_data.get("visits") else {}
+            )
 
             return {
                 "metrics": {
@@ -308,7 +324,9 @@ class WebTrafficClient:
             # Calculate growth rate
             growth_rate = None
             if len(history) >= 2 and history[0]["visits"] and history[-1]["visits"]:
-                growth_rate = (history[-1]["visits"] - history[0]["visits"]) / history[0]["visits"]
+                growth_rate = (history[-1]["visits"] - history[0]["visits"]) / history[
+                    0
+                ]["visits"]
 
             return {
                 "history": history,

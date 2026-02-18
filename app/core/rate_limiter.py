@@ -4,6 +4,7 @@ Per-source rate limiter service.
 Implements token bucket algorithm for rate limiting external API requests.
 Each source has configurable limits with burst capacity support.
 """
+
 import asyncio
 import logging
 import time
@@ -29,175 +30,176 @@ DEFAULT_RATE_LIMITS: Dict[str, Dict[str, Any]] = {
         "requests_per_second": 2.0,  # 120/min with key
         "burst_capacity": 10,
         "concurrent_limit": 5,
-        "description": "FRED API: 120 requests/minute with API key"
+        "description": "FRED API: 120 requests/minute with API key",
     },
     # US Census Bureau
     "census": {
         "requests_per_second": 0.8,  # ~50/min recommended
         "burst_capacity": 5,
         "concurrent_limit": 3,
-        "description": "Census API: ~50 requests/minute recommended"
+        "description": "Census API: ~50 requests/minute recommended",
     },
     # Energy Information Administration
     "eia": {
         "requests_per_second": 1.0,  # Conservative estimate
         "burst_capacity": 10,
         "concurrent_limit": 5,
-        "description": "EIA API: No published limit, conservative 60/min"
+        "description": "EIA API: No published limit, conservative 60/min",
     },
     # Bureau of Labor Statistics
     "bls": {
         "requests_per_second": 0.5,  # 25/day without key, 500/day with key
         "burst_capacity": 5,
         "concurrent_limit": 2,
-        "description": "BLS API: 500 requests/day with API key"
+        "description": "BLS API: 500 requests/day with API key",
     },
     # Securities and Exchange Commission
     "sec": {
         "requests_per_second": 0.1,  # 10 requests/second max, be conservative
         "burst_capacity": 5,
         "concurrent_limit": 2,
-        "description": "SEC EDGAR: 10 requests/second max, be respectful"
+        "description": "SEC EDGAR: 10 requests/second max, be respectful",
     },
     # Bureau of Economic Analysis
     "bea": {
         "requests_per_second": 1.5,  # 100 requests/minute
         "burst_capacity": 10,
         "concurrent_limit": 5,
-        "description": "BEA API: 100 requests/minute"
+        "description": "BEA API: 100 requests/minute",
     },
     # NOAA Climate Data
     "noaa": {
         "requests_per_second": 0.2,  # 5 requests/second max
         "burst_capacity": 5,
         "concurrent_limit": 2,
-        "description": "NOAA CDO: 5 requests/second max"
+        "description": "NOAA CDO: 5 requests/second max",
     },
     # Yelp Fusion API
     "yelp": {
         "requests_per_second": 0.1,  # 500/day = ~0.006/sec, but allow bursts
         "burst_capacity": 10,
         "concurrent_limit": 2,
-        "description": "Yelp Fusion: 500 calls/day free tier"
+        "description": "Yelp Fusion: 500 calls/day free tier",
     },
     # Google Data Commons
     "data_commons": {
         "requests_per_second": 1.0,
         "burst_capacity": 10,
         "concurrent_limit": 5,
-        "description": "Data Commons: No published limit, conservative"
+        "description": "Data Commons: No published limit, conservative",
     },
     # Bureau of Transportation Statistics
     "bts": {
         "requests_per_second": 0.5,
         "burst_capacity": 5,
         "concurrent_limit": 3,
-        "description": "BTS Socrata: ~1000 requests/hour without token"
+        "description": "BTS Socrata: ~1000 requests/hour without token",
     },
     # FEMA OpenFEMA
     "fema": {
         "requests_per_second": 1.0,
         "burst_capacity": 10,
         "concurrent_limit": 5,
-        "description": "OpenFEMA: No published limit"
+        "description": "OpenFEMA: No published limit",
     },
     # FBI Crime Data
     "fbi_crime": {
         "requests_per_second": 0.5,
         "burst_capacity": 5,
         "concurrent_limit": 2,
-        "description": "FBI Crime Data Explorer: Rate limited"
+        "description": "FBI Crime Data Explorer: Rate limited",
     },
     # US Trade (Census)
     "us_trade": {
         "requests_per_second": 0.8,
         "burst_capacity": 5,
         "concurrent_limit": 3,
-        "description": "Census Trade: Same as Census API"
+        "description": "Census Trade: Same as Census API",
     },
     # CFTC Commitments of Traders
     "cftc_cot": {
         "requests_per_second": 1.0,
         "burst_capacity": 10,
         "concurrent_limit": 5,
-        "description": "CFTC COT: Public data, be respectful"
+        "description": "CFTC COT: Public data, be respectful",
     },
     # USDA NASS
     "usda": {
         "requests_per_second": 0.5,
         "burst_capacity": 5,
         "concurrent_limit": 3,
-        "description": "USDA NASS QuickStats: Rate limited"
+        "description": "USDA NASS QuickStats: Rate limited",
     },
     # FCC Broadband
     "fcc_broadband": {
         "requests_per_second": 1.0,
         "burst_capacity": 10,
         "concurrent_limit": 5,
-        "description": "FCC National Broadband Map"
+        "description": "FCC National Broadband Map",
     },
     # Treasury FiscalData
     "treasury": {
         "requests_per_second": 1.0,
         "burst_capacity": 10,
         "concurrent_limit": 5,
-        "description": "Treasury FiscalData: Public API"
+        "description": "Treasury FiscalData: Public API",
     },
     # FDIC BankFind
     "fdic": {
         "requests_per_second": 1.0,
         "burst_capacity": 10,
         "concurrent_limit": 5,
-        "description": "FDIC BankFind Suite: Public API"
+        "description": "FDIC BankFind Suite: Public API",
     },
     # IRS Statistics of Income
     "irs_soi": {
         "requests_per_second": 0.5,
         "burst_capacity": 5,
         "concurrent_limit": 3,
-        "description": "IRS SOI: Public files, be respectful"
+        "description": "IRS SOI: Public files, be respectful",
     },
     # International Economic Data
     "international_econ": {
         "requests_per_second": 0.5,
         "burst_capacity": 5,
         "concurrent_limit": 3,
-        "description": "World Bank/IMF/OECD APIs"
+        "description": "World Bank/IMF/OECD APIs",
     },
     # Kaggle
     "kaggle": {
         "requests_per_second": 0.2,
         "burst_capacity": 3,
         "concurrent_limit": 2,
-        "description": "Kaggle API: Rate limited"
+        "description": "Kaggle API: Rate limited",
     },
     # CMS Healthcare
     "cms": {
         "requests_per_second": 1.0,
         "burst_capacity": 10,
         "concurrent_limit": 5,
-        "description": "CMS/HHS: Public data APIs"
+        "description": "CMS/HHS: Public data APIs",
     },
     # Real Estate sources
     "realestate": {
         "requests_per_second": 0.5,
         "burst_capacity": 5,
         "concurrent_limit": 3,
-        "description": "Real estate data sources"
+        "description": "Real estate data sources",
     },
     # Default fallback
     "default": {
         "requests_per_second": 1.0,
         "burst_capacity": 5,
         "concurrent_limit": 3,
-        "description": "Default rate limit for unknown sources"
-    }
+        "description": "Default rate limit for unknown sources",
+    },
 }
 
 
 # =============================================================================
 # Token Bucket Implementation
 # =============================================================================
+
 
 @dataclass
 class TokenBucket:
@@ -207,6 +209,7 @@ class TokenBucket:
     Tokens are added at a fixed rate (requests_per_second) up to a maximum
     (burst_capacity). Each request consumes one token.
     """
+
     source: str
     requests_per_second: float
     burst_capacity: int
@@ -289,6 +292,7 @@ class TokenBucket:
 # Rate Limiter Service
 # =============================================================================
 
+
 class RateLimiterService:
     """
     Per-source rate limiter service.
@@ -311,7 +315,7 @@ class RateLimiterService:
                 source=source,
                 requests_per_second=config["requests_per_second"],
                 burst_capacity=config["burst_capacity"],
-                concurrent_limit=config["concurrent_limit"]
+                concurrent_limit=config["concurrent_limit"],
             )
             self._locks[source] = asyncio.Lock()
 
@@ -349,7 +353,9 @@ class RateLimiterService:
             # Check timeout
             elapsed = time.time() - start_time
             if elapsed + wait_time > timeout:
-                logger.warning(f"Rate limit timeout for source '{source}' after {elapsed:.1f}s")
+                logger.warning(
+                    f"Rate limit timeout for source '{source}' after {elapsed:.1f}s"
+                )
                 return False
 
             # Wait before retrying
@@ -398,7 +404,7 @@ class RateLimiterService:
             "current_tokens": round(bucket.tokens, 2),
             "current_concurrent": bucket.current_concurrent,
             "total_requests": bucket.total_requests,
-            "total_throttled": bucket.total_throttled
+            "total_throttled": bucket.total_throttled,
         }
 
     def get_all_stats(self) -> Dict[str, Dict[str, Any]]:
@@ -410,7 +416,7 @@ class RateLimiterService:
         source: str,
         requests_per_second: float,
         burst_capacity: int,
-        concurrent_limit: int
+        concurrent_limit: int,
     ) -> None:
         """
         Configure rate limits for a source.
@@ -425,7 +431,7 @@ class RateLimiterService:
             source=source,
             requests_per_second=requests_per_second,
             burst_capacity=burst_capacity,
-            concurrent_limit=concurrent_limit
+            concurrent_limit=concurrent_limit,
         )
 
         if source not in self._locks:
@@ -448,12 +454,14 @@ class RateLimiterService:
 
 class RateLimitExceeded(Exception):
     """Raised when rate limit is exceeded and timeout occurs."""
+
     pass
 
 
 # =============================================================================
 # Database Integration
 # =============================================================================
+
 
 def load_rate_limits_from_db(db: Session, service: RateLimiterService) -> int:
     """
@@ -466,9 +474,9 @@ def load_rate_limits_from_db(db: Session, service: RateLimiterService) -> int:
     Returns:
         Number of rate limits loaded
     """
-    rate_limits = db.query(SourceRateLimit).filter(
-        SourceRateLimit.is_enabled == 1
-    ).all()
+    rate_limits = (
+        db.query(SourceRateLimit).filter(SourceRateLimit.is_enabled == 1).all()
+    )
 
     count = 0
     for rl in rate_limits:
@@ -476,7 +484,7 @@ def load_rate_limits_from_db(db: Session, service: RateLimiterService) -> int:
             source=rl.source,
             requests_per_second=float(rl.requests_per_second),
             burst_capacity=rl.burst_capacity,
-            concurrent_limit=rl.concurrent_limit
+            concurrent_limit=rl.concurrent_limit,
         )
         count += 1
 
@@ -490,7 +498,7 @@ def save_rate_limit_to_db(
     requests_per_second: float,
     burst_capacity: int,
     concurrent_limit: int,
-    description: Optional[str] = None
+    description: Optional[str] = None,
 ) -> SourceRateLimit:
     """
     Save rate limit configuration to database.
@@ -506,9 +514,9 @@ def save_rate_limit_to_db(
     Returns:
         Created or updated SourceRateLimit
     """
-    rate_limit = db.query(SourceRateLimit).filter(
-        SourceRateLimit.source == source
-    ).first()
+    rate_limit = (
+        db.query(SourceRateLimit).filter(SourceRateLimit.source == source).first()
+    )
 
     if rate_limit:
         # Update existing
@@ -524,7 +532,8 @@ def save_rate_limit_to_db(
             requests_per_second=str(requests_per_second),
             burst_capacity=burst_capacity,
             concurrent_limit=concurrent_limit,
-            description=description or DEFAULT_RATE_LIMITS.get(source, {}).get("description")
+            description=description
+            or DEFAULT_RATE_LIMITS.get(source, {}).get("description"),
         )
         db.add(rate_limit)
 
@@ -554,9 +563,9 @@ def init_default_rate_limits(db: Session) -> int:
             continue
 
         # Check if already exists
-        existing = db.query(SourceRateLimit).filter(
-            SourceRateLimit.source == source
-        ).first()
+        existing = (
+            db.query(SourceRateLimit).filter(SourceRateLimit.source == source).first()
+        )
 
         if not existing:
             rate_limit = SourceRateLimit(
@@ -564,7 +573,7 @@ def init_default_rate_limits(db: Session) -> int:
                 requests_per_second=str(config["requests_per_second"]),
                 burst_capacity=config["burst_capacity"],
                 concurrent_limit=config["concurrent_limit"],
-                description=config.get("description")
+                description=config.get("description"),
             )
             db.add(rate_limit)
             count += 1
@@ -577,9 +586,7 @@ def init_default_rate_limits(db: Session) -> int:
 
 
 def update_rate_limit_stats(
-    db: Session,
-    source: str,
-    service: RateLimiterService
+    db: Session, source: str, service: RateLimiterService
 ) -> None:
     """
     Update rate limit statistics in database.
@@ -589,9 +596,9 @@ def update_rate_limit_stats(
         source: Data source name
         service: Rate limiter service with current stats
     """
-    rate_limit = db.query(SourceRateLimit).filter(
-        SourceRateLimit.source == source
-    ).first()
+    rate_limit = (
+        db.query(SourceRateLimit).filter(SourceRateLimit.source == source).first()
+    )
 
     if rate_limit and source in service._buckets:
         bucket = service._buckets[source]

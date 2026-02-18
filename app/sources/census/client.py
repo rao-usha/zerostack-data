@@ -14,6 +14,7 @@ Rate limits:
 - 500 queries per day without API key
 - Unlimited queries with API key (free registration)
 """
+
 import logging
 from typing import Dict, List, Optional, Any
 from urllib.parse import urlencode
@@ -39,7 +40,7 @@ class CensusClient(BaseAPIClient):
         api_key: str,
         max_concurrency: int = 4,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize Census API client.
@@ -65,7 +66,7 @@ class CensusClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=config.timeout_seconds,
             connect_timeout=config.connect_timeout_seconds,
-            rate_limit_interval=config.get_rate_limit_interval()
+            rate_limit_interval=config.get_rate_limit_interval(),
         )
 
     def _add_auth_to_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -96,7 +97,7 @@ class CensusClient(BaseAPIClient):
         year: int,
         variables: List[str],
         geo_level: str,
-        geo_filter: Optional[Dict[str, str]] = None
+        geo_filter: Optional[Dict[str, str]] = None,
     ) -> str:
         """
         Build URL for fetching actual data.
@@ -116,10 +117,7 @@ class CensusClient(BaseAPIClient):
         """
         base = f"{self.BASE_URL}/{year}/acs/{survey}"
 
-        params = {
-            "get": ",".join(["NAME"] + variables),
-            "key": self.api_key
-        }
+        params = {"get": ",".join(["NAME"] + variables), "key": self.api_key}
 
         if geo_filter:
             params["for"] = f"{geo_level}:*"
@@ -135,10 +133,7 @@ class CensusClient(BaseAPIClient):
         return f"{base}?{query_string}"
 
     async def fetch_table_metadata(
-        self,
-        survey: str,
-        year: int,
-        table_id: str
+        self, survey: str, year: int, table_id: str
     ) -> Dict[str, Any]:
         """
         Fetch metadata for a specific Census table.
@@ -162,7 +157,7 @@ class CensusClient(BaseAPIClient):
         year: int,
         variables: List[str],
         geo_level: str,
-        geo_filter: Optional[Dict[str, str]] = None
+        geo_filter: Optional[Dict[str, str]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Fetch actual ACS data for specified variables and geography.
@@ -194,9 +189,7 @@ class CensusClient(BaseAPIClient):
             params["for"] = f"{geo_level}:*"
 
         data = await self.get(
-            url,
-            params=params,
-            resource_id=f"acs:{survey}:{year}:{geo_level}"
+            url, params=params, resource_id=f"acs:{survey}:{year}:{geo_level}"
         )
 
         # Parse Census API response format

@@ -6,6 +6,7 @@ Handles:
 - CREATE TABLE SQL generation
 - Data parsing and transformation
 """
+
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
@@ -16,20 +17,20 @@ logger = logging.getLogger(__name__)
 def generate_table_name(dataset: str) -> str:
     """
     Generate table name for Treasury dataset.
-    
+
     Convention: treasury_{dataset}
-    
+
     Args:
         dataset: Dataset name (e.g., "daily_balance", "debt_outstanding")
-        
+
     Returns:
         Table name (e.g., "treasury_daily_balance")
     """
     from app.sources.treasury.client import TREASURY_DATASETS
-    
+
     if dataset in TREASURY_DATASETS:
         return TREASURY_DATASETS[dataset]["table_name"]
-    
+
     # Sanitize dataset name
     sanitized = dataset.lower().replace("-", "_").replace(" ", "_")
     return f"treasury_{sanitized}"
@@ -38,13 +39,13 @@ def generate_table_name(dataset: str) -> str:
 def generate_create_table_sql(table_name: str, dataset: str) -> str:
     """
     Generate CREATE TABLE SQL for Treasury data.
-    
+
     Each dataset has its own schema based on the API response structure.
-    
+
     Args:
         table_name: Name of the table to create
         dataset: Dataset identifier
-        
+
     Returns:
         CREATE TABLE SQL statement
     """
@@ -263,32 +264,31 @@ def _generate_auctions_schema(table_name: str) -> str:
 
 
 def parse_treasury_response(
-    api_response: Dict[str, Any],
-    dataset: str
+    api_response: Dict[str, Any], dataset: str
 ) -> List[Dict[str, Any]]:
     """
     Parse Treasury API response into database rows.
-    
+
     Treasury API response format:
     {
         "data": [...],
         "meta": {"count": N, "labels": {...}},
         "links": {...}
     }
-    
+
     Args:
         api_response: Raw API response dict
         dataset: Dataset identifier
-        
+
     Returns:
         List of dictionaries suitable for database insertion
     """
     data = api_response.get("data", [])
-    
+
     if not data:
         logger.warning(f"No data in Treasury API response for {dataset}")
         return []
-    
+
     parsed_rows = []
     for record in data:
         try:
@@ -298,7 +298,7 @@ def parse_treasury_response(
         except Exception as e:
             logger.warning(f"Failed to parse record: {e}")
             continue
-    
+
     return parsed_rows
 
 
@@ -385,11 +385,21 @@ def _parse_monthly_statement_record(record: Dict[str, Any]) -> Optional[Dict[str
     return {
         "record_date": record.get("record_date"),
         "classification_desc": record.get("classification_desc"),
-        "current_month_net_rcpt_outly_amt": _parse_numeric(record.get("current_month_net_rcpt_outly_amt")),
-        "fiscal_year_to_date_net_rcpt_outly_amt": _parse_numeric(record.get("fiscal_year_to_date_net_rcpt_outly_amt")),
-        "prior_fiscal_year_to_date_net_rcpt_outly_amt": _parse_numeric(record.get("prior_fiscal_year_to_date_net_rcpt_outly_amt")),
-        "current_fytd_net_outly_rcpt_amt": _parse_numeric(record.get("current_fytd_net_outly_rcpt_amt")),
-        "prior_fytd_net_outly_rcpt_amt": _parse_numeric(record.get("prior_fytd_net_outly_rcpt_amt")),
+        "current_month_net_rcpt_outly_amt": _parse_numeric(
+            record.get("current_month_net_rcpt_outly_amt")
+        ),
+        "fiscal_year_to_date_net_rcpt_outly_amt": _parse_numeric(
+            record.get("fiscal_year_to_date_net_rcpt_outly_amt")
+        ),
+        "prior_fiscal_year_to_date_net_rcpt_outly_amt": _parse_numeric(
+            record.get("prior_fiscal_year_to_date_net_rcpt_outly_amt")
+        ),
+        "current_fytd_net_outly_rcpt_amt": _parse_numeric(
+            record.get("current_fytd_net_outly_rcpt_amt")
+        ),
+        "prior_fytd_net_outly_rcpt_amt": _parse_numeric(
+            record.get("prior_fytd_net_outly_rcpt_amt")
+        ),
         "category_desc": record.get("category_desc"),
         "table_nbr": record.get("table_nbr"),
         "table_nm": record.get("table_nm"),
@@ -423,16 +433,28 @@ def _parse_auctions_record(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "bid_to_cover_ratio": _parse_numeric(record.get("bid_to_cover_ratio")),
         "competitive_accepted": _parse_numeric(record.get("competitive_accepted")),
         "competitive_tendered": _parse_numeric(record.get("competitive_tendered")),
-        "non_competitive_accepted": _parse_numeric(record.get("non_competitive_accepted")),
-        "non_competitive_tendered": _parse_numeric(record.get("non_competitive_tendered")),
+        "non_competitive_accepted": _parse_numeric(
+            record.get("non_competitive_accepted")
+        ),
+        "non_competitive_tendered": _parse_numeric(
+            record.get("non_competitive_tendered")
+        ),
         "total_accepted": _parse_numeric(record.get("total_accepted")),
         "total_tendered": _parse_numeric(record.get("total_tendered")),
-        "primary_dealer_accepted": _parse_numeric(record.get("primary_dealer_accepted")),
-        "primary_dealer_tendered": _parse_numeric(record.get("primary_dealer_tendered")),
+        "primary_dealer_accepted": _parse_numeric(
+            record.get("primary_dealer_accepted")
+        ),
+        "primary_dealer_tendered": _parse_numeric(
+            record.get("primary_dealer_tendered")
+        ),
         "direct_bidder_accepted": _parse_numeric(record.get("direct_bidder_accepted")),
         "direct_bidder_tendered": _parse_numeric(record.get("direct_bidder_tendered")),
-        "indirect_bidder_accepted": _parse_numeric(record.get("indirect_bidder_accepted")),
-        "indirect_bidder_tendered": _parse_numeric(record.get("indirect_bidder_tendered")),
+        "indirect_bidder_accepted": _parse_numeric(
+            record.get("indirect_bidder_accepted")
+        ),
+        "indirect_bidder_tendered": _parse_numeric(
+            record.get("indirect_bidder_tendered")
+        ),
         "fima_noncomp_accepted": _parse_numeric(record.get("fima_noncomp_accepted")),
         "fima_noncomp_tendered": _parse_numeric(record.get("fima_noncomp_tendered")),
         "soma_accepted": _parse_numeric(record.get("soma_accepted")),
@@ -442,8 +464,12 @@ def _parse_auctions_record(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "security_term_day_month": record.get("security_term_day_month"),
         "security_term_week_year": record.get("security_term_week_year"),
         "spread": _parse_numeric(record.get("spread")),
-        "treasury_direct_accepted": _parse_numeric(record.get("treasury_direct_accepted")),
-        "treasury_direct_tendered": _parse_numeric(record.get("treasury_direct_tendered")),
+        "treasury_direct_accepted": _parse_numeric(
+            record.get("treasury_direct_accepted")
+        ),
+        "treasury_direct_tendered": _parse_numeric(
+            record.get("treasury_direct_tendered")
+        ),
         "record_date": record.get("record_date"),
     }
 
@@ -471,10 +497,10 @@ def _parse_int(value: Any) -> Optional[int]:
 def build_insert_values(parsed_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Build list of dictionaries for parameterized INSERT.
-    
+
     Args:
         parsed_data: List of parsed records
-        
+
     Returns:
         List of dictionaries for parameterized INSERT
     """
@@ -485,28 +511,25 @@ def build_insert_values(parsed_data: List[Dict[str, Any]]) -> List[Dict[str, Any
 def get_default_date_range() -> tuple[str, str]:
     """
     Get default date range for Treasury data ingestion.
-    
+
     Returns:
         Tuple of (start_date, end_date) in YYYY-MM-DD format
-        
+
     Default: Last 5 years
     """
     end_date = datetime.now()
     start_date = end_date - timedelta(days=365 * 5)  # 5 years
-    
-    return (
-        start_date.strftime("%Y-%m-%d"),
-        end_date.strftime("%Y-%m-%d")
-    )
+
+    return (start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d"))
 
 
 def validate_date_format(date_str: str) -> bool:
     """
     Validate date string is in YYYY-MM-DD format.
-    
+
     Args:
         date_str: Date string to validate
-        
+
     Returns:
         True if valid, False otherwise
     """
@@ -520,10 +543,10 @@ def validate_date_format(date_str: str) -> bool:
 def get_dataset_display_name(dataset: str) -> str:
     """
     Get display name for a Treasury dataset.
-    
+
     Args:
         dataset: Dataset identifier
-        
+
     Returns:
         Human-readable display name
     """
@@ -532,25 +555,25 @@ def get_dataset_display_name(dataset: str) -> str:
         "debt_outstanding": "Total Public Debt Outstanding",
         "interest_rates": "Treasury Interest Rates",
         "monthly_statement": "Monthly Treasury Statement",
-        "auctions": "Treasury Auction Results"
+        "auctions": "Treasury Auction Results",
     }
-    
+
     return display_names.get(dataset, dataset.replace("_", " ").title())
 
 
 def get_dataset_description(dataset: str) -> str:
     """
     Get description for a Treasury dataset.
-    
+
     Args:
         dataset: Dataset identifier
-        
+
     Returns:
         Description text
     """
     from app.sources.treasury.client import TREASURY_DATASETS
-    
+
     if dataset in TREASURY_DATASETS:
         return TREASURY_DATASETS[dataset]["description"]
-    
+
     return f"Treasury FiscalData - {dataset.replace('_', ' ').title()}"

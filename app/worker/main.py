@@ -11,6 +11,7 @@ Env vars:
     DATABASE_URL        — Required
     WORKER_POLL_INTERVAL — Seconds between polls (default 2.0)
 """
+
 import asyncio
 import logging
 import os
@@ -71,16 +72,18 @@ def _load_executors():
     from app.worker.executors.foot_traffic import execute as foot_traffic_exec
     from app.worker.executors.ingestion import execute as ingestion_exec
 
-    EXECUTORS.update({
-        QueueJobType.SITE_INTEL: site_intel_exec,
-        QueueJobType.PEOPLE: people_exec,
-        QueueJobType.LP: lp_exec,
-        QueueJobType.PE: pe_exec,
-        QueueJobType.FO: fo_exec,
-        QueueJobType.AGENTIC: agentic_exec,
-        QueueJobType.FOOT_TRAFFIC: foot_traffic_exec,
-        QueueJobType.INGESTION: ingestion_exec,
-    })
+    EXECUTORS.update(
+        {
+            QueueJobType.SITE_INTEL: site_intel_exec,
+            QueueJobType.PEOPLE: people_exec,
+            QueueJobType.LP: lp_exec,
+            QueueJobType.PE: pe_exec,
+            QueueJobType.FO: fo_exec,
+            QueueJobType.AGENTIC: agentic_exec,
+            QueueJobType.FOOT_TRAFFIC: foot_traffic_exec,
+            QueueJobType.INGESTION: ingestion_exec,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -148,7 +151,9 @@ async def _heartbeat_loop(db_factory, job_id: int):
 
 async def execute_job(job: JobQueue, db: Session):
     """Execute a claimed job using the appropriate executor."""
-    job_type_enum = QueueJobType(job.job_type) if isinstance(job.job_type, str) else job.job_type
+    job_type_enum = (
+        QueueJobType(job.job_type) if isinstance(job.job_type, str) else job.job_type
+    )
     executor = EXECUTORS.get(job_type_enum)
 
     if executor is None:
@@ -167,11 +172,17 @@ async def execute_job(job: JobQueue, db: Session):
     db.commit()
 
     # Send started event
-    send_job_event(db, "job_started", {
-        "job_id": job.id,
-        "job_type": job.job_type if isinstance(job.job_type, str) else job.job_type.value,
-        "worker_id": WORKER_ID,
-    })
+    send_job_event(
+        db,
+        "job_started",
+        {
+            "job_id": job.id,
+            "job_type": job.job_type
+            if isinstance(job.job_type, str)
+            else job.job_type.value,
+            "worker_id": WORKER_ID,
+        },
+    )
     db.commit()
 
     # Start heartbeat
@@ -188,11 +199,17 @@ async def execute_job(job: JobQueue, db: Session):
         job.progress_message = "Completed"
         db.commit()
 
-        send_job_event(db, "job_completed", {
-            "job_id": job.id,
-            "job_type": job.job_type if isinstance(job.job_type, str) else job.job_type.value,
-            "worker_id": WORKER_ID,
-        })
+        send_job_event(
+            db,
+            "job_completed",
+            {
+                "job_id": job.id,
+                "job_type": job.job_type
+                if isinstance(job.job_type, str)
+                else job.job_type.value,
+                "worker_id": WORKER_ID,
+            },
+        )
         db.commit()
 
         logger.info(f"Job {job.id} ({job.job_type}) completed successfully")
@@ -212,12 +229,18 @@ async def execute_job(job: JobQueue, db: Session):
         job.completed_at = datetime.utcnow()
         db.commit()
 
-        send_job_event(db, "job_failed", {
-            "job_id": job.id,
-            "job_type": job.job_type if isinstance(job.job_type, str) else job.job_type.value,
-            "worker_id": WORKER_ID,
-            "error_message": str(e)[:500],
-        })
+        send_job_event(
+            db,
+            "job_failed",
+            {
+                "job_id": job.id,
+                "job_type": job.job_type
+                if isinstance(job.job_type, str)
+                else job.job_type.value,
+                "worker_id": WORKER_ID,
+                "error_message": str(e)[:500],
+            },
+        )
         db.commit()
 
     finally:
@@ -263,6 +286,7 @@ def main():
     """Entrypoint for python -m app.worker.main."""
     # Ensure tables exist (worker might start before API)
     from app.core.database import create_tables
+
     create_tables()
 
     asyncio.run(poll_loop())

@@ -65,7 +65,6 @@ class NewsAgent(BaseCollector):
         "/media-room",
         "/media/press-releases",
         "/media/news",
-
         # About section patterns
         "/about/news",
         "/about/newsroom",
@@ -73,7 +72,6 @@ class NewsAgent(BaseCollector):
         "/about/media",
         "/about-us/news",
         "/about-us/press",
-
         # Company section patterns
         "/company/news",
         "/company/press",
@@ -81,7 +79,6 @@ class NewsAgent(BaseCollector):
         "/company/press-releases",
         "/corporate/news",
         "/corporate/press",
-
         # Investor relations patterns (often have leadership announcements)
         "/investors/news",
         "/investors/press-releases",
@@ -89,24 +86,20 @@ class NewsAgent(BaseCollector):
         "/investor-relations/press",
         "/ir/news",
         "/ir/press-releases",
-
         # Blog/stories patterns (some companies use these)
         "/blog",
         "/stories",
         "/insights",
         "/updates",
-
         # Resources section
         "/resources/news",
         "/resources/press",
-
         # International variants
         "/en/news",
         "/en/newsroom",
         "/en/press",
         "/en-us/news",
         "/en-us/newsroom",
-
         # Alternate naming
         "/announcements",
         "/latest-news",
@@ -137,29 +130,64 @@ class NewsAgent(BaseCollector):
     # Keywords to identify leadership press releases
     LEADERSHIP_KEYWORDS = [
         # Appointment keywords
-        "appoints", "appointed", "names", "named",
-        "hires", "hired", "promotes", "promoted",
-        "elevates", "elevated", "joins", "joined",
-
+        "appoints",
+        "appointed",
+        "names",
+        "named",
+        "hires",
+        "hired",
+        "promotes",
+        "promoted",
+        "elevates",
+        "elevated",
+        "joins",
+        "joined",
         # Announcement keywords
-        "announces", "announcement", "leadership",
-        "executive", "officer", "board", "director",
-
+        "announces",
+        "announcement",
+        "leadership",
+        "executive",
+        "officer",
+        "board",
+        "director",
         # Title keywords
-        "ceo", "cfo", "coo", "cto", "cmo", "cio", "ciso",
-        "president", "chairman", "chairwoman", "chairperson",
-        "chief", "vice president", "vp", "svp", "evp",
-        "general counsel", "treasurer", "controller",
-
+        "ceo",
+        "cfo",
+        "coo",
+        "cto",
+        "cmo",
+        "cio",
+        "ciso",
+        "president",
+        "chairman",
+        "chairwoman",
+        "chairperson",
+        "chief",
+        "vice president",
+        "vp",
+        "svp",
+        "evp",
+        "general counsel",
+        "treasurer",
+        "controller",
         # Departure keywords
-        "resignation", "resigns", "resigned",
-        "retires", "retirement", "retiring",
-        "departs", "departure", "departing",
-        "steps down", "stepping down",
-
+        "resignation",
+        "resigns",
+        "resigned",
+        "retires",
+        "retirement",
+        "retiring",
+        "departs",
+        "departure",
+        "departing",
+        "steps down",
+        "stepping down",
         # Transition keywords
-        "succession", "transition", "interim",
-        "effective immediately", "effective date",
+        "succession",
+        "transition",
+        "interim",
+        "effective immediately",
+        "effective date",
     ]
 
     # PR distribution service domains to recognize
@@ -218,19 +246,26 @@ class NewsAgent(BaseCollector):
 
         logger.info(f"[NewsAgent] Starting news collection for {company_name}")
         logger.info(f"[NewsAgent] Website URL: {website_url or 'None provided'}")
-        logger.info(f"[NewsAgent] Days back: {days_back}, Google News: {include_google_news}")
+        logger.info(
+            f"[NewsAgent] Days back: {days_back}, Google News: {include_google_news}"
+        )
 
         try:
             # 1. Check company newsroom
             if website_url or newsroom_url:
                 logger.info(f"[NewsAgent] Step 1: Searching for company newsroom")
                 newsroom_changes, newsroom_urls = await self._collect_from_newsroom(
-                    website_url or newsroom_url, company_name, days_back, result,
+                    website_url or newsroom_url,
+                    company_name,
+                    days_back,
+                    result,
                     newsroom_url=newsroom_url,
                 )
                 all_changes.extend(newsroom_changes)
                 result.page_urls.extend(newsroom_urls)
-                logger.info(f"[NewsAgent] Newsroom: Found {len(newsroom_changes)} changes from {len(newsroom_urls)} pages")
+                logger.info(
+                    f"[NewsAgent] Newsroom: Found {len(newsroom_changes)} changes from {len(newsroom_urls)} pages"
+                )
             else:
                 logger.info(f"[NewsAgent] Step 1: Skipping newsroom (no website URL)")
 
@@ -242,12 +277,16 @@ class NewsAgent(BaseCollector):
                 )
                 all_changes.extend(rss_changes)
                 result.page_urls.extend(rss_urls)
-                logger.info(f"[NewsAgent] RSS feeds: Found {len(rss_changes)} changes from {len(rss_urls)} feeds")
+                logger.info(
+                    f"[NewsAgent] RSS feeds: Found {len(rss_changes)} changes from {len(rss_urls)} feeds"
+                )
 
             # 3. Search Bing News RSS
             if include_google_news:
                 logger.info(f"[NewsAgent] Step 3: Searching Bing News RSS")
-                bing_changes = await self._search_bing_news(company_name, days_back, result)
+                bing_changes = await self._search_bing_news(
+                    company_name, days_back, result
+                )
                 all_changes.extend(bing_changes)
                 logger.info(f"[NewsAgent] Bing News: Found {len(bing_changes)} changes")
 
@@ -259,9 +298,13 @@ class NewsAgent(BaseCollector):
 
             # 5. Search financial news sites (Yahoo Finance, MarketWatch)
             logger.info(f"[NewsAgent] Step 5: Searching financial news sites")
-            finance_changes = await self._search_finance_news(company_name, days_back, result)
+            finance_changes = await self._search_finance_news(
+                company_name, days_back, result
+            )
             all_changes.extend(finance_changes)
-            logger.info(f"[NewsAgent] Finance News: Found {len(finance_changes)} changes")
+            logger.info(
+                f"[NewsAgent] Finance News: Found {len(finance_changes)} changes"
+            )
 
             # Deduplicate changes
             unique_changes = self._deduplicate_changes(all_changes)
@@ -277,7 +320,9 @@ class NewsAgent(BaseCollector):
             )
 
         except Exception as e:
-            logger.exception(f"[NewsAgent] Error collecting news for {company_name}: {e}")
+            logger.exception(
+                f"[NewsAgent] Error collecting news for {company_name}: {e}"
+            )
             result.errors.append(str(e))
             result.success = False
 
@@ -296,9 +341,9 @@ class NewsAgent(BaseCollector):
         urls_checked = []
 
         # Normalize URL
-        if not website_url.startswith('http'):
-            website_url = 'https://' + website_url
-        base_url = website_url.rstrip('/')
+        if not website_url.startswith("http"):
+            website_url = "https://" + website_url
+        base_url = website_url.rstrip("/")
 
         # Use provided newsroom_url directly, or discover it
         if newsroom_url:
@@ -319,7 +364,9 @@ class NewsAgent(BaseCollector):
         # Fetch newsroom page
         html = await self.fetch_url(newsroom_url)
         if not html:
-            logger.warning(f"[NewsAgent] Failed to fetch newsroom content from {newsroom_url}")
+            logger.warning(
+                f"[NewsAgent] Failed to fetch newsroom content from {newsroom_url}"
+            )
             result.warnings.append(f"Failed to fetch newsroom: {newsroom_url}")
             return changes, urls_checked
 
@@ -334,39 +381,46 @@ class NewsAgent(BaseCollector):
 
         # Filter to leadership-related releases
         leadership_releases = [
-            pr for pr in press_releases
-            if self._is_leadership_related(pr['title'])
+            pr for pr in press_releases if self._is_leadership_related(pr["title"])
         ]
 
         logger.info(f"[NewsAgent] {len(leadership_releases)} are leadership-related")
 
         if leadership_releases:
-            logger.debug(f"[NewsAgent] Leadership releases: {[pr['title'][:50] for pr in leadership_releases[:5]]}")
+            logger.debug(
+                f"[NewsAgent] Leadership releases: {[pr['title'][:50] for pr in leadership_releases[:5]]}"
+            )
 
         # Parse each leadership press release
         for pr_info in leadership_releases[:10]:  # Limit to prevent overload
             try:
-                logger.debug(f"[NewsAgent] Parsing press release: {pr_info['title'][:60]}")
+                logger.debug(
+                    f"[NewsAgent] Parsing press release: {pr_info['title'][:60]}"
+                )
                 result.pages_checked += 1
-                urls_checked.append(pr_info['url'])
+                urls_checked.append(pr_info["url"])
 
-                pr_html = await self.fetch_url(pr_info['url'])
+                pr_html = await self.fetch_url(pr_info["url"])
                 if not pr_html:
-                    logger.debug(f"[NewsAgent] Failed to fetch press release: {pr_info['url']}")
+                    logger.debug(
+                        f"[NewsAgent] Failed to fetch press release: {pr_info['url']}"
+                    )
                     continue
 
                 pr = PressRelease(
-                    title=pr_info['title'],
+                    title=pr_info["title"],
                     content=pr_html,
-                    publish_date=pr_info.get('date'),
-                    source_url=pr_info['url'],
+                    publish_date=pr_info.get("date"),
+                    source_url=pr_info["url"],
                     company_name=company_name,
                     source_type="newsroom",
                 )
 
                 parse_result = await self.parser.parse(pr)
                 if parse_result.changes:
-                    logger.info(f"[NewsAgent] Extracted {len(parse_result.changes)} changes from: {pr_info['title'][:50]}")
+                    logger.info(
+                        f"[NewsAgent] Extracted {len(parse_result.changes)} changes from: {pr_info['title'][:50]}"
+                    )
                 changes.extend(parse_result.changes)
 
             except Exception as e:
@@ -380,7 +434,9 @@ class NewsAgent(BaseCollector):
         result: CollectionResult,
     ) -> Optional[str]:
         """Find the newsroom URL for a company website."""
-        logger.debug(f"[NewsAgent] Trying {len(self.NEWSROOM_PATTERNS)} newsroom URL patterns")
+        logger.debug(
+            f"[NewsAgent] Trying {len(self.NEWSROOM_PATTERNS)} newsroom URL patterns"
+        )
 
         # Strategy 0: Try common newsroom subdomains (news.example.com, etc.)
         parsed = urlparse(base_url)
@@ -402,40 +458,56 @@ class NewsAgent(BaseCollector):
                 logger.debug(f"[NewsAgent] Found newsroom via pattern: {pattern}")
                 return url
 
-        logger.debug(f"[NewsAgent] No match in first 15 patterns, trying homepage link discovery")
+        logger.debug(
+            f"[NewsAgent] No match in first 15 patterns, trying homepage link discovery"
+        )
 
         # Strategy 2: Try to find from homepage links
         homepage = await self.fetch_url(base_url)
         if homepage:
             result.pages_checked += 1
-            soup = BeautifulSoup(homepage, 'html.parser')
+            soup = BeautifulSoup(homepage, "html.parser")
 
             # Keywords to look for in links
             newsroom_keywords = [
-                'news', 'newsroom', 'press', 'media', 'announcements',
-                'press-releases', 'press releases', 'latest news',
+                "news",
+                "newsroom",
+                "press",
+                "media",
+                "announcements",
+                "press-releases",
+                "press releases",
+                "latest news",
             ]
 
             # Look for news/press links
-            for a in soup.find_all('a', href=True):
-                href = a['href'].lower()
+            for a in soup.find_all("a", href=True):
+                href = a["href"].lower()
                 text = a.get_text().lower().strip()
 
                 if any(kw in href or kw in text for kw in newsroom_keywords):
-                    full_url = urljoin(base_url, a['href'])
+                    full_url = urljoin(base_url, a["href"])
                     # Allow same domain or subdomains (e.g. news.prudential.com)
                     link_netloc = urlparse(full_url).netloc.lstrip("www.")
-                    if link_netloc == root_domain or link_netloc.endswith("." + root_domain):
-                        logger.debug(f"[NewsAgent] Found newsroom via homepage link: {a.get_text()[:30]}")
+                    if link_netloc == root_domain or link_netloc.endswith(
+                        "." + root_domain
+                    ):
+                        logger.debug(
+                            f"[NewsAgent] Found newsroom via homepage link: {a.get_text()[:30]}"
+                        )
                         return full_url
 
         # Strategy 3: Try remaining patterns (slower, more exhaustive)
-        logger.debug(f"[NewsAgent] Trying remaining {len(self.NEWSROOM_PATTERNS) - 15} patterns")
+        logger.debug(
+            f"[NewsAgent] Trying remaining {len(self.NEWSROOM_PATTERNS) - 15} patterns"
+        )
         for pattern in self.NEWSROOM_PATTERNS[15:]:
             url = base_url + pattern
             exists = await self.check_url_exists(url, timeout=10)
             if exists:
-                logger.debug(f"[NewsAgent] Found newsroom via extended pattern: {pattern}")
+                logger.debug(
+                    f"[NewsAgent] Found newsroom via extended pattern: {pattern}"
+                )
                 return url
 
         # Strategy 4: Try investor relations pages (often have leadership news)
@@ -446,11 +518,18 @@ class NewsAgent(BaseCollector):
             if exists:
                 # Check if IR page has news section
                 ir_html = await self.fetch_url(url)
-                if ir_html and any(kw in ir_html.lower() for kw in ['leadership', 'executive', 'management changes']):
-                    logger.debug(f"[NewsAgent] Found leadership content on investor relations page: {pattern}")
+                if ir_html and any(
+                    kw in ir_html.lower()
+                    for kw in ["leadership", "executive", "management changes"]
+                ):
+                    logger.debug(
+                        f"[NewsAgent] Found leadership content on investor relations page: {pattern}"
+                    )
                     return url
 
-        logger.debug(f"[NewsAgent] Exhausted all {checked_count + len(self.NEWSROOM_PATTERNS) - 15} patterns")
+        logger.debug(
+            f"[NewsAgent] Exhausted all {checked_count + len(self.NEWSROOM_PATTERNS) - 15} patterns"
+        )
         return None
 
     async def _collect_from_rss_feeds(
@@ -465,9 +544,9 @@ class NewsAgent(BaseCollector):
         urls_checked = []
 
         # Normalize URL
-        if not website_url.startswith('http'):
-            website_url = 'https://' + website_url
-        base_url = website_url.rstrip('/')
+        if not website_url.startswith("http"):
+            website_url = "https://" + website_url
+        base_url = website_url.rstrip("/")
 
         # Strategy 1: Try common RSS feed patterns (parallel probes)
         feed_url = None
@@ -486,14 +565,18 @@ class NewsAgent(BaseCollector):
         if not feed_url:
             homepage = await self.fetch_url(base_url)
             if homepage:
-                soup = BeautifulSoup(homepage, 'html.parser')
+                soup = BeautifulSoup(homepage, "html.parser")
 
                 # Look for RSS/Atom link tags
-                for link in soup.find_all('link', type=lambda t: t and ('rss' in t or 'atom' in t)):
-                    href = link.get('href')
+                for link in soup.find_all(
+                    "link", type=lambda t: t and ("rss" in t or "atom" in t)
+                ):
+                    href = link.get("href")
                     if href:
                         feed_url = urljoin(base_url, href)
-                        logger.debug(f"[NewsAgent] Found RSS feed via autodiscovery: {feed_url}")
+                        logger.debug(
+                            f"[NewsAgent] Found RSS feed via autodiscovery: {feed_url}"
+                        )
                         break
 
         if not feed_url:
@@ -511,19 +594,23 @@ class NewsAgent(BaseCollector):
                 return changes, urls_checked
 
             # Parse as XML
-            soup = BeautifulSoup(feed_content, 'xml')
+            soup = BeautifulSoup(feed_content, "xml")
 
             # Find items (RSS) or entries (Atom)
-            items = soup.find_all('item') or soup.find_all('entry')
+            items = soup.find_all("item") or soup.find_all("entry")
             logger.info(f"[NewsAgent] RSS feed has {len(items)} items")
 
             cutoff_date = date.today() - timedelta(days=days_back)
 
             for item in items[:20]:  # Check first 20 items
                 try:
-                    title_elem = item.find('title')
-                    link_elem = item.find('link')
-                    pub_date_elem = item.find('pubDate') or item.find('published') or item.find('updated')
+                    title_elem = item.find("title")
+                    link_elem = item.find("link")
+                    pub_date_elem = (
+                        item.find("pubDate")
+                        or item.find("published")
+                        or item.find("updated")
+                    )
 
                     if not title_elem:
                         continue
@@ -532,7 +619,7 @@ class NewsAgent(BaseCollector):
 
                     # Get link (RSS vs Atom format)
                     if link_elem:
-                        link = link_elem.get('href') or link_elem.get_text(strip=True)
+                        link = link_elem.get("href") or link_elem.get_text(strip=True)
                     else:
                         continue
 
@@ -547,7 +634,10 @@ class NewsAgent(BaseCollector):
                     if pub_date_elem:
                         try:
                             from dateutil import parser as date_parser
-                            pub_date = date_parser.parse(pub_date_elem.get_text()).date()
+
+                            pub_date = date_parser.parse(
+                                pub_date_elem.get_text()
+                            ).date()
                             if pub_date < cutoff_date:
                                 continue
                         except Exception:
@@ -572,7 +662,9 @@ class NewsAgent(BaseCollector):
 
                     parse_result = await self.parser.parse(pr)
                     if parse_result.changes:
-                        logger.info(f"[NewsAgent] RSS: Extracted {len(parse_result.changes)} changes from: {title[:50]}")
+                        logger.info(
+                            f"[NewsAgent] RSS: Extracted {len(parse_result.changes)} changes from: {title[:50]}"
+                        )
                     changes.extend(parse_result.changes)
 
                 except Exception as e:
@@ -590,30 +682,38 @@ class NewsAgent(BaseCollector):
         days_back: int,
     ) -> List[Dict[str, Any]]:
         """Extract press release links from newsroom page."""
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, "html.parser")
         releases = []
 
         cutoff_date = date.today() - timedelta(days=days_back)
 
         # Common press release container patterns
-        containers = soup.find_all(['article', 'div', 'li'], class_=lambda x: x and any(
-            kw in str(x).lower() for kw in ['press', 'news', 'release', 'article', 'post']
-        ))
+        containers = soup.find_all(
+            ["article", "div", "li"],
+            class_=lambda x: x
+            and any(
+                kw in str(x).lower()
+                for kw in ["press", "news", "release", "article", "post"]
+            ),
+        )
 
         if not containers:
             # Fall back to all links
             containers = [soup]
 
         for container in containers[:50]:  # Limit containers
-            for a in container.find_all('a', href=True):
-                href = a['href']
+            for a in container.find_all("a", href=True):
+                href = a["href"]
                 title = a.get_text(strip=True)
 
                 if not title or len(title) < 10:
                     continue
 
                 # Skip navigation links
-                if any(skip in title.lower() for skip in ['read more', 'learn more', 'view all', 'see all']):
+                if any(
+                    skip in title.lower()
+                    for skip in ["read more", "learn more", "view all", "see all"]
+                ):
                     continue
 
                 full_url = urljoin(base_url, href)
@@ -625,18 +725,20 @@ class NewsAgent(BaseCollector):
                 if pr_date and pr_date < cutoff_date:
                     continue
 
-                releases.append({
-                    'url': full_url,
-                    'title': title,
-                    'date': pr_date,
-                })
+                releases.append(
+                    {
+                        "url": full_url,
+                        "title": title,
+                        "date": pr_date,
+                    }
+                )
 
         # Dedupe by URL
         seen_urls = set()
         unique = []
         for pr in releases:
-            if pr['url'] not in seen_urls:
-                seen_urls.add(pr['url'])
+            if pr["url"] not in seen_urls:
+                seen_urls.add(pr["url"])
                 unique.append(pr)
 
         return unique
@@ -652,9 +754,9 @@ class NewsAgent(BaseCollector):
 
         # Common date patterns
         patterns = [
-            r'(\w+\s+\d{1,2},?\s+\d{4})',  # January 15, 2024
-            r'(\d{1,2}/\d{1,2}/\d{4})',      # 01/15/2024
-            r'(\d{4}-\d{2}-\d{2})',           # 2024-01-15
+            r"(\w+\s+\d{1,2},?\s+\d{4})",  # January 15, 2024
+            r"(\d{1,2}/\d{1,2}/\d{4})",  # 01/15/2024
+            r"(\d{4}-\d{2}-\d{2})",  # 2024-01-15
         ]
 
         for pattern in patterns:
@@ -662,6 +764,7 @@ class NewsAgent(BaseCollector):
             if match:
                 try:
                     from dateutil import parser as date_parser
+
                     return date_parser.parse(match.group(1)).date()
                 except (ValueError, TypeError):
                     pass
@@ -701,7 +804,9 @@ class NewsAgent(BaseCollector):
         for query in queries[:3]:  # Limit to 3 queries to avoid rate limits
             try:
                 encoded_query = quote_plus(query)
-                rss_url = f"https://www.bing.com/news/search?q={encoded_query}&format=rss"
+                rss_url = (
+                    f"https://www.bing.com/news/search?q={encoded_query}&format=rss"
+                )
 
                 logger.debug(f"[NewsAgent] Bing News query: {query[:50]}")
                 result.pages_checked += 1
@@ -712,16 +817,18 @@ class NewsAgent(BaseCollector):
                     continue
 
                 # Parse RSS
-                soup = BeautifulSoup(content, 'xml')
-                items = soup.find_all('item')
+                soup = BeautifulSoup(content, "xml")
+                items = soup.find_all("item")
 
-                logger.debug(f"[NewsAgent] Bing News returned {len(items)} items for query")
+                logger.debug(
+                    f"[NewsAgent] Bing News returned {len(items)} items for query"
+                )
 
                 for item in items[:7]:  # Check first 7 results per query
                     try:
-                        title_elem = item.find('title')
-                        link_elem = item.find('link')
-                        pub_date_elem = item.find('pubDate')
+                        title_elem = item.find("title")
+                        link_elem = item.find("link")
+                        pub_date_elem = item.find("pubDate")
 
                         if not title_elem or not link_elem:
                             continue
@@ -737,16 +844,23 @@ class NewsAgent(BaseCollector):
                         articles_found += 1
 
                         logger.info(f"[NewsAgent] Bing News article: {title_text[:50]}")
-                        logger.info(f"[NewsAgent] Article URL: {link_url[:80] if link_url else 'none'}")
+                        logger.info(
+                            f"[NewsAgent] Article URL: {link_url[:80] if link_url else 'none'}"
+                        )
 
                         # Parse date if available
                         pub_date = None
                         if pub_date_elem:
                             try:
                                 from dateutil import parser as date_parser
-                                pub_date = date_parser.parse(pub_date_elem.get_text()).date()
+
+                                pub_date = date_parser.parse(
+                                    pub_date_elem.get_text()
+                                ).date()
                                 if pub_date < cutoff_date:
-                                    logger.debug(f"[NewsAgent] Skipping old article: {pub_date}")
+                                    logger.debug(
+                                        f"[NewsAgent] Skipping old article: {pub_date}"
+                                    )
                                     continue
                             except Exception:
                                 pass
@@ -762,8 +876,12 @@ class NewsAgent(BaseCollector):
                         should_parse = is_pr_service or articles_parsed < 5
 
                         if should_parse and link_url:
-                            source_type = "pr_service" if is_pr_service else "news_article"
-                            logger.info(f"[NewsAgent] Fetching {source_type}: {link_url[:60]}")
+                            source_type = (
+                                "pr_service" if is_pr_service else "news_article"
+                            )
+                            logger.info(
+                                f"[NewsAgent] Fetching {source_type}: {link_url[:60]}"
+                            )
                             result.pages_checked += 1
                             result.page_urls.append(link_url)
 
@@ -788,10 +906,14 @@ class NewsAgent(BaseCollector):
                                     )
                                 changes.extend(parse_result.changes)
                         else:
-                            logger.debug(f"[NewsAgent] Skipping (limit reached): {link_url[:50]}")
+                            logger.debug(
+                                f"[NewsAgent] Skipping (limit reached): {link_url[:50]}"
+                            )
 
                     except Exception as e:
-                        logger.debug(f"[NewsAgent] Error processing Bing News item: {e}")
+                        logger.debug(
+                            f"[NewsAgent] Error processing Bing News item: {e}"
+                        )
 
             except Exception as e:
                 logger.warning(f"[NewsAgent] Bing News search error: {e}")
@@ -830,26 +952,30 @@ class NewsAgent(BaseCollector):
 
             if html:
                 pr_links = self._extract_pr_newswire_links(html, days_back)
-                logger.info(f"[NewsAgent] PR Newswire: Found {len(pr_links)} potential releases")
+                logger.info(
+                    f"[NewsAgent] PR Newswire: Found {len(pr_links)} potential releases"
+                )
 
                 for pr_info in pr_links[:5]:  # Limit to 5
-                    if self._is_leadership_related(pr_info['title']):
+                    if self._is_leadership_related(pr_info["title"]):
                         result.pages_checked += 1
-                        result.page_urls.append(pr_info['url'])
+                        result.page_urls.append(pr_info["url"])
 
-                        pr_html = await self.fetch_url(pr_info['url'])
+                        pr_html = await self.fetch_url(pr_info["url"])
                         if pr_html:
                             pr = PressRelease(
-                                title=pr_info['title'],
+                                title=pr_info["title"],
                                 content=pr_html,
-                                publish_date=pr_info.get('date'),
-                                source_url=pr_info['url'],
+                                publish_date=pr_info.get("date"),
+                                source_url=pr_info["url"],
                                 company_name=company_name,
                                 source_type="prnewswire",
                             )
                             parse_result = await self.parser.parse(pr)
                             if parse_result.changes:
-                                logger.info(f"[NewsAgent] PR Newswire: {len(parse_result.changes)} changes from {pr_info['title'][:40]}")
+                                logger.info(
+                                    f"[NewsAgent] PR Newswire: {len(parse_result.changes)} changes from {pr_info['title'][:40]}"
+                                )
                             changes.extend(parse_result.changes)
         except Exception as e:
             logger.debug(f"[NewsAgent] PR Newswire search error: {e}")
@@ -864,26 +990,30 @@ class NewsAgent(BaseCollector):
 
             if html:
                 bw_links = self._extract_business_wire_links(html, days_back)
-                logger.info(f"[NewsAgent] Business Wire: Found {len(bw_links)} potential releases")
+                logger.info(
+                    f"[NewsAgent] Business Wire: Found {len(bw_links)} potential releases"
+                )
 
                 for pr_info in bw_links[:5]:
-                    if self._is_leadership_related(pr_info['title']):
+                    if self._is_leadership_related(pr_info["title"]):
                         result.pages_checked += 1
-                        result.page_urls.append(pr_info['url'])
+                        result.page_urls.append(pr_info["url"])
 
-                        pr_html = await self.fetch_url(pr_info['url'])
+                        pr_html = await self.fetch_url(pr_info["url"])
                         if pr_html:
                             pr = PressRelease(
-                                title=pr_info['title'],
+                                title=pr_info["title"],
                                 content=pr_html,
-                                publish_date=pr_info.get('date'),
-                                source_url=pr_info['url'],
+                                publish_date=pr_info.get("date"),
+                                source_url=pr_info["url"],
                                 company_name=company_name,
                                 source_type="businesswire",
                             )
                             parse_result = await self.parser.parse(pr)
                             if parse_result.changes:
-                                logger.info(f"[NewsAgent] Business Wire: {len(parse_result.changes)} changes from {pr_info['title'][:40]}")
+                                logger.info(
+                                    f"[NewsAgent] Business Wire: {len(parse_result.changes)} changes from {pr_info['title'][:40]}"
+                                )
                             changes.extend(parse_result.changes)
         except Exception as e:
             logger.debug(f"[NewsAgent] Business Wire search error: {e}")
@@ -898,26 +1028,30 @@ class NewsAgent(BaseCollector):
 
             if html:
                 globe_links = self._extract_globenewswire_links(html, days_back)
-                logger.info(f"[NewsAgent] GlobeNewswire: Found {len(globe_links)} potential releases")
+                logger.info(
+                    f"[NewsAgent] GlobeNewswire: Found {len(globe_links)} potential releases"
+                )
 
                 for pr_info in globe_links[:5]:
-                    if self._is_leadership_related(pr_info['title']):
+                    if self._is_leadership_related(pr_info["title"]):
                         result.pages_checked += 1
-                        result.page_urls.append(pr_info['url'])
+                        result.page_urls.append(pr_info["url"])
 
-                        pr_html = await self.fetch_url(pr_info['url'])
+                        pr_html = await self.fetch_url(pr_info["url"])
                         if pr_html:
                             pr = PressRelease(
-                                title=pr_info['title'],
+                                title=pr_info["title"],
                                 content=pr_html,
-                                publish_date=pr_info.get('date'),
-                                source_url=pr_info['url'],
+                                publish_date=pr_info.get("date"),
+                                source_url=pr_info["url"],
                                 company_name=company_name,
                                 source_type="globenewswire",
                             )
                             parse_result = await self.parser.parse(pr)
                             if parse_result.changes:
-                                logger.info(f"[NewsAgent] GlobeNewswire: {len(parse_result.changes)} changes")
+                                logger.info(
+                                    f"[NewsAgent] GlobeNewswire: {len(parse_result.changes)} changes"
+                                )
                             changes.extend(parse_result.changes)
         except Exception as e:
             logger.debug(f"[NewsAgent] GlobeNewswire search error: {e}")
@@ -949,16 +1083,16 @@ class NewsAgent(BaseCollector):
             content = await self.fetch_url(yahoo_rss)
 
             if content:
-                soup = BeautifulSoup(content, 'xml')
-                items = soup.find_all('item')
+                soup = BeautifulSoup(content, "xml")
+                items = soup.find_all("item")
 
                 leadership_items = 0
                 cutoff_date = date.today() - timedelta(days=days_back)
 
                 for item in items[:10]:
-                    title_elem = item.find('title')
-                    link_elem = item.find('link')
-                    pub_date_elem = item.find('pubDate')
+                    title_elem = item.find("title")
+                    link_elem = item.find("link")
+                    pub_date_elem = item.find("pubDate")
 
                     if not title_elem:
                         continue
@@ -972,14 +1106,19 @@ class NewsAgent(BaseCollector):
                         if link_elem:
                             link = link_elem.get_text(strip=True)
                             result.page_urls.append(link)
-                            logger.debug(f"[NewsAgent] Yahoo Finance match: {title[:50]}")
+                            logger.debug(
+                                f"[NewsAgent] Yahoo Finance match: {title[:50]}"
+                            )
 
                             # Parse date
                             pub_date = None
                             if pub_date_elem:
                                 try:
                                     from dateutil import parser as date_parser
-                                    pub_date = date_parser.parse(pub_date_elem.get_text()).date()
+
+                                    pub_date = date_parser.parse(
+                                        pub_date_elem.get_text()
+                                    ).date()
                                     if pub_date < cutoff_date:
                                         continue
                                 except Exception:
@@ -1000,7 +1139,9 @@ class NewsAgent(BaseCollector):
                                 parse_result = await self.parser.parse(pr)
                                 changes.extend(parse_result.changes)
 
-                logger.info(f"[NewsAgent] Yahoo Finance: {leadership_items} leadership items found")
+                logger.info(
+                    f"[NewsAgent] Yahoo Finance: {leadership_items} leadership items found"
+                )
         except Exception as e:
             logger.debug(f"[NewsAgent] Yahoo Finance search error: {e}")
 
@@ -1017,19 +1158,21 @@ class NewsAgent(BaseCollector):
                 logger.info(f"[NewsAgent] MarketWatch: Found {len(mw_links)} results")
 
                 for article in mw_links[:3]:
-                    if self._is_leadership_related(article['title']):
-                        logger.debug(f"[NewsAgent] MarketWatch match: {article['title'][:50]}")
-                        result.page_urls.append(article['url'])
+                    if self._is_leadership_related(article["title"]):
+                        logger.debug(
+                            f"[NewsAgent] MarketWatch match: {article['title'][:50]}"
+                        )
+                        result.page_urls.append(article["url"])
 
                         # Fetch and parse the article
                         result.pages_checked += 1
-                        article_html = await self.fetch_url(article['url'])
+                        article_html = await self.fetch_url(article["url"])
                         if article_html:
                             pr = PressRelease(
-                                title=article['title'],
+                                title=article["title"],
                                 content=article_html,
-                                publish_date=article.get('date'),
-                                source_url=article['url'],
+                                publish_date=article.get("date"),
+                                source_url=article["url"],
                                 company_name=company_name,
                                 source_type="marketwatch",
                             )
@@ -1044,18 +1187,33 @@ class NewsAgent(BaseCollector):
         """Normalize company name for search queries."""
         # Remove common suffixes
         suffixes = [
-            ', Inc.', ', Inc', ' Inc.', ' Inc',
-            ', Corp.', ', Corp', ' Corp.', ' Corp',
-            ', LLC', ' LLC',
-            ', Ltd.', ', Ltd', ' Ltd.', ' Ltd',
-            ', Co.', ', Co', ' Co.', ' Co',
-            ' Company', ' Corporation', ' International',
+            ", Inc.",
+            ", Inc",
+            " Inc.",
+            " Inc",
+            ", Corp.",
+            ", Corp",
+            " Corp.",
+            " Corp",
+            ", LLC",
+            " LLC",
+            ", Ltd.",
+            ", Ltd",
+            " Ltd.",
+            " Ltd",
+            ", Co.",
+            ", Co",
+            " Co.",
+            " Co",
+            " Company",
+            " Corporation",
+            " International",
         ]
 
         name = company_name
         for suffix in suffixes:
             if name.endswith(suffix):
-                name = name[:-len(suffix)]
+                name = name[: -len(suffix)]
                 break
 
         return name.strip()
@@ -1066,23 +1224,27 @@ class NewsAgent(BaseCollector):
         days_back: int,
     ) -> List[Dict[str, Any]]:
         """Extract press release links from PR Newswire search results."""
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, "html.parser")
         releases = []
 
         # PR Newswire uses specific card structure
-        for card in soup.find_all(['div', 'article'], class_=lambda x: x and 'card' in str(x).lower()):
-            link = card.find('a', href=True)
+        for card in soup.find_all(
+            ["div", "article"], class_=lambda x: x and "card" in str(x).lower()
+        ):
+            link = card.find("a", href=True)
             if link:
-                href = link.get('href', '')
+                href = link.get("href", "")
                 title = link.get_text(strip=True)
 
-                if href and title and '/news-releases/' in href:
-                    full_url = urljoin('https://www.prnewswire.com', href)
-                    releases.append({
-                        'url': full_url,
-                        'title': title,
-                        'date': None,
-                    })
+                if href and title and "/news-releases/" in href:
+                    full_url = urljoin("https://www.prnewswire.com", href)
+                    releases.append(
+                        {
+                            "url": full_url,
+                            "title": title,
+                            "date": None,
+                        }
+                    )
 
         return releases[:10]
 
@@ -1092,22 +1254,28 @@ class NewsAgent(BaseCollector):
         days_back: int,
     ) -> List[Dict[str, Any]]:
         """Extract press release links from Business Wire search results."""
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, "html.parser")
         releases = []
 
-        for item in soup.find_all(['div', 'li'], class_=lambda x: x and any(kw in str(x).lower() for kw in ['result', 'news', 'headline'])):
-            link = item.find('a', href=True)
+        for item in soup.find_all(
+            ["div", "li"],
+            class_=lambda x: x
+            and any(kw in str(x).lower() for kw in ["result", "news", "headline"]),
+        ):
+            link = item.find("a", href=True)
             if link:
-                href = link.get('href', '')
+                href = link.get("href", "")
                 title = link.get_text(strip=True)
 
                 if href and title:
-                    full_url = urljoin('https://www.businesswire.com', href)
-                    releases.append({
-                        'url': full_url,
-                        'title': title,
-                        'date': None,
-                    })
+                    full_url = urljoin("https://www.businesswire.com", href)
+                    releases.append(
+                        {
+                            "url": full_url,
+                            "title": title,
+                            "date": None,
+                        }
+                    )
 
         return releases[:10]
 
@@ -1117,22 +1285,26 @@ class NewsAgent(BaseCollector):
         days_back: int,
     ) -> List[Dict[str, Any]]:
         """Extract press release links from GlobeNewswire search results."""
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, "html.parser")
         releases = []
 
-        for item in soup.find_all(['div', 'article'], class_=lambda x: x and 'article' in str(x).lower()):
-            link = item.find('a', href=True)
+        for item in soup.find_all(
+            ["div", "article"], class_=lambda x: x and "article" in str(x).lower()
+        ):
+            link = item.find("a", href=True)
             if link:
-                href = link.get('href', '')
+                href = link.get("href", "")
                 title = link.get_text(strip=True)
 
-                if href and title and '/news-release/' in href:
-                    full_url = urljoin('https://www.globenewswire.com', href)
-                    releases.append({
-                        'url': full_url,
-                        'title': title,
-                        'date': None,
-                    })
+                if href and title and "/news-release/" in href:
+                    full_url = urljoin("https://www.globenewswire.com", href)
+                    releases.append(
+                        {
+                            "url": full_url,
+                            "title": title,
+                            "date": None,
+                        }
+                    )
 
         return releases[:10]
 
@@ -1142,21 +1314,25 @@ class NewsAgent(BaseCollector):
         days_back: int,
     ) -> List[Dict[str, Any]]:
         """Extract article links from MarketWatch search results."""
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, "html.parser")
         articles = []
 
-        for item in soup.find_all(['div', 'article'], class_=lambda x: x and 'article' in str(x).lower()):
-            link = item.find('a', href=True)
+        for item in soup.find_all(
+            ["div", "article"], class_=lambda x: x and "article" in str(x).lower()
+        ):
+            link = item.find("a", href=True)
             if link:
-                href = link.get('href', '')
+                href = link.get("href", "")
                 title = link.get_text(strip=True)
 
                 if href and title:
-                    articles.append({
-                        'url': href,
-                        'title': title,
-                        'date': None,
-                    })
+                    articles.append(
+                        {
+                            "url": href,
+                            "title": title,
+                            "date": None,
+                        }
+                    )
 
         return articles[:10]
 
@@ -1172,7 +1348,9 @@ class NewsAgent(BaseCollector):
             # Create key for comparison
             key = (
                 change.person_name.lower(),
-                change.change_type.value if hasattr(change.change_type, 'value') else str(change.change_type),
+                change.change_type.value
+                if hasattr(change.change_type, "value")
+                else str(change.change_type),
             )
 
             if key not in seen:
@@ -1184,9 +1362,10 @@ class NewsAgent(BaseCollector):
     def _finalize_result(self, result: CollectionResult) -> CollectionResult:
         """Finalize collection result with timing."""
         result.completed_at = datetime.utcnow()
-        result.duration_seconds = (result.completed_at - result.started_at).total_seconds()
+        result.duration_seconds = (
+            result.completed_at - result.started_at
+        ).total_seconds()
         return result
-
 
     async def deep_collect(
         self,
@@ -1235,7 +1414,10 @@ class NewsAgent(BaseCollector):
         try:
             # 1. Standard collection first
             standard_result = await self.collect(
-                company_id, company_name, website_url, days_back=min(days_back, 365),
+                company_id,
+                company_name,
+                website_url,
+                days_back=min(days_back, 365),
                 include_google_news=True,
                 newsroom_url=newsroom_url,
             )
@@ -1257,15 +1439,22 @@ class NewsAgent(BaseCollector):
                 for query in search_queries:
                     try:
                         changes = await self._search_bing_news_query(
-                            query, company_name, days_back,
-                            max_results=max_results_per_query, result=result,
+                            query,
+                            company_name,
+                            days_back,
+                            max_results=max_results_per_query,
+                            result=result,
                         )
                         all_changes.extend(changes)
                     except Exception as e:
-                        logger.debug(f"[NewsAgent] Query failed for '{query[:40]}': {e}")
+                        logger.debug(
+                            f"[NewsAgent] Query failed for '{query[:40]}': {e}"
+                        )
 
             # 2b. Search PR services for each subsidiary name
-            for name in all_names[1:]:  # Skip main name (already searched in standard collect)
+            for name in all_names[
+                1:
+            ]:  # Skip main name (already searched in standard collect)
                 try:
                     pr_changes = await self._search_pr_services(name, days_back, result)
                     all_changes.extend(pr_changes)
@@ -1276,7 +1465,10 @@ class NewsAgent(BaseCollector):
             if newsroom_url:
                 logger.info(f"[NewsAgent] Crawling newsroom archive: {newsroom_url}")
                 archive_changes = await self._crawl_newsroom_archive(
-                    newsroom_url, company_name, days_back, result,
+                    newsroom_url,
+                    company_name,
+                    days_back,
+                    result,
                 )
                 all_changes.extend(archive_changes)
 
@@ -1293,7 +1485,9 @@ class NewsAgent(BaseCollector):
             )
 
         except Exception as e:
-            logger.exception(f"[NewsAgent] Deep collection error for {company_name}: {e}")
+            logger.exception(
+                f"[NewsAgent] Deep collection error for {company_name}: {e}"
+            )
             result.errors.append(str(e))
             result.success = False
 
@@ -1319,14 +1513,14 @@ class NewsAgent(BaseCollector):
         if not content:
             return changes
 
-        soup = BeautifulSoup(content, 'xml')
-        items = soup.find_all('item')
+        soup = BeautifulSoup(content, "xml")
+        items = soup.find_all("item")
 
         for item in items[:max_results]:
             try:
-                title_elem = item.find('title')
-                link_elem = item.find('link')
-                pub_date_elem = item.find('pubDate')
+                title_elem = item.find("title")
+                link_elem = item.find("link")
+                pub_date_elem = item.find("pubDate")
 
                 if not title_elem or not link_elem:
                     continue
@@ -1343,6 +1537,7 @@ class NewsAgent(BaseCollector):
                 if pub_date_elem:
                     try:
                         from dateutil import parser as date_parser
+
                         pub_date = date_parser.parse(pub_date_elem.get_text()).date()
                         if pub_date < cutoff_date:
                             continue
@@ -1392,9 +1587,9 @@ class NewsAgent(BaseCollector):
         cutoff_date = date.today() - timedelta(days=days_back)
 
         # Normalize URL
-        if not newsroom_url.startswith('http'):
-            newsroom_url = 'https://' + newsroom_url
-        base_url = newsroom_url.rstrip('/')
+        if not newsroom_url.startswith("http"):
+            newsroom_url = "https://" + newsroom_url
+        base_url = newsroom_url.rstrip("/")
 
         # Try to find pagination pattern
         page_urls = [base_url]
@@ -1425,22 +1620,23 @@ class NewsAgent(BaseCollector):
 
                 # Filter to leadership-related
                 leadership_releases = [
-                    pr for pr in press_releases
-                    if self._is_leadership_related(pr['title'])
+                    pr
+                    for pr in press_releases
+                    if self._is_leadership_related(pr["title"])
                 ]
 
                 for pr_info in leadership_releases[:10]:
                     try:
                         result.pages_checked += 1
-                        pr_html = await self.fetch_url(pr_info['url'])
+                        pr_html = await self.fetch_url(pr_info["url"])
                         if not pr_html:
                             continue
 
                         pr = PressRelease(
-                            title=pr_info['title'],
+                            title=pr_info["title"],
                             content=pr_html,
-                            publish_date=pr_info.get('date'),
-                            source_url=pr_info['url'],
+                            publish_date=pr_info.get("date"),
+                            source_url=pr_info["url"],
                             company_name=company_name,
                             source_type="newsroom_archive",
                         )

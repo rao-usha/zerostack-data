@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Watchlist:
     """Watchlist data model."""
+
     id: int
     user_id: str
     name: str
@@ -37,6 +38,7 @@ class Watchlist:
 @dataclass
 class WatchlistItem:
     """Watchlist item data model."""
+
     id: int
     watchlist_id: int
     entity_type: str
@@ -50,6 +52,7 @@ class WatchlistItem:
 @dataclass
 class SavedSearch:
     """Saved search data model."""
+
     id: int
     user_id: str
     name: str
@@ -157,13 +160,13 @@ class WatchlistService:
         """Create tables, indexes, and triggers if they don't exist."""
         try:
             # Create tables
-            for statement in SCHEMA_SQL.split(';'):
+            for statement in SCHEMA_SQL.split(";"):
                 statement = statement.strip()
                 if statement:
                     self.db.execute(text(statement))
 
             # Create indexes
-            for statement in INDEX_SQL.split(';'):
+            for statement in INDEX_SQL.split(";"):
                 statement = statement.strip()
                 if statement:
                     self.db.execute(text(statement))
@@ -182,10 +185,7 @@ class WatchlistService:
     # =========================================================================
 
     def create_watchlist(
-        self,
-        user_id: str,
-        name: str,
-        description: Optional[str] = None
+        self, user_id: str, name: str, description: Optional[str] = None
     ) -> Watchlist:
         """Create a new watchlist."""
         self.ensure_schema()
@@ -196,7 +196,7 @@ class WatchlistService:
                 VALUES (:user_id, :name, :description)
                 RETURNING id, user_id, name, description, is_public, item_count, created_at, updated_at
             """),
-            {"user_id": user_id, "name": name, "description": description}
+            {"user_id": user_id, "name": name, "description": description},
         )
         self.db.commit()
         row = result.fetchone()
@@ -209,7 +209,7 @@ class WatchlistService:
             is_public=row[4],
             item_count=row[5],
             created_at=row[6],
-            updated_at=row[7]
+            updated_at=row[7],
         )
 
     def get_watchlist(self, watchlist_id: int) -> Optional[Watchlist]:
@@ -221,7 +221,7 @@ class WatchlistService:
                 SELECT id, user_id, name, description, is_public, item_count, created_at, updated_at
                 FROM watchlists WHERE id = :id
             """),
-            {"id": watchlist_id}
+            {"id": watchlist_id},
         )
         row = result.fetchone()
 
@@ -236,7 +236,7 @@ class WatchlistService:
             is_public=row[4],
             item_count=row[5],
             created_at=row[6],
-            updated_at=row[7]
+            updated_at=row[7],
         )
 
     def list_watchlists(self, user_id: str) -> List[Watchlist]:
@@ -250,7 +250,7 @@ class WatchlistService:
                 WHERE user_id = :user_id
                 ORDER BY updated_at DESC
             """),
-            {"user_id": user_id}
+            {"user_id": user_id},
         )
 
         return [
@@ -262,7 +262,7 @@ class WatchlistService:
                 is_public=row[4],
                 item_count=row[5],
                 created_at=row[6],
-                updated_at=row[7]
+                updated_at=row[7],
             )
             for row in result.fetchall()
         ]
@@ -271,7 +271,7 @@ class WatchlistService:
         self,
         watchlist_id: int,
         name: Optional[str] = None,
-        description: Optional[str] = None
+        description: Optional[str] = None,
     ) -> Optional[Watchlist]:
         """Update a watchlist."""
         updates = []
@@ -296,7 +296,7 @@ class WatchlistService:
                 WHERE id = :id
                 RETURNING id, user_id, name, description, is_public, item_count, created_at, updated_at
             """),
-            params
+            params,
         )
         self.db.commit()
         row = result.fetchone()
@@ -312,14 +312,14 @@ class WatchlistService:
             is_public=row[4],
             item_count=row[5],
             created_at=row[6],
-            updated_at=row[7]
+            updated_at=row[7],
         )
 
     def delete_watchlist(self, watchlist_id: int) -> bool:
         """Delete a watchlist and all its items (cascade)."""
         result = self.db.execute(
             text("DELETE FROM watchlists WHERE id = :id RETURNING id"),
-            {"id": watchlist_id}
+            {"id": watchlist_id},
         )
         self.db.commit()
         return result.fetchone() is not None
@@ -336,27 +336,22 @@ class WatchlistService:
                     SELECT name, lp_type, jurisdiction
                     FROM lp_fund WHERE id = :id
                 """),
-                {"id": entity_id}
+                {"id": entity_id},
             )
             row = result.fetchone()
             if row:
-                return row[0], {
-                    "investor_type": row[1],
-                    "location": row[2]
-                }
+                return row[0], {"investor_type": row[1], "location": row[2]}
         elif entity_type == "company":
             result = self.db.execute(
                 text("""
                     SELECT company_name, company_industry
                     FROM portfolio_companies WHERE id = :id
                 """),
-                {"id": entity_id}
+                {"id": entity_id},
             )
             row = result.fetchone()
             if row:
-                return row[0], {
-                    "industry": row[1]
-                }
+                return row[0], {"industry": row[1]}
 
         return f"Unknown {entity_type} #{entity_id}", {}
 
@@ -365,7 +360,7 @@ class WatchlistService:
         watchlist_id: int,
         entity_type: str,
         entity_id: int,
-        note: Optional[str] = None
+        note: Optional[str] = None,
     ) -> Optional[WatchlistItem]:
         """Add an item to a watchlist."""
         try:
@@ -379,8 +374,8 @@ class WatchlistService:
                     "watchlist_id": watchlist_id,
                     "entity_type": entity_type,
                     "entity_id": entity_id,
-                    "note": note
-                }
+                    "note": note,
+                },
             )
             self.db.commit()
             row = result.fetchone()
@@ -388,7 +383,9 @@ class WatchlistService:
             if not row:
                 return None
 
-            entity_name, entity_details = self._resolve_entity_name(entity_type, entity_id)
+            entity_name, entity_details = self._resolve_entity_name(
+                entity_type, entity_id
+            )
 
             return WatchlistItem(
                 id=row[0],
@@ -398,25 +395,24 @@ class WatchlistService:
                 entity_name=entity_name,
                 entity_details=entity_details,
                 note=row[4],
-                added_at=row[5]
+                added_at=row[5],
             )
         except IntegrityError:
             self.db.rollback()
             return None  # Duplicate or invalid watchlist_id
 
     def list_items(
-        self,
-        watchlist_id: int,
-        page: int = 1,
-        page_size: int = 50
+        self, watchlist_id: int, page: int = 1, page_size: int = 50
     ) -> tuple:
         """List items in a watchlist with pagination."""
         offset = (page - 1) * page_size
 
         # Get total count
         count_result = self.db.execute(
-            text("SELECT COUNT(*) FROM watchlist_items WHERE watchlist_id = :watchlist_id"),
-            {"watchlist_id": watchlist_id}
+            text(
+                "SELECT COUNT(*) FROM watchlist_items WHERE watchlist_id = :watchlist_id"
+            ),
+            {"watchlist_id": watchlist_id},
         )
         total = count_result.scalar() or 0
 
@@ -429,22 +425,24 @@ class WatchlistService:
                 ORDER BY added_at DESC
                 LIMIT :limit OFFSET :offset
             """),
-            {"watchlist_id": watchlist_id, "limit": page_size, "offset": offset}
+            {"watchlist_id": watchlist_id, "limit": page_size, "offset": offset},
         )
 
         items = []
         for row in result.fetchall():
             entity_name, entity_details = self._resolve_entity_name(row[2], row[3])
-            items.append(WatchlistItem(
-                id=row[0],
-                watchlist_id=row[1],
-                entity_type=row[2],
-                entity_id=row[3],
-                entity_name=entity_name,
-                entity_details=entity_details,
-                note=row[4],
-                added_at=row[5]
-            ))
+            items.append(
+                WatchlistItem(
+                    id=row[0],
+                    watchlist_id=row[1],
+                    entity_type=row[2],
+                    entity_id=row[3],
+                    entity_name=entity_name,
+                    entity_details=entity_details,
+                    note=row[4],
+                    added_at=row[5],
+                )
+            )
 
         return items, total
 
@@ -456,16 +454,13 @@ class WatchlistService:
                 WHERE id = :item_id AND watchlist_id = :watchlist_id
                 RETURNING id
             """),
-            {"item_id": item_id, "watchlist_id": watchlist_id}
+            {"item_id": item_id, "watchlist_id": watchlist_id},
         )
         self.db.commit()
         return result.fetchone() is not None
 
     def remove_item_by_entity(
-        self,
-        watchlist_id: int,
-        entity_type: str,
-        entity_id: int
+        self, watchlist_id: int, entity_type: str, entity_id: int
     ) -> bool:
         """Remove an item by entity type and ID."""
         result = self.db.execute(
@@ -479,8 +474,8 @@ class WatchlistService:
             {
                 "watchlist_id": watchlist_id,
                 "entity_type": entity_type,
-                "entity_id": entity_id
-            }
+                "entity_id": entity_id,
+            },
         )
         self.db.commit()
         return result.fetchone() is not None
@@ -494,12 +489,13 @@ class WatchlistService:
         user_id: str,
         name: str,
         query: Optional[str] = None,
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
     ) -> SavedSearch:
         """Create a new saved search."""
         self.ensure_schema()
 
         import json
+
         filters_json = json.dumps(filters or {})
 
         result = self.db.execute(
@@ -513,8 +509,8 @@ class WatchlistService:
                 "user_id": user_id,
                 "name": name,
                 "query": query or "",
-                "filters": filters_json
-            }
+                "filters": filters_json,
+            },
         )
         self.db.commit()
         row = result.fetchone()
@@ -528,7 +524,7 @@ class WatchlistService:
             execution_count=row[5],
             last_executed_at=row[6],
             created_at=row[7],
-            updated_at=row[8]
+            updated_at=row[8],
         )
 
     def get_saved_search(self, search_id: int) -> Optional[SavedSearch]:
@@ -541,7 +537,7 @@ class WatchlistService:
                        last_executed_at, created_at, updated_at
                 FROM saved_searches WHERE id = :id
             """),
-            {"id": search_id}
+            {"id": search_id},
         )
         row = result.fetchone()
 
@@ -557,13 +553,11 @@ class WatchlistService:
             execution_count=row[5],
             last_executed_at=row[6],
             created_at=row[7],
-            updated_at=row[8]
+            updated_at=row[8],
         )
 
     def list_saved_searches(
-        self,
-        user_id: str,
-        name_filter: Optional[str] = None
+        self, user_id: str, name_filter: Optional[str] = None
     ) -> List[SavedSearch]:
         """List saved searches for a user."""
         self.ensure_schema()
@@ -577,7 +571,7 @@ class WatchlistService:
                     WHERE user_id = :user_id AND name ILIKE :name_filter
                     ORDER BY updated_at DESC
                 """),
-                {"user_id": user_id, "name_filter": f"%{name_filter}%"}
+                {"user_id": user_id, "name_filter": f"%{name_filter}%"},
             )
         else:
             result = self.db.execute(
@@ -588,7 +582,7 @@ class WatchlistService:
                     WHERE user_id = :user_id
                     ORDER BY updated_at DESC
                 """),
-                {"user_id": user_id}
+                {"user_id": user_id},
             )
 
         return [
@@ -601,7 +595,7 @@ class WatchlistService:
                 execution_count=row[5],
                 last_executed_at=row[6],
                 created_at=row[7],
-                updated_at=row[8]
+                updated_at=row[8],
             )
             for row in result.fetchall()
         ]
@@ -611,7 +605,7 @@ class WatchlistService:
         search_id: int,
         name: Optional[str] = None,
         query: Optional[str] = None,
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
     ) -> Optional[SavedSearch]:
         """Update a saved search."""
         import json
@@ -642,7 +636,7 @@ class WatchlistService:
                 RETURNING id, user_id, name, query, filters, execution_count,
                           last_executed_at, created_at, updated_at
             """),
-            params
+            params,
         )
         self.db.commit()
         row = result.fetchone()
@@ -659,14 +653,14 @@ class WatchlistService:
             execution_count=row[5],
             last_executed_at=row[6],
             created_at=row[7],
-            updated_at=row[8]
+            updated_at=row[8],
         )
 
     def delete_saved_search(self, search_id: int) -> bool:
         """Delete a saved search."""
         result = self.db.execute(
             text("DELETE FROM saved_searches WHERE id = :id RETURNING id"),
-            {"id": search_id}
+            {"id": search_id},
         )
         self.db.commit()
         return result.fetchone() is not None
@@ -681,6 +675,6 @@ class WatchlistService:
                     updated_at = NOW()
                 WHERE id = :id
             """),
-            {"id": search_id}
+            {"id": search_id},
         )
         self.db.commit()

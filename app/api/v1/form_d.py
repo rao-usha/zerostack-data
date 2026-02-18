@@ -18,8 +18,10 @@ router = APIRouter(prefix="/form-d", tags=["form-d"])
 
 # Response Models
 
+
 class FilingSummary(BaseModel):
     """Brief filing information for search results."""
+
     accession_number: str
     cik: str
     submission_type: str
@@ -34,6 +36,7 @@ class FilingSummary(BaseModel):
 
 class SearchResponse(BaseModel):
     """Search results response."""
+
     total: int
     limit: int
     offset: int
@@ -42,6 +45,7 @@ class SearchResponse(BaseModel):
 
 class IssuerAddress(BaseModel):
     """Issuer address details."""
+
     street: Optional[str] = None
     city: Optional[str] = None
     state: Optional[str] = None
@@ -50,6 +54,7 @@ class IssuerAddress(BaseModel):
 
 class IssuerInfo(BaseModel):
     """Issuer information."""
+
     name: str
     address: IssuerAddress
     phone: Optional[str] = None
@@ -60,6 +65,7 @@ class IssuerInfo(BaseModel):
 
 class SecuritiesInfo(BaseModel):
     """Securities type information."""
+
     is_equity: bool = False
     is_debt: bool = False
     is_option: bool = False
@@ -68,6 +74,7 @@ class SecuritiesInfo(BaseModel):
 
 class AmountsInfo(BaseModel):
     """Offering amounts."""
+
     total_offering: Optional[int] = None
     amount_sold: Optional[int] = None
     remaining: Optional[int] = None
@@ -76,6 +83,7 @@ class AmountsInfo(BaseModel):
 
 class OfferingInfo(BaseModel):
     """Offering details."""
+
     exemptions: List[str] = []
     date_of_first_sale: Optional[str] = None
     more_than_one_year: bool = False
@@ -85,6 +93,7 @@ class OfferingInfo(BaseModel):
 
 class InvestorsInfo(BaseModel):
     """Investor breakdown."""
+
     total: Optional[int] = None
     accredited: Optional[int] = None
     non_accredited: Optional[int] = None
@@ -92,6 +101,7 @@ class InvestorsInfo(BaseModel):
 
 class RelatedPerson(BaseModel):
     """Related person info."""
+
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     relationship: List[str] = []
@@ -99,6 +109,7 @@ class RelatedPerson(BaseModel):
 
 class FilingDetail(BaseModel):
     """Full filing details."""
+
     accession_number: str
     cik: str
     submission_type: str
@@ -114,24 +125,28 @@ class FilingDetail(BaseModel):
 
 class IndustryCount(BaseModel):
     """Industry filing count."""
+
     industry: str
     count: int
 
 
 class ExemptionCount(BaseModel):
     """Exemption usage count."""
+
     exemption: str
     count: int
 
 
 class DateRange(BaseModel):
     """Date range."""
+
     earliest: Optional[str] = None
     latest: Optional[str] = None
 
 
 class StatsResponse(BaseModel):
     """Aggregate statistics."""
+
     total_filings: int
     unique_issuers: int
     total_offering_volume: Optional[int] = None
@@ -144,6 +159,7 @@ class StatsResponse(BaseModel):
 
 class IngestionResult(BaseModel):
     """Ingestion job result."""
+
     cik: str
     filings_found: int
     filings_ingested: int
@@ -153,6 +169,7 @@ class IngestionResult(BaseModel):
 
 class IngestionJobResponse(BaseModel):
     """Ingestion job response."""
+
     status: str
     message: str
     cik: Optional[str] = None
@@ -160,6 +177,7 @@ class IngestionJobResponse(BaseModel):
 
 
 # Endpoints
+
 
 @router.get(
     "/search",
@@ -181,7 +199,9 @@ def search_filings(
     industry: Optional[str] = Query(None, description="Industry group"),
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-    exemption: Optional[str] = Query(None, description="Exemption type (e.g., 'Rule 506(b)')"),
+    exemption: Optional[str] = Query(
+        None, description="Exemption type (e.g., 'Rule 506(b)')"
+    ),
     min_amount: Optional[int] = Query(None, description="Minimum offering amount"),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -197,7 +217,7 @@ def search_filings(
         exemption=exemption,
         min_amount=min_amount,
         limit=limit,
-        offset=offset
+        offset=offset,
     )
 
 
@@ -239,11 +259,7 @@ def get_recent_filings(
     start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
 
     service = FormDIngestionService(db)
-    return service.search_filings(
-        start_date=start_date,
-        end_date=end_date,
-        limit=limit
-    )
+    return service.search_filings(start_date=start_date, end_date=end_date, limit=limit)
 
 
 @router.get(
@@ -305,7 +321,7 @@ async def ingest_filings(
             "0001326801",  # Meta/Facebook
             "0001318605",  # Tesla
             "0001652044",  # Alphabet
-            "0001800",     # Abbott
+            "0001800",  # Abbott
             "0001467373",  # Airbnb
         ]
 
@@ -315,13 +331,15 @@ async def ingest_filings(
             result = await service.ingest_company_filings(cik)
             results.append(result)
         except Exception as e:
-            results.append({
-                "cik": cik,
-                "filings_found": 0,
-                "filings_ingested": 0,
-                "filings_skipped": 0,
-                "errors": [str(e)]
-            })
+            results.append(
+                {
+                    "cik": cik,
+                    "filings_found": 0,
+                    "filings_ingested": 0,
+                    "filings_skipped": 0,
+                    "errors": [str(e)],
+                }
+            )
 
     total_ingested = sum(r["filings_ingested"] for r in results)
     total_found = sum(r["filings_found"] for r in results)
@@ -329,7 +347,7 @@ async def ingest_filings(
     return {
         "status": "completed",
         "message": f"Ingested {total_ingested} filings from {len(ciks)} issuers ({total_found} found)",
-        "results": results
+        "results": results,
     }
 
 
@@ -356,8 +374,7 @@ def get_industries(
 
     return {
         "industries": [
-            {"name": r["industry_group"], "count": r["count"]}
-            for r in result
+            {"name": r["industry_group"], "count": r["count"]} for r in result
         ]
     }
 
@@ -383,8 +400,5 @@ def get_exemptions(
     result = db.execute(query).mappings().fetchall()
 
     return {
-        "exemptions": [
-            {"type": r["exemption"], "count": r["count"]}
-            for r in result
-        ]
+        "exemptions": [{"type": r["exemption"], "count": r["count"]} for r in result]
     }

@@ -20,6 +20,7 @@ Rate limits:
 API Key (REQUIRED):
 Get at: https://apikeys.datacommons.org
 """
+
 import logging
 from typing import Dict, List, Optional, Any
 
@@ -44,7 +45,7 @@ class DataCommonsClient(BaseAPIClient):
         api_key: Optional[str] = None,
         max_concurrency: int = 5,
         max_retries: int = 3,
-        backoff_factor: float = 2.0
+        backoff_factor: float = 2.0,
     ):
         """
         Initialize Data Commons API client.
@@ -64,7 +65,7 @@ class DataCommonsClient(BaseAPIClient):
             backoff_factor=backoff_factor,
             timeout=config.timeout_seconds,
             connect_timeout=config.connect_timeout_seconds,
-            rate_limit_interval=config.get_rate_limit_interval()
+            rate_limit_interval=config.get_rate_limit_interval(),
         )
 
     def _build_headers(self) -> Dict[str, str]:
@@ -78,23 +79,19 @@ class DataCommonsClient(BaseAPIClient):
 
     async def get_stat_var_info(self, stat_var: str) -> Dict[str, Any]:
         """Get information about a statistical variable."""
-        params = {
-            "nodes": stat_var,
-            "property": "<-"
-        }
-        return await self.get("node", params=params, resource_id=f"StatVarInfo:{stat_var}")
+        params = {"nodes": stat_var, "property": "<-"}
+        return await self.get(
+            "node", params=params, resource_id=f"StatVarInfo:{stat_var}"
+        )
 
     async def get_observation(
-        self,
-        variable: str,
-        entity: str,
-        date: Optional[str] = None
+        self, variable: str, entity: str, date: Optional[str] = None
     ) -> Dict[str, Any]:
         """Get observation data for a statistical variable at a specific entity."""
         body = {
             "variable": {"dcids": [variable]},
             "entity": {"dcids": [entity]},
-            "select": ["variable", "entity", "value", "date"]
+            "select": ["variable", "entity", "value", "date"],
         }
         if date:
             body["date"] = date
@@ -102,104 +99,83 @@ class DataCommonsClient(BaseAPIClient):
         return await self.post(
             "observation",
             json_body=body,
-            resource_id=f"Observation:{variable}:{entity}"
+            resource_id=f"Observation:{variable}:{entity}",
         )
 
     async def get_stat_all(
-        self,
-        places: List[str],
-        stat_vars: List[str]
+        self, places: List[str], stat_vars: List[str]
     ) -> Dict[str, Any]:
         """Get statistical data for multiple places and variables."""
         body = {
             "variable": {"dcids": stat_vars},
             "entity": {"dcids": places},
-            "select": ["variable", "entity", "value", "date"]
+            "select": ["variable", "entity", "value", "date"],
         }
 
         return await self.post(
             "observation",
             json_body=body,
-            resource_id=f"StatAll:{len(places)}places:{len(stat_vars)}vars"
+            resource_id=f"StatAll:{len(places)}places:{len(stat_vars)}vars",
         )
 
     # ========== Place/Entity Methods ==========
 
-    async def get_places_in(
-        self,
-        parent_place: str,
-        child_type: str
-    ) -> Dict[str, Any]:
+    async def get_places_in(self, parent_place: str, child_type: str) -> Dict[str, Any]:
         """Get child places within a parent place."""
         params = {
             "nodes": parent_place,
-            "property": f"<-containedInPlace+{{typeOf:{child_type}}}"
+            "property": f"<-containedInPlace+{{typeOf:{child_type}}}",
         }
 
         return await self.get(
-            "node",
-            params=params,
-            resource_id=f"PlacesIn:{parent_place}:{child_type}"
+            "node", params=params, resource_id=f"PlacesIn:{parent_place}:{child_type}"
         )
 
     async def get_place_info(self, place_dcid: str) -> Dict[str, Any]:
         """Get information about a place."""
-        params = {
-            "nodes": place_dcid,
-            "property": "->"
-        }
+        params = {"nodes": place_dcid, "property": "->"}
 
-        return await self.get("node", params=params, resource_id=f"PlaceInfo:{place_dcid}")
+        return await self.get(
+            "node", params=params, resource_id=f"PlaceInfo:{place_dcid}"
+        )
 
     async def search_places(
-        self,
-        query: str,
-        type_filter: Optional[str] = None
+        self, query: str, type_filter: Optional[str] = None
     ) -> Dict[str, Any]:
         """Search for places by name."""
-        params = {
-            "nodes": query,
-            "property": "<-description"
-        }
+        params = {"nodes": query, "property": "<-description"}
 
         if type_filter:
             params["property"] += f"{{typeOf:{type_filter}}}"
 
-        return await self.get("resolve", params=params, resource_id=f"SearchPlaces:{query}")
+        return await self.get(
+            "resolve", params=params, resource_id=f"SearchPlaces:{query}"
+        )
 
     # ========== Time Series Methods ==========
 
-    async def get_stat_series(
-        self,
-        place: str,
-        stat_var: str
-    ) -> Dict[str, Any]:
+    async def get_stat_series(self, place: str, stat_var: str) -> Dict[str, Any]:
         """Get time series data for a statistical variable."""
         body = {
             "variable": {"dcids": [stat_var]},
             "entity": {"dcids": [place]},
-            "select": ["variable", "entity", "value", "date"]
+            "select": ["variable", "entity", "value", "date"],
         }
 
         return await self.post(
-            "observation",
-            json_body=body,
-            resource_id=f"StatSeries:{place}:{stat_var}"
+            "observation", json_body=body, resource_id=f"StatSeries:{place}:{stat_var}"
         )
 
     # ========== Bulk Data Methods ==========
 
     async def bulk_observations(
-        self,
-        variables: List[str],
-        entities: List[str],
-        date: Optional[str] = None
+        self, variables: List[str], entities: List[str], date: Optional[str] = None
     ) -> Dict[str, Any]:
         """Bulk fetch observations for multiple variables and entities."""
         body = {
             "variable": {"dcids": variables},
             "entity": {"dcids": entities},
-            "select": ["variable", "entity", "value", "date"]
+            "select": ["variable", "entity", "value", "date"],
         }
 
         if date:
@@ -208,7 +184,7 @@ class DataCommonsClient(BaseAPIClient):
         return await self.post(
             "observation",
             json_body=body,
-            resource_id=f"BulkObs:{len(variables)}vars:{len(entities)}entities"
+            resource_id=f"BulkObs:{len(variables)}vars:{len(entities)}entities",
         )
 
     # ========== SPARQL Query Method ==========

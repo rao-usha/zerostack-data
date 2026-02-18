@@ -27,8 +27,10 @@ router = APIRouter(prefix="/people-reports", tags=["People Reports"])
 # Request Models
 # =============================================================================
 
+
 class ManagementAssessmentRequest(BaseModel):
     """Request to generate a management assessment report."""
+
     company_id: int
     include_bios: bool = Field(True, description="Include executive bios")
     include_experience: bool = Field(True, description="Include work experience")
@@ -37,17 +39,22 @@ class ManagementAssessmentRequest(BaseModel):
 
 class PeerComparisonRequest(BaseModel):
     """Request to generate a peer comparison report."""
+
     company_id: int
     peer_set_id: Optional[int] = Field(None, description="Use existing peer set")
-    peer_company_ids: Optional[List[int]] = Field(None, description="Or specify peer company IDs")
+    peer_company_ids: Optional[List[int]] = Field(
+        None, description="Or specify peer company IDs"
+    )
 
 
 # =============================================================================
 # Response Models
 # =============================================================================
 
+
 class ReportMetadata(BaseModel):
     """Report metadata."""
+
     report_type: str
     generated_at: str
     company_id: int
@@ -56,6 +63,7 @@ class ReportMetadata(BaseModel):
 
 class TeamSummary(BaseModel):
     """Team summary stats."""
+
     total_executives: int
     c_suite_count: int
     vp_count: int
@@ -65,6 +73,7 @@ class TeamSummary(BaseModel):
 
 class TeamMetrics(BaseModel):
     """Team-level metrics."""
+
     avg_c_suite_tenure_months: Optional[float] = None
     min_c_suite_tenure_months: Optional[int] = None
     max_c_suite_tenure_months: Optional[int] = None
@@ -78,6 +87,7 @@ class TeamMetrics(BaseModel):
 
 class ExecutiveProfile(BaseModel):
     """Executive profile in report."""
+
     name: str
     title: str
     title_normalized: Optional[str] = None
@@ -96,6 +106,7 @@ class ExecutiveProfile(BaseModel):
 
 class RecentChange(BaseModel):
     """Recent leadership change."""
+
     person_name: str
     change_type: str
     old_title: Optional[str] = None
@@ -105,6 +116,7 @@ class RecentChange(BaseModel):
 
 class ManagementAssessmentResponse(BaseModel):
     """Management assessment report response."""
+
     report_type: str
     generated_at: str
     company: dict
@@ -120,6 +132,7 @@ class ManagementAssessmentResponse(BaseModel):
 
 class CompanyMetrics(BaseModel):
     """Company leadership metrics."""
+
     company_id: int
     company_name: str
     total_executives: int
@@ -132,6 +145,7 @@ class CompanyMetrics(BaseModel):
 
 class PeerAverages(BaseModel):
     """Peer group averages."""
+
     total_executives: Optional[float] = None
     c_suite_count: Optional[float] = None
     vp_count: Optional[float] = None
@@ -142,6 +156,7 @@ class PeerAverages(BaseModel):
 
 class ComparisonInsight(BaseModel):
     """Comparison insight."""
+
     metric: str
     insight: str
     diff: Optional[float] = None
@@ -150,12 +165,14 @@ class ComparisonInsight(BaseModel):
 
 class Comparison(BaseModel):
     """Comparison results."""
+
     insights: List[ComparisonInsight]
     metrics_vs_peer_avg: dict
 
 
 class PeerComparisonResponse(BaseModel):
     """Peer comparison report response."""
+
     report_type: str
     generated_at: str
     target_company: dict
@@ -167,6 +184,7 @@ class PeerComparisonResponse(BaseModel):
 # =============================================================================
 # Endpoints
 # =============================================================================
+
 
 @router.post("/management-assessment", response_model=ManagementAssessmentResponse)
 async def generate_management_assessment(
@@ -235,13 +253,18 @@ async def generate_peer_comparison(
     )
 
     if "error" in report:
-        raise HTTPException(status_code=404 if "not found" in report["error"].lower() else 400, detail=report["error"])
+        raise HTTPException(
+            status_code=404 if "not found" in report["error"].lower() else 400,
+            detail=report["error"],
+        )
 
     return PeerComparisonResponse(
         report_type=report["report_type"],
         generated_at=report["generated_at"],
         target_company=report["target_company"],
-        peer_companies=[CompanyMetrics(**p) for p in report["peer_companies"] if "error" not in p],
+        peer_companies=[
+            CompanyMetrics(**p) for p in report["peer_companies"] if "error" not in p
+        ],
         peer_averages=PeerAverages(**report["peer_averages"]),
         comparison=Comparison(
             insights=[ComparisonInsight(**i) for i in report["comparison"]["insights"]],
@@ -278,9 +301,7 @@ async def export_management_assessment_json(
 
     return JSONResponse(
         content=report,
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"'
-        }
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -322,9 +343,7 @@ async def export_management_assessment_csv(
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"'
-        }
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -353,9 +372,7 @@ async def export_peer_comparison_json(
 
     return JSONResponse(
         content=report,
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"'
-        }
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -396,7 +413,5 @@ async def export_peer_comparison_csv(
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"'
-        }
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

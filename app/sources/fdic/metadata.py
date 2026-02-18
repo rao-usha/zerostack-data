@@ -9,6 +9,7 @@ Handles:
 
 FDIC BankFind API: https://banks.data.fdic.gov/docs/
 """
+
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -27,7 +28,6 @@ COMMON_FINANCIAL_METRICS = {
     "CERT": {"description": "FDIC Certificate Number", "type": "INTEGER"},
     "NAME": {"description": "Institution Name", "type": "TEXT"},
     "REPDTE": {"description": "Report Date (YYYYMMDD)", "type": "DATE"},
-    
     # Balance Sheet - Assets
     "ASSET": {"description": "Total Assets", "type": "NUMERIC"},
     "ASTEMPM": {"description": "Assets per Employee (thousands)", "type": "NUMERIC"},
@@ -41,7 +41,6 @@ COMMON_FINANCIAL_METRICS = {
     "INTANG": {"description": "Intangible Assets", "type": "NUMERIC"},
     "OREO": {"description": "Other Real Estate Owned", "type": "NUMERIC"},
     "OTEFN": {"description": "Other Assets", "type": "NUMERIC"},
-    
     # Balance Sheet - Liabilities
     "LIAB": {"description": "Total Liabilities", "type": "NUMERIC"},
     "DEP": {"description": "Total Deposits", "type": "NUMERIC"},
@@ -52,14 +51,12 @@ COMMON_FINANCIAL_METRICS = {
     "FREPP": {"description": "Federal Funds and Repos - Purchased", "type": "NUMERIC"},
     "OTHBRF": {"description": "Other Borrowed Funds", "type": "NUMERIC"},
     "SUBND": {"description": "Subordinated Notes and Debentures", "type": "NUMERIC"},
-    
     # Balance Sheet - Equity
     "EQ": {"description": "Total Equity Capital", "type": "NUMERIC"},
     "EQTOT": {"description": "Total Shareholders' Equity", "type": "NUMERIC"},
     "RBCT1J": {"description": "Tier 1 Capital", "type": "NUMERIC"},
     "RBCT2": {"description": "Tier 2 Capital", "type": "NUMERIC"},
     "RBC1AAJ": {"description": "Total Risk-Based Capital", "type": "NUMERIC"},
-    
     # Income Statement
     "NETINC": {"description": "Net Income", "type": "NUMERIC"},
     "NIMY": {"description": "Net Interest Margin", "type": "NUMERIC"},
@@ -72,7 +69,6 @@ COMMON_FINANCIAL_METRICS = {
     "EEFFR": {"description": "Efficiency Ratio (%)", "type": "NUMERIC"},
     "ELNATR": {"description": "Loan Loss Provision", "type": "NUMERIC"},
     "EPREEM": {"description": "Pre-tax Net Operating Income", "type": "NUMERIC"},
-    
     # Performance Ratios
     "ROA": {"description": "Return on Assets (%)", "type": "NUMERIC"},
     "ROE": {"description": "Return on Equity (%)", "type": "NUMERIC"},
@@ -80,22 +76,31 @@ COMMON_FINANCIAL_METRICS = {
     "ROAPTXQ": {"description": "Pre-tax ROA - Quarterly (%)", "type": "NUMERIC"},
     "ROAQ": {"description": "ROA - Quarterly Annualized (%)", "type": "NUMERIC"},
     "ROEQ": {"description": "ROE - Quarterly Annualized (%)", "type": "NUMERIC"},
-    
     # Capital Ratios
-    "RBC1RWAJ": {"description": "Tier 1 Risk-Based Capital Ratio (%)", "type": "NUMERIC"},
+    "RBC1RWAJ": {
+        "description": "Tier 1 Risk-Based Capital Ratio (%)",
+        "type": "NUMERIC",
+    },
     "RBCRWAJ": {"description": "Total Risk-Based Capital Ratio (%)", "type": "NUMERIC"},
     "IDT1CER": {"description": "Tier 1 Leverage Ratio (%)", "type": "NUMERIC"},
     "LNLSDEPR": {"description": "Loans to Deposits Ratio (%)", "type": "NUMERIC"},
-    
     # Asset Quality
-    "P3ASSET": {"description": "Noncurrent Assets + OREO / Assets (%)", "type": "NUMERIC"},
-    "P9ASSET": {"description": "Noncurrent Loans + OREO / Assets (%)", "type": "NUMERIC"},
+    "P3ASSET": {
+        "description": "Noncurrent Assets + OREO / Assets (%)",
+        "type": "NUMERIC",
+    },
+    "P9ASSET": {
+        "description": "Noncurrent Loans + OREO / Assets (%)",
+        "type": "NUMERIC",
+    },
     "NCLNLSR": {"description": "Noncurrent Loans / Loans (%)", "type": "NUMERIC"},
     "NTLNLSR": {"description": "Net Charge-offs / Loans (%)", "type": "NUMERIC"},
     "LNLSNTV": {"description": "Noncurrent Loans", "type": "NUMERIC"},
     "LNATRES": {"description": "Loan Loss Allowance", "type": "NUMERIC"},
-    "LNRESNCR": {"description": "Loan Loss Reserve / Noncurrent Loans (%)", "type": "NUMERIC"},
-    
+    "LNRESNCR": {
+        "description": "Loan Loss Reserve / Noncurrent Loans (%)",
+        "type": "NUMERIC",
+    },
     # Loan Composition
     "LNRE": {"description": "Real Estate Loans", "type": "NUMERIC"},
     "LNRECONS": {"description": "Construction & Development Loans", "type": "NUMERIC"},
@@ -107,7 +112,6 @@ COMMON_FINANCIAL_METRICS = {
     "LNCRCD": {"description": "Credit Card Loans", "type": "NUMERIC"},
     "LNAG": {"description": "Agricultural Loans", "type": "NUMERIC"},
     "LNOTH": {"description": "Other Loans", "type": "NUMERIC"},
-    
     # Deposit Composition
     "DEPNIDOM": {"description": "Non-Interest Bearing Deposits", "type": "NUMERIC"},
     "DEPTI": {"description": "Interest Bearing Deposits", "type": "NUMERIC"},
@@ -115,7 +119,6 @@ COMMON_FINANCIAL_METRICS = {
     "DEPLGAMT": {"description": "Deposits >= $250K", "type": "NUMERIC"},
     "COTEFN": {"description": "Core Deposits", "type": "NUMERIC"},
     "BKDEP": {"description": "Brokered Deposits", "type": "NUMERIC"},
-    
     # Other Metrics
     "NUMEMP": {"description": "Number of Full-time Employees", "type": "INTEGER"},
     "OFFDOM": {"description": "Number of Domestic Offices", "type": "INTEGER"},
@@ -137,7 +140,10 @@ FINANCIAL_METRICS = {
 INSTITUTION_FIELDS = {
     "CERT": {"description": "FDIC Certificate Number", "type": "INTEGER"},
     "NAME": {"description": "Institution Name", "type": "TEXT"},
-    "ACTIVE": {"description": "Active Status (0=Inactive, 1=Active)", "type": "INTEGER"},
+    "ACTIVE": {
+        "description": "Active Status (0=Inactive, 1=Active)",
+        "type": "INTEGER",
+    },
     "CITY": {"description": "City", "type": "TEXT"},
     "STALP": {"description": "State Abbreviation", "type": "TEXT"},
     "STNAME": {"description": "State Name", "type": "TEXT"},
@@ -173,7 +179,10 @@ INSTITUTION_FIELDS = {
     "OAKESSION": {"description": "OTS Acquisition", "type": "TEXT"},
     "OTHESSION": {"description": "Other Acquisition", "type": "TEXT"},
     "PARCERT": {"description": "Parent Certificate", "type": "INTEGER"},
-    "QBPRCOML": {"description": "Quarterly Banking Profile Commercial Flag", "type": "TEXT"},
+    "QBPRCOML": {
+        "description": "Quarterly Banking Profile Commercial Flag",
+        "type": "TEXT",
+    },
     "RISESSION": {"description": "Resolution", "type": "TEXT"},
     "RUNDATE": {"description": "Run Date", "type": "DATE"},
     "SESSION": {"description": "Session", "type": "TEXT"},
@@ -265,15 +274,16 @@ SOD_FIELDS = {
 # TABLE NAME GENERATION
 # =============================================================================
 
+
 def generate_table_name(dataset: str) -> str:
     """
     Generate table name for FDIC dataset.
-    
+
     Convention: fdic_{dataset}
-    
+
     Args:
         dataset: Dataset name (financials, institutions, failed_banks, summary_deposits)
-        
+
     Returns:
         Table name (e.g., "fdic_bank_financials")
     """
@@ -284,7 +294,7 @@ def generate_table_name(dataset: str) -> str:
         "summary_deposits": "fdic_summary_deposits",
         "sod": "fdic_summary_deposits",
     }
-    
+
     return dataset_mapping.get(dataset.lower(), f"fdic_{dataset.lower()}")
 
 
@@ -292,10 +302,11 @@ def generate_table_name(dataset: str) -> str:
 # CREATE TABLE SQL GENERATION
 # =============================================================================
 
+
 def generate_financials_table_sql(table_name: str = "fdic_bank_financials") -> str:
     """
     Generate CREATE TABLE SQL for bank financials data.
-    
+
     Uses key financial metrics with proper typing (NUMERIC for financials, DATE for dates).
     """
     sql = f"""
@@ -414,7 +425,7 @@ def generate_financials_table_sql(table_name: str = "fdic_bank_financials") -> s
     -- Add table comment
     COMMENT ON TABLE {table_name} IS 'FDIC Bank Financials - Balance sheet, income statement, and performance ratios';
     """
-    
+
     return sql
 
 
@@ -507,7 +518,7 @@ def generate_institutions_table_sql(table_name: str = "fdic_institutions") -> st
     -- Add table comment
     COMMENT ON TABLE {table_name} IS 'FDIC Bank Institutions - Bank demographics, locations, and regulatory info';
     """
-    
+
     return sql
 
 
@@ -563,7 +574,7 @@ def generate_failed_banks_table_sql(table_name: str = "fdic_failed_banks") -> st
     -- Add table comment
     COMMENT ON TABLE {table_name} IS 'FDIC Failed Banks - Historical bank failures and resolution info';
     """
-    
+
     return sql
 
 
@@ -640,7 +651,7 @@ def generate_deposits_table_sql(table_name: str = "fdic_summary_deposits") -> st
     -- Add table comment
     COMMENT ON TABLE {table_name} IS 'FDIC Summary of Deposits - Branch-level deposit data';
     """
-    
+
     return sql
 
 
@@ -648,37 +659,38 @@ def generate_deposits_table_sql(table_name: str = "fdic_summary_deposits") -> st
 # DATA PARSING UTILITIES
 # =============================================================================
 
+
 def parse_date(date_str: Optional[str]) -> Optional[str]:
     """
     Parse FDIC date string to ISO format (YYYY-MM-DD).
-    
+
     FDIC dates can be in various formats:
     - YYYYMMDD (e.g., "20230630")
     - YYYY-MM-DD (already ISO)
     - MM/DD/YYYY
-    
+
     Args:
         date_str: Date string from FDIC API
-        
+
     Returns:
         ISO formatted date string or None
     """
     if not date_str:
         return None
-    
+
     date_str = str(date_str).strip()
-    
+
     # Already ISO format
-    if len(date_str) == 10 and date_str[4] == '-' and date_str[7] == '-':
+    if len(date_str) == 10 and date_str[4] == "-" and date_str[7] == "-":
         return date_str
-    
+
     # YYYYMMDD format
     if len(date_str) == 8 and date_str.isdigit():
         try:
             return f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
         except Exception:
             pass
-    
+
     # Try parsing various formats
     formats = ["%Y%m%d", "%m/%d/%Y", "%Y-%m-%d", "%d-%b-%Y"]
     for fmt in formats:
@@ -687,7 +699,7 @@ def parse_date(date_str: Optional[str]) -> Optional[str]:
             return dt.strftime("%Y-%m-%d")
         except ValueError:
             continue
-    
+
     logger.warning(f"Could not parse date: {date_str}")
     return None
 
@@ -695,16 +707,16 @@ def parse_date(date_str: Optional[str]) -> Optional[str]:
 def parse_numeric(value: Any) -> Optional[float]:
     """
     Parse numeric value from FDIC API response.
-    
+
     Args:
         value: Value from API (can be string, int, float, or None)
-        
+
     Returns:
         Float value or None
     """
     if value is None or value == "" or value == "null":
         return None
-    
+
     try:
         return float(value)
     except (ValueError, TypeError):
@@ -714,16 +726,16 @@ def parse_numeric(value: Any) -> Optional[float]:
 def parse_integer(value: Any) -> Optional[int]:
     """
     Parse integer value from FDIC API response.
-    
+
     Args:
         value: Value from API
-        
+
     Returns:
         Integer value or None
     """
     if value is None or value == "" or value == "null":
         return None
-    
+
     try:
         return int(float(value))
     except (ValueError, TypeError):
@@ -733,20 +745,19 @@ def parse_integer(value: Any) -> Optional[int]:
 def parse_financials_record(record: Dict[str, Any]) -> Dict[str, Any]:
     """
     Parse a financial record from FDIC API.
-    
+
     Args:
         record: Raw record from API
-        
+
     Returns:
         Parsed record with proper types
     """
     data = record.get("data", record)
-    
+
     parsed = {
         "cert": parse_integer(data.get("CERT")),
         "name": data.get("NAME"),
         "repdte": parse_date(data.get("REPDTE")),
-        
         # Assets
         "asset": parse_numeric(data.get("ASSET")),
         "lnlsnet": parse_numeric(data.get("LNLSNET")),
@@ -757,7 +768,6 @@ def parse_financials_record(record: Dict[str, Any]) -> Dict[str, Any]:
         "frepo": parse_numeric(data.get("FREPO")),
         "intang": parse_numeric(data.get("INTANG")),
         "oreo": parse_numeric(data.get("OREO")),
-        
         # Liabilities
         "liab": parse_numeric(data.get("LIAB")),
         "dep": parse_numeric(data.get("DEP")),
@@ -768,14 +778,12 @@ def parse_financials_record(record: Dict[str, Any]) -> Dict[str, Any]:
         "frepp": parse_numeric(data.get("FREPP")),
         "othbrf": parse_numeric(data.get("OTHBRF")),
         "subnd": parse_numeric(data.get("SUBND")),
-        
         # Equity
         "eq": parse_numeric(data.get("EQ")),
         "eqtot": parse_numeric(data.get("EQTOT")),
         "rbct1j": parse_numeric(data.get("RBCT1J")),
         "rbct2": parse_numeric(data.get("RBCT2")),
         "rbc1aaj": parse_numeric(data.get("RBC1AAJ")),
-        
         # Income Statement
         "netinc": parse_numeric(data.get("NETINC")),
         "nim": parse_numeric(data.get("NIM")),
@@ -788,20 +796,17 @@ def parse_financials_record(record: Dict[str, Any]) -> Dict[str, Any]:
         "eeffr": parse_numeric(data.get("EEFFR")),
         "elnatr": parse_numeric(data.get("ELNATR")),
         "epreem": parse_numeric(data.get("EPREEM")),
-        
         # Performance Ratios
         "roa": parse_numeric(data.get("ROA")),
         "roe": parse_numeric(data.get("ROE")),
         "roaptx": parse_numeric(data.get("ROAPTX")),
         "roaq": parse_numeric(data.get("ROAQ")),
         "roeq": parse_numeric(data.get("ROEQ")),
-        
         # Capital Ratios
         "rbc1rwaj": parse_numeric(data.get("RBC1RWAJ")),
         "rbcrwaj": parse_numeric(data.get("RBCRWAJ")),
         "idt1cer": parse_numeric(data.get("IDT1CER")),
         "lnlsdepr": parse_numeric(data.get("LNLSDEPR")),
-        
         # Asset Quality
         "p3asset": parse_numeric(data.get("P3ASSET")),
         "p9asset": parse_numeric(data.get("P9ASSET")),
@@ -810,7 +815,6 @@ def parse_financials_record(record: Dict[str, Any]) -> Dict[str, Any]:
         "lnlsntv": parse_numeric(data.get("LNLSNTV")),
         "lnatres": parse_numeric(data.get("LNATRES")),
         "lnresncr": parse_numeric(data.get("LNRESNCR")),
-        
         # Loan Composition
         "lnre": parse_numeric(data.get("LNRE")),
         "lnrecons": parse_numeric(data.get("LNRECONS")),
@@ -822,7 +826,6 @@ def parse_financials_record(record: Dict[str, Any]) -> Dict[str, Any]:
         "lncrcd": parse_numeric(data.get("LNCRCD")),
         "lnag": parse_numeric(data.get("LNAG")),
         "lnoth": parse_numeric(data.get("LNOTH")),
-        
         # Deposit Composition
         "depnidom": parse_numeric(data.get("DEPNIDOM")),
         "depti": parse_numeric(data.get("DEPTI")),
@@ -830,34 +833,32 @@ def parse_financials_record(record: Dict[str, Any]) -> Dict[str, Any]:
         "deplgamt": parse_numeric(data.get("DEPLGAMT")),
         "cotefn": parse_numeric(data.get("COTEFN")),
         "bkdep": parse_numeric(data.get("BKDEP")),
-        
         # Other
         "numemp": parse_integer(data.get("NUMEMP")),
         "offdom": parse_integer(data.get("OFFDOM")),
         "offfor": parse_integer(data.get("OFFFOR")),
         "rssdhcr": data.get("RSSDHCR"),
     }
-    
+
     return parsed
 
 
 def parse_institution_record(record: Dict[str, Any]) -> Dict[str, Any]:
     """
     Parse an institution record from FDIC API.
-    
+
     Args:
         record: Raw record from API
-        
+
     Returns:
         Parsed record with proper types
     """
     data = record.get("data", record)
-    
+
     parsed = {
         "cert": parse_integer(data.get("CERT")),
         "name": data.get("NAME"),
         "active": parse_integer(data.get("ACTIVE")),
-        
         # Location
         "address": data.get("ADDRESS"),
         "city": data.get("CITY"),
@@ -866,13 +867,11 @@ def parse_institution_record(record: Dict[str, Any]) -> Dict[str, Any]:
         "zip": data.get("ZIP"),
         "county": data.get("COUNTY"),
         "stcnty": data.get("STCNTY"),
-        
         # CBSA
         "cbsa": data.get("CBSA"),
         "cbsa_div": data.get("CBSA_DIV"),
         "cbsa_metro": data.get("CBSA_METRO"),
         "cbsa_metro_name": data.get("CBSA_METRO_NAME"),
-        
         # Regulatory
         "fdicregn": data.get("FDICREGN"),
         "fdicsupv": data.get("FDICSUPV"),
@@ -881,7 +880,6 @@ def parse_institution_record(record: Dict[str, Any]) -> Dict[str, Any]:
         "insfdic": parse_integer(data.get("INSFDIC")),
         "occdist": data.get("OCCDIST"),
         "regagnt": data.get("REGAGNT"),
-        
         # Charter/Class
         "bkclass": data.get("BKCLASS"),
         "charter": data.get("CHARTER"),
@@ -889,17 +887,14 @@ def parse_institution_record(record: Dict[str, Any]) -> Dict[str, Any]:
         "stchrtr": parse_integer(data.get("STCHRTR")),
         "instcrcd": data.get("INSTCRCD"),
         "mutual": parse_integer(data.get("MUTUAL")),
-        
         # Dates
         "estymd": parse_date(data.get("ESTYMD")),
         "insdate": parse_date(data.get("INSDATE")),
         "dateupdt": parse_date(data.get("DATEUPDT")),
         "rundate": parse_date(data.get("RUNDATE")),
-        
         # Ownership
         "parcert": parse_integer(data.get("PARCERT")),
         "newcert": parse_integer(data.get("NEWCERT")),
-        
         # Financials
         "asset": parse_numeric(data.get("ASSET")),
         "dep": parse_numeric(data.get("DEP")),
@@ -908,41 +903,37 @@ def parse_institution_record(record: Dict[str, Any]) -> Dict[str, Any]:
         "netinc": parse_numeric(data.get("NETINC")),
         "roa": parse_numeric(data.get("ROA")),
         "roe": parse_numeric(data.get("ROE")),
-        
         # Offices
         "offdom": parse_integer(data.get("OFFDOM")),
         "offfor": parse_integer(data.get("OFFFOR")),
-        
         # Other
         "specgrp": data.get("SPECGRP"),
         "specgrpn": parse_integer(data.get("SPECGRPN")),
         "webaddr": data.get("WEBADDR"),
     }
-    
+
     return parsed
 
 
 def parse_failed_bank_record(record: Dict[str, Any]) -> Dict[str, Any]:
     """
     Parse a failed bank record from FDIC API.
-    
+
     Args:
         record: Raw record from API
-        
+
     Returns:
         Parsed record with proper types
     """
     data = record.get("data", record)
-    
+
     parsed = {
         "cert": parse_integer(data.get("CERT")),
         "name": data.get("NAME"),
-        
         # Location
         "city": data.get("CITY"),
         "state": data.get("STATE"),
         "cityst": data.get("CITYST"),
-        
         # Failure Info
         "faildate": parse_date(data.get("FAILDATE")),
         "savession": data.get("SAVESSION"),
@@ -950,44 +941,40 @@ def parse_failed_bank_record(record: Dict[str, Any]) -> Dict[str, Any]:
         "restype1": data.get("RESTYPE1"),
         "resession": data.get("RESESSION"),
         "chession": data.get("CHESSION"),
-        
         # Financials
         "qbfasset": parse_numeric(data.get("QBFASSET")),
         "qbfdep": parse_numeric(data.get("QBFDEP")),
         "cost": parse_numeric(data.get("COST")),
-        
         # Other
         "fund": data.get("FUND"),
         "psession": data.get("PSESSION"),
         "fession": data.get("FESSION"),
     }
-    
+
     return parsed
 
 
 def parse_sod_record(record: Dict[str, Any]) -> Dict[str, Any]:
     """
     Parse a Summary of Deposits record from FDIC API.
-    
+
     Args:
         record: Raw record from API
-        
+
     Returns:
         Parsed record with proper types
     """
     data = record.get("data", record)
-    
+
     parsed = {
         "cert": parse_integer(data.get("CERT")),
         "name": data.get("NAME"),
         "year": parse_integer(data.get("YEAR")),
-        
         # Branch Info
         "uninession": data.get("UNINUMBR"),
         "brnum": parse_integer(data.get("BRNUM")),
         "brsertyp": data.get("BRSERTYP"),
         "mainoff": parse_integer(data.get("MAINOFF")),
-        
         # Location
         "address": data.get("ADDRESS"),
         "city": data.get("CITY"),
@@ -996,33 +983,28 @@ def parse_sod_record(record: Dict[str, Any]) -> Dict[str, Any]:
         "zipbr": data.get("ZIPBR"),
         "county": data.get("COUNTY"),
         "stcnty": data.get("STCNTY"),
-        
         # CBSA
         "cbsa": data.get("CBSA"),
         "cbsa_div": data.get("CBSA_DIV"),
         "cbsa_metro": data.get("CBSA_METRO"),
         "csa": data.get("CSA"),
-        
         # Coordinates
         "latitude": parse_numeric(data.get("SIMS_LATITUDE")),
         "longitude": parse_numeric(data.get("SIMS_LONGITUDE")),
-        
         # Financials
         "asset": parse_numeric(data.get("ASSET")),
         "dession": parse_numeric(data.get("DESSION") or data.get("DEPSUMBR")),
         "depsum": parse_numeric(data.get("DEPSUM") or data.get("DEPSUMBR")),
         "depdom": parse_numeric(data.get("DEPDOM")),
-        
         # Classification
         "bkclass": data.get("BKCLASS"),
         "charter": data.get("CHARTER"),
         "specgrp": data.get("SPECGRP"),
-        
         # Dates
         "esession": parse_date(data.get("ESTYMD")),
         "rundate": parse_date(data.get("RUNDATE")),
     }
-    
+
     return parsed
 
 

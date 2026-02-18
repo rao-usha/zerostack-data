@@ -3,6 +3,7 @@ USPTO Patent API endpoints.
 
 Provides HTTP endpoints for searching and ingesting USPTO patent data.
 """
+
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
@@ -22,103 +23,64 @@ router = APIRouter(tags=["uspto"])
 
 # Request/Response Models
 
+
 class PatentSearchRequest(BaseModel):
     """Request model for patent search."""
+
     query: Optional[str] = Field(
-        None,
-        description="Text search query (searches title and abstract)"
+        None, description="Text search query (searches title and abstract)"
     )
-    assignee: Optional[str] = Field(
-        None,
-        description="Filter by assignee name"
-    )
+    assignee: Optional[str] = Field(None, description="Filter by assignee name")
     cpc_code: Optional[str] = Field(
         None,
-        description="Filter by CPC code prefix (e.g., 'G06N' for machine learning)"
+        description="Filter by CPC code prefix (e.g., 'G06N' for machine learning)",
     )
-    date_from: Optional[str] = Field(
-        None,
-        description="Start date (YYYY-MM-DD)"
-    )
-    date_to: Optional[str] = Field(
-        None,
-        description="End date (YYYY-MM-DD)"
-    )
+    date_from: Optional[str] = Field(None, description="Start date (YYYY-MM-DD)")
+    date_to: Optional[str] = Field(None, description="End date (YYYY-MM-DD)")
     limit: int = Field(
-        default=100,
-        ge=1,
-        le=1000,
-        description="Maximum results (1-1000)"
+        default=100, ge=1, le=1000, description="Maximum results (1-1000)"
     )
 
 
 class IngestByAssigneeRequest(BaseModel):
     """Request model for ingesting patents by assignee."""
+
     assignee_name: str = Field(
-        ...,
-        description="Assignee name to search (e.g., 'Apple Inc.')"
+        ..., description="Assignee name to search (e.g., 'Apple Inc.')"
     )
-    date_from: Optional[str] = Field(
-        None,
-        description="Start date (YYYY-MM-DD)"
-    )
-    date_to: Optional[str] = Field(
-        None,
-        description="End date (YYYY-MM-DD)"
-    )
+    date_from: Optional[str] = Field(None, description="Start date (YYYY-MM-DD)")
+    date_to: Optional[str] = Field(None, description="End date (YYYY-MM-DD)")
     max_patents: int = Field(
-        default=1000,
-        ge=1,
-        le=10000,
-        description="Maximum patents to ingest"
+        default=1000, ge=1, le=10000, description="Maximum patents to ingest"
     )
 
 
 class IngestByCPCRequest(BaseModel):
     """Request model for ingesting patents by CPC code."""
-    cpc_code: str = Field(
-        ...,
-        description="CPC code prefix (e.g., 'G06N')"
-    )
-    date_from: Optional[str] = Field(
-        None,
-        description="Start date (YYYY-MM-DD)"
-    )
-    date_to: Optional[str] = Field(
-        None,
-        description="End date (YYYY-MM-DD)"
-    )
+
+    cpc_code: str = Field(..., description="CPC code prefix (e.g., 'G06N')")
+    date_from: Optional[str] = Field(None, description="Start date (YYYY-MM-DD)")
+    date_to: Optional[str] = Field(None, description="End date (YYYY-MM-DD)")
     max_patents: int = Field(
-        default=1000,
-        ge=1,
-        le=10000,
-        description="Maximum patents to ingest"
+        default=1000, ge=1, le=10000, description="Maximum patents to ingest"
     )
 
 
 class IngestBySearchRequest(BaseModel):
     """Request model for ingesting patents by search query."""
+
     search_query: str = Field(
-        ...,
-        description="Text to search in patent titles and abstracts"
+        ..., description="Text to search in patent titles and abstracts"
     )
-    date_from: Optional[str] = Field(
-        None,
-        description="Start date (YYYY-MM-DD)"
-    )
-    date_to: Optional[str] = Field(
-        None,
-        description="End date (YYYY-MM-DD)"
-    )
+    date_from: Optional[str] = Field(None, description="Start date (YYYY-MM-DD)")
+    date_to: Optional[str] = Field(None, description="End date (YYYY-MM-DD)")
     max_patents: int = Field(
-        default=1000,
-        ge=1,
-        le=10000,
-        description="Maximum patents to ingest"
+        default=1000, ge=1, le=10000, description="Maximum patents to ingest"
     )
 
 
 # Search Endpoints
+
 
 @router.get("/uspto/patents")
 async def search_patents(
@@ -128,7 +90,7 @@ async def search_patents(
     date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     limit: int = Query(default=100, ge=1, le=1000, description="Max results"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Search patents from the local database.
@@ -190,22 +152,21 @@ async def search_patents(
 
         patents = []
         for row in rows:
-            patents.append({
-                "patent_id": row[0],
-                "title": row[1],
-                "date": str(row[2]) if row[2] else None,
-                "type": row[3],
-                "claims": row[4],
-                "citations": row[5],
-                "inventors": row[6],
-                "assignees": row[7],
-                "cpc_codes": row[8]
-            })
+            patents.append(
+                {
+                    "patent_id": row[0],
+                    "title": row[1],
+                    "date": str(row[2]) if row[2] else None,
+                    "type": row[3],
+                    "claims": row[4],
+                    "citations": row[5],
+                    "inventors": row[6],
+                    "assignees": row[7],
+                    "cpc_codes": row[8],
+                }
+            )
 
-        return {
-            "count": len(patents),
-            "patents": patents
-        }
+        return {"count": len(patents), "patents": patents}
 
     except HTTPException:
         raise
@@ -218,10 +179,7 @@ async def search_patents(
 
 
 @router.get("/uspto/patents/{patent_id}")
-async def get_patent(
-    patent_id: str,
-    db: Session = Depends(get_db)
-):
+async def get_patent(patent_id: str, db: Session = Depends(get_db)):
     """
     Get a single patent by ID from the local database.
     """
@@ -250,7 +208,7 @@ async def get_patent(
             "inventors": row[7],
             "assignees": row[8],
             "cpc_codes": row[9],
-            "ingested_at": str(row[10]) if row[10] else None
+            "ingested_at": str(row[10]) if row[10] else None,
         }
 
     except HTTPException:
@@ -264,7 +222,7 @@ async def get_patent(
 async def search_assignees(
     name: Optional[str] = Query(None, description="Assignee name search"),
     limit: int = Query(default=100, ge=1, le=1000),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Search assignees from the local database.
@@ -293,15 +251,17 @@ async def search_assignees(
 
         assignees = []
         for row in rows:
-            assignees.append({
-                "assignee_id": row[0],
-                "name": row[1],
-                "type": row[2],
-                "city": row[3],
-                "state": row[4],
-                "country": row[5],
-                "patent_count": row[6]
-            })
+            assignees.append(
+                {
+                    "assignee_id": row[0],
+                    "name": row[1],
+                    "type": row[2],
+                    "city": row[3],
+                    "state": row[4],
+                    "country": row[5],
+                    "patent_count": row[6],
+                }
+            )
 
         return {"count": len(assignees), "assignees": assignees}
 
@@ -315,7 +275,7 @@ async def search_assignees(
 async def search_inventors(
     name: Optional[str] = Query(None, description="Inventor name search"),
     limit: int = Query(default=100, ge=1, le=1000),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Search inventors from the local database.
@@ -325,9 +285,7 @@ async def search_inventors(
         params = {"limit": limit}
 
         if name:
-            conditions.append(
-                "(name_first ILIKE :name OR name_last ILIKE :name)"
-            )
+            conditions.append("(name_first ILIKE :name OR name_last ILIKE :name)")
             params["name"] = f"%{name}%"
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
@@ -346,15 +304,17 @@ async def search_inventors(
 
         inventors = []
         for row in rows:
-            inventors.append({
-                "inventor_id": row[0],
-                "first_name": row[1],
-                "last_name": row[2],
-                "city": row[3],
-                "state": row[4],
-                "country": row[5],
-                "patent_count": row[6]
-            })
+            inventors.append(
+                {
+                    "inventor_id": row[0],
+                    "first_name": row[1],
+                    "last_name": row[2],
+                    "city": row[3],
+                    "state": row[4],
+                    "country": row[5],
+                    "patent_count": row[6],
+                }
+            )
 
         return {"count": len(inventors), "inventors": inventors}
 
@@ -366,6 +326,7 @@ async def search_inventors(
 
 # Metadata Endpoints
 
+
 @router.get("/uspto/cpc-codes")
 async def get_cpc_codes():
     """
@@ -375,11 +336,13 @@ async def get_cpc_codes():
     """
     codes = []
     for name, code in CPC_CODES.items():
-        codes.append({
-            "code": code,
-            "name": name.replace("_", " ").title(),
-            "description": metadata.get_cpc_class_description(code)
-        })
+        codes.append(
+            {
+                "code": code,
+                "name": name.replace("_", " ").title(),
+                "description": metadata.get_cpc_class_description(code),
+            }
+        )
     return {"cpc_codes": codes}
 
 
@@ -401,11 +364,12 @@ async def get_major_assignees():
 
 # Ingestion Endpoints
 
+
 @router.post("/uspto/ingest/assignee")
 async def ingest_by_assignee(
     request: IngestByAssigneeRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest all patents for an assignee.
@@ -431,7 +395,9 @@ async def ingest_by_assignee(
         raise HTTPException(400, "Invalid date_to format. Use YYYY-MM-DD")
 
     return create_and_dispatch_job(
-        db, background_tasks, source="uspto",
+        db,
+        background_tasks,
+        source="uspto",
         config={
             "type": "assignee",
             "assignee_name": request.assignee_name,
@@ -447,7 +413,7 @@ async def ingest_by_assignee(
 async def ingest_by_cpc(
     request: IngestByCPCRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest patents by CPC classification code.
@@ -468,7 +434,9 @@ async def ingest_by_cpc(
     - A61K: Pharmaceuticals
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="uspto",
+        db,
+        background_tasks,
+        source="uspto",
         config={
             "type": "cpc",
             "cpc_code": request.cpc_code,
@@ -484,7 +452,7 @@ async def ingest_by_cpc(
 async def ingest_by_search(
     request: IngestBySearchRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Ingest patents by text search.
@@ -501,7 +469,9 @@ async def ingest_by_search(
     ```
     """
     return create_and_dispatch_job(
-        db, background_tasks, source="uspto",
+        db,
+        background_tasks,
+        source="uspto",
         config={
             "type": "search",
             "search_query": request.search_query,

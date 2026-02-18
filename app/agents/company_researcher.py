@@ -54,6 +54,7 @@ COMPANY_MAPPINGS = {
 
 class ResearchStatus(str, Enum):
     """Research job status."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -63,6 +64,7 @@ class ResearchStatus(str, Enum):
 
 class DataSource(str, Enum):
     """Available data sources."""
+
     ENRICHMENT = "enrichment"
     GITHUB = "github"
     GLASSDOOR = "glassdoor"
@@ -152,6 +154,7 @@ class CompanyResearchAgent:
     def _generate_job_id(self) -> str:
         """Generate unique job ID."""
         import uuid
+
         return f"research_{uuid.uuid4().hex[:12]}"
 
     def _normalize_company_name(self, input_str: str) -> str:
@@ -160,8 +163,8 @@ class CompanyResearchAgent:
         if "." in input_str and " " not in input_str:
             # Remove common TLDs and www
             name = input_str.lower()
-            name = re.sub(r'^(www\.)', '', name)
-            name = re.sub(r'\.(com|io|co|org|net|ai|dev|app)$', '', name)
+            name = re.sub(r"^(www\.)", "", name)
+            name = re.sub(r"\.(com|io|co|org|net|ai|dev|app)$", "", name)
             # Capitalize
             return name.title()
         return input_str.strip()
@@ -172,7 +175,7 @@ class CompanyResearchAgent:
             domain = input_str.lower()
             if not domain.startswith(("http://", "https://")):
                 domain = domain
-            domain = re.sub(r'^(https?://)?(www\.)?', '', domain)
+            domain = re.sub(r"^(https?://)?(www\.)?", "", domain)
             domain = domain.split("/")[0]
             return domain
         return None
@@ -182,7 +185,7 @@ class CompanyResearchAgent:
         company_name: str,
         domain: Optional[str] = None,
         ticker: Optional[str] = None,
-        priority_sources: Optional[List[str]] = None
+        priority_sources: Optional[List[str]] = None,
     ) -> str:
         """
         Start a company research job.
@@ -201,7 +204,9 @@ class CompanyResearchAgent:
 
         # Determine sources to query
         if priority_sources:
-            requested_sources = [s for s in priority_sources if s in [ds.value for ds in DataSource]]
+            requested_sources = [
+                s for s in priority_sources if s in [ds.value for ds in DataSource]
+            ]
         else:
             requested_sources = [ds.value for ds in DataSource]
 
@@ -213,19 +218,23 @@ class CompanyResearchAgent:
             VALUES (:job_id, :company_input, :company_name, 'pending', :sources)
         """)
 
-        self.db.execute(insert_query, {
-            "job_id": job_id,
-            "company_input": company_input,
-            "company_name": normalized_name,
-            "sources": json.dumps(requested_sources),
-        })
+        self.db.execute(
+            insert_query,
+            {
+                "job_id": job_id,
+                "company_input": company_input,
+                "company_name": normalized_name,
+                "sources": json.dumps(requested_sources),
+            },
+        )
         self.db.commit()
 
         # Run research synchronously in a thread (since FastAPI will handle this in background)
         import threading
+
         thread = threading.Thread(
             target=self._run_research_sync,
-            args=(job_id, normalized_name, company_input, requested_sources)
+            args=(job_id, normalized_name, company_input, requested_sources),
         )
         thread.daemon = True
         thread.start()
@@ -233,11 +242,7 @@ class CompanyResearchAgent:
         return job_id
 
     def _run_research_sync(
-        self,
-        job_id: str,
-        company_name: str,
-        company_input: str,
-        sources: List[str]
+        self, job_id: str, company_name: str, company_input: str, sources: List[str]
     ) -> None:
         """Execute research job synchronously (for threading)."""
         import asyncio
@@ -256,7 +261,11 @@ class CompanyResearchAgent:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
-                loop.run_until_complete(thread_agent._run_research(job_id, company_name, company_input, sources))
+                loop.run_until_complete(
+                    thread_agent._run_research(
+                        job_id, company_name, company_input, sources
+                    )
+                )
             finally:
                 loop.close()
         except Exception as e:
@@ -264,11 +273,15 @@ class CompanyResearchAgent:
             # Update job status to failed
             try:
                 from sqlalchemy import text as sql_text
-                db.execute(sql_text("""
+
+                db.execute(
+                    sql_text("""
                     UPDATE research_jobs
                     SET status = 'failed', error_message = :error, completed_at = NOW()
                     WHERE job_id = :job_id
-                """), {"job_id": job_id, "error": str(e)})
+                """),
+                    {"job_id": job_id, "error": str(e)},
+                )
                 db.commit()
             except Exception:
                 pass
@@ -276,11 +289,7 @@ class CompanyResearchAgent:
             db.close()
 
     async def _run_research(
-        self,
-        job_id: str,
-        company_name: str,
-        company_input: str,
-        sources: List[str]
+        self, job_id: str, company_name: str, company_input: str, sources: List[str]
     ) -> None:
         """Execute research job asynchronously."""
         # Update status to running
@@ -311,7 +320,12 @@ class CompanyResearchAgent:
                 logger.error(f"Source {source} failed: {result}")
                 failed_sources.append({"source": source, "error": str(result)})
             elif result is None or (isinstance(result, dict) and result.get("error")):
-                failed_sources.append({"source": source, "error": result.get("error") if result else "No data"})
+                failed_sources.append(
+                    {
+                        "source": source,
+                        "error": result.get("error") if result else "No data",
+                    }
+                )
             else:
                 results[source] = result
                 completed_sources.append(source)
@@ -346,17 +360,22 @@ class CompanyResearchAgent:
             WHERE job_id = :job_id
         """)
 
-        self.db.execute(final_update, {
-            "job_id": job_id,
-            "status": status.value,
-            "completed": json.dumps(completed_sources),
-            "failed": json.dumps(failed_sources),
-            "results": json.dumps({
-                "profile": profile,
-                "confidence": confidence,
-                "sources_used": completed_sources,
-            }),
-        })
+        self.db.execute(
+            final_update,
+            {
+                "job_id": job_id,
+                "status": status.value,
+                "completed": json.dumps(completed_sources),
+                "failed": json.dumps(failed_sources),
+                "results": json.dumps(
+                    {
+                        "profile": profile,
+                        "confidence": confidence,
+                        "sources_used": completed_sources,
+                    }
+                ),
+            },
+        )
         self.db.commit()
 
         # Cache the profile
@@ -364,10 +383,7 @@ class CompanyResearchAgent:
             self._cache_profile(company_name, profile, completed_sources, confidence)
 
     async def _query_source(
-        self,
-        source: str,
-        company_name: str,
-        domain: Optional[str]
+        self, source: str, company_name: str, domain: Optional[str]
     ) -> Optional[Dict[str, Any]]:
         """Query a specific data source."""
         try:
@@ -415,7 +431,9 @@ class CompanyResearchAgent:
                     "employee_growth": row.get("employee_growth_yoy"),
                     "funding_total": row.get("total_funding"),
                     "last_funding": row.get("last_funding_amount"),
-                    "last_funding_date": str(row["last_funding_date"]) if row.get("last_funding_date") else None,
+                    "last_funding_date": str(row["last_funding_date"])
+                    if row.get("last_funding_date")
+                    else None,
                     "industry": row.get("industry"),
                     "sector": row.get("sector"),
                     "status": row.get("company_status"),
@@ -435,7 +453,9 @@ class CompanyResearchAgent:
         ENHANCED: Now actually fetches from GitHub API if data is missing or stale.
         """
         # Get GitHub org name from mappings or derive from company name
-        normalized = company_name.lower().replace(" ", "").replace(",", "").replace(".", "")
+        normalized = (
+            company_name.lower().replace(" ", "").replace(",", "").replace(".", "")
+        )
         mapping = COMPANY_MAPPINGS.get(normalized, {})
         org_name = mapping.get("github", normalized)
 
@@ -447,7 +467,9 @@ class CompanyResearchAgent:
             LIMIT 1
         """)
         try:
-            result = self.db.execute(query, {"name": org_name, "pattern": f"%{company_name}%"})
+            result = self.db.execute(
+                query, {"name": org_name, "pattern": f"%{company_name}%"}
+            )
             row = result.mappings().fetchone()
 
             # Check if data is fresh (fetched within last 24 hours)
@@ -473,7 +495,9 @@ class CompanyResearchAgent:
                     "total_forks": row.get("total_forks"),
                     "total_contributors": row.get("total_contributors"),
                     "velocity_score": row.get("velocity_score"),
-                    "primary_language": row.get("primary_languages")[0] if row.get("primary_languages") else None,
+                    "primary_language": row.get("primary_languages")[0]
+                    if row.get("primary_languages")
+                    else None,
                     "github_url": f"https://github.com/{row.get('login')}",
                     "data_freshness": "cached",
                 }
@@ -502,9 +526,13 @@ class CompanyResearchAgent:
                     "public_repos": org_data.get("public_repos"),
                     "total_stars": org_data.get("metrics", {}).get("total_stars", 0),
                     "total_forks": org_data.get("metrics", {}).get("total_forks", 0),
-                    "total_contributors": org_data.get("metrics", {}).get("repo_count", 0),
+                    "total_contributors": org_data.get("metrics", {}).get(
+                        "repo_count", 0
+                    ),
                     "velocity_score": org_data.get("velocity_score"),
-                    "primary_language": org_data.get("metrics", {}).get("primary_languages", [None])[0],
+                    "primary_language": org_data.get("metrics", {}).get(
+                        "primary_languages", [None]
+                    )[0],
                     "github_url": f"https://github.com/{org_data.get('login')}",
                     "data_freshness": "fresh",
                 }
@@ -554,17 +582,21 @@ class CompanyResearchAgent:
             if rows:
                 apps = []
                 for row in rows:
-                    apps.append({
-                        "app_name": row["app_name"],
-                        "store": row["store"],
-                        "category": row["category"],
-                        "rating": row["current_rating"],
-                        "rating_count": row["rating_count"],
-                    })
+                    apps.append(
+                        {
+                            "app_name": row["app_name"],
+                            "store": row["store"],
+                            "category": row["category"],
+                            "rating": row["current_rating"],
+                            "rating_count": row["rating_count"],
+                        }
+                    )
                 return {
                     "app_count": len(apps),
                     "apps": apps,
-                    "avg_rating": sum(a["rating"] or 0 for a in apps) / len(apps) if apps else None,
+                    "avg_rating": sum(a["rating"] or 0 for a in apps) / len(apps)
+                    if apps
+                    else None,
                 }
             return None
         except Exception as e:
@@ -572,14 +604,18 @@ class CompanyResearchAgent:
             self.db.rollback()
             return None
 
-    async def _query_web_traffic(self, company_name: str, domain: Optional[str]) -> Optional[Dict]:
+    async def _query_web_traffic(
+        self, company_name: str, domain: Optional[str]
+    ) -> Optional[Dict]:
         """
         Query web traffic data (T35).
 
         ENHANCED: Now actually fetches from Tranco rankings.
         """
         # Get domain from mappings or use provided domain
-        normalized = company_name.lower().replace(" ", "").replace(",", "").replace(".", "")
+        normalized = (
+            company_name.lower().replace(" ", "").replace(",", "").replace(".", "")
+        )
         mapping = COMPANY_MAPPINGS.get(normalized, {})
 
         # Determine domain to look up
@@ -596,7 +632,9 @@ class CompanyResearchAgent:
             client.close()
 
             if traffic_data and traffic_data.get("tranco_rank"):
-                logger.info(f"Got web traffic data for {lookup_domain}: rank #{traffic_data['tranco_rank']}")
+                logger.info(
+                    f"Got web traffic data for {lookup_domain}: rank #{traffic_data['tranco_rank']}"
+                )
                 return {
                     "domain": lookup_domain,
                     "tranco_rank": traffic_data.get("tranco_rank"),
@@ -615,7 +653,9 @@ class CompanyResearchAgent:
                             return {
                                 "domain": alt_domain,
                                 "tranco_rank": traffic_data.get("tranco_rank"),
-                                "providers_used": traffic_data.get("providers_used", []),
+                                "providers_used": traffic_data.get(
+                                    "providers_used", []
+                                ),
                                 "data_freshness": "fresh",
                             }
 
@@ -645,12 +685,16 @@ class CompanyResearchAgent:
             if rows:
                 articles = []
                 for row in rows:
-                    articles.append({
-                        "title": row["title"],
-                        "source": row["source"],
-                        "date": str(row["published_at"]) if row["published_at"] else None,
-                        "url": row["url"],
-                    })
+                    articles.append(
+                        {
+                            "title": row["title"],
+                            "source": row["source"],
+                            "date": str(row["published_at"])
+                            if row["published_at"]
+                            else None,
+                            "url": row["url"],
+                        }
+                    )
                 return {
                     "recent_articles": articles,
                     "article_count": len(articles),
@@ -673,25 +717,32 @@ class CompanyResearchAgent:
             try:
                 # Fetch news for this company
                 items = await news_source.fetch(
-                    queries=[f'"{company_name}" company'],
-                    company_names=[company_name]
+                    queries=[f'"{company_name}" company'], company_names=[company_name]
                 )
 
                 if items:
                     articles = []
                     for item in items[:5]:  # Limit to 5 articles
-                        articles.append({
-                            "title": item.get("title"),
-                            "source": item.get("source", "Google News"),
-                            "date": item.get("published_at").isoformat() if item.get("published_at") else None,
-                            "url": item.get("url"),
-                            "event_type": item.get("event_type"),
-                        })
+                        articles.append(
+                            {
+                                "title": item.get("title"),
+                                "source": item.get("source", "Google News"),
+                                "date": item.get("published_at").isoformat()
+                                if item.get("published_at")
+                                else None,
+                                "url": item.get("url"),
+                                "event_type": item.get("event_type"),
+                            }
+                        )
 
-                    logger.info(f"Found {len(articles)} news articles for {company_name}")
+                    logger.info(
+                        f"Found {len(articles)} news articles for {company_name}"
+                    )
 
                     # Generate AI summary of the news
-                    summary = await self._summarize_news_with_llm(company_name, articles)
+                    summary = await self._summarize_news_with_llm(
+                        company_name, articles
+                    )
 
                     return {
                         "recent_articles": articles,
@@ -708,7 +759,9 @@ class CompanyResearchAgent:
             logger.warning(f"Google News fetch failed for {company_name}: {e}")
             return None
 
-    async def _summarize_news_with_llm(self, company_name: str, articles: List[Dict]) -> Optional[str]:
+    async def _summarize_news_with_llm(
+        self, company_name: str, articles: List[Dict]
+    ) -> Optional[str]:
         """Use LLM to create a concise summary of recent news."""
         try:
             from app.agentic.llm_client import get_llm_client
@@ -719,10 +772,12 @@ class CompanyResearchAgent:
                 return None
 
             # Build prompt with article titles
-            article_list = "\n".join([
-                f"- {a.get('title', 'Untitled')} ({a.get('event_type', 'news')})"
-                for a in articles
-            ])
+            article_list = "\n".join(
+                [
+                    f"- {a.get('title', 'Untitled')} ({a.get('event_type', 'news')})"
+                    for a in articles
+                ]
+            )
 
             prompt = f"""Analyze these recent news headlines about {company_name} and write a 2-3 sentence executive summary of what's happening with the company. Focus on the most important business developments.
 
@@ -737,7 +792,9 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
             response = await llm.complete(prompt, system_prompt=system_prompt)
 
             summary = response.content.strip()
-            logger.info(f"Generated summary ({response.total_tokens} tokens, ${response.cost_usd:.4f})")
+            logger.info(
+                f"Generated summary ({response.total_tokens} tokens, ${response.cost_usd:.4f})"
+            )
 
             return summary
 
@@ -769,7 +826,9 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
                     "cik": row["cik"],
                     "total_raised": row["total_amount_sold"],
                     "offering_amount": row["total_offering_amount"],
-                    "first_sale_date": str(row["date_of_first_sale"]) if row["date_of_first_sale"] else None,
+                    "first_sale_date": str(row["date_of_first_sale"])
+                    if row["date_of_first_sale"]
+                    else None,
                     "industry_group": row["industry_group"],
                     "data_source": "local_db",
                 }
@@ -802,43 +861,57 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
                             "dateb": "",
                             "owner": "include",
                             "count": "10",
-                            "output": "atom"
+                            "output": "atom",
                         },
-                        headers={"User-Agent": "Nexdata Research Bot (compliance@nexdata.ai)"}
+                        headers={
+                            "User-Agent": "Nexdata Research Bot (compliance@nexdata.ai)"
+                        },
                     )
 
                     if ticker_resp.status_code == 200:
                         # Parse the Atom feed for company info
                         import xml.etree.ElementTree as ET
+
                         try:
                             root = ET.fromstring(ticker_resp.text)
-                            ns = {'atom': 'http://www.w3.org/2005/Atom'}
+                            ns = {"atom": "http://www.w3.org/2005/Atom"}
 
-                            entries = root.findall('.//atom:entry', ns)
+                            entries = root.findall(".//atom:entry", ns)
                             if entries:
                                 # Get first matching company
                                 entry = entries[0]
-                                title = entry.find('atom:title', ns)
-                                summary = entry.find('atom:summary', ns)
-                                link = entry.find('atom:link', ns)
+                                title = entry.find("atom:title", ns)
+                                summary = entry.find("atom:summary", ns)
+                                link = entry.find("atom:link", ns)
 
                                 # Extract CIK from link
                                 cik = None
                                 if link is not None:
-                                    href = link.get('href', '')
+                                    href = link.get("href", "")
                                     import re
-                                    cik_match = re.search(r'CIK=(\d+)', href)
+
+                                    cik_match = re.search(r"CIK=(\d+)", href)
                                     if cik_match:
                                         cik = cik_match.group(1)
 
                                 if title is not None:
-                                    logger.info(f"Found SEC filing for {company_name}: {title.text}")
+                                    logger.info(
+                                        f"Found SEC filing for {company_name}: {title.text}"
+                                    )
                                     return {
-                                        "issuer_name": title.text.split(' - ')[0] if title.text else company_name,
+                                        "issuer_name": title.text.split(" - ")[0]
+                                        if title.text
+                                        else company_name,
                                         "cik": cik,
-                                        "filing_type": title.text.split(' - ')[-1] if title.text and ' - ' in title.text else None,
-                                        "summary": summary.text[:200] if summary is not None and summary.text else None,
-                                        "sec_url": link.get('href') if link is not None else None,
+                                        "filing_type": title.text.split(" - ")[-1]
+                                        if title.text and " - " in title.text
+                                        else None,
+                                        "summary": summary.text[:200]
+                                        if summary is not None and summary.text
+                                        else None,
+                                        "sec_url": link.get("href")
+                                        if link is not None
+                                        else None,
                                         "data_source": "sec_edgar",
                                         "data_freshness": "fresh",
                                     }
@@ -871,19 +944,18 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
             results = client.search_companies(
                 query=company_name,
                 jurisdiction="us_de",  # Delaware (most US companies)
-                per_page=5
+                per_page=5,
             )
 
             if not results.get("companies"):
                 # Try without jurisdiction filter
-                results = client.search_companies(
-                    query=company_name,
-                    per_page=5
-                )
+                results = client.search_companies(query=company_name, per_page=5)
 
             if results.get("companies"):
                 company = results["companies"][0]  # Best match
-                logger.info(f"Found corporate registry data for {company_name}: {company.get('name')}")
+                logger.info(
+                    f"Found corporate registry data for {company_name}: {company.get('name')}"
+                )
 
                 return {
                     "registered_name": company.get("name"),
@@ -932,14 +1004,18 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
             self.db.rollback()
             return None
 
-    async def _query_web_scrape(self, company_name: str, domain: Optional[str]) -> Optional[Dict]:
+    async def _query_web_scrape(
+        self, company_name: str, domain: Optional[str]
+    ) -> Optional[Dict]:
         """
         Scrape company website for info like employee count, revenue, about info.
 
         AGENTIC: Goes to company website and extracts structured data.
         """
         # Get domain from mappings or use provided
-        normalized = company_name.lower().replace(" ", "").replace(",", "").replace(".", "")
+        normalized = (
+            company_name.lower().replace(" ", "").replace(",", "").replace(".", "")
+        )
         mapping = COMPANY_MAPPINGS.get(normalized, {})
         target_domain = domain or mapping.get("domain")
 
@@ -967,9 +1043,12 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
 
                 for url in urls_to_try:
                     try:
-                        response = await client.get(url, headers={
-                            "User-Agent": "Mozilla/5.0 (compatible; NexdataBot/1.0; +https://nexdata.ai)"
-                        })
+                        response = await client.get(
+                            url,
+                            headers={
+                                "User-Agent": "Mozilla/5.0 (compatible; NexdataBot/1.0; +https://nexdata.ai)"
+                            },
+                        )
                         if response.status_code == 200:
                             page_content = response.text
                             fetched_url = url
@@ -1004,11 +1083,12 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
 
                 # Look for employee patterns
                 import re
+
                 employee_patterns = [
-                    r'(\d{1,3}(?:,\d{3})*)\+?\s*employees',
-                    r'team of\s*(\d{1,3}(?:,\d{3})*)\+?',
-                    r'(\d{1,3}(?:,\d{3})*)\+?\s*team members',
-                    r'workforce of\s*(\d{1,3}(?:,\d{3})*)',
+                    r"(\d{1,3}(?:,\d{3})*)\+?\s*employees",
+                    r"team of\s*(\d{1,3}(?:,\d{3})*)\+?",
+                    r"(\d{1,3}(?:,\d{3})*)\+?\s*team members",
+                    r"workforce of\s*(\d{1,3}(?:,\d{3})*)",
                 ]
 
                 for pattern in employee_patterns:
@@ -1024,9 +1104,9 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
 
                 # Look for funding/valuation mentions
                 funding_patterns = [
-                    r'\$(\d+(?:\.\d+)?)\s*(billion|million|B|M)\s*(?:valuation|valued)',
-                    r'raised\s*\$(\d+(?:\.\d+)?)\s*(billion|million|B|M)',
-                    r'\$(\d+(?:\.\d+)?)\s*(billion|million|B|M)\s*in\s*funding',
+                    r"\$(\d+(?:\.\d+)?)\s*(billion|million|B|M)\s*(?:valuation|valued)",
+                    r"raised\s*\$(\d+(?:\.\d+)?)\s*(billion|million|B|M)",
+                    r"\$(\d+(?:\.\d+)?)\s*(billion|million|B|M)\s*in\s*funding",
                 ]
 
                 for pattern in funding_patterns:
@@ -1044,9 +1124,9 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
 
                 # Look for founded year
                 founded_patterns = [
-                    r'founded\s*(?:in\s*)?(\d{4})',
-                    r'since\s*(\d{4})',
-                    r'established\s*(?:in\s*)?(\d{4})',
+                    r"founded\s*(?:in\s*)?(\d{4})",
+                    r"since\s*(\d{4})",
+                    r"established\s*(?:in\s*)?(\d{4})",
                 ]
 
                 for pattern in founded_patterns:
@@ -1079,11 +1159,7 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
             return None
 
     def _update_progress(
-        self,
-        job_id: str,
-        progress: float,
-        completed: List[str],
-        failed: List[Dict]
+        self, job_id: str, progress: float, completed: List[str], failed: List[Dict]
     ) -> None:
         """Update job progress."""
         update_query = text("""
@@ -1093,19 +1169,19 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
                 sources_failed = :failed
             WHERE job_id = :job_id
         """)
-        self.db.execute(update_query, {
-            "job_id": job_id,
-            "progress": progress,
-            "completed": json.dumps(completed),
-            "failed": json.dumps(failed),
-        })
+        self.db.execute(
+            update_query,
+            {
+                "job_id": job_id,
+                "progress": progress,
+                "completed": json.dumps(completed),
+                "failed": json.dumps(failed),
+            },
+        )
         self.db.commit()
 
     def _synthesize_profile(
-        self,
-        company_name: str,
-        results: Dict[str, Dict],
-        domain: Optional[str]
+        self, company_name: str, results: Dict[str, Dict], domain: Optional[str]
     ) -> Dict[str, Any]:
         """Synthesize data from all sources into unified profile."""
         profile = {
@@ -1255,7 +1331,9 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
                 if "team" not in profile:
                     profile["team"] = {}
                 if not profile["team"].get("employee_count"):
-                    profile["team"]["employee_count"] = web_scrape.get("estimated_employees")
+                    profile["team"]["employee_count"] = web_scrape.get(
+                        "estimated_employees"
+                    )
                     profile["team"]["employee_source"] = "website_scrape"
 
             # Fill in missing funding data
@@ -1263,7 +1341,9 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
                 if "financials" not in profile:
                     profile["financials"] = {}
                 if not profile["financials"].get("funding_total"):
-                    profile["financials"]["funding_total"] = web_scrape.get("funding_mentioned")
+                    profile["financials"]["funding_total"] = web_scrape.get(
+                        "funding_mentioned"
+                    )
                     profile["financials"]["funding_source"] = "website_mention"
 
         # Identify data gaps
@@ -1298,17 +1378,17 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
         """Calculate confidence score based on data coverage."""
         total_weight = 0
         for source in completed_sources:
-            source_enum = DataSource(source) if source in [ds.value for ds in DataSource] else None
+            source_enum = (
+                DataSource(source)
+                if source in [ds.value for ds in DataSource]
+                else None
+            )
             if source_enum:
                 total_weight += self.SOURCE_WEIGHTS.get(source_enum, 0)
         return round(min(total_weight, 1.0), 2)
 
     def _cache_profile(
-        self,
-        company_name: str,
-        profile: Dict,
-        sources: List[str],
-        confidence: float
+        self, company_name: str, profile: Dict, sources: List[str], confidence: float
     ) -> None:
         """Cache research profile."""
         expires_at = datetime.utcnow() + timedelta(days=7)
@@ -1324,23 +1404,30 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
                 expires_at = EXCLUDED.expires_at
         """)
 
-        self.db.execute(query, {
-            "name": company_name,
-            "profile": json.dumps(profile),
-            "sources": json.dumps(sources),
-            "confidence": confidence,
-            "expires": expires_at,
-        })
+        self.db.execute(
+            query,
+            {
+                "name": company_name,
+                "profile": json.dumps(profile),
+                "sources": json.dumps(sources),
+                "confidence": confidence,
+                "expires": expires_at,
+            },
+        )
         self.db.commit()
 
-    def _get_cached_profile(self, company_name: str, max_age_hours: int = 168) -> Optional[Dict]:
+    def _get_cached_profile(
+        self, company_name: str, max_age_hours: int = 168
+    ) -> Optional[Dict]:
         """Get cached profile if not expired."""
-        query = text("""
+        query = text(
+            """
             SELECT profile, sources_used, confidence_score, created_at
             FROM research_cache
             WHERE LOWER(company_name) = LOWER(:name)
               AND created_at > NOW() - INTERVAL ':hours hours'
-        """.replace(":hours", str(max_age_hours)))
+        """.replace(":hours", str(max_age_hours))
+        )
 
         result = self.db.execute(query, {"name": company_name})
         row = result.mappings().fetchone()
@@ -1348,7 +1435,9 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
         if row:
             profile = row["profile"]
             profile["_cache_info"] = {
-                "cached_at": row["created_at"].isoformat() + "Z" if row["created_at"] else None,
+                "cached_at": row["created_at"].isoformat() + "Z"
+                if row["created_at"]
+                else None,
                 "sources_used": row["sources_used"],
                 "confidence": row["confidence_score"],
             }
@@ -1376,9 +1465,15 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
             "sources_requested": row["sources_requested"],
             "sources_completed": row["sources_completed"],
             "sources_failed": row["sources_failed"],
-            "created_at": row["created_at"].isoformat() + "Z" if row["created_at"] else None,
-            "started_at": row["started_at"].isoformat() + "Z" if row["started_at"] else None,
-            "completed_at": row["completed_at"].isoformat() + "Z" if row["completed_at"] else None,
+            "created_at": row["created_at"].isoformat() + "Z"
+            if row["created_at"]
+            else None,
+            "started_at": row["started_at"].isoformat() + "Z"
+            if row["started_at"]
+            else None,
+            "completed_at": row["completed_at"].isoformat() + "Z"
+            if row["completed_at"]
+            else None,
         }
 
         if row["status"] in ("completed", "partial"):
@@ -1389,7 +1484,9 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
 
         return response
 
-    def get_cached_research(self, company_name: str, max_age_hours: int = 168) -> Optional[Dict[str, Any]]:
+    def get_cached_research(
+        self, company_name: str, max_age_hours: int = 168
+    ) -> Optional[Dict[str, Any]]:
         """Get cached research for a company."""
         profile = self._get_cached_profile(company_name, max_age_hours=max_age_hours)
         if profile:
@@ -1401,9 +1498,7 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
         return None
 
     def list_jobs(
-        self,
-        status: Optional[str] = None,
-        limit: int = 20
+        self, status: Optional[str] = None, limit: int = 20
     ) -> List[Dict[str, Any]]:
         """List research jobs."""
         conditions = ["1=1"]
@@ -1431,8 +1526,12 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
                 "company_name": row["company_name"],
                 "status": row["status"],
                 "progress": row["progress"],
-                "created_at": row["created_at"].isoformat() + "Z" if row["created_at"] else None,
-                "completed_at": row["completed_at"].isoformat() + "Z" if row["completed_at"] else None,
+                "created_at": row["created_at"].isoformat() + "Z"
+                if row["created_at"]
+                else None,
+                "completed_at": row["completed_at"].isoformat() + "Z"
+                if row["completed_at"]
+                else None,
             }
             for row in result.mappings()
         ]
@@ -1468,11 +1567,15 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
                 "partial": stats_result["partial"],
                 "failed": stats_result["failed"],
                 "running": stats_result["running"],
-                "avg_duration_seconds": round(stats_result["avg_duration_seconds"], 2) if stats_result["avg_duration_seconds"] else None,
+                "avg_duration_seconds": round(stats_result["avg_duration_seconds"], 2)
+                if stats_result["avg_duration_seconds"]
+                else None,
             },
             "cache": {
                 "cached_profiles": cache_result["cached_profiles"],
-                "avg_confidence": round(cache_result["avg_confidence"], 2) if cache_result["avg_confidence"] else None,
+                "avg_confidence": round(cache_result["avg_confidence"], 2)
+                if cache_result["avg_confidence"]
+                else None,
             },
             "available_sources": [ds.value for ds in DataSource],
         }

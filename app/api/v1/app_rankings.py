@@ -18,6 +18,7 @@ router = APIRouter(prefix="/apps", tags=["App Store Rankings"])
 # Request/Response Models
 class AndroidAppData(BaseModel):
     """Android app data for manual entry."""
+
     app_id: str
     app_name: str
     bundle_id: Optional[str] = None
@@ -41,6 +42,7 @@ class AndroidAppData(BaseModel):
 
 class RankingRecord(BaseModel):
     """Ranking record for manual entry."""
+
     app_id: str
     store: str = "ios"
     rank_position: int = Field(..., ge=1)
@@ -51,6 +53,7 @@ class RankingRecord(BaseModel):
 
 class CompanyAppLink(BaseModel):
     """Link app to company."""
+
     company_name: str
     app_id: str
     store: str = "ios"
@@ -59,6 +62,7 @@ class CompanyAppLink(BaseModel):
 
 class AppCompareRequest(BaseModel):
     """Request for comparing apps."""
+
     apps: List[dict] = Field(..., description="List of {app_id, store}")
 
 
@@ -67,7 +71,7 @@ async def search_ios_apps(
     q: str = Query(..., description="Search query"),
     country: str = Query("us", description="Country code"),
     limit: int = Query(25, ge=1, le=200),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Search iOS App Store using iTunes API.
@@ -91,7 +95,7 @@ async def get_ios_app(
     app_id: str,
     country: str = Query("us", description="Country code"),
     refresh: bool = Query(False, description="Force refresh from iTunes API"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get iOS app details by App ID.
@@ -119,10 +123,7 @@ async def get_ios_app(
 
 
 @router.get("/android/{app_id}")
-def get_android_app(
-    app_id: str,
-    db: Session = Depends(get_db)
-):
+def get_android_app(app_id: str, db: Session = Depends(get_db)):
     """
     Get Android app from database.
 
@@ -138,10 +139,7 @@ def get_android_app(
 
 
 @router.post("/android")
-def add_android_app(
-    data: AndroidAppData,
-    db: Session = Depends(get_db)
-):
+def add_android_app(data: AndroidAppData, db: Session = Depends(get_db)):
     """
     Add or update Android app data.
 
@@ -162,7 +160,7 @@ def get_rating_history(
     app_id: str,
     store: str = Query("ios"),
     limit: int = Query(30, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get rating history for an app.
@@ -185,7 +183,7 @@ def get_ranking_history(
     store: str = Query("ios"),
     rank_type: Optional[str] = Query(None, description="Filter by rank type"),
     limit: int = Query(30, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get ranking history for an app.
@@ -205,10 +203,7 @@ def get_ranking_history(
 
 
 @router.post("/rankings")
-def record_ranking(
-    data: RankingRecord,
-    db: Session = Depends(get_db)
-):
+def record_ranking(data: RankingRecord, db: Session = Depends(get_db)):
     """
     Record app ranking position.
 
@@ -234,10 +229,7 @@ def record_ranking(
 
 
 @router.post("/company/link")
-def link_app_to_company(
-    data: CompanyAppLink,
-    db: Session = Depends(get_db)
-):
+def link_app_to_company(data: CompanyAppLink, db: Session = Depends(get_db)):
     """
     Link an app to a company.
 
@@ -255,10 +247,7 @@ def link_app_to_company(
 
 
 @router.get("/company/{company_name}")
-def get_company_apps(
-    company_name: str,
-    db: Session = Depends(get_db)
-):
+def get_company_apps(company_name: str, db: Session = Depends(get_db)):
     """
     Get all apps linked to a company.
 
@@ -271,10 +260,7 @@ def get_company_apps(
 
 
 @router.get("/developer/{developer_name}")
-def search_by_developer(
-    developer_name: str,
-    db: Session = Depends(get_db)
-):
+def search_by_developer(developer_name: str, db: Session = Depends(get_db)):
     """
     Search apps by developer name.
 
@@ -296,7 +282,7 @@ def get_top_apps(
     category: Optional[str] = Query(None, description="Filter by category"),
     sort_by: str = Query("rating_count", pattern="^(rating_count|current_rating)$"),
     limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get top apps from database.
@@ -321,10 +307,7 @@ def get_top_apps(
 
 
 @router.post("/compare")
-def compare_apps(
-    request: AppCompareRequest,
-    db: Session = Depends(get_db)
-):
+def compare_apps(request: AppCompareRequest, db: Session = Depends(get_db)):
     """
     Compare multiple apps side by side.
 
@@ -332,15 +315,11 @@ def compare_apps(
     """
     if len(request.apps) < 2:
         raise HTTPException(
-            status_code=400,
-            detail="At least 2 apps required for comparison"
+            status_code=400, detail="At least 2 apps required for comparison"
         )
 
     if len(request.apps) > 10:
-        raise HTTPException(
-            status_code=400,
-            detail="Maximum 10 apps per comparison"
-        )
+        raise HTTPException(status_code=400, detail="Maximum 10 apps per comparison")
 
     client = AppStoreClient(db)
     result = client.compare_apps(request.apps)
@@ -360,11 +339,7 @@ def get_stats(db: Session = Depends(get_db)):
 
 
 @router.delete("/{app_id}")
-def delete_app(
-    app_id: str,
-    store: str = Query("ios"),
-    db: Session = Depends(get_db)
-):
+def delete_app(app_id: str, store: str = Query("ios"), db: Session = Depends(get_db)):
     """
     Delete an app from the database.
     """

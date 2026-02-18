@@ -27,15 +27,31 @@ logger = logging.getLogger(__name__)
 
 # News source patterns
 DEAL_KEYWORDS = [
-    "investment", "invested", "led round", "participated",
-    "acquired", "acquisition", "backed", "funding",
-    "series a", "series b", "series c", "series d",
-    "seed round", "growth equity", "stake in",
+    "investment",
+    "invested",
+    "led round",
+    "participated",
+    "acquired",
+    "acquisition",
+    "backed",
+    "funding",
+    "series a",
+    "series b",
+    "series c",
+    "series d",
+    "seed round",
+    "growth equity",
+    "stake in",
 ]
 
 PERSONNEL_KEYWORDS = [
-    "hired", "appointed", "promoted", "joined",
-    "new partner", "new director", "departing",
+    "hired",
+    "appointed",
+    "promoted",
+    "joined",
+    "new partner",
+    "new director",
+    "departing",
 ]
 
 
@@ -148,14 +164,16 @@ class FoNewsCollector(FoBaseCollector):
 
         return items[:20]  # Limit results
 
-    def _parse_rss_feed(self, xml_content: str, search_query: str) -> List[FoCollectedItem]:
+    def _parse_rss_feed(
+        self, xml_content: str, search_query: str
+    ) -> List[FoCollectedItem]:
         """Parse Google News RSS feed."""
         items = []
 
         # Simple regex parsing (avoid full XML parsing for speed)
         item_pattern = re.compile(
-            r'<item>.*?<title>([^<]+)</title>.*?<link>([^<]+)</link>.*?<pubDate>([^<]+)</pubDate>.*?</item>',
-            re.DOTALL
+            r"<item>.*?<title>([^<]+)</title>.*?<link>([^<]+)</link>.*?<pubDate>([^<]+)</pubDate>.*?</item>",
+            re.DOTALL,
         )
 
         for match in item_pattern.finditer(xml_content):
@@ -164,18 +182,20 @@ class FoNewsCollector(FoBaseCollector):
             pub_date = match.group(3).strip()
 
             # Clean up title (remove CDATA if present)
-            title = re.sub(r'<!\[CDATA\[(.*?)\]\]>', r'\1', title)
+            title = re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"\1", title)
 
-            items.append(FoCollectedItem(
-                item_type="news_item",
-                data={
-                    "title": title,
-                    "pub_date": pub_date,
-                    "search_query": search_query,
-                },
-                source_url=link,
-                confidence="medium",
-            ))
+            items.append(
+                FoCollectedItem(
+                    item_type="news_item",
+                    data={
+                        "title": title,
+                        "pub_date": pub_date,
+                        "search_query": search_query,
+                    },
+                    source_url=link,
+                    confidence="medium",
+                )
+            )
 
         return items
 
@@ -188,6 +208,7 @@ class FoNewsCollector(FoBaseCollector):
         try:
             # Parse RSS date format
             from email.utils import parsedate_to_datetime
+
             dt = parsedate_to_datetime(pub_date)
             return dt.replace(tzinfo=None) >= cutoff
         except Exception:

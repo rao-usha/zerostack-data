@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 # CONSTANTS
 # =============================================================================
 
+
 class GapStatus(str, Enum):
     PENDING = "pending"
     HUNTING = "hunting"
@@ -96,6 +97,7 @@ MAX_ATTEMPTS = 3
 # =============================================================================
 # DATA HUNTER AGENT
 # =============================================================================
+
 
 class DataHunterAgent:
     """
@@ -288,11 +290,14 @@ class DataHunterAgent:
             SELECT id, status FROM data_gaps
             WHERE entity_type = :type AND entity_name = :name AND field_name = :field
         """)
-        existing = self.db.execute(check_query, {
-            "type": entity_type,
-            "name": entity_name,
-            "field": field_name,
-        }).fetchone()
+        existing = self.db.execute(
+            check_query,
+            {
+                "type": entity_type,
+                "name": entity_name,
+                "field": field_name,
+            },
+        ).fetchone()
 
         if existing:
             # Don't recreate filled gaps
@@ -314,15 +319,18 @@ class DataHunterAgent:
         """)
 
         try:
-            self.db.execute(insert_query, {
-                "type": entity_type,
-                "name": entity_name,
-                "field": field_name,
-                "priority": priority["score"],
-                "field_imp": priority["field_importance"],
-                "record_imp": priority["record_importance"],
-                "fill_like": priority["fill_likelihood"],
-            })
+            self.db.execute(
+                insert_query,
+                {
+                    "type": entity_type,
+                    "name": entity_name,
+                    "field": field_name,
+                    "priority": priority["score"],
+                    "field_imp": priority["field_importance"],
+                    "record_imp": priority["record_importance"],
+                    "fill_like": priority["fill_likelihood"],
+                },
+            )
             self.db.commit()
             return True
         except Exception as e:
@@ -456,7 +464,9 @@ class DataHunterAgent:
                     self._update_source_reliability(source, field_name, False, 0)
 
             except Exception as e:
-                logger.debug(f"Error searching {source} for {entity_name}.{field_name}: {e}")
+                logger.debug(
+                    f"Error searching {source} for {entity_name}.{field_name}: {e}"
+                )
                 self._update_source_reliability(source, field_name, False, 0)
 
         # Update gap
@@ -517,10 +527,7 @@ class DataHunterAgent:
             return None
 
     def _search_source(
-        self,
-        source: str,
-        entity_name: str,
-        field_name: str
+        self, source: str, entity_name: str, field_name: str
     ) -> Optional[Any]:
         """Search a specific source for data."""
         if source == "glassdoor":
@@ -622,7 +629,11 @@ class DataHunterAgent:
 
             if row:
                 if field == "founding_date" and row[0]:
-                    return row[0].isoformat() if hasattr(row[0], 'isoformat') else str(row[0])
+                    return (
+                        row[0].isoformat()
+                        if hasattr(row[0], "isoformat")
+                        else str(row[0])
+                    )
                 if field == "headquarters" and row[1]:
                     return row[1]
                 if field == "status" and row[2]:
@@ -650,13 +661,15 @@ class DataHunterAgent:
 
                 if field == "employee_count":
                     # Look for employee mentions
-                    match = re.search(r'(\d+[,\d]*)\s*employees', title, re.I)
+                    match = re.search(r"(\d+[,\d]*)\s*employees", title, re.I)
                     if match:
                         return int(match.group(1).replace(",", ""))
 
                 if field == "total_funding":
                     # Look for funding mentions
-                    match = re.search(r'\$(\d+(?:\.\d+)?)\s*(M|B|million|billion)', title, re.I)
+                    match = re.search(
+                        r"\$(\d+(?:\.\d+)?)\s*(M|B|million|billion)", title, re.I
+                    )
                     if match:
                         amount = float(match.group(1))
                         unit = match.group(2).upper()
@@ -770,7 +783,9 @@ class DataHunterAgent:
     ) -> None:
         """Fill a gap with found data."""
         # Get current gap info for provenance
-        query = text("SELECT entity_type, entity_name, field_name FROM data_gaps WHERE id = :id")
+        query = text(
+            "SELECT entity_type, entity_name, field_name FROM data_gaps WHERE id = :id"
+        )
         result = self.db.execute(query, {"id": gap_id})
         gap = result.fetchone()
 
@@ -784,12 +799,15 @@ class DataHunterAgent:
                 filled_at = NOW()
             WHERE id = :id
         """)
-        self.db.execute(update_query, {
-            "value": str(value),
-            "source": source,
-            "confidence": confidence,
-            "id": gap_id,
-        })
+        self.db.execute(
+            update_query,
+            {
+                "value": str(value),
+                "source": source,
+                "confidence": confidence,
+                "id": gap_id,
+            },
+        )
 
         # Log provenance
         if gap:
@@ -869,16 +887,19 @@ class DataHunterAgent:
             (:type, :name, :field, :old, :new, :source, :conf, :job_id)
         """)
         try:
-            self.db.execute(query, {
-                "type": entity_type,
-                "name": entity_name,
-                "field": field_name,
-                "old": str(old_value) if old_value else None,
-                "new": str(new_value),
-                "source": source,
-                "conf": confidence,
-                "job_id": job_id,
-            })
+            self.db.execute(
+                query,
+                {
+                    "type": entity_type,
+                    "name": entity_name,
+                    "field": field_name,
+                    "old": str(old_value) if old_value else None,
+                    "new": str(new_value),
+                    "source": source,
+                    "conf": confidence,
+                    "job_id": job_id,
+                },
+            )
         except Exception as e:
             logger.warning(f"Error logging provenance: {e}")
 
@@ -907,12 +928,15 @@ class DataHunterAgent:
                     END,
                     last_updated = NOW()
             """)
-            self.db.execute(query, {
-                "source": source,
-                "field": field,
-                "success": 1 if success else 0,
-                "conf": confidence,
-            })
+            self.db.execute(
+                query,
+                {
+                    "source": source,
+                    "field": field,
+                    "success": 1 if success else 0,
+                    "conf": confidence,
+                },
+            )
             self.db.commit()
         except Exception as e:
             logger.debug(f"Error updating reliability: {e}")
@@ -961,13 +985,16 @@ class DataHunterAgent:
             VALUES
             (:job_id, :entity_type, :fields, :limit, 'pending', :total)
         """)
-        self.db.execute(insert_query, {
-            "job_id": job_id,
-            "entity_type": entity_type,
-            "fields": fields,
-            "limit": limit,
-            "total": min(total, limit),
-        })
+        self.db.execute(
+            insert_query,
+            {
+                "job_id": job_id,
+                "entity_type": entity_type,
+                "fields": fields,
+                "limit": limit,
+                "total": min(total, limit),
+            },
+        )
         self.db.commit()
 
         return {
@@ -988,8 +1015,10 @@ class DataHunterAgent:
 
         # Update status to running
         self.db.execute(
-            text("UPDATE hunt_jobs SET status = 'running', started_at = NOW() WHERE job_id = :id"),
-            {"id": job_id}
+            text(
+                "UPDATE hunt_jobs SET status = 'running', started_at = NOW() WHERE job_id = :id"
+            ),
+            {"id": job_id},
         )
         self.db.commit()
 
@@ -1039,14 +1068,16 @@ class DataHunterAgent:
                         failed = :failed
                     WHERE job_id = :id
                 """),
-                {"filled": filled, "failed": failed, "id": job_id}
+                {"filled": filled, "failed": failed, "id": job_id},
             )
             self.db.commit()
 
         # Mark job complete
         self.db.execute(
-            text("UPDATE hunt_jobs SET status = 'completed', completed_at = NOW() WHERE job_id = :id"),
-            {"id": job_id}
+            text(
+                "UPDATE hunt_jobs SET status = 'completed', completed_at = NOW() WHERE job_id = :id"
+            ),
+            {"id": job_id},
         )
         self.db.commit()
 
@@ -1081,7 +1112,9 @@ class DataHunterAgent:
             "processed": job["processed"],
             "filled": job["filled"],
             "failed": job["failed"],
-            "fill_rate": job["filled"] / job["processed"] if job["processed"] > 0 else 0,
+            "fill_rate": job["filled"] / job["processed"]
+            if job["processed"] > 0
+            else 0,
             "duration_seconds": duration,
             "created_at": job["created_at"].isoformat() if job["created_at"] else None,
         }

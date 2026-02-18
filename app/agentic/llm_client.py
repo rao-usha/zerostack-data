@@ -7,6 +7,7 @@ Provides:
 - Token counting and cost tracking
 - Support for both OpenAI and Anthropic
 """
+
 import asyncio
 import json
 import logging
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 try:
     import openai
     from openai import AsyncOpenAI
+
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
@@ -27,6 +29,7 @@ except ImportError:
 try:
     import anthropic
     from anthropic import AsyncAnthropic
+
     ANTHROPIC_AVAILABLE = True
 except ImportError:
     ANTHROPIC_AVAILABLE = False
@@ -53,6 +56,7 @@ MODEL_PRICING = {
 @dataclass
 class LLMResponse:
     """Response from LLM call."""
+
     content: str
     input_tokens: int
     output_tokens: int
@@ -151,7 +155,9 @@ class LLMClient:
                 self._client = AsyncAnthropic(api_key=self.api_key)
         return self._client
 
-    def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
+    def _calculate_cost(
+        self, model: str, input_tokens: int, output_tokens: int
+    ) -> float:
         """Calculate cost in USD for token usage."""
         pricing = MODEL_PRICING.get(model, {"input": 0.0, "output": 0.0})
         input_cost = (input_tokens / 1_000_000) * pricing["input"]
@@ -206,6 +212,7 @@ class LLMClient:
                 # Persist to DB via cost tracker
                 try:
                     from app.core.llm_cost_tracker import get_cost_tracker
+
                     tracker = get_cost_tracker()
                     await tracker.record(
                         model=response.model,
@@ -228,7 +235,7 @@ class LLMClient:
                 )
 
                 if attempt < self.max_retries - 1:
-                    delay = self.retry_delay * (2 ** attempt)
+                    delay = self.retry_delay * (2**attempt)
                     await asyncio.sleep(delay)
 
         raise last_error or Exception("LLM request failed after all retries")
@@ -335,6 +342,7 @@ def get_llm_client(
         LLMClient if API key available, None otherwise
     """
     from app.core.config import get_settings
+
     settings = get_settings()
 
     # Determine provider and API key
@@ -345,7 +353,9 @@ def get_llm_client(
         elif settings.get_anthropic_api_key():
             provider = "anthropic"
         else:
-            logger.warning("No LLM API key configured (OPENAI_API_KEY or ANTHROPIC_API_KEY)")
+            logger.warning(
+                "No LLM API key configured (OPENAI_API_KEY or ANTHROPIC_API_KEY)"
+            )
             return None
 
     if provider == "openai":

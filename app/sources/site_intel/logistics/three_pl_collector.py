@@ -13,6 +13,7 @@ Data sources:
 
 No API key required for most public data.
 """
+
 import asyncio
 import logging
 import re
@@ -25,7 +26,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import ThreePLCompany
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -34,10 +39,13 @@ logger = logging.getLogger(__name__)
 # Optional Playwright import - graceful fallback if not installed
 try:
     from playwright.async_api import async_playwright, Browser, BrowserContext
+
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
-    logger.info("Playwright not installed - JS rendering disabled. Install with: pip install playwright && playwright install chromium")
+    logger.info(
+        "Playwright not installed - JS rendering disabled. Install with: pip install playwright && playwright install chromium"
+    )
 
 
 # Known 3PL services mapping
@@ -120,11 +128,11 @@ class ThreePLCollector(BaseCollector):
                     "--no-sandbox",
                     "--disable-dev-shm-usage",
                     "--disable-setuid-sandbox",
-                ]
+                ],
             )
             self._browser_context = await self._browser.new_context(
                 user_agent=self.get_default_headers()["User-Agent"],
-                viewport={"width": 1280, "height": 720}
+                viewport={"width": 1280, "height": 720},
             )
             logger.info("Playwright browser initialized for Transport Topics scraping")
             return True
@@ -198,14 +206,30 @@ class ThreePLCollector(BaseCollector):
                     records,
                     unique_columns=["company_name"],
                     update_columns=[
-                        "parent_company", "headquarters_city", "headquarters_state",
-                        "headquarters_country", "website", "annual_revenue_million",
-                        "revenue_year", "employee_count", "facility_count",
-                        "services", "industries_served", "regions_served", "states_coverage",
-                        "countries_coverage", "armstrong_rank", "transport_topics_rank",
-                        "has_cold_chain", "has_hazmat", "has_ecommerce_fulfillment",
-                        "has_cross_dock", "is_asset_based", "is_non_asset",
-                        "source", "collected_at"
+                        "parent_company",
+                        "headquarters_city",
+                        "headquarters_state",
+                        "headquarters_country",
+                        "website",
+                        "annual_revenue_million",
+                        "revenue_year",
+                        "employee_count",
+                        "facility_count",
+                        "services",
+                        "industries_served",
+                        "regions_served",
+                        "states_coverage",
+                        "countries_coverage",
+                        "armstrong_rank",
+                        "transport_topics_rank",
+                        "has_cold_chain",
+                        "has_hazmat",
+                        "has_ecommerce_fulfillment",
+                        "has_cross_dock",
+                        "is_asset_based",
+                        "is_non_asset",
+                        "source",
+                        "collected_at",
                     ],
                 )
 
@@ -247,7 +271,9 @@ class ThreePLCollector(BaseCollector):
                 playwright_records = await self._scrape_with_playwright()
                 if playwright_records:
                     all_records.extend(playwright_records)
-                    logger.info(f"Scraped {len(playwright_records)} companies with Playwright")
+                    logger.info(
+                        f"Scraped {len(playwright_records)} companies with Playwright"
+                    )
             except Exception as e:
                 logger.warning(f"Playwright scraping failed: {e}")
 
@@ -262,7 +288,10 @@ class ThreePLCollector(BaseCollector):
                 logger.warning(f"httpx scraping failed: {e}")
 
         if not all_records:
-            return {"records": [], "error": "Failed to scrape Transport Topics - page may require JS or structure changed"}
+            return {
+                "records": [],
+                "error": "Failed to scrape Transport Topics - page may require JS or structure changed",
+            }
 
         return {"records": all_records}
 
@@ -278,7 +307,11 @@ class ThreePLCollector(BaseCollector):
 
             # Navigate to rankings page
             logger.info(f"Navigating to {self.RANKINGS_URL}")
-            await page.goto(self.RANKINGS_URL, wait_until="networkidle", timeout=self.PLAYWRIGHT_TIMEOUT)
+            await page.goto(
+                self.RANKINGS_URL,
+                wait_until="networkidle",
+                timeout=self.PLAYWRIGHT_TIMEOUT,
+            )
 
             # Wait for the table/data to load
             await asyncio.sleep(3)  # Give extra time for dynamic content
@@ -328,7 +361,9 @@ class ThreePLCollector(BaseCollector):
         # Transport Topics uses various structures - try multiple selectors
 
         # Look for table rows with company data
-        table_rows = soup.select("table tr, .ranking-row, .company-row, [class*='rank']")
+        table_rows = soup.select(
+            "table tr, .ranking-row, .company-row, [class*='rank']"
+        )
 
         if not table_rows:
             # Try finding any structured data container
@@ -358,7 +393,9 @@ class ThreePLCollector(BaseCollector):
 
         return records
 
-    def _extract_company_from_row(self, row, current_year: int) -> Optional[Dict[str, Any]]:
+    def _extract_company_from_row(
+        self, row, current_year: int
+    ) -> Optional[Dict[str, Any]]:
         """Extract company data from a table row element."""
         cells = row.find_all(["td", "th", "div", "span"])
 
@@ -376,7 +413,14 @@ class ThreePLCollector(BaseCollector):
             text = cell.get_text(strip=True)
 
             # Skip empty or header cells
-            if not text or text.lower() in ["rank", "company", "revenue", "employees", "gross", "net"]:
+            if not text or text.lower() in [
+                "rank",
+                "company",
+                "revenue",
+                "employees",
+                "gross",
+                "net",
+            ]:
                 continue
 
             # Check for rank (usually first column, numeric)
@@ -385,7 +429,11 @@ class ThreePLCollector(BaseCollector):
                 continue
 
             # Check for company name (usually after rank, contains letters)
-            if company_name is None and re.search(r"[A-Za-z]{3,}", text) and not text.startswith("$"):
+            if (
+                company_name is None
+                and re.search(r"[A-Za-z]{3,}", text)
+                and not text.startswith("$")
+            ):
                 # Clean up company name
                 company_name = re.sub(r"\s+", " ", text).strip()
                 # Remove rank if embedded
@@ -393,7 +441,9 @@ class ThreePLCollector(BaseCollector):
                 continue
 
             # Check for revenue (contains $ or large numbers)
-            if "$" in text or (text.replace(",", "").replace(".", "").isdigit() and len(text) > 3):
+            if "$" in text or (
+                text.replace(",", "").replace(".", "").isdigit() and len(text) > 3
+            ):
                 value = self._parse_revenue(text)
                 if value:
                     if gross_revenue is None:
@@ -420,7 +470,9 @@ class ThreePLCollector(BaseCollector):
             "revenue_year": current_year,
         }
 
-    def _extract_from_structured_data(self, soup: BeautifulSoup, current_year: int) -> List[Dict[str, Any]]:
+    def _extract_from_structured_data(
+        self, soup: BeautifulSoup, current_year: int
+    ) -> List[Dict[str, Any]]:
         """Try to extract company data from JSON-LD or other structured data."""
         records = []
 
@@ -429,22 +481,27 @@ class ThreePLCollector(BaseCollector):
         for script in scripts:
             try:
                 import json
+
                 data = json.loads(script.string)
                 # Process structured data if it contains organization info
                 if isinstance(data, list):
                     for item in data:
                         if item.get("@type") in ["Organization", "Corporation"]:
-                            records.append({
-                                "company_name": item.get("name"),
-                                "website": item.get("url"),
-                                "revenue_year": current_year,
-                            })
+                            records.append(
+                                {
+                                    "company_name": item.get("name"),
+                                    "website": item.get("url"),
+                                    "revenue_year": current_year,
+                                }
+                            )
             except Exception:
                 continue
 
         return records
 
-    def _extract_from_text_content(self, soup: BeautifulSoup, current_year: int) -> List[Dict[str, Any]]:
+    def _extract_from_text_content(
+        self, soup: BeautifulSoup, current_year: int
+    ) -> List[Dict[str, Any]]:
         """
         Extract company data from page text using pattern matching.
 
@@ -475,12 +532,14 @@ class ThreePLCollector(BaseCollector):
             revenue_value = self._parse_revenue(revenue)
 
             if company_name and len(company_name) > 3:
-                records.append({
-                    "company_name": company_name,
-                    "transport_topics_rank": rank,
-                    "annual_revenue_million": revenue_value,
-                    "revenue_year": current_year,
-                })
+                records.append(
+                    {
+                        "company_name": company_name,
+                        "transport_topics_rank": rank,
+                        "annual_revenue_million": revenue_value,
+                        "revenue_year": current_year,
+                    }
+                )
 
         return records
 
@@ -519,10 +578,26 @@ class ThreePLCollector(BaseCollector):
 
         # Filter out garbage names (navigation, headers, etc.)
         garbage_indicators = [
-            "top menu", "subscribe", "log in", "log out", "sort:", "publish date",
-            "relevance", "apply", "download", "share", "sponsored by", "up front",
-            "rank this year", "rank last year", "gross revenue", "net revenue",
-            "employees", "million", "advertising", "classifieds"
+            "top menu",
+            "subscribe",
+            "log in",
+            "log out",
+            "sort:",
+            "publish date",
+            "relevance",
+            "apply",
+            "download",
+            "share",
+            "sponsored by",
+            "up front",
+            "rank this year",
+            "rank last year",
+            "gross revenue",
+            "net revenue",
+            "employees",
+            "million",
+            "advertising",
+            "classifieds",
         ]
         name_lower = company_name.lower()
         if any(indicator in name_lower for indicator in garbage_indicators):
@@ -549,11 +624,27 @@ class ThreePLCollector(BaseCollector):
             services = ["third_party_logistics"]
 
         # Detect cold chain from name
-        has_cold_chain = any(kw in name_lower for kw in ["cold", "refrigerat", "lineage", "americold", "temperature"])
+        has_cold_chain = any(
+            kw in name_lower
+            for kw in ["cold", "refrigerat", "lineage", "americold", "temperature"]
+        )
 
         # Detect asset-based vs non-asset
-        is_asset_based = any(kw in name_lower for kw in ["ryder", "schneider", "fedex", "ups", "dhl", "gxo", "lineage"])
-        is_non_asset = any(kw in name_lower for kw in ["robinson", "expeditors", "tql", "echo", "coyote", "uber freight"])
+        is_asset_based = any(
+            kw in name_lower
+            for kw in ["ryder", "schneider", "fedex", "ups", "dhl", "gxo", "lineage"]
+        )
+        is_non_asset = any(
+            kw in name_lower
+            for kw in [
+                "robinson",
+                "expeditors",
+                "tql",
+                "echo",
+                "coyote",
+                "uber freight",
+            ]
+        )
 
         return {
             "company_name": company_name,
@@ -562,7 +653,9 @@ class ThreePLCollector(BaseCollector):
             "headquarters_state": company.get("headquarters_state"),
             "headquarters_country": company.get("headquarters_country", "USA"),
             "website": company.get("website"),
-            "annual_revenue_million": self._safe_float(company.get("annual_revenue_million")),
+            "annual_revenue_million": self._safe_float(
+                company.get("annual_revenue_million")
+            ),
             "revenue_year": self._safe_int(company.get("revenue_year")),
             "employee_count": self._safe_int(company.get("employee_count")),
             "facility_count": self._safe_int(company.get("facility_count")),
@@ -572,7 +665,9 @@ class ThreePLCollector(BaseCollector):
             "states_coverage": company.get("states_coverage"),
             "countries_coverage": company.get("countries_coverage"),
             "armstrong_rank": self._safe_int(company.get("armstrong_rank")),
-            "transport_topics_rank": self._safe_int(company.get("transport_topics_rank")),
+            "transport_topics_rank": self._safe_int(
+                company.get("transport_topics_rank")
+            ),
             "has_cold_chain": has_cold_chain or company.get("has_cold_chain"),
             "has_hazmat": company.get("has_hazmat"),
             "has_ecommerce_fulfillment": company.get("has_ecommerce_fulfillment"),

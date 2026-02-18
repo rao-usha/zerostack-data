@@ -12,6 +12,7 @@ Data sources:
 
 No API key required - public data.
 """
+
 import logging
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any
@@ -21,7 +22,11 @@ from sqlalchemy.orm import Session
 from app.core.models_site_intel import PortThroughputMonthly
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
-    SiteIntelDomain, SiteIntelSource, CollectionConfig, CollectionResult, CollectionStatus
+    SiteIntelDomain,
+    SiteIntelSource,
+    CollectionConfig,
+    CollectionResult,
+    CollectionStatus,
 )
 from app.sources.site_intel.runner import register_collector
 
@@ -125,13 +130,23 @@ class PortThroughputCollector(BaseCollector):
                     records,
                     unique_columns=["port_code", "period_year", "period_month"],
                     update_columns=[
-                        "port_name", "teu_loaded_import", "teu_loaded_export",
-                        "teu_empty_import", "teu_empty_export", "teu_total",
-                        "container_vessel_calls", "avg_berthing_hours",
-                        "avg_vessel_turnaround_hours", "tonnage_import",
-                        "tonnage_export", "tonnage_total", "bulk_tonnage",
-                        "breakbulk_tonnage", "roro_units",
-                        "source", "collected_at"
+                        "port_name",
+                        "teu_loaded_import",
+                        "teu_loaded_export",
+                        "teu_empty_import",
+                        "teu_empty_export",
+                        "teu_total",
+                        "container_vessel_calls",
+                        "avg_berthing_hours",
+                        "avg_vessel_turnaround_hours",
+                        "tonnage_import",
+                        "tonnage_export",
+                        "tonnage_total",
+                        "bulk_tonnage",
+                        "breakbulk_tonnage",
+                        "roro_units",
+                        "source",
+                        "collected_at",
                     ],
                 )
 
@@ -199,7 +214,9 @@ class PortThroughputCollector(BaseCollector):
 
                 if response.status_code == 200:
                     data = response.json()
-                    wcsc_records = data.get("data", []) if isinstance(data, dict) else data
+                    wcsc_records = (
+                        data.get("data", []) if isinstance(data, dict) else data
+                    )
                     all_records.extend(wcsc_records)
                     logger.info(f"Fetched {len(wcsc_records)} records from USACE WCSC")
 
@@ -257,8 +274,11 @@ class PortThroughputCollector(BaseCollector):
 
                 # Monthly TEU (with seasonal variation)
                 import random
+
                 seasonal_factor = 1.0 + 0.15 * (1 if month in [8, 9, 10, 11] else -0.1)
-                monthly_teu = int((annual_vol / 12) * seasonal_factor * random.uniform(0.9, 1.1))
+                monthly_teu = int(
+                    (annual_vol / 12) * seasonal_factor * random.uniform(0.9, 1.1)
+                )
 
                 # Split into loaded/empty, import/export
                 loaded_import = int(monthly_teu * 0.42)
@@ -277,26 +297,28 @@ class PortThroughputCollector(BaseCollector):
                 tonnage_import = int(loaded_import * 14 * 1000)
                 tonnage_export = int(loaded_export * 14 * 1000)
 
-                records.append({
-                    "port_code": port_code,
-                    "port_name": port_info.get("name"),
-                    "period_year": year,
-                    "period_month": month,
-                    "teu_loaded_import": loaded_import,
-                    "teu_loaded_export": loaded_export,
-                    "teu_empty_import": empty_import,
-                    "teu_empty_export": empty_export,
-                    "teu_total": monthly_teu,
-                    "container_vessel_calls": vessel_calls,
-                    "avg_berthing_hours": avg_berthing,
-                    "avg_vessel_turnaround_hours": avg_turnaround,
-                    "tonnage_import": tonnage_import,
-                    "tonnage_export": tonnage_export,
-                    "tonnage_total": tonnage_import + tonnage_export,
-                    "bulk_tonnage": int(random.randint(50000, 500000)),
-                    "breakbulk_tonnage": int(random.randint(10000, 100000)),
-                    "roro_units": int(random.randint(1000, 20000)),
-                })
+                records.append(
+                    {
+                        "port_code": port_code,
+                        "port_name": port_info.get("name"),
+                        "period_year": year,
+                        "period_month": month,
+                        "teu_loaded_import": loaded_import,
+                        "teu_loaded_export": loaded_export,
+                        "teu_empty_import": empty_import,
+                        "teu_empty_export": empty_export,
+                        "teu_total": monthly_teu,
+                        "container_vessel_calls": vessel_calls,
+                        "avg_berthing_hours": avg_berthing,
+                        "avg_vessel_turnaround_hours": avg_turnaround,
+                        "tonnage_import": tonnage_import,
+                        "tonnage_export": tonnage_export,
+                        "tonnage_total": tonnage_import + tonnage_export,
+                        "bulk_tonnage": int(random.randint(50000, 500000)),
+                        "breakbulk_tonnage": int(random.randint(10000, 100000)),
+                        "roro_units": int(random.randint(1000, 20000)),
+                    }
+                )
 
         return records
 
@@ -324,9 +346,13 @@ class PortThroughputCollector(BaseCollector):
             "teu_empty_import": self._safe_int(record.get("teu_empty_import")),
             "teu_empty_export": self._safe_int(record.get("teu_empty_export")),
             "teu_total": self._safe_int(record.get("teu_total")),
-            "container_vessel_calls": self._safe_int(record.get("container_vessel_calls")),
+            "container_vessel_calls": self._safe_int(
+                record.get("container_vessel_calls")
+            ),
             "avg_berthing_hours": self._safe_float(record.get("avg_berthing_hours")),
-            "avg_vessel_turnaround_hours": self._safe_float(record.get("avg_vessel_turnaround_hours")),
+            "avg_vessel_turnaround_hours": self._safe_float(
+                record.get("avg_vessel_turnaround_hours")
+            ),
             "tonnage_import": self._safe_int(record.get("tonnage_import")),
             "tonnage_export": self._safe_int(record.get("tonnage_export")),
             "tonnage_total": self._safe_int(record.get("tonnage_total")),

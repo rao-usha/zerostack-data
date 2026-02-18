@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class ResearchPhase(str, Enum):
     """Phases of deep research."""
+
     COLLECTING = "collecting"
     ANALYZING = "analyzing"
     SYNTHESIZING = "synthesizing"
@@ -31,6 +32,7 @@ class ResearchPhase(str, Enum):
 @dataclass
 class ResearchStep:
     """A single step in the research process."""
+
     phase: str
     action: str
     input_data: Optional[str] = None
@@ -93,7 +95,7 @@ FOLLOW_UP_PROMPTS = [
 
 Previous analysis context:
 {previous_analysis}
-"""
+""",
     },
     {
         "name": "risk_deep_dive",
@@ -108,7 +110,7 @@ Rate overall risk: Low / Medium / High and explain.
 
 Previous analysis context:
 {previous_analysis}
-"""
+""",
     },
     {
         "name": "investment_recommendation",
@@ -134,8 +136,8 @@ Under what conditions would this be most attractive?
 
 Previous analysis context:
 {previous_analysis}
-"""
-    }
+""",
+    },
 ]
 
 
@@ -184,13 +186,12 @@ class DeepResearchAgent:
         """Get LLM client."""
         if self.llm is None:
             from app.agentic.llm_client import get_llm_client
+
             self.llm = get_llm_client()
         return self.llm
 
     async def start_deep_research(
-        self,
-        company_name: str,
-        include_follow_ups: bool = True
+        self, company_name: str, include_follow_ups: bool = True
     ) -> str:
         """
         Start a deep research job.
@@ -203,6 +204,7 @@ class DeepResearchAgent:
             job_id for tracking
         """
         import hashlib
+
         job_id = f"deep_{hashlib.md5(f'{company_name}{datetime.utcnow()}'.encode()).hexdigest()[:12]}"
 
         # Calculate total steps
@@ -217,18 +219,22 @@ class DeepResearchAgent:
             VALUES (:job_id, :company_name, 'collecting', 'collecting', :total_steps)
         """)
 
-        self.db.execute(insert_query, {
-            "job_id": job_id,
-            "company_name": company_name,
-            "total_steps": total_steps
-        })
+        self.db.execute(
+            insert_query,
+            {
+                "job_id": job_id,
+                "company_name": company_name,
+                "total_steps": total_steps,
+            },
+        )
         self.db.commit()
 
         # Run research in background
         import threading
+
         thread = threading.Thread(
             target=self._run_deep_research_sync,
-            args=(job_id, company_name, include_follow_ups)
+            args=(job_id, company_name, include_follow_ups),
         )
         thread.daemon = True
         thread.start()
@@ -236,10 +242,7 @@ class DeepResearchAgent:
         return job_id
 
     def _run_deep_research_sync(
-        self,
-        job_id: str,
-        company_name: str,
-        include_follow_ups: bool
+        self, job_id: str, company_name: str, include_follow_ups: bool
     ):
         """Sync wrapper for async research."""
         loop = asyncio.new_event_loop()
@@ -252,10 +255,7 @@ class DeepResearchAgent:
             loop.close()
 
     async def _run_deep_research(
-        self,
-        job_id: str,
-        company_name: str,
-        include_follow_ups: bool
+        self, job_id: str, company_name: str, include_follow_ups: bool
     ):
         """Execute the deep research process."""
         steps: List[ResearchStep] = []
@@ -268,18 +268,20 @@ class DeepResearchAgent:
             self._update_job(job_id, phase="collecting", current_step=0)
 
             collected_data = await self._collect_company_data(company_name)
-            steps.append(ResearchStep(
-                phase="collecting",
-                action="Gathered data from 10 sources",
-                output=f"Collected {len(collected_data)} data points"
-            ))
+            steps.append(
+                ResearchStep(
+                    phase="collecting",
+                    action="Gathered data from 10 sources",
+                    output=f"Collected {len(collected_data)} data points",
+                )
+            )
 
             self._update_job(
                 job_id,
                 phase="analyzing",
                 current_step=1,
                 collected_data=collected_data,
-                analysis_steps=steps
+                analysis_steps=steps,
             )
 
             # Phase 2: Initial Analysis
@@ -287,34 +289,39 @@ class DeepResearchAgent:
 
             llm = self._get_llm()
             if not llm:
-                raise ValueError("No LLM API key configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY.")
+                raise ValueError(
+                    "No LLM API key configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY."
+                )
 
             # Format collected data for prompt
             data_summary = self._format_data_for_prompt(collected_data)
 
             initial_prompt = RESEARCH_PROMPT_TEMPLATE.format(
-                company_name=company_name,
-                collected_data=data_summary
+                company_name=company_name, collected_data=data_summary
             )
 
             logger.info(f"[{job_id}] Sending initial analysis prompt to LLM")
             response = await llm.complete(
                 initial_prompt,
-                system_prompt="You are a senior investment analyst at a top-tier venture fund. Provide thorough, data-driven analysis."
+                system_prompt="You are a senior investment analyst at a top-tier venture fund. Provide thorough, data-driven analysis.",
             )
 
             initial_analysis = response.content
             total_tokens += response.total_tokens
             total_cost += response.cost_usd
 
-            steps.append(ResearchStep(
-                phase="analyzing",
-                action="Initial comprehensive analysis",
-                input_data=f"Prompt: {len(initial_prompt)} chars",
-                output=initial_analysis[:500] + "..." if len(initial_analysis) > 500 else initial_analysis,
-                tokens_used=response.total_tokens,
-                cost_usd=response.cost_usd
-            ))
+            steps.append(
+                ResearchStep(
+                    phase="analyzing",
+                    action="Initial comprehensive analysis",
+                    input_data=f"Prompt: {len(initial_prompt)} chars",
+                    output=initial_analysis[:500] + "..."
+                    if len(initial_analysis) > 500
+                    else initial_analysis,
+                    tokens_used=response.total_tokens,
+                    cost_usd=response.cost_usd,
+                )
+            )
 
             self._update_job(
                 job_id,
@@ -322,7 +329,7 @@ class DeepResearchAgent:
                 current_step=2,
                 analysis_steps=steps,
                 total_tokens=total_tokens,
-                total_cost_usd=total_cost
+                total_cost_usd=total_cost,
             )
 
             # Phase 3+: Follow-up analyses
@@ -334,24 +341,30 @@ class DeepResearchAgent:
 
                     prompt = follow_up["prompt"].format(
                         company_name=company_name,
-                        previous_analysis=previous_analysis[-3000:]  # Last 3000 chars for context
+                        previous_analysis=previous_analysis[
+                            -3000:
+                        ],  # Last 3000 chars for context
                     )
 
                     response = await llm.complete(
                         prompt,
-                        system_prompt="You are a senior investment analyst. Build on your previous analysis with deeper insights."
+                        system_prompt="You are a senior investment analyst. Build on your previous analysis with deeper insights.",
                     )
 
                     total_tokens += response.total_tokens
                     total_cost += response.cost_usd
 
-                    steps.append(ResearchStep(
-                        phase="analyzing",
-                        action=f"Deep dive: {follow_up['name'].replace('_', ' ').title()}",
-                        output=response.content[:500] + "..." if len(response.content) > 500 else response.content,
-                        tokens_used=response.total_tokens,
-                        cost_usd=response.cost_usd
-                    ))
+                    steps.append(
+                        ResearchStep(
+                            phase="analyzing",
+                            action=f"Deep dive: {follow_up['name'].replace('_', ' ').title()}",
+                            output=response.content[:500] + "..."
+                            if len(response.content) > 500
+                            else response.content,
+                            tokens_used=response.total_tokens,
+                            cost_usd=response.cost_usd,
+                        )
+                    )
 
                     previous_analysis = response.content
 
@@ -361,7 +374,7 @@ class DeepResearchAgent:
                         current_step=3 + i,
                         analysis_steps=steps,
                         total_tokens=total_tokens,
-                        total_cost_usd=total_cost
+                        total_cost_usd=total_cost,
                     )
 
             # Phase Final: Synthesize report
@@ -377,18 +390,20 @@ class DeepResearchAgent:
                     "follow_ups": [
                         {
                             "name": FOLLOW_UP_PROMPTS[i]["name"],
-                            "analysis": steps[2 + i].output
+                            "analysis": steps[2 + i].output,
                         }
                         for i in range(len(FOLLOW_UP_PROMPTS))
-                    ] if include_follow_ups else [],
-                    "final_recommendation": previous_analysis
+                    ]
+                    if include_follow_ups
+                    else [],
+                    "final_recommendation": previous_analysis,
                 },
                 "metadata": {
                     "total_tokens": total_tokens,
                     "total_cost_usd": total_cost,
                     "analysis_steps": len(steps),
-                    "model": llm.model if llm else "unknown"
-                }
+                    "model": llm.model if llm else "unknown",
+                },
             }
 
             # Mark complete
@@ -401,18 +416,17 @@ class DeepResearchAgent:
                 final_report=final_report,
                 total_tokens=total_tokens,
                 total_cost_usd=total_cost,
-                completed_at=datetime.utcnow()
+                completed_at=datetime.utcnow(),
             )
 
-            logger.info(f"[{job_id}] Deep research complete. Tokens: {total_tokens}, Cost: ${total_cost:.4f}")
+            logger.info(
+                f"[{job_id}] Deep research complete. Tokens: {total_tokens}, Cost: ${total_cost:.4f}"
+            )
 
         except Exception as e:
             logger.error(f"[{job_id}] Deep research failed: {e}")
             self._update_job(
-                job_id,
-                status="failed",
-                phase="failed",
-                error_message=str(e)
+                job_id, status="failed", phase="failed", error_message=str(e)
             )
 
     async def _collect_company_data(self, company_name: str) -> Dict[str, Any]:
@@ -444,104 +458,118 @@ class DeepResearchAgent:
 
         # Company basics
         sections.append(f"**Company**: {data.get('company_name', 'Unknown')}")
-        if data.get('domain'):
+        if data.get("domain"):
             sections.append(f"**Domain**: {data.get('domain')}")
 
         # Financials
-        financials = data.get('financials', {})
+        financials = data.get("financials", {})
         if any(financials.values()):
             sections.append("\n**Financials**:")
-            if financials.get('revenue'):
+            if financials.get("revenue"):
                 sections.append(f"- Revenue: ${financials['revenue']:,.0f}")
-            if financials.get('funding_total'):
+            if financials.get("funding_total"):
                 sections.append(f"- Total Funding: ${financials['funding_total']:,.0f}")
-            if financials.get('assets'):
+            if financials.get("assets"):
                 sections.append(f"- Assets: ${financials['assets']:,.0f}")
 
         # Team
-        team = data.get('team', {})
-        if team.get('employee_count'):
+        team = data.get("team", {})
+        if team.get("employee_count"):
             sections.append(f"\n**Team**: {team['employee_count']:,} employees")
-            if team.get('employee_growth_yoy'):
+            if team.get("employee_growth_yoy"):
                 sections.append(f"- YoY Growth: {team['employee_growth_yoy']:.1%}")
 
         # Tech Presence
-        tech = data.get('tech_presence', {})
+        tech = data.get("tech_presence", {})
         if tech:
             sections.append("\n**Tech Presence (GitHub)**:")
-            if tech.get('github_org'):
+            if tech.get("github_org"):
                 sections.append(f"- Organization: {tech['github_org']}")
-            if tech.get('public_repos'):
+            if tech.get("public_repos"):
                 sections.append(f"- Public Repos: {tech['public_repos']}")
-            if tech.get('total_stars'):
+            if tech.get("total_stars"):
                 sections.append(f"- Total Stars: {tech['total_stars']:,}")
-            if tech.get('velocity_score'):
-                sections.append(f"- Developer Velocity Score: {tech['velocity_score']}/100")
-            if tech.get('primary_language'):
+            if tech.get("velocity_score"):
+                sections.append(
+                    f"- Developer Velocity Score: {tech['velocity_score']}/100"
+                )
+            if tech.get("primary_language"):
                 sections.append(f"- Primary Language: {tech['primary_language']}")
 
         # Web Traffic
-        traffic = data.get('web_traffic', {})
-        if traffic.get('tranco_rank'):
-            sections.append(f"\n**Web Traffic**: Tranco Rank #{traffic['tranco_rank']:,}")
+        traffic = data.get("web_traffic", {})
+        if traffic.get("tranco_rank"):
+            sections.append(
+                f"\n**Web Traffic**: Tranco Rank #{traffic['tranco_rank']:,}"
+            )
 
         # Employer Brand
-        employer = data.get('employer_brand', {})
+        employer = data.get("employer_brand", {})
         if employer:
             sections.append("\n**Employer Brand (Glassdoor)**:")
-            if employer.get('overall_rating'):
-                sections.append(f"- Overall Rating: {employer['overall_rating']:.1f}/5.0")
-            if employer.get('ceo_approval'):
+            if employer.get("overall_rating"):
+                sections.append(
+                    f"- Overall Rating: {employer['overall_rating']:.1f}/5.0"
+                )
+            if employer.get("ceo_approval"):
                 sections.append(f"- CEO Approval: {employer['ceo_approval']*100:.0f}%")
-            if employer.get('work_life_balance'):
-                sections.append(f"- Work-Life Balance: {employer['work_life_balance']:.1f}/5.0")
-            if employer.get('compensation_rating'):
-                sections.append(f"- Compensation Rating: {employer['compensation_rating']:.1f}/5.0")
+            if employer.get("work_life_balance"):
+                sections.append(
+                    f"- Work-Life Balance: {employer['work_life_balance']:.1f}/5.0"
+                )
+            if employer.get("compensation_rating"):
+                sections.append(
+                    f"- Compensation Rating: {employer['compensation_rating']:.1f}/5.0"
+                )
 
         # SEC Filings
-        sec = data.get('sec_filings', {})
-        if sec and (sec.get('cik') or sec.get('issuer_name')):
+        sec = data.get("sec_filings", {})
+        if sec and (sec.get("cik") or sec.get("issuer_name")):
             sections.append("\n**SEC Filings**:")
-            if sec.get('cik'):
+            if sec.get("cik"):
                 sections.append(f"- CIK: {sec['cik']}")
-            if sec.get('filing_type'):
+            if sec.get("filing_type"):
                 sections.append(f"- Recent Filing: {sec['filing_type']}")
 
         # Corporate Registry
-        corp = data.get('corporate_registry', {})
+        corp = data.get("corporate_registry", {})
         if corp:
             sections.append("\n**Corporate Registry**:")
-            if corp.get('jurisdiction'):
+            if corp.get("jurisdiction"):
                 sections.append(f"- Jurisdiction: {corp['jurisdiction']}")
-            if corp.get('incorporation_date'):
+            if corp.get("incorporation_date"):
                 sections.append(f"- Incorporated: {corp['incorporation_date']}")
-            if corp.get('status'):
+            if corp.get("status"):
                 sections.append(f"- Status: {corp['status']}")
 
         # Recent News
-        news = data.get('news', {})
-        if news.get('recent_articles'):
+        news = data.get("news", {})
+        if news.get("recent_articles"):
             sections.append("\n**Recent News**:")
-            for article in news['recent_articles'][:5]:
-                title = article.get('title', 'Untitled')
-                event = article.get('event_type', 'news')
+            for article in news["recent_articles"][:5]:
+                title = article.get("title", "Untitled")
+                event = article.get("event_type", "news")
                 sections.append(f"- [{event.upper()}] {title}")
-            if news.get('content_summary'):
+            if news.get("content_summary"):
                 sections.append(f"\n*AI Summary*: {news['content_summary']}")
 
         # Health Score
-        health = data.get('health_score', {})
-        if health.get('composite'):
-            sections.append(f"\n**Health Score**: {health['composite']:.0f}/100 (Tier {health.get('tier', 'N/A')})")
-            if health.get('growth'):
+        health = data.get("health_score", {})
+        if health.get("composite"):
+            sections.append(
+                f"\n**Health Score**: {health['composite']:.0f}/100 (Tier {health.get('tier', 'N/A')})"
+            )
+            if health.get("growth"):
                 sections.append(f"- Growth: {health['growth']:.0f}")
-            if health.get('stability'):
+            if health.get("stability"):
                 sections.append(f"- Stability: {health['stability']:.0f}")
 
         # Data Gaps
-        gaps = data.get('data_gaps', [])
+        gaps = data.get("data_gaps", [])
         if gaps:
-            sections.append(f"\n**Data Gaps**: {', '.join(g.replace('_', ' ') for g in gaps)}")
+            sections.append(
+                f"\n**Data Gaps**: {', '.join(g.replace('_', ' ') for g in gaps)}"
+            )
 
         return "\n".join(sections)
 
@@ -592,12 +620,16 @@ class DeepResearchAgent:
             "phase": row["phase"],
             "current_step": row["current_step"],
             "total_steps": row["total_steps"],
-            "progress": row["current_step"] / row["total_steps"] if row["total_steps"] > 0 else 0,
+            "progress": row["current_step"] / row["total_steps"]
+            if row["total_steps"] > 0
+            else 0,
             "analysis_steps": row["analysis_steps"] or [],
             "final_report": row["final_report"],
             "total_tokens": row["total_tokens"],
             "total_cost_usd": row["total_cost_usd"],
             "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-            "completed_at": row["completed_at"].isoformat() if row["completed_at"] else None,
-            "error_message": row["error_message"]
+            "completed_at": row["completed_at"].isoformat()
+            if row["completed_at"]
+            else None,
+            "error_message": row["error_message"],
         }
