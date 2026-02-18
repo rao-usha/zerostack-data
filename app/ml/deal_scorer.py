@@ -377,8 +377,6 @@ class DealScorer:
         # Stage velocity
         stage = deal.get("pipeline_stage")
         created_at = deal.get("created_at")
-        updated_at = deal.get("updated_at")
-
         if stage and created_at:
             if isinstance(created_at, str):
                 created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
@@ -706,9 +704,9 @@ class DealScorer:
         # Adjust based on similar deals
         if similar_deals:
             # Get average days to close for won deals
-            won_deals = [d for d in similar_deals if d.get("outcome") == "closed_won"]
             # Note: We'd need closed_at - created_at from similar deals
             # For now, use heuristic
+            pass
 
         days_to_decision = base_days
 

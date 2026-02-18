@@ -474,8 +474,6 @@ class MultiAgentOrchestrator:
 
         # Build dependency graph
         step_deps = {s["step_id"]: set(s["depends_on"] or []) for s in steps}
-        step_agents = {s["step_id"]: s["agent_type"] for s in steps}
-
         # Execute steps in order, respecting dependencies
         while len(completed_steps) + len(failed_steps) < len(steps):
             # Find steps ready to run (dependencies satisfied)

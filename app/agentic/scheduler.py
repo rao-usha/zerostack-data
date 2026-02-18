@@ -184,7 +184,7 @@ async def run_quarterly_refresh():
     4. Processes queue with rate limiting
     """
     logger.info("Starting quarterly portfolio refresh")
-    metrics = get_metrics_collector()
+    get_metrics_collector()
 
     try:
         # Queue stale investors

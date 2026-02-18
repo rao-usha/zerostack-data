@@ -79,17 +79,6 @@ async def get_flood_risk_at_location(
     """
     # This is a simplified lookup - full version uses PostGIS ST_Contains
     # For now, return nearby zone information
-    lat_range = 0.05  # ~3 miles
-
-    nearby_zones = (
-        db.query(FloodZone)
-        .filter(
-            FloodZone.state.isnot(None),  # Placeholder filter
-        )
-        .limit(5)
-        .all()
-    )
-
     return {
         "location": {"latitude": lat, "longitude": lng},
         "flood_risk": {

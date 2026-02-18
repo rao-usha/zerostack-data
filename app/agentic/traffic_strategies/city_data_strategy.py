@@ -109,7 +109,6 @@ class CityDataStrategy(BaseTrafficStrategy):
 
     async def execute(self, context: LocationContext) -> TrafficStrategyResult:
         """Execute city pedestrian data strategy."""
-        started_at = datetime.utcnow()
         requests_made = 0
 
         if not context.city:

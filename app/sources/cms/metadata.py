@@ -226,7 +226,6 @@ def generate_create_table_sql(dataset_type: str) -> str:
 
     for col_name, col_info in columns.items():
         col_type = col_info["type"]
-        col_desc = col_info["description"].replace("'", "''")  # Escape quotes
         col_defs.append(f"    {col_name} {col_type}")
 
     columns_sql = ",\n".join(col_defs)

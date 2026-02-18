@@ -514,7 +514,6 @@ async def get_watchlist_alerts(
     # Get person names
     person_ids = [wp.person_id for wp in watched]
     people = db.query(Person).filter(Person.id.in_(person_ids)).all()
-    person_map = {p.id: p for p in people}
     person_names = [p.full_name for p in people]
 
     # Find changes

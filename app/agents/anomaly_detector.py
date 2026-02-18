@@ -719,7 +719,6 @@ class AnomalyDetectorAgent:
     ) -> Dict[str, Any]:
         """Get recent anomalies."""
         try:
-            where_clauses = ["detected_at > NOW() - INTERVAL ':hours hours'"]
             params = {"hours": hours, "limit": limit}
 
             # Note: We need to handle interval differently
@@ -936,7 +935,6 @@ class AnomalyDetectorAgent:
         """Determine probable causes for an anomaly."""
         causes = []
         anomaly_type = anomaly.get("anomaly_type")
-        company = anomaly.get("company_name")
 
         if anomaly_type == AnomalyType.SCORE_DROP.value:
             # Check for related anomalies

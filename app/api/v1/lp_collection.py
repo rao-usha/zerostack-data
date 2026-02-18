@@ -228,7 +228,7 @@ async def create_collection_job(
 
     from app.core.job_queue_service import submit_job
 
-    submit_result = submit_job(
+    submit_job(
         db=db,
         job_type="lp",
         payload=config.to_dict(),
@@ -657,7 +657,7 @@ async def get_coverage(
 ):
     """Get LP coverage statistics."""
     # Get registry for comparison
-    registry = get_lp_registry()
+    get_lp_registry()
 
     # All LPs in database
     total_lps = db.query(LpFund).count()

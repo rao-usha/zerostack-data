@@ -292,7 +292,7 @@ async def export_management_assessment_json(
     if "error" in report:
         raise HTTPException(status_code=404, detail=report["error"])
 
-    json_content = service.export_to_json(report)
+    service.export_to_json(report)
 
     # Generate filename
     company_name = report["company"]["name"].replace(" ", "_")[:30]

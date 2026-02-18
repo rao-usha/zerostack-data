@@ -87,7 +87,6 @@ class FoursquareStrategy(BaseTrafficStrategy):
 
     async def execute(self, context: LocationContext) -> TrafficStrategyResult:
         """Execute Foursquare strategy."""
-        started_at = datetime.utcnow()
         requests_made = 0
 
         try:

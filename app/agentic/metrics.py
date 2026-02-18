@@ -353,7 +353,9 @@ class MetricsCollector:
         self._job_metrics.jobs_last_hour = sum(
             1 for dt in self._job_completions if dt > hour_ago
         )
-        self._job_metrics.jobs_last_24h = len(self._job_completions)
+        self._job_metrics.jobs_last_24h = sum(
+            1 for dt in self._job_completions if dt > day_ago
+        )
 
     def get_metrics(self) -> Dict[str, Any]:
         """Get all metrics as a dictionary for API response."""

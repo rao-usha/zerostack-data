@@ -180,8 +180,6 @@ async def find_nearby_power_plants(
 
     # Filter by approximate bounding box first for performance
     lat_range = radius_miles / 69.0  # ~69 miles per degree latitude
-    lng_range = radius_miles / (69.0 * func.cos(func.radians(lat)))
-
     query = query.filter(
         PowerPlant.latitude.between(lat - lat_range, lat + lat_range),
         PowerPlant.longitude.between(

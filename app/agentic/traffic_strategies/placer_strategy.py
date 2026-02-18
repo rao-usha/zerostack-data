@@ -89,7 +89,6 @@ class PlacerStrategy(BaseTrafficStrategy):
 
     async def execute(self, context: LocationContext) -> TrafficStrategyResult:
         """Execute Placer.ai strategy."""
-        started_at = datetime.utcnow()
         requests_made = 0
 
         settings = get_settings()

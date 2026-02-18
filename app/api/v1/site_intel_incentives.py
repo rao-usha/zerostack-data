@@ -363,6 +363,10 @@ async def benchmark_incentive_deals(
             "median": sorted(jobs)[len(jobs) // 2] if jobs else None,
             "average": sum(jobs) / len(jobs) if jobs else None,
         },
+        "investment_announced": {
+            "median": sorted(investments)[len(investments) // 2] if investments else None,
+            "average": sum(investments) / len(investments) if investments else None,
+        },
         "subsidy_per_job": {
             "average": sum(values) / sum(jobs)
             if values and jobs and sum(jobs) > 0

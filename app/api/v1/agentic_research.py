@@ -325,7 +325,7 @@ async def trigger_portfolio_collection(
         # Queue background task (or submit to worker queue)
         from app.core.job_queue_service import submit_job
 
-        submit_result = submit_job(
+        submit_job(
             db=db,
             job_type="agentic",
             payload={

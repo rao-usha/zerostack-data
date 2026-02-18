@@ -162,8 +162,6 @@ class UsdaTruckCollector(BaseCollector):
             all_records = []
 
             # Try USDA Market News API first
-            market_news_url = "https://marsapi.ams.usda.gov/services/v1.2/reports"
-
             # Get truck rate report slugs
             report_slugs = [
                 "2706",  # Truck Rate Report - National Summary
@@ -174,10 +172,6 @@ class UsdaTruckCollector(BaseCollector):
                 await self.apply_rate_limit()
 
                 try:
-                    params = {
-                        "slug_id": slug,
-                    }
-
                     # Fetch the report
                     response = await client.get(
                         f"https://marsapi.ams.usda.gov/services/v1.2/reports/{slug}",

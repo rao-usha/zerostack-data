@@ -207,7 +207,6 @@ class PortfolioDetailTemplate:
 
     def render_html(self, data: Dict[str, Any]) -> str:
         """Render report as HTML."""
-        investor = data.get("investor", {})
         holdings = data.get("holdings", [])
         sectors = data.get("sector_breakdown", [])
         stages = data.get("stage_breakdown", [])
@@ -350,8 +349,6 @@ class PortfolioDetailTemplate:
             start_color="27AE60", end_color="27AE60", fill_type="solid"
         )
         header_font = Font(bold=True, color="FFFFFF")
-
-        investor = data.get("investor", {})
 
         # Holdings sheet
         ws = wb.active

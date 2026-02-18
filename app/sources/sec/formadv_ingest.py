@@ -147,7 +147,7 @@ async def ingest_family_offices(
         )
 
         # Prepare tables
-        tables = await prepare_formadv_tables(db)
+        await prepare_formadv_tables(db)
 
         # Search for family offices
         logger.info(f"Searching for {len(family_office_names)} family offices")

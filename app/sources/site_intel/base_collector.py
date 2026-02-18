@@ -176,7 +176,7 @@ class BaseCollector(ABC):
                     continue
                 raise
 
-            except httpx.RequestError as e:
+            except httpx.RequestError:
                 if attempt < self.default_retries - 1:
                     import asyncio
 
@@ -396,7 +396,6 @@ class BaseCollector(ABC):
             }
 
             try:
-                loop = asyncio.get_running_loop()
                 asyncio.ensure_future(
                     webhook_service.trigger_webhooks(
                         event_type, event_data, source=self.source.value

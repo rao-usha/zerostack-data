@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 SEC_EDGAR_BASE = "https://data.sec.gov"
 SEC_COMPANY_SEARCH = "https://efts.sec.gov/LATEST/search-index"
 
-
 class SECEdgarClient:
     """Client for SEC EDGAR public filings API."""
 
@@ -36,10 +35,6 @@ class SECEdgarClient:
         """
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                # Use company tickers JSON for lookup
-                url = f"{SEC_EDGAR_BASE}/submissions/CIK0000000000.json"
-                # First try the company search endpoint
-                search_url = f"https://www.sec.gov/cgi-bin/browse-edgar?company={company_name}&CIK=&type=10-K&owner=include&count=10&action=getcompany&output=atom"
 
                 # For now, use the company tickers file
                 tickers_url = f"{SEC_EDGAR_BASE}/files/company_tickers.json"
@@ -73,9 +68,6 @@ class SECEdgarClient:
             Dict with filing information
         """
         try:
-            cik_padded = cik.zfill(10)
-            url = f"{SEC_EDGAR_BASE}/submissions/CIK{cik_padded}.json"
-
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, headers=self.headers)
 

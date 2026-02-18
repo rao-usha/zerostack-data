@@ -300,7 +300,7 @@ async def get_fo_coverage(
     Shows how many FOs from registry are in database and breakdown by type/region.
     """
     registry = get_fo_registry()
-    registry_stats = get_registry_stats()
+    get_registry_stats()
 
     from sqlalchemy import func
 

@@ -743,7 +743,7 @@ def batch_register_lp_contacts(
 
     for contact_input in contacts_input:
         try:
-            contact = register_lp_contact(db, contact_input)
+            register_lp_contact(db, contact_input)
             result.contacts_inserted += 1
         except Exception as e:
             logger.error(f"Error registering contact {contact_input.full_name}: {e}")

@@ -195,7 +195,7 @@ def request_password_reset(request: PasswordResetRequest):
     db = next(get_db())
     try:
         auth_service = AuthService(db)
-        token = auth_service.request_password_reset(request.email)
+        auth_service.request_password_reset(request.email)
 
         # Always return success to not reveal if email exists
         # Token is logged server-side only; in production, send via email

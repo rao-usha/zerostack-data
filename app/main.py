@@ -246,11 +246,10 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Failed to start scheduler: {e}")
 
     # Start PG LISTEN → EventBus bridge for live job progress
-    pg_listener_task = None
     try:
         from app.core.pg_listener import start_pg_listener
 
-        pg_listener_task = await start_pg_listener()
+        await start_pg_listener()
         logger.info("PG listener started for job event streaming")
     except Exception as e:
         logger.warning(f"Failed to start PG listener: {e}")

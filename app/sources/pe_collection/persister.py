@@ -468,7 +468,6 @@ class PEPersister:
             return
 
         data = item.data
-        filing_url = data.get("filing_url") or item.source_url
         sources = firm.data_sources or []
         if isinstance(sources, list):
             label = f"SEC Form ADV ({data.get('form_type', 'ADV')})"

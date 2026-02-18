@@ -462,7 +462,7 @@ class AnalyticsService:
             }
 
         # Get stats using industry stats method
-        stats = self.get_industry_stats(industry=None, days=days)
+        self.get_industry_stats(industry=None, days=days)
 
         # Override with portfolio-specific data
         total_executives = (

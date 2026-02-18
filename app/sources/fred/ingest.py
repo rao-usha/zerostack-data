@@ -102,7 +102,7 @@ class FREDIngestor(BaseSourceIngestor):
             table_name = metadata.generate_table_name(category)
             create_sql = metadata.generate_create_table_sql(table_name, series_ids)
 
-            table_info = self.prepare_table(
+            self.prepare_table(
                 dataset_id=f"fred_{category.lower()}",
                 table_name=table_name,
                 create_sql=create_sql,

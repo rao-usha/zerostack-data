@@ -531,7 +531,6 @@ def get_default_date_range(dataset: str) -> Tuple[int, int, Optional[int]]:
         Tuple of (start_year, end_year, month or None for annual)
     """
     current_year = datetime.now().year
-    current_month = datetime.now().month
 
     # Default to last 3 years of annual data
     return (current_year - 3, current_year, None)

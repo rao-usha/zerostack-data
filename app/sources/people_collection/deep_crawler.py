@@ -270,7 +270,6 @@ class DeepCrawler(BaseCollector):
     def _page_likely_has_people(self, html: str, url: str) -> bool:
         """Quick check if a page likely contains people information."""
         url_lower = url.lower()
-        html_lower = html[:5000].lower()  # Check first 5KB
 
         # URL-based signals
         url_signals = any(

@@ -61,7 +61,7 @@ class USTradeClient(BaseAPIClient):
             max_retries: Maximum retry attempts for failed requests
             backoff_factor: Exponential backoff multiplier
         """
-        config = get_api_config("us_trade")
+        get_api_config("us_trade")
 
         super().__init__(
             api_key=api_key,

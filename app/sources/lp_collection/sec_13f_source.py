@@ -253,13 +253,6 @@ class Sec13fCollector(BaseCollector):
 
         Uses the SEC company search API.
         """
-        # SEC company search endpoint
-        search_url = "https://efts.sec.gov/LATEST/search-index"
-        params = {
-            "q": name,
-            "dateRange": "custom",
-            "forms": "13F-HR",
-        }
 
         # Note: SEC full-text search requires different handling
         # For now, return None and rely on known CIKs or provided CIK

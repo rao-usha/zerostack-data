@@ -445,7 +445,6 @@ async def ingest_m5_dataset(
         logger.info(f"Downloaded files: {results['files_downloaded']}")
 
         # Get file paths
-        comp_dir = client.data_dir / KaggleClient.M5_COMPETITION
         calendar_path = client.get_local_file_path(
             KaggleClient.M5_COMPETITION, "calendar.csv"
         )

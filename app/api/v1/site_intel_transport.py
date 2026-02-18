@@ -173,15 +173,6 @@ async def check_rail_access(
     # This is a simplified version - full implementation would use PostGIS
     lat_range = radius_miles / 69.0
 
-    lines = (
-        db.query(RailLine)
-        .filter(
-            RailLine.state.isnot(None),
-        )
-        .limit(10)
-        .all()
-    )
-
     # Count nearby intermodal terminals as proxy for rail access
     terminal_count = (
         db.query(func.count(IntermodalTerminal.id))

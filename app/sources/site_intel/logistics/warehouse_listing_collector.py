@@ -168,7 +168,7 @@ class WarehouseListingCollector(BaseCollector):
         API access or data partnership.
         """
         try:
-            client = await self.get_client()
+            await self.get_client()
             all_records = []
 
             # Would scrape LoopNet search results

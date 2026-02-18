@@ -345,7 +345,7 @@ class SimpleIngestor(BaseSourceIngestor):
             self.start_job(job_id)
 
             # 2. Prepare table
-            table_info = self.prepare_table(
+            self.prepare_table(
                 dataset_id=dataset_id,
                 table_name=table_name,
                 create_sql=create_sql,

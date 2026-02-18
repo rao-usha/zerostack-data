@@ -186,7 +186,6 @@ class LpCollectionOrchestrator:
         )
 
         # Collect data
-        all_runs: List[int] = []
         all_results: List[CollectionResult] = []
 
         # Process LPs with concurrency limit

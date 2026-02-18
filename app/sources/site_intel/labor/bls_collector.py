@@ -237,7 +237,6 @@ class BLSLaborCollector(BaseCollector):
                 state = item["state"]
                 data = item["data"]
 
-                year = int(data.get("year", 0))
                 period = data.get("period", "")
 
                 # Only use annual averages (M13) or latest monthly

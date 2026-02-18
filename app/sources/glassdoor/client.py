@@ -241,7 +241,7 @@ class GlassdoorClient:
             "data_source": data.get("data_source", "manual"),
         }
 
-        result = self.db.execute(query, params)
+        self.db.execute(query, params)
         self.db.commit()
 
         return self.get_company(data["company_name"])

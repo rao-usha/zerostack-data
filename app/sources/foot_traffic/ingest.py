@@ -68,7 +68,6 @@ async def discover_brand_locations(
     started_at = datetime.utcnow()
     reasoning_log = []
     errors = []
-    warnings = []
 
     client = FootTrafficClient()
     available_sources = client.get_available_sources()

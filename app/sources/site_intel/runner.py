@@ -129,7 +129,7 @@ class SiteIntelOrchestrator:
         try:
             logger.info(f"Starting collection: {domain.value}/{source.value}")
             bridge = kwargs.pop("bridge_to_ingestion", False)
-            job = collector.create_job(config, bridge_to_ingestion=bridge)
+            collector.create_job(config, bridge_to_ingestion=bridge)
             collector.start_job()
 
             result = await collector.collect(config)

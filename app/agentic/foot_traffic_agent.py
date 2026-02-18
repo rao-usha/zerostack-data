@@ -137,7 +137,6 @@ class FootTrafficAgent:
         # Track results
         all_locations: List[Dict[str, Any]] = []
         strategy_results: List[TrafficStrategyResult] = []
-        reasoning_log: List[Dict[str, Any]] = []
         errors: List[Dict[str, Any]] = []
         warnings: List[str] = []
         total_requests = 0
@@ -298,7 +297,6 @@ class FootTrafficAgent:
         # Track results
         all_observations: List[Dict[str, Any]] = []
         strategy_results: List[TrafficStrategyResult] = []
-        reasoning_log: List[Dict[str, Any]] = []
         errors: List[Dict[str, Any]] = []
         total_requests = 0
         total_cost = 0.0

@@ -133,8 +133,6 @@ class CompanyScorer:
         would use domain mapping or live Tranco API.
         """
         # Try to infer domain from company name
-        domain_guess = company_name.lower().replace(" ", "") + ".com"
-
         # Check if we have cached traffic data
         # For now, return None - would integrate with T35 client
         return None

@@ -199,7 +199,6 @@ def parse_filings(
         primary_document = primary_documents[i] if i < len(primary_documents) else None
 
         # Build filing URLs
-        accession_clean = accession_number.replace("-", "")
         cik_padded = str(company_info["cik"]).zfill(10)
 
         filing_url = f"https://www.sec.gov/cgi-bin/viewer?action=view&cik={cik_padded}&accession_number={accession_number}"

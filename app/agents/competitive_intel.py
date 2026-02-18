@@ -289,8 +289,6 @@ class CompetitiveIntelAgent:
             return []
 
         target_sector = target.get("sector") or target.get("industry")
-        target_employees = target.get("employees") or target.get("employee_count")
-        target_funding = target.get("total_funding") or target.get("funding_total")
 
         # Query candidates from same sector
         candidates = self._query_sector_companies(target_sector, limit=100)
@@ -382,7 +380,6 @@ class CompetitiveIntelAgent:
                 total_score += SIMILARITY_WEIGHTS["employee_size"] * ratio
 
         # Funding stage similarity
-        target_funding = target.get("total_funding") or 0
         cand_funding = candidate.get("total_funding") or 0
         if target_funding > 0 and cand_funding > 0:
             # Use log scale for funding comparison
@@ -455,7 +452,6 @@ class CompetitiveIntelAgent:
         """Determine competitive relationship type."""
         target_emp = target.get("employees") or 0
         comp_emp = competitor.get("employees") or 0
-        target_funding = target.get("total_funding") or 0
         comp_funding = competitor.get("total_funding") or 0
 
         # Similar size = direct competitor
@@ -490,7 +486,6 @@ class CompetitiveIntelAgent:
             weaknesses.append("smaller team")
 
         # Funding comparison
-        target_funding = target.get("total_funding") or 0
         comp_funding = competitor.get("total_funding") or 0
         if comp_funding > target_funding * 1.5:
             strengths.append("better funded")

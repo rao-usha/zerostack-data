@@ -115,7 +115,6 @@ async def resolve_tickers_batch(tickers: List[str]) -> Dict[str, Optional[str]]:
     unique_tickers = list(set(tickers))
 
     # Process in batches to avoid overwhelming yfinance
-    batch_size = 10
     semaphore = asyncio.Semaphore(5)
 
     async def resolve_with_limit(ticker: str) -> Tuple[str, Optional[str]]:

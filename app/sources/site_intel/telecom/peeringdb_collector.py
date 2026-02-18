@@ -209,7 +209,6 @@ class PeeringDBCollector(BaseCollector):
         # Parse city/state from location fields
         city = record.get("city")
         state = None
-        region = record.get("region_continent")
 
         # PeeringDB doesn't always have state, try to extract from name or notes
         name = record.get("name", "")

@@ -105,7 +105,6 @@ class GooglePopularTimesStrategy(BaseTrafficStrategy):
 
     async def execute(self, context: LocationContext) -> TrafficStrategyResult:
         """Execute Google Popular Times scraping."""
-        started_at = datetime.utcnow()
         requests_made = 0
 
         settings = get_settings()

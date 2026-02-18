@@ -593,10 +593,6 @@ class GitHubAnalyticsService:
 
         velocity_score = org_data.get("velocity_score", 0)
 
-        # Estimate component scores based on available data
-        metrics = org_data.get("metrics", {})
-        total_stars = metrics.get("total_stars", 0)
-        total_forks = metrics.get("total_forks", 0)
 
         # These are estimates since we don't have detailed historical data
         return {

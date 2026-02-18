@@ -791,7 +791,7 @@ async def _run_enrichment(job_id: str, phases: List[str], db: Session):
                 job_type="enrichment",
             )
 
-            collector_job = collector.create_job(config)
+            collector.create_job(config)
             collector.start_job()
             result = await collector.collect(config)
             collector.complete_job(result)

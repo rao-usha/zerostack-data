@@ -602,6 +602,7 @@ class NewsAgent(BaseCollector):
 
             cutoff_date = date.today() - timedelta(days=days_back)
 
+
             for item in items[:20]:  # Check first 20 items
                 try:
                     title_elem = item.find("title")
@@ -1584,7 +1585,6 @@ class NewsAgent(BaseCollector):
         press releases.
         """
         changes = []
-        cutoff_date = date.today() - timedelta(days=days_back)
 
         # Normalize URL
         if not newsroom_url.startswith("http"):

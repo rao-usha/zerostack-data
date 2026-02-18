@@ -590,7 +590,6 @@ class ReportWriterAgent:
 
         if scores.get("composite_score"):
             score = scores["composite_score"]
-            tier = scores.get("tier", "N/A")
             findings.append(f"Health score: {score:.0f}/100 (Tier {tier})")
 
         if profile.get("sector"):
@@ -620,7 +619,6 @@ class ReportWriterAgent:
             return "Insufficient data for comprehensive assessment."
 
         score = scores.get("composite_score", 0)
-        tier = scores.get("tier", "N/A")
 
         if score >= 80:
             base = "Strong performance with solid fundamentals."

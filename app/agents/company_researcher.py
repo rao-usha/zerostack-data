@@ -847,8 +847,6 @@ Write a concise summary (2-3 sentences) for an investor audience:"""
 
             # Search SEC full-text search for company
             # SEC provides a company search endpoint
-            search_url = "https://efts.sec.gov/LATEST/search-index"
-
             async with httpx.AsyncClient(timeout=15.0) as client:
                 # Try company tickers endpoint first (for well-known companies)
                 try:
