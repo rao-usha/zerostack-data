@@ -1,0 +1,19 @@
+# Ruff linter configuration for Nexdata
+# https://docs.astral.sh/ruff/
+
+line-length = 120
+target-version = "py311"
+
+[format]
+line-ending = "lf"
+
+[lint]
+# Enforce error and pyflakes rules; whitespace/line-length handled by ruff format
+select = ["E", "F"]
+
+# Intentional patterns we suppress:
+# E711/E712: SQLAlchemy column comparisons use == None / == True to generate SQL
+# E741: Some short variable names (l, O) used in data processing loops
+# E402: Late imports used for optional dependencies and circular import avoidance
+# E501: Line length enforced by ruff format, not the linter
+ignore = ["E711", "E712", "E741", "E402", "E501"]
