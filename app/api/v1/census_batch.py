@@ -21,7 +21,7 @@ router = APIRouter(prefix="/census/batch", tags=["census-batch"])
 class BatchStateRequest(BaseModel):
     """Request to ingest Census data at state level for multiple years."""
     survey: str = Field(default="acs5", description="Survey type (acs5, acs1)")
-    years: List[int] = Field(..., description="List of years to ingest", min_items=1, max_items=10)
+    years: List[int] = Field(..., description="List of years to ingest", min_length=1, max_length=10)
     table_id: str = Field(..., description="Census table ID (e.g., B01001)")
     include_geojson: bool = Field(default=False, description="Include GeoJSON boundaries")
 
@@ -29,7 +29,7 @@ class BatchStateRequest(BaseModel):
 class BatchCountyRequest(BaseModel):
     """Request to ingest Census data at county level for multiple years."""
     survey: str = Field(default="acs5", description="Survey type (acs5, acs1)")
-    years: List[int] = Field(..., description="List of years to ingest", min_items=1, max_items=10)
+    years: List[int] = Field(..., description="List of years to ingest", min_length=1, max_length=10)
     table_id: str = Field(..., description="Census table ID (e.g., B01001)")
     state_fips: Optional[str] = Field(None, description="Filter to specific state FIPS code")
     include_geojson: bool = Field(default=False, description="Include GeoJSON boundaries")
