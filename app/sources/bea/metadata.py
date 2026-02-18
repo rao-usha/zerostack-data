@@ -497,7 +497,7 @@ def get_dataset_description(dataset: str) -> str:
             "Foreign Direct Investment, and International Investment Position."
         ),
     }
-    return descriptions.get(dataset, f"Economic data from Bureau of Economic Analysis")
+    return descriptions.get(dataset, "Economic data from Bureau of Economic Analysis")
 
 
 # Reference data for common geographic codes

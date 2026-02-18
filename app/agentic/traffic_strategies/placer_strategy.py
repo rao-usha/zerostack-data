@@ -204,7 +204,7 @@ class PlacerStrategy(BaseTrafficStrategy):
             return self._create_result(
                 success=False,
                 error_message=f"HTTP {e.response.status_code}: {e.response.text}",
-                reasoning=f"Placer.ai API error",
+                reasoning="Placer.ai API error",
                 requests_made=requests_made,
             )
         except Exception as e:

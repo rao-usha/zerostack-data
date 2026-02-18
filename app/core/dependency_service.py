@@ -195,7 +195,7 @@ def add_dependency(
 
     # Check for circular dependency
     if would_create_cycle(db, job_id, depends_on_job_id):
-        raise ValueError(f"Adding dependency would create circular reference")
+        raise ValueError("Adding dependency would create circular reference")
 
     dependency = JobDependency(
         job_id=job_id, depends_on_job_id=depends_on_job_id, condition=condition

@@ -252,7 +252,7 @@ class NewsAgent(BaseCollector):
         try:
             # 1. Check company newsroom
             if website_url or newsroom_url:
-                logger.info(f"[NewsAgent] Step 1: Searching for company newsroom")
+                logger.info("[NewsAgent] Step 1: Searching for company newsroom")
                 newsroom_changes, newsroom_urls = await self._collect_from_newsroom(
                     website_url or newsroom_url,
                     company_name,
@@ -266,11 +266,11 @@ class NewsAgent(BaseCollector):
                     f"[NewsAgent] Newsroom: Found {len(newsroom_changes)} changes from {len(newsroom_urls)} pages"
                 )
             else:
-                logger.info(f"[NewsAgent] Step 1: Skipping newsroom (no website URL)")
+                logger.info("[NewsAgent] Step 1: Skipping newsroom (no website URL)")
 
             # 2. Try RSS feed discovery
             if website_url:
-                logger.info(f"[NewsAgent] Step 2: Discovering RSS/Atom feeds")
+                logger.info("[NewsAgent] Step 2: Discovering RSS/Atom feeds")
                 rss_changes, rss_urls = await self._collect_from_rss_feeds(
                     website_url, company_name, days_back, result
                 )
@@ -282,7 +282,7 @@ class NewsAgent(BaseCollector):
 
             # 3. Search Bing News RSS
             if include_google_news:
-                logger.info(f"[NewsAgent] Step 3: Searching Bing News RSS")
+                logger.info("[NewsAgent] Step 3: Searching Bing News RSS")
                 bing_changes = await self._search_bing_news(
                     company_name, days_back, result
                 )
@@ -290,13 +290,13 @@ class NewsAgent(BaseCollector):
                 logger.info(f"[NewsAgent] Bing News: Found {len(bing_changes)} changes")
 
             # 4. Search PR distribution services directly (bypasses company website blocking)
-            logger.info(f"[NewsAgent] Step 4: Searching PR distribution services")
+            logger.info("[NewsAgent] Step 4: Searching PR distribution services")
             pr_changes = await self._search_pr_services(company_name, days_back, result)
             all_changes.extend(pr_changes)
             logger.info(f"[NewsAgent] PR Services: Found {len(pr_changes)} changes")
 
             # 5. Search financial news sites (Yahoo Finance, MarketWatch)
-            logger.info(f"[NewsAgent] Step 5: Searching financial news sites")
+            logger.info("[NewsAgent] Step 5: Searching financial news sites")
             finance_changes = await self._search_finance_news(
                 company_name, days_back, result
             )
@@ -458,7 +458,7 @@ class NewsAgent(BaseCollector):
                 return url
 
         logger.debug(
-            f"[NewsAgent] No match in first 15 patterns, trying homepage link discovery"
+            "[NewsAgent] No match in first 15 patterns, trying homepage link discovery"
         )
 
         # Strategy 2: Try to find from homepage links
@@ -813,7 +813,7 @@ class NewsAgent(BaseCollector):
 
                 content = await self.fetch_url(rss_url)
                 if not content:
-                    logger.debug(f"[NewsAgent] Failed to fetch Bing News RSS")
+                    logger.debug("[NewsAgent] Failed to fetch Bing News RSS")
                     continue
 
                 # Parse RSS

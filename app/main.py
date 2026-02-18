@@ -155,7 +155,7 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     settings = get_settings()
-    logger.info(f"Starting External Data Ingestion Service")
+    logger.info("Starting External Data Ingestion Service")
     logger.info(f"Log level: {settings.log_level}")
     logger.info(f"Max concurrency: {settings.max_concurrency}")
 

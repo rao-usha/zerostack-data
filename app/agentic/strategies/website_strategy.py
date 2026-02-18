@@ -384,7 +384,7 @@ class WebsiteStrategy(BaseStrategy):
                         content = js_content
                     else:
                         logger.debug(
-                            f"JS rendering didn't improve content much, using static"
+                            "JS rendering didn't improve content much, using static"
                         )
                         # Remove from JS domains since it didn't help
                         self._js_domains.discard(domain)

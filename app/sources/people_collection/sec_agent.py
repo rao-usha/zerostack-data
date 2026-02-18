@@ -113,18 +113,18 @@ class SECAgent(BaseCollector):
             all_changes: List[LeadershipChange] = []
 
             # 1. Get and parse latest proxy statement (DEF 14A)
-            logger.info(f"[SECAgent] Step 1: Fetching proxy statement")
+            logger.info("[SECAgent] Step 1: Fetching proxy statement")
             proxy_people = await self._collect_from_proxy(cik, company_name, result)
             all_people.extend(proxy_people)
 
             # 2. Get executives from 10-K Item 10
-            logger.info(f"[SECAgent] Step 2: Checking 10-K filing")
+            logger.info("[SECAgent] Step 2: Checking 10-K filing")
             tenk_people = await self._collect_from_10k(cik, company_name, result)
             all_people.extend(tenk_people)
 
             # 3. Get officers/directors from Form 4 filings
             if include_form4:
-                logger.info(f"[SECAgent] Step 3: Checking Form 4 filings")
+                logger.info("[SECAgent] Step 3: Checking Form 4 filings")
                 form4_people = await self._collect_from_form4s(
                     cik, company_name, result
                 )
@@ -132,7 +132,7 @@ class SECAgent(BaseCollector):
 
             # 4. Check recent 8-K filings for leadership changes
             if include_8k:
-                logger.info(f"[SECAgent] Step 4: Checking 8-K filings")
+                logger.info("[SECAgent] Step 4: Checking 8-K filings")
                 since_date = date.today() - timedelta(days=days_back)
                 changes = await self._collect_from_8ks(
                     cik, company_name, since_date, result
@@ -193,7 +193,7 @@ class SECAgent(BaseCollector):
 
         if not proxy_content:
             result.warnings.append("Failed to fetch proxy content")
-            logger.warning(f"[SECAgent] Failed to fetch proxy content")
+            logger.warning("[SECAgent] Failed to fetch proxy content")
             return people
 
         logger.debug(f"[SECAgent] Proxy content length: {len(proxy_content)} chars")

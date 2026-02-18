@@ -277,7 +277,7 @@ class PersonNameMatcher:
             similarity=round(best_similarity, 3),
             match_type=match_type if matched else "no_match",
             notes=f"Fuzzy: {best_similarity:.3f}"
-            + (f" (nickname-expanded)" if is_nickname else ""),
+            + (" (nickname-expanded)" if is_nickname else ""),
         )
 
     def classify_match(

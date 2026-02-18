@@ -654,7 +654,7 @@ def get_table_schema(db: Session, table_name: str) -> Optional[Dict]:
     """Get schema definition for a table."""
     try:
         result = db.execute(
-            text(f"""
+            text("""
             SELECT column_name, data_type, is_nullable
             FROM information_schema.columns
             WHERE table_name = :table_name

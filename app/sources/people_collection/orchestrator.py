@@ -1049,7 +1049,7 @@ class PeopleCollectionOrchestrator:
                     )
                 else:
                     logger.warning(
-                        f"[DIAG] Skipping WebsiteAgent - company has no website URL"
+                        "[DIAG] Skipping WebsiteAgent - company has no website URL"
                     )
                     diag.website_errors.append("Company has no website URL configured")
 
@@ -1087,7 +1087,7 @@ class PeopleCollectionOrchestrator:
                         (datetime.utcnow() - agent_start).total_seconds() * 1000
                     )
                 else:
-                    logger.warning(f"[DIAG] Skipping SECAgent - company has no CIK")
+                    logger.warning("[DIAG] Skipping SECAgent - company has no CIK")
                     diag.sec_errors.append("Company has no SEC CIK configured")
 
             # News collection

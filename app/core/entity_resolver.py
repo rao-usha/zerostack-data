@@ -891,7 +891,7 @@ class EntityResolver:
             action=MergeAction.ADD_ALIAS.value,
             target_entity_id=entity_id,
             affected_aliases=[alias_name],
-            reason=f"Manual alias addition",
+            reason="Manual alias addition",
             performed_by=performed_by,
         )
         self.db.add(history)

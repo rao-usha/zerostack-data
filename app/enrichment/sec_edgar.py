@@ -67,6 +67,8 @@ class SECEdgarClient:
             Dict with filing information
         """
         try:
+            cik_padded = cik.zfill(10)
+            url = f"{SEC_EDGAR_BASE}/submissions/CIK{cik_padded}.json"
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, headers=self.headers)
 

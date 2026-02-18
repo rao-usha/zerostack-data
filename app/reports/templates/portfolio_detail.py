@@ -249,6 +249,8 @@ class PortfolioDetailTemplate:
             </tr>
             """
 
+        investor = data.get('investor', {})
+
         html = f"""
 <!DOCTYPE html>
 <html>

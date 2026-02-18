@@ -590,7 +590,7 @@ class ReportWriterAgent:
 
         if scores.get("composite_score"):
             score = scores["composite_score"]
-            findings.append(f"Health score: {score:.0f}/100 (Tier {tier})")
+            findings.append(f"Health score: {score:.0f}/100 (Tier {scores.get('tier', 'N/A')})")
 
         if profile.get("sector"):
             findings.append(f"Operating in {profile['sector']} sector")

@@ -685,7 +685,7 @@ class OECDClient:
             dataSets = data_container.get("dataSets", [])
 
             if not dataSets:
-                logger.warning(f"No dataSets found in OECD response")
+                logger.warning("No dataSets found in OECD response")
                 return []
 
             # Get structure info

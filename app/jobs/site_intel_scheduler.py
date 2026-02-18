@@ -160,7 +160,7 @@ class SiteIntelScheduler:
 
             # 5-minute gap between domains to avoid overwhelming APIs
             if domain != domains[-1]:
-                logger.info(f"Waiting 5 minutes before next domain...")
+                logger.info("Waiting 5 minutes before next domain...")
                 await asyncio.sleep(300)
 
         results["completed_at"] = datetime.utcnow().isoformat()

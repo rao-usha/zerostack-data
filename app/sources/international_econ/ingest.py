@@ -340,7 +340,7 @@ async def ingest_worldbank_indicators(
             job.started_at = datetime.utcnow()
             db.commit()
 
-        logger.info(f"Ingesting World Bank indicator metadata")
+        logger.info("Ingesting World Bank indicator metadata")
 
         # Prepare table
         table_info = await prepare_table_for_intl_data(db, "worldbank", "indicators")

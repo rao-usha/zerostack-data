@@ -192,13 +192,13 @@ class StructureDiscoveryAgent(BaseCollector):
         # Get filing content
         content = await fetcher.get_filing_content(filing, max_length=1000000)
         if not content:
-            logger.warning(f"[StructureDiscovery] Could not fetch 10-K content")
+            logger.warning("[StructureDiscovery] Could not fetch 10-K content")
             return []
 
         # Find Exhibit 21 section
         exhibit_text = self._extract_exhibit_21(content)
         if not exhibit_text:
-            logger.info(f"[StructureDiscovery] No Exhibit 21 found in 10-K")
+            logger.info("[StructureDiscovery] No Exhibit 21 found in 10-K")
             return []
 
         # Use LLM to extract structured data from Exhibit 21

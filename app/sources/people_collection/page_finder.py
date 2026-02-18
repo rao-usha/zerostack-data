@@ -349,7 +349,7 @@ class PageFinder(BaseCollector):
 
         # Strategy 2: Crawl homepage for links
         if len(found_pages) < max_pages:
-            logger.debug(f"[PageFinder] Strategy 2: Crawling homepage for links")
+            logger.debug("[PageFinder] Strategy 2: Crawling homepage for links")
             homepage_pages = await self._crawl_homepage(base_url)
             new_count = 0
             for page in homepage_pages:
@@ -362,7 +362,7 @@ class PageFinder(BaseCollector):
 
         # Strategy 3: Check sitemap
         if len(found_pages) < max_pages:
-            logger.debug(f"[PageFinder] Strategy 3: Checking sitemap.xml")
+            logger.debug("[PageFinder] Strategy 3: Checking sitemap.xml")
             sitemap_pages = await self._check_sitemap(base_url)
             new_count = 0
             for page in sitemap_pages:
@@ -374,13 +374,13 @@ class PageFinder(BaseCollector):
         # Strategy 4: Google search fallback (only if Google API is configured)
         # DuckDuckGo is blocked from Docker containers — skip unless Google API available
         if len(found_pages) < 2 and GOOGLE_API_KEY and GOOGLE_CSE_ID:
-            logger.info(f"[PageFinder] Strategy 4: Trying Google API search fallback")
+            logger.info("[PageFinder] Strategy 4: Trying Google API search fallback")
             google_pages = await self._google_api_search(base_url)
             found_pages.extend(google_pages)
             logger.info(f"[PageFinder] Google search found {len(google_pages)} pages")
         elif len(found_pages) < 2:
             logger.info(
-                f"[PageFinder] Strategy 4: Skipping search fallback (no Google API key, DuckDuckGo blocked in Docker)"
+                "[PageFinder] Strategy 4: Skipping search fallback (no Google API key, DuckDuckGo blocked in Docker)"
             )
 
         # Sort by score and limit

@@ -1063,7 +1063,7 @@ class NewsMonitor:
             lines.append("")
 
         total = stats.get("total_matches", 0)
-        lines.append(f"## Summary")
+        lines.append("## Summary")
         lines.append(f"Total matched news items: {total}")
         lines.append("")
 

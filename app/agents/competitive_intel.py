@@ -380,6 +380,7 @@ class CompetitiveIntelAgent:
                 total_score += SIMILARITY_WEIGHTS["employee_size"] * ratio
 
         # Funding stage similarity
+        target_funding = target.get("total_funding") or 0
         cand_funding = candidate.get("total_funding") or 0
         if target_funding > 0 and cand_funding > 0:
             # Use log scale for funding comparison
@@ -453,6 +454,8 @@ class CompetitiveIntelAgent:
         target_emp = target.get("employees") or 0
         comp_emp = competitor.get("employees") or 0
         comp_funding = competitor.get("total_funding") or 0
+        target_funding = target.get("total_funding") or 0
+        target_funding = target.get("total_funding") or 0
 
         # Similar size = direct competitor
         if target_emp > 0 and comp_emp > 0:
@@ -487,6 +490,7 @@ class CompetitiveIntelAgent:
 
         # Funding comparison
         comp_funding = competitor.get("total_funding") or 0
+        target_funding = target.get("total_funding") or 0
         if comp_funding > target_funding * 1.5:
             strengths.append("better funded")
         elif target_funding > comp_funding * 1.5:

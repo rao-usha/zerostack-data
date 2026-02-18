@@ -189,7 +189,7 @@ class EIAElectricityCollector(BaseCollector):
             # Filter by states if specified
             if config.states:
                 for state in config.states:
-                    params[f"facets[stateid][]"] = state
+                    params["facets[stateid][]"] = state
 
             response = await client.get(url, params=params)
 

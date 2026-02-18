@@ -252,7 +252,7 @@ class KaggleClient:
                 )
             elif "401" in error_str or "unauthorized" in error_str:
                 raise Exception(
-                    f"Kaggle authentication failed. "
+                    "Kaggle authentication failed. "
                     "Ensure KAGGLE_USERNAME and KAGGLE_KEY are set correctly."
                 )
             else:

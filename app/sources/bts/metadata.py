@@ -400,7 +400,7 @@ def get_dataset_description(dataset: str) -> str:
     }
     return descriptions.get(
         dataset,
-        f"Transportation statistics data from Bureau of Transportation Statistics",
+        "Transportation statistics data from Bureau of Transportation Statistics",
     )
 
 

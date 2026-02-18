@@ -144,7 +144,7 @@ class FoursquareStrategy(BaseTrafficStrategy):
             reasoning = (
                 f"Found {len(locations_found)} locations for '{context.brand_name}'"
                 if locations_found
-                else f"Enriched location with Foursquare metadata"
+                else "Enriched location with Foursquare metadata"
             )
 
             return self._create_result(

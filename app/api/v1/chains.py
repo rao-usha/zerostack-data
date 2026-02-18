@@ -424,7 +424,7 @@ def add_job_dependency(dependency: DependencyCreate, db: Session = Depends(get_d
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid condition. Must be: on_success, on_complete, on_failure",
+            detail="Invalid condition. Must be: on_success, on_complete, on_failure",
         )
 
     try:

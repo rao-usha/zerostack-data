@@ -69,7 +69,7 @@ def send_job_event(
             )
 
     db.execute(
-        text(f"SELECT pg_notify(:channel, :payload)"),
+        text("SELECT pg_notify(:channel, :payload)"),
         {
             "channel": CHANNEL,
             "payload": payload,
