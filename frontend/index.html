@@ -613,6 +613,16 @@
         .schedule-badge.active { background: rgba(34,197,94,0.15); color: var(--success); }
         .schedule-badge.paused { background: rgba(148,163,184,0.15); color: var(--text-muted); }
 
+        /* ===== Collection Action Cards (new pattern) ===== */
+        .collection-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+        .collection-action-card { background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+        .collection-action-card:hover { border-color: var(--primary); background: rgba(99,102,241,0.05); }
+        .collection-action-card.active { border-color: var(--primary); background: rgba(99,102,241,0.1); }
+        .collection-action-title { font-size: 1rem; font-weight: 600; margin-bottom: 0.375rem; }
+        .collection-action-desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; }
+        .collection-panel { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin-top: 0.5rem; animation: epSlideDown 0.2s ease-out; }
+        .collection-panel h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; }
+
         /* ===== Checkbox Group (trigger forms) ===== */
         .tf-checkbox-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
         .tf-checkbox-group label {
@@ -1519,6 +1529,9 @@
                 label: 'Macro Economic',
                 sources: [
                     { key: 'fred', label: 'FRED (Federal Reserve)', tablePrefix: 'fred_',
+                      recommendedCadence: 'daily',
+                      backfillTrigger: { method:'POST', path:'/api/v1/fred/ingest/batch', label:'Historical Backfill' },
+                      scheduleTrigger: { method:'POST', path:'/api/v1/fred/ingest/batch', label:'Set Up Schedule' },
                       triggers: [{method:'POST', path:'/api/v1/fred/ingest', label:'Ingest category'}, {method:'POST', path:'/api/v1/fred/ingest/batch', label:'Batch ingest'}],
                       endpoints: [{method:'GET', path:'/api/v1/fred/categories', label:'List categories'}, {method:'GET', path:'/api/v1/fred/series/{category}', label:'Series by category'}],
                       scheduleOptions: ['daily','weekly','monthly'] },
@@ -1964,6 +1977,7 @@
         let selectedSource = null;       // source object when in detail view
         let selectedCatKey = null;       // category key of selected source
         let allTablesCache = null;       // cached /export/tables response
+        let collectionPanel = null;      // 'backfill' | 'schedule' | null
         let expandedTable = null;        // table name showing preview
         let tablePreview = null;         // { rows, columns, column_types, total_rows }
         let previewPage = 0;
@@ -2298,10 +2312,11 @@
                     </div>`;
                 }
             } else {
-                // Fallback to linear scale from local table counts
+                // Fallback to log scale from local table counts (handles 361 vs 7.1M gracefully)
                 const maxCatRecords = Math.max(...Object.values(inv.catRecords).map(c => c.records), 1);
+                const logMax = maxCatRecords > 0 ? Math.log10(maxCatRecords) : 1;
                 for (const [catKey, cat] of Object.entries(inv.catRecords)) {
-                    const pct = Math.max(1, Math.round((cat.records / maxCatRecords) * 100));
+                    const pct = cat.records > 0 ? Math.max(3, Math.round((Math.log10(cat.records) / logMax) * 100)) : 0;
                     const barColor = cat.records > 0 ? 'var(--primary)' : 'var(--border)';
                     html += `<div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.625rem;cursor:pointer;" onclick="expandedCategories['${catKey}']=true;renderSources();document.querySelector('[data-cat=\\'${catKey}\\']')?.scrollIntoView({behavior:'smooth'});">
                         <div style="width:130px;font-size:0.8rem;color:var(--text-muted);text-align:right;flex-shrink:0;">${cat.label}</div>
@@ -2537,6 +2552,7 @@
             tablePreview = null;
             previewPage = 0;
             expandedTriggerId = null;
+            collectionPanel = null;
             renderSources();
         }
 
@@ -3097,6 +3113,326 @@
             if (domWrap) domWrap.classList.toggle('hidden', freq !== 'monthly' && freq !== 'quarterly');
         }
 
+        // ===== New Collection Panel Pattern =====
+
+        function toggleCollectionPanel(panel) {
+            collectionPanel = collectionPanel === panel ? null : panel;
+            renderDetailView();
+        }
+
+        function renderTriggerFormFiltered(formDef, triggerId, skipFieldNames = []) {
+            if (!formDef) return '';
+            const prefix = `tf-${triggerId}`;
+            let html = '';
+            if (formDef.pathParams?.length) {
+                const filtered = formDef.pathParams.filter(p => !skipFieldNames.includes(p.name));
+                if (filtered.length) {
+                    html += '<div class="tf-row">';
+                    filtered.forEach(p => { html += renderFormField(p, prefix + '-pp'); });
+                    html += '</div>';
+                }
+            }
+            if (formDef.fields?.length) {
+                const filtered = formDef.fields.filter(f => !skipFieldNames.includes(f.name));
+                if (filtered.length) {
+                    html += '<div class="tf-row">';
+                    filtered.forEach(f => { html += renderFormField(f, prefix); });
+                    html += '</div>';
+                }
+            }
+            return html;
+        }
+
+        function renderCollectionSection(src) {
+            const backfillActive = collectionPanel === 'backfill';
+            const scheduleActive = collectionPanel === 'schedule';
+            let html = `<div class="ds-detail-tables" style="padding-bottom:1.25rem;">
+                <h3>Set Up Collection</h3>
+                <div class="collection-actions">
+                    <div class="collection-action-card${backfillActive ? ' active' : ''}" onclick="toggleCollectionPanel('backfill')">
+                        <div class="collection-action-title">Historical Backfill</div>
+                        <div class="collection-action-desc">One-time collection with a specific date range. Pull historical data.</div>
+                    </div>
+                    <div class="collection-action-card${scheduleActive ? ' active' : ''}" onclick="toggleCollectionPanel('schedule')">
+                        <div class="collection-action-title">Set Up Schedule</div>
+                        <div class="collection-action-desc">Recurring collection on a cadence. Recommended: <strong>${src.recommendedCadence || 'daily'}</strong></div>
+                    </div>
+                </div>`;
+            if (backfillActive) html += renderBackfillPanel(src);
+            if (scheduleActive) html += renderSchedulePanel(src);
+            html += renderExistingSchedules(src);
+            html += `</div>`;
+            return html;
+        }
+
+        function renderBackfillPanel(src) {
+            const trigger = src.backfillTrigger;
+            const basePath = trigger.path.split('?')[0];
+            const formDef = TRIGGER_FORMS[trigger.path] || TRIGGER_FORMS[basePath] || null;
+            let html = `<div class="collection-panel">
+                <h4>Historical Backfill</h4>`;
+            html += renderTriggerForm(formDef, 'backfill');
+            html += `<div class="tf-actions" style="margin-top:0.75rem;">
+                <button class="btn" style="padding:0.4rem 1.25rem;font-size:0.8rem;" onclick="submitBackfill()">Run Backfill</button>
+                <button class="btn btn-secondary" style="padding:0.4rem 1rem;font-size:0.8rem;" onclick="toggleCollectionPanel('backfill')">Cancel</button>
+            </div>
+            <div id="tf-result-backfill"></div>
+            </div>`;
+            return html;
+        }
+
+        function renderSchedulePanel(src) {
+            const trigger = src.scheduleTrigger;
+            const basePath = trigger.path.split('?')[0];
+            const formDef = TRIGGER_FORMS[trigger.path] || TRIGGER_FORMS[basePath] || null;
+            const rec = src.recommendedCadence || 'daily';
+            const schedOpts = src.scheduleOptions || ['daily','weekly','monthly'];
+            let html = `<div class="collection-panel">
+                <h4>Set Up Schedule</h4>
+                <div class="tf-row">
+                    <div class="tf-field" style="flex:1;">
+                        <label>Schedule Name</label>
+                        <input type="text" id="tf-sched-panel-name" placeholder="e.g. FRED Daily Interest Rates">
+                    </div>
+                    <div class="tf-field" style="flex:1;">
+                        <label>Description (optional)</label>
+                        <input type="text" id="tf-sched-panel-desc" placeholder="What this schedule does">
+                    </div>
+                </div>`;
+            // Render form fields excluding date fields (schedule doesn't need date range)
+            html += renderTriggerFormFiltered(formDef, 'sched-panel', ['observation_start', 'observation_end']);
+            html += `<div class="tf-row">
+                    <div class="tf-field">
+                        <label>Frequency</label>
+                        <select id="tf-sched-panel-freq" onchange="schedPanelFreqChanged()">
+                            ${schedOpts.map(o => `<option value="${o}"${o === rec ? ' selected' : ''}>${o.charAt(0).toUpperCase() + o.slice(1)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="tf-field">
+                        <label>Hour (UTC)</label>
+                        <input type="number" id="tf-sched-panel-hour" value="6" min="0" max="23">
+                    </div>
+                    <div class="tf-field${rec !== 'weekly' ? ' hidden' : ''}" id="tf-sched-panel-dow-wrap">
+                        <label>Day of Week</label>
+                        <select id="tf-sched-panel-dow">
+                            <option value="0">Monday</option><option value="1">Tuesday</option>
+                            <option value="2">Wednesday</option><option value="3">Thursday</option>
+                            <option value="4">Friday</option><option value="5">Saturday</option>
+                            <option value="6">Sunday</option>
+                        </select>
+                    </div>
+                    <div class="tf-field${rec !== 'monthly' && rec !== 'quarterly' ? ' hidden' : ''}" id="tf-sched-panel-dom-wrap">
+                        <label>Day of Month</label>
+                        <input type="number" id="tf-sched-panel-dom" value="1" min="1" max="31">
+                    </div>
+                </div>`;
+            html += `<div class="tf-actions" style="margin-top:0.75rem;">
+                <button class="btn" style="padding:0.4rem 1.25rem;font-size:0.8rem;" onclick="submitSchedulePanel()">Create Schedule</button>
+                <button class="btn btn-secondary" style="padding:0.4rem 1rem;font-size:0.8rem;" onclick="toggleCollectionPanel('schedule')">Cancel</button>
+            </div>
+            <div id="tf-result-sched-panel"></div>
+            </div>`;
+            return html;
+        }
+
+        function renderExistingSchedules(src) {
+            const sourceSchedules = (schedulesData || []).filter(s => s.source === src.key);
+            let html = `<div style="margin-top:0.75rem;">
+                <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;">Active Schedules</div>`;
+            if (sourceSchedules.length > 0) {
+                sourceSchedules.forEach(sched => {
+                    const isActive = sched.is_active !== false;
+                    const statusCls = isActive ? 'active' : 'paused';
+                    const statusLabel = isActive ? 'Active' : 'Paused';
+                    const lastRun = sched.last_run_time ? timeAgo(new Date(sched.last_run_time)) : 'Never';
+                    const nextRun = sched.next_run_time ? new Date(sched.next_run_time).toLocaleString() : 'N/A';
+                    html += `<div class="schedule-list-item">
+                        <span class="sched-name">${escapeHtml(sched.name || sched.source)}</span>
+                        <span class="sched-freq">${sched.frequency || ''}</span>
+                        <span style="font-size:0.7rem;color:var(--text-muted);">Last: ${lastRun}</span>
+                        <span style="font-size:0.7rem;color:var(--text-muted);">Next: ${nextRun}</span>
+                        <span class="schedule-badge ${statusCls}">${statusLabel}</span>
+                        <button class="btn-sm" onclick="toggleScheduleActive(${sched.id}, ${!isActive})">${isActive ? 'Pause' : 'Activate'}</button>
+                        <button class="btn-sm primary" onclick="runScheduleNow(${sched.id})">Run Now</button>
+                    </div>`;
+                });
+            } else {
+                html += `<div style="font-size:0.8rem;color:var(--text-muted);padding:0.5rem 0;">
+                    No schedules configured. Click <strong>Set Up Schedule</strong> above to create one.
+                </div>`;
+            }
+            html += `</div>`;
+            return html;
+        }
+
+        function schedPanelFreqChanged() {
+            const freq = document.getElementById('tf-sched-panel-freq')?.value;
+            const dowWrap = document.getElementById('tf-sched-panel-dow-wrap');
+            const domWrap = document.getElementById('tf-sched-panel-dom-wrap');
+            if (dowWrap) dowWrap.classList.toggle('hidden', freq !== 'weekly');
+            if (domWrap) domWrap.classList.toggle('hidden', freq !== 'monthly' && freq !== 'quarterly');
+        }
+
+        async function submitBackfill() {
+            if (!selectedSource?.backfillTrigger) return;
+            const trigger = selectedSource.backfillTrigger;
+            const resultEl = document.getElementById('tf-result-backfill');
+            const basePath = trigger.path.split('?')[0];
+            const formDef = TRIGGER_FORMS[trigger.path] || TRIGGER_FORMS[basePath] || null;
+
+            const collected = collectFormValues(formDef, trigger.path, trigger.body || {}, 'backfill');
+            if (collected.error) {
+                if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(collected.error)}</div>`;
+                return;
+            }
+
+            if (resultEl) resultEl.innerHTML = '<span style="color:var(--text-muted);font-size:0.8rem;">Submitting...</span>';
+            try {
+                const opts = { method: trigger.method, headers: { 'Content-Type': 'application/json' } };
+                if (Object.keys(collected.body).length > 0) opts.body = JSON.stringify(collected.body);
+                const res = await fetch(collected.resolvedPath, opts);
+                const data = await res.json();
+                if (res.ok) {
+                    const jobId = data.job_id || data.id || '';
+                    showToast(`Backfill started!${jobId ? ` Job ID: ${jobId}` : ''}`, 'success');
+                    if (resultEl) resultEl.innerHTML = `<div class="tf-result success">Started${jobId ? ` (Job ${jobId})` : ''}</div>`;
+                } else {
+                    showToast(`Failed: ${data.detail || JSON.stringify(data)}`, 'error');
+                    if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(data.detail || JSON.stringify(data))}</div>`;
+                }
+            } catch (e) {
+                showToast(`Request failed: ${e.message}`, 'error');
+                if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        async function submitSchedulePanel() {
+            const resultEl = document.getElementById('tf-result-sched-panel');
+            const name = document.getElementById('tf-sched-panel-name')?.value?.trim();
+            const description = document.getElementById('tf-sched-panel-desc')?.value?.trim() || null;
+            const frequency = document.getElementById('tf-sched-panel-freq')?.value || 'daily';
+            const hour = parseInt(document.getElementById('tf-sched-panel-hour')?.value) || 6;
+            const dayOfWeekEl = document.getElementById('tf-sched-panel-dow');
+            const dayOfMonthEl = document.getElementById('tf-sched-panel-dom');
+            const dayOfWeek = (frequency === 'weekly' && dayOfWeekEl) ? parseInt(dayOfWeekEl.value) : null;
+            const dayOfMonth = ((frequency === 'monthly' || frequency === 'quarterly') && dayOfMonthEl) ? parseInt(dayOfMonthEl.value) : null;
+
+            if (!name) {
+                if (resultEl) resultEl.innerHTML = '<div class="tf-result error">Schedule name is required</div>';
+                return;
+            }
+
+            if (!selectedSource?.scheduleTrigger) return;
+            const trigger = selectedSource.scheduleTrigger;
+            const basePath = trigger.path.split('?')[0];
+            const formDef = TRIGGER_FORMS[trigger.path] || TRIGGER_FORMS[basePath] || null;
+            // Collect form values from the schedule panel (uses 'sched-panel' trigger ID)
+            const collected = collectFormValues(formDef, trigger.path, trigger.body || {}, 'sched-panel');
+            if (collected.error) {
+                if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(collected.error)}</div>`;
+                return;
+            }
+
+            const config = { ...collected.body };
+            config._trigger_path = collected.resolvedPath;
+            config._trigger_method = trigger.method;
+
+            if (resultEl) resultEl.innerHTML = '<span style="color:var(--text-muted);font-size:0.8rem;">Creating schedule...</span>';
+            try {
+                const schedBody = {
+                    name,
+                    source: selectedSource.key,
+                    config,
+                    frequency,
+                    hour,
+                    is_active: true,
+                    priority: 5,
+                };
+                if (description) schedBody.description = description;
+                if (dayOfWeek !== null) schedBody.day_of_week = dayOfWeek;
+                if (dayOfMonth !== null) schedBody.day_of_month = dayOfMonth;
+                const res = await fetch(`${API}/schedules`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(schedBody),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(`Schedule "${name}" created!`, 'success');
+                    schedulesData = await fetch(`${API}/schedules`).then(r => r.ok ? r.json() : schedulesData).catch(() => schedulesData);
+                    collectionPanel = null;
+                    renderDetailView();
+                } else {
+                    showToast(`Schedule creation failed: ${data.detail || JSON.stringify(data)}`, 'error');
+                    if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(data.detail || JSON.stringify(data))}</div>`;
+                }
+            } catch (e) {
+                showToast(`Schedule creation failed: ${e.message}`, 'error');
+                if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        function renderLegacyTriggerSection(src, triggers) {
+            let html = `<div class="ds-detail-tables" style="padding-bottom:1.25rem;">
+                <h3>Run Collection</h3>
+                <div style="margin-bottom:1rem;">`;
+            triggers.forEach((t, i) => {
+                const isExpanded = expandedTriggerId === i;
+                const basePath = t.path.split('?')[0];
+                const formDef = TRIGGER_FORMS[t.path] || TRIGGER_FORMS[basePath] || null;
+                const hasForm = formDef && ((formDef.pathParams?.length) || (formDef.fields?.length));
+                const needsForm = t.path.includes('{') || hasForm;
+                html += `<div class="ds-detail-table-row" style="cursor:default;margin-bottom:${isExpanded ? '0' : '0.375rem'};">
+                    <div style="flex:1;">
+                        <div class="ds-detail-table-name" style="font-size:0.85rem;">${t.label}</div>
+                        <div style="font-family:monospace;font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">${t.method} ${t.path}</div>
+                        ${t.body && !isExpanded ? `<div style="font-family:monospace;font-size:0.7rem;color:var(--text-muted);margin-top:0.125rem;">Body: ${JSON.stringify(t.body)}</div>` : ''}
+                    </div>
+                    <button class="btn${isExpanded ? ' btn-secondary' : ''}" style="padding:0.375rem 1rem;font-size:0.8rem;"
+                        onclick="triggerCollection(${i})">${isExpanded ? 'Close' : 'Run'}</button>
+                </div>`;
+                if (isExpanded) {
+                    html += `<div class="trigger-form-panel">`;
+                    html += renderTriggerForm(formDef, i);
+                    html += renderScheduleToggle(i, src.key);
+                    html += `<div class="tf-actions">
+                        <button class="btn" style="padding:0.4rem 1.25rem;font-size:0.8rem;" onclick="submitTrigger(${i})">Submit</button>
+                        <button class="btn btn-secondary" style="padding:0.4rem 1rem;font-size:0.8rem;" onclick="cancelTrigger()">Cancel</button>
+                    </div>
+                    <div id="tf-result-${i}"></div>`;
+                    html += `</div>`;
+                }
+            });
+            html += `</div>`;
+
+            // Existing Schedules
+            const sourceSchedules = (schedulesData || []).filter(s => s.source === src.key);
+            html += `<div style="margin-top:0.5rem;">
+                <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;">Schedules</div>`;
+            if (sourceSchedules.length > 0) {
+                sourceSchedules.forEach(sched => {
+                    const isActive = sched.is_active !== false;
+                    const statusCls = isActive ? 'active' : 'paused';
+                    const statusLabel = isActive ? 'Active' : 'Paused';
+                    const nextRun = sched.next_run_time ? new Date(sched.next_run_time).toLocaleString() : 'N/A';
+                    html += `<div class="schedule-list-item">
+                        <span class="sched-name">${escapeHtml(sched.name || sched.source)}</span>
+                        <span class="sched-freq">${sched.frequency || ''}</span>
+                        <span style="font-size:0.7rem;color:var(--text-muted);">Next: ${nextRun}</span>
+                        <span class="schedule-badge ${statusCls}">${statusLabel}</span>
+                        <button class="btn-sm" onclick="toggleScheduleActive(${sched.id}, ${!isActive})">${isActive ? 'Pause' : 'Activate'}</button>
+                        <button class="btn-sm primary" onclick="runScheduleNow(${sched.id})">Run Now</button>
+                    </div>`;
+                });
+            } else {
+                html += `<div style="font-size:0.8rem;color:var(--text-muted);padding:0.5rem 0;">
+                    No schedules configured. Use the <strong>Run</strong> button above and toggle "Save as recurring schedule" to create one.
+                </div>`;
+            }
+            html += `</div></div>`;
+            return html;
+        }
+
         function renderDetailView() {
             const src = selectedSource;
             if (!src) { backToList(); return; }
@@ -3125,69 +3461,17 @@
                     <span class="ds-detail-chip">Frequency: ${getFrequency(src.key)}</span>
                     <span class="ds-detail-chip">${sourceTables.length} table${sourceTables.length !== 1 ? 's' : ''} &middot; ${fmtNum(totalRows)} total rows</span>
                 </div>
+                ${src.recommendedCadence && getFrequency(src.key) === 'Manual' ? `<div style="color:var(--text-muted);font-size:0.8rem;margin-top:0.5rem;">Recommended cadence: <strong>${src.recommendedCadence}</strong></div>` : ''}
             </div>`;
 
-            // ---- Run Collection section ----
+            // ---- Collection section ----
             const triggers = src.triggers || [];
-            if (triggers.length > 0) {
-                html += `<div class="ds-detail-tables" style="padding-bottom:1.25rem;">
-                    <h3>Run Collection</h3>
-                    <div style="margin-bottom:1rem;">`;
-                triggers.forEach((t, i) => {
-                    const isExpanded = expandedTriggerId === i;
-                    // Find the best matching form def: try exact path first, then strip query string
-                    const basePath = t.path.split('?')[0];
-                    const formDef = TRIGGER_FORMS[t.path] || TRIGGER_FORMS[basePath] || null;
-                    const hasForm = formDef && ((formDef.pathParams?.length) || (formDef.fields?.length));
-                    const needsForm = t.path.includes('{') || hasForm;
-                    html += `<div class="ds-detail-table-row" style="cursor:default;margin-bottom:${isExpanded ? '0' : '0.375rem'};">
-                        <div style="flex:1;">
-                            <div class="ds-detail-table-name" style="font-size:0.85rem;">${t.label}</div>
-                            <div style="font-family:monospace;font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">${t.method} ${t.path}</div>
-                            ${t.body && !isExpanded ? `<div style="font-family:monospace;font-size:0.7rem;color:var(--text-muted);margin-top:0.125rem;">Body: ${JSON.stringify(t.body)}</div>` : ''}
-                        </div>
-                        <button class="btn${isExpanded ? ' btn-secondary' : ''}" style="padding:0.375rem 1rem;font-size:0.8rem;"
-                            onclick="triggerCollection(${i})">${isExpanded ? 'Close' : 'Run'}</button>
-                    </div>`;
-                    if (isExpanded) {
-                        html += `<div class="trigger-form-panel">`;
-                        html += renderTriggerForm(formDef, i);
-                        html += renderScheduleToggle(i, src.key);
-                        html += `<div class="tf-actions">
-                            <button class="btn" style="padding:0.4rem 1.25rem;font-size:0.8rem;" onclick="submitTrigger(${i})">Submit</button>
-                            <button class="btn btn-secondary" style="padding:0.4rem 1rem;font-size:0.8rem;" onclick="cancelTrigger()">Cancel</button>
-                        </div>
-                        <div id="tf-result-${i}"></div>`;
-                        html += `</div>`;
-                    }
-                });
-                html += `</div>`;
-
-                // ---- Existing Schedules for this source ----
-                const sourceSchedules = (schedulesData || []).filter(s => s.source === src.key);
-                html += `<div style="margin-top:0.5rem;">
-                    <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;">Schedules</div>`;
-                if (sourceSchedules.length > 0) {
-                    sourceSchedules.forEach(sched => {
-                        const isActive = sched.is_active !== false;
-                        const statusCls = isActive ? 'active' : 'paused';
-                        const statusLabel = isActive ? 'Active' : 'Paused';
-                        const nextRun = sched.next_run_time ? new Date(sched.next_run_time).toLocaleString() : 'N/A';
-                        html += `<div class="schedule-list-item">
-                            <span class="sched-name">${escapeHtml(sched.name || sched.source)}</span>
-                            <span class="sched-freq">${sched.frequency || ''}</span>
-                            <span style="font-size:0.7rem;color:var(--text-muted);">Next: ${nextRun}</span>
-                            <span class="schedule-badge ${statusCls}">${statusLabel}</span>
-                            <button class="btn-sm" onclick="toggleScheduleActive(${sched.id}, ${!isActive})">${isActive ? 'Pause' : 'Activate'}</button>
-                            <button class="btn-sm primary" onclick="runScheduleNow(${sched.id})">Run Now</button>
-                        </div>`;
-                    });
-                } else {
-                    html += `<div style="font-size:0.8rem;color:var(--text-muted);padding:0.5rem 0;">
-                        No schedules configured. Use the <strong>Run</strong> button above and toggle "Save as recurring schedule" to create one.
-                    </div>`;
-                }
-                html += `</div></div>`;
+            if (src.backfillTrigger || src.scheduleTrigger) {
+                // NEW pattern: two action cards
+                html += renderCollectionSection(src);
+            } else if (triggers.length > 0) {
+                // LEGACY: keep old "Run" button behavior for unmigrated sources
+                html += renderLegacyTriggerSection(src, triggers);
             }
 
             // ---- Available Endpoints section ----
