@@ -376,6 +376,19 @@ API_REGISTRY: Dict[str, APIConfig] = {
         timeout_seconds=60.0,
         notes="PatentsView API. 45 req/min, max 1000 records/request. Free API key required.",
     ),
+    # -------------------------------------------------------------------------
+    # REFERENCE DATA
+    # -------------------------------------------------------------------------
+    "dunl": APIConfig(
+        source_name="dunl",
+        base_url="https://dunl.org",
+        api_key_requirement=APIKeyRequirement.OPTIONAL,
+        config_key="",
+        signup_url="https://dunl.org",
+        max_concurrency=2,
+        rate_limit_per_minute=60,
+        notes="S&P Global open data (DUNL.org). No key required. CC licensed.",
+    ),
 }
 
 

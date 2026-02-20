@@ -484,6 +484,32 @@ SOURCE_DISPATCH: Dict[str, Tuple[str, str, List[str]]] = {
         "dispatch_usda_all_major_crops",
         ["year", "api_key"],
     ),
+    # DUNL (S&P Global Data Unlocked)
+    "dunl:currencies": (
+        "app.sources.dunl.ingest",
+        "ingest_dunl_currencies",
+        [],
+    ),
+    "dunl:ports": (
+        "app.sources.dunl.ingest",
+        "ingest_dunl_ports",
+        [],
+    ),
+    "dunl:uom": (
+        "app.sources.dunl.ingest",
+        "ingest_dunl_uom",
+        [],
+    ),
+    "dunl:uom_conversions": (
+        "app.sources.dunl.ingest",
+        "ingest_dunl_uom_conversions",
+        [],
+    ),
+    "dunl:calendars": (
+        "app.sources.dunl.ingest",
+        "ingest_dunl_calendars",
+        ["years"],
+    ),
 }
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])

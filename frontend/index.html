@@ -565,21 +565,46 @@
             padding: 1rem 1.25rem; margin: 0.25rem 0 0.75rem 0;
             animation: epSlideDown 0.2s ease-out;
         }
-        .trigger-form-panel .tf-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
-        .trigger-form-panel .tf-field { display: flex; flex-direction: column; gap: 0.25rem; min-width: 140px; }
-        .trigger-form-panel .tf-field label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 500; }
+        .trigger-form-panel .tf-row,
+        .nc-form-section .tf-row,
+        .nc-sched-config .tf-row,
+        .nc-controls-row .tf-field { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+        .trigger-form-panel .tf-field,
+        .nc-form-section .tf-field,
+        .nc-sched-config .tf-field,
+        .nc-controls-row .tf-field { display: flex; flex-direction: column; gap: 0.25rem; min-width: 140px; }
+        .trigger-form-panel .tf-field label,
+        .nc-form-section .tf-field label,
+        .nc-sched-config .tf-field label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 500; }
         .trigger-form-panel .tf-field select,
         .trigger-form-panel .tf-field input,
-        .trigger-form-panel .tf-field textarea {
+        .trigger-form-panel .tf-field textarea,
+        .nc-form-section .tf-field select,
+        .nc-form-section .tf-field input,
+        .nc-form-section .tf-field textarea,
+        .nc-sched-config .tf-field select,
+        .nc-sched-config .tf-field input,
+        .nc-sched-config .tf-field textarea,
+        .nc-controls-row .tf-field select,
+        .nc-controls-row .tf-field input {
             padding: 0.45rem 0.65rem; background: var(--bg-input); border: 1px solid var(--border);
             border-radius: 6px; color: var(--text); font-size: 0.85rem;
         }
         .trigger-form-panel .tf-field select:focus,
-        .trigger-form-panel .tf-field input:focus { outline: none; border-color: var(--primary); }
+        .trigger-form-panel .tf-field input:focus,
+        .nc-form-section .tf-field select:focus,
+        .nc-form-section .tf-field input:focus,
+        .nc-sched-config .tf-field select:focus,
+        .nc-sched-config .tf-field input:focus,
+        .nc-controls-row .tf-field select:focus,
+        .nc-controls-row .tf-field input:focus { outline: none; border-color: var(--primary); }
         .trigger-form-panel .tf-actions { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem; }
-        .trigger-form-panel .tf-result { font-size: 0.8rem; margin-top: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; }
-        .trigger-form-panel .tf-result.success { background: rgba(34,197,94,0.1); color: var(--success); }
-        .trigger-form-panel .tf-result.error { background: rgba(239,68,68,0.1); color: var(--error); }
+        .trigger-form-panel .tf-result,
+        .nc-submit-row .tf-result { font-size: 0.8rem; margin-top: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; }
+        .trigger-form-panel .tf-result.success,
+        .nc-submit-row .tf-result.success { background: rgba(34,197,94,0.1); color: var(--success); }
+        .trigger-form-panel .tf-result.error,
+        .nc-submit-row .tf-result.error { background: rgba(239,68,68,0.1); color: var(--error); }
 
         /* ===== Toggle Switch ===== */
         .toggle-row { display: flex; align-items: center; gap: 0.75rem; margin: 0.75rem 0; }
@@ -613,18 +638,27 @@
         .schedule-badge.active { background: rgba(34,197,94,0.15); color: var(--success); }
         .schedule-badge.paused { background: rgba(148,163,184,0.15); color: var(--text-muted); }
 
-        /* ===== Execution Mode Toggle (New Collection) ===== */
-        .exec-mode-group { display: flex; gap: 0; margin: 1rem 0; }
-        .exec-mode-btn { flex: 1; padding: 0.625rem 1rem; text-align: center;
+        /* ===== New Collection Flow ===== */
+        .nc-controls-row { display: flex; gap: 1rem; align-items: flex-end; margin-bottom: 1rem; }
+        .nc-controls-row .tf-field { flex: 1; }
+        .exec-mode-group { display: flex; gap: 0; flex-shrink: 0; }
+        .exec-mode-btn { padding: 0.5rem 1.125rem; text-align: center;
             background: var(--bg-input); border: 1px solid var(--border);
-            color: var(--text-muted); cursor: pointer; font-size: 0.85rem; transition: all 0.15s; }
-        .exec-mode-btn:first-child { border-radius: 8px 0 0 8px; }
-        .exec-mode-btn:last-child { border-radius: 0 8px 8px 0; border-left: none; }
+            color: var(--text-muted); cursor: pointer; font-size: 0.8rem; transition: all 0.15s;
+            white-space: nowrap; line-height: 1.4; }
+        .exec-mode-btn:first-child { border-radius: 6px 0 0 6px; }
+        .exec-mode-btn:last-child { border-radius: 0 6px 6px 0; border-left: none; }
         .exec-mode-btn.active { background: rgba(99,102,241,0.15); border-color: var(--primary);
             color: var(--primary); font-weight: 600; }
-        .collection-info-note { font-size: 0.8rem; color: var(--text-muted);
-            padding: 0.5rem 0.75rem; background: rgba(6,182,212,0.08);
-            border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; margin: 0.75rem 0; }
+        .nc-form-section { background: var(--bg); border: 1px solid var(--border);
+            border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; }
+        .collection-info-note { font-size: 0.78rem; color: var(--text-muted);
+            padding: 0.5rem 0.75rem; background: rgba(6,182,212,0.06);
+            border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; margin: 0 0 1rem 0; }
+        .nc-sched-config { background: var(--bg); border: 1px solid var(--border);
+            border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; }
+        .nc-sched-config .tf-row:last-child { margin-bottom: 0; }
+        .nc-submit-row { display: flex; align-items: center; gap: 1rem; }
         .collection-panel { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin-top: 0.5rem; animation: epSlideDown 0.2s ease-out; }
         .collection-panel h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; }
 
@@ -1158,20 +1192,68 @@
             '/api/v1/census/batch/state': {
                 fields: [
                     { name: 'survey', label: 'Survey', type: 'select', options: [
-                        {value:'acs5',label:'ACS 5-Year'},{value:'acs1',label:'ACS 1-Year'},
+                        {value:'acs5',label:'ACS 5-Year Estimates'},{value:'acs1',label:'ACS 1-Year Estimates'},
                     ]},
-                    { name: 'table_id', label: 'Table ID', type: 'text', required: true, placeholder: 'B01001' },
-                    { name: 'years', label: 'Years (comma-separated)', type: 'text', required: true, placeholder: '2020,2021,2022 (max 10)' },
+                    { name: 'table_id', label: 'Census Table', type: 'select', required: true, options: [
+                        { value: 'B01001', label: 'B01001 — Sex by Age' },
+                        { value: 'B01003', label: 'B01003 — Total Population' },
+                        { value: 'B02001', label: 'B02001 — Race' },
+                        { value: 'B03003', label: 'B03003 — Hispanic/Latino Origin' },
+                        { value: 'B19013', label: 'B19013 — Median Household Income' },
+                        { value: 'B19001', label: 'B19001 — Household Income Brackets' },
+                        { value: 'B25001', label: 'B25001 — Housing Units' },
+                        { value: 'B25077', label: 'B25077 — Median Home Value' },
+                        { value: 'B25064', label: 'B25064 — Median Gross Rent' },
+                        { value: 'B23025', label: 'B23025 — Employment Status' },
+                        { value: 'B15003', label: 'B15003 — Educational Attainment' },
+                        { value: 'B17001', label: 'B17001 — Poverty Status' },
+                        { value: 'B08301', label: 'B08301 — Means of Transportation to Work' },
+                        { value: 'B27001', label: 'B27001 — Health Insurance Coverage' },
+                    ]},
+                    { name: 'years', label: 'Years (comma-sep, max 10)', type: 'text', required: true,
+                      placeholder: '2020,2021,2022,2023' },
+                    { name: 'include_geojson', label: 'Include GeoJSON boundaries', type: 'select', options: [
+                        { value: 'false', label: 'No (faster)' }, { value: 'true', label: 'Yes' },
+                    ]},
                 ]
             },
             '/api/v1/census/batch/county': {
                 fields: [
                     { name: 'survey', label: 'Survey', type: 'select', options: [
-                        {value:'acs5',label:'ACS 5-Year'},{value:'acs1',label:'ACS 1-Year'},
+                        {value:'acs5',label:'ACS 5-Year Estimates'},{value:'acs1',label:'ACS 1-Year Estimates'},
                     ]},
-                    { name: 'table_id', label: 'Table ID', type: 'text', required: true, placeholder: 'B01001' },
-                    { name: 'years', label: 'Years (comma-separated)', type: 'text', required: true, placeholder: '2020,2021,2022 (max 10)' },
-                    { name: 'state_fips', label: 'State FIPS (optional)', type: 'text', placeholder: '06' },
+                    { name: 'table_id', label: 'Census Table', type: 'select', required: true, options: [
+                        { value: 'B01001', label: 'B01001 — Sex by Age' },
+                        { value: 'B01003', label: 'B01003 — Total Population' },
+                        { value: 'B02001', label: 'B02001 — Race' },
+                        { value: 'B03003', label: 'B03003 — Hispanic/Latino Origin' },
+                        { value: 'B19013', label: 'B19013 — Median Household Income' },
+                        { value: 'B19001', label: 'B19001 — Household Income Brackets' },
+                        { value: 'B25001', label: 'B25001 — Housing Units' },
+                        { value: 'B25077', label: 'B25077 — Median Home Value' },
+                        { value: 'B25064', label: 'B25064 — Median Gross Rent' },
+                        { value: 'B23025', label: 'B23025 — Employment Status' },
+                        { value: 'B15003', label: 'B15003 — Educational Attainment' },
+                        { value: 'B17001', label: 'B17001 — Poverty Status' },
+                        { value: 'B08301', label: 'B08301 — Means of Transportation to Work' },
+                        { value: 'B27001', label: 'B27001 — Health Insurance Coverage' },
+                    ]},
+                    { name: 'years', label: 'Years (comma-sep, max 10)', type: 'text', required: true,
+                      placeholder: '2020,2021,2022,2023' },
+                    { name: 'state_fips', label: 'State (optional)', type: 'select', options: [
+                        { value: '', label: 'All states' },
+                        { value: '06', label: 'California' }, { value: '48', label: 'Texas' },
+                        { value: '36', label: 'New York' }, { value: '12', label: 'Florida' },
+                        { value: '17', label: 'Illinois' }, { value: '42', label: 'Pennsylvania' },
+                        { value: '39', label: 'Ohio' }, { value: '13', label: 'Georgia' },
+                        { value: '37', label: 'North Carolina' }, { value: '26', label: 'Michigan' },
+                        { value: '34', label: 'New Jersey' }, { value: '51', label: 'Virginia' },
+                        { value: '53', label: 'Washington' }, { value: '04', label: 'Arizona' },
+                        { value: '25', label: 'Massachusetts' }, { value: '47', label: 'Tennessee' },
+                    ]},
+                    { name: 'include_geojson', label: 'Include GeoJSON boundaries', type: 'select', options: [
+                        { value: 'false', label: 'No (faster)' }, { value: 'true', label: 'Yes' },
+                    ]},
                 ]
             },
 
@@ -1320,15 +1402,37 @@
             '/api/v1/pe/collection/collect': { fields: [] },
 
             // ── USDA ──
-            '/api/v1/usda/{dataset}/ingest': {
-                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
-                    { value: 'crop', label: 'Crop Production' }, { value: 'livestock', label: 'Livestock' },
-                    { value: 'annual-summary', label: 'Annual Summary' }, { value: 'all-major-crops', label: 'All Major Crops' },
-                ]}],
+            '/api/v1/usda/crop/ingest': {
                 fields: [
-                    { name: 'commodity', label: 'Commodity', type: 'text', placeholder: 'e.g. CORN' },
+                    { name: 'commodity', label: 'Commodity', type: 'select', required: true, options: [
+                        { value: 'CORN', label: 'Corn' }, { value: 'SOYBEANS', label: 'Soybeans' },
+                        { value: 'WHEAT', label: 'Wheat' }, { value: 'RICE', label: 'Rice' },
+                        { value: 'COTTON', label: 'Cotton' }, { value: 'BARLEY', label: 'Barley' },
+                        { value: 'OATS', label: 'Oats' }, { value: 'SORGHUM', label: 'Sorghum' },
+                    ]},
                     { name: 'year', label: 'Year', type: 'number', placeholder: '2025' },
-                    { name: 'state', label: 'State', type: 'text', placeholder: 'e.g. IOWA' },
+                    { name: 'state', label: 'State (blank = national)', type: 'text', placeholder: 'e.g. IOWA, ILLINOIS' },
+                ],
+            },
+            '/api/v1/usda/livestock/ingest': {
+                fields: [
+                    { name: 'commodity', label: 'Livestock Type', type: 'select', required: true, options: [
+                        { value: 'CATTLE', label: 'Cattle' }, { value: 'HOGS', label: 'Hogs' },
+                        { value: 'SHEEP', label: 'Sheep' }, { value: 'CHICKENS', label: 'Chickens' },
+                        { value: 'TURKEYS', label: 'Turkeys' },
+                    ]},
+                    { name: 'year', label: 'Year', type: 'number', placeholder: '2025' },
+                    { name: 'state', label: 'State (blank = national)', type: 'text', placeholder: 'e.g. TEXAS, IOWA' },
+                ],
+            },
+            '/api/v1/usda/annual-summary/ingest': {
+                fields: [
+                    { name: 'year', label: 'Year', type: 'number', placeholder: '2025' },
+                ],
+            },
+            '/api/v1/usda/all-major-crops/ingest': {
+                fields: [
+                    { name: 'year', label: 'Year', type: 'number', placeholder: '2025' },
                 ],
             },
             '/api/v1/noaa/ingest': {
@@ -1343,14 +1447,49 @@
                     { name: 'max_results', label: 'Max Results', type: 'number', placeholder: '1000' },
                 ],
             },
-            '/api/v1/fbi-crime/{dataset}/ingest': {
-                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
-                    { value: 'estimates', label: 'Crime Estimates' }, { value: 'summarized', label: 'Summarized (SRS)' },
-                    { value: 'nibrs', label: 'NIBRS' }, { value: 'hate-crime', label: 'Hate Crime' }, { value: 'leoka', label: 'LEOKA' },
-                ]}],
+            '/api/v1/fbi-crime/estimates/ingest': {
                 fields: [
-                    { name: 'states', label: 'States (comma-sep)', type: 'text', placeholder: 'CA,TX,NY' },
-                    { name: 'offenses', label: 'Offenses', type: 'text', placeholder: 'e.g. burglary' },
+                    { name: 'scope', label: 'Scope', type: 'select', options: [
+                        { value: 'national', label: 'National' }, { value: 'state', label: 'State-level' },
+                    ]},
+                    { name: 'offenses', label: 'Offenses (comma-sep)', type: 'text',
+                      placeholder: 'violent-crime,property-crime,homicide,robbery (blank = all)' },
+                    { name: 'states', label: 'States (comma-sep, for state scope)', type: 'text', placeholder: 'CA,TX,NY' },
+                ],
+            },
+            '/api/v1/fbi-crime/summarized/ingest': {
+                fields: [
+                    { name: 'states', label: 'States (comma-sep)', type: 'text', placeholder: 'CA,TX,NY (blank = all)' },
+                    { name: 'offenses', label: 'Offenses (comma-sep)', type: 'text',
+                      placeholder: 'burglary,larceny,robbery (blank = all)' },
+                    { name: 'since', label: 'Since Year', type: 'number', placeholder: '2010' },
+                    { name: 'until', label: 'Until Year', type: 'number', placeholder: '2023' },
+                ],
+            },
+            '/api/v1/fbi-crime/nibrs/ingest': {
+                fields: [
+                    { name: 'states', label: 'States (comma-sep)', type: 'text', placeholder: 'CA,TX,NY (blank = all)' },
+                    { name: 'variables', label: 'Variables (comma-sep)', type: 'text',
+                      placeholder: 'count,offense,victim/age,offender/race (blank = all)' },
+                ],
+            },
+            '/api/v1/fbi-crime/hate-crime/ingest': {
+                fields: [
+                    { name: 'states', label: 'States (comma-sep)', type: 'text', placeholder: 'CA,TX,NY (blank = national)' },
+                ],
+            },
+            '/api/v1/fbi-crime/leoka/ingest': {
+                fields: [
+                    { name: 'states', label: 'States (comma-sep)', type: 'text', placeholder: 'CA,TX,NY (blank = national)' },
+                ],
+            },
+            '/api/v1/fbi-crime/ingest/all': {
+                fields: [
+                    { name: 'datasets', label: 'Datasets (comma-sep)', type: 'text',
+                      placeholder: 'estimates_national,summarized,nibrs,hate_crime,leoka' },
+                    { name: 'include_states', label: 'Include state-level data', type: 'select', options: [
+                        { value: 'false', label: 'No (national only)' }, { value: 'true', label: 'Yes (more API calls)' },
+                    ]},
                 ],
             },
             '/api/v1/kaggle/m5/ingest': {
@@ -1359,6 +1498,10 @@
                     { name: 'limit_items', label: 'Limit Items', type: 'number', placeholder: '1000' },
                 ],
             },
+            '/api/v1/kaggle/m5/prepare-tables': {
+                fields: [],
+            },
+            // ── Yelp ──
             '/api/v1/yelp/businesses/ingest': {
                 fields: [
                     { name: 'location', label: 'Location', type: 'text', required: true, placeholder: 'e.g. San Francisco, CA' },
@@ -1367,16 +1510,53 @@
                     { name: 'limit', label: 'Limit', type: 'number', placeholder: '50' },
                 ],
             },
-            '/api/v1/uspto/ingest/{method}': {
-                pathParams: [{ name: 'method', label: 'Method', type: 'select', required: true, options: [
-                    { value: 'assignee', label: 'By Assignee' }, { value: 'cpc', label: 'By CPC Code' }, { value: 'search', label: 'By Search Query' },
-                ]}],
+            '/api/v1/yelp/businesses/multi-location/ingest': {
                 fields: [
-                    { name: 'assignee_name', label: 'Assignee Name', type: 'text', placeholder: 'e.g. Google LLC' },
-                    { name: 'cpc_code', label: 'CPC Code', type: 'text', placeholder: 'e.g. G06F' },
-                    { name: 'search_query', label: 'Search Query', type: 'text', placeholder: 'e.g. machine learning' },
-                    { name: 'date_from', label: 'Date From', type: 'date' }, { name: 'date_to', label: 'Date To', type: 'date' },
-                    { name: 'max_patents', label: 'Max Patents', type: 'number', placeholder: '100' },
+                    { name: 'locations', label: 'Locations (comma-sep)', type: 'text', required: true,
+                      placeholder: 'San Francisco CA, New York NY, Chicago IL' },
+                    { name: 'term', label: 'Search Term', type: 'text', placeholder: 'e.g. restaurants, coffee shops' },
+                    { name: 'categories', label: 'Categories', type: 'text', placeholder: 'e.g. restaurants,bars' },
+                    { name: 'limit_per_location', label: 'Limit per Location', type: 'number', placeholder: '20 (max 50)' },
+                ],
+            },
+            '/api/v1/yelp/categories/ingest': {
+                fields: [],
+            },
+            // ── USPTO ──
+            '/api/v1/uspto/ingest/assignee': {
+                fields: [
+                    { name: 'assignee_name', label: 'Assignee Name', type: 'text', required: true,
+                      placeholder: 'e.g. Apple Inc., Google LLC, Microsoft' },
+                    { name: 'date_from', label: 'Date From', type: 'date' },
+                    { name: 'date_to', label: 'Date To', type: 'date' },
+                    { name: 'max_patents', label: 'Max Patents', type: 'number', placeholder: '1000 (max 10000)' },
+                ],
+            },
+            '/api/v1/uspto/ingest/cpc': {
+                fields: [
+                    { name: 'cpc_code', label: 'CPC Code', type: 'select', required: true, options: [
+                        { value: 'G06N', label: 'G06N — AI / Machine Learning' },
+                        { value: 'G06F', label: 'G06F — Computing / Data Processing' },
+                        { value: 'H04L', label: 'H04L — Networking / Protocols' },
+                        { value: 'A61K', label: 'A61K — Pharmaceuticals' },
+                        { value: 'C12N', label: 'C12N — Biotech / Genetic Engineering' },
+                        { value: 'H01L', label: 'H01L — Semiconductors' },
+                        { value: 'B60L', label: 'B60L — Electric Vehicles' },
+                        { value: 'H02S', label: 'H02S — Solar Energy' },
+                        { value: 'G16H', label: 'G16H — Healthcare Informatics' },
+                    ]},
+                    { name: 'date_from', label: 'Date From', type: 'date' },
+                    { name: 'date_to', label: 'Date To', type: 'date' },
+                    { name: 'max_patents', label: 'Max Patents', type: 'number', placeholder: '1000 (max 10000)' },
+                ],
+            },
+            '/api/v1/uspto/ingest/search': {
+                fields: [
+                    { name: 'search_query', label: 'Search Query', type: 'text', required: true,
+                      placeholder: 'e.g. machine learning, autonomous vehicle, CRISPR' },
+                    { name: 'date_from', label: 'Date From', type: 'date' },
+                    { name: 'date_to', label: 'Date To', type: 'date' },
+                    { name: 'max_patents', label: 'Max Patents', type: 'number', placeholder: '1000 (max 10000)' },
                 ],
             },
             '/api/v1/fema/{dataset}/ingest': {
@@ -1390,31 +1570,268 @@
                     { name: 'max_records', label: 'Max Records', type: 'number', placeholder: '1000' },
                 ],
             },
-            '/api/v1/bts/{dataset}/ingest': {
-                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
-                    { value: 'border-crossing', label: 'Border Crossing' }, { value: 'vmt', label: 'Vehicle Miles Traveled' },
-                    { value: 'faf', label: 'Freight Analysis (FAF)' },
-                ]}],
+            '/api/v1/bts/border-crossing/ingest': {
                 fields: [
-                    { name: 'start_date', label: 'Start Date', type: 'date' }, { name: 'end_date', label: 'End Date', type: 'date' },
-                    { name: 'state', label: 'State', type: 'text', placeholder: 'e.g. TX' },
+                    { name: 'border', label: 'Border', type: 'select', options: [
+                        { value: '', label: 'Both borders' },
+                        { value: 'US-Mexico Border', label: 'US-Mexico' },
+                        { value: 'US-Canada Border', label: 'US-Canada' },
+                    ]},
+                    { name: 'measure', label: 'Measure', type: 'select', options: [
+                        { value: '', label: 'All measures' },
+                        { value: 'Trucks', label: 'Trucks' },
+                        { value: 'Personal Vehicles', label: 'Personal Vehicles' },
+                        { value: 'Pedestrians', label: 'Pedestrians' },
+                        { value: 'Trains', label: 'Trains' },
+                        { value: 'Buses', label: 'Buses' },
+                        { value: 'Loaded Truck Containers', label: 'Loaded Truck Containers' },
+                    ]},
+                    { name: 'state', label: 'State (blank = all)', type: 'text', placeholder: 'e.g. TX, CA, NY' },
+                    { name: 'start_date', label: 'Start Date', type: 'date' },
+                    { name: 'end_date', label: 'End Date', type: 'date' },
                 ],
             },
-            '/api/v1/data-commons/{dataset}/ingest': {
-                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
-                    { value: 'stat-var', label: 'Statistical Variable' }, { value: 'place-stats', label: 'Place Statistics' },
-                    { value: 'us-states', label: 'US States' },
-                ]}],
+            '/api/v1/bts/vmt/ingest': {
                 fields: [
-                    { name: 'variable_dcid', label: 'Variable DCID', type: 'text', placeholder: 'e.g. Count_Person' },
-                    { name: 'place_dcid', label: 'Place DCID', type: 'text', placeholder: 'e.g. geoId/06' },
-                    { name: 'variables', label: 'Variables (comma-sep)', type: 'text', placeholder: 'Count_Person,Median_Income_Person' },
+                    { name: 'state', label: 'State (blank = all)', type: 'text', placeholder: 'e.g. Texas, California' },
+                    { name: 'start_date', label: 'Start Date', type: 'date' },
+                    { name: 'end_date', label: 'End Date', type: 'date' },
+                ],
+            },
+            '/api/v1/bts/faf/ingest': {
+                fields: [
+                    { name: 'version', label: 'FAF Version', type: 'select', options: [
+                        { value: 'regional_2018_2024', label: 'Regional 2018-2024' },
+                        { value: 'regional_forecasts', label: 'Regional Forecasts' },
+                        { value: 'state_2018_2024', label: 'State 2018-2024' },
+                    ]},
+                ],
+            },
+            // ── Data Commons ──
+            '/api/v1/data-commons/stat-var/ingest': {
+                fields: [
+                    { name: 'variable_dcid', label: 'Statistical Variable', type: 'select', options: [
+                        {value:'Count_Person',label:'Population (Count_Person)'},
+                        {value:'Median_Income_Household',label:'Median Household Income'},
+                        {value:'UnemploymentRate_Person',label:'Unemployment Rate'},
+                        {value:'Median_Age_Person',label:'Median Age'},
+                        {value:'Count_Household',label:'Number of Households'},
+                        {value:'Count_HousingUnit',label:'Housing Units'},
+                        {value:'Count_Person_Employed',label:'Employed Persons'},
+                        {value:'Count_Person_Unemployed',label:'Unemployed Persons'},
+                        {value:'Median_Income_Person',label:'Median Personal Income'},
+                        {value:'Count_Person_BelowPovertyLine',label:'Below Poverty Line'},
+                        {value:'Count_CriminalActivities_CombinedCrime',label:'Total Crime'},
+                        {value:'Count_CriminalActivities_ViolentCrime',label:'Violent Crime'},
+                        {value:'LifeExpectancy_Person',label:'Life Expectancy'},
+                        {value:'Amount_EconomicActivity_GrossDomesticProduction_RealValue',label:'Real GDP'},
+                    ]},
+                    { name: 'places', label: 'Places (comma-sep DCIDs)', type: 'text',
+                      placeholder: 'geoId/06,geoId/48,geoId/36 (CA, TX, NY)' },
+                ],
+            },
+            '/api/v1/data-commons/place-stats/ingest': {
+                fields: [
+                    { name: 'place_dcid', label: 'Place', type: 'select', options: [
+                        {value:'geoId/06',label:'California (geoId/06)'},
+                        {value:'geoId/48',label:'Texas (geoId/48)'},
+                        {value:'geoId/36',label:'New York (geoId/36)'},
+                        {value:'geoId/12',label:'Florida (geoId/12)'},
+                        {value:'geoId/17',label:'Illinois (geoId/17)'},
+                        {value:'geoId/42',label:'Pennsylvania (geoId/42)'},
+                        {value:'geoId/39',label:'Ohio (geoId/39)'},
+                        {value:'geoId/13',label:'Georgia (geoId/13)'},
+                        {value:'geoId/37',label:'North Carolina (geoId/37)'},
+                        {value:'geoId/26',label:'Michigan (geoId/26)'},
+                        {value:'country/USA',label:'United States (country/USA)'},
+                    ]},
+                    { name: 'variables', label: 'Variables (comma-sep, blank = top 20)', type: 'text',
+                      placeholder: 'Count_Person,Median_Income_Household,UnemploymentRate_Person' },
+                ],
+            },
+            '/api/v1/data-commons/us-states/ingest': {
+                fields: [
+                    { name: 'variables', label: 'Variables', type: 'checkbox-group', options: [
+                        {value:'Count_Person',label:'Population'},
+                        {value:'Median_Income_Household',label:'Median Household Income'},
+                        {value:'UnemploymentRate_Person',label:'Unemployment Rate'},
+                        {value:'Median_Age_Person',label:'Median Age'},
+                        {value:'Count_Household',label:'Households'},
+                        {value:'Count_Person_Employed',label:'Employed'},
+                        {value:'Count_Person_BelowPovertyLine',label:'Below Poverty Line'},
+                        {value:'Count_CriminalActivities_CombinedCrime',label:'Total Crime'},
+                        {value:'LifeExpectancy_Person',label:'Life Expectancy'},
+                        {value:'Amount_EconomicActivity_GrossDomesticProduction_RealValue',label:'Real GDP'},
+                    ]},
                 ],
             },
             '/api/v1/prediction-markets/monitor/all': {
                 fields: [
-                    { name: 'kalshi_categories', label: 'Kalshi Categories', type: 'text', placeholder: 'e.g. politics,economics' },
-                    { name: 'limit_per_platform', label: 'Limit per Platform', type: 'number', placeholder: '50' },
+                    { name: 'kalshi_categories', label: 'Kalshi Categories', type: 'checkbox-group', options: [
+                        { value: 'FED', label: 'Fed Rate Decisions' },
+                        { value: 'CPI', label: 'CPI / Inflation' },
+                        { value: 'UNRATE', label: 'Unemployment Rate' },
+                        { value: 'GDP', label: 'GDP Growth' },
+                        { value: 'INXD', label: 'Stock Market Indices' },
+                        { value: 'PRES', label: 'Presidential Election' },
+                        { value: 'SENATE', label: 'Senate Control' },
+                        { value: 'HOUSE', label: 'House Control' },
+                        { value: 'BTCUSD', label: 'Bitcoin Price' },
+                        { value: 'ETHUSD', label: 'Ethereum Price' },
+                        { value: 'CLIMATE', label: 'Climate / Weather' },
+                    ]},
+                    { name: 'limit_per_platform', label: 'Markets per platform (10-200)', type: 'number', placeholder: '50' },
+                ],
+            },
+            '/api/v1/prediction-markets/monitor/kalshi': {
+                queryParams: [
+                    { name: 'categories', label: 'Kalshi Categories', type: 'checkbox-group', options: [
+                        { value: 'FED', label: 'Fed Rate Decisions' },
+                        { value: 'CPI', label: 'CPI / Inflation' },
+                        { value: 'UNRATE', label: 'Unemployment Rate' },
+                        { value: 'GDP', label: 'GDP Growth' },
+                        { value: 'INXD', label: 'Stock Market Indices' },
+                        { value: 'PRES', label: 'Presidential Election' },
+                        { value: 'SENATE', label: 'Senate Control' },
+                        { value: 'HOUSE', label: 'House Control' },
+                        { value: 'BTCUSD', label: 'Bitcoin Price' },
+                        { value: 'ETHUSD', label: 'Ethereum Price' },
+                        { value: 'CLIMATE', label: 'Climate / Weather' },
+                    ]},
+                    { name: 'limit', label: 'Max markets (10-200)', type: 'number', placeholder: '50' },
+                ],
+            },
+            '/api/v1/prediction-markets/monitor/polymarket': {
+                queryParams: [
+                    { name: 'limit', label: 'Max markets (10-200)', type: 'number', placeholder: '50' },
+                ],
+            },
+            '/api/v1/international/worldbank/wdi/ingest': {
+                fields: [
+                    { name: 'indicators', label: 'WDI Indicators', type: 'checkbox-group', options: [
+                        { value: 'NY.GDP.MKTP.CD', label: 'GDP (current US$)' },
+                        { value: 'NY.GDP.MKTP.KD.ZG', label: 'GDP growth (annual %)' },
+                        { value: 'NY.GDP.PCAP.CD', label: 'GDP per capita' },
+                        { value: 'NY.GDP.PCAP.PP.CD', label: 'GDP per capita, PPP' },
+                        { value: 'SP.POP.TOTL', label: 'Population, total' },
+                        { value: 'SP.POP.GROW', label: 'Population growth (%)' },
+                        { value: 'FP.CPI.TOTL.ZG', label: 'Inflation, CPI (%)' },
+                        { value: 'SL.UEM.TOTL.ZS', label: 'Unemployment (%)' },
+                        { value: 'NE.TRD.GNFS.ZS', label: 'Trade (% of GDP)' },
+                        { value: 'BN.CAB.XOKA.CD', label: 'Current account balance' },
+                        { value: 'SP.DYN.LE00.IN', label: 'Life expectancy' },
+                        { value: 'SI.POV.GINI', label: 'Gini index' },
+                        { value: 'EN.ATM.CO2E.PC', label: 'CO2 emissions per capita' },
+                        { value: 'SE.XPD.TOTL.GD.ZS', label: 'Education spending (% GDP)' },
+                        { value: 'SH.XPD.CHEX.GD.ZS', label: 'Health spending (% GDP)' },
+                        { value: 'EG.FEC.RNEW.ZS', label: 'Renewable energy (%)' },
+                    ]},
+                    { name: 'countries', label: 'Countries (ISO3 codes, comma-sep)', type: 'text',
+                      placeholder: 'USA,CHN,JPN,DEU,GBR (blank = all countries)' },
+                    { name: 'start_year', label: 'Start Year', type: 'number', placeholder: '2015' },
+                    { name: 'end_year', label: 'End Year', type: 'number', placeholder: '2025' },
+                ],
+            },
+            '/api/v1/international/worldbank/countries/ingest': {
+                fields: [],
+            },
+            '/api/v1/international/worldbank/indicators/ingest': {
+                fields: [
+                    { name: 'search', label: 'Search term (blank = all)', type: 'text',
+                      placeholder: 'e.g. GDP, population, health, trade' },
+                    { name: 'max_results', label: 'Max results', type: 'number', placeholder: '1000' },
+                ],
+            },
+            '/api/v1/international/imf/ifs/ingest': {
+                fields: [
+                    { name: 'indicator', label: 'IFS Indicator', type: 'select', required: true, options: [
+                        { value: 'NGDP_R_XDC', label: 'Real GDP (local currency)' },
+                        { value: 'NGDP_XDC', label: 'Nominal GDP (local currency)' },
+                        { value: 'NGDPD', label: 'GDP (current US$)' },
+                        { value: 'NGDP_RPCH', label: 'GDP growth (annual %)' },
+                        { value: 'PCPI_IX', label: 'Consumer Price Index' },
+                        { value: 'PCPIE_IX', label: 'CPI (End of Period)' },
+                        { value: 'PCPIEPCH', label: 'CPI Inflation (annual %)' },
+                        { value: 'FPOLM', label: 'Policy Rate (Central Bank)' },
+                        { value: 'FILR', label: 'Lending Rate' },
+                        { value: 'FITB', label: 'Treasury Bill Rate' },
+                        { value: 'ENEER', label: 'Nominal Effective Exchange Rate' },
+                        { value: 'EREER', label: 'Real Effective Exchange Rate' },
+                        { value: 'ENDA', label: 'Exchange Rate (per US$, avg)' },
+                        { value: 'BCA', label: 'Current Account Balance' },
+                        { value: 'TMG_CIF_USD', label: 'Imports (CIF, US$)' },
+                        { value: 'TXG_FOB_USD', label: 'Exports (FOB, US$)' },
+                        { value: 'GGXWDG', label: 'General Government Debt' },
+                        { value: 'GGXONLB', label: 'Government Expenditure' },
+                        { value: 'LUR', label: 'Unemployment Rate' },
+                        { value: 'LP', label: 'Population' },
+                    ]},
+                    { name: 'countries', label: 'Countries (ISO3, comma-sep)', type: 'text',
+                      placeholder: 'USA,GBR,JPN,DEU,FRA (blank = all)' },
+                    { name: 'start_year', label: 'Start Year', type: 'number', placeholder: '2015' },
+                    { name: 'end_year', label: 'End Year', type: 'number', placeholder: '2025' },
+                ],
+            },
+            '/api/v1/international/oecd/mei/ingest': {
+                fields: [
+                    { name: 'countries', label: 'Countries (ISO3, comma-sep)', type: 'text',
+                      placeholder: 'USA,GBR,DEU,FRA,JPN (blank = all OECD)' },
+                    { name: 'subjects', label: 'Subjects (comma-sep codes)', type: 'text',
+                      placeholder: 'blank = all (CLI, industrial production, CPI, etc.)' },
+                    { name: 'start_period', label: 'Start Year', type: 'number', placeholder: '2015' },
+                    { name: 'end_period', label: 'End Year', type: 'number', placeholder: '2025' },
+                ],
+            },
+            '/api/v1/international/oecd/kei/ingest': {
+                fields: [
+                    { name: 'countries', label: 'Countries (ISO3, comma-sep)', type: 'text',
+                      placeholder: 'USA,GBR,DEU,FRA,JPN (blank = all OECD)' },
+                    { name: 'start_period', label: 'Start Year', type: 'number', placeholder: '2015' },
+                    { name: 'end_period', label: 'End Year', type: 'number', placeholder: '2025' },
+                ],
+            },
+            '/api/v1/international/oecd/labor/ingest': {
+                fields: [
+                    { name: 'countries', label: 'Countries (ISO3, comma-sep)', type: 'text',
+                      placeholder: 'USA,GBR,DEU,FRA,JPN (blank = all OECD)' },
+                    { name: 'start_period', label: 'Start Year', type: 'number', placeholder: '2015' },
+                    { name: 'end_period', label: 'End Year', type: 'number', placeholder: '2025' },
+                ],
+            },
+            '/api/v1/international/oecd/trade/ingest': {
+                fields: [
+                    { name: 'countries', label: 'Countries (ISO3, comma-sep)', type: 'text',
+                      placeholder: 'USA,GBR,DEU,FRA,JPN (blank = all OECD)' },
+                    { name: 'start_period', label: 'Start Year', type: 'number', placeholder: '2015' },
+                    { name: 'end_period', label: 'End Year', type: 'number', placeholder: '2025' },
+                ],
+            },
+            '/api/v1/international/oecd/tax/ingest': {
+                fields: [
+                    { name: 'countries', label: 'Countries (ISO3, comma-sep)', type: 'text',
+                      placeholder: 'USA,GBR,DEU,FRA,JPN (blank = all OECD)' },
+                    { name: 'start_period', label: 'Start Year', type: 'number', placeholder: '2000' },
+                    { name: 'end_period', label: 'End Year', type: 'number', placeholder: '2025' },
+                ],
+            },
+            '/api/v1/international/bis/eer/ingest': {
+                fields: [
+                    { name: 'eer_type', label: 'Exchange Rate Type', type: 'select', options: [
+                        { value: 'R', label: 'Real (inflation-adjusted)' },
+                        { value: 'N', label: 'Nominal' },
+                    ]},
+                    { name: 'countries', label: 'Countries (ISO3, comma-sep)', type: 'text',
+                      placeholder: 'USA,GBR,DEU,JPN,CHN (blank = all)' },
+                    { name: 'start_period', label: 'Start Year', type: 'number', placeholder: '2015' },
+                    { name: 'end_period', label: 'End Year', type: 'number', placeholder: '2025' },
+                ],
+            },
+            '/api/v1/international/bis/property/ingest': {
+                fields: [
+                    { name: 'countries', label: 'Countries (ISO3, comma-sep)', type: 'text',
+                      placeholder: 'USA,GBR,DEU,FRA,JPN (blank = all)' },
+                    { name: 'start_period', label: 'Start Year', type: 'number', placeholder: '2015' },
+                    { name: 'end_period', label: 'End Year', type: 'number', placeholder: '2025' },
                 ],
             },
             '/api/v1/international/{dataset}/ingest': {
@@ -1432,54 +1849,286 @@
                     { name: 'end_year', label: 'End Year', type: 'number', placeholder: '2025' },
                 ],
             },
-            '/api/v1/us-trade/{dataset}/ingest': {
-                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
-                    { value: 'exports/hs', label: 'Exports by HS' }, { value: 'imports/hs', label: 'Imports by HS' },
-                    { value: 'exports/state', label: 'Exports by State' }, { value: 'port', label: 'Port Trade' },
-                    { value: 'summary', label: 'Trade Summary' },
-                ]}],
+            '/api/v1/us-trade/exports/hs/ingest': {
                 fields: [
-                    { name: 'year', label: 'Year', type: 'number', placeholder: '2025' },
-                    { name: 'month', label: 'Month', type: 'number', placeholder: '1-12' },
-                    { name: 'hs_code', label: 'HS Code', type: 'text', placeholder: 'e.g. 8471' },
-                    { name: 'country', label: 'Country', type: 'text', placeholder: 'e.g. China' },
+                    { name: 'year', label: 'Year', type: 'number', required: true, placeholder: '2025' },
+                    { name: 'month', label: 'Month (1-12, blank = annual)', type: 'number', placeholder: 'blank = annual totals' },
+                    { name: 'hs_code', label: 'HS Chapter/Code', type: 'select', options: [
+                        { value: '', label: 'All commodities' },
+                        { value: '27', label: '27 — Mineral fuels, oils' },
+                        { value: '84', label: '84 — Machinery, mechanical' },
+                        { value: '85', label: '85 — Electrical machinery' },
+                        { value: '87', label: '87 — Vehicles' },
+                        { value: '88', label: '88 — Aircraft, spacecraft' },
+                        { value: '90', label: '90 — Optical, medical instruments' },
+                        { value: '30', label: '30 — Pharmaceuticals' },
+                        { value: '39', label: '39 — Plastics' },
+                        { value: '71', label: '71 — Precious metals, gems' },
+                        { value: '72', label: '72 — Iron and steel' },
+                        { value: '12', label: '12 — Oil seeds, grains' },
+                        { value: '10', label: '10 — Cereals' },
+                    ]},
+                    { name: 'country', label: 'Country (Census code)', type: 'select', options: [
+                        { value: '', label: 'All countries' },
+                        { value: '1220', label: 'Canada' },
+                        { value: '2010', label: 'Mexico' },
+                        { value: '5700', label: 'China' },
+                        { value: '5880', label: 'Japan' },
+                        { value: '5800', label: 'South Korea' },
+                        { value: '5830', label: 'Taiwan' },
+                        { value: '4120', label: 'United Kingdom' },
+                        { value: '4280', label: 'Germany' },
+                        { value: '4759', label: 'India' },
+                        { value: '5520', label: 'Singapore' },
+                    ]},
+                ],
+            },
+            '/api/v1/us-trade/imports/hs/ingest': {
+                fields: [
+                    { name: 'year', label: 'Year', type: 'number', required: true, placeholder: '2025' },
+                    { name: 'month', label: 'Month (1-12, blank = annual)', type: 'number', placeholder: 'blank = annual totals' },
+                    { name: 'hs_code', label: 'HS Chapter/Code', type: 'select', options: [
+                        { value: '', label: 'All commodities' },
+                        { value: '27', label: '27 — Mineral fuels, oils' },
+                        { value: '84', label: '84 — Machinery, mechanical' },
+                        { value: '85', label: '85 — Electrical machinery' },
+                        { value: '87', label: '87 — Vehicles' },
+                        { value: '30', label: '30 — Pharmaceuticals' },
+                        { value: '39', label: '39 — Plastics' },
+                        { value: '61', label: '61 — Knitted apparel' },
+                        { value: '62', label: '62 — Woven apparel' },
+                        { value: '71', label: '71 — Precious metals, gems' },
+                        { value: '72', label: '72 — Iron and steel' },
+                        { value: '94', label: '94 — Furniture' },
+                        { value: '95', label: '95 — Toys, games' },
+                    ]},
+                    { name: 'country', label: 'Country (Census code)', type: 'select', options: [
+                        { value: '', label: 'All countries' },
+                        { value: '5700', label: 'China' },
+                        { value: '2010', label: 'Mexico' },
+                        { value: '1220', label: 'Canada' },
+                        { value: '5880', label: 'Japan' },
+                        { value: '5800', label: 'South Korea' },
+                        { value: '5830', label: 'Taiwan' },
+                        { value: '4280', label: 'Germany' },
+                        { value: '4120', label: 'United Kingdom' },
+                        { value: '5520', label: 'Vietnam' },
+                        { value: '4759', label: 'India' },
+                    ]},
+                ],
+            },
+            '/api/v1/us-trade/exports/state/ingest': {
+                fields: [
+                    { name: 'year', label: 'Year', type: 'number', required: true, placeholder: '2025' },
+                    { name: 'month', label: 'Month (1-12, blank = annual)', type: 'number', placeholder: 'blank = annual totals' },
+                    { name: 'state', label: 'State', type: 'select', options: [
+                        { value: '', label: 'All states' },
+                        { value: '06', label: 'California' },
+                        { value: '48', label: 'Texas' },
+                        { value: '36', label: 'New York' },
+                        { value: '17', label: 'Illinois' },
+                        { value: '12', label: 'Florida' },
+                        { value: '42', label: 'Pennsylvania' },
+                        { value: '39', label: 'Ohio' },
+                        { value: '22', label: 'Louisiana' },
+                        { value: '53', label: 'Washington' },
+                        { value: '26', label: 'Michigan' },
+                        { value: '13', label: 'Georgia' },
+                        { value: '34', label: 'New Jersey' },
+                    ]},
+                    { name: 'hs_code', label: 'HS Chapter (blank = all)', type: 'text', placeholder: 'e.g. 84, 85, 27' },
+                    { name: 'country', label: 'Country (Census code, blank = all)', type: 'text', placeholder: 'e.g. 5700 for China' },
+                ],
+            },
+            '/api/v1/us-trade/port/ingest': {
+                fields: [
+                    { name: 'year', label: 'Year', type: 'number', required: true, placeholder: '2025' },
+                    { name: 'trade_type', label: 'Trade Type', type: 'select', required: true, options: [
+                        { value: 'export', label: 'Exports' },
+                        { value: 'import', label: 'Imports' },
+                    ]},
+                    { name: 'month', label: 'Month (1-12, blank = annual)', type: 'number', placeholder: 'blank = annual totals' },
+                    { name: 'district', label: 'Customs District', type: 'select', options: [
+                        { value: '', label: 'All districts' },
+                        { value: '26', label: 'Houston, TX' },
+                        { value: '37', label: 'Los Angeles, CA' },
+                        { value: '10', label: 'New York, NY' },
+                        { value: '25', label: 'New Orleans, LA' },
+                        { value: '17', label: 'Savannah, GA' },
+                        { value: '16', label: 'Charleston, SC' },
+                        { value: '35', label: 'Seattle, WA' },
+                        { value: '20', label: 'Miami, FL' },
+                        { value: '27', label: 'Laredo, TX' },
+                        { value: '43', label: 'Detroit, MI' },
+                        { value: '14', label: 'Norfolk, VA' },
+                        { value: '30', label: 'San Diego, CA' },
+                    ]},
+                    { name: 'hs_code', label: 'HS Chapter (blank = all)', type: 'text', placeholder: 'e.g. 84, 27' },
+                    { name: 'country', label: 'Country (Census code, blank = all)', type: 'text', placeholder: 'e.g. 5700 for China' },
+                ],
+            },
+            '/api/v1/us-trade/summary/ingest': {
+                fields: [
+                    { name: 'year', label: 'Year', type: 'number', required: true, placeholder: '2025' },
+                    { name: 'month', label: 'Month (1-12, blank = annual)', type: 'number', placeholder: 'blank = annual totals' },
                 ],
             },
             '/api/v1/cftc-cot/ingest': {
                 fields: [
-                    { name: 'year', label: 'Year', type: 'number', placeholder: '2025' },
+                    { name: 'year', label: 'Year', type: 'number', placeholder: '2026' },
                     { name: 'report_type', label: 'Report Type', type: 'select', options: [
-                        { value: '', label: 'Default' }, { value: 'futures_only', label: 'Futures Only' }, { value: 'combined', label: 'Combined' },
+                        { value: 'legacy', label: 'Legacy (Commercial vs Non-Commercial)' },
+                        { value: 'disaggregated', label: 'Disaggregated (Producer, Swap, Managed Money)' },
+                        { value: 'tff', label: 'TFF (Traders in Financial Futures)' },
+                        { value: 'all', label: 'All report types' },
+                    ]},
+                    { name: 'combined', label: 'Include Options', type: 'select', options: [
+                        { value: 'true', label: 'Futures + Options combined' },
+                        { value: 'false', label: 'Futures only' },
                     ]},
                 ],
             },
-            '/api/v1/irs-soi/{dataset}/ingest': {
-                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
-                    { value: 'zip-income', label: 'ZIP Income' }, { value: 'county-income', label: 'County Income' },
-                    { value: 'migration', label: 'Migration' }, { value: 'business-income', label: 'Business Income' },
-                    { value: 'all', label: 'All SOI Data' },
-                ]}],
-                fields: [{ name: 'year', label: 'Year', type: 'number', placeholder: '2021' }],
-            },
-            '/api/v1/fcc-broadband/{dataset}/ingest': {
-                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
-                    { value: 'state', label: 'State Coverage' }, { value: 'all-states', label: 'All States' }, { value: 'county', label: 'County Coverage' },
-                ]}],
+            '/api/v1/irs-soi/zip-income/ingest': {
                 fields: [
-                    { name: 'state_codes', label: 'State Codes (comma-sep)', type: 'text', placeholder: 'CA,TX,NY' },
-                    { name: 'county_fips_codes', label: 'County FIPS', type: 'text', placeholder: '06037,48201' },
+                    { name: 'year', label: 'Tax Year', type: 'select', options: [
+                        { value: '2021', label: '2021' }, { value: '2020', label: '2020' },
+                        { value: '2019', label: '2019' }, { value: '2018', label: '2018' },
+                        { value: '2017', label: '2017' },
+                    ]},
+                    { name: 'use_cache', label: 'Use cached download', type: 'select', options: [
+                        { value: 'true', label: 'Yes (faster)' }, { value: 'false', label: 'No (re-download)' },
+                    ]},
                 ],
             },
-            '/api/v1/realestate/{dataset}/ingest': {
-                pathParams: [{ name: 'dataset', label: 'Dataset', type: 'select', required: true, options: [
-                    { value: 'fhfa', label: 'FHFA House Price Index' }, { value: 'hud', label: 'HUD Permits' },
-                    { value: 'redfin', label: 'Redfin Market Data' }, { value: 'osm', label: 'OSM Buildings' },
-                ]}],
+            '/api/v1/irs-soi/county-income/ingest': {
+                fields: [
+                    { name: 'year', label: 'Tax Year', type: 'select', options: [
+                        { value: '2021', label: '2021' }, { value: '2020', label: '2020' },
+                        { value: '2019', label: '2019' }, { value: '2018', label: '2018' },
+                        { value: '2017', label: '2017' },
+                    ]},
+                    { name: 'use_cache', label: 'Use cached download', type: 'select', options: [
+                        { value: 'true', label: 'Yes (faster)' }, { value: 'false', label: 'No (re-download)' },
+                    ]},
+                ],
+            },
+            '/api/v1/irs-soi/migration/ingest': {
+                fields: [
+                    { name: 'year', label: 'Tax Year', type: 'select', options: [
+                        { value: '2021', label: '2021' }, { value: '2020', label: '2020' },
+                        { value: '2019', label: '2019' }, { value: '2018', label: '2018' },
+                        { value: '2017', label: '2017' },
+                    ]},
+                    { name: 'flow_type', label: 'Migration Flow', type: 'select', options: [
+                        { value: 'both', label: 'Both (inflow + outflow)' },
+                        { value: 'inflow', label: 'Inflow only' },
+                        { value: 'outflow', label: 'Outflow only' },
+                    ]},
+                    { name: 'use_cache', label: 'Use cached download', type: 'select', options: [
+                        { value: 'true', label: 'Yes (faster)' }, { value: 'false', label: 'No (re-download)' },
+                    ]},
+                ],
+            },
+            '/api/v1/irs-soi/business-income/ingest': {
+                fields: [
+                    { name: 'year', label: 'Tax Year', type: 'select', options: [
+                        { value: '2021', label: '2021' }, { value: '2020', label: '2020' },
+                        { value: '2019', label: '2019' }, { value: '2018', label: '2018' },
+                        { value: '2017', label: '2017' },
+                    ]},
+                    { name: 'use_cache', label: 'Use cached download', type: 'select', options: [
+                        { value: 'true', label: 'Yes (faster)' }, { value: 'false', label: 'No (re-download)' },
+                    ]},
+                ],
+            },
+            '/api/v1/irs-soi/all/ingest': {
+                fields: [
+                    { name: 'year', label: 'Tax Year', type: 'select', options: [
+                        { value: '2021', label: '2021' }, { value: '2020', label: '2020' },
+                        { value: '2019', label: '2019' }, { value: '2018', label: '2018' },
+                        { value: '2017', label: '2017' },
+                    ]},
+                    { name: 'use_cache', label: 'Use cached download', type: 'select', options: [
+                        { value: 'true', label: 'Yes (faster)' }, { value: 'false', label: 'No (re-download)' },
+                    ]},
+                ],
+            },
+            // ── FCC Broadband ──
+            '/api/v1/fcc-broadband/state/ingest': {
+                fields: [
+                    { name: 'state_codes', label: 'State Codes (2-letter, comma-sep)', type: 'text', required: true,
+                      placeholder: 'CA,TX,NY,FL' },
+                    { name: 'include_summary', label: 'Include Summary Stats', type: 'select', options: [
+                        { value: 'true', label: 'Yes' }, { value: 'false', label: 'No' },
+                    ]},
+                ],
+            },
+            '/api/v1/fcc-broadband/all-states/ingest': {
+                fields: [
+                    { name: 'include_summary', label: 'Include Summary Stats', type: 'select', options: [
+                        { value: 'true', label: 'Yes' }, { value: 'false', label: 'No' },
+                    ]},
+                ],
+            },
+            '/api/v1/fcc-broadband/county/ingest': {
+                fields: [
+                    { name: 'county_fips_codes', label: 'County FIPS Codes (5-digit, comma-sep)', type: 'text', required: true,
+                      placeholder: '06037,48201,36061 (LA, Houston, Manhattan)' },
+                    { name: 'include_summary', label: 'Include Summary Stats', type: 'select', options: [
+                        { value: 'true', label: 'Yes' }, { value: 'false', label: 'No' },
+                    ]},
+                ],
+            },
+            // ── Real Estate ──
+            '/api/v1/realestate/fhfa/ingest': {
                 fields: [
                     { name: 'geography_type', label: 'Geography', type: 'select', options: [
-                        { value: '', label: 'Default' }, { value: 'state', label: 'State' }, { value: 'msa', label: 'MSA' }, { value: 'county', label: 'County' },
+                        { value: '', label: 'All (National + State + MSA)' },
+                        { value: 'National', label: 'National' }, { value: 'State', label: 'State' },
+                        { value: 'MSA', label: 'MSA' }, { value: 'ZIP3', label: 'ZIP3' },
                     ]},
-                    { name: 'start_date', label: 'Start Date', type: 'date' }, { name: 'end_date', label: 'End Date', type: 'date' },
+                    { name: 'start_date', label: 'Start Date', type: 'date' },
+                    { name: 'end_date', label: 'End Date', type: 'date' },
+                ],
+            },
+            '/api/v1/realestate/hud/ingest': {
+                fields: [
+                    { name: 'geography_type', label: 'Geography', type: 'select', options: [
+                        { value: 'National', label: 'National' }, { value: 'State', label: 'State' },
+                        { value: 'MSA', label: 'MSA' }, { value: 'County', label: 'County' },
+                    ]},
+                    { name: 'geography_id', label: 'Geography ID (for State/MSA/County)', type: 'text',
+                      placeholder: 'e.g. 06 (CA FIPS), 31080 (LA MSA)' },
+                    { name: 'start_date', label: 'Start Date', type: 'date' },
+                    { name: 'end_date', label: 'End Date', type: 'date' },
+                ],
+            },
+            '/api/v1/realestate/redfin/ingest': {
+                fields: [
+                    { name: 'region_type', label: 'Region Type', type: 'select', options: [
+                        { value: 'zip', label: 'ZIP Code' }, { value: 'city', label: 'City' },
+                        { value: 'neighborhood', label: 'Neighborhood' }, { value: 'metro', label: 'Metro' },
+                    ]},
+                    { name: 'property_type', label: 'Property Type', type: 'select', options: [
+                        { value: 'All Residential', label: 'All Residential' },
+                        { value: 'Single Family Residential', label: 'Single Family' },
+                        { value: 'Multi-Family (2-4 Unit)', label: 'Multi-Family (2-4)' },
+                        { value: 'Condo/Co-op', label: 'Condo/Co-op' },
+                        { value: 'Townhouse', label: 'Townhouse' },
+                    ]},
+                ],
+            },
+            '/api/v1/realestate/osm/ingest': {
+                fields: [
+                    { name: 'bounding_box', label: 'Bounding Box (south,west,north,east)', type: 'text', required: true,
+                      placeholder: '34.0,-118.5,34.1,-118.4 (LA example)' },
+                    { name: 'building_type', label: 'Building Type', type: 'select', options: [
+                        { value: '', label: 'All types' },
+                        { value: 'residential', label: 'Residential' }, { value: 'commercial', label: 'Commercial' },
+                        { value: 'industrial', label: 'Industrial' }, { value: 'retail', label: 'Retail' },
+                        { value: 'office', label: 'Office' }, { value: 'warehouse', label: 'Warehouse' },
+                    ]},
+                    { name: 'limit', label: 'Max Buildings', type: 'number', placeholder: '10000 (max 50000)' },
                 ],
             },
             '/api/v1/foot-traffic/collect': {
@@ -1499,22 +2148,122 @@
                     { name: 'limit', label: 'Limit', type: 'number', placeholder: '10' },
                 ],
             },
+            // ── App Stores ──
             '/api/v1/app-stores/ingest': {
                 fields: [
-                    { name: 'company_name', label: 'Company Name', type: 'text', required: true, placeholder: 'e.g. Uber' },
+                    { name: 'company_name', label: 'Company Name', type: 'text', placeholder: 'e.g. Uber (blank = all tracked)' },
                     { name: 'search_query', label: 'Search Query', type: 'text', placeholder: 'e.g. ride sharing' },
-                    { name: 'limit', label: 'Limit', type: 'number', placeholder: '10' },
+                    { name: 'limit', label: 'Limit', type: 'number', placeholder: '10 (max 200)' },
+                ],
+            },
+            '/api/v1/app-stores/link': {
+                fields: [
+                    { name: 'company_name', label: 'Company Name', type: 'text', required: true, placeholder: 'e.g. Uber Technologies' },
+                    { name: 'app_id', label: 'App ID', type: 'text', required: true, placeholder: 'e.g. 368677368 (iTunes ID)' },
+                    { name: 'store', label: 'Store', type: 'select', options: [
+                        { value: 'ios', label: 'iOS (App Store)' },
+                        { value: 'android', label: 'Android (Google Play)' },
+                    ]},
+                    { name: 'relationship', label: 'Relationship', type: 'select', options: [
+                        { value: 'owner', label: 'Owner' },
+                        { value: 'subsidiary', label: 'Subsidiary' },
+                        { value: 'partner', label: 'Partner' },
+                    ]},
                 ],
             },
             '/api/v1/github/org/{org}/fetch': {
                 pathParams: [{ name: 'org', label: 'GitHub Org', type: 'text', required: true, placeholder: 'e.g. facebook' }],
                 fields: [],
             },
+            // ── Glassdoor ──
             '/api/v1/glassdoor/company': {
                 fields: [
                     { name: 'company_name', label: 'Company Name', type: 'text', required: true, placeholder: 'e.g. Google' },
                     { name: 'website', label: 'Website', type: 'text', placeholder: 'e.g. google.com' },
+                    { name: 'industry', label: 'Industry', type: 'text', placeholder: 'e.g. Technology' },
+                    { name: 'headquarters', label: 'Headquarters', type: 'text', placeholder: 'e.g. Mountain View, CA' },
                 ],
+            },
+            '/api/v1/glassdoor/salaries/bulk': {
+                fields: [
+                    { name: 'company_name', label: 'Company Name', type: 'text', required: true, placeholder: 'e.g. Google' },
+                    { name: 'salaries', label: 'Salaries (JSON array)', type: 'textarea',
+                      placeholder: '[{"job_title":"Software Engineer","base_salary_median":180000,"location":"San Francisco"}]' },
+                ],
+            },
+            '/api/v1/glassdoor/reviews/summary': {
+                fields: [
+                    { name: 'company_name', label: 'Company Name', type: 'text', required: true, placeholder: 'e.g. Google' },
+                    { name: 'period', label: 'Period', type: 'text', required: true, placeholder: '2026-Q1' },
+                    { name: 'avg_rating', label: 'Average Rating (1.0-5.0)', type: 'number', required: true, placeholder: '4.2' },
+                    { name: 'review_count', label: 'Review Count', type: 'number', required: true, placeholder: '150' },
+                    { name: 'top_pros', label: 'Top Pros (comma-sep)', type: 'text', placeholder: 'Great culture, Good pay, Work-life balance' },
+                    { name: 'top_cons', label: 'Top Cons (comma-sep)', type: 'text', placeholder: 'Long hours, Bureaucracy, Slow promotions' },
+                ],
+            },
+            '/api/v1/glassdoor/import-csv': {
+                fields: [],
+                _note: 'File upload — use Swagger UI or curl for CSV import',
+            },
+            // ── LP Commitments ──
+            '/api/v1/lp-collection/jobs': {
+                fields: [
+                    { name: 'lp_types', label: 'LP Types', type: 'checkbox-group', options: [
+                        { value: 'public_pension', label: 'Public Pension' },
+                        { value: 'sovereign_wealth', label: 'Sovereign Wealth' },
+                        { value: 'endowment', label: 'Endowment' },
+                        { value: 'corporate_pension', label: 'Corporate Pension' },
+                        { value: 'insurance', label: 'Insurance' },
+                    ]},
+                    { name: 'regions', label: 'Regions', type: 'checkbox-group', options: [
+                        { value: 'us', label: 'US' }, { value: 'europe', label: 'Europe' },
+                        { value: 'asia', label: 'Asia' }, { value: 'middle_east', label: 'Middle East' },
+                        { value: 'oceania', label: 'Oceania' },
+                    ]},
+                    { name: 'sources', label: 'Sources (comma-sep)', type: 'text', placeholder: 'website,sec_adv,cafr,news (default: website)' },
+                    { name: 'mode', label: 'Mode', type: 'select', options: [
+                        { value: 'incremental', label: 'Incremental (skip recently collected)' },
+                        { value: 'full', label: 'Full (re-collect all)' },
+                    ]},
+                    { name: 'max_age_days', label: 'Max Age (days)', type: 'number', placeholder: '90' },
+                    { name: 'max_concurrent_lps', label: 'Max Concurrent LPs', type: 'number', placeholder: '5' },
+                ],
+            },
+            '/api/v1/lp-collection/collect/{lp_id}': {
+                pathParams: [{ name: 'lp_id', label: 'LP ID', type: 'number', required: true, placeholder: 'e.g. 1' }],
+                fields: [
+                    { name: 'sources', label: 'Sources (comma-sep)', type: 'text', placeholder: 'website,sec_adv,cafr,news (default: website)' },
+                ],
+            },
+            '/api/v1/lp-collection/collect/stale': {
+                queryParams: [
+                    { name: 'max_age_days', label: 'Max Age (days)', type: 'number', placeholder: '90' },
+                    { name: 'limit', label: 'Max LPs to Queue', type: 'number', placeholder: '50' },
+                ],
+            },
+            '/api/v1/lp-collection/schedules': {
+                fields: [
+                    { name: 'lp_id', label: 'LP ID', type: 'number', required: true, placeholder: 'e.g. 1' },
+                    { name: 'source_type', label: 'Source Type', type: 'select', required: true, options: [
+                        { value: 'website', label: 'Website' }, { value: 'sec_adv', label: 'SEC ADV' },
+                        { value: 'cafr', label: 'CAFR' }, { value: 'news', label: 'News' },
+                    ]},
+                    { name: 'frequency', label: 'Frequency', type: 'select', options: [
+                        { value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' },
+                        { value: 'monthly', label: 'Monthly' }, { value: 'quarterly', label: 'Quarterly' },
+                    ]},
+                    { name: 'day_of_week', label: 'Day of Week (0=Mon, for weekly)', type: 'number', placeholder: '0' },
+                    { name: 'day_of_month', label: 'Day of Month (for monthly)', type: 'number', placeholder: '1' },
+                    { name: 'hour', label: 'Hour (UTC, 0-23)', type: 'number', placeholder: '2' },
+                ],
+            },
+            '/api/v1/lp-collection/collect/{lp_id}/governance': {
+                pathParams: [{ name: 'lp_id', label: 'LP ID', type: 'number', required: true, placeholder: 'e.g. 1' }],
+                fields: [],
+            },
+            '/api/v1/lp-collection/collect/{lp_id}/performance': {
+                pathParams: [{ name: 'lp_id', label: 'LP ID', type: 'number', required: true, placeholder: 'e.g. 1' }],
+                fields: [],
             },
         };
 
@@ -1522,8 +2271,8 @@
         const DATE_FIELD_PATTERNS = {
             startDate: ['observation_start', 'start_date', 'start', 'date_from'],
             endDate:   ['observation_end',   'end_date',   'end',   'date_to'],
-            startYear: ['start_year'],
-            endYear:   ['end_year'],
+            startYear: ['start_year', 'start_period'],
+            endYear:   ['end_year', 'end_period'],
             year:      ['year'],
         };
 
@@ -1671,6 +2420,10 @@
                     { key: 'trade_gateway', label: 'Trade Gateway', tables: ['trade_gateway_stats', 'container_freight_index'],
                       endpoints: [{method:'GET', path:'/api/v1/site-intel/logistics/trade-gateways', label:'Trade gateways'}, {method:'GET', path:'/api/v1/site-intel/logistics/trade-gateways/trends', label:'Gateway trends'}],
                       scheduleOptions: ['monthly'] },
+                    { key: 'dunl', label: 'DUNL (S&P Data Unlocked)', tablePrefix: 'dunl_',
+                      triggers: [{method:'POST', path:'/api/v1/dunl/ingest-all', label:'Ingest all'}, {method:'POST', path:'/api/v1/dunl/currencies/ingest', label:'Ingest currencies'}, {method:'POST', path:'/api/v1/dunl/ports/ingest', label:'Ingest ports'}, {method:'POST', path:'/api/v1/dunl/uom/ingest', label:'Ingest UOM'}, {method:'POST', path:'/api/v1/dunl/calendars/ingest', label:'Ingest calendars'}],
+                      endpoints: [{method:'GET', path:'/api/v1/dunl/currencies', label:'List currencies'}, {method:'GET', path:'/api/v1/dunl/ports', label:'List ports'}, {method:'GET', path:'/api/v1/dunl/uom', label:'List UOM'}, {method:'GET', path:'/api/v1/dunl/uom/conversions', label:'UOM conversions'}, {method:'GET', path:'/api/v1/dunl/calendars', label:'Calendars'}, {method:'GET', path:'/api/v1/dunl/stats', label:'Stats'}, {method:'GET', path:'/api/v1/dunl/changes', label:'RSS changes'}],
+                      scheduleOptions: ['weekly','monthly'] },
                 ],
             },
             financial_reg: {
@@ -2632,7 +3385,6 @@
             expandedTable = null;
             tablePreview = null;
             previewPage = 0;
-            expandedTriggerId = null;
             collectionState = { selectedTriggerIndex: null, executionMode: null };
             renderSources();
         }
@@ -3032,7 +3784,6 @@
         }
 
         // ===== Trigger Form Rendering Helpers =====
-        let expandedTriggerId = null;
 
         function renderFormField(field, prefix) {
             const id = `${prefix}-${field.name}`;
@@ -3047,6 +3798,8 @@
                     <div class="tf-checkbox-group">
                         ${field.options.map(o => `<label><input type="checkbox" name="${id}" value="${o.value}" checked> ${o.label}</label>`).join('')}
                     </div></div>`;
+            } else if (field.type === 'textarea') {
+                input = `<textarea id="${id}" rows="4" style="width:100%;font-family:monospace;font-size:0.8rem;" placeholder="${field.placeholder || ''}"></textarea>`;
             } else if (field.type === 'date') {
                 input = `<input type="date" id="${id}" value="${field.default || ''}">`;
             } else if (field.type === 'number') {
@@ -3082,7 +3835,7 @@
             // Separate query string so path param replacement doesn't break it
             const qIdx = triggerPath.indexOf('?');
             let resolvedPath = qIdx >= 0 ? triggerPath.substring(0, qIdx) : triggerPath;
-            const queryString = qIdx >= 0 ? triggerPath.substring(qIdx) : '';
+            let queryString = qIdx >= 0 ? triggerPath.substring(qIdx) : '';
             let body = triggerBody ? { ...triggerBody } : {};
 
             if (formDef) {
@@ -3104,11 +3857,20 @@
                             let val = el?.value?.trim();
                             if (f.required && !val) return { error: `${f.label} is required` };
                             if (val) {
-                                // comma-separated text => array for known array fields
-                                if (f.type === 'text' && val.includes(',') && ['filing_types','ciks','categories','years','family_office_names','series_ids','company_names','indicators','countries','state_codes','county_fips_codes','states','variables','locations','offenses','subjects'].includes(f.name)) {
+                                if (f.type === 'textarea') {
+                                    // Parse JSON textarea (e.g. salaries array)
+                                    try { body[f.name] = JSON.parse(val); }
+                                    catch { return { error: `${f.label}: invalid JSON` }; }
+                                } else if (f.name === 'bounding_box') {
+                                    // Comma-separated floats => array of numbers
+                                    body[f.name] = val.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+                                } else if (f.type === 'text' && val.includes(',') && ['filing_types','ciks','categories','years','family_office_names','series_ids','company_names','indicators','countries','state_codes','county_fips_codes','states','variables','places','locations','offenses','subjects','sources','top_pros','top_cons','lp_types','regions','datasets'].includes(f.name)) {
+                                    // comma-separated text => array for known array fields
                                     body[f.name] = val.split(',').map(s => s.trim()).filter(Boolean);
                                 } else if (f.type === 'number') {
                                     body[f.name] = parseInt(val) || val;
+                                } else if (val === 'true' || val === 'false') {
+                                    body[f.name] = val === 'true';
                                 } else {
                                     body[f.name] = val;
                                 }
@@ -3124,244 +3886,250 @@
                     catch { return { error: 'Invalid JSON' }; }
                 }
             }
+            // Handle queryParams — append to URL instead of body
+            if (formDef?.queryParams) {
+                const qp = [];
+                for (const f of formDef.queryParams) {
+                    if (f.type === 'checkbox-group') {
+                        const vals = [...document.querySelectorAll(`input[name="${prefix}-${f.name}"]:checked`)].map(c => c.value);
+                        vals.forEach(v => qp.push(`${f.name}=${encodeURIComponent(v)}`));
+                    } else {
+                        const el = document.getElementById(`${prefix}-${f.name}`);
+                        let val = el?.value?.trim();
+                        if (f.required && !val) return { error: `${f.label} is required` };
+                        if (val) qp.push(`${f.name}=${encodeURIComponent(val)}`);
+                    }
+                }
+                if (qp.length) queryString += (queryString ? '&' : '?') + qp.join('&');
+            }
             return { resolvedPath: resolvedPath + queryString, body };
         }
 
-        function renderScheduleToggle(triggerId, sourceKey) {
-            const isIncremental = INCREMENTAL_SOURCES.has(sourceKey);
-            return `<div class="toggle-row">
-                <label class="toggle-switch"><input type="checkbox" id="tf-sched-toggle-${triggerId}" onchange="toggleScheduleFields(${triggerId})"><span class="toggle-slider"></span></label>
-                <span class="toggle-label">Save as recurring schedule</span>
-                ${isIncremental ? `<label style="margin-left:1rem;display:flex;align-items:center;gap:0.35rem;font-size:0.8rem;color:var(--text-muted);cursor:pointer;">
-                    <input type="checkbox" id="tf-incremental-${triggerId}" style="accent-color:var(--primary);"> Incremental
-                </label>` : ''}
-            </div>
-            <div id="tf-sched-fields-${triggerId}" class="schedule-fields hidden">
-                <div class="tf-row">
-                    <div class="tf-field" style="flex:1;">
-                        <label>Schedule Name</label>
-                        <input type="text" id="tf-sched-name-${triggerId}" placeholder="e.g. FRED Daily Interest Rates">
-                    </div>
-                    <div class="tf-field" style="flex:1;">
-                        <label>Description (optional)</label>
-                        <input type="text" id="tf-sched-desc-${triggerId}" placeholder="What this schedule does">
-                    </div>
+        // ===== Unified New Collection Flow =====
+
+        function findBestDefaultTrigger(triggers) {
+            // Prefer "all", "batch", or "Ingest all" triggers
+            const keywords = ['all', 'batch', 'bulk'];
+            for (let i = 0; i < triggers.length; i++) {
+                const lbl = triggers[i].label.toLowerCase();
+                if (keywords.some(k => lbl.includes(k))) return i;
+            }
+            return 0;
+        }
+
+        function renderNewCollectionSection(src) {
+            const flow = src.collectionFlow;
+            const triggers = flow.triggers;
+            // Initialize state if needed
+            if (collectionState.selectedTriggerIndex === null) {
+                collectionState.selectedTriggerIndex = flow.defaultTriggerIndex || 0;
+            }
+            if (collectionState.executionMode === null) {
+                collectionState.executionMode = 'run-once';
+            }
+            const selIdx = collectionState.selectedTriggerIndex;
+            const mode = collectionState.executionMode;
+            const trigger = triggers[selIdx];
+            const basePath = trigger.path.split('?')[0];
+            const formDef = TRIGGER_FORMS[trigger.path] || TRIGGER_FORMS[basePath] || null;
+
+            let html = `<div class="ds-detail-tables" style="padding-bottom:1.25rem;">
+                <h3>New Collection</h3>`;
+
+            // Row 1: Endpoint picker + mode toggle (side by side)
+            html += `<div class="nc-controls-row">
+                <div class="tf-field">
+                    <label>Endpoint</label>
+                    <select id="nc-endpoint-select" onchange="onCollectionTriggerChanged()">
+                        ${triggers.map((t, i) => `<option value="${i}"${i === selIdx ? ' selected' : ''}>${escapeHtml(t.label)}</option>`).join('')}
+                    </select>
                 </div>
-                <div class="tf-row">
-                    <div class="tf-field">
-                        <label>Frequency</label>
-                        <select id="tf-sched-freq-${triggerId}" onchange="schedFreqChanged(${triggerId})">
-                            <option value="daily">Daily</option>
-                            <option value="weekly">Weekly</option>
-                            <option value="monthly">Monthly</option>
-                            <option value="quarterly">Quarterly</option>
-                        </select>
-                    </div>
-                    <div class="tf-field">
-                        <label>Hour (UTC)</label>
-                        <input type="number" id="tf-sched-hour-${triggerId}" value="6" min="0" max="23">
-                    </div>
-                    <div class="tf-field hidden" id="tf-sched-dow-wrap-${triggerId}">
-                        <label>Day of Week</label>
-                        <select id="tf-sched-dow-${triggerId}">
-                            <option value="0">Monday</option><option value="1">Tuesday</option>
-                            <option value="2">Wednesday</option><option value="3">Thursday</option>
-                            <option value="4">Friday</option><option value="5">Saturday</option>
-                            <option value="6">Sunday</option>
-                        </select>
-                    </div>
-                    <div class="tf-field hidden" id="tf-sched-dom-wrap-${triggerId}">
-                        <label>Day of Month</label>
-                        <input type="number" id="tf-sched-dom-${triggerId}" value="1" min="1" max="31">
+                <div style="display:flex;flex-direction:column;gap:0.35rem;">
+                    <label style="font-size:0.75rem;color:var(--text-muted);font-weight:500;">Mode</label>
+                    <div class="exec-mode-group">
+                        <div class="exec-mode-btn${mode === 'run-once' ? ' active' : ''}" onclick="onExecutionModeChanged('run-once')">Run Once</div>
+                        <div class="exec-mode-btn${mode === 'schedule' ? ' active' : ''}" onclick="onExecutionModeChanged('schedule')">Schedule</div>
                     </div>
                 </div>
             </div>`;
-        }
 
-        function toggleScheduleFields(triggerId) {
-            const toggle = document.getElementById(`tf-sched-toggle-${triggerId}`);
-            const fields = document.getElementById(`tf-sched-fields-${triggerId}`);
-            if (toggle && fields) {
-                fields.classList.toggle('hidden', !toggle.checked);
+            // Form fields (adapted for mode)
+            html += `<div class="nc-form-section">`;
+            html += renderCollectionForm(formDef, 'nc-form', mode, trigger.body);
+            html += `</div>`;
+
+            // Schedule-specific: info note + config
+            if (mode === 'schedule') {
+                const classification = classifyFormFields(formDef);
+                if (classification.temporalType === 'date-range') {
+                    html += `<div class="collection-info-note">Each scheduled run collects data from the start date forward. End date is omitted for recurring runs.</div>`;
+                } else if (classification.temporalType === 'year-range') {
+                    html += `<div class="collection-info-note">Each scheduled run collects data from the start year forward. End year is omitted for recurring runs.</div>`;
+                }
+
+                const schedOpts = src.scheduleOptions || ['daily','weekly','monthly'];
+                const rec = src.recommendedCadence || schedOpts[0] || 'daily';
+
+                html += `<div class="nc-sched-config">
+                    <div class="tf-row">
+                        <div class="tf-field" style="flex:1;">
+                            <label>Schedule Name</label>
+                            <input type="text" id="nc-sched-name" placeholder="e.g. ${escapeHtml(src.label)} ${rec.charAt(0).toUpperCase() + rec.slice(1)}">
+                        </div>
+                        <div class="tf-field" style="flex:1;">
+                            <label>Description (optional)</label>
+                            <input type="text" id="nc-sched-desc" placeholder="What this schedule does">
+                        </div>
+                    </div>
+                    <div class="tf-row">
+                        <div class="tf-field">
+                            <label>Frequency</label>
+                            <select id="nc-sched-freq" onchange="schedNewCollFreqChanged()">
+                                ${schedOpts.map(o => `<option value="${o}"${o === rec ? ' selected' : ''}>${o.charAt(0).toUpperCase() + o.slice(1)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="tf-field">
+                            <label>Hour (UTC)</label>
+                            <input type="number" id="nc-sched-hour" value="6" min="0" max="23">
+                        </div>
+                        <div class="tf-field${rec !== 'weekly' ? ' hidden' : ''}" id="nc-sched-dow-wrap">
+                            <label>Day of Week</label>
+                            <select id="nc-sched-dow">
+                                <option value="0">Monday</option><option value="1">Tuesday</option>
+                                <option value="2">Wednesday</option><option value="3">Thursday</option>
+                                <option value="4">Friday</option><option value="5">Saturday</option>
+                                <option value="6">Sunday</option>
+                            </select>
+                        </div>
+                        <div class="tf-field${rec !== 'monthly' && rec !== 'quarterly' ? ' hidden' : ''}" id="nc-sched-dom-wrap">
+                            <label>Day of Month</label>
+                            <input type="number" id="nc-sched-dom" value="1" min="1" max="31">
+                        </div>
+                    </div>
+                </div>`;
             }
+
+            // Submit button
+            const btnLabel = mode === 'schedule' ? 'Create Schedule' : 'Run Collection';
+            html += `<div class="nc-submit-row">
+                <button class="btn" style="padding:0.5rem 1.5rem;font-size:0.85rem;" onclick="submitCollection()">${btnLabel}</button>
+                <div id="nc-result" style="flex:1;"></div>
+            </div>`;
+
+            // Active Schedules
+            html += renderExistingSchedules(src);
+
+            html += `</div>`;
+            return html;
         }
 
-        function schedFreqChanged(triggerId) {
-            const freq = document.getElementById(`tf-sched-freq-${triggerId}`)?.value;
-            const dowWrap = document.getElementById(`tf-sched-dow-wrap-${triggerId}`);
-            const domWrap = document.getElementById(`tf-sched-dom-wrap-${triggerId}`);
-            if (dowWrap) dowWrap.classList.toggle('hidden', freq !== 'weekly');
-            if (domWrap) domWrap.classList.toggle('hidden', freq !== 'monthly' && freq !== 'quarterly');
+        function renderCollectionForm(formDef, triggerId, mode, triggerBody) {
+            if (!formDef) {
+                const hasBody = triggerBody && Object.keys(triggerBody).length > 0;
+                if (hasBody) {
+                    // Pre-built body: show read-only summary instead of editable textarea
+                    return `<div style="font-size:0.8rem;color:var(--text-muted);padding:0.25rem 0;">
+                        <span style="font-family:monospace;background:var(--bg-input);padding:0.2rem 0.5rem;border-radius:4px;">${escapeHtml(JSON.stringify(triggerBody))}</span>
+                    </div>`;
+                }
+                return `<div class="tf-field" style="min-width:100%;">
+                    <label>Request Body (JSON)</label>
+                    <textarea id="tf-json-${triggerId}" rows="3" style="width:100%;font-family:monospace;font-size:0.8rem;" placeholder='{}'></textarea>
+                </div>`;
+            }
+
+            const prefix = `tf-${triggerId}`;
+            const classification = classifyFormFields(formDef);
+            const isSchedule = mode === 'schedule';
+            let html = '';
+
+            // Path params
+            if (formDef.pathParams?.length) {
+                html += '<div class="tf-row">';
+                formDef.pathParams.forEach(p => { html += renderFormField(p, prefix + '-pp'); });
+                html += '</div>';
+            }
+
+            // Body fields — adapt date/year fields based on mode
+            if (formDef.fields?.length) {
+                html += '<div class="tf-row">';
+                formDef.fields.forEach(f => {
+                    const isEndField = classification.endField && f.name === classification.endField.name;
+                    const isStartField = classification.startField && f.name === classification.startField.name;
+
+                    if (isSchedule && isEndField) {
+                        // Hide end date/year in schedule mode
+                        return;
+                    }
+
+                    if (isSchedule && isStartField) {
+                        // Adapt start field label and default for schedule mode
+                        const adaptedField = { ...f };
+                        if (classification.temporalType === 'date-range') {
+                            adaptedField.label = 'Collect from (initial lookback)';
+                            adaptedField.default = getSmartStartDefault(f.name);
+                        } else if (classification.temporalType === 'year-range') {
+                            adaptedField.label = 'Collect from year';
+                            adaptedField.default = getSmartStartDefault(f.name);
+                        }
+                        html += renderFormField(adaptedField, prefix);
+                        return;
+                    }
+
+                    html += renderFormField(f, prefix);
+                });
+                html += '</div>';
+            }
+
+            // Query params — rendered same as body fields but sent as URL params
+            if (formDef.queryParams?.length) {
+                html += '<div class="tf-row">';
+                formDef.queryParams.forEach(f => {
+                    html += renderFormField(f, prefix);
+                });
+                html += '</div>';
+            }
+
+            return html;
         }
 
-        // ===== New Collection Panel Pattern =====
-
-        function toggleCollectionPanel(panel) {
-            collectionPanel = collectionPanel === panel ? null : panel;
+        function onCollectionTriggerChanged() {
+            const sel = document.getElementById('nc-endpoint-select');
+            if (sel) {
+                collectionState.selectedTriggerIndex = parseInt(sel.value);
+            }
             renderDetailView();
         }
 
-        function renderTriggerFormFiltered(formDef, triggerId, skipFieldNames = []) {
-            if (!formDef) return '';
-            const prefix = `tf-${triggerId}`;
-            let html = '';
-            if (formDef.pathParams?.length) {
-                const filtered = formDef.pathParams.filter(p => !skipFieldNames.includes(p.name));
-                if (filtered.length) {
-                    html += '<div class="tf-row">';
-                    filtered.forEach(p => { html += renderFormField(p, prefix + '-pp'); });
-                    html += '</div>';
-                }
-            }
-            if (formDef.fields?.length) {
-                const filtered = formDef.fields.filter(f => !skipFieldNames.includes(f.name));
-                if (filtered.length) {
-                    html += '<div class="tf-row">';
-                    filtered.forEach(f => { html += renderFormField(f, prefix); });
-                    html += '</div>';
-                }
-            }
-            return html;
+        function onExecutionModeChanged(mode) {
+            collectionState.executionMode = mode;
+            renderDetailView();
         }
 
-        function renderCollectionSection(src) {
-            const backfillActive = collectionPanel === 'backfill';
-            const scheduleActive = collectionPanel === 'schedule';
-            let html = `<div class="ds-detail-tables" style="padding-bottom:1.25rem;">
-                <h3>Set Up Collection</h3>
-                <div class="collection-actions">
-                    <div class="collection-action-card${backfillActive ? ' active' : ''}" onclick="toggleCollectionPanel('backfill')">
-                        <div class="collection-action-title">Historical Backfill</div>
-                        <div class="collection-action-desc">One-time collection with a specific date range. Pull historical data.</div>
-                    </div>
-                    <div class="collection-action-card${scheduleActive ? ' active' : ''}" onclick="toggleCollectionPanel('schedule')">
-                        <div class="collection-action-title">Set Up Schedule</div>
-                        <div class="collection-action-desc">Recurring collection on a cadence. Recommended: <strong>${src.recommendedCadence || 'daily'}</strong></div>
-                    </div>
-                </div>`;
-            if (backfillActive) html += renderBackfillPanel(src);
-            if (scheduleActive) html += renderSchedulePanel(src);
-            html += renderExistingSchedules(src);
-            html += `</div>`;
-            return html;
-        }
-
-        function renderBackfillPanel(src) {
-            const trigger = src.backfillTrigger;
-            const basePath = trigger.path.split('?')[0];
-            const formDef = TRIGGER_FORMS[trigger.path] || TRIGGER_FORMS[basePath] || null;
-            let html = `<div class="collection-panel">
-                <h4>Historical Backfill</h4>`;
-            html += renderTriggerForm(formDef, 'backfill');
-            html += `<div class="tf-actions" style="margin-top:0.75rem;">
-                <button class="btn" style="padding:0.4rem 1.25rem;font-size:0.8rem;" onclick="submitBackfill()">Run Backfill</button>
-                <button class="btn btn-secondary" style="padding:0.4rem 1rem;font-size:0.8rem;" onclick="toggleCollectionPanel('backfill')">Cancel</button>
-            </div>
-            <div id="tf-result-backfill"></div>
-            </div>`;
-            return html;
-        }
-
-        function renderSchedulePanel(src) {
-            const trigger = src.scheduleTrigger;
-            const basePath = trigger.path.split('?')[0];
-            const formDef = TRIGGER_FORMS[trigger.path] || TRIGGER_FORMS[basePath] || null;
-            const rec = src.recommendedCadence || 'daily';
-            const schedOpts = src.scheduleOptions || ['daily','weekly','monthly'];
-            let html = `<div class="collection-panel">
-                <h4>Set Up Schedule</h4>
-                <div class="tf-row">
-                    <div class="tf-field" style="flex:1;">
-                        <label>Schedule Name</label>
-                        <input type="text" id="tf-sched-panel-name" placeholder="e.g. FRED Daily Interest Rates">
-                    </div>
-                    <div class="tf-field" style="flex:1;">
-                        <label>Description (optional)</label>
-                        <input type="text" id="tf-sched-panel-desc" placeholder="What this schedule does">
-                    </div>
-                </div>`;
-            // Render form fields excluding date fields (schedule doesn't need date range)
-            html += renderTriggerFormFiltered(formDef, 'sched-panel', ['observation_start', 'observation_end']);
-            html += `<div class="tf-row">
-                    <div class="tf-field">
-                        <label>Frequency</label>
-                        <select id="tf-sched-panel-freq" onchange="schedPanelFreqChanged()">
-                            ${schedOpts.map(o => `<option value="${o}"${o === rec ? ' selected' : ''}>${o.charAt(0).toUpperCase() + o.slice(1)}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="tf-field">
-                        <label>Hour (UTC)</label>
-                        <input type="number" id="tf-sched-panel-hour" value="6" min="0" max="23">
-                    </div>
-                    <div class="tf-field${rec !== 'weekly' ? ' hidden' : ''}" id="tf-sched-panel-dow-wrap">
-                        <label>Day of Week</label>
-                        <select id="tf-sched-panel-dow">
-                            <option value="0">Monday</option><option value="1">Tuesday</option>
-                            <option value="2">Wednesday</option><option value="3">Thursday</option>
-                            <option value="4">Friday</option><option value="5">Saturday</option>
-                            <option value="6">Sunday</option>
-                        </select>
-                    </div>
-                    <div class="tf-field${rec !== 'monthly' && rec !== 'quarterly' ? ' hidden' : ''}" id="tf-sched-panel-dom-wrap">
-                        <label>Day of Month</label>
-                        <input type="number" id="tf-sched-panel-dom" value="1" min="1" max="31">
-                    </div>
-                </div>`;
-            html += `<div class="tf-actions" style="margin-top:0.75rem;">
-                <button class="btn" style="padding:0.4rem 1.25rem;font-size:0.8rem;" onclick="submitSchedulePanel()">Create Schedule</button>
-                <button class="btn btn-secondary" style="padding:0.4rem 1rem;font-size:0.8rem;" onclick="toggleCollectionPanel('schedule')">Cancel</button>
-            </div>
-            <div id="tf-result-sched-panel"></div>
-            </div>`;
-            return html;
-        }
-
-        function renderExistingSchedules(src) {
-            const sourceSchedules = (schedulesData || []).filter(s => s.source === src.key);
-            let html = `<div style="margin-top:0.75rem;">
-                <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;">Active Schedules</div>`;
-            if (sourceSchedules.length > 0) {
-                sourceSchedules.forEach(sched => {
-                    const isActive = sched.is_active !== false;
-                    const statusCls = isActive ? 'active' : 'paused';
-                    const statusLabel = isActive ? 'Active' : 'Paused';
-                    const lastRun = sched.last_run_time ? timeAgo(new Date(sched.last_run_time)) : 'Never';
-                    const nextRun = sched.next_run_time ? new Date(sched.next_run_time).toLocaleString() : 'N/A';
-                    html += `<div class="schedule-list-item">
-                        <span class="sched-name">${escapeHtml(sched.name || sched.source)}</span>
-                        <span class="sched-freq">${sched.frequency || ''}</span>
-                        <span style="font-size:0.7rem;color:var(--text-muted);">Last: ${lastRun}</span>
-                        <span style="font-size:0.7rem;color:var(--text-muted);">Next: ${nextRun}</span>
-                        <span class="schedule-badge ${statusCls}">${statusLabel}</span>
-                        <button class="btn-sm" onclick="toggleScheduleActive(${sched.id}, ${!isActive})">${isActive ? 'Pause' : 'Activate'}</button>
-                        <button class="btn-sm primary" onclick="runScheduleNow(${sched.id})">Run Now</button>
-                    </div>`;
-                });
-            } else {
-                html += `<div style="font-size:0.8rem;color:var(--text-muted);padding:0.5rem 0;">
-                    No schedules configured. Click <strong>Set Up Schedule</strong> above to create one.
-                </div>`;
-            }
-            html += `</div>`;
-            return html;
-        }
-
-        function schedPanelFreqChanged() {
-            const freq = document.getElementById('tf-sched-panel-freq')?.value;
-            const dowWrap = document.getElementById('tf-sched-panel-dow-wrap');
-            const domWrap = document.getElementById('tf-sched-panel-dom-wrap');
+        function schedNewCollFreqChanged() {
+            const freq = document.getElementById('nc-sched-freq')?.value;
+            const dowWrap = document.getElementById('nc-sched-dow-wrap');
+            const domWrap = document.getElementById('nc-sched-dom-wrap');
             if (dowWrap) dowWrap.classList.toggle('hidden', freq !== 'weekly');
             if (domWrap) domWrap.classList.toggle('hidden', freq !== 'monthly' && freq !== 'quarterly');
         }
 
-        async function submitBackfill() {
-            if (!selectedSource?.backfillTrigger) return;
-            const trigger = selectedSource.backfillTrigger;
-            const resultEl = document.getElementById('tf-result-backfill');
+        async function submitCollection() {
+            if (collectionState.executionMode === 'schedule') {
+                return submitNewSchedule();
+            }
+            return submitRunOnce();
+        }
+
+        async function submitRunOnce() {
+            if (!selectedSource?.collectionFlow) return;
+            const flow = selectedSource.collectionFlow;
+            const trigger = flow.triggers[collectionState.selectedTriggerIndex];
+            const resultEl = document.getElementById('nc-result');
             const basePath = trigger.path.split('?')[0];
             const formDef = TRIGGER_FORMS[trigger.path] || TRIGGER_FORMS[basePath] || null;
 
-            const collected = collectFormValues(formDef, trigger.path, trigger.body || {}, 'backfill');
+            const collected = collectFormValues(formDef, trigger.path, trigger.body || {}, 'nc-form');
             if (collected.error) {
                 if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(collected.error)}</div>`;
                 return;
@@ -3375,7 +4143,7 @@
                 const data = await res.json();
                 if (res.ok) {
                     const jobId = data.job_id || data.id || '';
-                    showToast(`Backfill started!${jobId ? ` Job ID: ${jobId}` : ''}`, 'success');
+                    showToast(`Collection started!${jobId ? ` Job ID: ${jobId}` : ''}`, 'success');
                     if (resultEl) resultEl.innerHTML = `<div class="tf-result success">Started${jobId ? ` (Job ${jobId})` : ''}</div>`;
                 } else {
                     showToast(`Failed: ${data.detail || JSON.stringify(data)}`, 'error');
@@ -3387,14 +4155,20 @@
             }
         }
 
-        async function submitSchedulePanel() {
-            const resultEl = document.getElementById('tf-result-sched-panel');
-            const name = document.getElementById('tf-sched-panel-name')?.value?.trim();
-            const description = document.getElementById('tf-sched-panel-desc')?.value?.trim() || null;
-            const frequency = document.getElementById('tf-sched-panel-freq')?.value || 'daily';
-            const hour = parseInt(document.getElementById('tf-sched-panel-hour')?.value) || 6;
-            const dayOfWeekEl = document.getElementById('tf-sched-panel-dow');
-            const dayOfMonthEl = document.getElementById('tf-sched-panel-dom');
+        async function submitNewSchedule() {
+            if (!selectedSource?.collectionFlow) return;
+            const flow = selectedSource.collectionFlow;
+            const trigger = flow.triggers[collectionState.selectedTriggerIndex];
+            const resultEl = document.getElementById('nc-result');
+            const basePath = trigger.path.split('?')[0];
+            const formDef = TRIGGER_FORMS[trigger.path] || TRIGGER_FORMS[basePath] || null;
+
+            const name = document.getElementById('nc-sched-name')?.value?.trim();
+            const description = document.getElementById('nc-sched-desc')?.value?.trim() || null;
+            const frequency = document.getElementById('nc-sched-freq')?.value || 'daily';
+            const hour = parseInt(document.getElementById('nc-sched-hour')?.value) || 6;
+            const dayOfWeekEl = document.getElementById('nc-sched-dow');
+            const dayOfMonthEl = document.getElementById('nc-sched-dom');
             const dayOfWeek = (frequency === 'weekly' && dayOfWeekEl) ? parseInt(dayOfWeekEl.value) : null;
             const dayOfMonth = ((frequency === 'monthly' || frequency === 'quarterly') && dayOfMonthEl) ? parseInt(dayOfMonthEl.value) : null;
 
@@ -3403,12 +4177,7 @@
                 return;
             }
 
-            if (!selectedSource?.scheduleTrigger) return;
-            const trigger = selectedSource.scheduleTrigger;
-            const basePath = trigger.path.split('?')[0];
-            const formDef = TRIGGER_FORMS[trigger.path] || TRIGGER_FORMS[basePath] || null;
-            // Collect form values from the schedule panel (uses 'sched-panel' trigger ID)
-            const collected = collectFormValues(formDef, trigger.path, trigger.body || {}, 'sched-panel');
+            const collected = collectFormValues(formDef, trigger.path, trigger.body || {}, 'nc-form');
             if (collected.error) {
                 if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(collected.error)}</div>`;
                 return;
@@ -3441,7 +4210,7 @@
                 if (res.ok) {
                     showToast(`Schedule "${name}" created!`, 'success');
                     schedulesData = await fetch(`${API}/schedules`).then(r => r.ok ? r.json() : schedulesData).catch(() => schedulesData);
-                    collectionPanel = null;
+                    collectionState = { selectedTriggerIndex: null, executionMode: null };
                     renderDetailView();
                 } else {
                     showToast(`Schedule creation failed: ${data.detail || JSON.stringify(data)}`, 'error');
@@ -3453,52 +4222,21 @@
             }
         }
 
-        function renderLegacyTriggerSection(src, triggers) {
-            let html = `<div class="ds-detail-tables" style="padding-bottom:1.25rem;">
-                <h3>Run Collection</h3>
-                <div style="margin-bottom:1rem;">`;
-            triggers.forEach((t, i) => {
-                const isExpanded = expandedTriggerId === i;
-                const basePath = t.path.split('?')[0];
-                const formDef = TRIGGER_FORMS[t.path] || TRIGGER_FORMS[basePath] || null;
-                const hasForm = formDef && ((formDef.pathParams?.length) || (formDef.fields?.length));
-                const needsForm = t.path.includes('{') || hasForm;
-                html += `<div class="ds-detail-table-row" style="cursor:default;margin-bottom:${isExpanded ? '0' : '0.375rem'};">
-                    <div style="flex:1;">
-                        <div class="ds-detail-table-name" style="font-size:0.85rem;">${t.label}</div>
-                        <div style="font-family:monospace;font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">${t.method} ${t.path}</div>
-                        ${t.body && !isExpanded ? `<div style="font-family:monospace;font-size:0.7rem;color:var(--text-muted);margin-top:0.125rem;">Body: ${JSON.stringify(t.body)}</div>` : ''}
-                    </div>
-                    <button class="btn${isExpanded ? ' btn-secondary' : ''}" style="padding:0.375rem 1rem;font-size:0.8rem;"
-                        onclick="triggerCollection(${i})">${isExpanded ? 'Close' : 'Run'}</button>
-                </div>`;
-                if (isExpanded) {
-                    html += `<div class="trigger-form-panel">`;
-                    html += renderTriggerForm(formDef, i);
-                    html += renderScheduleToggle(i, src.key);
-                    html += `<div class="tf-actions">
-                        <button class="btn" style="padding:0.4rem 1.25rem;font-size:0.8rem;" onclick="submitTrigger(${i})">Submit</button>
-                        <button class="btn btn-secondary" style="padding:0.4rem 1rem;font-size:0.8rem;" onclick="cancelTrigger()">Cancel</button>
-                    </div>
-                    <div id="tf-result-${i}"></div>`;
-                    html += `</div>`;
-                }
-            });
-            html += `</div>`;
-
-            // Existing Schedules
+        function renderExistingSchedules(src) {
             const sourceSchedules = (schedulesData || []).filter(s => s.source === src.key);
-            html += `<div style="margin-top:0.5rem;">
-                <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;">Schedules</div>`;
+            let html = `<div style="margin-top:0.75rem;">
+                <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;">Active Schedules</div>`;
             if (sourceSchedules.length > 0) {
                 sourceSchedules.forEach(sched => {
                     const isActive = sched.is_active !== false;
                     const statusCls = isActive ? 'active' : 'paused';
                     const statusLabel = isActive ? 'Active' : 'Paused';
+                    const lastRun = sched.last_run_time ? timeAgo(new Date(sched.last_run_time)) : 'Never';
                     const nextRun = sched.next_run_time ? new Date(sched.next_run_time).toLocaleString() : 'N/A';
                     html += `<div class="schedule-list-item">
                         <span class="sched-name">${escapeHtml(sched.name || sched.source)}</span>
                         <span class="sched-freq">${sched.frequency || ''}</span>
+                        <span style="font-size:0.7rem;color:var(--text-muted);">Last: ${lastRun}</span>
                         <span style="font-size:0.7rem;color:var(--text-muted);">Next: ${nextRun}</span>
                         <span class="schedule-badge ${statusCls}">${statusLabel}</span>
                         <button class="btn-sm" onclick="toggleScheduleActive(${sched.id}, ${!isActive})">${isActive ? 'Pause' : 'Activate'}</button>
@@ -3507,10 +4245,10 @@
                 });
             } else {
                 html += `<div style="font-size:0.8rem;color:var(--text-muted);padding:0.5rem 0;">
-                    No schedules configured. Use the <strong>Run</strong> button above and toggle "Save as recurring schedule" to create one.
+                    No schedules configured. Select <strong>Schedule</strong> above to create one.
                 </div>`;
             }
-            html += `</div></div>`;
+            html += `</div>`;
             return html;
         }
 
@@ -3547,12 +4285,15 @@
 
             // ---- Collection section ----
             const triggers = src.triggers || [];
-            if (src.backfillTrigger || src.scheduleTrigger) {
-                // NEW pattern: two action cards
-                html += renderCollectionSection(src);
-            } else if (triggers.length > 0) {
-                // LEGACY: keep old "Run" button behavior for unmigrated sources
-                html += renderLegacyTriggerSection(src, triggers);
+            if (triggers.length > 0) {
+                // Auto-build collectionFlow from triggers if not explicitly defined
+                if (!src.collectionFlow) {
+                    src.collectionFlow = {
+                        triggers: triggers,
+                        defaultTriggerIndex: findBestDefaultTrigger(triggers),
+                    };
+                }
+                html += renderNewCollectionSection(src);
             }
 
             // ---- Available Endpoints section ----
@@ -3748,123 +4489,6 @@
                 }
             } catch (e) {
                 showToast(`Export failed: ${e.message}`, 'error');
-            }
-        }
-
-        function triggerCollection(triggerIndex) {
-            if (expandedTriggerId === triggerIndex) {
-                expandedTriggerId = null;
-            } else {
-                expandedTriggerId = triggerIndex;
-            }
-            renderDetailView();
-        }
-
-        function cancelTrigger() {
-            expandedTriggerId = null;
-            renderDetailView();
-        }
-
-        async function submitTrigger(triggerIndex) {
-            if (!selectedSource?.triggers?.[triggerIndex]) return;
-            const trigger = selectedSource.triggers[triggerIndex];
-            const resultEl = document.getElementById(`tf-result-${triggerIndex}`);
-            const basePath = trigger.path.split('?')[0];
-            const formDef = TRIGGER_FORMS[trigger.path] || TRIGGER_FORMS[basePath] || null;
-
-            const collected = collectFormValues(formDef, trigger.path, trigger.body, triggerIndex);
-            if (collected.error) {
-                if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(collected.error)}</div>`;
-                return;
-            }
-
-            // Check if schedule toggle is on
-            const schedToggle = document.getElementById(`tf-sched-toggle-${triggerIndex}`);
-            if (schedToggle?.checked) {
-                return submitAsSchedule(triggerIndex, collected, trigger);
-            }
-
-            // Check incremental
-            const incrEl = document.getElementById(`tf-incremental-${triggerIndex}`);
-            if (incrEl?.checked) {
-                collected.body.incremental = true;
-            }
-
-            if (resultEl) resultEl.innerHTML = '<span style="color:var(--text-muted);font-size:0.8rem;">Submitting...</span>';
-            try {
-                const opts = { method: trigger.method, headers: { 'Content-Type': 'application/json' } };
-                if (Object.keys(collected.body).length > 0) opts.body = JSON.stringify(collected.body);
-                const res = await fetch(collected.resolvedPath, opts);
-                const data = await res.json();
-                if (res.ok) {
-                    const jobId = data.job_id || data.id || '';
-                    showToast(`Collection started!${jobId ? ` Job ID: ${jobId}` : ''}`, 'success');
-                    if (resultEl) resultEl.innerHTML = `<div class="tf-result success">Started${jobId ? ` (Job ${jobId})` : ''}</div>`;
-                } else {
-                    showToast(`Failed: ${data.detail || JSON.stringify(data)}`, 'error');
-                    if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(data.detail || JSON.stringify(data))}</div>`;
-                }
-            } catch (e) {
-                showToast(`Request failed: ${e.message}`, 'error');
-                if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(e.message)}</div>`;
-            }
-        }
-
-        async function submitAsSchedule(triggerIndex, collected, trigger) {
-            const resultEl = document.getElementById(`tf-result-${triggerIndex}`);
-            const name = document.getElementById(`tf-sched-name-${triggerIndex}`)?.value?.trim();
-            const description = document.getElementById(`tf-sched-desc-${triggerIndex}`)?.value?.trim() || null;
-            const frequency = document.getElementById(`tf-sched-freq-${triggerIndex}`)?.value || 'daily';
-            const hour = parseInt(document.getElementById(`tf-sched-hour-${triggerIndex}`)?.value) || 6;
-            const dayOfWeekEl = document.getElementById(`tf-sched-dow-${triggerIndex}`);
-            const dayOfMonthEl = document.getElementById(`tf-sched-dom-${triggerIndex}`);
-            const dayOfWeek = (frequency === 'weekly' && dayOfWeekEl) ? parseInt(dayOfWeekEl.value) : null;
-            const dayOfMonth = ((frequency === 'monthly' || frequency === 'quarterly') && dayOfMonthEl) ? parseInt(dayOfMonthEl.value) : null;
-
-            if (!name) {
-                if (resultEl) resultEl.innerHTML = '<div class="tf-result error">Schedule name is required</div>';
-                return;
-            }
-
-            const incrEl = document.getElementById(`tf-incremental-${triggerIndex}`);
-            const config = { ...collected.body };
-            if (incrEl?.checked) config.incremental = true;
-            config._trigger_path = collected.resolvedPath;
-            config._trigger_method = trigger.method;
-
-            if (resultEl) resultEl.innerHTML = '<span style="color:var(--text-muted);font-size:0.8rem;">Creating schedule...</span>';
-            try {
-                const schedBody = {
-                    name,
-                    source: selectedSource.key,
-                    config,
-                    frequency,
-                    hour,
-                    is_active: true,
-                    priority: 5,
-                };
-                if (description) schedBody.description = description;
-                if (dayOfWeek !== null) schedBody.day_of_week = dayOfWeek;
-                if (dayOfMonth !== null) schedBody.day_of_month = dayOfMonth;
-                const res = await fetch(`${API}/schedules`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(schedBody),
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    showToast(`Schedule "${name}" created!`, 'success');
-                    // Refresh schedules data
-                    schedulesData = await fetch(`${API}/schedules`).then(r => r.ok ? r.json() : schedulesData).catch(() => schedulesData);
-                    expandedTriggerId = null;
-                    renderDetailView();
-                } else {
-                    showToast(`Schedule creation failed: ${data.detail || JSON.stringify(data)}`, 'error');
-                    if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(data.detail || JSON.stringify(data))}</div>`;
-                }
-            } catch (e) {
-                showToast(`Schedule creation failed: ${e.message}`, 'error');
-                if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(e.message)}</div>`;
             }
         }
 

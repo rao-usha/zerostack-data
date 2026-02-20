@@ -114,6 +114,7 @@ from app.api.v1 import (
     workflows,
     llm_costs,
     freshness,
+    dunl,
 )
 
 # Job Queue Streaming
@@ -1071,6 +1072,10 @@ Browse the endpoint sections below to see what's available:
             "name": "freshness",
             "description": "📊 **Data Freshness** - Monitor source staleness, auto-refresh status, and incremental loading",
         },
+        {
+            "name": "dunl",
+            "description": "🔗 **DUNL (S&P Data Unlocked)** - Open reference data: currencies, ports, UOM, calendars",
+        },
     ],
 )
 
@@ -1156,6 +1161,7 @@ app.include_router(treasury.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(fdic.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(irs_soi.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(foot_traffic.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(dunl.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(prediction_markets.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(schedules.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(webhooks.router, prefix="/api/v1", dependencies=_auth)
