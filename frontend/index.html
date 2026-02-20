@@ -2265,6 +2265,29 @@
                 pathParams: [{ name: 'lp_id', label: 'LP ID', type: 'number', required: true, placeholder: 'e.g. 1' }],
                 fields: [],
             },
+            // ── DUNL (S&P Data Unlocked) ──
+            '/api/v1/dunl/ingest-all': {
+                fields: [],
+                _note: 'Ingests all DUNL datasets: currencies (208), ports (301), UOM (210), and calendars (2024-2026). No parameters needed.',
+            },
+            '/api/v1/dunl/currencies/ingest': {
+                fields: [],
+                _note: 'Ingests all 208 ISO currency definitions from DUNL. No parameters needed.',
+            },
+            '/api/v1/dunl/ports/ingest': {
+                fields: [],
+                _note: 'Ingests all 301 commodity port definitions from DUNL. No parameters needed.',
+            },
+            '/api/v1/dunl/uom/ingest': {
+                fields: [],
+                _note: 'Ingests all 210 units of measure + conversion factors from DUNL. No parameters needed.',
+            },
+            '/api/v1/dunl/calendars/ingest': {
+                fields: [
+                    { name: 'years', label: 'Years', type: 'text', placeholder: '2024,2025,2026 (comma-separated)',
+                      default: '2024,2025,2026' },
+                ],
+            },
         };
 
         // ===== Date Field Detection (auto-classify temporal type) =====
@@ -4088,6 +4111,11 @@
                     html += renderFormField(f, prefix);
                 });
                 html += '</div>';
+            }
+
+            // Inline note (helpful guidance for no-param endpoints)
+            if (formDef._note) {
+                html += `<div style="font-size:0.78rem;color:var(--text-muted);padding:0.35rem 0 0.1rem;line-height:1.4;">${escapeHtml(formDef._note)}</div>`;
             }
 
             return html;
