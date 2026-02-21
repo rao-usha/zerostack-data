@@ -1441,6 +1441,9 @@
                 pathParams: [
                     { name: 'company_id', label: 'Company ID', type: 'number', required: true, placeholder: 'e.g. 1' },
                 ],
+                queryParams: [
+                    { name: 'sources', label: 'Sources', type: 'text', placeholder: 'website,sec,news (blank = website)' },
+                ],
             },
             '/api/v1/people-jobs/test/{company_id}?sources=website': {
                 pathParams: [
@@ -1451,17 +1454,87 @@
                 pathParams: [
                     { name: 'company_id', label: 'Company ID', type: 'number', required: true, placeholder: 'e.g. 1' },
                 ],
+                fields: [
+                    { name: 'run_sec', label: 'Run SEC', type: 'select', options: [
+                        { value: 'true', label: 'Yes (default)' }, { value: 'false', label: 'No' },
+                    ]},
+                    { name: 'run_website', label: 'Run Website Crawl', type: 'select', options: [
+                        { value: 'true', label: 'Yes (default)' }, { value: 'false', label: 'No' },
+                    ]},
+                    { name: 'run_news', label: 'Run News Scan', type: 'select', options: [
+                        { value: 'true', label: 'Yes (default)' }, { value: 'false', label: 'No' },
+                    ]},
+                    { name: 'build_org_chart', label: 'Build Org Chart', type: 'select', options: [
+                        { value: 'true', label: 'Yes (default)' }, { value: 'false', label: 'No' },
+                    ]},
+                    { name: 'max_crawl_pages', label: 'Max Crawl Pages', type: 'number', placeholder: '50' },
+                    { name: 'news_days_back', label: 'News Lookback (days)', type: 'number', placeholder: '1825 (5 years)' },
+                    { name: 'seed_urls', label: 'Seed URLs (comma-sep)', type: 'text', placeholder: 'https://example.com/team (optional)' },
+                    { name: 'subsidiary_names', label: 'Subsidiary Names (comma-sep)', type: 'text', placeholder: 'Acme Corp,Widget Inc (optional)' },
+                ],
             },
             '/api/v1/people-jobs/recursive-collect/{company_id}': {
                 pathParams: [
                     { name: 'company_id', label: 'Company ID', type: 'number', required: true, placeholder: 'e.g. 1' },
                 ],
+                fields: [
+                    { name: 'discover_structure', label: 'Auto-Discover Subsidiaries', type: 'select', options: [
+                        { value: 'true', label: 'Yes (default)' }, { value: 'false', label: 'No' },
+                    ]},
+                    { name: 'max_units', label: 'Max Business Units', type: 'number', placeholder: '25' },
+                    { name: 'run_sec_per_unit', label: 'SEC per Unit', type: 'select', options: [
+                        { value: 'true', label: 'Yes (default)' }, { value: 'false', label: 'No' },
+                    ]},
+                    { name: 'run_website_per_unit', label: 'Website Crawl per Unit', type: 'select', options: [
+                        { value: 'true', label: 'Yes (default)' }, { value: 'false', label: 'No' },
+                    ]},
+                    { name: 'run_news_per_unit', label: 'News Scan per Unit', type: 'select', options: [
+                        { value: 'false', label: 'No (default)' }, { value: 'true', label: 'Yes (slow)' },
+                    ]},
+                    { name: 'max_crawl_pages_per_unit', label: 'Max Pages per Unit', type: 'number', placeholder: '20' },
+                    { name: 'run_linkedin', label: 'LinkedIn Discovery', type: 'select', options: [
+                        { value: 'true', label: 'Yes (default)' }, { value: 'false', label: 'No' },
+                    ]},
+                    { name: 'max_linkedin_searches', label: 'Max LinkedIn Searches', type: 'number', placeholder: '100' },
+                ],
             },
-            '/api/v1/people-jobs/schedule': { fields: [] },
+            '/api/v1/people-jobs/schedule': {
+                fields: [
+                    { name: 'job_type', label: 'Job Type', type: 'select', required: true, options: [
+                        { value: 'website_crawl', label: 'Website Crawl' },
+                        { value: 'sec_parse', label: 'SEC Parse' },
+                        { value: 'news_scan', label: 'News Scan' },
+                    ]},
+                    { name: 'company_ids', label: 'Company IDs (comma-sep, blank = auto)', type: 'text', placeholder: '1,2,3 (blank = use priority filter)' },
+                    { name: 'priority', label: 'Priority', type: 'select', options: [
+                        { value: 'all', label: 'All companies' },
+                        { value: 'portfolio', label: 'Portfolio only' },
+                        { value: 'public', label: 'Public companies only' },
+                    ]},
+                    { name: 'limit', label: 'Max Companies', type: 'number', placeholder: '50' },
+                ],
+            },
 
-            // ── Site Intel & PE (body pre-defined in trigger) ──
-            '/api/v1/site-intel/sites/collect': { fields: [] },
-            '/api/v1/pe/collection/collect': { fields: [] },
+            // ── Site Intel ──
+            '/api/v1/site-intel/sites/collect': {
+                fields: [
+                    { name: 'states', label: 'State Codes (comma-sep, blank = all)', type: 'text', placeholder: 'TX,CA,NY (optional filter)' },
+                ],
+            },
+            // ── PE Collection ──
+            '/api/v1/pe/collection/collect': {
+                fields: [
+                    { name: 'entity_type', label: 'Entity Type', type: 'select', options: [
+                        { value: 'firm', label: 'Firm (default)' },
+                        { value: 'company', label: 'Company' },
+                        { value: 'person', label: 'Person' },
+                        { value: 'deal', label: 'Deal' },
+                    ]},
+                    { name: 'firm_ids', label: 'Firm IDs (comma-sep, blank = all)', type: 'text', placeholder: '1,2,3 (optional)' },
+                    { name: 'max_concurrent', label: 'Max Concurrent', type: 'number', placeholder: '5' },
+                    { name: 'rate_limit_delay', label: 'Rate Limit Delay (sec)', type: 'number', placeholder: '2.0' },
+                ],
+            },
 
             // ── USDA ──
             '/api/v1/usda/crop/ingest': {
@@ -3956,7 +4029,7 @@
                                 } else if (f.name === 'bounding_box') {
                                     // Comma-separated floats => array of numbers
                                     body[f.name] = val.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
-                                } else if (f.type === 'text' && val.includes(',') && ['filing_types','ciks','categories','years','family_office_names','series_ids','company_names','indicators','countries','state_codes','county_fips_codes','states','variables','places','locations','offenses','subjects','sources','top_pros','top_cons','lp_types','regions','datasets'].includes(f.name)) {
+                                } else if (f.type === 'text' && val.includes(',') && ['filing_types','ciks','categories','years','family_office_names','series_ids','company_names','indicators','countries','state_codes','county_fips_codes','states','variables','places','locations','offenses','subjects','sources','top_pros','top_cons','lp_types','regions','datasets','seed_urls','subsidiary_names','allowed_domains','firm_ids','company_ids','map_functions'].includes(f.name)) {
                                     // comma-separated text => array for known array fields
                                     body[f.name] = val.split(',').map(s => s.trim()).filter(Boolean);
                                 } else if (f.type === 'number') {
