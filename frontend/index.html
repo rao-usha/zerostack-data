@@ -515,6 +515,31 @@
         .jobs-load-more { text-align: center; padding: 0.75rem; }
         .jobs-load-more .btn { font-size: 0.8rem; padding: 0.5rem 1.5rem; }
 
+        /* ===== Source Detail Job Activity ===== */
+        .source-jobs-active { margin-bottom: 1rem; }
+        .source-jobs-active-item {
+            display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem;
+            background: rgba(6,182,212,0.06); border-radius: 8px; margin-bottom: 0.5rem; font-size: 0.85rem;
+        }
+        .source-jobs-active-item .job-progress-bar { max-width: 120px; }
+        .source-jobs-table { width: 100%; border-collapse: collapse; }
+        .source-jobs-table th {
+            text-align: left; padding: 0.45rem 0.5rem; font-size: 0.7rem; color: var(--text-muted);
+            text-transform: uppercase; border-bottom: 1px solid var(--border); font-weight: 500;
+        }
+        .source-jobs-table td { padding: 0.5rem 0.5rem; border-bottom: 1px solid rgba(51,65,85,0.3); font-size: 0.82rem; }
+        .source-jobs-table tbody tr { cursor: pointer; transition: background 0.1s; }
+        .source-jobs-table tbody tr:hover { background: rgba(99,102,241,0.06); }
+        .source-jobs-detail td { padding: 0 !important; }
+        .source-jobs-detail-inner {
+            padding: 0.6rem 0.75rem; background: var(--bg-input); border-radius: 6px; margin: 0.2rem 0.4rem 0.4rem;
+            font-size: 0.78rem; max-height: 250px; overflow-y: auto;
+        }
+        .source-jobs-detail-inner pre { white-space: pre-wrap; word-break: break-all; color: var(--text-muted); margin: 0.4rem 0; font-size: 0.72rem; }
+        .source-jobs-detail-inner .detail-label { font-weight: 600; color: var(--text); margin-right: 0.4rem; }
+        .source-jobs-detail-inner .detail-row { margin-bottom: 0.3rem; }
+        .source-jobs-empty { text-align: center; padding: 1.5rem; color: var(--text-muted); font-size: 0.85rem; }
+
         /* ===== Toast Notifications ===== */
         .toast-container {
             position: fixed; top: 1rem; right: 1rem; z-index: 9999;
@@ -637,6 +662,43 @@
         .schedule-badge { padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
         .schedule-badge.active { background: rgba(34,197,94,0.15); color: var(--success); }
         .schedule-badge.paused { background: rgba(148,163,184,0.15); color: var(--text-muted); }
+
+        /* Schedule edit inline form */
+        .sched-edit-form {
+            display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; padding: 0.5rem 0;
+        }
+        .sched-edit-form .tf-field { flex: 1; min-width: 100px; }
+        .sched-edit-form .tf-field label { font-size: 0.65rem; color: var(--text-muted); margin-bottom: 0.15rem; display: block; }
+        .sched-edit-form input, .sched-edit-form select {
+            padding: 0.3rem 0.5rem; font-size: 0.78rem; width: 100%;
+            background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text);
+        }
+        .sched-edit-actions { display: flex; gap: 0.35rem; align-items: flex-end; }
+
+        /* Schedule history */
+        .sched-history { padding: 0.4rem 0 0.2rem 0; }
+        .sched-history-item {
+            display: flex; align-items: center; gap: 0.6rem; padding: 0.3rem 0.5rem;
+            font-size: 0.75rem; border-bottom: 1px solid rgba(51,65,85,0.2);
+        }
+        .sched-history-item:last-child { border-bottom: none; }
+
+        /* ===== Source Jobs Toolbar ===== */
+        .source-jobs-toolbar {
+            display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap;
+        }
+        .source-jobs-toolbar select {
+            padding: 0.3rem 0.5rem; font-size: 0.78rem;
+            background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text);
+        }
+        .source-jobs-badges { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+        .source-jobs-badge {
+            padding: 0.2rem 0.5rem; border-radius: 10px; font-size: 0.7rem; font-weight: 600;
+        }
+        .source-jobs-badge.running { background: rgba(6,182,212,0.15); color: var(--info); }
+        .source-jobs-badge.pending { background: rgba(234,179,8,0.15); color: #eab308; }
+        .source-jobs-badge.success { background: rgba(34,197,94,0.15); color: var(--success); }
+        .source-jobs-badge.failed { background: rgba(239,68,68,0.15); color: var(--error); }
 
         /* ===== New Collection Flow ===== */
         .nc-controls-row { display: flex; gap: 1rem; align-items: flex-end; margin-bottom: 1rem; }
@@ -3394,12 +3456,17 @@
             expandedTable = null;
             tablePreview = null;
             previewPage = 0;
+            _sourceJobs = [];
+
+            // Update URL hash for deep linking
+            history.replaceState(null, '', '#/' + sourceKey);
 
             // Show loading state immediately
             document.getElementById('sources-content').innerHTML = '<div class="loading">Loading source details...</div>';
 
             await ensureTablesLoaded();
             renderSources();
+            startSourceJobPolling();
         }
 
         function backToList() {
@@ -3409,6 +3476,8 @@
             tablePreview = null;
             previewPage = 0;
             collectionState = { selectedTriggerIndex: null, executionMode: null };
+            stopSourceJobPolling();
+            history.replaceState(null, '', '#/');
             renderSources();
         }
 
@@ -4173,6 +4242,8 @@
                     const jobId = data.job_id || data.id || '';
                     showToast(`Collection started!${jobId ? ` Job ID: ${jobId}` : ''}`, 'success');
                     if (resultEl) resultEl.innerHTML = `<div class="tf-result success">Started${jobId ? ` (Job ${jobId})` : ''}</div>`;
+                    // Reload source jobs to show the new running job
+                    if (selectedSource) setTimeout(() => loadSourceJobs(selectedSource.key), 1000);
                 } else {
                     showToast(`Failed: ${data.detail || JSON.stringify(data)}`, 'error');
                     if (resultEl) resultEl.innerHTML = `<div class="tf-result error">${escapeHtml(data.detail || JSON.stringify(data))}</div>`;
@@ -4259,17 +4330,28 @@
                     const isActive = sched.is_active !== false;
                     const statusCls = isActive ? 'active' : 'paused';
                     const statusLabel = isActive ? 'Active' : 'Paused';
-                    const lastRun = sched.last_run_time ? timeAgo(new Date(sched.last_run_time)) : 'Never';
-                    const nextRun = sched.next_run_time ? new Date(sched.next_run_time).toLocaleString() : 'N/A';
-                    html += `<div class="schedule-list-item">
-                        <span class="sched-name">${escapeHtml(sched.name || sched.source)}</span>
-                        <span class="sched-freq">${sched.frequency || ''}</span>
-                        <span style="font-size:0.7rem;color:var(--text-muted);">Last: ${lastRun}</span>
-                        <span style="font-size:0.7rem;color:var(--text-muted);">Next: ${nextRun}</span>
-                        <span class="schedule-badge ${statusCls}">${statusLabel}</span>
-                        <button class="btn-sm" onclick="toggleScheduleActive(${sched.id}, ${!isActive})">${isActive ? 'Pause' : 'Activate'}</button>
-                        <button class="btn-sm primary" onclick="runScheduleNow(${sched.id})">Run Now</button>
-                    </div>`;
+                    const lastRun = sched.last_run_at ? timeAgo(new Date(sched.last_run_at)) : 'Never';
+                    const nextRun = sched.next_run_at ? new Date(sched.next_run_at).toLocaleString() : 'N/A';
+                    const isEditing = _editingScheduleId === sched.id;
+                    if (isEditing) {
+                        html += renderScheduleEditForm(sched);
+                    } else {
+                        html += `<div class="schedule-list-item" style="flex-wrap:wrap;">
+                            <span class="sched-name">${escapeHtml(sched.name || sched.source)}</span>
+                            <span class="sched-freq">${sched.frequency || ''}</span>
+                            <span style="font-size:0.7rem;color:var(--text-muted);">Last: ${lastRun}</span>
+                            <span style="font-size:0.7rem;color:var(--text-muted);">Next: ${nextRun}</span>
+                            <span class="schedule-badge ${statusCls}">${statusLabel}</span>
+                            <button class="btn-sm" onclick="toggleScheduleActive(${sched.id}, ${!isActive})">${isActive ? 'Pause' : 'Activate'}</button>
+                            <button class="btn-sm primary" onclick="runScheduleNow(${sched.id})">Run Now</button>
+                            <button class="btn-sm" onclick="startEditSchedule(${sched.id})">Edit</button>
+                            <button class="btn-sm" onclick="deleteSchedule(${sched.id}, '${escapeHtml(sched.name || sched.source)}')" style="color:var(--error);">Delete</button>
+                            <button class="btn-sm" onclick="toggleScheduleHistory(${sched.id})">${_scheduleHistoryOpen === sched.id ? 'Hide History' : 'History'}</button>
+                        </div>`;
+                        if (_scheduleHistoryOpen === sched.id) {
+                            html += renderScheduleHistoryPanel(sched.id);
+                        }
+                    }
                 });
             } else {
                 html += `<div style="font-size:0.8rem;color:var(--text-muted);padding:0.5rem 0;">
@@ -4278,6 +4360,435 @@
             }
             html += `</div>`;
             return html;
+        }
+
+        let _editingScheduleId = null;
+        let _scheduleHistoryOpen = null;
+        let _scheduleHistoryData = {};
+
+        function renderScheduleEditForm(sched) {
+            const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+            const freqOpts = ['daily','weekly','monthly','quarterly'];
+            return `<div class="schedule-list-item" style="flex-direction:column;align-items:stretch;">
+                <div class="sched-edit-form">
+                    <div class="tf-field"><label>Name</label>
+                        <input type="text" id="sched-edit-name-${sched.id}" value="${escapeHtml(sched.name || '')}">
+                    </div>
+                    <div class="tf-field"><label>Description</label>
+                        <input type="text" id="sched-edit-desc-${sched.id}" value="${escapeHtml(sched.description || '')}">
+                    </div>
+                    <div class="tf-field" style="max-width:120px;"><label>Frequency</label>
+                        <select id="sched-edit-freq-${sched.id}" onchange="schedEditFreqChanged(${sched.id})">
+                            ${freqOpts.map(f => `<option value="${f}"${f === sched.frequency ? ' selected' : ''}>${f.charAt(0).toUpperCase() + f.slice(1)}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="tf-field" style="max-width:80px;"><label>Hour (UTC)</label>
+                        <input type="number" id="sched-edit-hour-${sched.id}" value="${sched.hour != null ? sched.hour : 6}" min="0" max="23">
+                    </div>
+                    <div class="tf-field${sched.frequency !== 'weekly' ? ' hidden' : ''}" id="sched-edit-dow-wrap-${sched.id}" style="max-width:120px;">
+                        <label>Day of Week</label>
+                        <select id="sched-edit-dow-${sched.id}">
+                            ${days.map((d,i) => `<option value="${i}"${sched.day_of_week === i ? ' selected' : ''}>${d}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="tf-field${sched.frequency !== 'monthly' && sched.frequency !== 'quarterly' ? ' hidden' : ''}" id="sched-edit-dom-wrap-${sched.id}" style="max-width:100px;">
+                        <label>Day of Month</label>
+                        <input type="number" id="sched-edit-dom-${sched.id}" value="${sched.day_of_month || 1}" min="1" max="31">
+                    </div>
+                    <div class="sched-edit-actions">
+                        <button class="btn-sm primary" onclick="saveEditSchedule(${sched.id})">Save</button>
+                        <button class="btn-sm" onclick="cancelEditSchedule()">Cancel</button>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function schedEditFreqChanged(schedId) {
+            const freq = document.getElementById('sched-edit-freq-' + schedId)?.value;
+            const dowWrap = document.getElementById('sched-edit-dow-wrap-' + schedId);
+            const domWrap = document.getElementById('sched-edit-dom-wrap-' + schedId);
+            if (dowWrap) dowWrap.classList.toggle('hidden', freq !== 'weekly');
+            if (domWrap) domWrap.classList.toggle('hidden', freq !== 'monthly' && freq !== 'quarterly');
+        }
+
+        function startEditSchedule(schedId) {
+            _editingScheduleId = schedId;
+            renderDetailView();
+        }
+
+        function cancelEditSchedule() {
+            _editingScheduleId = null;
+            renderDetailView();
+        }
+
+        async function saveEditSchedule(schedId) {
+            const name = document.getElementById('sched-edit-name-' + schedId)?.value?.trim();
+            const description = document.getElementById('sched-edit-desc-' + schedId)?.value?.trim() || null;
+            const frequency = document.getElementById('sched-edit-freq-' + schedId)?.value;
+            const hour = parseInt(document.getElementById('sched-edit-hour-' + schedId)?.value) || 6;
+            const dayOfWeek = frequency === 'weekly' ? parseInt(document.getElementById('sched-edit-dow-' + schedId)?.value) : null;
+            const dayOfMonth = (frequency === 'monthly' || frequency === 'quarterly') ? parseInt(document.getElementById('sched-edit-dom-' + schedId)?.value) : null;
+
+            if (!name) { showToast('Schedule name is required', 'error'); return; }
+
+            const body = { name, frequency, hour };
+            if (description) body.description = description;
+            if (dayOfWeek !== null) body.day_of_week = dayOfWeek;
+            if (dayOfMonth !== null) body.day_of_month = dayOfMonth;
+
+            try {
+                const resp = await fetch(`${API}/schedules/${schedId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                if (resp.ok) {
+                    showToast('Schedule updated', 'success');
+                    _editingScheduleId = null;
+                    schedulesData = await fetch(`${API}/schedules`).then(r => r.ok ? r.json() : schedulesData).catch(() => schedulesData);
+                    renderDetailView();
+                } else {
+                    const data = await resp.json();
+                    showToast('Update failed: ' + (data.detail || resp.status), 'error');
+                }
+            } catch (err) { showToast('Update error: ' + err.message, 'error'); }
+        }
+
+        async function deleteSchedule(schedId, schedName) {
+            if (!confirm(`Delete schedule "${schedName}"? This cannot be undone.`)) return;
+            try {
+                const resp = await fetch(`${API}/schedules/${schedId}`, { method: 'DELETE' });
+                if (resp.ok) {
+                    showToast('Schedule deleted', 'success');
+                    schedulesData = await fetch(`${API}/schedules`).then(r => r.ok ? r.json() : schedulesData).catch(() => schedulesData);
+                    renderDetailView();
+                } else {
+                    const data = await resp.json();
+                    showToast('Delete failed: ' + (data.detail || resp.status), 'error');
+                }
+            } catch (err) { showToast('Delete error: ' + err.message, 'error'); }
+        }
+
+        async function toggleScheduleHistory(schedId) {
+            if (_scheduleHistoryOpen === schedId) {
+                _scheduleHistoryOpen = null;
+                renderDetailView();
+                return;
+            }
+            _scheduleHistoryOpen = schedId;
+            try {
+                const resp = await fetch(`${API}/schedules/${schedId}/history`);
+                if (resp.ok) {
+                    _scheduleHistoryData[schedId] = await resp.json();
+                } else {
+                    _scheduleHistoryData[schedId] = [];
+                }
+            } catch {
+                _scheduleHistoryData[schedId] = [];
+            }
+            renderDetailView();
+        }
+
+        function renderScheduleHistoryPanel(schedId) {
+            const jobs = (_scheduleHistoryData[schedId] || []).slice(0, 5);
+            if (jobs.length === 0) {
+                return `<div class="sched-history" style="padding-left:0.75rem;font-size:0.75rem;color:var(--text-muted);">No history for this schedule.</div>`;
+            }
+            let html = `<div class="sched-history" style="padding-left:0.75rem;">`;
+            for (const job of jobs) {
+                const statusCls = (job.status || '').toLowerCase();
+                const dur = job.started_at && job.completed_at
+                    ? Math.round((new Date(job.completed_at) - new Date(job.started_at)) / 1000)
+                    : null;
+                const when = job.created_at ? new Date(job.created_at).toLocaleString() : '-';
+                html += `<div class="sched-history-item">
+                    <span class="job-status-badge ${statusCls}" style="font-size:0.65rem;">${job.status}</span>
+                    <span>${formatDuration(dur)}</span>
+                    <span>${job.rows_inserted != null ? job.rows_inserted.toLocaleString() + ' records' : ''}</span>
+                    <span style="color:var(--text-muted);">${when}</span>
+                </div>`;
+            }
+            html += `</div>`;
+            return html;
+        }
+
+        // ==== Source Detail Job Activity ====
+        let _sourceJobs = [];
+        let _sourceJobsLoading = false;
+        let _sourceJobPollTimer = null;
+        let _sourceJobFilter = '';
+        let _sourceJobOffset = 0;
+        const _sourceJobLimit = 20;
+
+        async function loadSourceJobs(sourceKey, append) {
+            if (!sourceKey) return;
+            _sourceJobsLoading = true;
+            try {
+                let url = `${API}/jobs?source=${encodeURIComponent(sourceKey)}&limit=${_sourceJobLimit}&offset=${_sourceJobOffset}`;
+                if (_sourceJobFilter) url += `&status=${encodeURIComponent(_sourceJobFilter)}`;
+                const resp = await fetch(url);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (append) {
+                        _sourceJobs = _sourceJobs.concat(data);
+                    } else {
+                        _sourceJobs = data;
+                    }
+                } else if (!append) {
+                    _sourceJobs = [];
+                }
+            } catch {
+                if (!append) _sourceJobs = [];
+            }
+            _sourceJobsLoading = false;
+            const el = document.getElementById('source-jobs-container');
+            if (el && selectedSource && selectedSource.key === sourceKey) {
+                el.innerHTML = renderSourceJobsInner(selectedSource);
+            }
+        }
+
+        function onSourceJobFilterChanged() {
+            const sel = document.getElementById('source-job-filter');
+            _sourceJobFilter = sel ? sel.value : '';
+            _sourceJobOffset = 0;
+            if (selectedSource) loadSourceJobs(selectedSource.key);
+        }
+
+        function loadMoreSourceJobs() {
+            _sourceJobOffset += _sourceJobLimit;
+            if (selectedSource) loadSourceJobs(selectedSource.key, true);
+        }
+
+        function renderSourceJobActivity(src) {
+            return `<div class="ds-detail-tables" id="source-jobs-section">
+                <h3>Job Activity</h3>
+                <div id="source-jobs-container">${renderSourceJobsInner(src)}</div>
+            </div>`;
+        }
+
+        function renderSourceJobsInner(src) {
+            let html = '';
+
+            // Summary badges
+            const counts = { running: 0, pending: 0, success: 0, failed: 0 };
+            for (const j of _sourceJobs) {
+                const s = (j.status || '').toLowerCase();
+                if (counts[s] !== undefined) counts[s]++;
+            }
+
+            // Toolbar: filter + badges + retry all
+            html += `<div class="source-jobs-toolbar">
+                <select id="source-job-filter" onchange="onSourceJobFilterChanged()">
+                    <option value=""${!_sourceJobFilter ? ' selected' : ''}>All Statuses</option>
+                    <option value="success"${_sourceJobFilter === 'success' ? ' selected' : ''}>Success</option>
+                    <option value="failed"${_sourceJobFilter === 'failed' ? ' selected' : ''}>Failed</option>
+                    <option value="running"${_sourceJobFilter === 'running' ? ' selected' : ''}>Running</option>
+                    <option value="pending"${_sourceJobFilter === 'pending' ? ' selected' : ''}>Pending</option>
+                </select>
+                <div class="source-jobs-badges">
+                    ${counts.running ? `<span class="source-jobs-badge running">Running: ${counts.running}</span>` : ''}
+                    ${counts.pending ? `<span class="source-jobs-badge pending">Pending: ${counts.pending}</span>` : ''}
+                    ${counts.success ? `<span class="source-jobs-badge success">Success: ${counts.success}</span>` : ''}
+                    ${counts.failed ? `<span class="source-jobs-badge failed">Failed: ${counts.failed}</span>` : ''}
+                </div>
+                ${counts.failed > 0 ? `<button class="btn-sm" onclick="retryAllFailedSource()" style="color:var(--error);border-color:var(--error);">Retry All Failed</button>` : ''}
+            </div>`;
+
+            // Active/running jobs for this source (from SSE-powered global map)
+            const activeForSource = [];
+            for (const [id, job] of _activeJobs) {
+                if ((job.job_type || '').toLowerCase() === src.key.toLowerCase()) {
+                    activeForSource.push({ id, ...job });
+                }
+            }
+
+            // Also include pending/running jobs from _sourceJobs that aren't in activeForSource
+            const activeIds = new Set(activeForSource.map(j => j.id));
+            const runningFromHistory = _sourceJobs.filter(j =>
+                (j.status === 'running' || j.status === 'pending') && !activeIds.has(j.id)
+            );
+
+            if (activeForSource.length > 0 || runningFromHistory.length > 0) {
+                html += `<div class="source-jobs-active">`;
+                for (const job of activeForSource) {
+                    const pct = job.progress_pct || 0;
+                    html += `<div class="source-jobs-active-item">
+                        <span class="job-status-badge running">${job.status || 'running'}</span>
+                        <div class="job-progress-bar"><div class="job-progress-fill" style="width:${pct}%"></div></div>
+                        <span style="font-size:0.8rem;color:var(--text-muted);">${escapeHtml(job.progress_message || 'Processing...')}</span>
+                        <span class="jobs-elapsed" data-started="${job.started_at || ''}">${job.started_at ? formatElapsed(job.started_at) : ''}</span>
+                        <button class="btn-sm" onclick="event.stopPropagation();cancelSourceJob(${job.id})" style="color:var(--error);font-size:0.7rem;">Cancel</button>
+                    </div>`;
+                }
+                for (const job of runningFromHistory) {
+                    html += `<div class="source-jobs-active-item">
+                        <span class="job-status-badge ${job.status}">${job.status}</span>
+                        <div class="job-progress-bar"><div class="job-progress-fill" style="width:0%"></div></div>
+                        <span style="font-size:0.8rem;color:var(--text-muted);">Job #${job.id}${job.config?.dataset ? ' &mdash; ' + job.config.dataset : ''}</span>
+                        <span class="jobs-elapsed" data-started="${job.started_at || ''}">${job.started_at ? formatElapsed(job.started_at) : ''}</span>
+                        <button class="btn-sm" onclick="event.stopPropagation();cancelSourceJob(${job.id})" style="color:var(--error);font-size:0.7rem;">Cancel</button>
+                    </div>`;
+                }
+                html += `</div>`;
+            }
+
+            // Loading state
+            if (_sourceJobsLoading && _sourceJobs.length === 0) {
+                html += `<div class="source-jobs-empty">Loading job history...</div>`;
+                return html;
+            }
+
+            // History table
+            if (_sourceJobs.length === 0) {
+                html += `<div class="source-jobs-empty">No jobs have run for this source yet.</div>`;
+                return html;
+            }
+
+            html += `<table class="source-jobs-table">
+                <thead><tr>
+                    <th>ID</th><th>Status</th><th>Config</th><th>Duration</th><th>Records</th><th>Error</th><th>Started</th><th></th>
+                </tr></thead><tbody>`;
+
+            for (const job of _sourceJobs) {
+                const statusCls = (job.status || '').toLowerCase();
+                const started = job.started_at ? new Date(job.started_at).toLocaleString() : '-';
+                const dur = job.started_at && job.completed_at
+                    ? Math.round((new Date(job.completed_at) - new Date(job.started_at)) / 1000)
+                    : null;
+                const configSnip = job.config ? Object.entries(job.config).filter(([k,v]) => v != null && k !== 'dataset').map(([k,v]) => `${k}=${v}`).join(', ') : '-';
+                const errorSnip = job.error_message ? escapeHtml(job.error_message.substring(0, 60)) + (job.error_message.length > 60 ? '...' : '') : '-';
+
+                // Action button logic: Re-run for success, Retry for failed, Restart for pending, Cancel for running
+                let actionBtn = '';
+                if (job.status === 'running') {
+                    actionBtn = `<button class="btn-sm" onclick="event.stopPropagation();cancelSourceJob(${job.id})" style="white-space:nowrap;color:var(--error);">Cancel</button>`;
+                } else if (job.status === 'failed') {
+                    actionBtn = `<button class="btn-sm primary" onclick="event.stopPropagation();sourceJobRestart(${job.id})" style="white-space:nowrap;">Retry</button>`;
+                } else if (job.status === 'pending') {
+                    actionBtn = `<button class="btn-sm primary" onclick="event.stopPropagation();sourceJobRestart(${job.id})" style="white-space:nowrap;">Restart</button>`;
+                } else if (job.status === 'success') {
+                    actionBtn = `<button class="btn-sm" onclick="event.stopPropagation();sourceJobRestart(${job.id})" style="white-space:nowrap;">Re-run</button>`;
+                }
+
+                html += `<tr onclick="toggleSourceJobDetail(${job.id})">
+                    <td>${job.id}</td>
+                    <td><span class="job-status-badge ${statusCls}">${escapeHtml(job.status)}</span></td>
+                    <td style="font-size:0.78rem;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(configSnip) || '-'}</td>
+                    <td>${formatDuration(dur)}</td>
+                    <td>${job.rows_inserted != null ? job.rows_inserted.toLocaleString() : '-'}</td>
+                    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${job.error_message ? 'var(--error)' : 'var(--text-muted)'};">${errorSnip}</td>
+                    <td style="font-size:0.78rem;color:var(--text-muted);">${started}</td>
+                    <td>${actionBtn}</td>
+                </tr>
+                <tr class="source-jobs-detail hidden" id="src-job-detail-${job.id}">
+                    <td colspan="8">
+                        <div class="source-jobs-detail-inner">
+                            <div class="detail-row"><span class="detail-label">Created:</span>${job.created_at ? new Date(job.created_at).toLocaleString() : '-'}</div>
+                            <div class="detail-row"><span class="detail-label">Started:</span>${job.started_at ? new Date(job.started_at).toLocaleString() : '-'}</div>
+                            <div class="detail-row"><span class="detail-label">Completed:</span>${job.completed_at ? new Date(job.completed_at).toLocaleString() : '-'}</div>
+                            <div class="detail-row"><span class="detail-label">Records:</span>${job.rows_inserted != null ? job.rows_inserted.toLocaleString() : '-'}</div>
+                            ${job.error_message ? `<div class="detail-row"><span class="detail-label">Error:</span><span style="color:var(--error);">${escapeHtml(job.error_message)}</span></div>` : ''}
+                            <div class="detail-row"><span class="detail-label">Config:</span></div>
+                            <pre>${escapeHtml(JSON.stringify(job.config, null, 2))}</pre>
+                        </div>
+                    </td>
+                </tr>`;
+            }
+            html += '</tbody></table>';
+
+            // Load More button
+            if (_sourceJobs.length >= _sourceJobOffset + _sourceJobLimit) {
+                html += `<div style="text-align:center;padding:0.75rem;">
+                    <button class="btn-sm" onclick="loadMoreSourceJobs()">Load More</button>
+                </div>`;
+            }
+
+            return html;
+        }
+
+        function toggleSourceJobDetail(jobId) {
+            const el = document.getElementById('src-job-detail-' + jobId);
+            if (el) el.classList.toggle('hidden');
+        }
+
+        async function sourceJobRetry(jobId) {
+            try {
+                const resp = await fetch(`${API}/jobs/${jobId}/retry`, { method: 'POST' });
+                if (resp.ok) {
+                    showToast('Retry submitted', 'success');
+                    setTimeout(() => { if (selectedSource) loadSourceJobs(selectedSource.key); }, 500);
+                } else {
+                    const data = await resp.json();
+                    showToast('Retry failed: ' + (data.detail || resp.status), 'error');
+                }
+            } catch (err) { showToast('Retry error: ' + err.message, 'error'); }
+        }
+
+        async function sourceJobRestart(jobId) {
+            try {
+                const resp = await fetch(`${API}/jobs/${jobId}/restart`, { method: 'POST' });
+                if (resp.ok) {
+                    showToast('Job restarted', 'success');
+                    _sourceJobOffset = 0;
+                    setTimeout(() => { if (selectedSource) loadSourceJobs(selectedSource.key); }, 1000);
+                } else {
+                    const data = await resp.json();
+                    showToast('Restart failed: ' + (data.detail || resp.status), 'error');
+                }
+            } catch (err) { showToast('Restart error: ' + err.message, 'error'); }
+        }
+
+        async function cancelSourceJob(jobId) {
+            if (!confirm('Cancel this job?')) return;
+            try {
+                const resp = await fetch(`${API}/jobs/${jobId}/cancel`, { method: 'POST' });
+                if (resp.ok) {
+                    showToast('Job cancelled', 'success');
+                    setTimeout(() => { if (selectedSource) loadSourceJobs(selectedSource.key); }, 500);
+                } else {
+                    const data = await resp.json();
+                    showToast('Cancel failed: ' + (data.detail || resp.status), 'error');
+                }
+            } catch (err) { showToast('Cancel error: ' + err.message, 'error'); }
+        }
+
+        async function retryAllFailedSource() {
+            if (!selectedSource) return;
+            if (!confirm('Retry all failed jobs for this source?')) return;
+            try {
+                const resp = await fetch(`${API}/jobs/retry/all?source=${encodeURIComponent(selectedSource.key)}`, { method: 'POST' });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    showToast(data.message || 'Retrying failed jobs', 'success');
+                    _sourceJobOffset = 0;
+                    setTimeout(() => { if (selectedSource) loadSourceJobs(selectedSource.key); }, 1000);
+                } else {
+                    const data = await resp.json();
+                    showToast('Retry all failed: ' + (data.detail || resp.status), 'error');
+                }
+            } catch (err) { showToast('Retry all error: ' + err.message, 'error'); }
+        }
+
+        function startSourceJobPolling() {
+            stopSourceJobPolling();
+            if (selectedSource) {
+                _sourceJobOffset = 0;
+                loadSourceJobs(selectedSource.key);
+                _sourceJobPollTimer = setInterval(() => {
+                    if (selectedSource && currentView === 'detail') {
+                        loadSourceJobs(selectedSource.key);
+                    } else {
+                        stopSourceJobPolling();
+                    }
+                }, 10000);
+            }
+        }
+
+        function stopSourceJobPolling() {
+            if (_sourceJobPollTimer) {
+                clearInterval(_sourceJobPollTimer);
+                _sourceJobPollTimer = null;
+            }
         }
 
         function renderDetailView() {
@@ -4323,6 +4834,9 @@
                 }
                 html += renderNewCollectionSection(src);
             }
+
+            // ---- Job Activity section ----
+            html += renderSourceJobActivity(src);
 
             // ---- Available Endpoints section ----
             const endpoints = src.endpoints || [];
@@ -4858,8 +5372,10 @@
                     status: 'running',
                     progress_pct: 0,
                     progress_message: 'Started',
+                    started_at: new Date().toISOString(),
                 });
                 _renderActiveJobs();
+                if (currentView === 'detail' && selectedSource) loadSourceJobs(selectedSource.key);
             });
 
             es.addEventListener('job_progress', e => {
@@ -4886,6 +5402,7 @@
                 _renderActiveJobs();
                 setTimeout(() => _removeJobWithFade(d.job_id), 2000);
                 if (_currentTab === 'jobs') setTimeout(() => jobsLoadHistory(), 1500);
+                if (currentView === 'detail' && selectedSource) setTimeout(() => loadSourceJobs(selectedSource.key), 1500);
             });
 
             es.addEventListener('job_failed', e => {
@@ -4899,6 +5416,7 @@
                 _renderActiveJobs();
                 setTimeout(() => _removeJobWithFade(d.job_id), 5000);
                 if (_currentTab === 'jobs') setTimeout(() => jobsLoadHistory(), 1500);
+                if (currentView === 'detail' && selectedSource) setTimeout(() => loadSourceJobs(selectedSource.key), 1500);
             });
 
             es.onerror = () => {
@@ -5347,6 +5865,23 @@
                 }
             } catch (err) { showToast('Retry error: ' + err.message, 'error'); }
         }
+
+        // ==================================================================
+        // Hash-based URL routing — e.g. #/cms navigates to CMS detail
+        // ==================================================================
+        function handleHashRoute() {
+            const hash = location.hash.replace(/^#\/?/, '');
+            if (!hash) return;
+            const found = findSourceByKey(hash);
+            if (found) {
+                openSourceDetail(hash, found.catKey);
+            }
+        }
+
+        window.addEventListener('hashchange', handleHashRoute);
+
+        // On initial page load, navigate to hash route if present
+        handleHashRoute();
 
     </script>
 </body>

@@ -988,6 +988,7 @@ def list_jobs(
     source: str = None,
     status: JobStatus = None,
     limit: int = 100,
+    offset: int = 0,
     db: Session = Depends(get_db),
 ) -> List[JobResponse]:
     """
@@ -1000,7 +1001,7 @@ def list_jobs(
     if status:
         query = query.filter(IngestionJob.status == status)
 
-    query = query.order_by(IngestionJob.created_at.desc()).limit(limit)
+    query = query.order_by(IngestionJob.created_at.desc()).offset(offset).limit(limit)
 
     jobs = query.all()
     return [JobResponse.model_validate(job) for job in jobs]
@@ -1065,6 +1066,79 @@ async def retry_job(
     )
 
     return JobResponse.model_validate(updated_job)
+
+
+@router.post("/{job_id}/cancel", response_model=JobResponse)
+async def cancel_job(
+    job_id: int, db: Session = Depends(get_db)
+) -> JobResponse:
+    """
+    Cancel a running or pending job.
+
+    Sets the job status to FAILED with error_message "Cancelled by user".
+    Does not kill the background task mid-execution, but marks it as cancelled.
+    """
+    from datetime import datetime
+
+    job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status not in (JobStatus.RUNNING, JobStatus.PENDING):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job is not running or pending (current: {job.status.value})",
+        )
+
+    job.status = JobStatus.FAILED
+    job.error_message = "Cancelled by user"
+    job.completed_at = datetime.utcnow()
+    db.commit()
+    db.refresh(job)
+
+    logger.info(f"Job {job_id} cancelled by user")
+
+    return JobResponse.model_validate(job)
+
+
+@router.post("/{job_id}/restart", response_model=JobResponse)
+async def restart_job(
+    job_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+) -> JobResponse:
+    """
+    Restart a pending, failed, or completed job.
+
+    Resets the job to PENDING and re-dispatches it as a background task.
+    Works for any non-running job status.
+    """
+    job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status == JobStatus.RUNNING:
+        raise HTTPException(
+            status_code=400,
+            detail="Job is currently running. Wait for it to complete or fail.",
+        )
+
+    # Reset job state
+    job.status = JobStatus.PENDING
+    job.started_at = None
+    job.completed_at = None
+    job.error_message = None
+    job.error_details = None
+    job.rows_inserted = None
+    db.commit()
+    db.refresh(job)
+
+    # Re-dispatch
+    background_tasks.add_task(
+        run_ingestion_job, job.id, job.source, job.config
+    )
+
+    logger.info(f"Restarting job {job_id} (source={job.source})")
+
+    return JobResponse.model_validate(job)
 
 
 @router.post("/retry/all")
