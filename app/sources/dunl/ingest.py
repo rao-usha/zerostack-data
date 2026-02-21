@@ -8,7 +8,7 @@ and holiday calendars.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
