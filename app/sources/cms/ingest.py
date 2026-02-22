@@ -62,14 +62,15 @@ async def ingest_medicare_utilization(
         table_name = meta["table_name"]
         dataset_id = meta.get("socrata_dataset_id")
 
-        # Check if dataset is available via Socrata API
-        # CMS migrated from Socrata to DKAN format in 2024
-        if dataset_id is None:
+        # Check API availability — prefer DKAN, fall back to Socrata
+        dkan_dataset_id = meta.get("dkan_dataset_id")
+        use_dkan = dataset_id is None and dkan_dataset_id is not None
+
+        if dataset_id is None and dkan_dataset_id is None:
             error_msg = (
-                f"CMS dataset '{dataset_type}' is no longer available via Socrata API. "
-                f"CMS has migrated to a new DKAN format. Please visit {meta.get('source_url', 'data.cms.gov')} "
-                f"to download the data directly. See https://downloads.cms.gov/files/Socrata-DKAN-API-Endpoints-Mapping.pdf "
-                f"for API migration details."
+                f"CMS dataset '{dataset_type}' has no Socrata or DKAN dataset ID configured. "
+                f"Please visit {meta.get('source_url', 'data.cms.gov')} "
+                f"to find the current dataset ID."
             )
             logger.error(error_msg)
             if job:
@@ -88,14 +89,7 @@ async def ingest_medicare_utilization(
         # 3. Register dataset
         _register_dataset(db, dataset_type, meta)
 
-        # 4. Build SoQL WHERE clause for filters
-        where_clauses = []
-        if state:
-            where_clauses.append(f"rndrng_prvdr_state_abrvtn='{state.upper()}'")
-
-        where_clause = " AND ".join(where_clauses) if where_clauses else None
-
-        # 5. Initialize CMS client
+        # 4. Initialize CMS client
         client = CMSClient(
             max_concurrency=settings.max_concurrency,
             max_retries=settings.max_retries,
@@ -103,14 +97,34 @@ async def ingest_medicare_utilization(
         )
 
         try:
-            # 6. Fetch data from Socrata API
-            logger.info(f"Fetching data from Socrata dataset {dataset_id}")
-            records = await client.fetch_socrata_data(
-                dataset_id=dataset_id,
-                limit=1000,  # Records per page
-                where=where_clause,
-                max_records=limit,
-            )
+            # 5. Fetch data via DKAN or Socrata
+            if use_dkan:
+                # Build DKAN filter dict (CamelCase keys as DKAN expects)
+                dkan_filters = {}
+                if state:
+                    dkan_filters["Rndrng_Prvdr_State_Abrvtn"] = state.upper()
+
+                logger.info(f"Fetching data from DKAN dataset {dkan_dataset_id}")
+                records = await client.fetch_dkan_data(
+                    dataset_id=dkan_dataset_id,
+                    size=1000,
+                    filters=dkan_filters if dkan_filters else None,
+                    max_records=limit,
+                )
+            else:
+                # Legacy Socrata path
+                where_clauses = []
+                if state:
+                    where_clauses.append(f"rndrng_prvdr_state_abrvtn='{state.upper()}'")
+                where_clause = " AND ".join(where_clauses) if where_clauses else None
+
+                logger.info(f"Fetching data from Socrata dataset {dataset_id}")
+                records = await client.fetch_socrata_data(
+                    dataset_id=dataset_id,
+                    limit=1000,
+                    where=where_clause,
+                    max_records=limit,
+                )
 
             logger.info(f"Fetched {len(records)} records")
 
@@ -145,7 +159,8 @@ async def ingest_medicare_utilization(
                 "table_name": table_name,
                 "rows_inserted": rows_inserted,
                 "duration_seconds": duration,
-                "dataset_id": dataset_id,
+                "dataset_id": dkan_dataset_id if use_dkan else dataset_id,
+                "api": "dkan" if use_dkan else "socrata",
             }
 
         finally:
@@ -328,14 +343,15 @@ async def ingest_drug_pricing(
         table_name = meta["table_name"]
         dataset_id = meta.get("socrata_dataset_id")
 
-        # Check if dataset is available via Socrata API
-        # CMS migrated from Socrata to DKAN format in 2024
-        if dataset_id is None:
+        # Check API availability — prefer DKAN, fall back to Socrata
+        dkan_dataset_id = meta.get("dkan_dataset_id")
+        use_dkan = dataset_id is None and dkan_dataset_id is not None
+
+        if dataset_id is None and dkan_dataset_id is None:
             error_msg = (
-                f"CMS dataset '{dataset_type}' is no longer available via Socrata API. "
-                f"CMS has migrated to a new DKAN format. Please visit {meta.get('source_url', 'data.cms.gov')} "
-                f"to download the data directly. See https://downloads.cms.gov/files/Socrata-DKAN-API-Endpoints-Mapping.pdf "
-                f"for API migration details."
+                f"CMS dataset '{dataset_type}' has no Socrata or DKAN dataset ID configured. "
+                f"Please visit {meta.get('source_url', 'data.cms.gov')} "
+                f"to find the current dataset ID."
             )
             logger.error(error_msg)
             if job:
@@ -354,18 +370,7 @@ async def ingest_drug_pricing(
         # 3. Register dataset
         _register_dataset(db, dataset_type, meta)
 
-        # 4. Build SoQL WHERE clause for filters
-        where_clauses = []
-        if year:
-            where_clauses.append(f"year={year}")
-        if brand_name:
-            # Escape single quotes in brand name
-            safe_brand = brand_name.replace("'", "''")
-            where_clauses.append(f"brnd_name='{safe_brand}'")
-
-        where_clause = " AND ".join(where_clauses) if where_clauses else None
-
-        # 5. Initialize CMS client
+        # 4. Initialize CMS client
         client = CMSClient(
             max_concurrency=settings.max_concurrency,
             max_retries=settings.max_retries,
@@ -373,14 +378,38 @@ async def ingest_drug_pricing(
         )
 
         try:
-            # 6. Fetch data from Socrata API
-            logger.info(f"Fetching data from Socrata dataset {dataset_id}")
-            records = await client.fetch_socrata_data(
-                dataset_id=dataset_id,
-                limit=1000,  # Records per page
-                where=where_clause,
-                max_records=limit,
-            )
+            # 5. Fetch data via DKAN or Socrata
+            if use_dkan:
+                dkan_filters = {}
+                if year:
+                    dkan_filters["Year"] = str(year)
+                if brand_name:
+                    dkan_filters["Brnd_Name"] = brand_name
+
+                logger.info(f"Fetching data from DKAN dataset {dkan_dataset_id}")
+                records = await client.fetch_dkan_data(
+                    dataset_id=dkan_dataset_id,
+                    size=1000,
+                    filters=dkan_filters if dkan_filters else None,
+                    max_records=limit,
+                )
+            else:
+                # Legacy Socrata path
+                where_clauses = []
+                if year:
+                    where_clauses.append(f"year={year}")
+                if brand_name:
+                    safe_brand = brand_name.replace("'", "''")
+                    where_clauses.append(f"brnd_name='{safe_brand}'")
+                where_clause = " AND ".join(where_clauses) if where_clauses else None
+
+                logger.info(f"Fetching data from Socrata dataset {dataset_id}")
+                records = await client.fetch_socrata_data(
+                    dataset_id=dataset_id,
+                    limit=1000,
+                    where=where_clause,
+                    max_records=limit,
+                )
 
             logger.info(f"Fetched {len(records)} records")
 
@@ -413,7 +442,8 @@ async def ingest_drug_pricing(
                 "table_name": table_name,
                 "rows_inserted": rows_inserted,
                 "duration_seconds": duration,
-                "dataset_id": dataset_id,
+                "dataset_id": dkan_dataset_id if use_dkan else dataset_id,
+                "api": "dkan" if use_dkan else "socrata",
             }
 
         finally:

@@ -326,6 +326,10 @@ class FirmWebsiteCollector(BasePECollector):
         """
         Scrape team members from a team page.
 
+        Uses BeautifulSoup to extract names and titles from common HTML
+        patterns (card grids, heading+subtitle pairs, figure/figcaption,
+        list items). Falls back to regex if BS4 is unavailable.
+
         Args:
             url: Team page URL
 
@@ -340,30 +344,147 @@ class FirmWebsiteCollector(BasePECollector):
 
         html = response.text
 
-        # This is a simplified extraction - real implementation would use
-        # BeautifulSoup or an LLM for more accurate extraction
+        try:
+            from bs4 import BeautifulSoup
+        except ImportError:
+            # Fallback: regex extraction
+            return self._scrape_team_page_regex(html)
 
-        # Look for people in common patterns
-        # Pattern: Name followed by title
-        person_patterns = [
-            r"<h[2-4][^>]*>([A-Z][a-z]+ (?:[A-Z]\. )?[A-Z][a-z]+(?:-[A-Z][a-z]+)?)</h[2-4]>\s*<(?:p|span|div)[^>]*>([^<]+)</(?:p|span|div)>",
+        soup = BeautifulSoup(html, "html.parser")
+
+        # Remove noisy elements
+        for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
+            tag.decompose()
+
+        seen_people: set = set()
+
+        # Strategy 1: Card grids — divs/articles/lis with a heading + subtitle
+        card_selectors = [
+            "div.team-member", "div.person", "div.member", "div.staff",
+            "div.team-card", "div.people-card", "div.bio-card",
+            "article.team-member", "article.person",
+            "li.team-member", "li.person",
         ]
+        for sel in card_selectors:
+            for card in soup.select(sel):
+                # Prefer headings (they contain the name); <a> may be empty links
+                name_el = card.find(["h2", "h3", "h4", "h5"]) or card.find(["a", "strong"])
+                if not name_el:
+                    continue
 
-        seen_people = set()
-        for pattern in person_patterns:
-            matches = re.findall(pattern, html)
-            for match in matches:
-                if len(match) >= 2:
-                    name = match[0].strip()
-                    title = match[1].strip()
-                    if name and name not in seen_people:
+                # Extract name: use only direct text, excluding <small>/<span> children
+                # which often contain the title (e.g. <h2>Name<small>Title</small></h2>)
+                small = name_el.find("small")
+                if small:
+                    title_from_small = small.get_text(strip=True)
+                    small.extract()  # temporarily remove to get clean name
+                    name = name_el.get_text(strip=True)
+                else:
+                    title_from_small = ""
+                    name = name_el.get_text(strip=True)
+
+                # Find title: <small> inside heading > class-matched p/span > first <p>
+                # Exclude <div> from class match — divs with "title" in class are
+                # usually containers (e.g. "person--title"), not the title itself.
+                if title_from_small:
+                    title = title_from_small
+                else:
+                    # Try p/span with title/role class first
+                    title_el = card.find(["p", "span"], class_=re.compile(
+                        r"title|role|position|designation", re.I
+                    ))
+                    if title_el:
+                        title = title_el.get_text(strip=True)
+                    else:
+                        first_p = card.find("p")
+                        title = first_p.get_text(strip=True) if first_p else ""
+
+                if self._looks_like_name(name) and name not in seen_people:
+                    seen_people.add(name)
+                    people.append({"full_name": name, "title": title, "source_type": "team_page"})
+
+        # Strategy 2: Heading (h2-h5) immediately followed by a p/span/div sibling
+        if not people:
+            for heading in soup.find_all(["h2", "h3", "h4", "h5"]):
+                name = heading.get_text(strip=True)
+                if not self._looks_like_name(name) or name in seen_people:
+                    continue
+                # Next sibling element may contain the title
+                sibling = heading.find_next_sibling(["p", "span", "div"])
+                title = sibling.get_text(strip=True) if sibling else ""
+                # Skip if title looks like a long paragraph (>80 chars)
+                if len(title) > 80:
+                    title = ""
+                seen_people.add(name)
+                people.append({"full_name": name, "title": title, "source_type": "team_page"})
+
+        # Strategy 3: figure/figcaption (image + caption pattern)
+        if not people:
+            for fig in soup.find_all("figure"):
+                caption = fig.find("figcaption")
+                if not caption:
+                    continue
+                lines = [l.strip() for l in caption.get_text(separator="\n").split("\n") if l.strip()]
+                if lines and self._looks_like_name(lines[0]):
+                    name = lines[0]
+                    title = lines[1] if len(lines) > 1 else ""
+                    if name not in seen_people:
                         seen_people.add(name)
-                        people.append(
-                            {
-                                "full_name": name,
-                                "title": title,
-                                "source_type": "team_page",
-                            }
-                        )
+                        people.append({"full_name": name, "title": title, "source_type": "team_page"})
 
-        return people[:100]  # Limit to 100 people
+        # Strategy 4: Any element with a class/id containing "name" paired with "title"
+        if not people:
+            name_els = soup.find_all(
+                class_=re.compile(r"\bname\b", re.I)
+            )
+            for name_el in name_els:
+                name = name_el.get_text(strip=True)
+                if not self._looks_like_name(name) or name in seen_people:
+                    continue
+                # Look for a sibling or nearby element with title/role class
+                parent = name_el.parent
+                title_el = parent.find(
+                    class_=re.compile(r"title|role|position", re.I)
+                ) if parent else None
+                title = title_el.get_text(strip=True) if title_el else ""
+                seen_people.add(name)
+                people.append({"full_name": name, "title": title, "source_type": "team_page"})
+
+        # Final fallback: regex
+        if not people:
+            people = self._scrape_team_page_regex(html)
+
+        return people[:100]
+
+    def _scrape_team_page_regex(self, html: str) -> List[Dict[str, Any]]:
+        """Regex fallback for team page extraction."""
+        people = []
+        seen_people: set = set()
+        pattern = r"<h[2-4][^>]*>([A-Z][a-z]+ (?:[A-Z]\. )?[A-Z][a-z]+(?:-[A-Z][a-z]+)?)</h[2-4]>\s*<(?:p|span|div)[^>]*>([^<]+)</(?:p|span|div)>"
+        matches = re.findall(pattern, html)
+        for match in matches:
+            if len(match) >= 2:
+                name = match[0].strip()
+                title = match[1].strip()
+                if name and name not in seen_people:
+                    seen_people.add(name)
+                    people.append({"full_name": name, "title": title, "source_type": "team_page"})
+        return people[:100]
+
+    @staticmethod
+    def _looks_like_name(text: str) -> bool:
+        """Check if text looks like a person's name (2-4 capitalized words, <60 chars)."""
+        if not text or len(text) > 60 or len(text) < 3:
+            return False
+        words = text.split()
+        if len(words) < 2 or len(words) > 5:
+            return False
+        # At least first and last word should start with uppercase
+        if not words[0][0].isupper() or not words[-1][0].isupper():
+            return False
+        # Should not contain common non-name indicators
+        lower = text.lower()
+        non_name = ["about", "team", "our", "the", "view", "read", "more", "contact", "learn"]
+        if any(w in lower for w in non_name):
+            return False
+        return True

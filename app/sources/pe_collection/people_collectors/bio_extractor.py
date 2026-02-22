@@ -378,8 +378,9 @@ class BioExtractor(BasePECollector):
     ) -> List[Dict[str, Any]]:
         """Use LLM to extract structured bio data from team page text."""
 
-        # Truncate to keep input small so model has room for output tokens
-        text = text[:6000]
+        # Truncate to keep input manageable — 12k chars is well within
+        # GPT-4o-mini's 128k context while covering most team pages
+        text = text[:12000]
         prompt = BIO_EXTRACTION_PROMPT.format(firm_name=firm_name, text=text)
 
         try:

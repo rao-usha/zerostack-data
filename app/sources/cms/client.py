@@ -28,6 +28,7 @@ class CMSClient:
 
     # CMS API base URLs
     SOCRATA_BASE_URL = "https://data.cms.gov/resource"
+    DKAN_BASE_URL = "https://data.cms.gov/data-api/v1/dataset"
     BULK_DOWNLOAD_BASE_URL = "https://www.cms.gov/files"
 
     def __init__(
@@ -159,6 +160,104 @@ class CMSClient:
 
         logger.info(
             f"Fetched {len(all_records)} total records from Socrata dataset {dataset_id}"
+        )
+        return all_records
+
+    def build_dkan_url(
+        self,
+        dataset_id: str,
+        size: int = 1000,
+        offset: int = 0,
+        filters: Optional[Dict[str, str]] = None,
+    ) -> str:
+        """
+        Build CMS DKAN API URL.
+
+        CMS migrated from Socrata to DKAN in 2024. DKAN uses different
+        pagination and filtering parameters.
+
+        Args:
+            dataset_id: DKAN dataset UUID (e.g., "92396110-2aed-4d63-a6a2-5d6207d46a29")
+            size: Number of records per page
+            offset: Number of records to skip
+            filters: Dictionary of column filters (e.g., {"Rndrng_Prvdr_State_Abrvtn": "NY"})
+
+        Returns:
+            Full DKAN API URL
+        """
+        url = f"{self.DKAN_BASE_URL}/{dataset_id}/data"
+        params = [f"size={size}", f"offset={offset}"]
+
+        if filters:
+            for col, value in filters.items():
+                params.append(f"filter[{col}]={value}")
+
+        return url + "?" + "&".join(params)
+
+    async def fetch_dkan_data(
+        self,
+        dataset_id: str,
+        size: int = 1000,
+        offset: int = 0,
+        filters: Optional[Dict[str, str]] = None,
+        max_records: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch data from CMS DKAN API.
+
+        Handles pagination automatically. Lowercases column names to match
+        our DB schema (DKAN returns CamelCase column names).
+
+        Args:
+            dataset_id: DKAN dataset UUID
+            size: Records per page
+            offset: Starting offset
+            filters: Column filters (keys should be CamelCase as DKAN expects)
+            max_records: Maximum total records to fetch (None = all)
+
+        Returns:
+            List of records with lowercased column names
+        """
+        all_records = []
+        current_offset = offset
+
+        while True:
+            if max_records and len(all_records) >= max_records:
+                break
+
+            current_size = size
+            if max_records:
+                remaining = max_records - len(all_records)
+                current_size = min(size, remaining)
+
+            url = self.build_dkan_url(
+                dataset_id=dataset_id,
+                size=current_size,
+                offset=current_offset,
+                filters=filters,
+            )
+
+            logger.info(
+                f"Fetching CMS DKAN data: offset={current_offset}, size={current_size}"
+            )
+
+            async with self.semaphore:
+                records = await self._fetch_with_retry(url)
+
+            if not records:
+                break
+
+            # Lowercase all column names to match DB schema
+            lowered = [{k.lower(): v for k, v in rec.items()} for rec in records]
+            all_records.extend(lowered)
+
+            if len(records) < current_size:
+                break
+
+            current_offset += len(records)
+
+        logger.info(
+            f"Fetched {len(all_records)} total records from DKAN dataset {dataset_id}"
         )
         return all_records
 

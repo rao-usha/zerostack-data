@@ -20,7 +20,7 @@ DATASETS = {
         "display_name": "Medicare Provider Utilization and Payment Data",
         "description": "Medicare Part B claims data for physicians and other healthcare practitioners",
         "socrata_dataset_id": None,  # DEPRECATED: CMS moved to DKAN format
-        "dkan_dataset_id": None,  # TODO: Get current ID from data.cms.gov
+        "dkan_dataset_id": "92396110-2aed-4d63-a6a2-5d6207d46a29",
         "source_url": "https://data.cms.gov/provider-summary-by-type-of-service/medicare-physician-other-practitioners/medicare-physician-other-practitioners-by-provider-and-service",
         "columns": {
             "rndrng_npi": {

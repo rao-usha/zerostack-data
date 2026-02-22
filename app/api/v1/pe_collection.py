@@ -25,8 +25,8 @@ class CollectRequest(BaseModel):
         default="firm", description="firm, company, person, or deal"
     )
     sources: List[str] = Field(
-        default=["firm_website"],
-        description="Collection sources (sec_adv, firm_website, sec_form_d, etc.)",
+        default=["firm_website", "bio_extractor"],
+        description="Collection sources (sec_adv, firm_website, bio_extractor, sec_form_d, etc.)",
     )
     firm_id: Optional[int] = Field(default=None, description="Single firm ID")
     firm_ids: Optional[List[int]] = Field(default=None, description="Multiple firm IDs")
