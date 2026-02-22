@@ -110,7 +110,7 @@ TIER_4 = Tier(
     name="Agentic / LLM Pipelines",
     sources=[
         SourceDef("site_intel_full_sync", {"mode": "full_sync"}),
-        SourceDef("people_batch", {"mode": "batch"}),
+        SourceDef("people_batch", {"mode": "batch", "max_jobs": 50}),
         SourceDef("pe_batch", {"mode": "batch"}),
     ],
 )
@@ -203,6 +203,11 @@ async def launch_nightly_batch(
                 "batch_id": batch.id,
                 "tier": tier.level,
             }
+
+            # Agentic executors read config from top-level payload keys
+            # (e.g., PE reads payload["mode"], people reads payload["max_jobs"])
+            if source_def.key in AGENTIC_SOURCE_MAP:
+                payload.update(source_def.default_config)
 
             # Tier 4 jobs should wait for lower tiers to complete
             if tier.level == 4:

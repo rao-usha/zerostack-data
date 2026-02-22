@@ -154,6 +154,58 @@ async def _heartbeat_loop(db_factory, job_id: int):
             session.close()
 
 
+async def _wait_for_tier_completion(
+    db: Session, batch_id: int, wait_for_tiers: list, job: JobQueue
+):
+    """
+    Wait until all jobs from specified tiers in the same batch are complete.
+
+    Polls the job_queue table every 15s. Times out after 1 hour.
+    """
+    max_wait = 3600  # 1 hour
+    poll_interval = 15
+    waited = 0
+
+    # Validate and build tier list for SQL IN clause
+    tier_ints = [int(t) for t in wait_for_tiers]
+    tier_list = ",".join(str(t) for t in tier_ints)
+
+    while waited < max_wait and not _shutdown.is_set():
+        result = db.execute(
+            text(f"""
+                SELECT COUNT(*) FROM job_queue
+                WHERE (payload->>'batch_id')::int = :batch_id
+                AND (payload->>'tier')::int IN ({tier_list})
+                AND status NOT IN (:success, :failed)
+            """),
+            {
+                "batch_id": batch_id,
+                "success": QueueJobStatus.SUCCESS.name,
+                "failed": QueueJobStatus.FAILED.name,
+            },
+        )
+        incomplete = result.scalar()
+
+        if incomplete == 0:
+            logger.info(
+                f"Job {job.id}: tier dependencies satisfied (waited {waited}s)"
+            )
+            return
+
+        job.progress_message = f"Waiting for {incomplete} lower-tier jobs to complete"
+        db.commit()
+
+        await asyncio.sleep(poll_interval)
+        waited += poll_interval
+
+    if _shutdown.is_set():
+        raise RuntimeError("Worker shutting down while waiting for tier dependencies")
+    raise RuntimeError(
+        f"Tier dependency wait timed out after {max_wait}s "
+        f"(batch_id={batch_id}, waiting_for_tiers={wait_for_tiers})"
+    )
+
+
 async def execute_job(job: JobQueue, db: Session):
     """Execute a claimed job using the appropriate executor."""
     job_type_enum = (
@@ -189,6 +241,15 @@ async def execute_job(job: JobQueue, db: Session):
         },
     )
     db.commit()
+
+    # Check tier dependencies (Tier 4 jobs wait for lower tiers)
+    payload = job.payload or {}
+    wait_for_tiers = payload.get("wait_for_tiers")
+    batch_id = payload.get("batch_id")
+    if wait_for_tiers and batch_id:
+        job.progress_message = "Waiting for lower-tier jobs to complete"
+        db.commit()
+        await _wait_for_tier_completion(db, batch_id, wait_for_tiers, job)
 
     # Start heartbeat
     SessionLocal = get_session_factory()

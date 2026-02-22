@@ -303,6 +303,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Failed to start scheduler: {e}")
 
+    # Seed distributed rate limit buckets (idempotent — only creates missing rows)
+    try:
+        from app.core.rate_limiter import seed_rate_limit_buckets
+        from app.core.database import get_session_factory
+
+        SessionLocal = get_session_factory()
+        seed_db = SessionLocal()
+        try:
+            created = seed_rate_limit_buckets(seed_db)
+            if created:
+                logger.info(f"Seeded {created} distributed rate limit buckets")
+        finally:
+            seed_db.close()
+    except Exception as e:
+        logger.warning(f"Failed to seed rate limit buckets: {e}")
+
     # Start PG LISTEN → EventBus bridge for live job progress
     try:
         from app.core.pg_listener import start_pg_listener
