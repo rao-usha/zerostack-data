@@ -14,8 +14,13 @@ async def execute(job: JobQueue, db: Session):
     """Execute an agentic portfolio research job."""
     payload = job.payload or {}
 
-    investor_id = payload["investor_id"]
-    investor_type = payload["investor_type"]
+    investor_id = payload.get("investor_id")
+    investor_type = payload.get("investor_type")
+    if not investor_id or not investor_type:
+        raise ValueError(
+            f"Agentic job {job.id} missing required payload keys: "
+            f"investor_id={investor_id}, investor_type={investor_type}"
+        )
     strategies = payload.get("strategies")
     domain_job_id = payload.get("job_id")
     db_url = payload.get("db_url")

@@ -175,126 +175,8 @@ async def list_jobs(
     )
 
 
-@router.get("/{job_id}", response_model=JobDetail)
-async def get_job(
-    job_id: int,
-    db: Session = Depends(get_db),
-):
-    """
-    Get detailed information about a collection job.
-
-    Includes configuration, timing, and any errors.
-    """
-    job = db.query(PeopleCollectionJob).filter(PeopleCollectionJob.id == job_id).first()
-
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-
-    company_name = None
-    if job.company_id:
-        company = db.get(IndustrialCompany, job.company_id)
-        company_name = company.name if company else None
-
-    return JobDetail(
-        id=job.id,
-        job_type=job.job_type,
-        company_id=job.company_id,
-        company_name=company_name,
-        config=job.config,
-        status=job.status,
-        started_at=job.started_at,
-        completed_at=job.completed_at,
-        people_found=job.people_found or 0,
-        people_created=job.people_created or 0,
-        people_updated=job.people_updated or 0,
-        changes_detected=job.changes_detected or 0,
-        errors=job.errors,
-        created_at=job.created_at,
-    )
-
-
-@router.post("/batch", response_model=BatchJobResponse)
-async def create_batch_job(
-    request: BatchJobRequest,
-    background_tasks: BackgroundTasks = None,
-    db: Session = Depends(get_db),
-):
-    """
-    Create a batch collection job for multiple companies.
-
-    Can specify companies by ID, industry, or collect all.
-    """
-    # Determine which companies to collect
-    query = db.query(IndustrialCompany)
-
-    if request.company_ids:
-        query = query.filter(IndustrialCompany.id.in_(request.company_ids))
-    elif request.industry:
-        query = query.filter(IndustrialCompany.industry == request.industry)
-
-    # Only companies with websites (for website collection)
-    if "website" in request.sources:
-        query = query.filter(IndustrialCompany.website.isnot(None))
-
-    # Limit to max companies
-    companies = query.limit(request.max_companies).all()
-
-    if not companies:
-        raise HTTPException(
-            status_code=404, detail="No companies found matching criteria"
-        )
-
-    # Create individual jobs for each company
-    job_ids = []
-    for company in companies:
-        job = PeopleCollectionJob(
-            job_type="batch",
-            company_id=company.id,
-            config={"sources": request.sources},
-            status="pending",
-        )
-        db.add(job)
-        db.flush()
-        job_ids.append(job.id)
-
-    db.commit()
-
-    # Note: Background task execution would be handled by a worker
-    # For now, we just create the job records
-
-    return BatchJobResponse(
-        job_ids=job_ids,
-        total_companies=len(companies),
-        status="pending",
-        message=f"Created {len(job_ids)} collection jobs. Sources: {', '.join(request.sources)}",
-    )
-
-
-@router.post("/{job_id}/cancel")
-async def cancel_job(
-    job_id: int,
-    db: Session = Depends(get_db),
-):
-    """
-    Cancel a pending or running job.
-
-    Jobs that have already completed cannot be cancelled.
-    """
-    job = db.query(PeopleCollectionJob).filter(PeopleCollectionJob.id == job_id).first()
-
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-
-    if job.status in ["success", "failed", "cancelled"]:
-        raise HTTPException(
-            status_code=400, detail=f"Cannot cancel job with status: {job.status}"
-        )
-
-    job.status = "cancelled"
-    job.completed_at = datetime.utcnow()
-    db.commit()
-
-    return {"status": "cancelled", "job_id": job_id}
+# NOTE: Literal path routes MUST come before /{job_id} to avoid route shadowing
+# (FastAPI matches /{job_id} pattern first, fails int parse, returns 422)
 
 
 @router.get("/stats/summary")
@@ -415,3 +297,125 @@ async def get_job_queue(
         "pending_count": pending_count,
         "running_count": running_count,
     }
+
+
+@router.get("/{job_id}", response_model=JobDetail)
+async def get_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Get detailed information about a collection job.
+
+    Includes configuration, timing, and any errors.
+    """
+    job = db.query(PeopleCollectionJob).filter(PeopleCollectionJob.id == job_id).first()
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    company_name = None
+    if job.company_id:
+        company = db.get(IndustrialCompany, job.company_id)
+        company_name = company.name if company else None
+
+    return JobDetail(
+        id=job.id,
+        job_type=job.job_type,
+        company_id=job.company_id,
+        company_name=company_name,
+        config=job.config,
+        status=job.status,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+        people_found=job.people_found or 0,
+        people_created=job.people_created or 0,
+        people_updated=job.people_updated or 0,
+        changes_detected=job.changes_detected or 0,
+        errors=job.errors,
+        created_at=job.created_at,
+    )
+
+
+@router.post("/batch", response_model=BatchJobResponse)
+async def create_batch_job(
+    request: BatchJobRequest,
+    background_tasks: BackgroundTasks = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Create a batch collection job for multiple companies.
+
+    Can specify companies by ID, industry, or collect all.
+    """
+    # Determine which companies to collect
+    query = db.query(IndustrialCompany)
+
+    if request.company_ids:
+        query = query.filter(IndustrialCompany.id.in_(request.company_ids))
+    elif request.industry:
+        query = query.filter(IndustrialCompany.industry_segment == request.industry)
+
+    # Only companies with websites (for website collection)
+    if "website" in request.sources:
+        query = query.filter(IndustrialCompany.website.isnot(None))
+
+    # Limit to max companies
+    companies = query.limit(request.max_companies).all()
+
+    if not companies:
+        raise HTTPException(
+            status_code=404, detail="No companies found matching criteria"
+        )
+
+    # Create individual jobs for each company
+    job_ids = []
+    for company in companies:
+        job = PeopleCollectionJob(
+            job_type="batch",
+            company_id=company.id,
+            config={"sources": request.sources},
+            status="pending",
+        )
+        db.add(job)
+        db.flush()
+        job_ids.append(job.id)
+
+    db.commit()
+
+    # Note: Background task execution would be handled by a worker
+    # For now, we just create the job records
+
+    return BatchJobResponse(
+        job_ids=job_ids,
+        total_companies=len(companies),
+        status="pending",
+        message=f"Created {len(job_ids)} collection jobs. Sources: {', '.join(request.sources)}",
+    )
+
+
+@router.post("/{job_id}/cancel")
+async def cancel_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Cancel a pending or running job.
+
+    Jobs that have already completed cannot be cancelled.
+    """
+    job = db.query(PeopleCollectionJob).filter(PeopleCollectionJob.id == job_id).first()
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status in ["success", "failed", "cancelled"]:
+        raise HTTPException(
+            status_code=400, detail=f"Cannot cancel job with status: {job.status}"
+        )
+
+    job.status = "cancelled"
+    job.completed_at = datetime.utcnow()
+    db.commit()
+
+    return {"status": "cancelled", "job_id": job_id}

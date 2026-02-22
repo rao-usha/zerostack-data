@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 async def execute(job: JobQueue, db: Session):
     """Execute a people collection job."""
-    from app.core.database import get_session_factory
     from app.jobs.people_collection_scheduler import process_pending_jobs
 
     payload = job.payload or {}
@@ -33,14 +32,11 @@ async def execute(job: JobQueue, db: Session):
     )
     db.commit()
 
-    # Use a fresh session
-    SessionLocal = get_session_factory()
-    work_db = SessionLocal()
     try:
-        result = process_pending_jobs(max_jobs=max_jobs)
+        result = await process_pending_jobs(max_jobs=max_jobs)
 
         job.progress_pct = 100.0
         job.progress_message = f"Processed {result.get('processed', 0)} jobs"
         db.commit()
-    finally:
-        work_db.close()
+    except Exception:
+        raise
