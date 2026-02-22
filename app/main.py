@@ -114,6 +114,7 @@ from app.api.v1 import (
     llm_costs,
     freshness,
     dunl,
+    job_postings,
 )
 
 # Job Queue Streaming
@@ -1136,6 +1137,10 @@ Browse the endpoint sections below to see what's available:
             "name": "dunl",
             "description": "🔗 **DUNL (S&P Data Unlocked)** - Open reference data: currencies, ports, UOM, calendars",
         },
+        {
+            "name": "job_postings",
+            "description": "💼 **Job Posting Intelligence** - Track hiring across companies via ATS APIs (Greenhouse, Lever, Workday, Ashby)",
+        },
     ],
 )
 
@@ -1291,6 +1296,9 @@ app.include_router(people_reports.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(people_data_quality.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(people_dedup.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(people_jobs.router, prefix="/api/v1", dependencies=_auth)
+
+# Job Posting Intelligence
+app.include_router(job_postings.router, prefix="/api/v1", dependencies=_auth)
 
 # Site Intelligence Platform
 app.include_router(site_intel_power.router, prefix="/api/v1", dependencies=_auth)

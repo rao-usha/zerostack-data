@@ -389,6 +389,39 @@ API_REGISTRY: Dict[str, APIConfig] = {
         rate_limit_per_minute=60,
         notes="S&P Global open data (DUNL.org). No key required. CC licensed.",
     ),
+    # -------------------------------------------------------------------------
+    # JOB POSTING INTELLIGENCE
+    # -------------------------------------------------------------------------
+    "greenhouse_jobs": APIConfig(
+        source_name="greenhouse_jobs",
+        base_url="https://boards-api.greenhouse.io",
+        api_key_requirement=APIKeyRequirement.OPTIONAL,
+        config_key="",
+        signup_url="https://www.greenhouse.com",
+        max_concurrency=5,
+        rate_limit_per_minute=300,
+        notes="Greenhouse public job board API. No auth required for GET.",
+    ),
+    "lever_jobs": APIConfig(
+        source_name="lever_jobs",
+        base_url="https://api.lever.co",
+        api_key_requirement=APIKeyRequirement.OPTIONAL,
+        config_key="",
+        signup_url="https://www.lever.co",
+        max_concurrency=3,
+        rate_limit_per_minute=600,
+        notes="Lever public postings API. No auth required for GET.",
+    ),
+    "job_postings": APIConfig(
+        source_name="job_postings",
+        base_url="",
+        api_key_requirement=APIKeyRequirement.OPTIONAL,
+        config_key="",
+        signup_url="",
+        max_concurrency=3,
+        rate_limit_per_minute=30,
+        notes="Job posting intelligence. Aggregates from Greenhouse, Lever, Workday, Ashby, + generic.",
+    ),
 }
 
 

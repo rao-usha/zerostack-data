@@ -510,6 +510,22 @@ SOURCE_DISPATCH: Dict[str, Tuple[str, str, List[str]]] = {
         "ingest_dunl_calendars",
         ["years"],
     ),
+    # ── Job Postings ────────────────────────────────────────────────────
+    "job_postings:company": (
+        "app.sources.job_postings.ingest",
+        "ingest_job_postings_company",
+        ["company_id", "force_rediscover"],
+    ),
+    "job_postings:all": (
+        "app.sources.job_postings.ingest",
+        "ingest_job_postings_all",
+        ["limit", "skip_recent_hours"],
+    ),
+    "job_postings:discover": (
+        "app.sources.job_postings.ingest",
+        "ingest_job_postings_discover",
+        ["company_id"],
+    ),
 }
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])

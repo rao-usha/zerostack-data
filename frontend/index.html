@@ -1529,6 +1529,29 @@
                 ],
             },
 
+            // ── Job Postings ──
+            '/api/v1/job-postings/collect-all': {
+                fields: [
+                    { name: 'limit', label: 'Max Companies', type: 'number', placeholder: 'blank = all' },
+                    { name: 'skip_recent_hours', label: 'Skip Recent (hours)', type: 'number', placeholder: '24' },
+                ],
+            },
+            '/api/v1/job-postings/collect/{company_id}': {
+                pathParams: [
+                    { name: 'company_id', label: 'Company ID', type: 'number', required: true, placeholder: 'e.g. 1' },
+                ],
+                fields: [
+                    { name: 'force_rediscover', label: 'Force Re-detect ATS', type: 'select', options: [
+                        { value: 'false', label: 'No (default)' }, { value: 'true', label: 'Yes' },
+                    ]},
+                ],
+            },
+            '/api/v1/job-postings/discover-ats/{company_id}': {
+                pathParams: [
+                    { name: 'company_id', label: 'Company ID', type: 'number', required: true, placeholder: 'e.g. 1' },
+                ],
+            },
+
             // ── Site Intel ──
             '/api/v1/site-intel/sites/collect': {
                 fields: [
@@ -2873,6 +2896,21 @@
                     { key: 'industrial_companies', label: 'Industrial Companies', tables: ['industrial_companies'],
                       endpoints: [{method:'GET', path:'/api/v1/companies/', label:'List companies'}],
                       scheduleOptions: ['monthly'] },
+                    { key: 'job_postings', label: 'Job Posting Intelligence', tablePrefix: 'job_posting',
+                      triggers: [
+                        {method:'POST', path:'/api/v1/job-postings/collect-all', label:'Collect all companies'},
+                        {method:'POST', path:'/api/v1/job-postings/collect/{company_id}', label:'Collect company'},
+                        {method:'POST', path:'/api/v1/job-postings/discover-ats/{company_id}', label:'Discover ATS'},
+                      ],
+                      endpoints: [
+                        {method:'GET', path:'/api/v1/job-postings/', label:'List postings'},
+                        {method:'GET', path:'/api/v1/job-postings/company/{company_id}', label:'Company postings'},
+                        {method:'GET', path:'/api/v1/job-postings/company/{company_id}/trends', label:'Company trends'},
+                        {method:'GET', path:'/api/v1/job-postings/ats-configs', label:'ATS configs'},
+                        {method:'GET', path:'/api/v1/job-postings/snapshots', label:'Snapshots'},
+                        {method:'GET', path:'/api/v1/job-postings/stats', label:'Stats'},
+                      ],
+                      scheduleOptions: ['daily','weekly'] },
                 ],
             },
             pe: {
