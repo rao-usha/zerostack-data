@@ -12,7 +12,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
-from app.core.database import create_tables
 from app.api.v1.auth import get_current_user
 from app.api.v1 import (
     jobs,
@@ -160,13 +159,38 @@ async def lifespan(app: FastAPI):
     logger.info(f"Log level: {settings.log_level}")
     logger.info(f"Max concurrency: {settings.max_concurrency}")
 
-    # Create core tables
+    # Run database migrations
     try:
-        create_tables()
-        logger.info("Database tables ready")
+        from alembic.config import Config
+        from alembic import command
+        from app.core.database import get_engine, create_tables
+        from sqlalchemy import inspect
+
+        engine = get_engine()
+        inspector = inspect(engine)
+        has_alembic = "alembic_version" in inspector.get_table_names()
+
+        alembic_cfg = Config("alembic.ini")
+
+        if not has_alembic:
+            # Fresh database — create all tables then stamp as current
+            create_tables(engine)
+            command.stamp(alembic_cfg, "head")
+            logger.info("Fresh database: tables created and stamped at head")
+        else:
+            # Existing database — apply any pending migrations
+            command.upgrade(alembic_cfg, "head")
+            logger.info("Database migrations applied (alembic upgrade head)")
     except Exception as e:
-        logger.error(f"Failed to create tables: {e}")
-        raise
+        logger.error(f"Alembic migration failed, falling back to create_all: {e}")
+        try:
+            from app.core.database import create_tables
+
+            create_tables()
+            logger.info("Fallback: tables created via create_all()")
+        except Exception as e2:
+            logger.error(f"Fallback create_tables also failed: {e2}")
+            raise
 
     # Start scheduler (optional - can be started manually via API)
     try:
@@ -214,6 +238,20 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Failed to register people collection schedules: {e}")
 
+        # Register PE collection schedules
+        try:
+            from app.jobs.pe_collection_scheduler import (
+                register_pe_collection_schedules,
+            )
+
+            pe_results = register_pe_collection_schedules()
+            registered_count = sum(1 for v in pe_results.values() if v)
+            logger.info(
+                f"PE collection schedules registered: {registered_count}/{len(pe_results)}"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to register PE collection schedules: {e}")
+
         # Register site intel collection schedules
         try:
             from app.jobs.site_intel_scheduler import register_site_intel_schedules
@@ -242,6 +280,24 @@ async def lifespan(app: FastAPI):
             logger.info("Stale queue job recovery registered (every 5 min)")
         except Exception as e:
             logger.warning(f"Failed to register stale job recovery: {e}")
+
+        # Register nightly batch collection (2 AM UTC daily)
+        try:
+            from app.core.nightly_batch_service import scheduled_nightly_batch
+            from app.core.scheduler_service import get_scheduler
+            from apscheduler.triggers.cron import CronTrigger
+
+            sched = get_scheduler()
+            sched.add_job(
+                scheduled_nightly_batch,
+                trigger=CronTrigger(hour=2, minute=0),
+                id="nightly_batch",
+                name="Nightly Collection Batch",
+                replace_existing=True,
+            )
+            logger.info("Nightly batch collection registered (2:00 AM UTC)")
+        except Exception as e:
+            logger.warning(f"Failed to register nightly batch: {e}")
 
     except Exception as e:
         logger.warning(f"Failed to start scheduler: {e}")
@@ -1071,6 +1127,10 @@ Browse the endpoint sections below to see what's available:
         {
             "name": "freshness",
             "description": "📊 **Data Freshness** - Monitor source staleness, auto-refresh status, and incremental loading",
+        },
+        {
+            "name": "Nightly Batch",
+            "description": "🌙 **Nightly Batch Collection** - Launch and monitor distributed nightly data collection across all sources",
         },
         {
             "name": "dunl",

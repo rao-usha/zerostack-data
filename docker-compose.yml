@@ -79,12 +79,14 @@ services:
       LOG_LEVEL: INFO
       BROWSER_HEADED: ${BROWSER_HEADED:-0}
       # Set to "1" to route jobs through the queue instead of BackgroundTasks
-      WORKER_MODE: ${WORKER_MODE:-}
+      WORKER_MODE: ${WORKER_MODE:-1}
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./app:/app/app
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
       - ./data/kaggle:/app/data/kaggle
       - ./data/seeds:/app/data/seeds
       - ./scripts:/app/scripts
@@ -101,6 +103,7 @@ services:
       <<: *api-keys
       WORKER_MODE: "1"
       WORKER_POLL_INTERVAL: "2.0"
+      WORKER_MAX_CONCURRENT: "4"
       MAX_CONCURRENCY: 4
       LOG_LEVEL: INFO
     depends_on:
@@ -110,9 +113,9 @@ services:
       - ./app:/app/app
       - ./data/seeds:/app/data/seeds
     command: python -m app.worker.main
-    # Scale with: docker-compose up --scale worker=3
-    profiles:
-      - worker
+    # Scale with: docker-compose up --scale worker=4
+    deploy:
+      replicas: 2
 
   frontend:
     image: nginx:alpine

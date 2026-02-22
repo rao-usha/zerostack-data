@@ -134,3 +134,56 @@ class JobQueue(Base):
             f"<JobQueue id={self.id} type={self.job_type} "
             f"status={self.status} worker={self.worker_id}>"
         )
+
+
+class NightlyBatch(Base):
+    """
+    Tracks a nightly batch collection run.
+
+    Each batch enqueues jobs for all configured sources with tier-based
+    priority and dependency ordering.
+    """
+
+    __tablename__ = "nightly_batch"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    status = Column(
+        String(20), nullable=False, default="running"
+    )  # running, completed, failed, partial_success
+    total_jobs = Column(Integer, nullable=False, default=0)
+    completed_jobs = Column(Integer, nullable=False, default=0)
+    failed_jobs = Column(Integer, nullable=False, default=0)
+    started_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+    config = Column(JSON, nullable=False, default=dict)  # which sources, overrides
+    job_ids = Column(JSON, nullable=False, default=list)  # list of ingestion_job IDs
+
+    def __repr__(self):
+        return (
+            f"<NightlyBatch id={self.id} status={self.status} "
+            f"{self.completed_jobs}/{self.total_jobs}>"
+        )
+
+
+class RateLimitBucket(Base):
+    """
+    Distributed rate limit token bucket backed by PostgreSQL.
+
+    Workers call SELECT ... FOR UPDATE to serialize token acquisition
+    across all worker processes, ensuring per-domain rate limits are
+    respected globally.
+    """
+
+    __tablename__ = "rate_limit_bucket"
+
+    domain = Column(String(100), primary_key=True)  # e.g. "api.stlouisfed.org"
+    tokens = Column(Float, nullable=False, default=5.0)
+    max_tokens = Column(Float, nullable=False, default=5.0)
+    refill_rate = Column(Float, nullable=False, default=1.0)  # tokens per second
+    last_refill_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    def __repr__(self):
+        return (
+            f"<RateLimitBucket domain={self.domain} "
+            f"tokens={self.tokens:.1f}/{self.max_tokens:.1f}>"
+        )

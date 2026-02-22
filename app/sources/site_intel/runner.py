@@ -4,6 +4,7 @@ Site Intelligence Platform - Collection Orchestrator.
 Coordinates data collection across all domains and sources.
 """
 
+import asyncio
 import logging
 from datetime import datetime
 from typing import Optional, Dict, Any, List, Type
@@ -216,9 +217,20 @@ class SiteIntelOrchestrator:
             },
         )
 
-        for source in registered_sources:
-            result = await self.collect(domain, source, **kwargs)
-            results[source] = result
+        # Run all sources in the domain concurrently
+        async def _collect_one(src):
+            return src, await self.collect(domain, src, **kwargs)
+
+        collected = await asyncio.gather(
+            *[_collect_one(src) for src in registered_sources],
+            return_exceptions=True,
+        )
+        for item in collected:
+            if isinstance(item, Exception):
+                logger.error(f"Concurrent collect error in {domain.value}: {item}")
+                continue
+            src, result = item
+            results[src] = result
 
         # Publish domain_completed SSE event
         success_count = sum(
@@ -254,14 +266,24 @@ class SiteIntelOrchestrator:
         results = {}
 
         target_domains = domains or list(SiteIntelDomain)
+        # Filter out SCORING (no data collectors)
+        target_domains = [d for d in target_domains if d != SiteIntelDomain.SCORING]
 
-        for domain in target_domains:
-            if domain == SiteIntelDomain.SCORING:
-                # Skip scoring domain - it doesn't have data collectors
-                continue
-
+        # Run all domains concurrently
+        async def _sync_domain(domain):
             logger.info(f"Starting full sync for domain: {domain.value}")
             domain_results = await self.collect_domain(domain, **kwargs)
+            return domain, domain_results
+
+        collected = await asyncio.gather(
+            *[_sync_domain(d) for d in target_domains],
+            return_exceptions=True,
+        )
+        for item in collected:
+            if isinstance(item, Exception):
+                logger.error(f"Full sync domain error: {item}")
+                continue
+            domain, domain_results = item
             results[domain] = domain_results
 
         return results

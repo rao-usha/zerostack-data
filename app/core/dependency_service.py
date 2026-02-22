@@ -339,17 +339,41 @@ async def process_unblocked_jobs(db: Session, job_ids: List[int]):
     """
     Process jobs that were just unblocked by starting them.
 
+    In worker mode: enqueues all unblocked jobs simultaneously — workers
+    run them in parallel (bounded by worker slots and rate limits).
+    In legacy mode: runs them serially via run_ingestion_job.
+
     Args:
         db: Database session
         job_ids: List of job IDs to process
     """
-    from app.api.v1.jobs import run_ingestion_job
+    from app.core.job_queue_service import submit_job, WORKER_MODE
 
-    for job_id in job_ids:
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
-        if job and job.status == JobStatus.PENDING:
-            logger.info(f"Starting unblocked job {job_id}")
-            await run_ingestion_job(job.id, job.source, job.config)
+    if WORKER_MODE:
+        for job_id in job_ids:
+            job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+            if job and job.status == JobStatus.PENDING:
+                logger.info(f"Enqueueing unblocked job {job_id} to worker queue")
+                submit_job(
+                    db=db,
+                    job_type="ingestion",
+                    payload={
+                        "source": job.source,
+                        "config": job.config or {},
+                        "ingestion_job_id": job.id,
+                    },
+                    priority=5,
+                    job_table_id=job.id,
+                )
+    else:
+        # Legacy: serial execution
+        from app.api.v1.jobs import run_ingestion_job
+
+        for job_id in job_ids:
+            job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+            if job and job.status == JobStatus.PENDING:
+                logger.info(f"Starting unblocked job {job_id}")
+                await run_ingestion_job(job.id, job.source, job.config)
 
 
 # =============================================================================

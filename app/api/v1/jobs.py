@@ -965,8 +965,23 @@ async def create_job(
     except Exception as e:
         logger.debug("Audit trail logging failed: %s", e)
 
-    # Start background ingestion
-    background_tasks.add_task(run_ingestion_job, job.id, job.source, job.config)
+    # Start ingestion — queue if WORKER_MODE is on, else background task
+    from app.core.job_queue_service import submit_job
+
+    submit_job(
+        db=db,
+        job_type="ingestion",
+        payload={
+            "source": job.source,
+            "config": job.config or {},
+            "ingestion_job_id": job.id,
+        },
+        priority=5,
+        job_table_id=job.id,
+        background_tasks=background_tasks,
+        background_func=run_ingestion_job,
+        background_args=(job.id, job.source, job.config),
+    )
 
     return JobResponse.model_validate(job)
 
@@ -1056,9 +1071,22 @@ async def retry_job(
     if not updated_job:
         raise HTTPException(status_code=500, detail="Failed to mark job for retry")
 
-    # Start background ingestion
-    background_tasks.add_task(
-        run_ingestion_job, updated_job.id, updated_job.source, updated_job.config
+    # Start ingestion — queue or background
+    from app.core.job_queue_service import submit_job
+
+    submit_job(
+        db=db,
+        job_type="ingestion",
+        payload={
+            "source": updated_job.source,
+            "config": updated_job.config or {},
+            "ingestion_job_id": updated_job.id,
+        },
+        priority=5,
+        job_table_id=updated_job.id,
+        background_tasks=background_tasks,
+        background_func=run_ingestion_job,
+        background_args=(updated_job.id, updated_job.source, updated_job.config),
     )
 
     logger.info(
@@ -1131,9 +1159,22 @@ async def restart_job(
     db.commit()
     db.refresh(job)
 
-    # Re-dispatch
-    background_tasks.add_task(
-        run_ingestion_job, job.id, job.source, job.config
+    # Re-dispatch — queue or background
+    from app.core.job_queue_service import submit_job
+
+    submit_job(
+        db=db,
+        job_type="ingestion",
+        payload={
+            "source": job.source,
+            "config": job.config or {},
+            "ingestion_job_id": job.id,
+        },
+        priority=5,
+        job_table_id=job.id,
+        background_tasks=background_tasks,
+        background_func=run_ingestion_job,
+        background_args=(job.id, job.source, job.config),
     )
 
     logger.info(f"Restarting job {job_id} (source={job.source})")
@@ -1161,13 +1202,28 @@ async def retry_all_failed_jobs(
 
     results = retry_all_eligible_jobs(db, source=source, limit=limit)
 
-    # Schedule background tasks for retried jobs
+    # Schedule retried jobs — queue or background
+    from app.core.job_queue_service import submit_job
+
     for job_info in results["retried"]:
         job = (
             db.query(IngestionJob).filter(IngestionJob.id == job_info["job_id"]).first()
         )
         if job:
-            background_tasks.add_task(run_ingestion_job, job.id, job.source, job.config)
+            submit_job(
+                db=db,
+                job_type="ingestion",
+                payload={
+                    "source": job.source,
+                    "config": job.config or {},
+                    "ingestion_job_id": job.id,
+                },
+                priority=5,
+                job_table_id=job.id,
+                background_tasks=background_tasks,
+                background_func=run_ingestion_job,
+                background_args=(job.id, job.source, job.config),
+            )
 
     return {"message": f"Scheduled {len(results['retried'])} jobs for retry", **results}
 
@@ -1317,3 +1373,65 @@ def get_monitoring_dashboard(db: Session = Depends(get_db)):
     from app.core.monitoring import get_monitoring_dashboard as get_dashboard
 
     return get_dashboard(db)
+
+
+# =============================================================================
+# Nightly Batch Endpoints
+# =============================================================================
+
+
+@router.post("/nightly/launch")
+async def launch_nightly(
+    tiers: List[int] = None,
+    sources: List[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Launch a nightly batch collection.
+
+    Enqueues all data sources across 4 priority tiers:
+    - Tier 1 (priority 10): Fast gov APIs (treasury, fred, bea, fdic, fema, bts, cftc, data_commons)
+    - Tier 2 (priority 7): Medium APIs (eia, bls, noaa, cms, fbi, irs, usda, trade, fcc, etc.)
+    - Tier 3 (priority 5): Complex sources (sec, kaggle, int'l econ, census, foot_traffic, yelp)
+    - Tier 4 (priority 3): Agentic/LLM (site_intel, people, PE)
+
+    Args:
+        tiers: Optional list of tier levels to run (default: all)
+        sources: Optional list of specific source keys to run
+    """
+    from app.core.nightly_batch_service import launch_nightly_batch
+
+    batch = await launch_nightly_batch(db, tiers=tiers, sources=sources)
+    return {
+        "batch_id": batch.id,
+        "total_jobs": batch.total_jobs,
+        "status": batch.status,
+        "started_at": batch.started_at.isoformat() if batch.started_at else None,
+    }
+
+
+@router.get("/nightly/{batch_id}")
+def get_nightly_status(batch_id: int, db: Session = Depends(get_db)):
+    """
+    Get nightly batch progress.
+
+    Returns overall status, per-tier breakdown, and individual job details.
+    """
+    from app.core.nightly_batch_service import get_batch_status
+
+    result = get_batch_status(db, batch_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    return result
+
+
+@router.get("/nightly")
+def list_nightly_batches(
+    limit: int = 20,
+    status: str = None,
+    db: Session = Depends(get_db),
+):
+    """List recent nightly batch runs."""
+    from app.core.nightly_batch_service import list_batches
+
+    return list_batches(db, limit=limit, status=status)

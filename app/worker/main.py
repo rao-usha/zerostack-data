@@ -4,12 +4,16 @@ Worker process entrypoint.
 Polls job_queue for pending jobs, claims them via SELECT FOR UPDATE SKIP LOCKED,
 and routes to the appropriate executor. Sends progress via pg_notify.
 
+Each worker runs up to WORKER_MAX_CONCURRENT jobs simultaneously using an
+asyncio.Semaphore to bound concurrency.
+
 Usage:
     python -m app.worker.main
 
 Env vars:
     DATABASE_URL        — Required
     WORKER_POLL_INTERVAL — Seconds between polls (default 2.0)
+    WORKER_MAX_CONCURRENT — Max concurrent jobs per worker (default 4)
 """
 
 import asyncio
@@ -36,6 +40,7 @@ logging.basicConfig(
 logger = logging.getLogger("worker")
 
 POLL_INTERVAL = float(os.getenv("WORKER_POLL_INTERVAL", "2.0"))
+MAX_CONCURRENT = int(os.getenv("WORKER_MAX_CONCURRENT", "4"))
 HEARTBEAT_INTERVAL = 30  # seconds
 WORKER_ID = f"{socket.gethostname()}-{uuid.uuid4().hex[:8]}"
 
@@ -114,8 +119,8 @@ def claim_job(db: Session) -> Optional[JobQueue]:
             RETURNING id, job_type, payload, job_table_id
         """),
         {
-            "claimed": QueueJobStatus.CLAIMED.value,
-            "pending": QueueJobStatus.PENDING.value,
+            "claimed": QueueJobStatus.CLAIMED.name,
+            "pending": QueueJobStatus.PENDING.name,
             "worker_id": WORKER_ID,
         },
     )
@@ -251,14 +256,39 @@ async def execute_job(job: JobQueue, db: Session):
             pass
 
 
+async def _run_slot(semaphore: asyncio.Semaphore, job: JobQueue, db: Session):
+    """Execute a job in a semaphore-bounded slot, then release."""
+    try:
+        await execute_job(job, db)
+    finally:
+        db.close()
+        semaphore.release()
+
+
 async def poll_loop():
-    """Main poll loop: claim → execute → repeat."""
+    """
+    Main poll loop with concurrent execution.
+
+    Uses a semaphore to bound the number of concurrent jobs per worker.
+    Each claimed job runs in its own asyncio task within a slot.
+    """
     _load_executors()
 
     SessionLocal = get_session_factory()
-    logger.info(f"Worker {WORKER_ID} starting poll loop (interval={POLL_INTERVAL}s)")
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+    active_tasks: set = set()
+
+    logger.info(
+        f"Worker {WORKER_ID} starting poll loop "
+        f"(interval={POLL_INTERVAL}s, max_concurrent={MAX_CONCURRENT})"
+    )
 
     while not _shutdown.is_set():
+        # If all slots are full, wait briefly before checking again
+        if semaphore._value == 0:
+            await asyncio.sleep(0.5)
+            continue
+
         db = SessionLocal()
         try:
             job = claim_job(db)
@@ -266,8 +296,12 @@ async def poll_loop():
                 logger.info(
                     f"Claimed job {job.id} (type={job.job_type}, priority={job.priority})"
                 )
-                await execute_job(job, db)
+                await semaphore.acquire()
+                task = asyncio.create_task(_run_slot(semaphore, job, db))
+                active_tasks.add(task)
+                task.add_done_callback(active_tasks.discard)
             else:
+                db.close()
                 # No jobs available — wait before polling again
                 try:
                     await asyncio.wait_for(_shutdown.wait(), timeout=POLL_INTERVAL)
@@ -275,9 +309,13 @@ async def poll_loop():
                     pass
         except Exception as e:
             logger.error(f"Poll loop error: {e}", exc_info=True)
-            await asyncio.sleep(POLL_INTERVAL)
-        finally:
             db.close()
+            await asyncio.sleep(POLL_INTERVAL)
+
+    # Graceful shutdown: wait for active tasks to finish
+    if active_tasks:
+        logger.info(f"Waiting for {len(active_tasks)} active task(s) to finish...")
+        await asyncio.gather(*active_tasks, return_exceptions=True)
 
     logger.info(f"Worker {WORKER_ID} shut down cleanly")
 

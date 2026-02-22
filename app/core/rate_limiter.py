@@ -630,3 +630,155 @@ def reset_rate_limiter() -> None:
     """Reset the global rate limiter instance (for testing)."""
     global _rate_limiter
     _rate_limiter = None
+
+
+# =============================================================================
+# Distributed Rate Limiting (Postgres-backed)
+# =============================================================================
+#
+# For multi-worker deployments, in-memory token buckets don't coordinate
+# across processes. These functions use PostgreSQL SELECT ... FOR UPDATE
+# to serialize token acquisition across all workers.
+# =============================================================================
+
+# Domain → (max_tokens, refill_rate) for pre-seeding
+DISTRIBUTED_RATE_LIMITS: Dict[str, Dict[str, float]] = {
+    "api.weather.gov": {"max_tokens": 5.0, "refill_rate": 0.08},       # NOAA: 5/min
+    "api.bls.gov": {"max_tokens": 5.0, "refill_rate": 0.5},            # BLS: 500/day
+    "efts.sec.gov": {"max_tokens": 10.0, "refill_rate": 10.0},         # SEC: 10/sec
+    "api.eia.gov": {"max_tokens": 10.0, "refill_rate": 1.4},           # EIA: 5000/hr
+    "apps.bea.gov": {"max_tokens": 10.0, "refill_rate": 1.5},          # BEA: 100/min
+    "api.stlouisfed.org": {"max_tokens": 10.0, "refill_rate": 2.0},    # FRED: 120/min
+    "api.census.gov": {"max_tokens": 5.0, "refill_rate": 0.8},         # Census
+    "api.usa.gov": {"max_tokens": 10.0, "refill_rate": 1.0},           # FEMA
+    "api.yelp.com": {"max_tokens": 5.0, "refill_rate": 0.1},           # Yelp: 500/day
+    "api.fiscaldata.treasury.gov": {"max_tokens": 10.0, "refill_rate": 1.0},
+    "banks.data.fdic.gov": {"max_tokens": 10.0, "refill_rate": 1.0},
+}
+
+
+def acquire_distributed_token(db: Session, domain: str) -> bool:
+    """
+    Acquire a rate limit token from the Postgres-backed bucket.
+
+    Uses SELECT ... FOR UPDATE to serialize access across workers.
+    Refills tokens based on elapsed time since last refill.
+
+    Args:
+        db: Database session (caller manages transaction)
+        domain: API domain (e.g. "api.stlouisfed.org")
+
+    Returns:
+        True if a token was acquired, False if bucket is empty (caller should sleep)
+    """
+    from sqlalchemy import text as sa_text
+
+    row = db.execute(
+        sa_text("""
+            SELECT domain, tokens, max_tokens, refill_rate, last_refill_at
+            FROM rate_limit_bucket
+            WHERE domain = :domain
+            FOR UPDATE
+        """),
+        {"domain": domain},
+    ).fetchone()
+
+    if row is None:
+        # No bucket configured for this domain — allow the request
+        return True
+
+    tokens = row[1]
+    max_tokens = row[2]
+    refill_rate = row[3]
+    last_refill_at = row[4]
+
+    # Refill tokens based on elapsed time
+    now = datetime.utcnow()
+    if last_refill_at:
+        elapsed = (now - last_refill_at).total_seconds()
+        tokens = min(max_tokens, tokens + elapsed * refill_rate)
+
+    if tokens < 1.0:
+        # Bucket empty — update timestamp but don't consume
+        db.execute(
+            sa_text("""
+                UPDATE rate_limit_bucket
+                SET tokens = :tokens, last_refill_at = :now
+                WHERE domain = :domain
+            """),
+            {"tokens": tokens, "now": now, "domain": domain},
+        )
+        db.commit()
+        return False
+
+    # Consume one token
+    tokens -= 1.0
+    db.execute(
+        sa_text("""
+            UPDATE rate_limit_bucket
+            SET tokens = :tokens, last_refill_at = :now
+            WHERE domain = :domain
+        """),
+        {"tokens": tokens, "now": now, "domain": domain},
+    )
+    db.commit()
+    return True
+
+
+async def acquire_distributed_token_with_wait(
+    db: Session, domain: str, max_wait: float = 30.0
+) -> bool:
+    """
+    Acquire a distributed rate limit token, waiting if necessary.
+
+    Args:
+        db: Database session
+        domain: API domain
+        max_wait: Maximum seconds to wait
+
+    Returns:
+        True if acquired, False if timed out
+    """
+    start = time.time()
+    while True:
+        if acquire_distributed_token(db, domain):
+            return True
+        elapsed = time.time() - start
+        if elapsed >= max_wait:
+            return False
+        await asyncio.sleep(0.5)
+
+
+def seed_rate_limit_buckets(db: Session) -> int:
+    """
+    Seed rate_limit_bucket table with default configurations.
+
+    Only creates entries that don't already exist.
+
+    Returns:
+        Number of buckets created
+    """
+    from app.core.models_queue import RateLimitBucket
+
+    count = 0
+    for domain, config in DISTRIBUTED_RATE_LIMITS.items():
+        existing = (
+            db.query(RateLimitBucket)
+            .filter(RateLimitBucket.domain == domain)
+            .first()
+        )
+        if not existing:
+            bucket = RateLimitBucket(
+                domain=domain,
+                tokens=config["max_tokens"],
+                max_tokens=config["max_tokens"],
+                refill_rate=config["refill_rate"],
+            )
+            db.add(bucket)
+            count += 1
+
+    if count:
+        db.commit()
+        logger.info(f"Seeded {count} distributed rate limit buckets")
+
+    return count
