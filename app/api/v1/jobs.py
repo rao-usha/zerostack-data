@@ -1002,6 +1002,88 @@ async def create_job(
     return JobResponse.model_validate(job)
 
 
+@router.get("/workers")
+def get_worker_status(db: Session = Depends(get_db)):
+    """
+    Get active worker status.
+
+    Shows which workers are running, what jobs they're processing,
+    and heartbeat health.
+    """
+    from sqlalchemy import text as sa_text
+    from datetime import datetime, timedelta
+
+    # Get all workers with recent activity (heartbeat within last 5 min)
+    cutoff = datetime.utcnow() - timedelta(minutes=5)
+
+    rows = db.execute(
+        sa_text("""
+            SELECT
+                worker_id,
+                COUNT(*) FILTER (WHERE status = 'RUNNING') as running_jobs,
+                COUNT(*) FILTER (WHERE status = 'CLAIMED') as claimed_jobs,
+                MAX(heartbeat_at) as last_heartbeat,
+                json_agg(json_build_object(
+                    'job_id', id,
+                    'job_type', job_type,
+                    'status', status,
+                    'source', payload->>'source',
+                    'tier', payload->>'tier',
+                    'progress_pct', progress_pct,
+                    'progress_message', progress_message,
+                    'started_at', started_at,
+                    'heartbeat_at', heartbeat_at
+                )) FILTER (WHERE status IN ('RUNNING', 'CLAIMED')) as active_jobs
+            FROM job_queue
+            WHERE worker_id IS NOT NULL
+            AND heartbeat_at >= :cutoff
+            GROUP BY worker_id
+            ORDER BY last_heartbeat DESC
+        """),
+        {"cutoff": cutoff},
+    ).fetchall()
+
+    workers = []
+    for row in rows:
+        last_hb = row[3]
+        stale = (datetime.utcnow() - last_hb).total_seconds() > 60 if last_hb else True
+        workers.append({
+            "worker_id": row[0],
+            "running_jobs": row[1],
+            "claimed_jobs": row[2],
+            "last_heartbeat": last_hb.isoformat() if last_hb else None,
+            "healthy": not stale,
+            "active_jobs": row[4] or [],
+        })
+
+    # Queue summary
+    summary = db.execute(
+        sa_text("""
+            SELECT
+                COUNT(*) FILTER (WHERE status = 'PENDING') as pending,
+                COUNT(*) FILTER (WHERE status = 'CLAIMED') as claimed,
+                COUNT(*) FILTER (WHERE status = 'RUNNING') as running,
+                COUNT(*) FILTER (WHERE status = 'SUCCESS'
+                    AND completed_at >= NOW() - INTERVAL '1 hour') as recent_success,
+                COUNT(*) FILTER (WHERE status = 'FAILED'
+                    AND completed_at >= NOW() - INTERVAL '1 hour') as recent_failed
+            FROM job_queue
+        """)
+    ).fetchone()
+
+    return {
+        "workers": workers,
+        "total_active_workers": len(workers),
+        "queue": {
+            "pending": summary[0],
+            "claimed": summary[1],
+            "running": summary[2],
+            "recent_success_1h": summary[3],
+            "recent_failed_1h": summary[4],
+        },
+    }
+
+
 @router.get("/{job_id}", response_model=JobResponse)
 def get_job(job_id: int, db: Session = Depends(get_db)) -> JobResponse:
     """
@@ -1451,3 +1533,5 @@ def list_nightly_batches(
     from app.core.nightly_batch_service import list_batches
 
     return list_batches(db, limit=limit, status=status)
+
+

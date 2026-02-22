@@ -7,9 +7,11 @@ Implements bounded concurrency, exponential backoff, and standardized error hand
 
 import asyncio
 import logging
+import os
 import random
 from abc import ABC
 from typing import Dict, List, Optional, Any, Callable, TypeVar
+from urllib.parse import urlparse
 import httpx
 
 from app.core.api_errors import (
@@ -147,6 +149,45 @@ class BaseAPIClient(ABC):
                 await asyncio.sleep(wait_time)
             self._last_request_time = asyncio.get_running_loop().time()
 
+    async def _acquire_distributed_rate_limit(self, url: str) -> None:
+        """
+        Acquire a distributed rate limit token for the request URL's domain.
+
+        Only active when WORKER_MODE=1 (multi-worker deployment). Checks the
+        Postgres-backed rate_limit_bucket table to coordinate rate limits
+        across all workers. If no bucket exists for the domain, the request
+        proceeds immediately.
+        """
+        if os.getenv("WORKER_MODE", "0") != "1":
+            return
+
+        domain = urlparse(url).netloc
+        if not domain:
+            return
+
+        try:
+            from app.core.database import get_session_factory
+            from app.core.rate_limiter import acquire_distributed_token_with_wait
+
+            SessionLocal = get_session_factory()
+            db = SessionLocal()
+            try:
+                acquired = await acquire_distributed_token_with_wait(
+                    db, domain, max_wait=30.0
+                )
+                if not acquired:
+                    logger.warning(
+                        f"[{self.SOURCE_NAME}] Distributed rate limit timeout "
+                        f"for {domain}"
+                    )
+            finally:
+                db.close()
+        except Exception as e:
+            # Don't block requests if the rate limiter is unavailable
+            logger.debug(
+                f"[{self.SOURCE_NAME}] Distributed rate limit check skipped: {e}"
+            )
+
     async def _backoff(self, attempt: int, base_delay: float = 1.0) -> None:
         """
         Exponential backoff with jitter.
@@ -280,6 +321,7 @@ class BaseAPIClient(ABC):
             headers.update(extra_headers)
 
         async with self.semaphore:
+            await self._acquire_distributed_rate_limit(url)
             await self._enforce_rate_limit()
             client = await self._get_client()
 

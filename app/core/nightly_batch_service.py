@@ -85,6 +85,11 @@ TIER_2 = Tier(
         SourceDef("prediction_markets"),
         SourceDef("realestate"),
         SourceDef("uspto"),
+        SourceDef("dunl:currencies"),
+        SourceDef("dunl:ports"),
+        SourceDef("dunl:uom"),
+        SourceDef("dunl:uom_conversions"),
+        SourceDef("dunl:calendars", {"years": "2020,2021,2022,2023,2024,2025"}),
     ],
 )
 
