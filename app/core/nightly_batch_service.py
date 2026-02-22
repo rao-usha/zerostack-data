@@ -111,7 +111,7 @@ TIER_4 = Tier(
     sources=[
         SourceDef("site_intel_full_sync", {"mode": "full_sync"}),
         SourceDef("people_batch", {"mode": "batch", "max_jobs": 50}),
-        SourceDef("pe_batch", {"mode": "batch"}),
+        SourceDef("pe_batch", {"mode": "full"}),
     ],
 )
 
