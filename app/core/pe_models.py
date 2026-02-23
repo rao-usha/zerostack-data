@@ -278,6 +278,7 @@ class PEPortfolioCompany(Base):
     linkedin_url = Column(String(500))
     crunchbase_url = Column(String(500))
     ticker = Column(String(20))  # If public
+    market_cap_usd = Column(Numeric(18, 2))  # Market cap from Yahoo Finance
     ein = Column(String(20))  # Employer Identification Number
 
     # Status

@@ -29,6 +29,21 @@ def _format_aum(aum_millions: Optional[float]) -> str:
     return f"${aum_millions:,.0f}M"
 
 
+def _format_market_cap(mcap: Optional[float]) -> str:
+    """Format market cap in human-readable form (e.g. $2.1T, $45.3B, $800M)."""
+    if mcap is None:
+        return "-"
+    if mcap >= 1e12:
+        return f"${mcap / 1e12:,.1f}T"
+    if mcap >= 1e9:
+        return f"${mcap / 1e9:,.1f}B"
+    if mcap >= 1e6:
+        return f"${mcap / 1e6:,.0f}M"
+    if mcap >= 1e3:
+        return f"${mcap / 1e3:,.0f}K"
+    return f"${mcap:,.0f}"
+
+
 class InvestorProfileTemplate:
     """Investor profile report template."""
 
@@ -147,7 +162,9 @@ class InvestorProfileTemplate:
                     pc.website as company_website,
                     pc.ownership_status,
                     fi.investment_date,
-                    CASE WHEN fi.investment_type = '13F Holding' THEN 1 ELSE 0 END as is_13f
+                    CASE WHEN fi.investment_type = '13F Holding' THEN 1 ELSE 0 END as is_13f,
+                    pc.market_cap_usd,
+                    pc.ticker
                 FROM pe_fund_investments fi
                 JOIN pe_funds f ON f.id = fi.fund_id
                 JOIN pe_portfolio_companies pc ON pc.id = fi.company_id
@@ -163,7 +180,9 @@ class InvestorProfileTemplate:
                     pc.website as company_website,
                     pc.ownership_status,
                     pc.created_at::date as investment_date,
-                    0 as is_13f
+                    0 as is_13f,
+                    pc.market_cap_usd,
+                    pc.ticker
                 FROM pe_portfolio_companies pc
                 WHERE pc.current_pe_owner = :firm_name
                     AND pc.id NOT IN (
@@ -175,7 +194,8 @@ class InvestorProfileTemplate:
             deduped AS (
                 SELECT DISTINCT ON (UPPER(name))
                     id, name, industry, location, stage, company_website,
-                    ownership_status, investment_date, is_13f
+                    ownership_status, investment_date, is_13f,
+                    market_cap_usd, ticker
                 FROM all_companies
                 ORDER BY UPPER(name), is_13f ASC, investment_date DESC NULLS LAST
             )
@@ -194,7 +214,9 @@ class InvestorProfileTemplate:
                 SELECT
                     COUNT(*) as total_holdings,
                     COUNT(DISTINCT industry) FILTER (WHERE industry IS NOT NULL) as sectors,
-                    COUNT(*) as current_holdings
+                    COUNT(*) as current_holdings,
+                    SUM(market_cap_usd) as total_market_cap,
+                    COUNT(market_cap_usd) as companies_with_mcap
                 FROM deduped
                 """),
                 {"investor_id": investor_id, "firm_name": firm_name or ""},
@@ -205,7 +227,9 @@ class InvestorProfileTemplate:
                 SELECT
                     COUNT(*) as total_holdings,
                     COUNT(DISTINCT company_industry) as sectors,
-                    COUNT(CASE WHEN current_holding = 1 THEN 1 END) as current_holdings
+                    COUNT(CASE WHEN current_holding = 1 THEN 1 END) as current_holdings,
+                    NULL as total_market_cap,
+                    0 as companies_with_mcap
                 FROM portfolio_companies
                 WHERE investor_id = :investor_id AND investor_type = :investor_type
             """),
@@ -217,53 +241,52 @@ class InvestorProfileTemplate:
             "total_holdings": row[0] if row else 0,
             "sectors": row[1] if row else 0,
             "current_holdings": row[2] if row else 0,
+            "total_market_cap": float(row[3]) if row and row[3] else None,
+            "companies_with_mcap": row[4] if row else 0,
         }
 
     def _get_top_holdings(
         self, db: Session, investor_id: int, investor_type: str,
-        firm_name: Optional[str] = None, limit: int = 10,
+        firm_name: Optional[str] = None,
     ) -> list:
-        """Get top portfolio holdings."""
+        """Get all portfolio holdings with market cap and ticker."""
         if investor_type == "pe_firm":
             base = self._get_pe_portfolio_query(investor_id, firm_name)
             result = db.execute(
                 text(base + """
-                SELECT name, industry, location, stage
+                SELECT name, industry, location, stage, market_cap_usd, ticker
                 FROM deduped
                 WHERE is_13f = 0
-                ORDER BY name
-                LIMIT :limit
+                ORDER BY market_cap_usd DESC NULLS LAST, name
                 """),
-                {"investor_id": investor_id, "firm_name": firm_name or "", "limit": limit},
+                {"investor_id": investor_id, "firm_name": firm_name or ""},
             )
             rows = result.fetchall()
             # If no non-13F holdings, fall back to showing 13F holdings
             if not rows:
                 result = db.execute(
                     text(base + """
-                    SELECT name, industry, location, stage
+                    SELECT name, industry, location, stage, market_cap_usd, ticker
                     FROM deduped
-                    ORDER BY name
-                    LIMIT :limit
+                    ORDER BY market_cap_usd DESC NULLS LAST, name
                     """),
-                    {"investor_id": investor_id, "firm_name": firm_name or "", "limit": limit},
+                    {"investor_id": investor_id, "firm_name": firm_name or ""},
                 )
                 rows = result.fetchall()
         else:
             result = db.execute(
                 text("""
-                SELECT company_name, company_industry, company_location, company_stage
+                SELECT company_name, company_industry, company_location, company_stage,
+                       NULL as market_cap_usd, NULL as ticker
                 FROM portfolio_companies
                 WHERE investor_id = :investor_id
                     AND investor_type = :investor_type
                     AND current_holding = 1
                 ORDER BY company_name
-                LIMIT :limit
             """),
                 {
                     "investor_id": investor_id,
                     "investor_type": investor_type,
-                    "limit": limit,
                 },
             )
             rows = result.fetchall()
@@ -274,6 +297,8 @@ class InvestorProfileTemplate:
                 "industry": row[1],
                 "location": row[2],
                 "stage": row[3],
+                "market_cap": float(row[4]) if row[4] else None,
+                "ticker": row[5],
             }
             for row in rows
         ]
@@ -282,18 +307,18 @@ class InvestorProfileTemplate:
         self, db: Session, investor_id: int, investor_type: str,
         firm_name: Optional[str] = None,
     ) -> list:
-        """Get sector allocation breakdown."""
+        """Get sector allocation breakdown with market cap totals."""
         if investor_type == "pe_firm":
             base = self._get_pe_portfolio_query(investor_id, firm_name)
             result = db.execute(
                 text(base + """
                 SELECT
                     COALESCE(industry, 'Unknown') as sector,
-                    COUNT(*) as count
+                    COUNT(*) as count,
+                    SUM(market_cap_usd) as sector_market_cap
                 FROM deduped
                 GROUP BY COALESCE(industry, 'Unknown')
                 ORDER BY count DESC
-                LIMIT 10
                 """),
                 {"investor_id": investor_id, "firm_name": firm_name or ""},
             )
@@ -302,14 +327,14 @@ class InvestorProfileTemplate:
                 text("""
                 SELECT
                     COALESCE(company_industry, 'Unknown') as sector,
-                    COUNT(*) as count
+                    COUNT(*) as count,
+                    NULL as sector_market_cap
                 FROM portfolio_companies
                 WHERE investor_id = :investor_id
                     AND investor_type = :investor_type
                     AND current_holding = 1
                 GROUP BY company_industry
                 ORDER BY count DESC
-                LIMIT 10
             """),
                 {"investor_id": investor_id, "investor_type": investor_type},
             )
@@ -322,6 +347,7 @@ class InvestorProfileTemplate:
                 "sector": row[0],
                 "count": row[1],
                 "pct": round(row[1] / total * 100, 1) if total > 0 else 0,
+                "market_cap": float(row[2]) if row[2] else None,
             }
             for row in rows
         ]
@@ -426,23 +452,29 @@ class InvestorProfileTemplate:
             industry = h.get('industry') or '-'
             location = h.get('location') or '-'
             stage = h.get('stage') or '-'
+            ticker = h.get('ticker') or '-'
+            mcap_display = _format_market_cap(h.get('market_cap'))
             holdings_rows += f"""
             <tr>
                 <td>{h.get('name', 'N/A')}</td>
+                <td>{ticker}</td>
                 <td>{industry}</td>
                 <td>{location}</td>
                 <td>{stage}</td>
+                <td class="num">{mcap_display}</td>
             </tr>
             """
 
         # Build sector table rows
         sector_rows = ""
         for s in sectors:
+            mcap_display = _format_market_cap(s.get('market_cap'))
             sector_rows += f"""
             <tr>
                 <td>{s.get('sector', 'N/A')}</td>
                 <td>{s.get('count', 0)}</td>
                 <td>{s.get('pct', 0)}%</td>
+                <td class="num">{mcap_display}</td>
             </tr>
             """
 
@@ -489,6 +521,23 @@ class InvestorProfileTemplate:
         if investor.get("employee_count"):
             extra_details += f'<p><strong>Employees:</strong> {investor["employee_count"]:,}</p>\n'
 
+        # Compute exposure display
+        total_mcap = summary.get('total_market_cap')
+        mcap_count = summary.get('companies_with_mcap', 0)
+        exposure_display = _format_market_cap(total_mcap) if total_mcap else "N/A"
+
+        # Build the 4th stat only for PE firms with market cap data
+        exposure_stat = ""
+        if total_mcap:
+            exposure_stat = f"""
+            <div class="stat">
+                <div class="stat-value">{exposure_display}</div>
+                <div class="stat-label">Est. Public Equity Exposure*</div>
+            </div>
+            """
+
+        grid_cols = "4" if total_mcap else "3"
+
         html = f"""
 <!DOCTYPE html>
 <html>
@@ -499,18 +548,21 @@ class InvestorProfileTemplate:
         h1 {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
         h2 {{ color: #34495e; margin-top: 30px; }}
         .summary-box {{ background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }}
-        .summary-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }}
+        .summary-grid {{ display: grid; grid-template-columns: repeat({grid_cols}, 1fr); gap: 20px; }}
         .stat {{ text-align: center; }}
         .stat-value {{ font-size: 2em; font-weight: bold; color: #3498db; }}
-        .stat-label {{ color: #7f8c8d; }}
-        table {{ width: 100%; border-collapse: collapse; margin: 15px 0; }}
-        th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }}
-        th {{ background: #3498db; color: white; }}
+        .stat-label {{ color: #7f8c8d; font-size: 0.9em; }}
+        .table-container {{ max-height: 800px; overflow-y: auto; margin: 15px 0; border: 1px solid #ddd; border-radius: 4px; }}
+        table {{ width: 100%; border-collapse: collapse; }}
+        th, td {{ padding: 10px 12px; text-align: left; border-bottom: 1px solid #ddd; }}
+        th {{ background: #3498db; color: white; position: sticky; top: 0; z-index: 1; }}
         tr:hover {{ background: #f5f5f5; }}
-        td:last-child {{ max-width: 300px; font-size: 0.9em; color: #555; }}
+        .num {{ text-align: right; font-variant-numeric: tabular-nums; }}
+        th.num {{ text-align: right; }}
         a {{ color: #3498db; text-decoration: none; }}
         a:hover {{ text-decoration: underline; }}
         .meta {{ color: #95a5a6; font-size: 0.9em; margin-top: 40px; }}
+        .footnote {{ color: #95a5a6; font-size: 0.85em; margin-top: 8px; font-style: italic; }}
     </style>
 </head>
 <body>
@@ -539,40 +591,49 @@ class InvestorProfileTemplate:
                 <div class="stat-value">{summary.get('total_holdings', 0)}</div>
                 <div class="stat-label">Total (incl. exited)</div>
             </div>
+            {exposure_stat}
         </div>
     </div>
 
-    <h2>Top Holdings</h2>
+    <h2>All Holdings ({len(holdings)})</h2>
+    <div class="table-container">
     <table>
         <thead>
             <tr>
                 <th>Company</th>
+                <th>Ticker</th>
                 <th>Industry</th>
                 <th>Location</th>
                 <th>Type</th>
+                <th class="num">Est. Market Cap</th>
             </tr>
         </thead>
         <tbody>
-            {holdings_rows if holdings_rows else '<tr><td colspan="4">No holdings data</td></tr>'}
+            {holdings_rows if holdings_rows else '<tr><td colspan="6">No holdings data</td></tr>'}
         </tbody>
     </table>
+    </div>
 
-    <h2>Sector Allocation</h2>
+    <h2>Sector Allocation ({len(sectors)})</h2>
+    <div class="table-container">
     <table>
         <thead>
             <tr>
                 <th>Sector</th>
                 <th>Count</th>
                 <th>% of Portfolio</th>
+                <th class="num">Est. Value</th>
             </tr>
         </thead>
         <tbody>
-            {sector_rows if sector_rows else '<tr><td colspan="3">No sector data</td></tr>'}
+            {sector_rows if sector_rows else '<tr><td colspan="4">No sector data</td></tr>'}
         </tbody>
     </table>
+    </div>
 
     {team_section}
 
+    <p class="footnote">*Market cap = total company value (source: Yahoo Finance). Actual position sizes require 13F filing data.</p>
     <p class="meta">Generated: {data.get('generated_at', 'N/A')} | Nexdata Investment Intelligence</p>
 </body>
 </html>
@@ -637,15 +698,19 @@ class InvestorProfileTemplate:
         row_offset += 1
         ws[f"A{row_offset}"] = "Total Holdings"
         ws[f"B{row_offset}"] = summary.get("total_holdings", 0)
+        if summary.get("total_market_cap"):
+            row_offset += 1
+            ws[f"A{row_offset}"] = "Est. Public Equity Exposure"
+            ws[f"B{row_offset}"] = _format_market_cap(summary["total_market_cap"])
 
-        ws.column_dimensions["A"].width = 20
+        ws.column_dimensions["A"].width = 30
         ws.column_dimensions["B"].width = 40
 
         # Holdings sheet
         ws_holdings = wb.create_sheet("Holdings")
         holdings = data.get("top_holdings", [])
 
-        headers = ["Company", "Industry", "Location", "Type"]
+        headers = ["Company", "Ticker", "Industry", "Location", "Type", "Est. Market Cap"]
         for col, header in enumerate(headers, 1):
             cell = ws_holdings.cell(row=1, column=col, value=header)
             cell.font = header_font_white
@@ -653,20 +718,24 @@ class InvestorProfileTemplate:
 
         for row, h in enumerate(holdings, 2):
             ws_holdings.cell(row=row, column=1, value=h.get("name"))
-            ws_holdings.cell(row=row, column=2, value=h.get("industry") or "-")
-            ws_holdings.cell(row=row, column=3, value=h.get("location") or "-")
-            ws_holdings.cell(row=row, column=4, value=h.get("stage") or "-")
+            ws_holdings.cell(row=row, column=2, value=h.get("ticker") or "-")
+            ws_holdings.cell(row=row, column=3, value=h.get("industry") or "-")
+            ws_holdings.cell(row=row, column=4, value=h.get("location") or "-")
+            ws_holdings.cell(row=row, column=5, value=h.get("stage") or "-")
+            ws_holdings.cell(row=row, column=6, value=h.get("market_cap"))
 
         ws_holdings.column_dimensions["A"].width = 30
-        ws_holdings.column_dimensions["B"].width = 20
+        ws_holdings.column_dimensions["B"].width = 10
         ws_holdings.column_dimensions["C"].width = 20
-        ws_holdings.column_dimensions["D"].width = 18
+        ws_holdings.column_dimensions["D"].width = 20
+        ws_holdings.column_dimensions["E"].width = 18
+        ws_holdings.column_dimensions["F"].width = 18
 
         # Sectors sheet
         ws_sectors = wb.create_sheet("Sectors")
         sectors = data.get("sector_allocation", [])
 
-        headers = ["Sector", "Count", "Percentage"]
+        headers = ["Sector", "Count", "Percentage", "Est. Value"]
         for col, header in enumerate(headers, 1):
             cell = ws_sectors.cell(row=1, column=col, value=header)
             cell.font = header_font_white
@@ -676,10 +745,12 @@ class InvestorProfileTemplate:
             ws_sectors.cell(row=row, column=1, value=s.get("sector"))
             ws_sectors.cell(row=row, column=2, value=s.get("count"))
             ws_sectors.cell(row=row, column=3, value=f"{s.get('pct', 0)}%")
+            ws_sectors.cell(row=row, column=4, value=s.get("market_cap"))
 
         ws_sectors.column_dimensions["A"].width = 25
         ws_sectors.column_dimensions["B"].width = 10
         ws_sectors.column_dimensions["C"].width = 12
+        ws_sectors.column_dimensions["D"].width = 18
 
         # Team sheet (PE firms only)
         team = data.get("team", [])

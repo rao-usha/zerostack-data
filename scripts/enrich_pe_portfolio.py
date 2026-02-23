@@ -17,6 +17,7 @@ Usage:
     python scripts/enrich_pe_portfolio.py --limit 10         # Test with 10
     python scripts/enrich_pe_portfolio.py --dry-run          # Preview only
     python scripts/enrich_pe_portfolio.py --skip-sec         # Skip SEC phase
+    python scripts/enrich_pe_portfolio.py --refresh-mcap     # Refresh market caps only
 """
 
 import argparse
@@ -212,6 +213,8 @@ def fetch_yfinance_info(ticker: str) -> Optional[Dict[str, Any]]:
 
 def extract_profile(info: Dict[str, Any]) -> Dict[str, Any]:
     """Extract profile fields from yfinance info dict."""
+    # Only include market cap if denominated in USD
+    mcap = info.get("marketCap") if info.get("currency") == "USD" else None
     return {
         "industry": info.get("industry"),
         "sector": info.get("sector"),
@@ -222,6 +225,7 @@ def extract_profile(info: Dict[str, Any]) -> Dict[str, Any]:
         "headquarters_country": info.get("country"),
         "website": info.get("website"),
         "ticker": info.get("symbol"),
+        "market_cap_usd": mcap,
         "founded_year": None,  # yfinance doesn't provide this
     }
 
@@ -373,6 +377,50 @@ def get_companies_needing_sic(
     return [(r[0], r[1], r[2]) for r in rows]
 
 
+def get_companies_for_mcap(
+    db, firm_name: Optional[str] = None, limit: Optional[int] = None
+) -> List[Dict]:
+    """
+    Query portfolio companies for market cap refresh.
+
+    Returns ALL companies that have industry (i.e. were previously enriched).
+    The refresh function will resolve tickers via yfinance search as needed.
+    """
+    from sqlalchemy import text
+
+    sql = """
+        SELECT DISTINCT pc.id, pc.name, pc.ticker,
+               pf.name AS firm_name
+        FROM pe_portfolio_companies pc
+        LEFT JOIN pe_fund_investments fi ON fi.company_id = pc.id
+        LEFT JOIN pe_funds f ON f.id = fi.fund_id
+        LEFT JOIN pe_firms pf ON pf.id = f.firm_id
+        WHERE pc.industry IS NOT NULL
+    """
+    params = {}
+
+    if firm_name:
+        sql += " AND pf.name ILIKE :firm_name"
+        params["firm_name"] = f"%{firm_name}%"
+
+    sql += " ORDER BY pc.name"
+
+    if limit:
+        sql += " LIMIT :limit"
+        params["limit"] = limit
+
+    rows = db.execute(text(sql), params).fetchall()
+    return [
+        {
+            "id": r[0],
+            "name": r[1],
+            "ticker": r[2],
+            "firm_name": r[3],
+        }
+        for r in rows
+    ]
+
+
 def null_preserving_update(db, company_id: int, updates: Dict[str, Any]) -> int:
     """
     Update pe_portfolio_companies with COALESCE — only fills NULL columns.
@@ -404,6 +452,136 @@ def null_preserving_update(db, company_id: int, updates: Dict[str, Any]) -> int:
 
     result = db.execute(text(sql), params)
     return result.rowcount
+
+
+def force_update_market_cap(db, company_id: int, market_cap: float) -> int:
+    """
+    Force-update market_cap_usd (overwrites existing — market caps change daily).
+
+    Returns 1 if row was updated, 0 otherwise.
+    """
+    from sqlalchemy import text
+
+    sql = """
+        UPDATE pe_portfolio_companies
+        SET market_cap_usd = :mcap, updated_at = NOW()
+        WHERE id = :cid
+    """
+    result = db.execute(text(sql), {"cid": company_id, "mcap": market_cap})
+    return result.rowcount
+
+
+# ---------------------------------------------------------------------------
+# Refresh market cap mode
+# ---------------------------------------------------------------------------
+
+def _format_mcap(mcap: float) -> str:
+    """Format market cap for terminal display."""
+    if mcap >= 1e12:
+        return f"${mcap / 1e12:.1f}T"
+    elif mcap >= 1e9:
+        return f"${mcap / 1e9:.1f}B"
+    elif mcap >= 1e6:
+        return f"${mcap / 1e6:.0f}M"
+    return f"${mcap:,.0f}"
+
+
+async def refresh_market_caps(
+    db,
+    companies: List[Dict],
+    dry_run: bool = False,
+) -> Dict[str, Any]:
+    """
+    Resolve tickers and fetch market caps for enriched portfolio companies.
+
+    For each company: resolve ticker via yfinance search → fetch market cap → store.
+    Also updates the ticker column with the resolved ticker.
+    """
+    banner("Market Cap Refresh")
+
+    stats = {"total": len(companies), "updated": 0, "no_ticker": 0, "no_data": 0, "errors": 0}
+    loop = asyncio.get_running_loop()
+
+    for i, company in enumerate(companies, 1):
+        cid = company["id"]
+        name = company["name"]
+        progress = f"[{i}/{len(companies)}]"
+
+        try:
+            # Resolve actual ticker via yfinance search
+            search_name = normalize_13f_name(name)
+            ticker = await search_ticker(search_name)
+            if not ticker:
+                ticker = await search_ticker(name)
+
+            if not ticker:
+                skip(f"{progress} {name} → no ticker")
+                stats["no_ticker"] += 1
+                await asyncio.sleep(0.5)
+                continue
+
+            # Fetch profile for market cap
+            yf_info = await loop.run_in_executor(None, fetch_yfinance_info, ticker)
+
+            if not yf_info or not yf_info.get("marketCap"):
+                skip(f"{progress} {name} ({ticker}) → no market cap")
+                stats["no_data"] += 1
+                await asyncio.sleep(0.5)
+                continue
+
+            # Only store market cap if denominated in USD
+            currency = yf_info.get("currency", "USD")
+            mcap = yf_info["marketCap"]
+
+            if currency != "USD":
+                warn(f"{progress} {name} ({ticker}) → {currency} not USD, clearing market cap")
+                if not dry_run:
+                    from sqlalchemy import text as sa_text
+                    db.execute(
+                        sa_text("""
+                            UPDATE pe_portfolio_companies
+                            SET market_cap_usd = NULL, ticker = :ticker, updated_at = NOW()
+                            WHERE id = :cid
+                        """),
+                        {"cid": cid, "ticker": ticker},
+                    )
+                stats["no_data"] += 1
+                await asyncio.sleep(0.5)
+                continue
+
+            display = _format_mcap(mcap)
+
+            if dry_run:
+                ok(f"{progress} {name} → {ticker} {display} {C.DIM}(dry run){C.E}")
+            else:
+                from sqlalchemy import text as sa_text
+                db.execute(
+                    sa_text("""
+                        UPDATE pe_portfolio_companies
+                        SET market_cap_usd = :mcap, ticker = :ticker, updated_at = NOW()
+                        WHERE id = :cid
+                    """),
+                    {"cid": cid, "mcap": mcap, "ticker": ticker},
+                )
+                ok(f"{progress} {name} → {ticker} {display}")
+
+            stats["updated"] += 1
+
+        except Exception as e:
+            fail(f"{progress} {name}: {e}")
+            stats["errors"] += 1
+
+        # Rate limit
+        await asyncio.sleep(0.8)
+
+    info(
+        f"Market cap refresh: {stats['updated']} updated, "
+        f"{stats['no_ticker']} no ticker, "
+        f"{stats['no_data']} no data, "
+        f"{stats['errors']} errors"
+    )
+
+    return stats
 
 
 # ---------------------------------------------------------------------------
@@ -836,6 +1014,32 @@ async def run(args):
     db = SessionFactory()
 
     try:
+        if args.refresh_mcap:
+            # Market cap refresh mode: resolve tickers + fetch market caps
+            info("Querying enriched companies for market cap refresh...")
+            companies = get_companies_for_mcap(
+                db, firm_name=args.firm, limit=args.limit
+            )
+            if not companies:
+                warn("No enriched companies found!")
+                return
+
+            info(f"Found {len(companies)} enriched companies")
+            if args.firm:
+                info(f"  Filtered by firm: '{args.firm}'")
+            if args.dry_run:
+                warn("  DRY RUN — no database changes will be made")
+
+            await refresh_market_caps(db, companies, dry_run=args.dry_run)
+
+            if not args.dry_run:
+                db.commit()
+                ok("All changes committed to database")
+            else:
+                db.rollback()
+                info("Dry run complete — no changes committed")
+            return
+
         if args.sec_only:
             # SEC-only mode: skip Phase 1, query companies with ticker but no SIC
             info("Querying companies with ticker but no SIC code...")
@@ -953,6 +1157,10 @@ def main():
     parser.add_argument(
         "--sec-only", action="store_true",
         help="Only run Phase 2 (SEC SIC codes) for already-enriched companies"
+    )
+    parser.add_argument(
+        "--refresh-mcap", action="store_true",
+        help="Refresh market cap for all companies with tickers (skips Phase 1/1b/2)"
     )
     args = parser.parse_args()
 

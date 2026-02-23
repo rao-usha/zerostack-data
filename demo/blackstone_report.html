@@ -8,18 +8,21 @@
         h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
         h2 { color: #34495e; margin-top: 30px; }
         .summary-box { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
-        .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
         .stat { text-align: center; }
         .stat-value { font-size: 2em; font-weight: bold; color: #3498db; }
-        .stat-label { color: #7f8c8d; }
-        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background: #3498db; color: white; }
+        .stat-label { color: #7f8c8d; font-size: 0.9em; }
+        .table-container { max-height: 800px; overflow-y: auto; margin: 15px 0; border: 1px solid #ddd; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #3498db; color: white; position: sticky; top: 0; z-index: 1; }
         tr:hover { background: #f5f5f5; }
-        td:last-child { max-width: 300px; font-size: 0.9em; color: #555; }
+        .num { text-align: right; font-variant-numeric: tabular-nums; }
+        th.num { text-align: right; }
         a { color: #3498db; text-decoration: none; }
         a:hover { text-decoration: underline; }
         .meta { color: #95a5a6; font-size: 0.9em; margin-top: 40px; }
+        .footnote { color: #95a5a6; font-size: 0.85em; margin-top: 8px; font-style: italic; }
     </style>
 </head>
 <body>
@@ -49,101 +52,3184 @@
                 <div class="stat-value">349</div>
                 <div class="stat-label">Total (incl. exited)</div>
             </div>
+            
+            <div class="stat">
+                <div class="stat-value">$35.4T</div>
+                <div class="stat-label">Est. Public Equity Exposure*</div>
+            </div>
+            
         </div>
     </div>
 
-    <h2>Top Holdings</h2>
+    <h2>All Holdings (349)</h2>
+    <div class="table-container">
     <table>
         <thead>
             <tr>
                 <th>Company</th>
+                <th>Ticker</th>
                 <th>Industry</th>
                 <th>Location</th>
                 <th>Type</th>
+                <th class="num">Est. Market Cap</th>
             </tr>
         </thead>
         <tbody>
             
             <tr>
-                <td>10X GENOMICS INC</td>
-                <td>Health Information Services</td>
-                <td>Pleasanton, CA</td>
+                <td>NVIDIA CORPORATION</td>
+                <td>NVDA</td>
+                <td>Semiconductors</td>
+                <td>Santa Clara, CA</td>
                 <td>13F Holding</td>
+                <td class="num">$4.7T</td>
             </tr>
             
             <tr>
-                <td>ABACUS LIFE INC</td>
-                <td>-</td>
-                <td>-</td>
+                <td>APPLE INC</td>
+                <td>AAPL</td>
+                <td>Consumer Electronics</td>
+                <td>Cupertino, CA</td>
                 <td>13F Holding</td>
+                <td class="num">$3.9T</td>
             </tr>
             
             <tr>
-                <td>ABBOTT LABS</td>
-                <td>Medical Devices</td>
-                <td>North Chicago, IL</td>
+                <td>ALPHABET INC</td>
+                <td>GOOG</td>
+                <td>Internet Content & Information</td>
+                <td>Mountain View, CA</td>
                 <td>13F Holding</td>
+                <td class="num">$3.8T</td>
+            </tr>
+            
+            <tr>
+                <td>MICROSOFT CORP</td>
+                <td>MSFT</td>
+                <td>Software - Infrastructure</td>
+                <td>Redmond, WA</td>
+                <td>13F Holding</td>
+                <td class="num">$2.9T</td>
+            </tr>
+            
+            <tr>
+                <td>AMAZON COM INC</td>
+                <td>AMZN</td>
+                <td>Internet Retail</td>
+                <td>Seattle, WA</td>
+                <td>13F Holding</td>
+                <td class="num">$2.2T</td>
+            </tr>
+            
+            <tr>
+                <td>META PLATFORMS INC</td>
+                <td>META</td>
+                <td>Internet Content & Information</td>
+                <td>Menlo Park, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$1.6T</td>
+            </tr>
+            
+            <tr>
+                <td>BERKSHIRE HATHAWAY INC DEL</td>
+                <td>BRK-B</td>
+                <td>Insurance - Diversified</td>
+                <td>Omaha, NE</td>
+                <td>13F Holding</td>
+                <td class="num">$1.1T</td>
+            </tr>
+            
+            <tr>
+                <td>WALMART INC</td>
+                <td>WMT</td>
+                <td>Discount Stores</td>
+                <td>Bentonville, AR</td>
+                <td>13F Holding</td>
+                <td class="num">$1.0T</td>
+            </tr>
+            
+            <tr>
+                <td>ELI LILLY & CO</td>
+                <td>LLY</td>
+                <td>Drug Manufacturers - General</td>
+                <td>Indianapolis, IN</td>
+                <td>13F Holding</td>
+                <td class="num">$998.6B</td>
+            </tr>
+            
+            <tr>
+                <td>JPMORGAN CHASE & CO.</td>
+                <td>JPM</td>
+                <td>Banks - Diversified</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$810.3B</td>
+            </tr>
+            
+            <tr>
+                <td>EXXON MOBIL CORP</td>
+                <td>XOM</td>
+                <td>Oil & Gas Integrated</td>
+                <td>Spring, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$635.8B</td>
+            </tr>
+            
+            <tr>
+                <td>JOHNSON & JOHNSON</td>
+                <td>JNJ</td>
+                <td>Drug Manufacturers - General</td>
+                <td>New Brunswick, NJ</td>
+                <td>13F Holding</td>
+                <td class="num">$592.4B</td>
+            </tr>
+            
+            <tr>
+                <td>VISA INC</td>
+                <td>V</td>
+                <td>Credit Services</td>
+                <td>San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$591.0B</td>
+            </tr>
+            
+            <tr>
+                <td>MASTERCARD INCORPORATED</td>
+                <td>MA</td>
+                <td>Credit Services</td>
+                <td>Purchase, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$442.7B</td>
             </tr>
             
             <tr>
                 <td>ABBVIE INC</td>
+                <td>ABBV</td>
                 <td>Drug Manufacturers - General</td>
                 <td>North Chicago, IL</td>
                 <td>13F Holding</td>
+                <td class="num">$405.6B</td>
             </tr>
             
             <tr>
-                <td>ABIVAX SA</td>
-                <td>Biotechnology</td>
-                <td>Paris</td>
+                <td>CHEVRON CORP NEW</td>
+                <td>CVX</td>
+                <td>Oil & Gas Integrated</td>
+                <td>Houston, TX</td>
                 <td>13F Holding</td>
+                <td class="num">$369.7B</td>
             </tr>
             
             <tr>
-                <td>ACCELERANT HOLDINGS</td>
-                <td>Insurance Brokers</td>
-                <td>Grand Cayman</td>
+                <td>GE AEROSPACE</td>
+                <td>GE</td>
+                <td>Aerospace & Defense</td>
+                <td>Evendale, OH</td>
                 <td>13F Holding</td>
+                <td class="num">$357.6B</td>
             </tr>
             
             <tr>
-                <td>ADICET BIO INC</td>
-                <td>Biotechnology</td>
-                <td>Boston, MA</td>
+                <td>NETFLIX INC</td>
+                <td>NFLX</td>
+                <td>Entertainment</td>
+                <td>Los Gatos, CA</td>
                 <td>13F Holding</td>
+                <td class="num">$322.5B</td>
             </tr>
             
             <tr>
                 <td>ADVANCED MICRO DEVICES INC</td>
+                <td>AMD</td>
                 <td>Semiconductors</td>
                 <td>Santa Clara, CA</td>
                 <td>13F Holding</td>
+                <td class="num">$320.5B</td>
+            </tr>
+            
+            <tr>
+                <td>MERCK & CO INC</td>
+                <td>MRK</td>
+                <td>Drug Manufacturers - General</td>
+                <td>Rahway, NJ</td>
+                <td>13F Holding</td>
+                <td class="num">$309.3B</td>
+            </tr>
+            
+            <tr>
+                <td>PHILIP MORRIS INTL INC</td>
+                <td>PM</td>
+                <td>Tobacco</td>
+                <td>Stamford, CT</td>
+                <td>13F Holding</td>
+                <td class="num">$291.4B</td>
+            </tr>
+            
+            <tr>
+                <td>GOLDMAN SACHS GROUP INC</td>
+                <td>GS</td>
+                <td>Capital Markets</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$270.1B</td>
+            </tr>
+            
+            <tr>
+                <td>WELLS FARGO CO NEW</td>
+                <td>WFC</td>
+                <td>Banks - Diversified</td>
+                <td>San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$267.3B</td>
+            </tr>
+            
+            <tr>
+                <td>UNITEDHEALTH GROUP INC</td>
+                <td>UNH</td>
+                <td>Healthcare Plans</td>
+                <td>Eden Prairie, MN</td>
+                <td>13F Holding</td>
+                <td class="num">$255.8B</td>
+            </tr>
+            
+            <tr>
+                <td>T-MOBILE US INC</td>
+                <td>TMUS</td>
+                <td>Telecom Services</td>
+                <td>Bellevue, WA</td>
+                <td>13F Holding</td>
+                <td class="num">$246.0B</td>
+            </tr>
+            
+            <tr>
+                <td>BANK AMERICA CORP</td>
+                <td>BML-PL</td>
+                <td>Banks - Diversified</td>
+                <td>Charlotte, NC</td>
+                <td>13F Holding</td>
+                <td class="num">$243.8B</td>
+            </tr>
+            
+            <tr>
+                <td>SHELL PLC</td>
+                <td>SHEL</td>
+                <td>Oil & Gas Integrated</td>
+                <td>London</td>
+                <td>13F Holding</td>
+                <td class="num">$225.7B</td>
+            </tr>
+            
+            <tr>
+                <td>AMERICAN EXPRESS CO</td>
+                <td>AXP</td>
+                <td>Credit Services</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$221.3B</td>
+            </tr>
+            
+            <tr>
+                <td>CITIGROUP INC</td>
+                <td>C</td>
+                <td>Banks - Diversified</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$198.2B</td>
+            </tr>
+            
+            <tr>
+                <td>NEXTERA ENERGY INC</td>
+                <td>NEE</td>
+                <td>Utilities - Regulated Electric</td>
+                <td>Juno Beach, FL</td>
+                <td>13F Holding</td>
+                <td class="num">$196.0B</td>
+            </tr>
+            
+            <tr>
+                <td>THERMO FISHER SCIENTIFIC INC</td>
+                <td>TMO</td>
+                <td>Diagnostics & Research</td>
+                <td>Waltham, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$194.0B</td>
+            </tr>
+            
+            <tr>
+                <td>GILEAD SCIENCES INC</td>
+                <td>GILD</td>
+                <td>Drug Manufacturers - General</td>
+                <td>Foster City, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$185.9B</td>
+            </tr>
+            
+            <tr>
+                <td>BOEING CO</td>
+                <td>BA</td>
+                <td>Aerospace & Defense</td>
+                <td>Arlington, VA</td>
+                <td>13F Holding</td>
+                <td class="num">$181.0B</td>
+            </tr>
+            
+            <tr>
+                <td>INTUIT</td>
+                <td>ISRG</td>
+                <td>Medical Instruments & Supplies</td>
+                <td>Sunnyvale, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$174.8B</td>
+            </tr>
+            
+            <tr>
+                <td>UL SOLUTIONS INC</td>
+                <td>UL</td>
+                <td>Household & Personal Products</td>
+                <td>London</td>
+                <td>13F Holding</td>
+                <td class="num">$161.8B</td>
+            </tr>
+            
+            <tr>
+                <td>UNION PAC CORP</td>
+                <td>UNP</td>
+                <td>Railroads</td>
+                <td>Omaha, NE</td>
+                <td>13F Holding</td>
+                <td class="num">$156.5B</td>
+            </tr>
+            
+            <tr>
+                <td>DANAHER CORPORATION</td>
+                <td>DHR</td>
+                <td>Diagnostics & Research</td>
+                <td>Washington, DC</td>
+                <td>13F Holding</td>
+                <td class="num">$149.1B</td>
+            </tr>
+            
+            <tr>
+                <td>UBER TECHNOLOGIES INC</td>
+                <td>UBER</td>
+                <td>Software - Application</td>
+                <td>San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$146.9B</td>
+            </tr>
+            
+            <tr>
+                <td>CONOCOPHILLIPS</td>
+                <td>COP</td>
+                <td>Oil & Gas E&P</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$135.8B</td>
+            </tr>
+            
+            <tr>
+                <td>PROLOGIS INC.</td>
+                <td>PLD</td>
+                <td>REIT - Industrial</td>
+                <td>San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$130.7B</td>
+            </tr>
+            
+            <tr>
+                <td>PROGRESSIVE CORP</td>
+                <td>PGR</td>
+                <td>Insurance - Property & Casualty</td>
+                <td>Mayfield, OH</td>
+                <td>13F Holding</td>
+                <td class="num">$119.4B</td>
+            </tr>
+            
+            <tr>
+                <td>MCKESSON CORP</td>
+                <td>MCK</td>
+                <td>Medical Distribution</td>
+                <td>Irving, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$117.2B</td>
+            </tr>
+            
+            <tr>
+                <td>ALTRIA GROUP INC</td>
+                <td>MO</td>
+                <td>Tobacco</td>
+                <td>Richmond, VA</td>
+                <td>13F Holding</td>
+                <td class="num">$115.8B</td>
+            </tr>
+            
+            <tr>
+                <td>ENBRIDGE INC</td>
+                <td>ENB</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Calgary, AB</td>
+                <td>13F Holding</td>
+                <td class="num">$114.2B</td>
+            </tr>
+            
+            <tr>
+                <td>BOSTON SCIENTIFIC CORP</td>
+                <td>BSX</td>
+                <td>Medical Devices</td>
+                <td>Marlborough, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$110.3B</td>
+            </tr>
+            
+            <tr>
+                <td>CONSTELLATION ENERGY CORP</td>
+                <td>CEG</td>
+                <td>Utilities - Independent Power Producers</td>
+                <td>Baltimore, MD</td>
+                <td>13F Holding</td>
+                <td class="num">$106.4B</td>
+            </tr>
+            
+            <tr>
+                <td>SOUTHERN CO</td>
+                <td>SO</td>
+                <td>Utilities - Regulated Electric</td>
+                <td>Atlanta, GA</td>
+                <td>13F Holding</td>
+                <td class="num">$104.8B</td>
+            </tr>
+            
+            <tr>
+                <td>DUKE ENERGY CORP NEW</td>
+                <td>DUK</td>
+                <td>Utilities - Regulated Electric</td>
+                <td>Charlotte, NC</td>
+                <td>13F Holding</td>
+                <td class="num">$99.4B</td>
+            </tr>
+            
+            <tr>
+                <td>BP PLC</td>
+                <td>BP</td>
+                <td>Oil & Gas Integrated</td>
+                <td>London</td>
+                <td>13F Holding</td>
+                <td class="num">$98.4B</td>
+            </tr>
+            
+            <tr>
+                <td>CVS HEALTH CORP</td>
+                <td>CVS</td>
+                <td>Healthcare Plans</td>
+                <td>Woonsocket, RI</td>
+                <td>13F Holding</td>
+                <td class="num">$98.0B</td>
+            </tr>
+            
+            <tr>
+                <td>WILLIAMS COS INC</td>
+                <td>WMB</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Tulsa, OK</td>
+                <td>13F Holding</td>
+                <td class="num">$89.2B</td>
+            </tr>
+            
+            <tr>
+                <td>SEA LTD</td>
+                <td>STX</td>
+                <td>Computer Hardware</td>
+                <td>Singapore</td>
+                <td>13F Holding</td>
+                <td class="num">$88.8B</td>
+            </tr>
+            
+            <tr>
+                <td>CRH PLC</td>
+                <td>CRH</td>
+                <td>Building Materials</td>
+                <td>Dublin</td>
+                <td>13F Holding</td>
+                <td class="num">$81.2B</td>
+            </tr>
+            
+            <tr>
+                <td>SYNOPSYS INC</td>
+                <td>SNPS</td>
+                <td>Software - Infrastructure</td>
+                <td>Sunnyvale, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$80.5B</td>
+            </tr>
+            
+            <tr>
+                <td>CSX CORP</td>
+                <td>CSX</td>
+                <td>Railroads</td>
+                <td>Jacksonville, FL</td>
+                <td>13F Holding</td>
+                <td class="num">$78.0B</td>
+            </tr>
+            
+            <tr>
+                <td>TRANSDIGM GROUP INC</td>
+                <td>TDG</td>
+                <td>Aerospace & Defense</td>
+                <td>Cleveland, OH</td>
+                <td>13F Holding</td>
+                <td class="num">$73.2B</td>
+            </tr>
+            
+            <tr>
+                <td>KINDER MORGAN INC DEL</td>
+                <td>KMI</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$72.8B</td>
+            </tr>
+            
+            <tr>
+                <td>DOORDASH INC</td>
+                <td>DASH</td>
+                <td>Internet Retail</td>
+                <td>San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$71.0B</td>
+            </tr>
+            
+            <tr>
+                <td>BECTON DICKINSON & CO</td>
+                <td>BDX</td>
+                <td>Medical Instruments & Supplies</td>
+                <td>Franklin Lakes, NJ</td>
+                <td>13F Holding</td>
+                <td class="num">$66.8B</td>
+            </tr>
+            
+            <tr>
+                <td>EOG RES INC</td>
+                <td>EOG</td>
+                <td>Oil & Gas E&P</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$66.8B</td>
+            </tr>
+            
+            <tr>
+                <td>TC ENERGY CORP</td>
+                <td>TRP</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Calgary, AB</td>
+                <td>13F Holding</td>
+                <td class="num">$65.7B</td>
+            </tr>
+            
+            <tr>
+                <td>REALTY INCOME CORP</td>
+                <td>O</td>
+                <td>REIT - Retail</td>
+                <td>San Diego, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$61.2B</td>
+            </tr>
+            
+            <tr>
+                <td>SEMPRA</td>
+                <td>SRE</td>
+                <td>Utilities - Diversified</td>
+                <td>San Diego, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$61.1B</td>
+            </tr>
+            
+            <tr>
+                <td>MPLX LP</td>
+                <td>MPLX</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Findlay, OH</td>
+                <td>13F Holding</td>
+                <td class="num">$59.8B</td>
+            </tr>
+            
+            <tr>
+                <td>VISTRA CORP</td>
+                <td>VST</td>
+                <td>Utilities - Independent Power Producers</td>
+                <td>Irving, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$56.9B</td>
+            </tr>
+            
+            <tr>
+                <td>ONEOK INC NEW</td>
+                <td>OKE</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Tulsa, OK</td>
+                <td>13F Holding</td>
+                <td class="num">$55.0B</td>
+            </tr>
+            
+            <tr>
+                <td>ALLSTATE CORP</td>
+                <td>ALL</td>
+                <td>Insurance - Property & Casualty</td>
+                <td>Northbrook, IL</td>
+                <td>13F Holding</td>
+                <td class="num">$53.9B</td>
+            </tr>
+            
+            <tr>
+                <td>CAMECO CORP</td>
+                <td>CCJ</td>
+                <td>Uranium</td>
+                <td>Saskatoon, SK</td>
+                <td>13F Holding</td>
+                <td class="num">$51.8B</td>
+            </tr>
+            
+            <tr>
+                <td>FERGUSON ENTERPRISES INC</td>
+                <td>FERG</td>
+                <td>Industrial Distribution</td>
+                <td>Newport News, VA</td>
+                <td>13F Holding</td>
+                <td class="num">$50.5B</td>
+            </tr>
+            
+            <tr>
+                <td>TARGA RES CORP</td>
+                <td>TRGP</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$49.9B</td>
+            </tr>
+            
+            <tr>
+                <td>DIAMONDBACK ENERGY INC</td>
+                <td>FANG</td>
+                <td>Oil & Gas E&P</td>
+                <td>Midland, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$49.8B</td>
+            </tr>
+            
+            <tr>
+                <td>CHENIERE ENERGY INC</td>
+                <td>LNG</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$49.1B</td>
+            </tr>
+            
+            <tr>
+                <td>ENTERGY CORP NEW</td>
+                <td>ETR</td>
+                <td>Utilities - Regulated Electric</td>
+                <td>New Orleans, LA</td>
+                <td>13F Holding</td>
+                <td class="num">$47.4B</td>
+            </tr>
+            
+            <tr>
+                <td>COREWEAVE INC</td>
+                <td>CRWV</td>
+                <td>Software - Infrastructure</td>
+                <td>Livingston, NJ</td>
+                <td>13F Holding</td>
+                <td class="num">$47.4B</td>
+            </tr>
+            
+            <tr>
+                <td>CENOVUS ENERGY INC</td>
+                <td>CVE</td>
+                <td>Oil & Gas Integrated</td>
+                <td>Calgary, AB</td>
+                <td>13F Holding</td>
+                <td class="num">$42.5B</td>
+            </tr>
+            
+            <tr>
+                <td>PG&E CORP</td>
+                <td>PCG</td>
+                <td>Utilities - Regulated Electric</td>
+                <td>Oakland, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$40.6B</td>
+            </tr>
+            
+            <tr>
+                <td>KEURIG DR PEPPER INC</td>
+                <td>KDP</td>
+                <td>Beverages - Non-Alcoholic</td>
+                <td>Burlington, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$40.4B</td>
+            </tr>
+            
+            <tr>
+                <td>EQT CORP</td>
+                <td>EQT</td>
+                <td>Oil & Gas E&P</td>
+                <td>Pittsburgh, PA</td>
+                <td>13F Holding</td>
+                <td class="num">$36.8B</td>
+            </tr>
+            
+            <tr>
+                <td>KENVUE INC</td>
+                <td>KVUE</td>
+                <td>Household & Personal Products</td>
+                <td>Summit, NJ</td>
+                <td>13F Holding</td>
+                <td class="num">$36.3B</td>
+            </tr>
+            
+            <tr>
+                <td>TAKE-TWO INTERACTIVE SOFTWAR</td>
+                <td>TTWO</td>
+                <td>Electronic Gaming & Multimedia</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$36.2B</td>
+            </tr>
+            
+            <tr>
+                <td>NUTRIEN LTD</td>
+                <td>NTR</td>
+                <td>Agricultural Inputs</td>
+                <td>Saskatoon, SK</td>
+                <td>13F Holding</td>
+                <td class="num">$35.0B</td>
+            </tr>
+            
+            <tr>
+                <td>CELESTICA INC</td>
+                <td>CLS</td>
+                <td>Electronic Components</td>
+                <td>Toronto, ON</td>
+                <td>13F Holding</td>
+                <td class="num">$34.2B</td>
+            </tr>
+            
+            <tr>
+                <td>BLOCK INC</td>
+                <td>XYZ</td>
+                <td>Software - Infrastructure</td>
+                <td>Oakland, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$30.9B</td>
+            </tr>
+            
+            <tr>
+                <td>FIRSTENERGY CORP</td>
+                <td>FE</td>
+                <td>Utilities - Regulated Electric</td>
+                <td>Akron, OH</td>
+                <td>13F Holding</td>
+                <td class="num">$29.1B</td>
+            </tr>
+            
+            <tr>
+                <td>TECK RESOURCES LTD</td>
+                <td>TECK</td>
+                <td>Other Industrial Metals & Mining</td>
+                <td>Vancouver, BC</td>
+                <td>13F Holding</td>
+                <td class="num">$28.9B</td>
+            </tr>
+            
+            <tr>
+                <td>CHENIERE ENERGY PARTNERS LP</td>
+                <td>CQP</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$28.9B</td>
+            </tr>
+            
+            <tr>
+                <td>DEVON ENERGY CORP NEW</td>
+                <td>DVN</td>
+                <td>Oil & Gas E&P</td>
+                <td>Oklahoma City, OK</td>
+                <td>13F Holding</td>
+                <td class="num">$27.4B</td>
+            </tr>
+            
+            <tr>
+                <td>REDDIT INC</td>
+                <td>RDDT</td>
+                <td>Internet Content & Information</td>
+                <td>San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$27.2B</td>
+            </tr>
+            
+            <tr>
+                <td>FIRST SOLAR INC</td>
+                <td>FSLR</td>
+                <td>Solar</td>
+                <td>Tempe, AZ</td>
+                <td>13F Holding</td>
+                <td class="num">$26.0B</td>
+            </tr>
+            
+            <tr>
+                <td>PEMBINA PIPELINE CORP</td>
+                <td>PBA</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Calgary, AB</td>
+                <td>13F Holding</td>
+                <td class="num">$25.6B</td>
+            </tr>
+            
+            <tr>
+                <td>NEBIUS GROUP N.V.</td>
+                <td>NBIS</td>
+                <td>Internet Content & Information</td>
+                <td>Amsterdam</td>
+                <td>13F Holding</td>
+                <td class="num">$25.5B</td>
+            </tr>
+            
+            <tr>
+                <td>EXPAND ENERGY CORPORATION</td>
+                <td>EXE</td>
+                <td>Oil & Gas E&P</td>
+                <td>Oklahoma City, OK</td>
+                <td>13F Holding</td>
+                <td class="num">$24.6B</td>
+            </tr>
+            
+            <tr>
+                <td>BROWN & BROWN INC</td>
+                <td>BRO</td>
+                <td>Insurance Brokers</td>
+                <td>Daytona Beach, FL</td>
+                <td>13F Holding</td>
+                <td class="num">$23.6B</td>
+            </tr>
+            
+            <tr>
+                <td>VENTURE GLOBAL INC</td>
+                <td>VG</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Arlington, VA</td>
+                <td>13F Holding</td>
+                <td class="num">$23.1B</td>
+            </tr>
+            
+            <tr>
+                <td>MASTEC INC</td>
+                <td>MTZ</td>
+                <td>Engineering & Construction</td>
+                <td>Coral Gables, FL</td>
+                <td>13F Holding</td>
+                <td class="num">$22.0B</td>
+            </tr>
+            
+            <tr>
+                <td>ALBEMARLE CORP</td>
+                <td>ALB</td>
+                <td>Specialty Chemicals</td>
+                <td>Charlotte, NC</td>
+                <td>13F Holding</td>
+                <td class="num">$20.9B</td>
+            </tr>
+            
+            <tr>
+                <td>ROIVANT SCIENCES LTD</td>
+                <td>ROIV</td>
+                <td>Biotechnology</td>
+                <td>London</td>
+                <td>13F Holding</td>
+                <td class="num">$19.9B</td>
+            </tr>
+            
+            <tr>
+                <td>MODERNA INC</td>
+                <td>MRNA</td>
+                <td>Biotechnology</td>
+                <td>Cambridge, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$19.6B</td>
+            </tr>
+            
+            <tr>
+                <td>CARPENTER TECHNOLOGY CORP</td>
+                <td>CRS</td>
+                <td>Metal Fabrication</td>
+                <td>Philadelphia, PA</td>
+                <td>13F Holding</td>
+                <td class="num">$19.2B</td>
+            </tr>
+            
+            <tr>
+                <td>RIVIAN AUTOMOTIVE INC</td>
+                <td>RIVN</td>
+                <td>Auto Manufacturers</td>
+                <td>Irvine, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$18.6B</td>
+            </tr>
+            
+            <tr>
+                <td>ILLUMINA INC</td>
+                <td>ILMN</td>
+                <td>Diagnostics & Research</td>
+                <td>San Diego, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$18.4B</td>
+            </tr>
+            
+            <tr>
+                <td>RB GLOBAL INC</td>
+                <td>RBA</td>
+                <td>Specialty Business Services</td>
+                <td>Westchester, IL</td>
+                <td>13F Holding</td>
+                <td class="num">$18.3B</td>
+            </tr>
+            
+            <tr>
+                <td>FORTIVE CORP</td>
+                <td>FTV</td>
+                <td>Scientific & Technical Instruments</td>
+                <td>Everett, WA</td>
+                <td>13F Holding</td>
+                <td class="num">$18.2B</td>
+            </tr>
+            
+            <tr>
+                <td>CEMEX SAB DE CV</td>
+                <td>CX</td>
+                <td>Building Materials</td>
+                <td>San Pedro Garza García, NL</td>
+                <td>13F Holding</td>
+                <td class="num">$17.9B</td>
+            </tr>
+            
+            <tr>
+                <td>WESTERN MIDSTREAM PARTNERS L</td>
+                <td>WES</td>
+                <td>Oil & Gas Midstream</td>
+                <td>The Woodlands, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$16.8B</td>
+            </tr>
+            
+            <tr>
+                <td>TALEN ENERGY CORP</td>
+                <td>TLN</td>
+                <td>Utilities - Independent Power Producers</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$16.8B</td>
+            </tr>
+            
+            <tr>
+                <td>KRATOS DEFENSE & SEC SOLUTIO</td>
+                <td>KTOS</td>
+                <td>Aerospace & Defense</td>
+                <td>San Diego, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$16.1B</td>
+            </tr>
+            
+            <tr>
+                <td>CIRCLE INTERNET GROUP INC</td>
+                <td>CRCL</td>
+                <td>Capital Markets</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$15.6B</td>
+            </tr>
+            
+            <tr>
+                <td>GFL ENVIRONMENTAL INC</td>
+                <td>GFL</td>
+                <td>Waste Management</td>
+                <td>Miami Beach, FL</td>
+                <td>13F Holding</td>
+                <td class="num">$15.2B</td>
+            </tr>
+            
+            <tr>
+                <td>VIPER ENERGY INC</td>
+                <td>VNOM</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Midland, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$14.7B</td>
+            </tr>
+            
+            <tr>
+                <td>OVINTIV INC</td>
+                <td>OVV</td>
+                <td>Oil & Gas E&P</td>
+                <td>Denver, CO</td>
+                <td>13F Holding</td>
+                <td class="num">$14.4B</td>
+            </tr>
+            
+            <tr>
+                <td>DT MIDSTREAM INC</td>
+                <td>DTM</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Detroit, MI</td>
+                <td>13F Holding</td>
+                <td class="num">$14.0B</td>
+            </tr>
+            
+            <tr>
+                <td>EQUINOX GOLD CORP</td>
+                <td>EQX</td>
+                <td>Gold</td>
+                <td>Vancouver, BC</td>
+                <td>13F Holding</td>
+                <td class="num">$14.0B</td>
+            </tr>
+            
+            <tr>
+                <td>TRANSUNION</td>
+                <td>TRU</td>
+                <td>Financial Data & Stock Exchanges</td>
+                <td>Chicago, IL</td>
+                <td>13F Holding</td>
+                <td class="num">$13.8B</td>
+            </tr>
+            
+            <tr>
+                <td>PERMIAN RESOURCES CORP</td>
+                <td>PR</td>
+                <td>Oil & Gas E&P</td>
+                <td>Midland, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$13.2B</td>
+            </tr>
+            
+            <tr>
+                <td>BRIDGEBIO PHARMA INC</td>
+                <td>BBIO</td>
+                <td>Biotechnology</td>
+                <td>Palo Alto, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$13.0B</td>
+            </tr>
+            
+            <tr>
+                <td>OKTA INC</td>
+                <td>OKTA</td>
+                <td>Software - Infrastructure</td>
+                <td>San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$12.3B</td>
+            </tr>
+            
+            <tr>
+                <td>FIGMA INC</td>
+                <td>FIG</td>
+                <td>Software - Application</td>
+                <td>San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$12.3B</td>
+            </tr>
+            
+            <tr>
+                <td>THE TRADE DESK INC</td>
+                <td>TTD</td>
+                <td>Advertising Agencies</td>
+                <td>Ventura, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$11.8B</td>
+            </tr>
+            
+            <tr>
+                <td>PINTEREST INC</td>
+                <td>PINS</td>
+                <td>Internet Content & Information</td>
+                <td>San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$11.3B</td>
+            </tr>
+            
+            <tr>
+                <td>IONQ INC</td>
+                <td>IONQ</td>
+                <td>Computer Hardware</td>
+                <td>College Park, MD</td>
+                <td>13F Holding</td>
+                <td class="num">$11.1B</td>
+            </tr>
+            
+            <tr>
+                <td>CONFLUENT INC</td>
+                <td>CFLT</td>
+                <td>Software - Infrastructure</td>
+                <td>Mountain View, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$11.0B</td>
+            </tr>
+            
+            <tr>
+                <td>DRAFTKINGS INC NEW</td>
+                <td>DKNG</td>
+                <td>Gambling</td>
+                <td>Boston, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$10.9B</td>
+            </tr>
+            
+            <tr>
+                <td>ABIVAX SA</td>
+                <td>ABVX</td>
+                <td>Biotechnology</td>
+                <td>Paris</td>
+                <td>13F Holding</td>
+                <td class="num">$10.5B</td>
+            </tr>
+            
+            <tr>
+                <td>ANTERO RESOURCES CORP</td>
+                <td>AR</td>
+                <td>Oil & Gas E&P</td>
+                <td>Denver, CO</td>
+                <td>13F Holding</td>
+                <td class="num">$10.5B</td>
+            </tr>
+            
+            <tr>
+                <td>STANDARDAERO INC</td>
+                <td>SARO</td>
+                <td>Aerospace & Defense</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">$10.5B</td>
+            </tr>
+            
+            <tr>
+                <td>SITIME CORP</td>
+                <td>SITM</td>
+                <td>Semiconductors</td>
+                <td>Santa Clara, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$10.4B</td>
+            </tr>
+            
+            <tr>
+                <td>ANTERO MIDSTREAM CORP</td>
+                <td>AM</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Denver, CO</td>
+                <td>13F Holding</td>
+                <td class="num">$10.3B</td>
+            </tr>
+            
+            <tr>
+                <td>HUDBAY MINERALS INC</td>
+                <td>HBM</td>
+                <td>Copper</td>
+                <td>Toronto, ON</td>
+                <td>13F Holding</td>
+                <td class="num">$10.3B</td>
+            </tr>
+            
+            <tr>
+                <td>APA CORPORATION</td>
+                <td>APA</td>
+                <td>Oil & Gas E&P</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$10.3B</td>
+            </tr>
+            
+            <tr>
+                <td>MP MATERIALS CORP</td>
+                <td>MP</td>
+                <td>Other Industrial Metals & Mining</td>
+                <td>Las Vegas, NV</td>
+                <td>13F Holding</td>
+                <td class="num">$9.9B</td>
+            </tr>
+            
+            <tr>
+                <td>IMMUNITYBIO INC</td>
+                <td>IBRX</td>
+                <td>Biotechnology</td>
+                <td>San Diego, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$9.7B</td>
+            </tr>
+            
+            <tr>
+                <td>MGM RESORTS INTERNATIONAL</td>
+                <td>MGM</td>
+                <td>Resorts & Casinos</td>
+                <td>Las Vegas, NV</td>
+                <td>13F Holding</td>
+                <td class="num">$9.4B</td>
+            </tr>
+            
+            <tr>
+                <td>ELDORADO GOLD CORP NEW</td>
+                <td>EGO</td>
+                <td>Gold</td>
+                <td>Vancouver, BC</td>
+                <td>13F Holding</td>
+                <td class="num">$8.9B</td>
+            </tr>
+            
+            <tr>
+                <td>AXSOME THERAPEUTICS INC</td>
+                <td>AXSM</td>
+                <td>Biotechnology</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$8.8B</td>
+            </tr>
+            
+            <tr>
+                <td>HESS CORP</td>
+                <td>HESM</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$8.0B</td>
+            </tr>
+            
+            <tr>
+                <td>HESS MIDSTREAM LP</td>
+                <td>HESM</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$8.0B</td>
+            </tr>
+            
+            <tr>
+                <td>PLANET FITNESS INC</td>
+                <td>PLNT</td>
+                <td>Leisure</td>
+                <td>Hampton, NH</td>
+                <td>13F Holding</td>
+                <td class="num">$7.6B</td>
+            </tr>
+            
+            <tr>
+                <td>LIBERTY BROADBAND CORP</td>
+                <td>LBRDK</td>
+                <td>Telecom Services</td>
+                <td>Englewood, CO</td>
+                <td>13F Holding</td>
+                <td class="num">$7.6B</td>
+            </tr>
+            
+            <tr>
+                <td>SAILPOINT INC</td>
+                <td>SAIL</td>
+                <td>Cybersecurity</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">$7.2B</td>
+            </tr>
+            
+            <tr>
+                <td>AMENTUM HOLDINGS INC</td>
+                <td>AMTM</td>
+                <td>Specialty Business Services</td>
+                <td>Chantilly, VA</td>
+                <td>13F Holding</td>
+                <td class="num">$7.2B</td>
+            </tr>
+            
+            <tr>
+                <td>TRANSOCEAN LTD</td>
+                <td>RIG</td>
+                <td>Oil & Gas Drilling</td>
+                <td>Steinhausen</td>
+                <td>13F Holding</td>
+                <td class="num">$7.0B</td>
+            </tr>
+            
+            <tr>
+                <td>PRIMO BRANDS CORPORATION</td>
+                <td>PRMB</td>
+                <td>Beverages - Non-Alcoholic</td>
+                <td>Stamford, CT</td>
+                <td>13F Holding</td>
+                <td class="num">$7.0B</td>
+            </tr>
+            
+            <tr>
+                <td>D-WAVE QUANTUM INC</td>
+                <td>QBTS</td>
+                <td>Computer Hardware</td>
+                <td>Palo Alto, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$6.7B</td>
+            </tr>
+            
+            <tr>
+                <td>SOUTH BOW CORP</td>
+                <td>SOBO</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Calgary, AB</td>
+                <td>13F Holding</td>
+                <td class="num">$6.6B</td>
+            </tr>
+            
+            <tr>
+                <td>FIGURE TECHNOLOGY SOLUTIO</td>
+                <td>FIGR</td>
+                <td>Capital Markets</td>
+                <td>Reno, NV</td>
+                <td>13F Holding</td>
+                <td class="num">$6.5B</td>
+            </tr>
+            
+            <tr>
+                <td>TXNM ENERGY INC</td>
+                <td>TXNM</td>
+                <td>Utilities - Regulated Electric</td>
+                <td>Albuquerque, NM</td>
+                <td>13F Holding</td>
+                <td class="num">$6.4B</td>
+            </tr>
+            
+            <tr>
+                <td>ENPHASE ENERGY INC</td>
+                <td>ENPH</td>
+                <td>Solar</td>
+                <td>Fremont, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$6.2B</td>
+            </tr>
+            
+            <tr>
+                <td>LOAR HOLDINGS INC</td>
+                <td>LOAR</td>
+                <td>Aerospace & Defense</td>
+                <td>White Plains, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$6.1B</td>
+            </tr>
+            
+            <tr>
+                <td>AVANTOR INC</td>
+                <td>AVTR</td>
+                <td>Medical Instruments & Supplies</td>
+                <td>Radnor, PA</td>
+                <td>13F Holding</td>
+                <td class="num">$6.1B</td>
+            </tr>
+            
+            <tr>
+                <td>CIPHER MINING INC</td>
+                <td>CIFR</td>
+                <td>Capital Markets</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$6.0B</td>
+            </tr>
+            
+            <tr>
+                <td>SERVICETITAN INC</td>
+                <td>TTAN</td>
+                <td>Software</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">$5.9B</td>
+            </tr>
+            
+            <tr>
+                <td>ONESTREAM INC</td>
+                <td>OS</td>
+                <td>Software - Infrastructure</td>
+                <td>Birmingham, MI</td>
+                <td>13F Holding</td>
+                <td class="num">$5.8B</td>
+            </tr>
+            
+            <tr>
+                <td>ARCHROCK INC</td>
+                <td>AROC</td>
+                <td>Oil & Gas Equipment & Services</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$5.8B</td>
+            </tr>
+            
+            <tr>
+                <td>PTC THERAPEUTICS INC</td>
+                <td>PTCT</td>
+                <td>Biotechnology</td>
+                <td>Warren, NJ</td>
+                <td>13F Holding</td>
+                <td class="num">$5.7B</td>
+            </tr>
+            
+            <tr>
+                <td>LEGENCE CORP</td>
+                <td>LGN</td>
+                <td>Engineering & Construction</td>
+                <td>San Jose, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$5.6B</td>
+            </tr>
+            
+            <tr>
+                <td>SM ENERGY CO</td>
+                <td>SM</td>
+                <td>Oil & Gas E&P</td>
+                <td>Denver, CO</td>
+                <td>13F Holding</td>
+                <td class="num">$5.4B</td>
+            </tr>
+            
+            <tr>
+                <td>LANDBRIDGE COMPANY LLC</td>
+                <td>LB</td>
+                <td>Oil & Gas Equipment & Services</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$5.3B</td>
+            </tr>
+            
+            <tr>
+                <td>CORE SCIENTIFIC INC NEW</td>
+                <td>CORZ</td>
+                <td>Software - Infrastructure</td>
+                <td>Dover, DE</td>
+                <td>13F Holding</td>
+                <td class="num">$5.2B</td>
+            </tr>
+            
+            <tr>
+                <td>ARCHER AVIATION INC</td>
+                <td>ACHR</td>
+                <td>Aerospace & Defense</td>
+                <td>San Jose, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$5.1B</td>
+            </tr>
+            
+            <tr>
+                <td>CARIS LIFE SCIENCES INC</td>
+                <td>CAI</td>
+                <td>Biotechnology</td>
+                <td>Irving, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$5.0B</td>
+            </tr>
+            
+            <tr>
+                <td>KLARNA GROUP PLC</td>
+                <td>KLAR</td>
+                <td>Software - Infrastructure</td>
+                <td>London</td>
+                <td>13F Holding</td>
+                <td class="num">$4.8B</td>
+            </tr>
+            
+            <tr>
+                <td>APOGEE THERAPEUTICS INC</td>
+                <td>APGE</td>
+                <td>Biotechnology</td>
+                <td>Waltham, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$4.8B</td>
+            </tr>
+            
+            <tr>
+                <td>RALLIANT CORP</td>
+                <td>RAL</td>
+                <td>Electronic Components</td>
+                <td>Raleigh, NC</td>
+                <td>13F Holding</td>
+                <td class="num">$4.8B</td>
+            </tr>
+            
+            <tr>
+                <td>GOLAR LNG LTD</td>
+                <td>GLNG</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Hamilton</td>
+                <td>13F Holding</td>
+                <td class="num">$4.6B</td>
+            </tr>
+            
+            <tr>
+                <td>SUNRUN INC</td>
+                <td>RUN</td>
+                <td>Solar</td>
+                <td>San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$4.6B</td>
+            </tr>
+            
+            <tr>
+                <td>BULLISH</td>
+                <td>BLSH</td>
+                <td>Software - Infrastructure</td>
+                <td>George Town</td>
+                <td>13F Holding</td>
+                <td class="num">$4.6B</td>
+            </tr>
+            
+            <tr>
+                <td>AMICUS THERAPEUTICS INC</td>
+                <td>FOLD</td>
+                <td>Biotechnology</td>
+                <td>Princeton, NJ</td>
+                <td>13F Holding</td>
+                <td class="num">$4.5B</td>
+            </tr>
+            
+            <tr>
+                <td>VIKING HOLDINGS LTD</td>
+                <td>VKTX</td>
+                <td>Biotechnology</td>
+                <td>San Diego, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$4.0B</td>
+            </tr>
+            
+            <tr>
+                <td>TRANSALTA CORP</td>
+                <td>TAC</td>
+                <td>Utilities - Independent Power Producers</td>
+                <td>Calgary, AB</td>
+                <td>13F Holding</td>
+                <td class="num">$3.8B</td>
+            </tr>
+            
+            <tr>
+                <td>METHANEX CORP</td>
+                <td>MEOH</td>
+                <td>Chemicals</td>
+                <td>Vancouver, BC</td>
+                <td>13F Holding</td>
+                <td class="num">$3.8B</td>
+            </tr>
+            
+            <tr>
+                <td>NETSKOPE INC</td>
+                <td>NTSK</td>
+                <td>Software - Infrastructure</td>
+                <td>Santa Clara, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$3.6B</td>
+            </tr>
+            
+            <tr>
+                <td>SPYRE THERAPEUTICS INC</td>
+                <td>SYRE</td>
+                <td>Biotechnology</td>
+                <td>Waltham, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$3.4B</td>
+            </tr>
+            
+            <tr>
+                <td>USA COMPRESSION PARTNERS LP</td>
+                <td>USAC</td>
+                <td>Oil & Gas Equipment & Services</td>
+                <td>Dallas, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$3.3B</td>
+            </tr>
+            
+            <tr>
+                <td>UNDER ARMOUR INC</td>
+                <td>UAA</td>
+                <td>Apparel Manufacturing</td>
+                <td>Baltimore, MD</td>
+                <td>13F Holding</td>
+                <td class="num">$3.2B</td>
+            </tr>
+            
+            <tr>
+                <td>ARCUTIS BIOTHERAPEUTICS INC</td>
+                <td>ARQT</td>
+                <td>Biotechnology</td>
+                <td>Westlake Village, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$3.2B</td>
+            </tr>
+            
+            <tr>
+                <td>FIREFLY AEROSPACE INC</td>
+                <td>FLY</td>
+                <td>Aerospace & Defense</td>
+                <td>Cedar Park, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$3.2B</td>
+            </tr>
+            
+            <tr>
+                <td>PATTERSON-UTI ENERGY INC</td>
+                <td>PTEN</td>
+                <td>Oil & Gas Drilling</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$3.2B</td>
+            </tr>
+            
+            <tr>
+                <td>ATS CORPORATION</td>
+                <td>ATS</td>
+                <td>Specialty Industrial Machinery</td>
+                <td>Cambridge, ON</td>
+                <td>13F Holding</td>
+                <td class="num">$3.1B</td>
+            </tr>
+            
+            <tr>
+                <td>BKV CORP</td>
+                <td>BKV</td>
+                <td>Oil & Gas E&P</td>
+                <td>Denver, CO</td>
+                <td>13F Holding</td>
+                <td class="num">$3.0B</td>
+            </tr>
+            
+            <tr>
+                <td>VNET GROUP INC</td>
+                <td>VNET</td>
+                <td>Information Technology Services</td>
+                <td>Beijing</td>
+                <td>13F Holding</td>
+                <td class="num">$3.0B</td>
+            </tr>
+            
+            <tr>
+                <td>RINGCENTRAL INC</td>
+                <td>RNG</td>
+                <td>Software - Application</td>
+                <td>Belmont, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$3.0B</td>
+            </tr>
+            
+            <tr>
+                <td>APPLE HOSPITALITY REIT INC</td>
+                <td>APLE</td>
+                <td>REIT - Hotel & Motel</td>
+                <td>Richmond, VA</td>
+                <td>13F Holding</td>
+                <td class="num">$2.9B</td>
+            </tr>
+            
+            <tr>
+                <td>KINETIK HOLDINGS INC</td>
+                <td>KNTK</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Midland, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$2.9B</td>
+            </tr>
+            
+            <tr>
+                <td>DELEK LOGISTICS PARTNERS LP</td>
+                <td>DKL</td>
+                <td>Oil & Gas Refining & Marketing</td>
+                <td>Brentwood, TN</td>
+                <td>13F Holding</td>
+                <td class="num">$2.9B</td>
+            </tr>
+            
+            <tr>
+                <td>WEBULL CORP</td>
+                <td>BULL</td>
+                <td>Software - Application</td>
+                <td>Saint Petersburg, FL</td>
+                <td>13F Holding</td>
+                <td class="num">$2.8B</td>
+            </tr>
+            
+            <tr>
+                <td>GLOBAL BUSINESS TRAVEL GROUP</td>
+                <td>GBTG</td>
+                <td>Travel Services</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$2.6B</td>
+            </tr>
+            
+            <tr>
+                <td>10X GENOMICS INC</td>
+                <td>TXG</td>
+                <td>Health Information Services</td>
+                <td>Pleasanton, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$2.4B</td>
+            </tr>
+            
+            <tr>
+                <td>SOLAREDGE TECHNOLOGIES INC</td>
+                <td>SEDG</td>
+                <td>Solar</td>
+                <td>Herzliya Pituach</td>
+                <td>13F Holding</td>
+                <td class="num">$2.4B</td>
+            </tr>
+            
+            <tr>
+                <td>DAVE INC</td>
+                <td>DAVE</td>
+                <td>Software - Application</td>
+                <td>Los Angeles, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$2.2B</td>
+            </tr>
+            
+            <tr>
+                <td>ACCELERANT HOLDINGS</td>
+                <td>ARX</td>
+                <td>Insurance Brokers</td>
+                <td>Grand Cayman</td>
+                <td>13F Holding</td>
+                <td class="num">$2.1B</td>
+            </tr>
+            
+            <tr>
+                <td>QFIN HOLDINGS INC</td>
+                <td>QFIN</td>
+                <td>Credit Services</td>
+                <td>Shanghai</td>
+                <td>13F Holding</td>
+                <td class="num">$2.0B</td>
+            </tr>
+            
+            <tr>
+                <td>SEZZLE INC</td>
+                <td>SEZL</td>
+                <td>Credit Services</td>
+                <td>Minneapolis, MN</td>
+                <td>13F Holding</td>
+                <td class="num">$1.9B</td>
+            </tr>
+            
+            <tr>
+                <td>PATTERN GROUP INC</td>
+                <td>PTRN</td>
+                <td>Software - Application</td>
+                <td>Lehi, UT</td>
+                <td>13F Holding</td>
+                <td class="num">$1.9B</td>
+            </tr>
+            
+            <tr>
+                <td>QUANTUM COMPUTING INC</td>
+                <td>QUBT</td>
+                <td>Computer Hardware</td>
+                <td>Hoboken, NJ</td>
+                <td>13F Holding</td>
+                <td class="num">$1.8B</td>
+            </tr>
+            
+            <tr>
+                <td>ZYMEWORKS INC</td>
+                <td>ZYME</td>
+                <td>Biotechnology</td>
+                <td>Middletown, DE</td>
+                <td>13F Holding</td>
+                <td class="num">$1.8B</td>
+            </tr>
+            
+            <tr>
+                <td>SHOALS TECHNOLOGIES GROUP IN</td>
+                <td>SHLS</td>
+                <td>Solar</td>
+                <td>Portland, TN</td>
+                <td>13F Holding</td>
+                <td class="num">$1.7B</td>
+            </tr>
+            
+            <tr>
+                <td>ARRAY TECHNOLOGIES INC</td>
+                <td>ARRY</td>
+                <td>Solar</td>
+                <td>Albuquerque, NM</td>
+                <td>13F Holding</td>
+                <td class="num">$1.6B</td>
+            </tr>
+            
+            <tr>
+                <td>ENLIVEN THERAPEUTICS INC</td>
+                <td>ELVN</td>
+                <td>Biotechnology</td>
+                <td>Boulder, CO</td>
+                <td>13F Holding</td>
+                <td class="num">$1.6B</td>
+            </tr>
+            
+            <tr>
+                <td>ORUKA THERAPEUTICS INC</td>
+                <td>ORKA</td>
+                <td>Biotechnology</td>
+                <td>Menlo Park, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$1.6B</td>
+            </tr>
+            
+            <tr>
+                <td>RELAY THERAPEUTICS INC</td>
+                <td>RLAY</td>
+                <td>Biotechnology</td>
+                <td>Cambridge, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$1.5B</td>
+            </tr>
+            
+            <tr>
+                <td>MIND MEDICINE MINDMED INC</td>
+                <td>MNMD</td>
+                <td>Biotechnology</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$1.5B</td>
+            </tr>
+            
+            <tr>
+                <td>NEXTDECADE CORP</td>
+                <td>NEXT</td>
+                <td>Oil & Gas Equipment & Services</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$1.4B</td>
+            </tr>
+            
+            <tr>
+                <td>C3 AI INC</td>
+                <td>AI</td>
+                <td>Software - Infrastructure</td>
+                <td>Redwood City, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$1.4B</td>
+            </tr>
+            
+            <tr>
+                <td>SUBURBAN PROPANE PARTNERS L</td>
+                <td>SPH</td>
+                <td>Utilities - Regulated Gas</td>
+                <td>Whippany, NJ</td>
+                <td>13F Holding</td>
+                <td class="num">$1.4B</td>
+            </tr>
+            
+            <tr>
+                <td>AMPRIUS TECHNOLOGIES INC</td>
+                <td>AMPX</td>
+                <td>Electrical Equipment & Parts</td>
+                <td>Fremont, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$1.3B</td>
+            </tr>
+            
+            <tr>
+                <td>PROASSURANCE CORP</td>
+                <td>PRA</td>
+                <td>Insurance - Property & Casualty</td>
+                <td>Birmingham, AL</td>
+                <td>13F Holding</td>
+                <td class="num">$1.3B</td>
+            </tr>
+            
+            <tr>
+                <td>TRIP COM GROUP LTD</td>
+                <td>TRIP</td>
+                <td>Travel Services</td>
+                <td>Needham, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$1.2B</td>
+            </tr>
+            
+            <tr>
+                <td>WATERBRIDGE INFRASTRUCTURE L</td>
+                <td>WBI</td>
+                <td>Oil & Gas Equipment & Services</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$1.1B</td>
+            </tr>
+            
+            <tr>
+                <td>COMPASS THERAPEUTICS INC</td>
+                <td>CMPX</td>
+                <td>Biotechnology</td>
+                <td>Boston, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$1.0B</td>
+            </tr>
+            
+            <tr>
+                <td>FS CREDIT OPPORTUNITIES CORP</td>
+                <td>FSCO</td>
+                <td>Asset Management</td>
+                <td>Philadelphia, PA</td>
+                <td>13F Holding</td>
+                <td class="num">$1.0B</td>
+            </tr>
+            
+            <tr>
+                <td>TASKUS INC</td>
+                <td>TASK</td>
+                <td>Information Technology Services</td>
+                <td>New Braunfels, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$932M</td>
+            </tr>
+            
+            <tr>
+                <td>BICARA THERAPEUTICS INC</td>
+                <td>BCAX</td>
+                <td>Biotechnology</td>
+                <td>Boston, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$898M</td>
+            </tr>
+            
+            <tr>
+                <td>CROSSAMERICA PARTNERS LP</td>
+                <td>CAPL</td>
+                <td>Oil & Gas Refining & Marketing</td>
+                <td>Allentown, PA</td>
+                <td>13F Holding</td>
+                <td class="num">$792M</td>
+            </tr>
+            
+            <tr>
+                <td>INDEPENDENT BANK GROUP INC</td>
+                <td>IBCP</td>
+                <td>Banks - Regional</td>
+                <td>Rockland, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$735M</td>
+            </tr>
+            
+            <tr>
+                <td>GEMINI SPACE STA INC</td>
+                <td>GEMI</td>
+                <td>Capital Markets</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$691M</td>
+            </tr>
+            
+            <tr>
+                <td>WHITEFIBER INC</td>
+                <td>WYFI</td>
+                <td>Software - Application</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$651M</td>
+            </tr>
+            
+            <tr>
+                <td>OMADA HEALTH INC</td>
+                <td>OMDA</td>
+                <td>Health Information Services</td>
+                <td>South San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$647M</td>
+            </tr>
+            
+            <tr>
+                <td>AMBIQ MICRO INC</td>
+                <td>AMBQ</td>
+                <td>Semiconductors</td>
+                <td>Austin, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$630M</td>
+            </tr>
+            
+            <tr>
+                <td>CANTOR EQUITY PARTNERS IV IN</td>
+                <td>CEPF</td>
+                <td>Shell Companies</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$597M</td>
+            </tr>
+            
+            <tr>
+                <td>BIT DIGITAL INC</td>
+                <td>BTBT</td>
+                <td>Capital Markets</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$537M</td>
+            </tr>
+            
+            <tr>
+                <td>ASSEMBLY BIOSCIENCES INC</td>
+                <td>ASMB</td>
+                <td>Biotechnology</td>
+                <td>South San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$474M</td>
+            </tr>
+            
+            <tr>
+                <td>LEXEO THERAPEUTICS INC</td>
+                <td>LXEO</td>
+                <td>Biotechnology</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$463M</td>
+            </tr>
+            
+            <tr>
+                <td>AUTOLUS THERAPEUTICS PLC</td>
+                <td>AUTL</td>
+                <td>Biotechnology</td>
+                <td>London</td>
+                <td>13F Holding</td>
+                <td class="num">$460M</td>
+            </tr>
+            
+            <tr>
+                <td>BUMBLE INC</td>
+                <td>BMBL</td>
+                <td>Internet Content & Information</td>
+                <td>Austin, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$440M</td>
+            </tr>
+            
+            <tr>
+                <td>LINEAGE INC</td>
+                <td>LCTX</td>
+                <td>Biotechnology</td>
+                <td>Carlsbad, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$408M</td>
+            </tr>
+            
+            <tr>
+                <td>CRYOPORT INC</td>
+                <td>CYRX</td>
+                <td>Integrated Freight & Logistics</td>
+                <td>Brentwood, TN</td>
+                <td>13F Holding</td>
+                <td class="num">$408M</td>
+            </tr>
+            
+            <tr>
+                <td>PROTARA THERAPEUTICS INC</td>
+                <td>TARA</td>
+                <td>Biotechnology</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$398M</td>
+            </tr>
+            
+            <tr>
+                <td>CHATHAM LODGING TR</td>
+                <td>CLDT</td>
+                <td>REIT - Hotel & Motel</td>
+                <td>West Palm Beach, FL</td>
+                <td>13F Holding</td>
+                <td class="num">$371M</td>
+            </tr>
+            
+            <tr>
+                <td>OATLY GROUP AB</td>
+                <td>OTLY</td>
+                <td>Packaged Foods</td>
+                <td>Malmö</td>
+                <td>13F Holding</td>
+                <td class="num">$365M</td>
+            </tr>
+            
+            <tr>
+                <td>CANTOR EQUITY PARTNERS II IN</td>
+                <td>CAEP</td>
+                <td>Shell Companies</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">$359M</td>
+            </tr>
+            
+            <tr>
+                <td>PAYSAFE LIMITED</td>
+                <td>PSFE</td>
+                <td>Software - Infrastructure</td>
+                <td>London</td>
+                <td>13F Holding</td>
+                <td class="num">$354M</td>
+            </tr>
+            
+            <tr>
+                <td>CRESCENT BIOPHARMA INC.</td>
+                <td>CBIO</td>
+                <td>Biotechnology</td>
+                <td>Waltham, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$349M</td>
+            </tr>
+            
+            <tr>
+                <td>REZOLUTE INC</td>
+                <td>RZLT</td>
+                <td>Biotechnology</td>
+                <td>Redwood City, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$306M</td>
+            </tr>
+            
+            <tr>
+                <td>BARNES GROUP INC</td>
+                <td>BNED</td>
+                <td>Specialty Retail</td>
+                <td>Florham Park, NJ</td>
+                <td>13F Holding</td>
+                <td class="num">$278M</td>
+            </tr>
+            
+            <tr>
+                <td>ALECTOR INC</td>
+                <td>ALEC</td>
+                <td>Biotechnology</td>
+                <td>South San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$229M</td>
+            </tr>
+            
+            <tr>
+                <td>INHIBIKASE THERAPEUTICS INC</td>
+                <td>IKT</td>
+                <td>Biotechnology</td>
+                <td>Atlanta, GA</td>
+                <td>13F Holding</td>
+                <td class="num">$218M</td>
+            </tr>
+            
+            <tr>
+                <td>FINANCE OF AMERICA COMPAN</td>
+                <td>FOA</td>
+                <td>Credit Services</td>
+                <td>Plano, TX</td>
+                <td>13F Holding</td>
+                <td class="num">$211M</td>
+            </tr>
+            
+            <tr>
+                <td>CONTEXT THERAPEUTICS INC</td>
+                <td>CNTX</td>
+                <td>Biotechnology</td>
+                <td>Philadelphia, PA</td>
+                <td>13F Holding</td>
+                <td class="num">$209M</td>
+            </tr>
+            
+            <tr>
+                <td>VOYAGER TECHNOLOGIES INC</td>
+                <td>VYGR</td>
+                <td>Biotechnology</td>
+                <td>Lexington, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$199M</td>
+            </tr>
+            
+            <tr>
+                <td>NKARTA INC</td>
+                <td>NKTX</td>
+                <td>Biotechnology</td>
+                <td>South San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$164M</td>
+            </tr>
+            
+            <tr>
+                <td>CARDIFF ONCOLOGY INC</td>
+                <td>CRDF</td>
+                <td>Biotechnology</td>
+                <td>San Diego, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$105M</td>
+            </tr>
+            
+            <tr>
+                <td>PLIANT THERAPEUTICS INC</td>
+                <td>PLRX</td>
+                <td>Biotechnology</td>
+                <td>South San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">$76M</td>
+            </tr>
+            
+            <tr>
+                <td>FRACTYL HEALTH INC</td>
+                <td>GUTS</td>
+                <td>Biotechnology</td>
+                <td>Burlington, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$73M</td>
+            </tr>
+            
+            <tr>
+                <td>ADICET BIO INC</td>
+                <td>ACET</td>
+                <td>Biotechnology</td>
+                <td>Boston, MA</td>
+                <td>13F Holding</td>
+                <td class="num">$67M</td>
+            </tr>
+            
+            <tr>
+                <td>VOLATO GROUP INC</td>
+                <td>SOAR</td>
+                <td>Airports & Air Services</td>
+                <td>Chamblee, GA</td>
+                <td>13F Holding</td>
+                <td class="num">$3M</td>
+            </tr>
+            
+            <tr>
+                <td>GLOBAL PARTNERS LP</td>
+                <td>TRBO</td>
+                <td>Advertising Agencies</td>
+                <td>Carson City, NV</td>
+                <td>13F Holding</td>
+                <td class="num">$33K</td>
+            </tr>
+            
+            <tr>
+                <td>ABACUS LIFE INC</td>
+                <td>CL A</td>
+                <td>-</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ABBOTT LABS</td>
+                <td>ABT.NE</td>
+                <td>Medical Devices</td>
+                <td>North Chicago, IL</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
             </tr>
             
             <tr>
                 <td>AEROVATE THERAPEUTICS INC</td>
+                <td>COM</td>
                 <td>Biotechnology</td>
                 <td>Boston, MA</td>
                 <td>13F Holding</td>
+                <td class="num">-</td>
             </tr>
             
             <tr>
                 <td>AIR TRANSPORT SERVICES GRP I</td>
+                <td>COM</td>
                 <td>Air Freight & Logistics</td>
                 <td>Wilmington, OH</td>
                 <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ALGONQUIN PWR UTILS CORP</td>
+                <td>COM</td>
+                <td>Utilities - Diversified</td>
+                <td>Oakville, ON</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ALLAKOS INC</td>
+                <td>COM</td>
+                <td>Biotechnology</td>
+                <td>San Carlos, CA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ALLETE INC</td>
+                <td>COM NEW</td>
+                <td>Utilities - Regulated Electric</td>
+                <td>Duluth, MN</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ALTAIR ENGR INC</td>
+                <td>COM CL A</td>
+                <td>Software - Application</td>
+                <td>Troy, MI</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ALTUS POWER INC</td>
+                <td>COM</td>
+                <td>Utilities - Renewable</td>
+                <td>Greenwich, CT</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>AMERICAN ELEC PWR CO INC</td>
+                <td>COM</td>
+                <td>Utilities - Regulated Electric</td>
+                <td>Columbus, OH</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ANSYS INC</td>
+                <td>COM</td>
+                <td>Software - Application</td>
+                <td>Canonsburg, PA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>APOLLO GLOBAL MGMT INC</td>
+                <td>COM</td>
+                <td>Asset Management</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ARCADIUM LITHIUM PLC</td>
+                <td>COM SHS</td>
+                <td>-</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ARCELORMITTAL SA LUXEMBOURG</td>
+                <td>NY REGISTRY SH</td>
+                <td>Steel</td>
+                <td>Luxembourg</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ARIS WATER SOLUTIONS INC</td>
+                <td>CLASS A COM</td>
+                <td>Gold</td>
+                <td>Vancouver, BC</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>AVIDXCHANGE HOLDINGS INC</td>
+                <td>COM</td>
+                <td>Banks - Regional</td>
+                <td>Las Vegas, NV</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>AZEK CO INC</td>
+                <td>CL A</td>
+                <td>Building Products</td>
+                <td>Chicago, IL</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>BARRICK MNG CORP</td>
+                <td>COM SHS</td>
+                <td>Capital Markets</td>
+                <td>Costa Mesa, CA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>BEACON ROOFING SUPPLY INC</td>
+                <td>COM</td>
+                <td>Building Products</td>
+                <td>Herndon, VA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>BLACKSTONE MTG TR INC</td>
+                <td>COM CL A</td>
+                <td>REIT - Mortgage</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>BLACKSTONE SECD LENDING FD</td>
+                <td>COMMON STOCK</td>
+                <td>ETF / Index Fund</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>BRIDGER AEROSPACE GRP HLDGS</td>
+                <td>COM</td>
+                <td>Security & Protection Services</td>
+                <td>Belgrade, MT</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>BRIGHTSPRING HEALTH SVCS INC</td>
+                <td>COM</td>
+                <td>-</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>BRITISH AMERN TOB PLC</td>
+                <td>SPONSORED ADR</td>
+                <td>Tobacco</td>
+                <td>London</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>CAPITAL ONE FINL CORP</td>
+                <td>COM</td>
+                <td>Credit Services</td>
+                <td>McLean, VA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>CHAMPIONX CORPORATION</td>
+                <td>COM</td>
+                <td>Oil & Gas Equipment & Services</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>CHIME FINL INC</td>
+                <td>COM SHS CL A</td>
+                <td>-</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>CLEARWATER ANALYTICS HLDGS I</td>
+                <td>CL A</td>
+                <td>Software - Application</td>
+                <td>Boise, ID</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>COMMSCOPE HLDG CO INC</td>
+                <td>COM</td>
+                <td>Communication Equipment</td>
+                <td>Richardson, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>COREBRIDGE FINL INC</td>
+                <td>COM</td>
+                <td>Asset Management</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>COSTCO WHSL CORP NEW</td>
+                <td>COM</td>
+                <td>Discount Stores</td>
+                <td>Issaquah, WA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>CRESCENT CAP BDC INC</td>
+                <td>COM</td>
+                <td>-</td>
+                <td>Los Angeles, CA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>DIGITALOCEAN HLDGS INC</td>
+                <td>NOTE        12/0</td>
+                <td>Software - Infrastructure</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>DISCOVER FINL SVCS</td>
+                <td>COM</td>
+                <td>Credit Services</td>
+                <td>Riverwoods, IL</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>DUN & BRADSTREET HLDGS INC</td>
+                <td>COM</td>
+                <td>Business Information Services</td>
+                <td>Short Hills, NJ</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ENDEAVOR GROUP HLDGS INC</td>
+                <td>CL A COM</td>
+                <td>Entertainment</td>
+                <td>Beverly Hills, CA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ENERGY TRANSFER L P</td>
+                <td>COM UT LTD PTN</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Dallas, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ENLINK MIDSTREAM LLC</td>
+                <td>COM UNIT REP LTD</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Dallas, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ENSTAR GROUP LIMITED</td>
+                <td>SHS</td>
+                <td>Insurance - Diversified</td>
+                <td>Hamilton</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ENTERPRISE PRODS PARTNERS L</td>
+                <td>COM</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>EVE HLDG INC</td>
+                <td>COM</td>
+                <td>Aerospace & Defense</td>
+                <td>Melbourne, FL</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>FIRST INDL RLTY TR INC</td>
+                <td>COM</td>
+                <td>REIT - Industrial</td>
+                <td>Chicago, IL</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>FLUTTER ENTMT PLC</td>
+                <td>SHS</td>
+                <td>Gambling</td>
+                <td>Dublin</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>FORD MTR CO</td>
+                <td>COM</td>
+                <td>Auto Manufacturers</td>
+                <td>Dearborn, MI</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>FRONTIER COMMUNICATIONS PARE</td>
+                <td>COM</td>
+                <td>Telecom Services</td>
+                <td>Dallas, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>GALLAGHER ARTHUR J & CO</td>
+                <td>AJG.MX</td>
+                <td>Insurance Brokers</td>
+                <td>Rolling Meadows, IL</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>GENESIS ENERGY L P</td>
+                <td>UNIT LTD PARTN</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>H & E EQUIPMENT SERVICES INC</td>
+                <td>COM</td>
+                <td>Specialty Industrial Machinery</td>
+                <td>Baton Rouge, LA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>HASHICORP INC</td>
+                <td>COM CL A</td>
+                <td>Software - Application</td>
+                <td>San Francisco, CA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>HUDSON PAC PPTYS INC</td>
+                <td>COM</td>
+                <td>REIT - Office</td>
+                <td>Los Angeles, CA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>INFORMATICA INC</td>
+                <td>COM CL A</td>
+                <td>Software - Application</td>
+                <td>Redwood City, CA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>INTRA-CELLULAR THERAPIES INC</td>
+                <td>COM</td>
+                <td>Biotechnology</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>INVESCO QQQ TR</td>
+                <td>UNIT SER 1</td>
+                <td>ETF / Index Fund</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>ISHARES TR</td>
+                <td>MSCI INDIA ETF</td>
+                <td>ETF / Index Fund</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>JUNIPER NETWORKS INC</td>
+                <td>COM</td>
+                <td>Communication Equipment</td>
+                <td>Sunnyvale, CA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>KARMAN HLDGS INC</td>
+                <td>COMMON STOCK</td>
+                <td>-</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>KELLANOVA</td>
+                <td>COM</td>
+                <td>Packaged Foods</td>
+                <td>Battle Creek, MI</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>KODIAK GAS SVCS INC</td>
+                <td>COM</td>
+                <td>Oil & Gas Equipment & Services</td>
+                <td>The Woodlands, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>KRANESHARES TRUST</td>
+                <td>CSI CHI INTERNET</td>
+                <td>ETF / Index Fund</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>LATAM AIRLINES GROUP SA</td>
+                <td>LTM.SN</td>
+                <td>Airlines</td>
+                <td>Santiago</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>LPL FINL HLDGS INC</td>
+                <td>LPLA.MX</td>
+                <td>Capital Markets</td>
+                <td>San Diego, CA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>MAKEMYTRIP LIMITED MAURITIUS</td>
+                <td>SHS</td>
+                <td>Travel Services</td>
+                <td>Gurugram</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>MARTIN MARIETTA MATLS INC</td>
+                <td>COM</td>
+                <td>Building Materials</td>
+                <td>Raleigh, NC</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>MARTIN MIDSTREAM PRTNRS L P</td>
+                <td>UNIT L P INT</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Kilgore, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>MIAMI INTL HLDGS INC</td>
+                <td>COM</td>
+                <td>Financial Exchanges</td>
+                <td>Miami, FL</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>MILLICOM INTL CELLULAR S A</td>
+                <td>COM STK</td>
+                <td>Telecom Services</td>
+                <td>Luxembourg</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>MINISO GROUP HLDG LTD</td>
+                <td>SPONSORED ADS</td>
+                <td>-</td>
+                <td>Guangzhou</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>MR COOPER GROUP INC</td>
+                <td>COM</td>
+                <td>Mortgage Finance</td>
+                <td>Coppell, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>NEUEHEALTH INC</td>
+                <td>COM NEW</td>
+                <td>-</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>NEXTRACKER INC</td>
+                <td>CLASS A COM</td>
+                <td>Solar</td>
+                <td>Fremont, CA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>NIQ GLOBAL INTELLIGENCE PLC</td>
+                <td>ORDINARY SHARES</td>
+                <td>-</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>PACTIV EVERGREEN INC</td>
+                <td>COM</td>
+                <td>Packaging & Containers</td>
+                <td>Lake Forest, IL</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>PLAINS ALL AMERN PIPELINE L</td>
+                <td>UNIT LTD PARTN</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>PLAINS GP HLDGS L P</td>
+                <td>LTD PARTNR INT A</td>
+                <td>Oil & Gas Midstream</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>PROCTER AND GAMBLE CO</td>
+                <td>COM</td>
+                <td>Household & Personal Products</td>
+                <td>Cincinnati, OH</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>REDFIN CORP</td>
+                <td>COM</td>
+                <td>Real Estate Services</td>
+                <td>Seattle, WA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>RENAISSANCERE HLDGS LTD</td>
+                <td>COM</td>
+                <td>Insurance - Reinsurance</td>
+                <td>Pembroke</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>REPARE THERAPEUTICS INC</td>
+                <td>COM</td>
+                <td>Biotechnology</td>
+                <td>Montreal, QC</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>RESTAURANT BRANDS INTL INC</td>
+                <td>0R6.F</td>
+                <td>Restaurants</td>
+                <td>Miami, FL</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>SCHOLAR ROCK HLDG CORP</td>
+                <td>COM</td>
+                <td>Biotechnology</td>
+                <td>Cambridge, MA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>SCHWAB CHARLES CORP</td>
+                <td>SCHW.MX</td>
+                <td>Capital Markets</td>
+                <td>Westlake, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>SKECHERS U S A INC</td>
+                <td>CL A</td>
+                <td>Footwear</td>
+                <td>Manhattan Beach, CA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>SLIDE INS HLDGS INC</td>
+                <td>ID8.F</td>
+                <td>Insurance - Property & Casualty</td>
+                <td>Tampa, FL</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>SPDR S&P 500 ETF TR</td>
+                <td>TR UNIT</td>
+                <td>ETF / Index Fund</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>SPDR SER TR</td>
+                <td>S&P BIOTECH</td>
+                <td>ETF / Index Fund</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>SPDR SERIES TRUST</td>
+                <td>S&P BIOTECH</td>
+                <td>ETF / Index Fund</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>SPOTIFY TECHNOLOGY S A</td>
+                <td>639.F</td>
+                <td>Internet Content & Information</td>
+                <td>Stockholm</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>SPRINGWORKS THERAPEUTICS INC</td>
+                <td>COM</td>
+                <td>Biotechnology</td>
+                <td>Stamford, CT</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>SSGA ACTIVE ETF TR</td>
+                <td>BLACKSTONE SENR</td>
+                <td>ETF / Index Fund</td>
+                <td>-</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>STAR GROUP L P</td>
+                <td>UNIT LTD PARTNR</td>
+                <td>Oil & Gas Refining & Marketing</td>
+                <td>Stamford, CT</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>SUMMIT MATLS INC</td>
+                <td>CL A</td>
+                <td>Building Materials</td>
+                <td>Denver, CO</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>SUNNOVA ENERGY INTL INC.</td>
+                <td>COM</td>
+                <td>Solar</td>
+                <td>Houston, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>SUNOCO LP/SUNOCO FIN CORP</td>
+                <td>COM UT REP LTD</td>
+                <td>Oil & Gas Refining & Marketing</td>
+                <td>Dallas, TX</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>SUNSTONE HOTEL INVS INC NEW</td>
+                <td>COM</td>
+                <td>REIT - Hotel & Motel</td>
+                <td>Aliso Viejo, CA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>TAIWAN SEMICONDUCTOR MFG LTD</td>
+                <td>SPONSORED ADS</td>
+                <td>Semiconductors</td>
+                <td>Hsinchu City</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>TEVA PHARMACEUTICAL INDS LTD</td>
+                <td>SPONSORED ADS</td>
+                <td>Drug Manufacturers - Specialty & Generic</td>
+                <td>Tel Aviv-Yafo</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>TRIUMPH GROUP INC NEW</td>
+                <td>TRIUMPIN.BO</td>
+                <td>Credit Services</td>
+                <td>Mumbai</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>UNITED STATES STL CORP NEW</td>
+                <td>COM</td>
+                <td>Steel</td>
+                <td>Pittsburgh, PA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>VANECK ETF TRUST</td>
+                <td>GOLD MINERS ETF</td>
+                <td>-</td>
+                <td>New York, NY</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>VERONA PHARMA PLC</td>
+                <td>SPONSORED ADS</td>
+                <td>Biotechnology</td>
+                <td>London</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>WALGREENS BOOTS ALLIANCE INC</td>
+                <td>COM</td>
+                <td>Drug Stores</td>
+                <td>Deerfield, IL</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>WAYSTAR HLDG CORP</td>
+                <td>COM</td>
+                <td>Medical Instruments & Supplies</td>
+                <td>Exton, PA</td>
+                <td>13F Holding</td>
+                <td class="num">-</td>
             </tr>
             
         </tbody>
     </table>
+    </div>
 
-    <h2>Sector Allocation</h2>
+    <h2>Sector Allocation (101)</h2>
+    <div class="table-container">
     <table>
         <thead>
             <tr>
                 <th>Sector</th>
                 <th>Count</th>
                 <th>% of Portfolio</th>
+                <th class="num">Est. Value</th>
             </tr>
         </thead>
         <tbody>
@@ -151,65 +3237,713 @@
             <tr>
                 <td>Biotechnology</td>
                 <td>43</td>
-                <td>28.3%</td>
+                <td>12.3%</td>
+                <td class="num">$126.2B</td>
             </tr>
             
             <tr>
                 <td>Oil & Gas Midstream</td>
                 <td>27</td>
-                <td>17.8%</td>
+                <td>7.7%</td>
+                <td class="num">$719.1B</td>
             </tr>
             
             <tr>
                 <td>Software - Infrastructure</td>
                 <td>14</td>
-                <td>9.2%</td>
+                <td>4.0%</td>
+                <td class="num">$3.1T</td>
             </tr>
             
             <tr>
                 <td>Oil & Gas E&P</td>
                 <td>12</td>
-                <td>7.9%</td>
+                <td>3.4%</td>
+                <td class="num">$398.0B</td>
             </tr>
             
             <tr>
                 <td>Software - Application</td>
                 <td>12</td>
-                <td>7.9%</td>
-            </tr>
-            
-            <tr>
-                <td>Utilities - Regulated Electric</td>
-                <td>9</td>
-                <td>5.9%</td>
-            </tr>
-            
-            <tr>
-                <td>Aerospace & Defense</td>
-                <td>9</td>
-                <td>5.9%</td>
+                <td>3.4%</td>
+                <td class="num">$169.8B</td>
             </tr>
             
             <tr>
                 <td>Capital Markets</td>
                 <td>9</td>
-                <td>5.9%</td>
+                <td>2.6%</td>
+                <td class="num">$299.4B</td>
+            </tr>
+            
+            <tr>
+                <td>Utilities - Regulated Electric</td>
+                <td>9</td>
+                <td>2.6%</td>
+                <td class="num">$523.8B</td>
             </tr>
             
             <tr>
                 <td>Credit Services</td>
                 <td>9</td>
-                <td>5.9%</td>
+                <td>2.6%</td>
+                <td class="num">$1.3T</td>
+            </tr>
+            
+            <tr>
+                <td>Aerospace & Defense</td>
+                <td>9</td>
+                <td>2.6%</td>
+                <td class="num">$652.7B</td>
+            </tr>
+            
+            <tr>
+                <td>Solar</td>
+                <td>8</td>
+                <td>2.3%</td>
+                <td class="num">$42.5B</td>
             </tr>
             
             <tr>
                 <td>ETF / Index Fund</td>
                 <td>8</td>
-                <td>5.3%</td>
+                <td>2.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Oil & Gas Equipment & Services</td>
+                <td>7</td>
+                <td>2.0%</td>
+                <td class="num">$16.9B</td>
+            </tr>
+            
+            <tr>
+                <td>Unknown</td>
+                <td>7</td>
+                <td>2.0%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Internet Content & Information</td>
+                <td>7</td>
+                <td>2.0%</td>
+                <td class="num">$5.4T</td>
+            </tr>
+            
+            <tr>
+                <td>Oil & Gas Integrated</td>
+                <td>5</td>
+                <td>1.4%</td>
+                <td class="num">$1.4T</td>
+            </tr>
+            
+            <tr>
+                <td>Semiconductors</td>
+                <td>5</td>
+                <td>1.4%</td>
+                <td class="num">$5.0T</td>
+            </tr>
+            
+            <tr>
+                <td>Drug Manufacturers - General</td>
+                <td>5</td>
+                <td>1.4%</td>
+                <td class="num">$2.5T</td>
+            </tr>
+            
+            <tr>
+                <td>Computer Hardware</td>
+                <td>4</td>
+                <td>1.1%</td>
+                <td class="num">$108.3B</td>
+            </tr>
+            
+            <tr>
+                <td>Oil & Gas Refining & Marketing</td>
+                <td>4</td>
+                <td>1.1%</td>
+                <td class="num">$3.7B</td>
+            </tr>
+            
+            <tr>
+                <td>Insurance - Property & Casualty</td>
+                <td>4</td>
+                <td>1.1%</td>
+                <td class="num">$174.6B</td>
+            </tr>
+            
+            <tr>
+                <td>Utilities - Independent Power Producers</td>
+                <td>4</td>
+                <td>1.1%</td>
+                <td class="num">$183.9B</td>
+            </tr>
+            
+            <tr>
+                <td>Medical Instruments & Supplies</td>
+                <td>4</td>
+                <td>1.1%</td>
+                <td class="num">$247.6B</td>
+            </tr>
+            
+            <tr>
+                <td>Banks - Diversified</td>
+                <td>4</td>
+                <td>1.1%</td>
+                <td class="num">$1.5T</td>
+            </tr>
+            
+            <tr>
+                <td>Telecom Services</td>
+                <td>4</td>
+                <td>1.1%</td>
+                <td class="num">$253.6B</td>
+            </tr>
+            
+            <tr>
+                <td>Building Materials</td>
+                <td>4</td>
+                <td>1.1%</td>
+                <td class="num">$99.1B</td>
+            </tr>
+            
+            <tr>
+                <td>REIT - Hotel & Motel</td>
+                <td>3</td>
+                <td>0.9%</td>
+                <td class="num">$3.3B</td>
+            </tr>
+            
+            <tr>
+                <td></td>
+                <td>3</td>
+                <td>0.9%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Household & Personal Products</td>
+                <td>3</td>
+                <td>0.9%</td>
+                <td class="num">$198.1B</td>
+            </tr>
+            
+            <tr>
+                <td>Travel Services</td>
+                <td>3</td>
+                <td>0.9%</td>
+                <td class="num">$3.8B</td>
+            </tr>
+            
+            <tr>
+                <td>Diagnostics & Research</td>
+                <td>3</td>
+                <td>0.9%</td>
+                <td class="num">$361.6B</td>
+            </tr>
+            
+            <tr>
+                <td>Gold</td>
+                <td>3</td>
+                <td>0.9%</td>
+                <td class="num">$22.9B</td>
+            </tr>
+            
+            <tr>
+                <td>Asset Management</td>
+                <td>3</td>
+                <td>0.9%</td>
+                <td class="num">$1.0B</td>
+            </tr>
+            
+            <tr>
+                <td>Tobacco</td>
+                <td>3</td>
+                <td>0.9%</td>
+                <td class="num">$407.2B</td>
+            </tr>
+            
+            <tr>
+                <td>Insurance Brokers</td>
+                <td>3</td>
+                <td>0.9%</td>
+                <td class="num">$25.7B</td>
+            </tr>
+            
+            <tr>
+                <td>Healthcare Plans</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$353.7B</td>
+            </tr>
+            
+            <tr>
+                <td>Discount Stores</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$1.0T</td>
+            </tr>
+            
+            <tr>
+                <td>Insurance - Diversified</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$1.1T</td>
+            </tr>
+            
+            <tr>
+                <td>Entertainment</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$322.5B</td>
+            </tr>
+            
+            <tr>
+                <td>Utilities - Diversified</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$61.1B</td>
+            </tr>
+            
+            <tr>
+                <td>Electronic Components</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$39.0B</td>
+            </tr>
+            
+            <tr>
+                <td>Oil & Gas Drilling</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$10.2B</td>
+            </tr>
+            
+            <tr>
+                <td>Internet Retail</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$2.3T</td>
+            </tr>
+            
+            <tr>
+                <td>Medical Devices</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$110.3B</td>
+            </tr>
+            
+            <tr>
+                <td>REIT - Industrial</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$130.7B</td>
+            </tr>
+            
+            <tr>
+                <td>Specialty Industrial Machinery</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$3.1B</td>
+            </tr>
+            
+            <tr>
+                <td>Auto Manufacturers</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$18.6B</td>
+            </tr>
+            
+            <tr>
+                <td>Specialty Business Services</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$25.5B</td>
+            </tr>
+            
+            <tr>
+                <td>Railroads</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$234.6B</td>
+            </tr>
+            
+            <tr>
+                <td>Other Industrial Metals & Mining</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$38.8B</td>
+            </tr>
+            
+            <tr>
+                <td>Advertising Agencies</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$11.8B</td>
+            </tr>
+            
+            <tr>
+                <td>Gambling</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$10.9B</td>
+            </tr>
+            
+            <tr>
+                <td>Engineering & Construction</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$27.6B</td>
+            </tr>
+            
+            <tr>
+                <td>Banks - Regional</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$735M</td>
+            </tr>
+            
+            <tr>
+                <td>Steel</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Health Information Services</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$3.1B</td>
+            </tr>
+            
+            <tr>
+                <td>Building Products</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Packaged Foods</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$365M</td>
+            </tr>
+            
+            <tr>
+                <td>Shell Companies</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$956M</td>
+            </tr>
+            
+            <tr>
+                <td>Communication Equipment</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Information Technology Services</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$4.0B</td>
+            </tr>
+            
+            <tr>
+                <td>Beverages - Non-Alcoholic</td>
+                <td>2</td>
+                <td>0.6%</td>
+                <td class="num">$47.5B</td>
+            </tr>
+            
+            <tr>
+                <td>Metal Fabrication</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$19.2B</td>
+            </tr>
+            
+            <tr>
+                <td>Business Information Services</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Packaging & Containers</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>REIT - Retail</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$61.2B</td>
+            </tr>
+            
+            <tr>
+                <td>Specialty Chemicals</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$20.9B</td>
+            </tr>
+            
+            <tr>
+                <td>Restaurants</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Utilities - Regulated Gas</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$1.4B</td>
+            </tr>
+            
+            <tr>
+                <td>Footwear</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Electronic Gaming & Multimedia</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$36.2B</td>
+            </tr>
+            
+            <tr>
+                <td>Airlines</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Waste Management</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$15.2B</td>
+            </tr>
+            
+            <tr>
+                <td>Airports & Air Services</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$3M</td>
+            </tr>
+            
+            <tr>
+                <td>REIT - Mortgage</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Financial Data & Stock Exchanges</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$13.8B</td>
+            </tr>
+            
+            <tr>
+                <td>Scientific & Technical Instruments</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$18.2B</td>
+            </tr>
+            
+            <tr>
+                <td>Agricultural Inputs</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$35.0B</td>
+            </tr>
+            
+            <tr>
+                <td>Drug Manufacturers - Specialty & Generic</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Resorts & Casinos</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$9.4B</td>
+            </tr>
+            
+            <tr>
+                <td>Industrial Distribution</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$50.5B</td>
+            </tr>
+            
+            <tr>
+                <td>Utilities - Renewable</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Insurance - Reinsurance</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Copper</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$10.3B</td>
+            </tr>
+            
+            <tr>
+                <td>Air Freight & Logistics</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Leisure</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$7.6B</td>
+            </tr>
+            
+            <tr>
+                <td>Security & Protection Services</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Cybersecurity</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$7.2B</td>
+            </tr>
+            
+            <tr>
+                <td>Mortgage Finance</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Uranium</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$51.8B</td>
+            </tr>
+            
+            <tr>
+                <td>Integrated Freight & Logistics</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$408M</td>
+            </tr>
+            
+            <tr>
+                <td>Software</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$5.9B</td>
+            </tr>
+            
+            <tr>
+                <td>Drug Stores</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Consumer Electronics</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$3.9T</td>
+            </tr>
+            
+            <tr>
+                <td>Specialty Retail</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$278M</td>
+            </tr>
+            
+            <tr>
+                <td>Medical Distribution</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$117.2B</td>
+            </tr>
+            
+            <tr>
+                <td>REIT - Office</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Real Estate Services</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Apparel Manufacturing</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$3.2B</td>
+            </tr>
+            
+            <tr>
+                <td>Financial Exchanges</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">-</td>
+            </tr>
+            
+            <tr>
+                <td>Electrical Equipment & Parts</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$1.3B</td>
+            </tr>
+            
+            <tr>
+                <td>Chemicals</td>
+                <td>1</td>
+                <td>0.3%</td>
+                <td class="num">$3.8B</td>
             </tr>
             
         </tbody>
     </table>
+    </div>
 
     
     <h2>Key Team Members (1)</h2>
@@ -235,7 +3969,8 @@
     </table>
 
 
-    <p class="meta">Generated: 2026-02-23T21:46:15.067154 | Nexdata Investment Intelligence</p>
+    <p class="footnote">*Market cap = total company value (source: Yahoo Finance). Actual position sizes require 13F filing data.</p>
+    <p class="meta">Generated: 2026-02-23T22:54:37.788454 | Nexdata Investment Intelligence</p>
 </body>
 </html>
         
