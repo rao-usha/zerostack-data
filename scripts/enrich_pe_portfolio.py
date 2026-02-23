@@ -238,25 +238,35 @@ SEC_HEADERS = {
 }
 
 
-async def fetch_sec_ticker_map(client: httpx.AsyncClient) -> Dict[str, str]:
-    """Fetch SEC company_tickers.json → {ticker: CIK (zero-padded)}."""
+async def fetch_sec_maps(
+    client: httpx.AsyncClient,
+) -> Tuple[Dict[str, str], Dict[str, str]]:
+    """
+    Fetch SEC company_tickers.json → two lookup maps:
+      1. {TICKER: CIK} — lookup by stock ticker
+      2. {NORMALIZED_NAME: CIK} — lookup by company title (for 13F name matching)
+    """
     try:
         resp = await client.get(SEC_TICKERS_URL, headers=SEC_HEADERS, timeout=30)
         if resp.status_code != 200:
             warn(f"SEC tickers fetch failed: HTTP {resp.status_code}")
-            return {}
+            return {}, {}
 
         data = resp.json()
         ticker_map = {}
+        name_map = {}
         for entry in data.values():
             tick = entry.get("ticker", "").upper()
             cik = str(entry.get("cik_str", "")).zfill(10)
+            title = entry.get("title", "").upper().strip()
             if tick:
                 ticker_map[tick] = cik
-        return ticker_map
+            if title:
+                name_map[title] = cik
+        return ticker_map, name_map
     except Exception as e:
         warn(f"SEC tickers fetch error: {e}")
-        return {}
+        return {}, {}
 
 
 async def fetch_sec_sic(
@@ -326,6 +336,41 @@ def get_sparse_companies(
         }
         for r in rows
     ]
+
+
+def get_companies_needing_sic(
+    db, firm_name: Optional[str] = None, limit: Optional[int] = None
+) -> List[Tuple[int, str, str]]:
+    """
+    Query portfolio companies that have industry but no SIC code.
+
+    Returns list of (id, name, ticker) tuples for Phase 2.
+    """
+    from sqlalchemy import text
+
+    sql = """
+        SELECT DISTINCT pc.id, pc.name, pc.ticker
+        FROM pe_portfolio_companies pc
+        LEFT JOIN pe_fund_investments fi ON fi.company_id = pc.id
+        LEFT JOIN pe_funds f ON f.id = fi.fund_id
+        LEFT JOIN pe_firms pf ON pf.id = f.firm_id
+        WHERE pc.industry IS NOT NULL
+          AND pc.sic_code IS NULL
+    """
+    params = {}
+
+    if firm_name:
+        sql += " AND pf.name ILIKE :firm_name"
+        params["firm_name"] = f"%{firm_name}%"
+
+    sql += " ORDER BY pc.name"
+
+    if limit:
+        sql += " LIMIT :limit"
+        params["limit"] = limit
+
+    rows = db.execute(text(sql), params).fetchall()
+    return [(r[0], r[1], r[2]) for r in rows]
 
 
 def null_preserving_update(db, company_id: int, updates: Dict[str, Any]) -> int:
@@ -467,31 +512,52 @@ async def enrich_phase1_yfinance(
 
 async def enrich_phase2_sec(
     db,
-    ticker_map: List[Tuple[int, str]],
+    ticker_map: List[tuple],
     dry_run: bool = False,
 ) -> Dict[str, Any]:
     """
     Phase 2: Enrich SIC codes from SEC EDGAR.
+
+    Accepts tuples of either:
+      - (company_id, ticker) from Phase 1
+      - (company_id, name, ticker) from --sec-only mode
+
+    Looks up CIK by ticker first, then falls back to name matching.
     """
     banner("Phase 2: SEC EDGAR SIC Codes")
 
     if not ticker_map:
-        info("No tickers to look up — skipping SEC phase")
+        info("No companies to look up — skipping SEC phase")
         return {"enriched": 0, "not_found": 0, "errors": 0}
 
     stats = {"enriched": 0, "not_found": 0, "errors": 0}
 
     async with httpx.AsyncClient() as client:
-        # Fetch global ticker → CIK map
+        # Fetch ticker → CIK and name → CIK maps
         info("Fetching SEC company_tickers.json...")
-        sec_ticker_cik = await fetch_sec_ticker_map(client)
-        info(f"Loaded {len(sec_ticker_cik)} SEC tickers")
+        sec_ticker_cik, sec_name_cik = await fetch_sec_maps(client)
+        info(f"Loaded {len(sec_ticker_cik)} SEC tickers, {len(sec_name_cik)} company names")
 
-        for i, (cid, ticker) in enumerate(ticker_map, 1):
+        for i, entry in enumerate(ticker_map, 1):
+            # Support both (id, ticker) and (id, name, ticker) tuples
+            if len(entry) == 3:
+                cid, name, ticker = entry
+            else:
+                cid, ticker = entry
+                name = None
+
             progress = f"[{i}/{len(ticker_map)}]"
-            ticker_upper = ticker.upper()
+            display = name or ticker or str(cid)
 
-            cik = sec_ticker_cik.get(ticker_upper)
+            # Try ticker lookup first (if it's a valid ticker)
+            cik = None
+            if ticker and is_valid_ticker(ticker):
+                cik = sec_ticker_cik.get(ticker.upper())
+
+            # Fallback: match by company name
+            if not cik and name:
+                cik = sec_name_cik.get(name.upper().strip())
+
             if not cik:
                 stats["not_found"] += 1
                 continue
@@ -501,7 +567,7 @@ async def enrich_phase2_sec(
                 if result:
                     sic_code, sic_desc = result
                     if dry_run:
-                        ok(f"{progress} {ticker} → SIC {sic_code} ({sic_desc}) {C.DIM}(dry run){C.E}")
+                        ok(f"{progress} {display} → SIC {sic_code} ({sic_desc}) {C.DIM}(dry run){C.E}")
                     else:
                         from sqlalchemy import text
                         db.execute(
@@ -513,13 +579,13 @@ async def enrich_phase2_sec(
                             """),
                             {"cid": cid, "sic": sic_code},
                         )
-                        ok(f"{progress} {ticker} → SIC {sic_code} ({sic_desc})")
+                        ok(f"{progress} {display} → SIC {sic_code} ({sic_desc})")
                     stats["enriched"] += 1
                 else:
                     stats["not_found"] += 1
 
             except Exception as e:
-                fail(f"{progress} {ticker}: {e}")
+                fail(f"{progress} {display}: {e}")
                 stats["errors"] += 1
 
             # SEC rate limit: 10 req/sec max
@@ -541,6 +607,33 @@ async def run(args):
     db = SessionFactory()
 
     try:
+        if args.sec_only:
+            # SEC-only mode: skip Phase 1, query companies with ticker but no SIC
+            info("Querying companies with ticker but no SIC code...")
+            ticker_map = get_companies_needing_sic(
+                db, firm_name=args.firm, limit=args.limit
+            )
+            if not ticker_map:
+                warn("No companies need SIC codes!")
+                return
+
+            info(f"Found {len(ticker_map)} companies to enrich with SIC codes")
+            if args.dry_run:
+                warn("  DRY RUN — no database changes will be made")
+
+            await enrich_phase2_sec(db, ticker_map, dry_run=args.dry_run)
+
+            if not args.dry_run:
+                db.commit()
+                ok("All changes committed to database")
+            else:
+                db.rollback()
+                info("Dry run complete — no changes committed")
+
+            banner("Enrichment Summary")
+            info(f"SEC-only mode: {len(ticker_map)} companies processed")
+            return
+
         # Query sparse companies
         info("Querying portfolio companies missing industry/sector...")
         companies = get_sparse_companies(
@@ -615,6 +708,10 @@ def main():
     parser.add_argument(
         "--skip-sec", action="store_true",
         help="Skip Phase 2 (SEC EDGAR SIC codes)"
+    )
+    parser.add_argument(
+        "--sec-only", action="store_true",
+        help="Only run Phase 2 (SEC SIC codes) for already-enriched companies"
     )
     args = parser.parse_args()
 
