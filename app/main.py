@@ -118,6 +118,8 @@ from app.api.v1 import (
     job_postings_velocity,
     health_scores,
     lp_allocation,
+    exit_readiness,
+    acquisition_targets,
 )
 
 # Job Queue Streaming
@@ -1172,6 +1174,14 @@ Browse the endpoint sections below to see what's available:
             "name": "lp_allocation",
             "description": "📊 **LP Allocation Gap Analysis** - Target vs current allocation gaps showing where LP capital must be deployed",
         },
+        {
+            "name": "exit_readiness",
+            "description": "🚪 **Exit Readiness Score** - 7-signal composite score for PE portfolio exit timing",
+        },
+        {
+            "name": "acquisition_targets",
+            "description": "🎯 **Acquisition Target Score** - 5-signal score identifying attractive PE acquisition targets",
+        },
     ],
 )
 
@@ -1335,6 +1345,8 @@ app.include_router(job_postings_velocity.router, prefix="/api/v1", dependencies=
 # Derived Data Scores
 app.include_router(health_scores.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(lp_allocation.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(exit_readiness.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(acquisition_targets.router, prefix="/api/v1", dependencies=_auth)
 
 # Site Intelligence Platform
 app.include_router(site_intel_power.router, prefix="/api/v1", dependencies=_auth)
