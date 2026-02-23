@@ -116,6 +116,8 @@ from app.api.v1 import (
     dunl,
     job_postings,
     job_postings_velocity,
+    health_scores,
+    lp_allocation,
 )
 
 # Job Queue Streaming
@@ -1162,6 +1164,14 @@ Browse the endpoint sections below to see what's available:
             "name": "hiring_velocity",
             "description": "📈 **Hiring Velocity Score** - Cross-reference job postings with BLS baselines for expansion/contraction signals",
         },
+        {
+            "name": "company_health",
+            "description": "🏥 **Private Company Health Score** - Multi-signal health proxy combining hiring, web traffic, sentiment, and foot traffic",
+        },
+        {
+            "name": "lp_allocation",
+            "description": "📊 **LP Allocation Gap Analysis** - Target vs current allocation gaps showing where LP capital must be deployed",
+        },
     ],
 )
 
@@ -1321,6 +1331,10 @@ app.include_router(people_jobs.router, prefix="/api/v1", dependencies=_auth)
 # Job Posting Intelligence
 app.include_router(job_postings.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(job_postings_velocity.router, prefix="/api/v1", dependencies=_auth)
+
+# Derived Data Scores
+app.include_router(health_scores.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(lp_allocation.router, prefix="/api/v1", dependencies=_auth)
 
 # Site Intelligence Platform
 app.include_router(site_intel_power.router, prefix="/api/v1", dependencies=_auth)
