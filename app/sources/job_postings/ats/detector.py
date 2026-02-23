@@ -55,16 +55,20 @@ ATS_URL_PATTERNS: dict[str, list[str]] = {
 
 # HTML signatures: (substring in page, ats_type)
 ATS_HTML_SIGNATURES: list[tuple[str, str]] = [
-    ("greenhouse.io", "greenhouse"),
     ("boards-api.greenhouse.io", "greenhouse"),
-    ("lever.co", "lever"),
-    ("jobs.lever.co", "lever"),
-    ("ashbyhq.com", "ashby"),
+    ("boards.greenhouse.io", "greenhouse"),
+    ("greenhouse.io/embed", "greenhouse"),
+    ("jobs.lever.co/", "lever"),
+    ("api.lever.co/", "lever"),
+    ("jobs.ashbyhq.com", "ashby"),
+    ("ashbyhq.com/posting-api", "ashby"),
     ("myworkdayjobs.com", "workday"),
-    ("smartrecruiters.com", "smartrecruiters"),
+    ("jobs.smartrecruiters.com", "smartrecruiters"),
+    ("smartrecruiters.com/v1/companies", "smartrecruiters"),
     ("Powered by Greenhouse", "greenhouse"),
     ("Powered by Lever", "lever"),
     ("Powered by Ashby", "ashby"),
+    ("Powered by SmartRecruiters", "smartrecruiters"),
 ]
 
 CAREER_PATH_SUFFIXES = [
@@ -257,6 +261,19 @@ class ATSDetector:
 
     def _extract_token_from_html(self, html: str, ats_type: str) -> Optional[str]:
         """Try to extract the board token from embedded iframes/scripts."""
+        # For Workday, extract the full URL since the client needs it
+        if ats_type == "workday":
+            m = re.search(
+                r'https?://[\w-]+\.wd[1-5]\.myworkdayjobs\.com[^\s"\'<>]*',
+                html, re.IGNORECASE,
+            )
+            return m.group(0) if m else None
+
+        # For SmartRecruiters, extract from jobs.smartrecruiters.com/{identifier}
+        if ats_type == "smartrecruiters":
+            m = re.search(r'jobs\.smartrecruiters\.com/([\w-]+)', html, re.IGNORECASE)
+            return m.group(1) if m else None
+
         patterns = ATS_URL_PATTERNS.get(ats_type, [])
         for pattern in patterns:
             m = re.search(pattern, html, re.IGNORECASE)
@@ -272,6 +289,7 @@ class ATSDetector:
             "greenhouse": lambda t: f"https://boards-api.greenhouse.io/v1/boards/{t}/jobs?content=true",
             "lever": lambda t: f"https://api.lever.co/v0/postings/{t}?mode=json",
             "ashby": lambda t: f"https://api.ashbyhq.com/posting-api/job-board/{t}",
+            "smartrecruiters": lambda t: f"https://api.smartrecruiters.com/v1/companies/{t}/postings",
         }
         builder = builders.get(ats_type)
         return builder(token) if builder else None

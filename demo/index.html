@@ -211,6 +211,49 @@
             border-color: var(--primary);
         }
 
+        .input-row {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .input-row input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            background: var(--darker);
+            border: 1px solid var(--surface2);
+            border-radius: 8px;
+            color: var(--light);
+            font-size: 0.9rem;
+        }
+
+        .input-row input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .quick-picks {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .quick-pick {
+            padding: 0.35rem 0.75rem;
+            background: var(--surface2);
+            border-radius: 16px;
+            font-size: 0.8rem;
+            color: var(--muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-pick:hover {
+            background: var(--primary);
+            color: white;
+        }
+
         .run-btn {
             padding: 0.75rem 1.5rem;
             background: var(--primary);
@@ -502,6 +545,22 @@
                 </button>
                 <button class="nav-btn" onclick="showSection('predictions')">
                     <span class="icon">🎲</span> Deal Predictions
+                </button>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">PE Intelligence <span style="color: var(--secondary); font-size: 0.7rem;">NEW</span></div>
+                <button class="nav-btn" onclick="showSection('exit-readiness')">
+                    <span class="icon">🎯</span> Exit Readiness
+                </button>
+                <button class="nav-btn" onclick="showSection('benchmark')">
+                    <span class="icon">📊</span> Benchmarking
+                </button>
+                <button class="nav-btn" onclick="showSection('buyers')">
+                    <span class="icon">🏢</span> Buyer Discovery
+                </button>
+                <button class="nav-btn" onclick="showSection('data-room')">
+                    <span class="icon">📦</span> Data Room
                 </button>
             </div>
         </aside>
@@ -920,6 +979,133 @@
                             Load Pipeline
                         </button>
                         <div id="pipeline-result"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PE Exit Readiness -->
+            <section id="exit-readiness" class="section">
+                <div class="hero">
+                    <h1>Exit Readiness Score</h1>
+                    <p>6-signal composite score assessing whether a PE portfolio company is ready for exit. Analyzes financials, leadership, valuation momentum, market position, and hold period.</p>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Exit Readiness Assessment</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="demo-description">
+                            Scores company 0-100 across 6 dimensions: Financial Health (25%), Financial Trajectory (20%), Leadership Stability (15%), Valuation Momentum (15%), Market Position (15%), Hold Period (10%).
+                        </div>
+                        <div class="input-row">
+                            <input type="number" id="exit-company-id" value="308" placeholder="Company ID">
+                            <button class="run-btn" onclick="runExitReadiness()">
+                                Run Exit Readiness
+                            </button>
+                        </div>
+                        <div class="quick-picks">
+                            <span class="quick-pick" onclick="document.getElementById('exit-company-id').value='308'">SailPoint (308)</span>
+                            <span class="quick-pick" onclick="document.getElementById('exit-company-id').value='274'">ServiceTitan (274)</span>
+                            <span class="quick-pick" onclick="document.getElementById('exit-company-id').value='1341'">Coupa (1341)</span>
+                            <span class="quick-pick" onclick="document.getElementById('exit-company-id').value='1349'">Qualtrics (1349)</span>
+                            <span class="quick-pick" onclick="document.getElementById('exit-company-id').value='355'">N-ABLE (355)</span>
+                        </div>
+                        <div id="exit-result"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PE Financial Benchmarking -->
+            <section id="benchmark" class="section">
+                <div class="hero">
+                    <h1>Financial Benchmarking</h1>
+                    <p>Compare a PE portfolio company's financial performance against its peer group. Includes revenue, margins, growth rates, and valuation multiples vs. median, P25, and P75.</p>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Peer Benchmark Comparison</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="demo-description">
+                            Builds a peer group from competitors + same-sector companies, then ranks the target company on revenue, EBITDA margin, growth, and valuation multiples.
+                        </div>
+                        <div class="input-row">
+                            <input type="number" id="benchmark-company-id" value="308" placeholder="Company ID">
+                            <button class="run-btn" onclick="runBenchmark()">
+                                Run Benchmark
+                            </button>
+                        </div>
+                        <div class="quick-picks">
+                            <span class="quick-pick" onclick="document.getElementById('benchmark-company-id').value='308'">SailPoint (308)</span>
+                            <span class="quick-pick" onclick="document.getElementById('benchmark-company-id').value='274'">ServiceTitan (274)</span>
+                            <span class="quick-pick" onclick="document.getElementById('benchmark-company-id').value='1001'">Medline (1001)</span>
+                            <span class="quick-pick" onclick="document.getElementById('benchmark-company-id').value='1533'">Alteryx (1533)</span>
+                        </div>
+                        <div id="benchmark-result"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PE Buyer Discovery -->
+            <section id="buyers" class="section">
+                <div class="hero">
+                    <h1>Buyer Discovery</h1>
+                    <p>Identify potential strategic and financial buyers for a portfolio company. Maps competitors as strategic acquirers and PE firms with matching sector focus as financial buyers.</p>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Potential Buyer Universe</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="demo-description">
+                            Strategic buyers scored on size match, competitor type, and market position. Financial buyers scored on strategy fit, sector focus, AUM, and existing portfolio overlap.
+                        </div>
+                        <div class="input-row">
+                            <input type="number" id="buyers-company-id" value="308" placeholder="Company ID">
+                            <button class="run-btn" onclick="runBuyerDiscovery()">
+                                Find Buyers
+                            </button>
+                        </div>
+                        <div class="quick-picks">
+                            <span class="quick-pick" onclick="document.getElementById('buyers-company-id').value='308'">SailPoint (308)</span>
+                            <span class="quick-pick" onclick="document.getElementById('buyers-company-id').value='274'">ServiceTitan (274)</span>
+                            <span class="quick-pick" onclick="document.getElementById('buyers-company-id').value='1341'">Coupa (1341)</span>
+                        </div>
+                        <div id="buyers-result"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PE Data Room Package -->
+            <section id="data-room" class="section">
+                <div class="hero">
+                    <h1>Data Room Package</h1>
+                    <p>Assemble a comprehensive data room package for a portfolio company exit. Combines company profile, financials, valuations, leadership, competitive landscape, and investment history.</p>
+                </div>
+
+                <div class="demo-section">
+                    <div class="demo-header">
+                        <span class="demo-title">Generate Data Room</span>
+                    </div>
+                    <div class="demo-content">
+                        <div class="demo-description">
+                            One-click assembly of all due diligence data: financial time series, valuation history, leadership roster with PE appointments, competitive landscape, and deal history.
+                        </div>
+                        <div class="input-row">
+                            <input type="number" id="dataroom-company-id" value="308" placeholder="Company ID">
+                            <button class="run-btn" onclick="runDataRoom()">
+                                Generate Package
+                            </button>
+                        </div>
+                        <div class="quick-picks">
+                            <span class="quick-pick" onclick="document.getElementById('dataroom-company-id').value='308'">SailPoint (308)</span>
+                            <span class="quick-pick" onclick="document.getElementById('dataroom-company-id').value='274'">ServiceTitan (274)</span>
+                            <span class="quick-pick" onclick="document.getElementById('dataroom-company-id').value='1001'">Medline (1001)</span>
+                        </div>
+                        <div id="dataroom-result"></div>
                     </div>
                 </div>
             </section>
@@ -1444,6 +1630,118 @@
                 }
             } catch (e) {
                 renderResult('pipeline-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // ── PE Intelligence ──
+
+        // Exit Readiness Score
+        async function runExitReadiness() {
+            const companyId = document.getElementById('exit-company-id').value;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall(`/api/v1/pe/companies/${companyId}/exit-readiness`);
+                renderResult('exit-result', data, time, !ok);
+
+                if (ok) {
+                    renderMetrics('exit-result', {
+                        'Exit Score': data.exit_readiness_score?.toFixed(0) || 'N/A',
+                        'Tier': data.tier || 'N/A',
+                        'Timing': data.timing_recommendation || 'N/A',
+                        'Strengths': data.strengths?.length || 0,
+                        'Risks': data.risks?.length || 0
+                    });
+                }
+            } catch (e) {
+                renderResult('exit-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Financial Benchmarking
+        async function runBenchmark() {
+            const companyId = document.getElementById('benchmark-company-id').value;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall(`/api/v1/pe/companies/${companyId}/benchmark`);
+                renderResult('benchmark-result', data, time, !ok);
+
+                if (ok) {
+                    renderMetrics('benchmark-result', {
+                        'Peer Count': data.peer_count || 0,
+                        'Revenue Rank': data.percentile_ranks?.revenue ? `P${data.percentile_ranks.revenue}` : 'N/A',
+                        'EBITDA Margin': data.percentile_ranks?.ebitda_margin ? `P${data.percentile_ranks.ebitda_margin}` : 'N/A',
+                        'Growth Rank': data.percentile_ranks?.revenue_growth ? `P${data.percentile_ranks.revenue_growth}` : 'N/A'
+                    });
+                }
+            } catch (e) {
+                renderResult('benchmark-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Buyer Discovery
+        async function runBuyerDiscovery() {
+            const companyId = document.getElementById('buyers-company-id').value;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall(`/api/v1/pe/companies/${companyId}/potential-buyers`);
+                renderResult('buyers-result', data, time, !ok);
+
+                if (ok) {
+                    renderMetrics('buyers-result', {
+                        'Total Buyers': data.total_buyers || 0,
+                        'Strategic': data.strategic_buyers?.length || 0,
+                        'Financial': data.financial_buyers?.length || 0,
+                        'Top Fit': data.strategic_buyers?.[0]?.fit_score?.toFixed(0) || data.financial_buyers?.[0]?.fit_score?.toFixed(0) || 'N/A'
+                    });
+                }
+            } catch (e) {
+                renderResult('buyers-result', { error: e.message }, 0, true);
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+
+        // Data Room Package
+        async function runDataRoom() {
+            const companyId = document.getElementById('dataroom-company-id').value;
+            const btn = event.target;
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                const { data, time, ok } = await apiCall(`/api/v1/pe/companies/${companyId}/data-room-package`, 'POST');
+                renderResult('dataroom-result', data, time, !ok);
+
+                if (ok && data.summary) {
+                    renderMetrics('dataroom-result', {
+                        'Financials': data.summary.financial_periods || 0,
+                        'Valuations': data.summary.valuations || 0,
+                        'Leaders': data.summary.leaders || 0,
+                        'Competitors': data.summary.competitors || 0,
+                        'Completeness': data.summary.data_completeness || 'N/A'
+                    });
+                }
+            } catch (e) {
+                renderResult('dataroom-result', { error: e.message }, 0, true);
             }
 
             btn.disabled = false;

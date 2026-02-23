@@ -412,6 +412,16 @@ API_REGISTRY: Dict[str, APIConfig] = {
         rate_limit_per_minute=600,
         notes="Lever public postings API. No auth required for GET.",
     ),
+    "smartrecruiters_jobs": APIConfig(
+        source_name="smartrecruiters_jobs",
+        base_url="https://api.smartrecruiters.com/v1/companies",
+        api_key_requirement=APIKeyRequirement.OPTIONAL,
+        config_key="",
+        signup_url="https://www.smartrecruiters.com",
+        max_concurrency=3,
+        rate_limit_per_minute=120,
+        notes="SmartRecruiters public posting API. No auth required for listing.",
+    ),
     "job_postings": APIConfig(
         source_name="job_postings",
         base_url="",

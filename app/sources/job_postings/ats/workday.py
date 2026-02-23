@@ -88,9 +88,9 @@ class WorkdayClient:
         self, url: str, token: Optional[str]
     ) -> tuple[Optional[str], str, str]:
         """Extract (company_slug, wd_instance, site_name) from a Workday URL."""
-        # Pattern: {slug}.wd{N}.myworkdayjobs.com/.../{site}
+        # Pattern: {slug}.wd{N}.myworkdayjobs.com/{site} or .com/en/{site}
         m = re.search(
-            r"([\w-]+)\.(wd[1-5])\.myworkdayjobs\.com(?:/.*?/([\w-]+))?",
+            r"([\w-]+)\.(wd[1-5])\.myworkdayjobs\.com(?:/(?:en/)?([\w-]+))?",
             url,
             re.IGNORECASE,
         )

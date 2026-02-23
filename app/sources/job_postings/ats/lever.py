@@ -45,6 +45,9 @@ class LeverClient:
         while True:
             url = f"{self.BASE_URL}/{site_name}"
             resp = await client.get(url, params={"mode": "json", "skip": skip, "limit": limit})
+            if resp.status_code == 404:
+                logger.warning(f"Lever site '{site_name}' not found (404)")
+                return []
             resp.raise_for_status()
             batch = resp.json()
             if not batch:
@@ -55,6 +58,18 @@ class LeverClient:
             skip += limit
 
         return all_jobs
+
+    @staticmethod
+    def _epoch_ms_to_iso(epoch_ms) -> str | None:
+        """Convert epoch milliseconds to ISO 8601 string."""
+        if not epoch_ms:
+            return None
+        try:
+            from datetime import datetime, timezone
+            ts = int(epoch_ms) / 1000.0
+            return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+        except (ValueError, TypeError, OverflowError):
+            return None
 
     def normalize_job(self, raw: dict, site_name: str) -> dict:
         """Map Lever fields to our unified schema."""
@@ -85,5 +100,5 @@ class LeverClient:
             "description_text": raw.get("descriptionPlain", ""),
             "source_url": raw.get("hostedUrl", ""),
             "ats_type": "lever",
-            "posted_date": None,  # Lever uses createdAt as epoch ms
+            "posted_date": self._epoch_ms_to_iso(raw.get("createdAt")),
         }

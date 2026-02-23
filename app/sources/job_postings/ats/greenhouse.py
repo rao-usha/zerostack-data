@@ -40,6 +40,9 @@ class GreenhouseClient:
         client = await self._get_client()
         url = f"{self.BASE_URL}/{board_token}/jobs"
         resp = await client.get(url, params={"content": "true"})
+        if resp.status_code == 404:
+            logger.warning(f"Greenhouse board '{board_token}' not found (404)")
+            return []
         resp.raise_for_status()
         data = resp.json()
         return data.get("jobs", [])
