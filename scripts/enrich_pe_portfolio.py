@@ -475,6 +475,14 @@ async def enrich_phase1_yfinance(
             state = profile.get("headquarters_state") or ""
             location = f"{city}, {state}".rstrip(", ")
 
+            # If profile has no industry, treat as failed so Phase 1b can try
+            if not profile.get("industry"):
+                skip(f"{progress} {raw_name} → {ticker} (no industry in profile)")
+                stats["no_profile"] += 1
+                failed.append(company)
+                await asyncio.sleep(1.0)
+                continue
+
             if dry_run:
                 ok(
                     f"{progress} {raw_name} → {ticker} | "
@@ -583,9 +591,29 @@ async def enrich_phase1b_llm(
     ticker_map: List[Tuple[int, str]] = []
 
     # Build name → list of company IDs mapping (for deduped updates)
+    # Use both exact and normalized names for fuzzy matching
     name_to_ids = {}
+    normalized_to_ids = {}
     for c in failed_companies:
         name_to_ids.setdefault(c["name"], []).append(c["id"])
+        norm = normalize_13f_name(c["name"]).upper().strip()
+        normalized_to_ids.setdefault(norm, []).append(c["id"])
+
+    def lookup_ids(llm_name: str) -> List[int]:
+        """Look up company IDs by exact name first, then normalized."""
+        ids = name_to_ids.get(llm_name)
+        if ids:
+            return ids
+        # Try normalized match
+        norm = normalize_13f_name(llm_name).upper().strip()
+        ids = normalized_to_ids.get(norm)
+        if ids:
+            return ids
+        # Try matching with original names as substrings
+        for orig_name, orig_ids in name_to_ids.items():
+            if llm_name.upper() in orig_name.upper() or orig_name.upper() in llm_name.upper():
+                return orig_ids
+        return []
 
     # LLM resolution in batches
     llm_results = {}  # name → resolved data
@@ -632,8 +660,12 @@ async def enrich_phase1b_llm(
 
     for i, (name, llm_data) in enumerate(resolved, 1):
         ticker = llm_data["ticker"]
-        company_ids = name_to_ids.get(name, [])
+        company_ids = lookup_ids(name)
         progress = f"[{i}/{len(resolved)}]"
+
+        if not company_ids:
+            warn(f"{progress} {name} → {ticker} (no matching DB records)")
+            continue
 
         try:
             # Fetch yfinance profile for validation + full data
@@ -642,23 +674,24 @@ async def enrich_phase1b_llm(
             if yf_info:
                 profile = extract_profile(yf_info)
             else:
-                # Use LLM data directly as fallback
-                profile = {
-                    "industry": llm_data.get("industry"),
-                    "sector": llm_data.get("sector"),
-                    "headquarters_city": llm_data.get("hq_city"),
-                    "headquarters_state": llm_data.get("hq_state"),
-                    "headquarters_country": llm_data.get("hq_country"),
-                    "ticker": ticker,
-                    "description": None,
-                    "employee_count": None,
-                    "website": None,
-                    "founded_year": None,
-                }
+                profile = {}
 
-            industry = profile.get("industry") or llm_data.get("industry") or "-"
-            city = profile.get("headquarters_city") or llm_data.get("hq_city") or "-"
-            state = profile.get("headquarters_state") or llm_data.get("hq_state") or ""
+            # Merge LLM data as fallback for any missing fields
+            llm_fallback = {
+                "industry": llm_data.get("industry"),
+                "sector": llm_data.get("sector"),
+                "headquarters_city": llm_data.get("hq_city"),
+                "headquarters_state": llm_data.get("hq_state"),
+                "headquarters_country": llm_data.get("hq_country"),
+                "ticker": ticker,
+            }
+            for key, val in llm_fallback.items():
+                if not profile.get(key) and val:
+                    profile[key] = val
+
+            industry = profile.get("industry") or "-"
+            city = profile.get("headquarters_city") or "-"
+            state = profile.get("headquarters_state") or ""
             location = f"{city}, {state}".rstrip(", ")
 
             if not dry_run:
@@ -683,7 +716,7 @@ async def enrich_phase1b_llm(
     if etf_names and not dry_run:
         from sqlalchemy import text
         for etf_name in etf_names:
-            for cid in name_to_ids.get(etf_name, []):
+            for cid in lookup_ids(etf_name):
                 db.execute(
                     text("""
                         UPDATE pe_portfolio_companies
