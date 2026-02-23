@@ -430,6 +430,7 @@ async def enrich_phase1_yfinance(
         "errors": 0,
     }
     ticker_map: List[Tuple[int, str]] = []  # (company_id, ticker) for Phase 2
+    failed: List[Dict] = []  # Companies that couldn't be resolved
 
     loop = asyncio.get_running_loop()
 
@@ -452,6 +453,7 @@ async def enrich_phase1_yfinance(
             if not ticker:
                 skip(f"{progress} {raw_name} → no ticker found")
                 stats["no_ticker"] += 1
+                failed.append(company)
                 await asyncio.sleep(0.5)
                 continue
 
@@ -504,6 +506,200 @@ async def enrich_phase1_yfinance(
         f"Phase 1 complete: {stats['enriched']} enriched, "
         f"{stats['no_ticker']} no ticker, "
         f"{stats['no_profile']} no profile, "
+        f"{stats['errors']} errors"
+    )
+
+    return {"stats": stats, "ticker_map": ticker_map, "failed": failed}
+
+
+# ---------------------------------------------------------------------------
+# Phase 1b: LLM-based resolution for companies yfinance couldn't match
+# ---------------------------------------------------------------------------
+
+LLM_DECODE_PROMPT = """You are a financial data expert. Below is a list of company names from SEC 13F filings.
+These names are heavily abbreviated (e.g. "COSTCO WHSL CORP NEW" = Costco, "FORD MTR CO" = Ford Motor Company).
+
+For each company, provide:
+- "name": the 13F filing name (exactly as given)
+- "real_name": the actual company name
+- "ticker": the US stock ticker symbol (or null if private/delisted/not a company)
+- "industry": the specific industry (e.g. "Discount Stores", "Auto Manufacturers")
+- "sector": the broad sector (e.g. "Consumer Cyclical", "Technology")
+- "hq_city": headquarters city
+- "hq_state": headquarters state/province abbreviation
+- "hq_country": headquarters country (e.g. "United States", "United Kingdom")
+- "is_etf": true if this is an ETF, index fund, or trust (not a real company)
+
+Respond with a JSON array. If you're unsure about a field, use null.
+
+Companies to identify:
+{companies}"""
+
+# Process in batches to stay within token limits
+LLM_BATCH_SIZE = 30
+
+
+async def enrich_phase1b_llm(
+    db,
+    failed_companies: List[Dict],
+    dry_run: bool = False,
+) -> Dict[str, Any]:
+    """
+    Phase 1b: Use LLM to decode 13F names that yfinance couldn't match.
+
+    Sends company names to GPT-4o-mini in batches, gets back real names + tickers,
+    then validates via yfinance for full profile data.
+    """
+    banner("Phase 1b: LLM Name Resolution")
+
+    if not failed_companies:
+        info("No failed companies to resolve")
+        return {"stats": {"enriched": 0, "llm_resolved": 0, "etfs_skipped": 0, "errors": 0}, "ticker_map": []}
+
+    # Deduplicate by name
+    seen_names = set()
+    unique_companies = []
+    for c in failed_companies:
+        if c["name"] not in seen_names:
+            seen_names.add(c["name"])
+            unique_companies.append(c)
+
+    info(f"{len(unique_companies)} unique company names to resolve ({len(failed_companies)} total entries)")
+
+    try:
+        from app.agentic.llm_client import get_llm_client
+    except ImportError:
+        warn("LLM client not available — skipping Phase 1b")
+        return {"stats": {"enriched": 0, "llm_resolved": 0, "etfs_skipped": 0, "errors": 0}, "ticker_map": []}
+
+    llm_client = get_llm_client(model="gpt-4o-mini")
+    if llm_client:
+        llm_client.max_tokens = 4000  # Need room for JSON output
+    if not llm_client:
+        warn("No LLM API key configured — skipping Phase 1b")
+        return {"stats": {"enriched": 0, "llm_resolved": 0, "etfs_skipped": 0, "errors": 0}, "ticker_map": []}
+
+    stats = {"enriched": 0, "llm_resolved": 0, "etfs_skipped": 0, "errors": 0}
+    ticker_map: List[Tuple[int, str]] = []
+
+    # Build name → list of company IDs mapping (for deduped updates)
+    name_to_ids = {}
+    for c in failed_companies:
+        name_to_ids.setdefault(c["name"], []).append(c["id"])
+
+    # LLM resolution in batches
+    llm_results = {}  # name → resolved data
+    batches = [unique_companies[i:i + LLM_BATCH_SIZE] for i in range(0, len(unique_companies), LLM_BATCH_SIZE)]
+
+    for batch_num, batch in enumerate(batches, 1):
+        info(f"LLM batch {batch_num}/{len(batches)} ({len(batch)} companies)...")
+        names_list = "\n".join(f"- {c['name']}" for c in batch)
+        prompt = LLM_DECODE_PROMPT.format(companies=names_list)
+
+        try:
+            response = await llm_client.complete(prompt, json_mode=True)
+            data = response.parse_json()
+
+            if not data:
+                warn(f"  Batch {batch_num}: LLM returned unparseable response")
+                stats["errors"] += len(batch)
+                continue
+
+            # Handle both list and dict-with-list responses
+            items = data if isinstance(data, list) else data.get("companies", data.get("results", []))
+
+            for item in items:
+                name = item.get("name", "").strip()
+                if name:
+                    llm_results[name] = item
+                    if item.get("is_etf"):
+                        stats["etfs_skipped"] += 1
+                    elif item.get("ticker"):
+                        stats["llm_resolved"] += 1
+
+            ok(f"  Batch {batch_num}: resolved {len(items)} companies (cost: ${response.cost_usd:.4f})")
+
+        except Exception as e:
+            fail(f"  Batch {batch_num}: LLM error: {e}")
+            stats["errors"] += len(batch)
+
+    # Now enrich each resolved company via yfinance
+    loop = asyncio.get_running_loop()
+    resolved = [(name, data) for name, data in llm_results.items()
+                if data.get("ticker") and not data.get("is_etf")]
+
+    info(f"Validating {len(resolved)} tickers via yfinance...")
+
+    for i, (name, llm_data) in enumerate(resolved, 1):
+        ticker = llm_data["ticker"]
+        company_ids = name_to_ids.get(name, [])
+        progress = f"[{i}/{len(resolved)}]"
+
+        try:
+            # Fetch yfinance profile for validation + full data
+            yf_info = await loop.run_in_executor(None, fetch_yfinance_info, ticker)
+
+            if yf_info:
+                profile = extract_profile(yf_info)
+            else:
+                # Use LLM data directly as fallback
+                profile = {
+                    "industry": llm_data.get("industry"),
+                    "sector": llm_data.get("sector"),
+                    "headquarters_city": llm_data.get("hq_city"),
+                    "headquarters_state": llm_data.get("hq_state"),
+                    "headquarters_country": llm_data.get("hq_country"),
+                    "ticker": ticker,
+                    "description": None,
+                    "employee_count": None,
+                    "website": None,
+                    "founded_year": None,
+                }
+
+            industry = profile.get("industry") or llm_data.get("industry") or "-"
+            city = profile.get("headquarters_city") or llm_data.get("hq_city") or "-"
+            state = profile.get("headquarters_state") or llm_data.get("hq_state") or ""
+            location = f"{city}, {state}".rstrip(", ")
+
+            if not dry_run:
+                for cid in company_ids:
+                    null_preserving_update(db, cid, profile)
+
+            source = "yf" if yf_info else "llm"
+            ok(f"{progress} {name} → {ticker} | {industry} | {location} ({source})")
+            stats["enriched"] += len(company_ids)
+
+            for cid in company_ids:
+                ticker_map.append((cid, ticker))
+
+        except Exception as e:
+            fail(f"{progress} {name}: {e}")
+            stats["errors"] += 1
+
+        await asyncio.sleep(1.0)
+
+    # Handle ETFs — mark them so they don't show as "Unknown"
+    etf_names = [name for name, data in llm_results.items() if data.get("is_etf")]
+    if etf_names and not dry_run:
+        from sqlalchemy import text
+        for etf_name in etf_names:
+            for cid in name_to_ids.get(etf_name, []):
+                db.execute(
+                    text("""
+                        UPDATE pe_portfolio_companies
+                        SET industry = COALESCE(industry, :industry),
+                            sector = COALESCE(sector, :sector),
+                            updated_at = NOW()
+                        WHERE id = :cid
+                    """),
+                    {"cid": cid, "industry": "ETF / Index Fund", "sector": "Financial Services"},
+                )
+        info(f"Marked {len(etf_names)} ETFs/trusts")
+
+    info(
+        f"Phase 1b complete: {stats['enriched']} enriched, "
+        f"{stats['llm_resolved']} LLM-resolved, "
+        f"{stats['etfs_skipped']} ETFs skipped, "
         f"{stats['errors']} errors"
     )
 
@@ -657,10 +853,18 @@ async def run(args):
         # Phase 1: yfinance
         phase1 = await enrich_phase1_yfinance(db, companies, dry_run=args.dry_run)
 
+        # Phase 1b: LLM resolution for companies yfinance couldn't match
+        all_ticker_map = list(phase1["ticker_map"])
+        if phase1["failed"] and not args.skip_llm:
+            phase1b = await enrich_phase1b_llm(db, phase1["failed"], dry_run=args.dry_run)
+            all_ticker_map.extend(phase1b["ticker_map"])
+        elif args.skip_llm:
+            info("Skipping LLM resolution phase (--skip-llm)")
+
         # Phase 2: SEC EDGAR
         if not args.skip_sec:
             await enrich_phase2_sec(
-                db, phase1["ticker_map"], dry_run=args.dry_run
+                db, all_ticker_map, dry_run=args.dry_run
             )
         else:
             info("Skipping SEC EDGAR phase (--skip-sec)")
@@ -679,7 +883,7 @@ async def run(args):
         info(f"Total companies:    {p1['total']}")
         info(f"Enriched (yfinance): {p1['enriched']}")
         info(f"No ticker found:    {p1['no_ticker']}")
-        info(f"Tickers for SEC:    {len(phase1['ticker_map'])}")
+        info(f"Tickers for SEC:    {len(all_ticker_map)}")
 
     except Exception as e:
         fail(f"Fatal error: {e}")
@@ -708,6 +912,10 @@ def main():
     parser.add_argument(
         "--skip-sec", action="store_true",
         help="Skip Phase 2 (SEC EDGAR SIC codes)"
+    )
+    parser.add_argument(
+        "--skip-llm", action="store_true",
+        help="Skip Phase 1b (LLM name resolution)"
     )
     parser.add_argument(
         "--sec-only", action="store_true",
