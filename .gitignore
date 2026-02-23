@@ -62,6 +62,7 @@ data/*
 !data/README.md
 !data/.gitkeep
 sec_data_output/
+demo_output/
 
 # Database backups
 backup/

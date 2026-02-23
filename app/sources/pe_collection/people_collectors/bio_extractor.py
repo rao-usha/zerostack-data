@@ -21,20 +21,21 @@ from app.sources.pe_collection.types import (
 
 logger = logging.getLogger(__name__)
 
-# URL path patterns for team/people pages (reuses FirmWebsiteCollector concept)
+# URL path patterns for team/people pages — ordered by likelihood of being
+# the actual people directory (not a marketing page that happens to say "team")
 TEAM_PATTERNS = [
-    "/team",
     "/people",
-    "/leadership",
-    "/our-team",
-    "/about/team",
     "/professionals",
+    "/our-people",
+    "/about/people",
+    "/leadership",
     "/about/leadership",
     "/about/professionals",
+    "/team",
+    "/our-team",
+    "/about/team",
     "/about-us/team",
     "/who-we-are/team",
-    "/about/people",
-    "/our-people",
 ]
 
 # Maximum people to extract per firm
@@ -244,18 +245,21 @@ class BioExtractor(BasePECollector):
         """
         Find the team/people page on a PE firm website.
 
-        Tries common URL patterns first, then falls back to scanning
-        the homepage for team-related links.
+        Tries common URL patterns, scores them by people-content quality,
+        and returns the best candidate. Falls back to homepage link scanning.
         """
+        from bs4 import BeautifulSoup
+
+        candidates: list[tuple[str, int]] = []  # (url, name_count)
+
         # Try common patterns directly
         for pattern in TEAM_PATTERNS:
             url = urljoin(website_url.rstrip("/") + "/", pattern.lstrip("/"))
             response = await self._fetch_url(url)
             if response and response.status_code == 200:
-                # Verify it's actually a team page (not a redirect to homepage)
-                text = response.text.lower()
+                text_lower = response.text.lower()
                 if any(
-                    kw in text
+                    kw in text_lower
                     for kw in [
                         "team",
                         "people",
@@ -264,7 +268,33 @@ class BioExtractor(BasePECollector):
                         "managing",
                     ]
                 ):
-                    return url
+                    # Score by how many person names appear in cleaned page
+                    soup = BeautifulSoup(response.text, "html.parser")
+                    for tag in soup(
+                        ["script", "style", "nav", "footer", "header", "aside"]
+                    ):
+                        tag.decompose()
+                    page_text = soup.get_text(separator="\n", strip=True)
+                    # Match "Firstname Lastname" (exactly 2-3 words, no Inc/LLC/etc)
+                    name_count = sum(
+                        1 for line in page_text.split("\n")
+                        if re.match(
+                            r"^[A-Z][a-z]+ [A-Z][a-z]+( [A-Z][a-z]+)?$",
+                            line.strip(),
+                        )
+                        and len(line.strip()) < 40
+                    )
+                    candidates.append((url, name_count))
+                    # If this page clearly has lots of people, use it immediately
+                    if name_count >= 10:
+                        logger.info(f"Team page found: {url} ({name_count} names)")
+                        return url
+
+        # Pick the candidate with the most names
+        if candidates:
+            best = max(candidates, key=lambda x: x[1])
+            logger.info(f"Best team page: {best[0]} ({best[1]} names)")
+            return best[0]
 
         # Fall back: fetch homepage and look for team links
         response = await self._fetch_url(website_url)
@@ -301,17 +331,44 @@ class BioExtractor(BasePECollector):
         return None
 
     async def _fetch_page_text(self, url: str) -> Optional[str]:
-        """Fetch a page and extract clean text content."""
-        response = await self._fetch_url(url)
-        if not response or response.status_code != 200:
-            return None
+        """Fetch a page and extract clean text content.
 
+        Tries httpx first; if the page looks JS-rendered (very little text),
+        falls back to Playwright for headless Chromium rendering.
+        """
+        response = await self._fetch_url(url)
+        html = response.text if response and response.status_code == 200 else None
+
+        # If httpx got content, check if it has enough real people data
+        if html:
+            text = self._extract_text_from_html(html)
+            if text and self._has_people_content(text):
+                return text
+            logger.info(
+                f"Page looks JS-rendered or lacks people data ({len(text or '')} chars), "
+                f"trying Playwright: {url}"
+            )
+
+        # Playwright fallback for JS-rendered pages
+        js_html = await self._fetch_with_playwright(url)
+        if js_html:
+            text = self._extract_text_from_html(js_html)
+            if text:
+                return text
+
+        # Return whatever we got from httpx, even if thin
+        if html:
+            return self._extract_text_from_html(html)
+        return None
+
+    def _extract_text_from_html(self, html: str) -> Optional[str]:
+        """Extract clean text from HTML."""
         try:
             from bs4 import BeautifulSoup
         except ImportError:
             return None
 
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = BeautifulSoup(html, "html.parser")
 
         # Remove noise elements
         for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
@@ -328,6 +385,51 @@ class BioExtractor(BasePECollector):
             return main.get_text(separator="\n", strip=True)
 
         return soup.get_text(separator="\n", strip=True)
+
+    @staticmethod
+    def _has_people_content(text: str) -> bool:
+        """Check if text contains enough person-name-like content to skip Playwright.
+
+        A real team page should have multiple "Firstname Lastname" patterns.
+        JS-rendered pages return boilerplate nav/footer text with few or no names.
+        """
+        if not text or len(text) < 500:
+            return False
+        # Count lines that look like person names (two+ capitalized words, short)
+        name_pattern = re.compile(r"^[A-Z][a-z]+ [A-Z][a-z]+")
+        lines = text.split("\n")
+        name_count = sum(
+            1 for line in lines
+            if name_pattern.match(line.strip()) and len(line.strip()) < 60
+        )
+        return name_count >= 3
+
+    async def _fetch_with_playwright(self, url: str) -> Optional[str]:
+        """Fetch a page using Playwright headless Chromium for JS rendering."""
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError:
+            logger.debug("Playwright not installed — skipping JS rendering")
+            return None
+
+        try:
+            async with async_playwright() as pw:
+                browser = await pw.chromium.launch(headless=True)
+                context = await browser.new_context(
+                    user_agent="NexdataResearch/1.0 (research@nexdata.com; respectful research bot)",
+                    viewport={"width": 1280, "height": 720},
+                )
+                page = await context.new_page()
+                await page.goto(url, wait_until="networkidle", timeout=45000)
+                # Wait a bit for any late-rendering JS
+                await page.wait_for_timeout(2000)
+                html = await page.content()
+                await browser.close()
+                logger.info(f"Playwright rendered {len(html)} chars from {url}")
+                return html
+        except Exception as e:
+            logger.warning(f"Playwright fetch failed for {url}: {e}")
+            return None
 
     async def _fetch_profile_pages(
         self, team_url: str, team_html_text: str
