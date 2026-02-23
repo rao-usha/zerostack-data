@@ -115,6 +115,7 @@ from app.api.v1 import (
     freshness,
     dunl,
     job_postings,
+    job_postings_velocity,
 )
 
 # Job Queue Streaming
@@ -1157,6 +1158,10 @@ Browse the endpoint sections below to see what's available:
             "name": "job_postings",
             "description": "💼 **Job Posting Intelligence** - Track hiring across companies via ATS APIs (Greenhouse, Lever, Workday, Ashby)",
         },
+        {
+            "name": "hiring_velocity",
+            "description": "📈 **Hiring Velocity Score** - Cross-reference job postings with BLS baselines for expansion/contraction signals",
+        },
     ],
 )
 
@@ -1315,6 +1320,7 @@ app.include_router(people_jobs.router, prefix="/api/v1", dependencies=_auth)
 
 # Job Posting Intelligence
 app.include_router(job_postings.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(job_postings_velocity.router, prefix="/api/v1", dependencies=_auth)
 
 # Site Intelligence Platform
 app.include_router(site_intel_power.router, prefix="/api/v1", dependencies=_auth)

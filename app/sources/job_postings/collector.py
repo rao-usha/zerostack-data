@@ -551,6 +551,14 @@ class JobPostingCollector:
         except Exception as e:
             logger.warning(f"Change detection failed for company {company_id}: {e}")
 
+        # Update hiring velocity score
+        try:
+            from app.sources.job_postings.velocity_scorer import HiringVelocityScorer
+            scorer = HiringVelocityScorer(db)
+            scorer.score_company(company_id)
+        except Exception as e:
+            logger.warning(f"Velocity scoring failed for company {company_id}: {e}")
+
     def _update_ats_config(
         self,
         db: Session,
