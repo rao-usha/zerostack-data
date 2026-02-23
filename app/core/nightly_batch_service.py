@@ -90,6 +90,7 @@ TIER_2 = Tier(
         SourceDef("dunl:uom"),
         SourceDef("dunl:uom_conversions"),
         SourceDef("dunl:calendars", {"years": "2020,2021,2022,2023,2024,2025"}),
+        SourceDef("job_postings:all", {"skip_recent_hours": 20}),
     ],
 )
 

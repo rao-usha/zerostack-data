@@ -19,12 +19,15 @@ from app.sources.job_postings.metadata import (
     normalize_workplace_type,
     normalize_title,
 )
+from app.sources.job_postings.skills_extractor import extract_skills
+from app.sources.job_postings.change_detector import JobPostingChangeDetector
 from app.sources.job_postings.ats.detector import ATSDetector, ATSResult
 from app.sources.job_postings.ats.greenhouse import GreenhouseClient
 from app.sources.job_postings.ats.lever import LeverClient
 from app.sources.job_postings.ats.ashby import AshbyClient
 from app.sources.job_postings.ats.workday import WorkdayClient
 from app.sources.job_postings.ats.generic import GenericJobScraper
+from app.sources.job_postings.ats.smartrecruiters import SmartRecruitersClient
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +55,7 @@ class JobPostingCollector:
         self._ashby = AshbyClient()
         self._workday = WorkdayClient()
         self._generic = GenericJobScraper()
+        self._smartrecruiters = SmartRecruitersClient()
 
     async def close(self):
         await self._detector.close()
@@ -60,6 +64,7 @@ class JobPostingCollector:
         await self._ashby.close()
         await self._workday.close()
         await self._generic.close()
+        await self._smartrecruiters.close()
 
     async def __aenter__(self):
         return self
@@ -106,6 +111,15 @@ class JobPostingCollector:
 
             # Phase 2: Fetch jobs via appropriate client
             raw_jobs = await self._fetch_jobs(ats_config)
+
+            # If cached config returned 0 and we haven't re-detected, try fresh detection
+            if not raw_jobs and not force_rediscover and ats_config.is_known:
+                logger.info(f"Cached ATS config for {company_name} returned 0 jobs, re-detecting...")
+                ats_config = await self._detector.detect(company_name, website, careers_url)
+                result.ats_type = ats_config.ats_type
+                if ats_config.ats_type not in ("unknown",):
+                    raw_jobs = await self._fetch_jobs(ats_config)
+
             result.total_fetched = len(raw_jobs)
             logger.info(f"Fetched {len(raw_jobs)} jobs for {company_name} ({ats_config.ats_type})")
 
@@ -244,9 +258,15 @@ class JobPostingCollector:
             return await self._lever.fetch_jobs(token)
         elif ats_type == "ashby" and token:
             return await self._ashby.fetch_jobs(token)
+        elif ats_type == "smartrecruiters" and token:
+            return await self._smartrecruiters.fetch_jobs(token)
         elif ats_type == "workday":
-            url = ats.careers_url or ""
-            return await self._workday.fetch_jobs(url, token)
+            # Token may be a full Workday URL if detected from HTML
+            if token and "myworkdayjobs" in token:
+                url = token  # Use token as URL when it's a full Workday URL
+            else:
+                url = ats.careers_url or ""
+            return await self._workday.fetch_jobs(url, token if "myworkdayjobs" not in token else None)
         elif ats_type == "generic" and ats.careers_url:
             return await self._generic.fetch_jobs(ats.careers_url)
         else:
@@ -267,6 +287,8 @@ class JobPostingCollector:
                     rec = self._lever.normalize_job(raw, token)
                 elif ats_type == "ashby":
                     rec = self._ashby.normalize_job(raw, token)
+                elif ats_type == "smartrecruiters":
+                    rec = self._smartrecruiters.normalize_job(raw, token)
                 elif ats_type == "workday":
                     rec = self._workday.normalize_job(raw, token)
                 elif ats_type == "generic":
@@ -282,6 +304,12 @@ class JobPostingCollector:
                     rec["employment_type"] = normalize_employment_type(rec["employment_type"])
                 if rec.get("workplace_type"):
                     rec["workplace_type"] = normalize_workplace_type(rec["workplace_type"])
+
+                # Extract skills from description
+                if rec.get("description_text"):
+                    reqs = extract_skills(rec["description_text"], rec.get("title", ""))
+                    if reqs and reqs.get("skill_count", 0) > 0:
+                        rec["requirements"] = reqs
 
                 normalized.append(rec)
             except Exception as e:
@@ -321,6 +349,7 @@ class JobPostingCollector:
 
             if existing:
                 # Update last_seen and mutable fields
+                req_json_upd = json.dumps(job.get("requirements")) if job.get("requirements") else None
                 db.execute(
                     text("""
                         UPDATE job_postings SET
@@ -335,11 +364,12 @@ class JobPostingCollector:
                             seniority_level = COALESCE(:seniority_level, seniority_level),
                             salary_min = COALESCE(:salary_min, salary_min),
                             salary_max = COALESCE(:salary_max, salary_max),
+                            requirements = COALESCE(:requirements_json, requirements),
                             status = 'open',
                             closed_at = NULL
                         WHERE company_id = :cid AND external_job_id = :eid
                     """),
-                    {**job, "cid": company_id, "eid": ext_id},
+                    {**job, "cid": company_id, "eid": ext_id, "requirements_json": req_json_upd},
                 )
                 updated_count += 1
             else:
@@ -513,6 +543,13 @@ class JobPostingCollector:
                 "emp": json.dumps(by_employment),
             },
         )
+
+        # Run change detection to generate alerts
+        try:
+            detector = JobPostingChangeDetector()
+            detector.detect(db, company_id, today)
+        except Exception as e:
+            logger.warning(f"Change detection failed for company {company_id}: {e}")
 
     def _update_ats_config(
         self,

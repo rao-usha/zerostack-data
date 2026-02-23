@@ -90,6 +90,31 @@ def generate_create_job_posting_snapshots_sql() -> str:
     """
 
 
+def generate_create_job_posting_alerts_sql() -> str:
+    return """
+    CREATE TABLE IF NOT EXISTS job_posting_alerts (
+        id              SERIAL PRIMARY KEY,
+        company_id      INTEGER REFERENCES industrial_companies(id),
+        alert_type      TEXT NOT NULL,
+        severity        TEXT DEFAULT 'medium',
+        snapshot_date   DATE NOT NULL,
+        current_total   INTEGER,
+        previous_total  INTEGER,
+        change_pct      NUMERIC(8,2),
+        change_abs      INTEGER,
+        department      TEXT,
+        details         JSONB,
+        acknowledged    BOOLEAN DEFAULT FALSE,
+        created_at      TIMESTAMP DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_jpa_company_id ON job_posting_alerts(company_id);
+    CREATE INDEX IF NOT EXISTS idx_jpa_alert_type ON job_posting_alerts(alert_type);
+    CREATE INDEX IF NOT EXISTS idx_jpa_severity ON job_posting_alerts(severity);
+    CREATE INDEX IF NOT EXISTS idx_jpa_snapshot_date ON job_posting_alerts(snapshot_date);
+    """
+
+
 # ---------------------------------------------------------------------------
 # Dataset registry info
 # ---------------------------------------------------------------------------
