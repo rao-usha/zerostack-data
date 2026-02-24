@@ -44,7 +44,7 @@ class FHFAClient:
     """
 
     # FHFA data download URLs
-    BASE_URL = "https://www.fhfa.gov/HPI_master.csv"
+    BASE_URL = "https://www.fhfa.gov/hpi/download/monthly/hpi_master.csv"
 
     DEFAULT_MAX_CONCURRENCY = 2
 
