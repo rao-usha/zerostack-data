@@ -73,6 +73,7 @@ class InvestorProfileTemplate:
                 db, investor_id, investor_type
             ),
             "team": self._get_team(db, investor_id, investor_type),
+            "segments": self._get_segments(db, investor_id, investor_type),
         }
 
         return data
@@ -395,8 +396,37 @@ class InvestorProfileTemplate:
             for row in result.fetchall()
         ]
 
+    def _get_segments(
+        self, db: Session, investor_id: int, investor_type: str,
+    ) -> list:
+        """Get business segment / fund breakdown for PE firms."""
+        if investor_type != "pe_firm":
+            return []
+
+        result = db.execute(
+            text("""
+                SELECT name, strategy, final_close_usd_millions, status
+                FROM pe_funds
+                WHERE firm_id = :investor_id
+                  AND name NOT LIKE '%13F%'
+                ORDER BY final_close_usd_millions DESC NULLS LAST, name
+            """),
+            {"investor_id": investor_id},
+        )
+
+        segments = []
+        for row in result.fetchall():
+            aum = float(row[2]) if row[2] else None
+            segments.append({
+                "name": row[0],
+                "strategy": row[1],
+                "aum_millions": aum,
+                "status": row[3],
+            })
+        return segments
+
     def _get_team(
-        self, db: Session, investor_id: int, investor_type: str, limit: int = 15
+        self, db: Session, investor_id: int, investor_type: str, limit: int = 50
     ) -> list:
         """Get key team members for PE firms."""
         if investor_type != "pe_firm":
@@ -443,6 +473,7 @@ class InvestorProfileTemplate:
         holdings = data.get("top_holdings", [])
         sectors = data.get("sector_allocation", [])
         team = data.get("team", [])
+        segments = data.get("segments", [])
 
         aum_display = _format_aum(investor.get("aum_millions"))
 
@@ -493,6 +524,48 @@ class InvestorProfileTemplate:
                 <td>{bio_snippet}</td>
             </tr>
             """
+
+        # Build segments section HTML
+        segments_section = ""
+        if segments:
+            seg_rows = ""
+            seg_total = sum(s.get("aum_millions") or 0 for s in segments)
+            for s in segments:
+                aum = s.get("aum_millions")
+                aum_display_seg = _format_aum(aum) if aum else "-"
+                pct = f"{aum / seg_total * 100:.0f}%" if aum and seg_total else "-"
+                seg_rows += f"""
+            <tr>
+                <td>{s.get('name', 'N/A')}</td>
+                <td>{s.get('strategy') or '-'}</td>
+                <td class="num">{aum_display_seg}</td>
+                <td class="num">{pct}</td>
+            </tr>
+                """
+            total_display = _format_aum(seg_total) if seg_total else "-"
+            segments_section = f"""
+    <h2>AUM by Business Segment</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Segment</th>
+                <th>Strategy</th>
+                <th class="num">AUM</th>
+                <th class="num">% of Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {seg_rows}
+            <tr style="font-weight: bold; border-top: 2px solid #3498db;">
+                <td>Total</td>
+                <td></td>
+                <td class="num">{total_display}</td>
+                <td class="num">100%</td>
+            </tr>
+        </tbody>
+    </table>
+    <p class="footnote">Source: Blackstone 10-K filing (Dec 31, 2024)</p>
+"""
 
         # Build team section HTML
         team_section = ""
@@ -594,6 +667,8 @@ class InvestorProfileTemplate:
             {exposure_stat}
         </div>
     </div>
+
+    {segments_section}
 
     <h2>All Holdings ({len(holdings)})</h2>
     <div class="table-container">
