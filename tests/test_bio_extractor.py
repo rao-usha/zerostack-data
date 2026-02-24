@@ -393,6 +393,9 @@ class TestPageTextExtraction:
         extractor._fetch_url = AsyncMock(
             return_value=_make_http_response(200, html)
         )
+        # Mock Playwright fallback so it doesn't hit real URLs when
+        # _has_people_content() fails (test HTML has < 3 names)
+        extractor._fetch_with_playwright = AsyncMock(return_value=None)
         text = await extractor._fetch_page_text("https://example.com/team")
         assert text is not None
         assert "John Doe" in text
