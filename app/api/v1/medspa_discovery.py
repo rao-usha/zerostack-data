@@ -239,33 +239,48 @@ def trigger_discovery(
     calls_per_zip = len(term_list) if term_list else 2
     estimated_calls = min(limit, max_api_calls // calls_per_zip) * calls_per_zip
 
-    def _run_discovery():
+    import threading
+
+    def _run_in_thread():
+        import traceback as _tb
         from app.core.database import get_db as _get_db
 
         gen = _get_db()
         session = next(gen)
         try:
+            print("[medspa-discovery] Starting discovery...", flush=True)
             collector = MedSpaDiscoveryCollector(session)
-            result = asyncio.run(
-                collector.discover(
-                    api_key=api_key,
-                    limit=limit,
-                    states=state_list,
-                    min_grade=min_grade,
-                    search_terms=term_list,
-                    max_api_calls=max_api_calls,
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(
+                    collector.discover(
+                        api_key=api_key,
+                        limit=limit,
+                        states=state_list,
+                        min_grade=min_grade,
+                        search_terms=term_list,
+                        max_api_calls=max_api_calls,
+                    )
                 )
+            finally:
+                loop.close()
+            print(
+                f"[medspa-discovery] Complete: "
+                f"{result.get('unique_businesses', 0)} unique businesses, "
+                f"{result.get('zips_searched', 0)} ZIPs searched",
+                flush=True,
             )
-            logger.info(f"Med-spa discovery complete: {result}")
-        except Exception as e:
-            logger.error(f"Med-spa discovery failed: {e}", exc_info=True)
+        except Exception as exc:
+            print(f"[medspa-discovery] FAILED: {exc}", flush=True)
+            _tb.print_exc()
         finally:
             try:
                 next(gen)
             except StopIteration:
                 pass
 
-    background_tasks.add_task(_run_discovery)
+    threading.Thread(target=_run_in_thread, daemon=True).start()
 
     return {
         "status": "started",
