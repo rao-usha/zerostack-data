@@ -67,7 +67,7 @@ def generate_create_medspa_prospects_sql() -> str:
         address         TEXT,
         city            TEXT,
         state           TEXT,
-        zip_code        VARCHAR(5),
+        zip_code        VARCHAR(10),
         categories      TEXT[],
         is_closed       BOOLEAN DEFAULT false,
 

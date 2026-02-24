@@ -189,6 +189,11 @@ class MedSpaDiscoveryCollector:
         if not prospects:
             return []
 
+        # Normalize ZIP codes to 5 chars (Yelp sometimes returns ZIP+4)
+        for p in prospects:
+            zc = p.get("zip_code") or ""
+            p["zip_code"] = zc[:5] if len(zc) > 5 else zc
+
         # Compute competitor_count_in_zip
         zip_counts: Counter = Counter(p.get("zip_code") for p in prospects)
         for p in prospects:
@@ -361,12 +366,21 @@ class MedSpaDiscoveryCollector:
                     params["batch_id"] = batch_id
                     params["search_term"] = search_term
                     params["model_version"] = MODEL_VERSION
+                    # Convert Python list to PostgreSQL TEXT[] literal
+                    cats = params.get("categories")
+                    if isinstance(cats, list):
+                        params["categories"] = "{" + ",".join(str(c) for c in cats) + "}"
+                    elif cats is None:
+                        params["categories"] = "{}"
                     self.db.execute(upsert_sql, params)
                 self.db.commit()
                 total_saved += len(batch)
             logger.info(f"Saved {total_saved} med-spa prospects")
+            print(f"[medspa-discovery] Saved {total_saved} prospects to DB", flush=True)
         except Exception as e:
             logger.error(f"Error bulk-saving med-spa prospects: {e}")
+            print(f"[medspa-discovery] SAVE ERROR: {e}", flush=True)
+            import traceback; traceback.print_exc()
             self.db.rollback()
 
     # ------------------------------------------------------------------
