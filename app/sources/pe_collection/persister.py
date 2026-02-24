@@ -609,12 +609,16 @@ class PEPersister:
                 .first()
             )
             if not exists:
+                grad_year = edu.get("graduation_year")
+                start_year = edu.get("start_year")
                 self.db.add(
                     PEPersonEducation(
                         person_id=person_id,
                         institution=institution,
                         degree=edu.get("degree"),
                         field_of_study=edu.get("field"),
+                        graduation_year=int(grad_year) if grad_year else None,
+                        start_year=int(start_year) if start_year else None,
                     )
                 )
 
@@ -634,16 +638,23 @@ class PEPersister:
                 .first()
             )
             if not exists:
+                exp_start = exp.get("start_year")
+                exp_end = exp.get("end_year")
                 self.db.add(
                     PEPersonExperience(
                         person_id=person_id,
                         company=company,
                         title=title,
+                        start_date=date(int(exp_start), 1, 1) if exp_start else None,
+                        end_date=date(int(exp_end), 1, 1) if exp_end else None,
+                        is_current=exp.get("is_current", False),
                     )
                 )
 
         # Firm link
         firm_id = data.get("firm_id") or entity_id
+        start_year = data.get("start_year_at_firm")
+        firm_start_date = date(int(start_year), 1, 1) if start_year else None
         existing_link = (
             self.db.query(PEFirmPeople)
             .filter(
@@ -658,8 +669,22 @@ class PEPersister:
                     firm_id=firm_id,
                     person_id=person_id,
                     title=data.get("title", "Team Member"),
+                    seniority=data.get("seniority"),
+                    department=data.get("department"),
+                    start_date=firm_start_date,
                     is_current=True,
                 )
+            )
+        else:
+            # Update existing link with seniority/department/start_date if missing
+            self._null_preserving_update(
+                existing_link,
+                {
+                    "seniority": data.get("seniority"),
+                    "department": data.get("department"),
+                    "start_date": firm_start_date,
+                },
+                item.confidence,
             )
 
         self.stats["persisted"] += 1

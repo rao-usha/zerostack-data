@@ -321,7 +321,7 @@ def get_sparse_companies(
     params = {}
 
     if firm_name:
-        sql += " AND pf.name ILIKE :firm_name"
+        sql += " AND (pf.name ILIKE :firm_name OR pc.current_pe_owner ILIKE :firm_name)"
         params["firm_name"] = f"%{firm_name}%"
 
     sql += " ORDER BY pc.name"
@@ -364,7 +364,7 @@ def get_companies_needing_sic(
     params = {}
 
     if firm_name:
-        sql += " AND pf.name ILIKE :firm_name"
+        sql += " AND (pf.name ILIKE :firm_name OR pc.current_pe_owner ILIKE :firm_name)"
         params["firm_name"] = f"%{firm_name}%"
 
     sql += " ORDER BY pc.name"
@@ -400,7 +400,7 @@ def get_companies_for_mcap(
     params = {}
 
     if firm_name:
-        sql += " AND pf.name ILIKE :firm_name"
+        sql += " AND (pf.name ILIKE :firm_name OR pc.current_pe_owner ILIKE :firm_name)"
         params["firm_name"] = f"%{firm_name}%"
 
     sql += " ORDER BY pc.name"

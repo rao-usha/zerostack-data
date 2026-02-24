@@ -50,12 +50,15 @@ Return ONLY valid JSON — an array of person objects:
   {{
     "full_name": "First Last",
     "title": "Managing Director",
+    "seniority": "Partner",
+    "department": "Private Equity",
+    "start_year_at_firm": 2005,
     "bio": "2-3 sentence professional summary",
     "education": [
-      {{"institution": "Harvard Business School", "degree": "MBA", "field": "Finance"}}
+      {{"institution": "Harvard Business School", "degree": "MBA", "field": "Finance", "graduation_year": 2002}}
     ],
     "experience": [
-      {{"company": "Goldman Sachs", "title": "Vice President"}}
+      {{"company": "Goldman Sachs", "title": "Vice President", "start_year": 1998, "end_year": 2005}}
     ],
     "focus_areas": ["Technology", "Healthcare"]
   }}
@@ -66,6 +69,10 @@ Rules:
 - If education or experience details are not mentioned, use empty arrays
 - Keep bios factual; do not fabricate details not present in the text
 - focus_areas should reflect investment or industry focus mentioned in their bio
+- seniority must be one of: Partner, Managing Director, Principal, VP, Associate, Analyst
+- department should be the business unit or function (e.g. "Private Equity", "Real Estate", "Finance")
+- start_year_at_firm: year they joined {firm_name} (integer), null if unknown
+- graduation_year, start_year, end_year: integers (e.g. 2005), null if unknown
 
 Page text:
 {text}"""
@@ -209,6 +216,9 @@ class BioExtractor(BasePECollector):
                             "firm_name": entity_name,
                             "full_name": full_name,
                             "title": person.get("title"),
+                            "seniority": person.get("seniority"),
+                            "department": person.get("department"),
+                            "start_year_at_firm": person.get("start_year_at_firm"),
                             "bio": person.get("bio"),
                             "education": person.get("education", []),
                             "experience": person.get("experience", []),

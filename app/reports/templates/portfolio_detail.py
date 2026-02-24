@@ -5,6 +5,7 @@ Generates a detailed portfolio breakdown with all holdings,
 sector distribution, stage breakdown, and recent changes.
 """
 
+import json
 import logging
 from datetime import datetime
 from typing import Dict, Any, List
@@ -12,6 +13,14 @@ from io import BytesIO
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+
+from app.reports.design_system import (
+    html_document, hero_header, kpi_card, kpi_grid,
+    section_heading, data_table, pill_badge,
+    chart_container, chart_init_js, footer,
+    build_doughnut_config, build_horizontal_bar_config,
+    build_bar_fallback, CHART_COLORS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -206,139 +215,140 @@ class PortfolioDetailTemplate:
         ]
 
     def render_html(self, data: Dict[str, Any]) -> str:
-        """Render report as HTML."""
+        """Render report as HTML using the shared design system."""
+        investor = data.get("investor", {})
         holdings = data.get("holdings", [])
         sectors = data.get("sector_breakdown", [])
         stages = data.get("stage_breakdown", [])
+        locations = data.get("location_breakdown", [])
 
-        # Build holdings rows
-        holdings_rows = ""
+        charts_js = ""
+        body = ""
+        current_count = len([h for h in holdings if h.get("current")])
+
+        # ── Hero Header ──────────────────────────────────────────
+        pills = []
+        if investor.get("type"):
+            pills.append({"label": "Type", "value": str(investor["type"])})
+        if investor.get("jurisdiction"):
+            pills.append({"label": "Location", "value": str(investor["jurisdiction"])})
+
+        body += hero_header(
+            title=f"{investor.get('name', 'Unknown')} — Portfolio Detail",
+            pills=pills if pills else None,
+        )
+
+        # ── KPI Cards ────────────────────────────────────────────
+        cards = ""
+        cards += kpi_card(str(current_count), "Current Holdings", "blue")
+        cards += kpi_card(str(len(holdings)), "Total Holdings", "emerald")
+        cards += kpi_card(str(len(sectors)), "Sectors", "slate")
+
+        body += '\n    <main class="container">'
+        body += "\n" + kpi_grid(cards)
+
+        # ── Holdings Table ───────────────────────────────────────
+        body += "\n" + section_heading("All Holdings", count=len(holdings))
+
+        table_rows = []
         for h in holdings:
-            status = "Current" if h.get("current") else "Exited"
-            holdings_rows += f"""
-            <tr>
-                <td>{h.get('name', 'N/A')}</td>
-                <td>{h.get('industry', 'N/A')}</td>
-                <td>{h.get('location', 'N/A')}</td>
-                <td>{h.get('stage', 'N/A')}</td>
-                <td>{status}</td>
-            </tr>
-            """
+            status = pill_badge("Current", "public") if h.get("current") else pill_badge("Exited", "default")
+            table_rows.append([
+                f'<span class="company-name">{h.get("name", "N/A")}</span>',
+                h.get("industry", "N/A"),
+                h.get("location", "N/A"),
+                h.get("stage", "N/A"),
+                status,
+            ])
 
-        # Build sector rows
-        sector_rows = ""
-        for s in sectors:
-            sector_rows += f"""
-            <tr>
-                <td>{s.get('sector', 'N/A')}</td>
-                <td>{s.get('current', 0)}</td>
-                <td>{s.get('total', 0)}</td>
-                <td>{s.get('pct', 0)}%</td>
-            </tr>
-            """
+        body += "\n" + data_table(
+            headers=["Company", "Industry", "Location", "Stage", "Status"],
+            rows=table_rows,
+        )
 
-        # Build stage rows
-        stage_rows = ""
-        for s in stages:
-            stage_rows += f"""
-            <tr>
-                <td>{s.get('stage', 'N/A')}</td>
-                <td>{s.get('current', 0)}</td>
-                <td>{s.get('total', 0)}</td>
-                <td>{s.get('pct', 0)}%</td>
-            </tr>
-            """
+        # ── Sector Breakdown (doughnut chart + table) ────────────
+        if sectors:
+            body += "\n" + section_heading("Sector Breakdown", count=len(sectors))
 
-        investor = data.get('investor', {})
+            sector_labels = [s.get("sector", "N/A") for s in sectors]
+            sector_values = [float(s.get("total", 0)) for s in sectors]
+            doughnut_config = build_doughnut_config(sector_labels, sector_values)
+            doughnut_json = json.dumps(doughnut_config)
+            doughnut_fallback = build_bar_fallback(sector_labels, sector_values)
 
-        html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <title>{investor.get('name', 'Portfolio')} - Detail Report</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 40px; color: #333; }}
-        h1 {{ color: #2c3e50; border-bottom: 2px solid #27ae60; padding-bottom: 10px; }}
-        h2 {{ color: #34495e; margin-top: 30px; }}
-        table {{ width: 100%; border-collapse: collapse; margin: 15px 0; }}
-        th, td {{ padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }}
-        th {{ background: #27ae60; color: white; }}
-        tr:hover {{ background: #f5f5f5; }}
-        .stats {{ display: flex; gap: 20px; margin: 20px 0; }}
-        .stat-box {{ background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; flex: 1; }}
-        .stat-value {{ font-size: 1.5em; font-weight: bold; color: #27ae60; }}
-        .meta {{ color: #95a5a6; font-size: 0.9em; margin-top: 40px; }}
-    </style>
-</head>
-<body>
-    <h1>{investor.get('name', 'Unknown')} - Portfolio Detail</h1>
+            body += '\n<div class="charts-row">'
+            body += "\n" + chart_container("sectorChart", doughnut_json, doughnut_fallback)
+            charts_js += chart_init_js("sectorChart", doughnut_json)
 
-    <div class="stats">
-        <div class="stat-box">
-            <div class="stat-value">{len([h for h in holdings if h.get('current')])}</div>
-            <div>Current Holdings</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-value">{len(holdings)}</div>
-            <div>Total Holdings</div>
-        </div>
-        <div class="stat-box">
-            <div class="stat-value">{len(sectors)}</div>
-            <div>Sectors</div>
-        </div>
-    </div>
+            # Sector table alongside chart
+            sector_table_rows = []
+            for s in sectors:
+                sector_table_rows.append([
+                    s.get("sector", "N/A"),
+                    str(s.get("current", 0)),
+                    str(s.get("total", 0)),
+                    f'{s.get("pct", 0)}%',
+                ])
+            body += "\n" + data_table(
+                headers=["Sector", "Current", "Total", "% of Portfolio"],
+                rows=sector_table_rows,
+                numeric_columns={1, 2, 3},
+            )
+            body += "\n</div>"
 
-    <h2>All Holdings</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Company</th>
-                <th>Industry</th>
-                <th>Location</th>
-                <th>Stage</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            {holdings_rows if holdings_rows else '<tr><td colspan="5">No holdings</td></tr>'}
-        </tbody>
-    </table>
+        # ── Stage Breakdown (horizontal bar chart) ───────────────
+        if stages:
+            body += "\n" + section_heading("Stage Breakdown", count=len(stages))
 
-    <h2>Sector Breakdown</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Sector</th>
-                <th>Current</th>
-                <th>Total</th>
-                <th>% of Portfolio</th>
-            </tr>
-        </thead>
-        <tbody>
-            {sector_rows if sector_rows else '<tr><td colspan="4">No data</td></tr>'}
-        </tbody>
-    </table>
+            stage_labels = [s.get("stage", "N/A") for s in stages]
+            stage_values = [float(s.get("total", 0)) for s in stages]
+            bar_config = build_horizontal_bar_config(stage_labels, stage_values, dataset_label="Companies")
+            bar_json = json.dumps(bar_config)
+            bar_fallback = build_bar_fallback(stage_labels, stage_values)
 
-    <h2>Stage Breakdown</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Stage</th>
-                <th>Current</th>
-                <th>Total</th>
-                <th>% of Portfolio</th>
-            </tr>
-        </thead>
-        <tbody>
-            {stage_rows if stage_rows else '<tr><td colspan="4">No data</td></tr>'}
-        </tbody>
-    </table>
+            body += '\n<div class="charts-row">'
+            body += "\n" + chart_container("stageChart", bar_json, bar_fallback)
+            charts_js += chart_init_js("stageChart", bar_json)
 
-    <p class="meta">Generated: {data.get('generated_at', 'N/A')} | Nexdata Investment Intelligence</p>
-</body>
-</html>
-        """
-        return html
+            # Stage table alongside chart
+            stage_table_rows = []
+            for s in stages:
+                stage_table_rows.append([
+                    s.get("stage", "N/A"),
+                    str(s.get("current", 0)),
+                    str(s.get("total", 0)),
+                    f'{s.get("pct", 0)}%',
+                ])
+            body += "\n" + data_table(
+                headers=["Stage", "Current", "Total", "% of Portfolio"],
+                rows=stage_table_rows,
+                numeric_columns={1, 2, 3},
+            )
+            body += "\n</div>"
+
+        # ── Location Breakdown (horizontal bar chart) ────────────
+        if locations:
+            body += "\n" + section_heading("Location Breakdown", count=len(locations))
+
+            loc_labels = [loc.get("location", "N/A") for loc in locations]
+            loc_values = [float(loc.get("total", 0)) for loc in locations]
+            loc_config = build_horizontal_bar_config(loc_labels, loc_values, dataset_label="Companies")
+            loc_json = json.dumps(loc_config)
+            loc_fallback = build_bar_fallback(loc_labels, loc_values)
+
+            body += "\n" + chart_container("locationChart", loc_json, loc_fallback)
+            charts_js += chart_init_js("locationChart", loc_json)
+
+        body += "\n    </main>"
+
+        # ── Footer ───────────────────────────────────────────────
+        body += "\n" + footer(data.get("generated_at", "N/A"))
+
+        return html_document(
+            title=f"{investor.get('name', 'Portfolio')} - Detail Report",
+            body_content=body,
+            charts_js=charts_js,
+        )
 
     def render_excel(self, data: Dict[str, Any]) -> bytes:
         """Render report as Excel workbook."""

@@ -5,6 +5,7 @@ Generates a one-pager with investor overview, portfolio summary,
 top holdings, sector allocation, and team/leadership.
 """
 
+import json
 import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
@@ -12,6 +13,14 @@ from io import BytesIO
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+
+from app.reports.design_system import (
+    html_document, hero_header, kpi_card, kpi_grid,
+    section_heading, data_table, pill_badge, profile_card,
+    chart_container, chart_init_js, footer,
+    build_doughnut_config, build_horizontal_bar_config,
+    build_bar_fallback, CHART_COLORS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -255,7 +264,7 @@ class InvestorProfileTemplate:
             base = self._get_pe_portfolio_query(investor_id, firm_name)
             result = db.execute(
                 text(base + """
-                SELECT name, industry, location, stage, market_cap_usd, ticker
+                SELECT name, industry, location, stage, market_cap_usd, ticker, ownership_status
                 FROM deduped
                 WHERE is_13f = 0
                 ORDER BY market_cap_usd DESC NULLS LAST, name
@@ -267,7 +276,7 @@ class InvestorProfileTemplate:
             if not rows:
                 result = db.execute(
                     text(base + """
-                    SELECT name, industry, location, stage, market_cap_usd, ticker
+                    SELECT name, industry, location, stage, market_cap_usd, ticker, ownership_status
                     FROM deduped
                     ORDER BY market_cap_usd DESC NULLS LAST, name
                     """),
@@ -278,7 +287,7 @@ class InvestorProfileTemplate:
             result = db.execute(
                 text("""
                 SELECT company_name, company_industry, company_location, company_stage,
-                       NULL as market_cap_usd, NULL as ticker
+                       NULL as market_cap_usd, NULL as ticker, NULL as ownership_status
                 FROM portfolio_companies
                 WHERE investor_id = :investor_id
                     AND investor_type = :investor_type
@@ -300,6 +309,7 @@ class InvestorProfileTemplate:
                 "stage": row[3],
                 "market_cap": float(row[4]) if row[4] else None,
                 "ticker": row[5],
+                "ownership_status": row[6],
             }
             for row in rows
         ]
@@ -428,14 +438,14 @@ class InvestorProfileTemplate:
     def _get_team(
         self, db: Session, investor_id: int, investor_type: str, limit: int = 50
     ) -> list:
-        """Get key team members for PE firms."""
+        """Get key team members for PE firms with education and experience."""
         if investor_type != "pe_firm":
             return []
 
         result = db.execute(
             text("""
-                SELECT p.full_name, fp.title, fp.seniority, fp.department,
-                       p.linkedin_url, p.bio
+                SELECT p.id, p.full_name, fp.title, fp.seniority, fp.department,
+                       p.linkedin_url, p.bio, fp.start_date
                 FROM pe_firm_people fp
                 JOIN pe_people p ON fp.person_id = p.id
                 WHERE fp.firm_id = :investor_id AND fp.is_current = true
@@ -454,20 +464,71 @@ class InvestorProfileTemplate:
             {"investor_id": investor_id, "limit": limit},
         )
 
-        return [
-            {
-                "name": row[0],
-                "title": row[1],
-                "seniority": row[2],
-                "department": row[3],
-                "linkedin": row[4],
-                "bio": (row[5][:150] + "...") if row[5] and len(row[5]) > 150 else row[5],
-            }
-            for row in result.fetchall()
-        ]
+        rows = result.fetchall()
+        if not rows:
+            return []
+
+        # Collect person IDs for batch queries
+        person_ids = [row[0] for row in rows]
+
+        # Batch-fetch education
+        edu_result = db.execute(
+            text("""
+                SELECT person_id, institution, degree, field_of_study, graduation_year
+                FROM pe_person_education
+                WHERE person_id = ANY(:pids)
+                ORDER BY graduation_year DESC NULLS LAST
+            """),
+            {"pids": person_ids},
+        )
+        edu_map: dict = {}
+        for erow in edu_result.fetchall():
+            edu_map.setdefault(erow[0], []).append({
+                "institution": erow[1],
+                "degree": erow[2],
+                "field": erow[3],
+                "year": erow[4],
+            })
+
+        # Batch-fetch experience (prior roles, not current)
+        exp_result = db.execute(
+            text("""
+                SELECT person_id, company, title, start_date, end_date
+                FROM pe_person_experience
+                WHERE person_id = ANY(:pids)
+                ORDER BY start_date DESC NULLS LAST
+            """),
+            {"pids": person_ids},
+        )
+        exp_map: dict = {}
+        for xrow in exp_result.fetchall():
+            exp_map.setdefault(xrow[0], []).append({
+                "company": xrow[1],
+                "title": xrow[2],
+                "start_year": xrow[3].year if xrow[3] else None,
+                "end_year": xrow[4].year if xrow[4] else None,
+            })
+
+        team = []
+        for row in rows:
+            pid = row[0]
+            start_date = row[7]
+            start_year = start_date.year if start_date else None
+            team.append({
+                "name": row[1],
+                "title": row[2],
+                "seniority": row[3],
+                "department": row[4],
+                "linkedin": row[5],
+                "bio": row[6],
+                "start_year": start_year,
+                "education": edu_map.get(pid, []),
+                "experience": exp_map.get(pid, []),
+            })
+        return team
 
     def render_html(self, data: Dict[str, Any]) -> str:
-        """Render report as HTML."""
+        """Render report as HTML using the shared design system."""
         investor = data.get("investor", {})
         summary = data.get("portfolio_summary", {})
         holdings = data.get("top_holdings", [])
@@ -476,244 +537,194 @@ class InvestorProfileTemplate:
         segments = data.get("segments", [])
 
         aum_display = _format_aum(investor.get("aum_millions"))
+        charts_js = ""
+        body = ""
 
-        # Build holdings table rows
-        holdings_rows = ""
-        for h in holdings:
-            industry = h.get('industry') or '-'
-            location = h.get('location') or '-'
-            stage = h.get('stage') or '-'
-            ticker = h.get('ticker') or '-'
-            mcap_display = _format_market_cap(h.get('market_cap'))
-            holdings_rows += f"""
-            <tr>
-                <td>{h.get('name', 'N/A')}</td>
-                <td>{ticker}</td>
-                <td>{industry}</td>
-                <td>{location}</td>
-                <td>{stage}</td>
-                <td class="num">{mcap_display}</td>
-            </tr>
-            """
+        # ── Hero Header ──────────────────────────────────────────
+        pills = []
+        if investor.get("type"):
+            pills.append({"label": "Type", "value": str(investor["type"])})
+        if investor.get("jurisdiction"):
+            pills.append({"label": "HQ", "value": str(investor["jurisdiction"])})
+        if investor.get("aum_millions"):
+            pills.append({"label": "AUM", "value": aum_display})
+        if investor.get("founded_year"):
+            pills.append({"label": "Founded", "value": str(investor["founded_year"])})
+        if investor.get("employee_count"):
+            pills.append({"label": "Employees", "value": f"{investor['employee_count']:,}"})
 
-        # Build sector table rows
-        sector_rows = ""
-        for s in sectors:
-            mcap_display = _format_market_cap(s.get('market_cap'))
-            sector_rows += f"""
-            <tr>
-                <td>{s.get('sector', 'N/A')}</td>
-                <td>{s.get('count', 0)}</td>
-                <td>{s.get('pct', 0)}%</td>
-                <td class="num">{mcap_display}</td>
-            </tr>
-            """
+        body += hero_header(
+            title=investor.get("name", "Unknown Investor"),
+            website=investor.get("website"),
+            pills=pills if pills else None,
+        )
 
-        # Build team table rows
-        team_rows = ""
-        for t in team:
-            name = t.get('name', 'N/A')
-            if t.get('linkedin'):
-                name = f'<a href="{t["linkedin"]}" target="_blank">{name}</a>'
-            bio_snippet = t.get('bio') or ''
-            team_rows += f"""
-            <tr>
-                <td>{name}</td>
-                <td>{t.get('title', '-')}</td>
-                <td>{t.get('seniority') or '-'}</td>
-                <td>{bio_snippet}</td>
-            </tr>
-            """
+        # ── KPI Cards ────────────────────────────────────────────
+        total_mcap = summary.get("total_market_cap")
+        exposure_display = _format_market_cap(total_mcap) if total_mcap else None
 
-        # Build segments section HTML
-        segments_section = ""
+        cards = ""
+        cards += kpi_card(str(summary.get("current_holdings", 0)), "Current Holdings", "blue")
+        cards += kpi_card(str(summary.get("sectors", 0)), "Sectors", "emerald")
+        cards += kpi_card(str(summary.get("total_holdings", 0)), "Total (incl. exited)", "slate")
+        if exposure_display:
+            cards += kpi_card(exposure_display, "Est. Public Equity Exposure*", "amber")
+
+        body += '\n    <main class="container">'
+        body += "\n" + kpi_grid(cards)
+
+        # ── AUM Segments (Chart.js horizontal bar) ───────────────
         if segments:
-            seg_rows = ""
             seg_total = sum(s.get("aum_millions") or 0 for s in segments)
+            body += "\n" + section_heading("AUM by Business Segment")
+
+            seg_labels = [s.get("name", "N/A") for s in segments]
+            seg_values = [s.get("aum_millions") or 0 for s in segments]
+            seg_config = build_horizontal_bar_config(seg_labels, seg_values, dataset_label="AUM ($M)")
+            seg_config_json = json.dumps(seg_config)
+            seg_fallback = build_bar_fallback(seg_labels, seg_values)
+            body += "\n" + chart_container("aumSegmentChart", seg_config_json, seg_fallback)
+            charts_js += chart_init_js("aumSegmentChart", seg_config_json)
+
+            # Segment detail cards
+            seg_cards = ""
             for s in segments:
                 aum = s.get("aum_millions")
-                aum_display_seg = _format_aum(aum) if aum else "-"
-                pct = f"{aum / seg_total * 100:.0f}%" if aum and seg_total else "-"
-                seg_rows += f"""
-            <tr>
-                <td>{s.get('name', 'N/A')}</td>
-                <td>{s.get('strategy') or '-'}</td>
-                <td class="num">{aum_display_seg}</td>
-                <td class="num">{pct}</td>
-            </tr>
-                """
+                aum_seg = _format_aum(aum) if aum else "-"
+                pct = (aum / seg_total * 100) if aum and seg_total else 0
+                pct_display = f"{pct:.0f}%" if pct else "-"
+                bar_width = pct if pct else 0
+                strategy = s.get("strategy") or "-"
+                seg_cards += f"""
+                <div class="segment-card">
+                    <div class="segment-header">
+                        <span class="segment-name">{s.get('name', 'N/A')}</span>
+                        <span class="segment-aum">{aum_seg}</span>
+                    </div>
+                    <div class="segment-strategy">{strategy}</div>
+                    <div class="segment-bar-track">
+                        <div class="segment-bar-fill" style="width: {bar_width}%"></div>
+                    </div>
+                    <div class="segment-pct">{pct_display} of total AUM</div>
+                </div>"""
+
             total_display = _format_aum(seg_total) if seg_total else "-"
-            segments_section = f"""
-    <h2>AUM by Business Segment</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Segment</th>
-                <th>Strategy</th>
-                <th class="num">AUM</th>
-                <th class="num">% of Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            {seg_rows}
-            <tr style="font-weight: bold; border-top: 2px solid #3498db;">
-                <td>Total</td>
-                <td></td>
-                <td class="num">{total_display}</td>
-                <td class="num">100%</td>
-            </tr>
-        </tbody>
-    </table>
-    <p class="footnote">Source: Blackstone 10-K filing (Dec 31, 2024)</p>
-"""
+            body += f"""
+        <div class="segments-grid">{seg_cards}</div>
+        <div class="segment-total">Total: {total_display}</div>
+        <p class="footnote">Source: {investor.get('name', 'Firm')} 10-K filing (Dec 31, 2024)</p>"""
 
-        # Build team section HTML
-        team_section = ""
+        # ── Holdings Table ───────────────────────────────────────
+        body += "\n" + section_heading("Portfolio Holdings", count=len(holdings))
+
+        table_rows = []
+        for h in holdings:
+            ticker = h.get("ticker")
+            ownership = h.get("ownership_status") or ""
+            if ticker:
+                badge = pill_badge("Public", "public")
+                ticker_html = f'<span class="ticker">{ticker}</span>'
+            elif "pe-backed" in ownership.lower():
+                badge = pill_badge("PE-Backed", "pe")
+                ticker_html = "-"
+            elif "subsidiary" in ownership.lower():
+                badge = pill_badge("Subsidiary", "sub")
+                ticker_html = "-"
+            else:
+                badge = pill_badge("Private", "private")
+                ticker_html = "-"
+
+            table_rows.append([
+                f'<span class="company-name">{h.get("name", "N/A")}</span>',
+                ticker_html,
+                h.get("industry") or "-",
+                h.get("location") or "-",
+                badge,
+                _format_market_cap(h.get("market_cap")),
+            ])
+
+        body += "\n" + data_table(
+            headers=["Company", "Ticker", "Industry", "Location", "Status", "Est. Market Cap"],
+            rows=table_rows,
+            numeric_columns={5},
+        )
+
+        # ── Sector Allocation (Chart.js doughnut) ────────────────
+        if sectors:
+            body += "\n" + section_heading("Sector Allocation", count=len(sectors))
+
+            sector_labels = [s.get("sector", "N/A") for s in sectors]
+            sector_values = [float(s.get("count", 0)) for s in sectors]
+            doughnut_config = build_doughnut_config(sector_labels, sector_values)
+            doughnut_json = json.dumps(doughnut_config)
+            doughnut_fallback = build_bar_fallback(sector_labels, sector_values)
+
+            body += '\n<div class="charts-row">'
+            body += "\n" + chart_container("sectorDoughnut", doughnut_json, doughnut_fallback)
+            charts_js += chart_init_js("sectorDoughnut", doughnut_json)
+
+            # Sector summary list alongside chart
+            sector_summary = '<div class="chart-wrapper"><div style="padding: 8px 0;">'
+            for s in sectors:
+                mcap_note = ""
+                if s.get("market_cap"):
+                    mcap_note = f' &middot; {_format_market_cap(s["market_cap"])}'
+                sector_summary += (
+                    f'<div style="padding:6px 0;border-bottom:1px solid var(--border-table)">'
+                    f'<span style="font-weight:600;color:var(--text-primary)">{s.get("sector", "N/A")}</span>'
+                    f'<span style="float:right;color:var(--text-muted)">{s.get("count", 0)} cos &middot; {s.get("pct", 0)}%{mcap_note}</span>'
+                    f'</div>'
+                )
+            sector_summary += "</div></div>"
+            body += "\n" + sector_summary
+            body += "\n</div>"
+
+        # ── Team Section ─────────────────────────────────────────
         if team:
-            team_section = f"""
-    <h2>Key Team Members ({len(team)})</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Title</th>
-                <th>Seniority</th>
-                <th>Bio</th>
-            </tr>
-        </thead>
-        <tbody>
-            {team_rows}
-        </tbody>
-    </table>
-"""
+            body += "\n" + section_heading("Key Team Members", count=len(team))
+            body += '\n<div class="team-grid">'
+            for t in team:
+                name = t.get("name", "N/A")
+                name_parts = name.split()
+                if len(name_parts) >= 2:
+                    initials = (name_parts[0][0] + name_parts[-1][0]).upper()
+                elif name_parts:
+                    initials = name_parts[0][0].upper()
+                else:
+                    initials = "?"
 
-        # Optional founded year / employee count line
-        extra_details = ""
-        if investor.get("founded_year"):
-            extra_details += f'<p><strong>Founded:</strong> {investor["founded_year"]}</p>\n'
-        if investor.get("employee_count"):
-            extra_details += f'<p><strong>Employees:</strong> {investor["employee_count"]:,}</p>\n'
+                badges = []
+                if t.get("seniority"):
+                    badges.append(f'<span class="badge badge-seniority">{t["seniority"]}</span>')
+                if t.get("department"):
+                    badges.append(f'<span class="badge badge-dept">{t["department"]}</span>')
+                if t.get("start_year"):
+                    badges.append(f'<span class="badge badge-tenure">Since {t["start_year"]}</span>')
 
-        # Compute exposure display
-        total_mcap = summary.get('total_market_cap')
-        mcap_count = summary.get('companies_with_mcap', 0)
-        exposure_display = _format_market_cap(total_mcap) if total_mcap else "N/A"
+                body += "\n" + profile_card(
+                    name=name,
+                    title=t.get("title", "-"),
+                    initials=initials,
+                    badges=badges if badges else None,
+                    bio=t.get("bio"),
+                    experience=t.get("experience"),
+                    education=t.get("education"),
+                    linkedin=t.get("linkedin"),
+                )
+            body += "\n</div>"
 
-        # Build the 4th stat only for PE firms with market cap data
-        exposure_stat = ""
-        if total_mcap:
-            exposure_stat = f"""
-            <div class="stat">
-                <div class="stat-value">{exposure_display}</div>
-                <div class="stat-label">Est. Public Equity Exposure*</div>
-            </div>
-            """
+        # ── Footnote ─────────────────────────────────────────────
+        body += '\n<p class="footnote">*Market cap = total company value (source: Yahoo Finance). Actual position sizes require 13F filing data.</p>'
+        body += "\n    </main>"
 
-        grid_cols = "4" if total_mcap else "3"
+        # ── Footer ───────────────────────────────────────────────
+        body += "\n" + footer(data.get("generated_at", "N/A"))
 
-        html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <title>{investor.get('name', 'Investor')} - Profile Report</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 40px; color: #333; }}
-        h1 {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
-        h2 {{ color: #34495e; margin-top: 30px; }}
-        .summary-box {{ background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }}
-        .summary-grid {{ display: grid; grid-template-columns: repeat({grid_cols}, 1fr); gap: 20px; }}
-        .stat {{ text-align: center; }}
-        .stat-value {{ font-size: 2em; font-weight: bold; color: #3498db; }}
-        .stat-label {{ color: #7f8c8d; font-size: 0.9em; }}
-        .table-container {{ max-height: 800px; overflow-y: auto; margin: 15px 0; border: 1px solid #ddd; border-radius: 4px; }}
-        table {{ width: 100%; border-collapse: collapse; }}
-        th, td {{ padding: 10px 12px; text-align: left; border-bottom: 1px solid #ddd; }}
-        th {{ background: #3498db; color: white; position: sticky; top: 0; z-index: 1; }}
-        tr:hover {{ background: #f5f5f5; }}
-        .num {{ text-align: right; font-variant-numeric: tabular-nums; }}
-        th.num {{ text-align: right; }}
-        a {{ color: #3498db; text-decoration: none; }}
-        a:hover {{ text-decoration: underline; }}
-        .meta {{ color: #95a5a6; font-size: 0.9em; margin-top: 40px; }}
-        .footnote {{ color: #95a5a6; font-size: 0.85em; margin-top: 8px; font-style: italic; }}
-    </style>
-</head>
-<body>
-    <h1>{investor.get('name', 'Unknown Investor')}</h1>
-
-    <div class="summary-box">
-        <p><strong>Type:</strong> {investor.get('type', 'N/A')}</p>
-        <p><strong>Headquarters:</strong> {investor.get('jurisdiction', 'N/A')}</p>
-        <p><strong>AUM:</strong> {aum_display}</p>
-        <p><strong>Website:</strong> {investor.get('website', 'N/A')}</p>
-        {extra_details}
-    </div>
-
-    <h2>Portfolio Summary</h2>
-    <div class="summary-box">
-        <div class="summary-grid">
-            <div class="stat">
-                <div class="stat-value">{summary.get('current_holdings', 0)}</div>
-                <div class="stat-label">Current Holdings</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">{summary.get('sectors', 0)}</div>
-                <div class="stat-label">Sectors</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">{summary.get('total_holdings', 0)}</div>
-                <div class="stat-label">Total (incl. exited)</div>
-            </div>
-            {exposure_stat}
-        </div>
-    </div>
-
-    {segments_section}
-
-    <h2>All Holdings ({len(holdings)})</h2>
-    <div class="table-container">
-    <table>
-        <thead>
-            <tr>
-                <th>Company</th>
-                <th>Ticker</th>
-                <th>Industry</th>
-                <th>Location</th>
-                <th>Type</th>
-                <th class="num">Est. Market Cap</th>
-            </tr>
-        </thead>
-        <tbody>
-            {holdings_rows if holdings_rows else '<tr><td colspan="6">No holdings data</td></tr>'}
-        </tbody>
-    </table>
-    </div>
-
-    <h2>Sector Allocation ({len(sectors)})</h2>
-    <div class="table-container">
-    <table>
-        <thead>
-            <tr>
-                <th>Sector</th>
-                <th>Count</th>
-                <th>% of Portfolio</th>
-                <th class="num">Est. Value</th>
-            </tr>
-        </thead>
-        <tbody>
-            {sector_rows if sector_rows else '<tr><td colspan="4">No sector data</td></tr>'}
-        </tbody>
-    </table>
-    </div>
-
-    {team_section}
-
-    <p class="footnote">*Market cap = total company value (source: Yahoo Finance). Actual position sizes require 13F filing data.</p>
-    <p class="meta">Generated: {data.get('generated_at', 'N/A')} | Nexdata Investment Intelligence</p>
-</body>
-</html>
-        """
-        return html
+        return html_document(
+            title=f"{investor.get('name', 'Investor')} - Profile Report",
+            body_content=body,
+            charts_js=charts_js,
+        )
 
     def render_excel(self, data: Dict[str, Any]) -> bytes:
         """Render report as Excel workbook."""
@@ -831,7 +842,10 @@ class InvestorProfileTemplate:
         team = data.get("team", [])
         if team:
             ws_team = wb.create_sheet("Team")
-            headers = ["Name", "Title", "Seniority", "Department", "LinkedIn", "Bio"]
+            headers = [
+                "Name", "Title", "Seniority", "Department", "Start Year",
+                "Education", "Prior Experience", "LinkedIn", "Bio",
+            ]
             for col, header in enumerate(headers, 1):
                 cell = ws_team.cell(row=1, column=col, value=header)
                 cell.font = header_font_white
@@ -842,15 +856,35 @@ class InvestorProfileTemplate:
                 ws_team.cell(row=row, column=2, value=t.get("title") or "-")
                 ws_team.cell(row=row, column=3, value=t.get("seniority") or "-")
                 ws_team.cell(row=row, column=4, value=t.get("department") or "-")
-                ws_team.cell(row=row, column=5, value=t.get("linkedin") or "")
-                ws_team.cell(row=row, column=6, value=t.get("bio") or "")
+                ws_team.cell(row=row, column=5, value=t.get("start_year") or "-")
+                # Format education
+                edu_parts = []
+                for edu in t.get("education", []):
+                    deg = edu.get("degree", "")
+                    inst = edu.get("institution", "")
+                    yr = f" ({edu['year']})" if edu.get("year") else ""
+                    edu_parts.append(f"{deg} — {inst}{yr}")
+                ws_team.cell(row=row, column=6, value="; ".join(edu_parts) if edu_parts else "-")
+                # Format experience
+                exp_parts = []
+                for exp in t.get("experience", [])[:3]:
+                    yrs = ""
+                    if exp.get("start_year") and exp.get("end_year"):
+                        yrs = f" ({exp['start_year']}–{exp['end_year']})"
+                    exp_parts.append(f"{exp.get('title', '')} at {exp.get('company', '')}{yrs}")
+                ws_team.cell(row=row, column=7, value="; ".join(exp_parts) if exp_parts else "-")
+                ws_team.cell(row=row, column=8, value=t.get("linkedin") or "")
+                ws_team.cell(row=row, column=9, value=t.get("bio") or "")
 
             ws_team.column_dimensions["A"].width = 25
             ws_team.column_dimensions["B"].width = 30
             ws_team.column_dimensions["C"].width = 15
-            ws_team.column_dimensions["D"].width = 15
-            ws_team.column_dimensions["E"].width = 35
-            ws_team.column_dimensions["F"].width = 50
+            ws_team.column_dimensions["D"].width = 18
+            ws_team.column_dimensions["E"].width = 12
+            ws_team.column_dimensions["F"].width = 45
+            ws_team.column_dimensions["G"].width = 45
+            ws_team.column_dimensions["H"].width = 35
+            ws_team.column_dimensions["I"].width = 60
 
         # Save to bytes
         output = BytesIO()
