@@ -15,11 +15,12 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.reports.design_system import (
-    html_document, hero_header, kpi_card, kpi_grid,
-    section_heading, data_table, pill_badge, profile_card,
-    chart_container, chart_init_js, footer,
+    html_document, page_header, kpi_strip, kpi_card,
+    toc, section_start, section_end,
+    data_table, pill_badge, profile_card, callout,
+    chart_container, chart_init_js, page_footer,
     build_doughnut_config, build_horizontal_bar_config,
-    build_bar_fallback, CHART_COLORS,
+    build_bar_fallback, build_chart_legend, CHART_COLORS,
 )
 
 logger = logging.getLogger(__name__)
@@ -540,50 +541,77 @@ class InvestorProfileTemplate:
         charts_js = ""
         body = ""
 
-        # ── Hero Header ──────────────────────────────────────────
-        pills = []
-        if investor.get("type"):
-            pills.append({"label": "Type", "value": str(investor["type"])})
-        if investor.get("jurisdiction"):
-            pills.append({"label": "HQ", "value": str(investor["jurisdiction"])})
-        if investor.get("aum_millions"):
-            pills.append({"label": "AUM", "value": aum_display})
-        if investor.get("founded_year"):
-            pills.append({"label": "Founded", "value": str(investor["founded_year"])})
-        if investor.get("employee_count"):
-            pills.append({"label": "Employees", "value": f"{investor['employee_count']:,}"})
+        # ── Page Header ──────────────────────────────────────────
+        sub_parts = [p for p in [investor.get("type"), investor.get("jurisdiction")] if p]
+        subtitle = " · ".join(sub_parts) if sub_parts else None
 
-        body += hero_header(
-            title=investor.get("name", "Unknown Investor"),
-            website=investor.get("website"),
-            pills=pills if pills else None,
+        badge_parts = []
+        if investor.get("aum_millions"):
+            badge_parts.append(f"AUM {aum_display}")
+        if investor.get("founded_year"):
+            badge_parts.append(f"Founded {investor['founded_year']}")
+        if investor.get("employee_count"):
+            badge_parts.append(f"{investor['employee_count']:,} Employees")
+        badge = " · ".join(badge_parts) if badge_parts else None
+
+        body += page_header(
+            title=f"{investor.get('name', 'Unknown')} \u2014 Investor Profile",
+            subtitle=subtitle,
+            badge=badge,
         )
 
-        # ── KPI Cards ────────────────────────────────────────────
+        # ── KPI Strip ────────────────────────────────────────────
         total_mcap = summary.get("total_market_cap")
         exposure_display = _format_market_cap(total_mcap) if total_mcap else None
 
         cards = ""
-        cards += kpi_card(str(summary.get("current_holdings", 0)), "Current Holdings", "blue")
-        cards += kpi_card(str(summary.get("sectors", 0)), "Sectors", "emerald")
-        cards += kpi_card(str(summary.get("total_holdings", 0)), "Total (incl. exited)", "slate")
+        cards += kpi_card("Current Holdings", str(summary.get("current_holdings", 0)))
+        cards += kpi_card("Sectors", str(summary.get("sectors", 0)))
+        cards += kpi_card("Total Holdings", str(summary.get("total_holdings", 0)))
+        if investor.get("aum_millions"):
+            cards += kpi_card("AUM", aum_display)
+        else:
+            cards += kpi_card("Investor Type", str(investor.get("type", "N/A")))
         if exposure_display:
-            cards += kpi_card(exposure_display, "Est. Public Equity Exposure*", "amber")
+            cards += kpi_card("Public Equity*", exposure_display)
+        elif investor.get("website"):
+            cards += kpi_card("Website", investor["website"].replace("https://", "").replace("http://", ""))
+        else:
+            cards += kpi_card("Holdings (Active)", str(summary.get("current_holdings", 0)))
 
-        body += '\n    <main class="container">'
-        body += "\n" + kpi_grid(cards)
+        body += '\n<div class="container">'
+        body += "\n" + kpi_strip(cards)
 
-        # ── AUM Segments (Chart.js horizontal bar) ───────────────
+        # ── Table of Contents ────────────────────────────────────
+        toc_items = []
+        sec_counter = 0
         if segments:
+            sec_counter += 1
+            toc_items.append({"number": sec_counter, "id": "aum-segments", "title": "AUM by Business Segment"})
+        sec_counter += 1
+        toc_items.append({"number": sec_counter, "id": "holdings", "title": "Portfolio Holdings"})
+        if sectors:
+            sec_counter += 1
+            toc_items.append({"number": sec_counter, "id": "sectors", "title": "Sector Allocation"})
+        if team:
+            sec_counter += 1
+            toc_items.append({"number": sec_counter, "id": "team", "title": "Key Team Members"})
+        body += "\n" + toc(toc_items)
+
+        # ── Section: AUM Segments ────────────────────────────────
+        sec_num = 0
+        if segments:
+            sec_num += 1
             seg_total = sum(s.get("aum_millions") or 0 for s in segments)
-            body += "\n" + section_heading("AUM by Business Segment")
+            body += "\n" + section_start(sec_num, "AUM by Business Segment", "aum-segments")
+            body += f'<p><strong>{len(segments)}</strong> business segments with combined AUM of <strong>{_format_aum(seg_total)}</strong>.</p>'
 
             seg_labels = [s.get("name", "N/A") for s in segments]
             seg_values = [s.get("aum_millions") or 0 for s in segments]
             seg_config = build_horizontal_bar_config(seg_labels, seg_values, dataset_label="AUM ($M)")
             seg_config_json = json.dumps(seg_config)
-            seg_fallback = build_bar_fallback(seg_labels, seg_values)
-            body += "\n" + chart_container("aumSegmentChart", seg_config_json, seg_fallback)
+            bar_height = f"{max(len(seg_labels) * 48 + 40, 140)}px"
+            body += chart_container("aumSegmentChart", seg_config_json, build_bar_fallback(seg_labels, seg_values), title="AUM by Segment ($M)", height=bar_height)
             charts_js += chart_init_js("aumSegmentChart", seg_config_json)
 
             # Segment detail cards
@@ -592,46 +620,44 @@ class InvestorProfileTemplate:
                 aum = s.get("aum_millions")
                 aum_seg = _format_aum(aum) if aum else "-"
                 pct = (aum / seg_total * 100) if aum and seg_total else 0
-                pct_display = f"{pct:.0f}%" if pct else "-"
-                bar_width = pct if pct else 0
                 strategy = s.get("strategy") or "-"
-                seg_cards += f"""
-                <div class="segment-card">
-                    <div class="segment-header">
-                        <span class="segment-name">{s.get('name', 'N/A')}</span>
-                        <span class="segment-aum">{aum_seg}</span>
-                    </div>
-                    <div class="segment-strategy">{strategy}</div>
-                    <div class="segment-bar-track">
-                        <div class="segment-bar-fill" style="width: {bar_width}%"></div>
-                    </div>
-                    <div class="segment-pct">{pct_display} of total AUM</div>
-                </div>"""
+                seg_cards += f"""<div class="segment-card">
+    <div class="segment-header">
+        <span class="segment-name">{s.get('name', 'N/A')}</span>
+        <span class="segment-aum">{aum_seg}</span>
+    </div>
+    <div class="segment-strategy">{strategy}</div>
+    <div class="segment-bar-track">
+        <div class="segment-bar-fill" style="width: {pct:.0f}%"></div>
+    </div>
+    <div class="segment-pct">{pct:.0f}% of total AUM</div>
+</div>"""
 
-            total_display = _format_aum(seg_total) if seg_total else "-"
-            body += f"""
-        <div class="segments-grid">{seg_cards}</div>
-        <div class="segment-total">Total: {total_display}</div>
-        <p class="footnote">Source: {investor.get('name', 'Firm')} 10-K filing (Dec 31, 2024)</p>"""
+            body += f'<div class="segments-grid">{seg_cards}</div>'
+            body += f'<div class="segment-total">Total: {_format_aum(seg_total)}</div>'
+            body += f'<p class="footnote">Source: {investor.get("name", "Firm")} 10-K filing (Dec 31, 2024)</p>'
+            body += "\n" + section_end()
 
-        # ── Holdings Table ───────────────────────────────────────
-        body += "\n" + section_heading("Portfolio Holdings", count=len(holdings))
+        # ── Section: Holdings ────────────────────────────────────
+        sec_num += 1
+        body += "\n" + section_start(sec_num, "Portfolio Holdings", "holdings")
+        body += f'<p><strong>{len(holdings)}</strong> portfolio companies across <strong>{summary.get("sectors", 0)}</strong> sectors.</p>'
 
         table_rows = []
         for h in holdings:
             ticker = h.get("ticker")
             ownership = h.get("ownership_status") or ""
             if ticker:
-                badge = pill_badge("Public", "public")
+                badge_html = pill_badge("Public", "public")
                 ticker_html = f'<span class="ticker">{ticker}</span>'
             elif "pe-backed" in ownership.lower():
-                badge = pill_badge("PE-Backed", "pe")
+                badge_html = pill_badge("PE-Backed", "pe")
                 ticker_html = "-"
             elif "subsidiary" in ownership.lower():
-                badge = pill_badge("Subsidiary", "sub")
+                badge_html = pill_badge("Subsidiary", "sub")
                 ticker_html = "-"
             else:
-                badge = pill_badge("Private", "private")
+                badge_html = pill_badge("Private", "private")
                 ticker_html = "-"
 
             table_rows.append([
@@ -639,50 +665,85 @@ class InvestorProfileTemplate:
                 ticker_html,
                 h.get("industry") or "-",
                 h.get("location") or "-",
-                badge,
+                badge_html,
                 _format_market_cap(h.get("market_cap")),
             ])
 
-        body += "\n" + data_table(
+        body += data_table(
             headers=["Company", "Ticker", "Industry", "Location", "Status", "Est. Market Cap"],
             rows=table_rows,
             numeric_columns={5},
         )
 
-        # ── Sector Allocation (Chart.js doughnut) ────────────────
+        # Concentration callout
+        if holdings:
+            public_count = sum(1 for h in holdings if h.get("ticker"))
+            private_count = len(holdings) - public_count
+            body += callout(
+                f"<strong>Insight:</strong> Portfolio is {public_count} public and {private_count} private companies. "
+                f"Market cap figures represent total company value (Yahoo Finance), not position sizes.",
+            )
+
+        body += "\n" + section_end()
+
+        # ── Section: Sector Allocation ───────────────────────────
         if sectors:
-            body += "\n" + section_heading("Sector Allocation", count=len(sectors))
+            sec_num += 1
+            body += "\n" + section_start(sec_num, "Sector Allocation", "sectors")
+            body += f'<p>Portfolio spans <strong>{len(sectors)}</strong> sectors.</p>'
 
-            sector_labels = [s.get("sector", "N/A") for s in sectors]
-            sector_values = [float(s.get("count", 0)) for s in sectors]
-            doughnut_config = build_doughnut_config(sector_labels, sector_values)
+            # Group into top 7 + "Other" for clean doughnut
+            max_slices = 7
+            if len(sectors) > max_slices:
+                top = sectors[:max_slices]
+                rest = sectors[max_slices:]
+                other_count = sum(s.get("count", 0) for s in rest)
+                other_pct = sum(s.get("pct", 0) for s in rest)
+                chart_sectors = top + [{"sector": f"Other ({len(rest)})", "count": other_count, "pct": other_pct}]
+            else:
+                chart_sectors = sectors
+
+            chart_labels = [s.get("sector", "N/A") for s in chart_sectors]
+            chart_values = [float(s.get("count", 0)) for s in chart_sectors]
+            chart_colors = [CHART_COLORS[i % len(CHART_COLORS)] for i in range(len(chart_labels))]
+
+            doughnut_config = build_doughnut_config(chart_labels, chart_values, chart_colors)
             doughnut_json = json.dumps(doughnut_config)
-            doughnut_fallback = build_bar_fallback(sector_labels, sector_values)
 
-            body += '\n<div class="charts-row">'
-            body += "\n" + chart_container("sectorDoughnut", doughnut_json, doughnut_fallback)
+            body += '<div class="chart-row">'
+            body += '<div>'
+            body += chart_container("sectorDoughnut", doughnut_json, build_bar_fallback(chart_labels, chart_values), size="medium", title="Sector Distribution")
             charts_js += chart_init_js("sectorDoughnut", doughnut_json)
+            body += '</div>'
+            body += '<div>'
+            body += build_chart_legend(chart_labels, chart_values, chart_colors, show_pct=True)
+            body += '</div>'
+            body += '</div>'
 
-            # Sector summary list alongside chart
-            sector_summary = '<div class="chart-wrapper"><div style="padding: 8px 0;">'
+            # Full sector detail table
+            sector_rows = []
             for s in sectors:
-                mcap_note = ""
-                if s.get("market_cap"):
-                    mcap_note = f' &middot; {_format_market_cap(s["market_cap"])}'
-                sector_summary += (
-                    f'<div style="padding:6px 0;border-bottom:1px solid var(--border-table)">'
-                    f'<span style="font-weight:600;color:var(--text-primary)">{s.get("sector", "N/A")}</span>'
-                    f'<span style="float:right;color:var(--text-muted)">{s.get("count", 0)} cos &middot; {s.get("pct", 0)}%{mcap_note}</span>'
-                    f'</div>'
-                )
-            sector_summary += "</div></div>"
-            body += "\n" + sector_summary
-            body += "\n</div>"
+                mcap_display = _format_market_cap(s.get("market_cap")) if s.get("market_cap") else "-"
+                sector_rows.append([
+                    s.get("sector", "N/A"),
+                    str(s.get("count", 0)),
+                    f'{s.get("pct", 0)}%',
+                    mcap_display,
+                ])
+            body += data_table(
+                headers=["Sector", "Companies", "% of Portfolio", "Est. Market Cap"],
+                rows=sector_rows,
+                numeric_columns={1, 2, 3},
+            )
+            body += "\n" + section_end()
 
-        # ── Team Section ─────────────────────────────────────────
+        # ── Section: Team ────────────────────────────────────────
         if team:
-            body += "\n" + section_heading("Key Team Members", count=len(team))
-            body += '\n<div class="team-grid">'
+            sec_num += 1
+            body += "\n" + section_start(sec_num, "Key Team Members", "team")
+            body += f'<p><strong>{len(team)}</strong> key team members.</p>'
+
+            body += '<div class="team-grid">'
             for t in team:
                 name = t.get("name", "N/A")
                 name_parts = name.split()
@@ -695,11 +756,11 @@ class InvestorProfileTemplate:
 
                 badges = []
                 if t.get("seniority"):
-                    badges.append(f'<span class="badge badge-seniority">{t["seniority"]}</span>')
+                    badges.append(f'<span class="card-badge badge-seniority">{t["seniority"]}</span>')
                 if t.get("department"):
-                    badges.append(f'<span class="badge badge-dept">{t["department"]}</span>')
+                    badges.append(f'<span class="card-badge badge-dept">{t["department"]}</span>')
                 if t.get("start_year"):
-                    badges.append(f'<span class="badge badge-tenure">Since {t["start_year"]}</span>')
+                    badges.append(f'<span class="card-badge badge-tenure">Since {t["start_year"]}</span>')
 
                 body += "\n" + profile_card(
                     name=name,
@@ -711,17 +772,24 @@ class InvestorProfileTemplate:
                     education=t.get("education"),
                     linkedin=t.get("linkedin"),
                 )
-            body += "\n</div>"
+            body += '</div>'
+            body += "\n" + section_end()
 
-        # ── Footnote ─────────────────────────────────────────────
-        body += '\n<p class="footnote">*Market cap = total company value (source: Yahoo Finance). Actual position sizes require 13F filing data.</p>'
-        body += "\n    </main>"
+        body += '\n</div>'  # close container
 
         # ── Footer ───────────────────────────────────────────────
-        body += "\n" + footer(data.get("generated_at", "N/A"))
+        notes = [
+            "Data sourced from SEC EDGAR filings, company websites, and public records.",
+            "Market cap figures from Yahoo Finance; represent total company value, not position sizes.",
+            "Ownership status determined by cross-referencing SEC filings and web collection.",
+        ]
+        body += "\n" + page_footer(
+            notes=notes,
+            generated_line=f"Report generated {data.get('generated_at', 'N/A')} | Nexdata Investment Intelligence",
+        )
 
         return html_document(
-            title=f"{investor.get('name', 'Investor')} - Profile Report",
+            title=f"{investor.get('name', 'Investor')} \u2014 Profile Report",
             body_content=body,
             charts_js=charts_js,
         )

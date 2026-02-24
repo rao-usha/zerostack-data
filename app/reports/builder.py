@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.reports.templates.investor_profile import InvestorProfileTemplate
 from app.reports.templates.portfolio_detail import PortfolioDetailTemplate
+from app.reports.templates.data_quality import DataQualityTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ class ReportBuilder:
         self.templates = {
             "investor_profile": InvestorProfileTemplate(),
             "portfolio_detail": PortfolioDetailTemplate(),
+            "data_quality": DataQualityTemplate(),
         }
         self._ensure_table()
 

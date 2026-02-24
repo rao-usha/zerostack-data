@@ -15,11 +15,12 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.reports.design_system import (
-    html_document, hero_header, kpi_card, kpi_grid,
-    section_heading, data_table, pill_badge,
-    chart_container, chart_init_js, footer,
+    html_document, page_header, kpi_strip, kpi_card,
+    toc, section_start, section_end,
+    data_table, pill_badge, callout,
+    chart_container, chart_init_js, page_footer,
     build_doughnut_config, build_horizontal_bar_config,
-    build_bar_fallback, CHART_COLORS,
+    build_bar_fallback, build_chart_legend, CHART_COLORS,
 )
 
 logger = logging.getLogger(__name__)
@@ -226,29 +227,46 @@ class PortfolioDetailTemplate:
         body = ""
         current_count = len([h for h in holdings if h.get("current")])
 
-        # ── Hero Header ──────────────────────────────────────────
-        pills = []
-        if investor.get("type"):
-            pills.append({"label": "Type", "value": str(investor["type"])})
-        if investor.get("jurisdiction"):
-            pills.append({"label": "Location", "value": str(investor["jurisdiction"])})
+        # ── Page Header ──────────────────────────────────────────
+        sub_parts = [p for p in [investor.get("type"), investor.get("jurisdiction")] if p]
+        subtitle = " · ".join(sub_parts) if sub_parts else None
 
-        body += hero_header(
-            title=f"{investor.get('name', 'Unknown')} — Portfolio Detail",
-            pills=pills if pills else None,
+        body += page_header(
+            title=f"{investor.get('name', 'Unknown')} \u2014 Portfolio Detail",
+            subtitle=subtitle,
         )
 
-        # ── KPI Cards ────────────────────────────────────────────
+        # ── KPI Strip (5 cards) ──────────────────────────────────
         cards = ""
-        cards += kpi_card(str(current_count), "Current Holdings", "blue")
-        cards += kpi_card(str(len(holdings)), "Total Holdings", "emerald")
-        cards += kpi_card(str(len(sectors)), "Sectors", "slate")
+        cards += kpi_card("Current Holdings", str(current_count))
+        cards += kpi_card("Total Holdings", str(len(holdings)))
+        cards += kpi_card("Sectors", str(len(sectors)))
+        cards += kpi_card("Stages", str(len(stages)))
+        cards += kpi_card("Locations", str(len(locations)))
 
-        body += '\n    <main class="container">'
-        body += "\n" + kpi_grid(cards)
+        body += '\n<div class="container">'
+        body += "\n" + kpi_strip(cards)
 
-        # ── Holdings Table ───────────────────────────────────────
-        body += "\n" + section_heading("All Holdings", count=len(holdings))
+        # ── Table of Contents ────────────────────────────────────
+        toc_items = [
+            {"number": 1, "id": "holdings", "title": "All Holdings"},
+        ]
+        sec_counter = 1
+        if sectors:
+            sec_counter += 1
+            toc_items.append({"number": sec_counter, "id": "sectors", "title": "Sector Breakdown"})
+        if stages:
+            sec_counter += 1
+            toc_items.append({"number": sec_counter, "id": "stages", "title": "Stage Breakdown"})
+        if locations:
+            sec_counter += 1
+            toc_items.append({"number": sec_counter, "id": "locations", "title": "Location Breakdown"})
+        body += "\n" + toc(toc_items)
+
+        # ── Section 1: Holdings ──────────────────────────────────
+        sec_num = 1
+        body += "\n" + section_start(sec_num, "All Holdings", "holdings")
+        body += f'<p><strong>{len(holdings)}</strong> total holdings ({current_count} current, {len(holdings) - current_count} exited).</p>'
 
         table_rows = []
         for h in holdings:
@@ -261,26 +279,32 @@ class PortfolioDetailTemplate:
                 status,
             ])
 
-        body += "\n" + data_table(
+        body += data_table(
             headers=["Company", "Industry", "Location", "Stage", "Status"],
             rows=table_rows,
         )
+        body += "\n" + section_end()
 
-        # ── Sector Breakdown (doughnut chart + table) ────────────
+        # ── Section 2: Sector Breakdown ──────────────────────────
         if sectors:
-            body += "\n" + section_heading("Sector Breakdown", count=len(sectors))
+            sec_num += 1
+            body += "\n" + section_start(sec_num, "Sector Breakdown", "sectors")
+            body += f'<p>Portfolio spans <strong>{len(sectors)}</strong> sectors.</p>'
 
             sector_labels = [s.get("sector", "N/A") for s in sectors]
             sector_values = [float(s.get("total", 0)) for s in sectors]
-            doughnut_config = build_doughnut_config(sector_labels, sector_values)
+            sector_colors = [CHART_COLORS[i % len(CHART_COLORS)] for i in range(len(sector_labels))]
+            doughnut_config = build_doughnut_config(sector_labels, sector_values, sector_colors)
             doughnut_json = json.dumps(doughnut_config)
-            doughnut_fallback = build_bar_fallback(sector_labels, sector_values)
 
-            body += '\n<div class="charts-row">'
-            body += "\n" + chart_container("sectorChart", doughnut_json, doughnut_fallback)
+            body += '<div class="chart-row">'
+            body += '<div>'
+            body += chart_container("sectorChart", doughnut_json, build_bar_fallback(sector_labels, sector_values), size="medium", title="Sector Distribution")
             charts_js += chart_init_js("sectorChart", doughnut_json)
+            body += '</div>'
+            body += '<div>'
+            body += build_chart_legend(sector_labels, sector_values, sector_colors, show_pct=True)
 
-            # Sector table alongside chart
             sector_table_rows = []
             for s in sectors:
                 sector_table_rows.append([
@@ -289,28 +313,34 @@ class PortfolioDetailTemplate:
                     str(s.get("total", 0)),
                     f'{s.get("pct", 0)}%',
                 ])
-            body += "\n" + data_table(
-                headers=["Sector", "Current", "Total", "% of Portfolio"],
+            body += data_table(
+                headers=["Sector", "Current", "Total", "%"],
                 rows=sector_table_rows,
                 numeric_columns={1, 2, 3},
             )
-            body += "\n</div>"
+            body += '</div>'
+            body += '</div>'
+            body += "\n" + section_end()
 
-        # ── Stage Breakdown (horizontal bar chart) ───────────────
+        # ── Section 3: Stage Breakdown ───────────────────────────
         if stages:
-            body += "\n" + section_heading("Stage Breakdown", count=len(stages))
+            sec_num += 1
+            body += "\n" + section_start(sec_num, "Stage Breakdown", "stages")
+            body += f'<p><strong>{len(stages)}</strong> investment stages represented.</p>'
 
             stage_labels = [s.get("stage", "N/A") for s in stages]
             stage_values = [float(s.get("total", 0)) for s in stages]
             bar_config = build_horizontal_bar_config(stage_labels, stage_values, dataset_label="Companies")
             bar_json = json.dumps(bar_config)
-            bar_fallback = build_bar_fallback(stage_labels, stage_values)
+            bar_height = f"{max(len(stage_labels) * 48 + 40, 140)}px"
 
-            body += '\n<div class="charts-row">'
-            body += "\n" + chart_container("stageChart", bar_json, bar_fallback)
+            body += '<div class="chart-row">'
+            body += '<div>'
+            body += chart_container("stageChart", bar_json, build_bar_fallback(stage_labels, stage_values), title="Companies by Stage", height=bar_height)
             charts_js += chart_init_js("stageChart", bar_json)
+            body += '</div>'
+            body += '<div>'
 
-            # Stage table alongside chart
             stage_table_rows = []
             for s in stages:
                 stage_table_rows.append([
@@ -319,33 +349,44 @@ class PortfolioDetailTemplate:
                     str(s.get("total", 0)),
                     f'{s.get("pct", 0)}%',
                 ])
-            body += "\n" + data_table(
-                headers=["Stage", "Current", "Total", "% of Portfolio"],
+            body += data_table(
+                headers=["Stage", "Current", "Total", "%"],
                 rows=stage_table_rows,
                 numeric_columns={1, 2, 3},
             )
-            body += "\n</div>"
+            body += '</div>'
+            body += '</div>'
+            body += "\n" + section_end()
 
-        # ── Location Breakdown (horizontal bar chart) ────────────
+        # ── Section 4: Location Breakdown ────────────────────────
         if locations:
-            body += "\n" + section_heading("Location Breakdown", count=len(locations))
+            sec_num += 1
+            body += "\n" + section_start(sec_num, "Location Breakdown", "locations")
+            body += f'<p>Companies across <strong>{len(locations)}</strong> locations.</p>'
 
             loc_labels = [loc.get("location", "N/A") for loc in locations]
             loc_values = [float(loc.get("total", 0)) for loc in locations]
             loc_config = build_horizontal_bar_config(loc_labels, loc_values, dataset_label="Companies")
             loc_json = json.dumps(loc_config)
-            loc_fallback = build_bar_fallback(loc_labels, loc_values)
+            loc_height = f"{max(len(loc_labels) * 48 + 40, 140)}px"
 
-            body += "\n" + chart_container("locationChart", loc_json, loc_fallback)
+            body += chart_container("locationChart", loc_json, build_bar_fallback(loc_labels, loc_values), title="Companies by Location", height=loc_height)
             charts_js += chart_init_js("locationChart", loc_json)
+            body += "\n" + section_end()
 
-        body += "\n    </main>"
+        body += '\n</div>'  # close container
 
         # ── Footer ───────────────────────────────────────────────
-        body += "\n" + footer(data.get("generated_at", "N/A"))
+        body += "\n" + page_footer(
+            notes=[
+                "Data sourced from SEC EDGAR filings, company websites, and public records.",
+                "Sector and stage classifications based on available data; may be approximate.",
+            ],
+            generated_line=f"Report generated {data.get('generated_at', 'N/A')} | Nexdata Investment Intelligence",
+        )
 
         return html_document(
-            title=f"{investor.get('name', 'Portfolio')} - Detail Report",
+            title=f"{investor.get('name', 'Portfolio')} \u2014 Detail Report",
             body_content=body,
             charts_js=charts_js,
         )

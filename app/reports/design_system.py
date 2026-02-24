@@ -1,12 +1,8 @@
 """
 Nexdata Report Design System.
 
-Shared CSS, JS, Chart.js helpers, and HTML component functions
-for all report templates. Provides:
-- Dark/light mode toggle with localStorage persistence
-- Chart.js integration with CDN fallback
-- Flat design: rounded 12px, shadow-only elevation, no card borders
-- Responsive layout with print optimization
+Shared CSS, JS, Chart.js helpers, and HTML component functions.
+Follows the report-style conventions in .claude/skills/report-style/.
 """
 
 import json as _json
@@ -16,529 +12,615 @@ from typing import Optional, List, Dict, Any
 # Constants
 # ---------------------------------------------------------------------------
 
-CHART_JS_CDN = "https://cdn.jsdelivr.net/npm/chart.js@4"
+CHART_JS_CDN = "https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
 
-CHART_COLORS = [
-    "#2563eb", "#059669", "#d97706", "#dc2626", "#7c3aed",
-    "#0891b2", "#ea580c", "#4f46e5", "#0d9488", "#b91c1c",
-]
+# Chart color palette — matches .claude/skills/report-style/chartjs_conventions.md
+BLUE = "#2b6cb0"
+BLUE_LIGHT = "#63b3ed"
+BLUE_DARK = "#2c5282"
+ORANGE = "#ed8936"
+GREEN = "#38a169"
+RED = "#e53e3e"
+GRAY = "#a0aec0"
+PURPLE = "#805ad5"
+TEAL = "#319795"
+PINK = "#d53f8c"
+
+CHART_COLORS = [BLUE, BLUE_LIGHT, ORANGE, GREEN, GRAY, PURPLE, TEAL, PINK, BLUE_DARK, RED]
 
 # ---------------------------------------------------------------------------
-# CSS — Design System (light + dark via CSS custom properties)
+# CSS — from .claude/skills/report-style/css_reference.md + Nexdata extras
 # ---------------------------------------------------------------------------
 
 DESIGN_SYSTEM_CSS = """
-/* ── Reset & Custom Properties ───────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; }
-
 :root {
-    --bg-body: #f8fafc;
-    --bg-card: #fff;
-    --bg-card-hover: #fff;
-    --bg-table-header: #f8fafc;
-    --bg-table-stripe: #fafbfc;
-    --bg-table-hover: #f1f5f9;
-    --bg-hero: #0f172a;
-    --bg-hero-pill: rgba(255,255,255,0.1);
-    --border-hero-pill: rgba(255,255,255,0.15);
-    --text-primary: #0f172a;
-    --text-secondary: #334155;
-    --text-muted: #64748b;
-    --text-faint: #94a3b8;
-    --text-hero: #fff;
-    --text-hero-sub: #e2e8f0;
-    --text-hero-label: #94a3b8;
-    --text-hero-link: #93c5fd;
-    --border-light: #e2e8f0;
-    --border-table: #f1f5f9;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
-    --radius: 12px;
-    --radius-pill: 20px;
-    --color-blue: #2563eb;
-    --color-emerald: #059669;
-    --color-amber: #d97706;
-    --color-slate: #64748b;
-    --avatar-bg: #0f172a;
-    --avatar-text: #fff;
-    --badge-seniority-bg: #0f172a;
-    --badge-seniority-text: #fff;
-    --badge-dept-bg: #eff6ff;
-    --badge-dept-text: #1e40af;
-    --badge-dept-border: #bfdbfe;
-    --badge-tenure-bg: #ecfdf5;
-    --badge-tenure-text: #065f46;
-    --badge-tenure-border: #a7f3d0;
-    --pill-public-bg: #dbeafe;
-    --pill-public-text: #1d4ed8;
-    --pill-pe-bg: #fef3c7;
-    --pill-pe-text: #92400e;
-    --pill-sub-bg: #f1f5f9;
-    --pill-sub-text: #475569;
-    --pill-private-bg: #f0fdf4;
-    --pill-private-text: #166534;
-    --pill-default-bg: #f1f5f9;
-    --pill-default-text: #475569;
-    --bar-track: #e2e8f0;
-    --bar-fill: #2563eb;
-    --chart-grid: rgba(0,0,0,0.06);
-    --chart-tick: #64748b;
+  --primary: #1a365d;
+  --primary-light: #2b6cb0;
+  --accent: #ed8936;
+  --accent-red: #e53e3e;
+  --accent-green: #38a169;
+  --gray-50: #f7fafc;
+  --gray-100: #edf2f7;
+  --gray-200: #e2e8f0;
+  --gray-300: #cbd5e0;
+  --gray-500: #718096;
+  --gray-700: #4a5568;
+  --gray-800: #2d3748;
+  --gray-900: #1a202c;
+  --white: #ffffff;
 }
 
-[data-theme="dark"] {
-    --bg-body: #0f172a;
-    --bg-card: #1e293b;
-    --bg-card-hover: #1e293b;
-    --bg-table-header: #1e293b;
-    --bg-table-stripe: #1a2435;
-    --bg-table-hover: #263348;
-    --bg-hero: #020617;
-    --bg-hero-pill: rgba(255,255,255,0.08);
-    --border-hero-pill: rgba(255,255,255,0.12);
-    --text-primary: #f1f5f9;
-    --text-secondary: #cbd5e1;
-    --text-muted: #94a3b8;
-    --text-faint: #64748b;
-    --text-hero: #f1f5f9;
-    --text-hero-sub: #cbd5e1;
-    --text-hero-label: #64748b;
-    --text-hero-link: #93c5fd;
-    --border-light: #334155;
-    --border-table: #293548;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-    --shadow-md: 0 4px 12px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.25);
-    --avatar-bg: #334155;
-    --avatar-text: #e2e8f0;
-    --badge-seniority-bg: #334155;
-    --badge-seniority-text: #e2e8f0;
-    --badge-dept-bg: #1e3a5f;
-    --badge-dept-text: #93c5fd;
-    --badge-dept-border: #1e3a5f;
-    --badge-tenure-bg: #14332a;
-    --badge-tenure-text: #6ee7b7;
-    --badge-tenure-border: #14332a;
-    --pill-public-bg: #1e3a5f;
-    --pill-public-text: #93c5fd;
-    --pill-pe-bg: #422006;
-    --pill-pe-text: #fbbf24;
-    --pill-sub-bg: #334155;
-    --pill-sub-text: #cbd5e1;
-    --pill-private-bg: #14332a;
-    --pill-private-text: #6ee7b7;
-    --pill-default-bg: #334155;
-    --pill-default-text: #cbd5e1;
-    --bar-track: #334155;
-    --bar-fill: #3b82f6;
-    --chart-grid: rgba(255,255,255,0.08);
-    --chart-tick: #94a3b8;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    margin: 0; padding: 0;
-    background: var(--bg-body);
-    color: var(--text-secondary);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: var(--gray-800);
+  background: var(--gray-50);
+  line-height: 1.6;
 }
 
-a { color: var(--color-blue); text-decoration: none; }
-a:hover { text-decoration: underline; }
-
-/* ── Hero Header ─────────────────────────────────────────────── */
-.hero {
-    background: var(--bg-hero);
-    color: var(--text-hero);
-    padding: 48px 0 40px;
+.page-header {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: var(--white);
+  padding: 40px 0;
 }
-.hero-inner {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 0 40px;
+.page-header .container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
 }
-.hero h1 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    margin: 0 0 4px;
-    letter-spacing: -0.02em;
-    color: var(--text-hero);
-}
-.hero-subtitle {
-    color: var(--text-hero-sub);
-    font-size: 1.05rem;
-    margin: 2px 0 0;
-}
-.hero-website {
-    color: var(--text-hero-link);
-    text-decoration: none;
-    font-size: 0.95rem;
-}
-.hero-website:hover { text-decoration: underline; }
-.hero-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 20px;
-}
-.hero-pill {
-    background: var(--bg-hero-pill);
-    border: 1px solid var(--border-hero-pill);
-    border-radius: var(--radius-pill);
-    padding: 6px 16px;
-    font-size: 0.85rem;
-    color: var(--text-hero-sub);
-}
-.hero-pill-label {
-    color: var(--text-hero-label);
-    font-weight: 600;
-    text-transform: uppercase;
-    font-size: 0.7rem;
-    letter-spacing: 0.05em;
-    margin-right: 6px;
+.page-header h1 { font-size: 28px; font-weight: 700; }
+.page-header .subtitle { font-size: 16px; opacity: 0.85; margin-top: 4px; }
+.page-header .badge {
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.3);
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
 }
 
-/* ── Container ───────────────────────────────────────────────── */
-.container {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 0 40px 60px;
-}
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 
-/* ── Section Headings ────────────────────────────────────────── */
-.section-title {
-    font-size: 1.35rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 48px 0 20px;
-    padding-bottom: 0;
-}
-.count-badge {
-    background: var(--border-light);
-    color: var(--text-muted);
-    font-size: 0.8rem;
-    font-weight: 600;
-    padding: 2px 10px;
-    border-radius: 12px;
-    margin-left: 8px;
-    vertical-align: middle;
-}
-
-/* ── KPI Cards ───────────────────────────────────────────────── */
-.kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 20px;
-    margin-top: 32px;
+/* KPI Strip */
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: -32px 0 32px 0;
+  position: relative;
+  z-index: 10;
 }
 .kpi-card {
-    background: var(--bg-card);
-    border-radius: var(--radius);
-    padding: 24px 20px;
-    text-align: center;
-    box-shadow: var(--shadow-sm);
-    border-left: 4px solid var(--border-light);
+  background: var(--white);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  text-align: center;
 }
-.kpi-blue  { border-left-color: var(--color-blue); }
-.kpi-emerald { border-left-color: var(--color-emerald); }
-.kpi-slate { border-left-color: var(--color-slate); }
-.kpi-amber { border-left-color: var(--color-amber); }
-.kpi-value {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    line-height: 1.2;
+.kpi-card .label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--gray-500);
+  font-weight: 600;
 }
-.kpi-label {
-    font-size: 0.82rem;
-    color: var(--text-muted);
-    margin-top: 6px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    font-weight: 500;
+.kpi-card .value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--primary);
+  margin: 4px 0;
+}
+.kpi-card .delta {
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.delta.up { color: var(--accent-green); }
+.delta.down { color: var(--accent-red); }
+.delta.neutral { color: var(--gray-500); }
+
+/* Table of Contents */
+.toc {
+  background: var(--white);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  margin-bottom: 24px;
+  padding: 20px 24px;
+}
+.toc h2 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+.toc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 6px 24px;
+}
+.toc a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--gray-700);
+  font-size: 14px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.toc a:hover { background: var(--gray-100); }
+.toc a .toc-num {
+  background: var(--primary);
+  color: var(--white);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
-/* ── Tables ──────────────────────────────────────────────────── */
-.table-container {
-    overflow-x: auto;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-sm);
-    background: var(--bg-card);
+/* Sections */
+.section {
+  background: var(--white);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  margin-bottom: 24px;
+  overflow: hidden;
 }
-table {
-    width: 100%;
-    border-collapse: collapse;
+.section-header {
+  padding: 20px 24px 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-th {
-    background: var(--bg-table-header);
-    color: var(--text-muted);
-    font-size: 0.78rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 12px 16px;
-    text-align: left;
-    border-bottom: 2px solid var(--border-light);
-    position: sticky;
-    top: 0;
-    z-index: 1;
+.section-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary);
 }
-td {
-    padding: 11px 16px;
-    border-bottom: 1px solid var(--border-table);
-    font-size: 0.9rem;
-    color: var(--text-secondary);
+.section-number {
+  background: var(--primary);
+  color: var(--white);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
 }
-tbody tr:nth-child(even) { background: var(--bg-table-stripe); }
-tbody tr:hover { background: var(--bg-table-hover); }
-.num { text-align: right; font-variant-numeric: tabular-nums; }
-th.num { text-align: right; }
-.company-name { font-weight: 600; color: var(--text-primary); }
-.ticker {
-    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    font-size: 0.85rem;
-    color: var(--color-blue);
-    font-weight: 500;
-}
-.empty-state {
-    text-align: center;
-    color: var(--text-faint);
-    padding: 32px 16px !important;
-    font-style: italic;
+.section-body { padding: 16px 24px 24px 24px; }
+.section-body p { color: var(--gray-700); font-size: 14px; margin-bottom: 12px; }
+.section-body .count-badge {
+  background: var(--gray-100);
+  color: var(--gray-500);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 12px;
+  margin-left: 8px;
+  vertical-align: middle;
 }
 
-/* ── Status Pills ────────────────────────────────────────────── */
-.pill {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    white-space: nowrap;
+/* Charts */
+.chart-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin: 12px 0;
 }
-.pill-public  { background: var(--pill-public-bg);  color: var(--pill-public-text); }
-.pill-pe      { background: var(--pill-pe-bg);      color: var(--pill-pe-text); }
-.pill-sub     { background: var(--pill-sub-bg);      color: var(--pill-sub-text); }
-.pill-private { background: var(--pill-private-bg);  color: var(--pill-private-text); }
-.pill-default { background: var(--pill-default-bg);  color: var(--pill-default-text); }
-
-/* ── Segments ────────────────────────────────────────────────── */
-.segments-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 16px;
+@media (max-width: 768px) { .chart-row { grid-template-columns: 1fr; } }
+.chart-container { position: relative; width: 100%; }
+.chart-container.tall { height: 360px; }
+.chart-container.medium { height: 300px; }
+.chart-container.short { height: 240px; }
+.chart-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
-.segment-card {
-    background: var(--bg-card);
-    border-radius: var(--radius);
-    padding: 20px;
-    box-shadow: var(--shadow-sm);
-}
-.segment-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 4px;
-}
-.segment-name { font-weight: 600; color: var(--text-primary); font-size: 0.95rem; }
-.segment-aum  { font-weight: 700; color: var(--text-primary); font-size: 1.1rem; }
-.segment-strategy { color: var(--text-muted); font-size: 0.82rem; margin-bottom: 12px; }
-.segment-bar-track {
-    height: 6px;
-    background: var(--bar-track);
-    border-radius: 3px;
-    overflow: hidden;
-}
-.segment-bar-fill {
-    height: 100%;
-    background: var(--bar-fill);
-    border-radius: 3px;
-}
-.segment-pct { font-size: 0.78rem; color: var(--text-faint); margin-top: 6px; }
-.segment-total {
-    text-align: right;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin-top: 16px;
-    font-size: 1rem;
-}
-
-/* ── Chart Containers ────────────────────────────────────────── */
-.chart-wrapper {
-    background: var(--bg-card);
-    border-radius: var(--radius);
-    padding: 24px;
-    box-shadow: var(--shadow-sm);
-    position: relative;
-}
-.chart-wrapper canvas {
-    max-height: 350px;
-}
-.chart-fallback {
-    display: none;
-    padding: 12px 0;
-}
+.chart-fallback { display: none; padding: 12px 0; }
 .chart-fallback .fb-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
-    font-size: 0.88rem;
-    color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--gray-700);
 }
 .chart-fallback .fb-label { min-width: 160px; }
 .chart-fallback .fb-bar-track {
-    flex: 1;
-    height: 8px;
-    background: var(--bar-track);
-    border-radius: 4px;
-    overflow: hidden;
+  flex: 1; height: 8px;
+  background: var(--gray-100);
+  border-radius: 4px;
+  overflow: hidden;
 }
-.chart-fallback .fb-bar-fill {
-    height: 100%;
-    border-radius: 4px;
-}
+.chart-fallback .fb-bar-fill { height: 100%; border-radius: 4px; }
 .chart-fallback .fb-value {
-    min-width: 60px;
-    text-align: right;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-.charts-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
+  min-width: 60px;
+  text-align: right;
+  font-weight: 600;
+  color: var(--gray-900);
 }
 
-/* ── Team / Profile Cards ────────────────────────────────────── */
+/* Tables */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 12px;
+}
+.data-table thead th {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  font-weight: 600;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 2px solid var(--gray-200);
+  white-space: nowrap;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.data-table thead th.right { text-align: right; }
+.data-table tbody td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--gray-100);
+  vertical-align: middle;
+}
+.data-table tbody td.right { text-align: right; font-variant-numeric: tabular-nums; }
+.data-table tbody td.bold { font-weight: 600; }
+.data-table tbody tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover { background: var(--gray-50); }
+.data-table tfoot td {
+  padding: 10px 12px;
+  border-top: 2px solid var(--gray-300);
+  font-weight: 700;
+  background: var(--gray-50);
+}
+.data-table tfoot td.right { text-align: right; font-variant-numeric: tabular-nums; }
+.company-name { font-weight: 600; color: var(--gray-900); }
+.ticker {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+  color: var(--primary-light);
+  font-weight: 500;
+}
+.change-positive { color: var(--accent-green); font-weight: 600; }
+.change-negative { color: var(--accent-red); font-weight: 600; }
+.change-neutral { color: var(--gray-500); }
+
+/* Status pills */
+.pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pill-public  { background: #dbeafe; color: #1d4ed8; }
+.pill-pe      { background: #fef3c7; color: #92400e; }
+.pill-sub     { background: var(--gray-100); color: var(--gray-700); }
+.pill-private { background: #f0fdf4; color: #166534; }
+.pill-default { background: var(--gray-100); color: var(--gray-700); }
+
+/* Call-out boxes */
+.callout {
+  border-left: 4px solid var(--primary-light);
+  background: #ebf8ff;
+  padding: 12px 16px;
+  border-radius: 0 6px 6px 0;
+  margin: 12px 0;
+  font-size: 13px;
+  color: var(--gray-700);
+}
+.callout.warn {
+  border-left-color: var(--accent);
+  background: #fffaf0;
+}
+.callout.good {
+  border-left-color: var(--accent-green);
+  background: #f0fff4;
+}
+.callout strong { color: var(--gray-900); }
+
+/* Custom chart legend */
+.chart-legend { padding: 8px 0; }
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--gray-100);
+  font-size: 13px;
+}
+.legend-item:last-child { border-bottom: none; }
+.legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.legend-label { flex: 1; color: var(--gray-700); font-weight: 500; }
+.legend-value {
+  font-weight: 600; color: var(--gray-900);
+  font-variant-numeric: tabular-nums;
+  min-width: 40px; text-align: right;
+}
+.legend-pct { color: var(--gray-500); font-size: 12px; min-width: 36px; text-align: right; }
+
+/* Segment cards */
+.segments-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.segment-card {
+  background: var(--white);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.segment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+.segment-name { font-weight: 600; color: var(--gray-900); font-size: 14px; }
+.segment-aum  { font-weight: 700; color: var(--primary); font-size: 16px; }
+.segment-strategy { color: var(--gray-500); font-size: 12px; margin-bottom: 12px; }
+.segment-bar-track {
+  height: 6px;
+  background: var(--gray-100);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.segment-bar-fill {
+  height: 100%;
+  background: var(--primary-light);
+  border-radius: 3px;
+}
+.segment-pct { font-size: 12px; color: var(--gray-500); margin-top: 6px; }
+.segment-total {
+  text-align: right;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-top: 16px;
+  font-size: 14px;
+}
+
+/* Profile / team cards */
 .team-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
 }
 .profile-card {
-    background: var(--bg-card);
-    border-radius: var(--radius);
-    padding: 20px;
-    box-shadow: var(--shadow-sm);
-    transition: box-shadow 0.15s ease;
+  background: var(--white);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: box-shadow 0.15s ease;
 }
-.profile-card:hover { box-shadow: var(--shadow-md); }
+.profile-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
 .card-header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
 }
 .avatar {
-    width: 44px; height: 44px;
-    border-radius: 50%;
-    background: var(--avatar-bg);
-    color: var(--avatar-text);
-    font-size: 0.85rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    letter-spacing: 0.02em;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--white);
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
-.card-name { font-size: 1.05rem; font-weight: 600; color: var(--text-primary); }
-.card-name a { color: var(--color-blue); text-decoration: none; }
+.card-name { font-size: 15px; font-weight: 600; color: var(--gray-900); }
+.card-name a { color: var(--primary-light); text-decoration: none; }
 .card-name a:hover { text-decoration: underline; }
-.card-title { color: var(--text-muted); font-size: 0.88rem; margin: 1px 0 0; }
+.card-title { color: var(--gray-500); font-size: 13px; margin: 1px 0 0; }
 .card-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
-.badge {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 12px;
-    font-size: 0.72rem;
-    font-weight: 600;
+.card-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
 }
-.badge-seniority { background: var(--badge-seniority-bg); color: var(--badge-seniority-text); }
-.badge-dept { background: var(--badge-dept-bg); color: var(--badge-dept-text); border: 1px solid var(--badge-dept-border); }
-.badge-tenure { background: var(--badge-tenure-bg); color: var(--badge-tenure-text); border: 1px solid var(--badge-tenure-border); }
-.card-bio { color: var(--text-muted); font-size: 0.85rem; line-height: 1.6; margin: 8px 0 4px; }
+.badge-seniority { background: var(--primary); color: var(--white); }
+.badge-dept { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+.badge-tenure { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.card-bio { color: var(--gray-500); font-size: 13px; line-height: 1.6; margin: 8px 0 4px; }
 .card-section { margin-top: 10px; }
 .section-label {
-    font-size: 0.72rem; font-weight: 700;
-    color: var(--text-faint);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+  font-size: 11px; font-weight: 700;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 .exp-list, .edu-list {
-    margin: 4px 0 0 16px; padding: 0;
-    font-size: 0.82rem; color: var(--text-muted);
+  margin: 4px 0 0 16px; padding: 0;
+  font-size: 13px; color: var(--gray-500);
 }
 .exp-list li, .edu-list li { margin-bottom: 3px; }
-.exp-years { color: var(--text-faint); }
+.exp-years { color: var(--gray-300); }
 
-/* ── Footnote & Footer ───────────────────────────────────────── */
+/* Footer */
+.page-footer {
+  padding: 24px 0 40px 0;
+  text-align: center;
+  color: var(--gray-500);
+  font-size: 12px;
+}
+.page-footer .notes {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: left;
+  background: var(--white);
+  border-radius: 10px;
+  padding: 20px 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  margin-bottom: 16px;
+}
+.page-footer .notes h3 {
+  font-size: 14px;
+  color: var(--gray-700);
+  margin-bottom: 8px;
+}
+.page-footer .notes ul { padding-left: 20px; }
+.page-footer .notes li { margin-bottom: 4px; font-size: 12px; color: var(--gray-500); }
+
+/* Footnote */
 .footnote {
-    color: var(--text-faint);
-    font-size: 0.82rem;
-    margin-top: 10px;
-    font-style: italic;
+  color: var(--gray-500);
+  font-size: 12px;
+  margin-top: 10px;
+  font-style: italic;
 }
-footer {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 24px 40px;
-    border-top: 1px solid var(--border-light);
-    color: var(--text-faint);
-    font-size: 0.82rem;
-    display: flex;
-    justify-content: space-between;
-}
-footer .brand { font-weight: 600; color: var(--text-muted); }
 
-/* ── Dark Mode Toggle ────────────────────────────────────────── */
+/* Utility */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+.mt-16 { margin-top: 16px; }
+.mb-8 { margin-bottom: 8px; }
+
+/* Theme toggle switch */
 .theme-toggle {
-    position: fixed;
-    top: 16px;
-    right: 16px;
-    z-index: 9999;
-    width: 40px; height: 40px;
-    border-radius: 50%;
-    border: none;
-    background: var(--bg-card);
-    box-shadow: var(--shadow-sm);
-    cursor: pointer;
-    font-size: 1.15rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
 }
-.theme-toggle:hover { box-shadow: var(--shadow-md); }
+.theme-toggle .toggle-track {
+  width: 48px;
+  height: 26px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 13px;
+  position: relative;
+  transition: background 0.2s;
+}
+.theme-toggle .toggle-thumb {
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  color: #ed8936;
+}
+.theme-toggle .toggle-thumb::after { content: '\\2600\\FE0E'; }
 
-/* ── Print ───────────────────────────────────────────────────── */
+/* ── Dark Mode ── */
+[data-theme="dark"] {
+  --primary: #63b3ed;
+  --primary-light: #90cdf4;
+  --accent: #ed8936;
+  --accent-red: #fc8181;
+  --accent-green: #68d391;
+  --gray-50: #1a202c;
+  --gray-100: #2d3748;
+  --gray-200: #4a5568;
+  --gray-300: #718096;
+  --gray-500: #a0aec0;
+  --gray-700: #e2e8f0;
+  --gray-800: #edf2f7;
+  --gray-900: #f7fafc;
+  --white: #2d3748;
+}
+[data-theme="dark"] .page-header {
+  background: linear-gradient(135deg, #1a365d 0%, #2a4365 100%);
+  color: #f7fafc;
+}
+[data-theme="dark"] .page-header .badge {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.2);
+}
+[data-theme="dark"] .kpi-card .value { color: #90cdf4; }
+[data-theme="dark"] .section-number { background: #63b3ed; color: #1a202c; }
+[data-theme="dark"] .kpi-card,
+[data-theme="dark"] .section,
+[data-theme="dark"] .toc,
+[data-theme="dark"] .page-footer .notes {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+[data-theme="dark"] .callout {
+  border-left-color: #63b3ed;
+  background: #2a4365;
+  color: #e2e8f0;
+}
+[data-theme="dark"] .callout.warn {
+  border-left-color: var(--accent);
+  background: #744210;
+}
+[data-theme="dark"] .callout.good {
+  border-left-color: var(--accent-green);
+  background: #22543d;
+}
+[data-theme="dark"] .callout strong { color: #f7fafc; }
+[data-theme="dark"] .toc a .toc-num { background: #63b3ed; color: #1a202c; }
+[data-theme="dark"] .pill-public  { background: #1e3a5f; color: #93c5fd; }
+[data-theme="dark"] .pill-pe      { background: #422006; color: #fbbf24; }
+[data-theme="dark"] .pill-sub     { background: #334155; color: #cbd5e1; }
+[data-theme="dark"] .pill-private { background: #14332a; color: #6ee7b7; }
+[data-theme="dark"] .pill-default { background: #334155; color: #cbd5e1; }
+[data-theme="dark"] .badge-seniority { background: #334155; color: #e2e8f0; }
+[data-theme="dark"] .badge-dept { background: #1e3a5f; color: #93c5fd; border-color: #1e3a5f; }
+[data-theme="dark"] .badge-tenure { background: #14332a; color: #6ee7b7; border-color: #14332a; }
+[data-theme="dark"] .theme-toggle .toggle-track { background: rgba(144,205,244,0.3); }
+[data-theme="dark"] .theme-toggle .toggle-thumb { transform: translateX(22px); color: #63b3ed; }
+[data-theme="dark"] .theme-toggle .toggle-thumb::after { content: '\\263E\\FE0E'; }
+
+/* ── Print ── */
 @media print {
-    body { background: #fff !important; color: #334155 !important; }
-    .hero { background: #0f172a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .kpi-card, .profile-card, .segment-card, .chart-wrapper, .table-container {
-        box-shadow: none !important;
-        border: 1px solid #e2e8f0;
-    }
-    .profile-card:hover { box-shadow: none !important; }
-    .theme-toggle { display: none !important; }
-    .chart-wrapper canvas { max-height: 280px; }
-    footer { border-top-color: #e2e8f0; }
+  .theme-toggle { display: none !important; }
+  .kpi-card, .section, .toc, .profile-card, .segment-card, .page-footer .notes {
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0;
+  }
+  .page-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
-/* ── Responsive ──────────────────────────────────────────────── */
+/* ── Responsive ── */
 @media (max-width: 768px) {
-    .hero-inner, .container, footer { padding-left: 20px; padding-right: 20px; }
-    .hero h1 { font-size: 1.8rem; }
-    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-    .team-grid { grid-template-columns: 1fr; }
-    .charts-row { grid-template-columns: 1fr; }
+  .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+  .team-grid { grid-template-columns: 1fr; }
+  .segments-grid { grid-template-columns: 1fr; }
 }
 """
 
 # ---------------------------------------------------------------------------
-# JavaScript — Dark mode + Chart.js theme + CDN fallback
+# JavaScript
 # ---------------------------------------------------------------------------
 
+# Early theme detection (runs in <head> before paint)
 DARK_MODE_JS = """
 (function() {
     var stored = localStorage.getItem('nexdata-theme');
@@ -548,62 +630,16 @@ DARK_MODE_JS = """
         document.documentElement.setAttribute('data-theme', 'dark');
     }
 })();
-
-function toggleTheme() {
-    var html = document.documentElement;
-    var current = html.getAttribute('data-theme');
-    var next = current === 'dark' ? 'light' : 'dark';
-    html.setAttribute('data-theme', next);
-    localStorage.setItem('nexdata-theme', next);
-    var btn = document.getElementById('themeToggle');
-    if (btn) btn.textContent = next === 'dark' ? '\\u2600' : '\\u263E';
-    if (typeof updateChartsForTheme === 'function') {
-        updateChartsForTheme(next === 'dark');
-    }
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    var btn = document.getElementById('themeToggle');
-    if (btn) {
-        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-        btn.textContent = isDark ? '\\u2600' : '\\u263E';
-    }
-});
 """
 
-CHART_THEME_JS = """
-window._nexdataCharts = [];
-
-function updateChartsForTheme(isDark) {
-    var gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
-    var tickColor = isDark ? '#94a3b8' : '#64748b';
-    var legendColor = isDark ? '#cbd5e1' : '#334155';
-    window._nexdataCharts.forEach(function(chart) {
-        if (chart.options.scales) {
-            Object.keys(chart.options.scales).forEach(function(key) {
-                var scale = chart.options.scales[key];
-                if (scale.ticks) scale.ticks.color = tickColor;
-                if (scale.grid) scale.grid.color = gridColor;
-            });
-        }
-        if (chart.options.plugins && chart.options.plugins.legend && chart.options.plugins.legend.labels) {
-            chart.options.plugins.legend.labels.color = legendColor;
-        }
-        chart.update();
-    });
-}
-"""
-
-CHARTJS_FALLBACK_JS = """
+# Chart.js setup, fallback, and dark mode re-theming IIFE
+CHART_RUNTIME_JS = """
 window.CHARTJS_AVAILABLE = false;
 
 function renderChartOrFallback(canvasId, config) {
     if (window.CHARTJS_AVAILABLE && typeof Chart !== 'undefined') {
         var ctx = document.getElementById(canvasId);
-        if (ctx) {
-            var c = new Chart(ctx, config);
-            window._nexdataCharts.push(c);
-        }
+        if (ctx) new Chart(ctx, config);
     } else {
         var wrapper = document.getElementById(canvasId + '_fallback');
         if (wrapper) wrapper.style.display = 'block';
@@ -611,6 +647,65 @@ function renderChartOrFallback(canvasId, config) {
         if (canvas) canvas.style.display = 'none';
     }
 }
+
+function _nexdataSetChartDefaults() {
+    if (typeof Chart === 'undefined') return;
+    Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif";
+    Chart.defaults.font.size = 12;
+    Chart.defaults.color = '#4a5568';
+}
+
+/* Dark mode re-theming IIFE — matches chartjs_conventions.md */
+(function() {
+    var LIGHT = { text: '#4a5568', grid: '#edf2f7', doughnutBorder: '#ffffff' };
+    var DARK  = { text: '#a0aec0', grid: '#4a5568', doughnutBorder: '#2d3748' };
+
+    function applyTheme(isDark) {
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        localStorage.setItem('nexdata-theme', isDark ? 'dark' : 'light');
+        var toggle = document.getElementById('themeToggle');
+        if (toggle) toggle.setAttribute('aria-checked', isDark ? 'true' : 'false');
+        if (typeof Chart === 'undefined') return;
+        var palette = isDark ? DARK : LIGHT;
+        Chart.defaults.color = palette.text;
+        Object.values(Chart.instances).forEach(function(chart) {
+            var scales = chart.options.scales || {};
+            Object.keys(scales).forEach(function(key) {
+                var s = scales[key];
+                if (s.grid) s.grid.color = s.grid.display === false ? undefined : palette.grid;
+                if (s.ticks) s.ticks.color = palette.text;
+            });
+            var plugins = chart.options.plugins || {};
+            if (plugins.legend && plugins.legend.labels) plugins.legend.labels.color = palette.text;
+            if (chart.config.type === 'doughnut') {
+                chart.data.datasets.forEach(function(ds) { ds.borderColor = palette.doughnutBorder; });
+            }
+            chart.update('none');
+        });
+    }
+
+    var systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+    var userOverride = null;
+    function currentIsDark() {
+        if (userOverride !== null) return userOverride;
+        var stored = localStorage.getItem('nexdata-theme');
+        if (stored) return stored === 'dark';
+        return systemDark.matches;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        applyTheme(currentIsDark());
+    });
+
+    var toggleEl = document.getElementById('themeToggle');
+    if (toggleEl) {
+        toggleEl.addEventListener('click', function() { userOverride = !currentIsDark(); applyTheme(userOverride); });
+        toggleEl.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEl.click(); }
+        });
+    }
+    systemDark.addEventListener('change', function() { if (userOverride === null) applyTheme(systemDark.matches); });
+})();
 """
 
 
@@ -636,7 +731,6 @@ def html_document(
     extra_css: str = "",
 ) -> str:
     """Full <!DOCTYPE html> wrapper with design system CSS, dark mode, and Chart.js."""
-    theme_icon_init = ""
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -647,110 +741,150 @@ def html_document(
     <script>{DARK_MODE_JS}</script>
 </head>
 <body>
-    <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode"></button>
 {body_content}
-    <script>{CHART_THEME_JS}</script>
-    <script>{CHARTJS_FALLBACK_JS}</script>
-    <script src="{CHART_JS_CDN}" onload="window.CHARTJS_AVAILABLE=true;{charts_js}" onerror="document.querySelectorAll('.chart-fallback').forEach(function(e){{e.style.display='block'}});document.querySelectorAll('.chart-wrapper canvas').forEach(function(e){{e.style.display='none'}})"></script>
+    <script>{CHART_RUNTIME_JS}</script>
     <script>
-    // If CDN loaded synchronously before our onload, run charts now
-    if (window.CHARTJS_AVAILABLE && typeof Chart !== 'undefined') {{
+    function _nexdataInitCharts() {{
+        _nexdataSetChartDefaults();
         {charts_js}
+    }}
+    </script>
+    <script src="{CHART_JS_CDN}" onload="window.CHARTJS_AVAILABLE=true;_nexdataInitCharts();" onerror="document.querySelectorAll('.chart-fallback').forEach(function(e){{e.style.display='block'}});document.querySelectorAll('.chart-container canvas').forEach(function(e){{e.style.display='none'}})"></script>
+    <script>
+    if (window.CHARTJS_AVAILABLE && typeof Chart !== 'undefined') {{
+        _nexdataInitCharts();
     }}
     </script>
 </body>
 </html>"""
 
 
-def hero_header(
+def page_header(
     title: str,
     subtitle: Optional[str] = None,
-    website: Optional[str] = None,
-    pills: Optional[List[Dict[str, str]]] = None,
+    badge: Optional[str] = None,
 ) -> str:
-    """Dark navy hero banner with optional subtitle, website, and metadata pills."""
-    subtitle_html = ""
-    if subtitle:
-        subtitle_html = f'<div class="hero-subtitle">{_esc(subtitle)}</div>'
+    """Page header with gradient banner, dark mode toggle, and optional badge."""
+    subtitle_html = f'\n      <div class="subtitle">{_esc(subtitle)}</div>' if subtitle else ""
+    badge_html = f'\n      <div class="badge">{_esc(badge)}</div>' if badge else ""
 
-    website_html = ""
-    if website:
-        url = website if website.startswith("http") else f"https://{website}"
-        website_html = f'<a href="{_esc(url)}" target="_blank" class="hero-website">{_esc(website)}</a>'
-
-    pills_html = ""
-    if pills:
-        pill_items = "".join(
-            f'<span class="hero-pill"><span class="hero-pill-label">{_esc(p["label"])}</span> {_esc(p["value"])}</span>'
-            for p in pills
-        )
-        pills_html = f'<div class="hero-pills">{pill_items}</div>'
-
-    return f"""
-    <header class="hero">
-        <div class="hero-inner">
-            <h1>{_esc(title)}</h1>
-            {subtitle_html}
-            {website_html}
-            {pills_html}
-        </div>
-    </header>"""
-
-
-def kpi_card(value: str, label: str, color: str = "blue") -> str:
-    """Single KPI stat card. Colors: blue, emerald, slate, amber."""
-    return f"""<div class="kpi-card kpi-{_esc(color)}">
-    <div class="kpi-value">{_esc(str(value))}</div>
-    <div class="kpi-label">{_esc(label)}</div>
+    return f"""<div class="page-header">
+  <div class="container">
+    <div>
+      <h1>{_esc(title)}</h1>{subtitle_html}
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <div class="theme-toggle" id="themeToggle" role="switch" aria-label="Toggle dark mode" aria-checked="false" tabindex="0">
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+      </div>{badge_html}
+    </div>
+  </div>
 </div>"""
 
 
-def kpi_grid(cards_html: str) -> str:
-    """Wrap kpi_card outputs in a responsive grid."""
-    return f'<div class="kpi-grid">{cards_html}</div>'
+def kpi_strip(cards_html: str) -> str:
+    """Wrap kpi_card outputs in a KPI strip grid."""
+    return f'<div class="kpi-strip">{cards_html}</div>'
 
 
-def section_heading(title: str, count: Optional[int] = None) -> str:
-    """Section heading with optional count badge."""
-    badge = ""
-    if count is not None:
-        badge = f' <span class="count-badge">{count}</span>'
-    return f'<h2 class="section-title">{_esc(title)}{badge}</h2>'
+def kpi_card(
+    label: str,
+    value: str,
+    delta: Optional[str] = None,
+    delta_dir: str = "neutral",
+) -> str:
+    """Single KPI card. delta_dir: 'up', 'down', or 'neutral'."""
+    delta_html = ""
+    if delta:
+        delta_html = f'\n    <div class="delta {_esc(delta_dir)}">{_esc(delta)}</div>'
+    return f"""<div class="kpi-card">
+    <div class="label">{_esc(label)}</div>
+    <div class="value">{_esc(str(value))}</div>{delta_html}
+</div>"""
+
+
+def toc(items: List[Dict[str, Any]]) -> str:
+    """Table of contents. items = [{"number": 1, "id": "section-id", "title": "Title"}]."""
+    links = ""
+    for item in items:
+        num = item.get("number", "")
+        sid = item.get("id", "")
+        title = item.get("title", "")
+        links += f'<a href="#{_esc(sid)}"><span class="toc-num">{num}</span> {_esc(title)}</a>\n'
+    return f"""<div class="toc">
+    <h2>Contents</h2>
+    <div class="toc-grid">
+        {links}
+    </div>
+</div>"""
+
+
+def section_start(number: int, title: str, section_id: str) -> str:
+    """Open a numbered section card. Must be closed with section_end()."""
+    return f"""<div class="section" id="{_esc(section_id)}">
+    <div class="section-header">
+        <div class="section-number">{number}</div>
+        <h2>{_esc(title)}</h2>
+    </div>
+    <div class="section-body">"""
+
+
+def section_end() -> str:
+    """Close a numbered section card."""
+    return """    </div>
+</div>"""
 
 
 def data_table(
     headers: List[str],
     rows: List[List[str]],
     numeric_columns: Optional[set] = None,
+    footer_row: Optional[List[str]] = None,
 ) -> str:
-    """Full HTML table with thead/tbody, zebra striping."""
+    """HTML data table with optional numeric alignment and footer row."""
     if numeric_columns is None:
         numeric_columns = set()
 
     th_cells = "".join(
-        f'<th class="num">{_esc(h)}</th>' if i in numeric_columns else f"<th>{_esc(h)}</th>"
+        f'<th class="right">{_esc(h)}</th>' if i in numeric_columns else f"<th>{_esc(h)}</th>"
         for i, h in enumerate(headers)
     )
 
     if not rows:
-        empty_row = f'<tr><td colspan="{len(headers)}" class="empty-state">No data available</td></tr>'
-        tbody = empty_row
+        tbody = f'<tr><td colspan="{len(headers)}" style="text-align:center;color:var(--gray-500);padding:32px;font-style:italic">No data available</td></tr>'
     else:
         row_htmls = []
         for row in rows:
             cells = "".join(
-                f'<td class="num">{cell}</td>' if i in numeric_columns else f"<td>{cell}</td>"
+                f'<td class="right">{cell}</td>' if i in numeric_columns else f"<td>{cell}</td>"
                 for i, cell in enumerate(row)
             )
             row_htmls.append(f"<tr>{cells}</tr>")
         tbody = "\n".join(row_htmls)
 
-    return f"""<div class="table-container">
-<table>
+    tfoot = ""
+    if footer_row:
+        foot_cells = "".join(
+            f'<td class="right">{_esc(cell)}</td>' if i in numeric_columns else f"<td>{_esc(cell)}</td>"
+            for i, cell in enumerate(footer_row)
+        )
+        tfoot = f"\n    <tfoot><tr>{foot_cells}</tr></tfoot>"
+
+    return f"""<table class="data-table">
     <thead><tr>{th_cells}</tr></thead>
-    <tbody>{tbody}</tbody>
-</table>
-</div>"""
+    <tbody>{tbody}</tbody>{tfoot}
+</table>"""
+
+
+def callout(content: str, variant: str = "info") -> str:
+    """Callout box. Variants: 'info' (blue), 'warn' (orange), 'good' (green).
+    Content should include <strong>Label:</strong> prefix."""
+    cls = ""
+    if variant == "warn":
+        cls = " warn"
+    elif variant == "good":
+        cls = " good"
+    return f'<div class="callout{cls}">{content}</div>'
 
 
 def pill_badge(text: str, variant: str = "default") -> str:
@@ -768,7 +902,7 @@ def profile_card(
     education: Optional[List[Dict]] = None,
     linkedin: Optional[str] = None,
 ) -> str:
-    """Team member profile card with avatar, badges, bio, experience, education."""
+    """Team member profile card."""
     name_html = _esc(name)
     if linkedin:
         name_html = f'<a href="{_esc(linkedin)}" target="_blank">{_esc(name)}</a>'
@@ -787,9 +921,9 @@ def profile_card(
         for exp in experience[:3]:
             years = ""
             if exp.get("start_year") and exp.get("end_year"):
-                years = f' <span class="exp-years">({exp["start_year"]}–{exp["end_year"]})</span>'
+                years = f' <span class="exp-years">({exp["start_year"]}\u2013{exp["end_year"]})</span>'
             elif exp.get("start_year"):
-                years = f' <span class="exp-years">({exp["start_year"]}–)</span>'
+                years = f' <span class="exp-years">({exp["start_year"]}\u2013)</span>'
             exp_items += f'<li>{_esc(exp.get("title", ""))} at {_esc(exp.get("company", ""))}{years}</li>'
         exp_html = f'<div class="card-section"><span class="section-label">Prior Experience</span><ul class="exp-list">{exp_items}</ul></div>'
 
@@ -802,15 +936,15 @@ def profile_card(
             inst = edu.get("institution", "")
             year = f" ({edu['year']})" if edu.get("year") else ""
             if field:
-                edu_items += f"<li>{_esc(degree)} {_esc(field)} — {_esc(inst)}{year}</li>"
+                edu_items += f"<li>{_esc(degree)} {_esc(field)} \u2014 {_esc(inst)}{year}</li>"
             else:
-                edu_items += f"<li>{_esc(degree)} — {_esc(inst)}{year}</li>"
+                edu_items += f"<li>{_esc(degree)} \u2014 {_esc(inst)}{year}</li>"
         edu_html = f'<div class="card-section"><span class="section-label">Education</span><ul class="edu-list">{edu_items}</ul></div>'
 
     return f"""<div class="profile-card">
     <div class="card-header">
         <div class="avatar">{_esc(initials)}</div>
-        <div class="card-header-text">
+        <div>
             <div class="card-name">{name_html}</div>
             <div class="card-title">{_esc(title)}</div>
         </div>
@@ -826,9 +960,15 @@ def chart_container(
     chart_id: str,
     chart_config_json: str,
     fallback_html: str = "",
+    size: str = "tall",
+    title: Optional[str] = None,
+    height: Optional[str] = None,
 ) -> str:
-    """Chart.js canvas with CDN fallback."""
-    return f"""<div class="chart-wrapper">
+    """Chart.js canvas with CDN fallback. size: 'tall', 'medium', 'short'."""
+    title_html = f'<div class="chart-title">{_esc(title)}</div>' if title else ""
+    size_class = f" {size}" if size and not height else ""
+    style = f' style="height:{height}"' if height else ""
+    return f"""{title_html}<div class="chart-container{size_class}"{style}>
     <canvas id="{_esc(chart_id)}"></canvas>
     <div id="{_esc(chart_id)}_fallback" class="chart-fallback">{fallback_html}</div>
 </div>"""
@@ -839,12 +979,56 @@ def chart_init_js(chart_id: str, chart_config_json: str) -> str:
     return f"renderChartOrFallback('{chart_id}', {chart_config_json});"
 
 
-def footer(generated_at: str, brand: str = "Nexdata Investment Intelligence") -> str:
-    """Page footer with timestamp and brand."""
-    return f"""<footer>
-    <span>Generated: {_esc(generated_at)}</span>
-    <span class="brand">{_esc(brand)}</span>
-</footer>"""
+def page_footer(
+    notes: Optional[List[str]] = None,
+    generated_line: str = "",
+) -> str:
+    """Page footer with data quality notes and generation stamp."""
+    notes_html = ""
+    if notes:
+        items = "".join(f"<li>{_esc(n)}</li>" for n in notes)
+        notes_html = f"""<div class="notes">
+            <h3>Data Quality Notes &amp; Methodology</h3>
+            <ul>{items}</ul>
+        </div>"""
+    return f"""<div class="container">
+    <div class="page-footer">
+        {notes_html}
+        <div>{_esc(generated_line)}</div>
+    </div>
+</div>"""
+
+
+# Legacy aliases for backward compatibility
+def hero_header(title, subtitle=None, website=None, pills=None):
+    """Legacy alias — use page_header() instead."""
+    sub_parts = []
+    if subtitle:
+        sub_parts.append(subtitle)
+    if website:
+        sub_parts.append(website)
+    badge = None
+    if pills:
+        badge = " · ".join(f'{p["label"]}: {p["value"]}' for p in pills)
+    return page_header(title, " · ".join(sub_parts) if sub_parts else None, badge)
+
+
+def kpi_grid(cards_html):
+    """Legacy alias — use kpi_strip() instead."""
+    return kpi_strip(cards_html)
+
+
+def section_heading(title, count=None):
+    """Legacy alias for simple section headings (non-numbered)."""
+    badge = ""
+    if count is not None:
+        badge = f' <span class="count-badge">{count}</span>'
+    return f'<h2 style="font-size:18px;font-weight:700;color:var(--primary);margin:24px 0 12px">{_esc(title)}{badge}</h2>'
+
+
+def footer(generated_at, brand="Nexdata Investment Intelligence"):
+    """Legacy alias — use page_footer() instead."""
+    return page_footer(generated_line=f"Generated: {generated_at} | {brand}")
 
 
 # ---------------------------------------------------------------------------
@@ -856,11 +1040,9 @@ def build_doughnut_config(
     values: List[float],
     colors: Optional[List[str]] = None,
 ) -> dict:
-    """Build Chart.js config dict for a doughnut chart (cutout 60%, legend bottom)."""
+    """Build Chart.js doughnut config following chartjs_conventions.md."""
     if colors is None:
         colors = [CHART_COLORS[i % len(CHART_COLORS)] for i in range(len(labels))]
-
-    is_dark = False  # Charts adapt via updateChartsForTheme()
 
     return {
         "type": "doughnut",
@@ -869,22 +1051,17 @@ def build_doughnut_config(
             "datasets": [{
                 "data": values,
                 "backgroundColor": colors[:len(values)],
-                "borderWidth": 0,
+                "borderWidth": 2,
+                "borderColor": "#ffffff",
+                "hoverOffset": 4,
             }],
         },
         "options": {
             "responsive": True,
-            "maintainAspectRatio": True,
-            "cutout": "60%",
+            "maintainAspectRatio": False,
+            "cutout": "50%",
             "plugins": {
-                "legend": {
-                    "position": "bottom",
-                    "labels": {
-                        "padding": 16,
-                        "usePointStyle": True,
-                        "pointStyleWidth": 10,
-                    },
-                },
+                "legend": {"display": False},
             },
         },
     }
@@ -896,9 +1073,9 @@ def build_horizontal_bar_config(
     colors: Optional[List[str]] = None,
     dataset_label: str = "Value",
 ) -> dict:
-    """Build Chart.js config dict for a horizontal bar chart."""
+    """Build Chart.js horizontal bar config following chartjs_conventions.md."""
     if colors is None:
-        colors = [CHART_COLORS[i % len(CHART_COLORS)] for i in range(len(labels))]
+        colors = [BLUE] * len(labels)
 
     return {
         "type": "bar",
@@ -910,43 +1087,72 @@ def build_horizontal_bar_config(
                 "backgroundColor": colors[:len(values)],
                 "borderWidth": 0,
                 "borderRadius": 4,
+                "barThickness": 28,
             }],
         },
         "options": {
             "indexAxis": "y",
             "responsive": True,
-            "maintainAspectRatio": True,
+            "maintainAspectRatio": False,
             "plugins": {
                 "legend": {"display": False},
             },
             "scales": {
                 "x": {
-                    "grid": {"color": "rgba(0,0,0,0.06)"},
-                    "ticks": {"color": "#64748b"},
+                    "grid": {"color": "#edf2f7"},
+                    "ticks": {"color": "#4a5568"},
+                    "beginAtZero": True,
                 },
                 "y": {
                     "grid": {"display": False},
-                    "ticks": {"color": "#64748b"},
+                    "ticks": {"color": "#4a5568", "font": {"size": 13}},
                 },
             },
         },
     }
 
 
-def build_bar_fallback(labels: List[str], values: List[float], colors: Optional[List[str]] = None) -> str:
+def build_bar_fallback(labels: List[str], values: List[float], color: str = "#2b6cb0") -> str:
     """Build simple CSS bar fallback HTML for when Chart.js CDN fails."""
-    if colors is None:
-        colors = [CHART_COLORS[i % len(CHART_COLORS)] for i in range(len(labels))]
     max_val = max(values) if values else 1
     rows = []
-    for i, (label, val) in enumerate(zip(labels, values)):
+    for label, val in zip(labels, values):
         pct = (val / max_val * 100) if max_val > 0 else 0
-        c = colors[i % len(colors)]
         rows.append(
             f'<div class="fb-row">'
             f'<span class="fb-label">{_esc(label)}</span>'
-            f'<div class="fb-bar-track"><div class="fb-bar-fill" style="width:{pct:.0f}%;background:{c}"></div></div>'
+            f'<div class="fb-bar-track"><div class="fb-bar-fill" style="width:{pct:.0f}%;background:{color}"></div></div>'
             f'<span class="fb-value">{val:,.0f}</span>'
             f'</div>'
         )
     return "\n".join(rows)
+
+
+def build_chart_legend(
+    labels: List[str],
+    values: List[float],
+    colors: Optional[List[str]] = None,
+    value_suffix: str = "",
+    show_pct: bool = True,
+) -> str:
+    """Build a custom HTML legend for charts (color dot + label + value)."""
+    if colors is None:
+        colors = [CHART_COLORS[i % len(CHART_COLORS)] for i in range(len(labels))]
+    total = sum(values) if values else 0
+    rows = []
+    for i, (label, val) in enumerate(zip(labels, values)):
+        c = colors[i % len(colors)]
+        pct_html = ""
+        if show_pct and total > 0:
+            pct = val / total * 100
+            pct_html = f'<span class="legend-pct">{pct:.0f}%</span>'
+        val_display = f"{val:,.0f}{value_suffix}" if val == int(val) else f"{val:,.1f}{value_suffix}"
+        rows.append(
+            f'<div class="legend-item">'
+            f'<span class="legend-dot" style="background:{c}"></span>'
+            f'<span class="legend-label">{_esc(label)}</span>'
+            f'<span class="legend-value">{val_display}</span>'
+            f'{pct_html}'
+            f'</div>'
+        )
+    return '<div class="chart-legend">' + "\n".join(rows) + "</div>"
