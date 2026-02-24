@@ -121,6 +121,7 @@ from app.api.v1 import (
     exit_readiness,
     acquisition_targets,
     quarterly_diff,
+    zip_scores,
 )
 
 # Job Queue Streaming
@@ -1185,6 +1186,10 @@ Browse the endpoint sections below to see what's available:
             "description": "🎯 **Acquisition Target Score** - 5-signal score identifying attractive PE acquisition targets",
         },
         {
+            "name": "ZIP Intelligence",
+            "description": "📍 **ZIP Med-Spa Score** - Revenue potential scoring for US ZIPs based on IRS SOI income data",
+        },
+        {
             "name": "13F Analysis",
             "description": "📊 **13F Quarterly Analysis** - Quarter-over-quarter holding diffs and cross-investor convergence detection",
         },
@@ -1356,6 +1361,7 @@ app.include_router(health_scores.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(lp_allocation.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(exit_readiness.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(acquisition_targets.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(zip_scores.router, prefix="/api/v1", dependencies=_auth)
 
 # Site Intelligence Platform
 app.include_router(site_intel_power.router, prefix="/api/v1", dependencies=_auth)
