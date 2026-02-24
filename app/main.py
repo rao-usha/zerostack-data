@@ -120,6 +120,7 @@ from app.api.v1 import (
     lp_allocation,
     exit_readiness,
     acquisition_targets,
+    quarterly_diff,
 )
 
 # Job Queue Streaming
@@ -1182,6 +1183,10 @@ Browse the endpoint sections below to see what's available:
             "name": "acquisition_targets",
             "description": "🎯 **Acquisition Target Score** - 5-signal score identifying attractive PE acquisition targets",
         },
+        {
+            "name": "13F Analysis",
+            "description": "📊 **13F Quarterly Analysis** - Quarter-over-quarter holding diffs and cross-investor convergence detection",
+        },
     ],
 )
 
@@ -1324,6 +1329,9 @@ app.include_router(pe_companies.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_people.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_deals.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_collection.router, prefix="/api/v1", dependencies=_auth)
+
+# 13F Quarterly Analysis
+app.include_router(quarterly_diff.router, prefix="/api/v1", dependencies=_auth)
 
 # People & Org Chart Intelligence
 app.include_router(people.router, prefix="/api/v1", dependencies=_auth)

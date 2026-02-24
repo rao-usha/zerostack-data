@@ -630,6 +630,7 @@ class LpCollectionOrchestrator:
                 PortfolioCompany.investor_type == "lp",
                 PortfolioCompany.company_cusip == cusip,
                 PortfolioCompany.source_type == "sec_13f",
+                PortfolioCompany.investment_date == report_date,
             )
             .first()
         )

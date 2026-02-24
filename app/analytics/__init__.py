@@ -31,3 +31,11 @@ try:
     __all__.append("RecommendationEngine")
 except ImportError:
     pass
+
+# 13F Quarterly Diff & Convergence
+try:
+    from app.analytics.quarterly_diff import QuarterlyDiffService  # noqa: F401
+
+    __all__.append("QuarterlyDiffService")
+except ImportError:
+    pass
