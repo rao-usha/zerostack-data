@@ -125,8 +125,8 @@ from app.api.v1 import (
     medspa_discovery,
 )
 
-# Job Queue Streaming
-from app.api.v1 import job_stream
+# Job Queue Streaming & Monitor
+from app.api.v1 import job_stream, jobs_monitor
 
 # Site Intelligence Platform
 from app.api.v1 import (
@@ -840,6 +840,8 @@ Browse the endpoint sections below to see what's available:
         {"name": "schedules", "description": "📅 **Scheduled Ingestion** - Automated data refresh with cron-based scheduling for all data sources"},
         {"name": "job-chains", "description": "🔗 **Job Dependency Chains** - Create DAG workflows with job dependencies, execute chains, and track progress"},
         {"name": "Job Queue", "description": "Distributed job queue - live streaming, active jobs, and queue status"},
+        {"name": "Job Monitor", "description": "Live jobs monitoring dashboard with real-time SSE streaming"},
+        {"name": "Job Monitor", "description": "Live jobs monitoring dashboard"},
         {"name": "webhooks", "description": "🔔 **Webhook Notifications** - Configure webhooks to receive notifications for job events and monitoring alerts"},
         {"name": "rate-limits", "description": "⚡ **Per-Source Rate Limits** - Configure and monitor rate limits for each data source API"},
         {"name": "data-quality", "description": "✅ **Data Quality Rules Engine** - Define and evaluate data quality rules with range, null, regex, freshness checks"},
@@ -1025,6 +1027,7 @@ _auth = [Depends(get_current_user)] if _require_auth else []
 app.include_router(auth.router, prefix="/api/v1")  # login/register must be public
 app.include_router(public.router, prefix="/api/v1")  # has its own API key auth
 app.include_router(job_stream.router, prefix="/api/v1")  # SSE streaming
+app.include_router(jobs_monitor.router, prefix="/api/v1", dependencies=_auth)  # Jobs dashboard
 
 # Protected routers
 app.include_router(jobs.router, prefix="/api/v1", dependencies=_auth)
