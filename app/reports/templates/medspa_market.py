@@ -14,6 +14,14 @@ Sections:
   5. ZIP Affluence Profile
   6. Competitive Landscape
   7. Data Sources & Methodology
+  8. Whitespace Analysis
+  9. Workforce Economics
+  10. Service Category Breakdown
+  11. PE Platform Benchmarking
+  12. Review Velocity & Growth Signals
+  13. Deal Model — Unit Economics
+  14. Deal Model — Capital Requirements
+  15. Deal Model — Returns Analysis
 """
 
 import json
@@ -65,6 +73,33 @@ ZIP_SCORE_WEIGHTS = {
     "market_size": 0.20,
     "professional_density": 0.15,
     "wealth_concentration": 0.10,
+}
+
+# ---------------------------------------------------------------------------
+# Deal Model Benchmarks (Industry averages by Yelp price tier)
+# Sources: AmSpa State of the Industry, IBISWorld, PE deal comps
+# ---------------------------------------------------------------------------
+
+MEDSPA_BENCHMARKS = {
+    "$":    {"revenue": 400_000, "ebitda_margin": 0.12, "entry_multiple": 3.0},
+    "$$":   {"revenue": 700_000, "ebitda_margin": 0.18, "entry_multiple": 3.5},
+    "$$$":  {"revenue": 1_200_000, "ebitda_margin": 0.22, "entry_multiple": 4.0},
+    "$$$$": {"revenue": 2_000_000, "ebitda_margin": 0.25, "entry_multiple": 4.5},
+    None:   {"revenue": 600_000, "ebitda_margin": 0.15, "entry_multiple": 3.5},
+}
+
+DEAL_ASSUMPTIONS = {
+    "debt_pct": 0.60,
+    "equity_pct": 0.40,
+    "transaction_cost_pct": 0.05,
+    "working_capital_months": 3,
+    "sga_pct": 0.32,
+    "cogs_pct": 0.40,
+    "scenarios": {
+        "conservative": {"entry_multiple": 3.0, "exit_multiple": 7, "margin_improvement": 0.03, "hold_years": 5},
+        "base":         {"entry_multiple": 4.0, "exit_multiple": 10, "margin_improvement": 0.05, "hold_years": 5},
+        "aggressive":   {"entry_multiple": 3.5, "exit_multiple": 12, "margin_improvement": 0.07, "hold_years": 4},
+    },
 }
 
 # Extra CSS for med-spa report specifics
@@ -166,6 +201,94 @@ MEDSPA_EXTRA_CSS = """
     font-weight: 600;
     color: var(--gray-900);
 }
+
+/* Deal Model Sections */
+.deal-scenario-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+}
+.scenario-card {
+    background: var(--white);
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    border-top: 4px solid var(--primary);
+}
+.scenario-card.conservative { border-top-color: #48bb78; }
+.scenario-card.base { border-top-color: #4299e1; }
+.scenario-card.aggressive { border-top-color: #ed8936; }
+.scenario-card .scenario-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+.scenario-card.conservative .scenario-label { color: #48bb78; }
+.scenario-card.base .scenario-label { color: #4299e1; }
+.scenario-card.aggressive .scenario-label { color: #ed8936; }
+.scenario-card .scenario-metric {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--gray-100);
+    font-size: 13px;
+}
+.scenario-card .scenario-metric:last-child { border-bottom: none; }
+.scenario-card .scenario-metric .label { color: var(--gray-500); }
+.scenario-card .scenario-metric .value { font-weight: 600; color: var(--gray-900); }
+
+.capital-stack {
+    display: flex;
+    height: 40px;
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 16px 0;
+}
+.capital-stack .stack-segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    transition: width 0.3s ease;
+}
+
+.pnl-waterfall {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    height: 180px;
+    padding: 16px 0;
+}
+.pnl-waterfall .waterfall-bar {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+}
+.pnl-waterfall .waterfall-bar .bar {
+    width: 100%;
+    max-width: 80px;
+    border-radius: 4px 4px 0 0;
+    transition: height 0.3s ease;
+}
+.pnl-waterfall .waterfall-bar .bar-label {
+    font-size: 11px;
+    color: var(--gray-500);
+    margin-top: 6px;
+    text-align: center;
+}
+.pnl-waterfall .waterfall-bar .bar-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-900);
+    margin-bottom: 4px;
+}
 """
 
 
@@ -229,6 +352,18 @@ class MedSpaMarketTemplate:
             "pe_comps": self._get_pe_aesthetics_comps(db),
             "recent_deals": self._get_recent_deals(db),
             "data_freshness": self._get_data_freshness(db),
+            # Section 8: Whitespace Analysis
+            **self._get_whitespace_data(db),
+            # Section 9: Workforce Economics
+            **self._get_bls_wage_data(db),
+            # Section 10: Service Categories
+            "category_breakdown": self._get_category_breakdown(db, state_filter),
+            # Section 11: PE Benchmarking
+            **self._get_pe_financial_benchmarks(db),
+            # Section 12: Growth Signals
+            **self._get_growth_signals(db, state_filter),
+            # Sections 13-15: Deal Model
+            "deal_model": self._get_deal_model_data(db, state_filter),
         }
 
         return data
@@ -766,6 +901,527 @@ class MedSpaMarketTemplate:
         return freshness
 
     # ------------------------------------------------------------------
+    # Section 8: Whitespace Analysis
+    # ------------------------------------------------------------------
+
+    def _get_whitespace_data(self, db: Session) -> Dict:
+        """Get A-grade ZIPs with no discovered prospects (greenfield opportunities)."""
+        try:
+            # Whitespace ZIPs: A-grade with no prospects
+            result = db.execute(
+                text("""
+                    SELECT z.zip_code, z.state_abbr, z.overall_score, z.avg_agi,
+                           z.total_returns, z.affluence_density_score
+                    FROM zip_medspa_scores z
+                    WHERE z.grade = 'A'
+                      AND z.zip_code NOT IN (
+                          SELECT DISTINCT zip_code FROM medspa_prospects
+                          WHERE zip_code IS NOT NULL
+                      )
+                    ORDER BY z.overall_score DESC
+                """),
+            )
+            whitespace_zips = [
+                {
+                    "zip_code": row[0],
+                    "state": row[1],
+                    "score": float(row[2]) if row[2] else 0,
+                    "avg_agi": float(row[3]) if row[3] else 0,
+                    "total_returns": int(row[4]) if row[4] else 0,
+                    "affluence_score": float(row[5]) if row[5] else 0,
+                }
+                for row in result.fetchall()
+            ]
+
+            # By-state rollup
+            state_counts: Dict[str, int] = {}
+            for z in whitespace_zips:
+                st = z["state"] or "??"
+                state_counts[st] = state_counts.get(st, 0) + 1
+            whitespace_by_state = sorted(
+                [{"state": k, "count": v} for k, v in state_counts.items()],
+                key=lambda x: x["count"],
+                reverse=True,
+            )
+
+            # Summary stats
+            total_a_result = db.execute(
+                text("SELECT COUNT(*) FROM zip_medspa_scores WHERE grade = 'A'"),
+            )
+            total_a = total_a_result.scalar() or 0
+
+            return {
+                "whitespace_zips": whitespace_zips,
+                "whitespace_by_state": whitespace_by_state,
+                "whitespace_summary": {
+                    "total_a_zips": total_a,
+                    "a_with_prospects": total_a - len(whitespace_zips),
+                    "whitespace_count": len(whitespace_zips),
+                },
+            }
+        except Exception as e:
+            logger.warning(f"Could not fetch whitespace data: {e}")
+            db.rollback()
+            return {
+                "whitespace_zips": [],
+                "whitespace_by_state": [],
+                "whitespace_summary": {"total_a_zips": 0, "a_with_prospects": 0, "whitespace_count": 0},
+            }
+
+    # ------------------------------------------------------------------
+    # Section 9: Workforce Economics (BLS OES)
+    # ------------------------------------------------------------------
+
+    def _get_bls_wage_data(self, db: Session) -> Dict:
+        """Get BLS OES wage trends for aesthetics-adjacent occupations."""
+        # Target series IDs: annual mean wages (data type 04) for key occupations
+        WAGE_SERIES = {
+            "OEUM000000000000029122904": "Dermatologists",
+            "OEUM000000000000029114104": "Registered Nurses",
+            "OEUM000000000000029117104": "Nurse Practitioners",
+            "OEUM000000000000031901104": "Massage Therapists",
+            "OEUM000000000000039501204": "Cosmetologists",
+            "OEUM000000000000031909904": "Healthcare Support",
+            "OEUM000000000000029107104": "Physician Assistants",
+            "OEUM000000000000029209904": "Health Technicians",
+        }
+        EMPLOYMENT_SERIES = {
+            "OEUM000000000000029122901": "Dermatologists",
+            "OEUM000000000000029114101": "Registered Nurses",
+            "OEUM000000000000029117101": "Nurse Practitioners",
+            "OEUM000000000000031901101": "Massage Therapists",
+            "OEUM000000000000039501201": "Cosmetologists",
+            "OEUM000000000000031909901": "Healthcare Support",
+            "OEUM000000000000029107101": "Physician Assistants",
+            "OEUM000000000000029209901": "Health Technicians",
+        }
+        try:
+            # Wages
+            wage_ids = list(WAGE_SERIES.keys())
+            result = db.execute(
+                text("""
+                    SELECT series_id, year, value
+                    FROM bls_oes
+                    WHERE series_id = ANY(:ids)
+                      AND period = 'M13'
+                    ORDER BY year
+                """),
+                {"ids": wage_ids},
+            )
+            bls_wages: Dict[str, Dict[int, float]] = {}
+            for row in result.fetchall():
+                occ = WAGE_SERIES.get(row[0], row[0])
+                yr = int(row[1])
+                val = float(row[2]) if row[2] else 0
+                bls_wages.setdefault(occ, {})[yr] = val
+
+            # Employment counts
+            emp_ids = list(EMPLOYMENT_SERIES.keys())
+            result = db.execute(
+                text("""
+                    SELECT series_id, year, value
+                    FROM bls_oes
+                    WHERE series_id = ANY(:ids)
+                      AND period = 'M13'
+                    ORDER BY year
+                """),
+                {"ids": emp_ids},
+            )
+            bls_employment: Dict[str, Dict[int, float]] = {}
+            for row in result.fetchall():
+                occ = EMPLOYMENT_SERIES.get(row[0], row[0])
+                yr = int(row[1])
+                val = float(row[2]) if row[2] else 0
+                bls_employment.setdefault(occ, {})[yr] = val
+
+            return {
+                "bls_wages": bls_wages,
+                "bls_employment": bls_employment,
+            }
+        except Exception as e:
+            logger.warning(f"Could not fetch BLS wage data: {e}")
+            db.rollback()
+            return {"bls_wages": {}, "bls_employment": {}}
+
+    # ------------------------------------------------------------------
+    # Section 10: Service Category Breakdown
+    # ------------------------------------------------------------------
+
+    def _get_category_breakdown(self, db: Session, state: Optional[str]) -> List[Dict]:
+        """Get prospect counts by Yelp category."""
+        state_clause = "WHERE state = :state" if state else ""
+        params: Dict[str, Any] = {}
+        if state:
+            params["state"] = state.upper()
+
+        try:
+            result = db.execute(
+                text(f"""
+                    SELECT unnest(categories) AS category, COUNT(*) AS cnt,
+                           ROUND(AVG(acquisition_score), 1) AS avg_score,
+                           ROUND(AVG(rating), 2) AS avg_rating,
+                           ROUND(AVG(review_count), 0) AS avg_reviews
+                    FROM medspa_prospects
+                    {state_clause}
+                    GROUP BY category
+                    ORDER BY cnt DESC
+                """),
+                params,
+            )
+            return [
+                {
+                    "category": row[0],
+                    "count": row[1],
+                    "avg_score": float(row[2]) if row[2] else 0,
+                    "avg_rating": float(row[3]) if row[3] else 0,
+                    "avg_reviews": int(row[4]) if row[4] else 0,
+                }
+                for row in result.fetchall()
+            ]
+        except Exception as e:
+            logger.warning(f"Could not fetch category breakdown: {e}")
+            db.rollback()
+            return []
+
+    # ------------------------------------------------------------------
+    # Section 11: PE Platform Benchmarking
+    # ------------------------------------------------------------------
+
+    def _get_pe_financial_benchmarks(self, db: Session) -> Dict:
+        """Get financial benchmarks for PE-backed aesthetics platforms."""
+        try:
+            result = db.execute(
+                text("""
+                    SELECT c.name, c.headquarters_state, c.employee_count,
+                           c.current_pe_owner,
+                           f.revenue_usd, f.revenue_growth_pct, f.ebitda_margin_pct,
+                           f.gross_margin_pct, f.debt_to_ebitda, f.is_estimated,
+                           f.confidence
+                    FROM pe_portfolio_companies c
+                    JOIN pe_company_financials f ON f.company_id = c.id
+                    WHERE (c.industry ILIKE '%aesthetics%'
+                           OR c.sub_industry ILIKE '%med%spa%'
+                           OR c.sub_industry ILIKE '%dermatolog%')
+                      AND f.fiscal_year = (
+                          SELECT MAX(fiscal_year) FROM pe_company_financials
+                          WHERE company_id = c.id
+                      )
+                    ORDER BY f.revenue_usd DESC NULLS LAST
+                """),
+            )
+            pe_financials = [
+                {
+                    "name": row[0],
+                    "state": row[1],
+                    "employees": int(row[2]) if row[2] else None,
+                    "pe_owner": row[3],
+                    "revenue": float(row[4]) if row[4] else None,
+                    "rev_growth": float(row[5]) if row[5] else None,
+                    "ebitda_margin": float(row[6]) if row[6] else None,
+                    "gross_margin": float(row[7]) if row[7] else None,
+                    "debt_ebitda": float(row[8]) if row[8] else None,
+                    "is_estimated": bool(row[9]) if row[9] is not None else True,
+                    "confidence": row[10] or "low",
+                }
+                for row in result.fetchall()
+            ]
+
+            # Compute summary stats
+            ebitda_margins = [f["ebitda_margin"] for f in pe_financials if f["ebitda_margin"] is not None]
+            rev_growths = [f["rev_growth"] for f in pe_financials if f["rev_growth"] is not None]
+            debt_ratios = [f["debt_ebitda"] for f in pe_financials if f["debt_ebitda"] is not None]
+
+            pe_summary = {
+                "avg_ebitda_margin": round(sum(ebitda_margins) / len(ebitda_margins), 1) if ebitda_margins else None,
+                "avg_rev_growth": round(sum(rev_growths) / len(rev_growths), 1) if rev_growths else None,
+                "median_debt_ebitda": round(
+                    sorted(debt_ratios)[len(debt_ratios) // 2], 1
+                ) if debt_ratios else None,
+            }
+
+            return {
+                "pe_financials": pe_financials,
+                "pe_financial_summary": pe_summary,
+            }
+        except Exception as e:
+            logger.warning(f"Could not fetch PE financial benchmarks: {e}")
+            db.rollback()
+            return {
+                "pe_financials": [],
+                "pe_financial_summary": {"avg_ebitda_margin": None, "avg_rev_growth": None, "median_debt_ebitda": None},
+            }
+
+    # ------------------------------------------------------------------
+    # Section 12: Review Velocity & Growth Signals
+    # ------------------------------------------------------------------
+
+    def _get_growth_signals(self, db: Session, state: Optional[str]) -> Dict:
+        """Get review velocity and low-competition opportunities."""
+        state_clause = "AND state = :state" if state else ""
+        params: Dict[str, Any] = {}
+        if state:
+            params["state"] = state.upper()
+
+        try:
+            # Top by review count
+            result = db.execute(
+                text(f"""
+                    SELECT name, city, state, review_count, rating,
+                           acquisition_score, acquisition_grade,
+                           competitor_count_in_zip, zip_overall_score
+                    FROM medspa_prospects
+                    WHERE acquisition_grade IN ('A', 'B') {state_clause}
+                    ORDER BY review_count DESC
+                    LIMIT 25
+                """),
+                params,
+            )
+            top_by_reviews = [
+                {
+                    "name": row[0], "city": row[1], "state": row[2],
+                    "reviews": int(row[3]) if row[3] else 0,
+                    "rating": float(row[4]) if row[4] else 0,
+                    "score": float(row[5]) if row[5] else 0,
+                    "grade": row[6],
+                    "competitors": int(row[7]) if row[7] else 0,
+                    "zip_score": float(row[8]) if row[8] else 0,
+                }
+                for row in result.fetchall()
+            ]
+
+            # Review volume distribution
+            result = db.execute(
+                text(f"""
+                    SELECT
+                        CASE
+                            WHEN review_count >= 500 THEN '500+'
+                            WHEN review_count >= 200 THEN '200-499'
+                            WHEN review_count >= 100 THEN '100-199'
+                            WHEN review_count >= 50  THEN '50-99'
+                            ELSE '<50'
+                        END AS bucket,
+                        COUNT(*) AS cnt,
+                        ROUND(AVG(acquisition_score), 1) AS avg_score,
+                        ROUND(AVG(rating), 2) AS avg_rating
+                    FROM medspa_prospects
+                    WHERE 1=1 {state_clause}
+                    GROUP BY bucket
+                    ORDER BY MIN(review_count) DESC
+                """),
+                params,
+            )
+            review_buckets = [
+                {
+                    "bucket": row[0], "count": row[1],
+                    "avg_score": float(row[2]) if row[2] else 0,
+                    "avg_rating": float(row[3]) if row[3] else 0,
+                }
+                for row in result.fetchall()
+            ]
+
+            # Low competition gems
+            result = db.execute(
+                text(f"""
+                    SELECT name, city, state, acquisition_score, acquisition_grade,
+                           rating, review_count, competitor_count_in_zip, zip_overall_score
+                    FROM medspa_prospects
+                    WHERE acquisition_grade IN ('A', 'B')
+                      AND competitor_count_in_zip <= 3
+                      {state_clause}
+                    ORDER BY acquisition_score DESC
+                    LIMIT 15
+                """),
+                params,
+            )
+            low_competition_gems = [
+                {
+                    "name": row[0], "city": row[1], "state": row[2],
+                    "score": float(row[3]) if row[3] else 0,
+                    "grade": row[4],
+                    "rating": float(row[5]) if row[5] else 0,
+                    "reviews": int(row[6]) if row[6] else 0,
+                    "competitors": int(row[7]) if row[7] else 0,
+                    "zip_score": float(row[8]) if row[8] else 0,
+                }
+                for row in result.fetchall()
+            ]
+
+            return {
+                "top_by_reviews": top_by_reviews,
+                "review_buckets": review_buckets,
+                "low_competition_gems": low_competition_gems,
+            }
+        except Exception as e:
+            logger.warning(f"Could not fetch growth signals: {e}")
+            db.rollback()
+            return {
+                "top_by_reviews": [],
+                "review_buckets": [],
+                "low_competition_gems": [],
+            }
+
+    # ------------------------------------------------------------------
+    # Sections 13-15: Deal Model
+    # ------------------------------------------------------------------
+
+    def _get_deal_model_data(self, db: Session, state: Optional[str]) -> Dict:
+        """Build full PE roll-up deal model from A-grade prospects and industry benchmarks."""
+        state_clause = "AND state = :state" if state else ""
+        params: Dict[str, Any] = {}
+        if state:
+            params["state"] = state.upper()
+
+        try:
+            # Count A-grade prospects by price tier
+            result = db.execute(
+                text(f"""
+                    SELECT price, COUNT(*) as cnt
+                    FROM medspa_prospects
+                    WHERE acquisition_grade = 'A' {state_clause}
+                    GROUP BY price
+                    ORDER BY cnt DESC
+                """),
+                params,
+            )
+            tier_counts: Dict[Optional[str], int] = {}
+            for row in result.fetchall():
+                tier_counts[row[0]] = row[1]
+
+            # A-grade by state for geographic breakdown
+            result = db.execute(
+                text(f"""
+                    SELECT state, COUNT(*) as cnt
+                    FROM medspa_prospects
+                    WHERE acquisition_grade = 'A' AND state IS NOT NULL {state_clause}
+                    GROUP BY state
+                    ORDER BY cnt DESC
+                """),
+                params,
+            )
+            a_grade_states = [{"state": row[0], "count": row[1]} for row in result.fetchall()]
+
+            # Build per-tier economics
+            tier_economics = []
+            total_locations = 0
+            total_revenue = 0
+            total_ebitda = 0
+            total_acquisition_cost = 0
+
+            for tier, count in tier_counts.items():
+                benchmarks = MEDSPA_BENCHMARKS.get(tier, MEDSPA_BENCHMARKS[None])
+                rev = benchmarks["revenue"]
+                margin = benchmarks["ebitda_margin"]
+                ebitda = rev * margin
+                multiple = benchmarks["entry_multiple"]
+                acq_cost = ebitda * multiple
+
+                tier_economics.append({
+                    "tier": tier or "Unknown",
+                    "count": count,
+                    "avg_revenue": rev,
+                    "ebitda_margin": margin,
+                    "avg_ebitda": ebitda,
+                    "entry_multiple": multiple,
+                    "total_revenue": rev * count,
+                    "total_ebitda": ebitda * count,
+                    "total_acq_cost": acq_cost * count,
+                })
+                total_locations += count
+                total_revenue += rev * count
+                total_ebitda += ebitda * count
+                total_acquisition_cost += acq_cost * count
+
+            # Weighted average margin
+            weighted_margin = total_ebitda / total_revenue if total_revenue > 0 else 0
+
+            # Capital stack
+            da = DEAL_ASSUMPTIONS
+            debt = total_acquisition_cost * da["debt_pct"]
+            equity = total_acquisition_cost * da["equity_pct"]
+            transaction_costs = total_acquisition_cost * da["transaction_cost_pct"]
+            monthly_sga = total_revenue * da["sga_pct"] / 12
+            working_capital = monthly_sga * da["working_capital_months"]
+            total_capital_required = equity + transaction_costs + working_capital
+
+            # Leverage check
+            leverage_ratio = debt / total_ebitda if total_ebitda > 0 else 0
+
+            # P&L waterfall (per average location)
+            avg_revenue = total_revenue / total_locations if total_locations > 0 else 0
+            avg_cogs = avg_revenue * da["cogs_pct"]
+            avg_gross_profit = avg_revenue - avg_cogs
+            avg_sga = avg_revenue * da["sga_pct"]
+            avg_ebitda = avg_gross_profit - avg_sga
+
+            # Scenario returns
+            scenarios = {}
+            for name, s in da["scenarios"].items():
+                improved_ebitda = total_ebitda * (1 + s["margin_improvement"]) ** s["hold_years"]
+                exit_ev = improved_ebitda * s["exit_multiple"]
+                entry_ev = total_acquisition_cost
+                gross_moic = exit_ev / entry_ev if entry_ev > 0 else 0
+                # Net IRR approximation: (MOIC)^(1/years) - 1
+                net_irr = (gross_moic ** (1.0 / s["hold_years"]) - 1) if gross_moic > 0 and s["hold_years"] > 0 else 0
+                scenarios[name] = {
+                    "entry_ev": entry_ev,
+                    "exit_ev": exit_ev,
+                    "exit_multiple": s["exit_multiple"],
+                    "margin_improvement": s["margin_improvement"],
+                    "hold_years": s["hold_years"],
+                    "improved_ebitda": improved_ebitda,
+                    "gross_moic": gross_moic,
+                    "net_irr": net_irr,
+                }
+
+            return {
+                "tier_economics": tier_economics,
+                "total_locations": total_locations,
+                "total_revenue": total_revenue,
+                "total_ebitda": total_ebitda,
+                "weighted_margin": weighted_margin,
+                "total_acquisition_cost": total_acquisition_cost,
+                "capital_stack": {
+                    "debt": debt,
+                    "equity": equity,
+                    "transaction_costs": transaction_costs,
+                    "working_capital": working_capital,
+                    "total_capital_required": total_capital_required,
+                },
+                "leverage_ratio": leverage_ratio,
+                "pnl_waterfall": {
+                    "revenue": avg_revenue,
+                    "cogs": avg_cogs,
+                    "gross_profit": avg_gross_profit,
+                    "sga": avg_sga,
+                    "ebitda": avg_ebitda,
+                },
+                "scenarios": scenarios,
+                "a_grade_states": a_grade_states,
+            }
+        except Exception as e:
+            logger.warning(f"Could not compute deal model data: {e}")
+            db.rollback()
+            return {
+                "tier_economics": [],
+                "total_locations": 0,
+                "total_revenue": 0,
+                "total_ebitda": 0,
+                "weighted_margin": 0,
+                "total_acquisition_cost": 0,
+                "capital_stack": {
+                    "debt": 0, "equity": 0, "transaction_costs": 0,
+                    "working_capital": 0, "total_capital_required": 0,
+                },
+                "leverage_ratio": 0,
+                "pnl_waterfall": {
+                    "revenue": 0, "cogs": 0, "gross_profit": 0,
+                    "sga": 0, "ebitda": 0,
+                },
+                "scenarios": {},
+                "a_grade_states": [],
+            }
+
+    # ------------------------------------------------------------------
     # HTML Rendering
     # ------------------------------------------------------------------
 
@@ -786,6 +1442,22 @@ class MedSpaMarketTemplate:
         recent_deals = data.get("recent_deals", [])
         data_fresh = data.get("data_freshness", {})
         params = data.get("params", {})
+
+        # New sections (8-12) data
+        whitespace_zips = data.get("whitespace_zips", [])
+        whitespace_by_state = data.get("whitespace_by_state", [])
+        whitespace_summary = data.get("whitespace_summary", {})
+        bls_wages = data.get("bls_wages", {})
+        bls_employment = data.get("bls_employment", {})
+        category_breakdown = data.get("category_breakdown", [])
+        pe_financials = data.get("pe_financials", [])
+        pe_fin_summary = data.get("pe_financial_summary", {})
+        top_by_reviews = data.get("top_by_reviews", [])
+        review_buckets = data.get("review_buckets", [])
+        low_competition_gems = data.get("low_competition_gems", [])
+
+        # Deal model data (sections 13-15)
+        deal_model = data.get("deal_model", {})
 
         charts_js = ""
         body = ""
@@ -821,6 +1493,14 @@ class MedSpaMarketTemplate:
             {"number": 5, "id": "zip-affluence", "title": "ZIP Affluence Profile"},
             {"number": 6, "id": "competitive", "title": "Competitive Landscape"},
             {"number": 7, "id": "methodology", "title": "Data Sources & Methodology"},
+            {"number": 8, "id": "whitespace", "title": "Whitespace Analysis"},
+            {"number": 9, "id": "workforce", "title": "Workforce Economics"},
+            {"number": 10, "id": "categories", "title": "Service Category Breakdown"},
+            {"number": 11, "id": "pe-benchmarks", "title": "PE Platform Benchmarking"},
+            {"number": 12, "id": "growth-signals", "title": "Review Velocity & Growth Signals"},
+            {"number": 13, "id": "deal-unit-econ", "title": "Deal Model \u2014 Unit Economics"},
+            {"number": 14, "id": "deal-capital", "title": "Deal Model \u2014 Capital Requirements"},
+            {"number": 15, "id": "deal-returns", "title": "Deal Model \u2014 Returns Analysis"},
         ]
         body += "\n" + toc(toc_items)
 
@@ -1378,6 +2058,842 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
 
         body += "\n" + section_end()
 
+        # ==================================================================
+        # Section 8: Whitespace Analysis
+        # ==================================================================
+        body += "\n" + section_start(8, "Whitespace Analysis", "whitespace")
+        body += '<p>Grade-A affluent ZIPs with zero discovered med-spa prospects — greenfield acquisition opportunities.</p>'
+
+        ws_total = whitespace_summary.get("total_a_zips", 0)
+        ws_with = whitespace_summary.get("a_with_prospects", 0)
+        ws_count = whitespace_summary.get("whitespace_count", 0)
+
+        if ws_total > 0:
+            # KPI cards
+            body += '<div class="metric-grid">'
+            body += f"""<div class="metric-card">
+    <div class="metric-label">Total A-Grade ZIPs</div>
+    <div class="metric-value">{_fmt(ws_total)}</div>
+    <div class="metric-detail">ZIPs scoring 80+ on affluence model</div>
+</div>"""
+            body += f"""<div class="metric-card">
+    <div class="metric-label">A-Grade w/ Prospects</div>
+    <div class="metric-value">{_fmt(ws_with)}</div>
+    <div class="metric-detail">Already have discoverable med-spas</div>
+</div>"""
+            body += f"""<div class="metric-card">
+    <div class="metric-label">Whitespace ZIPs</div>
+    <div class="metric-value" style="color:{GREEN}">{_fmt(ws_count)}</div>
+    <div class="metric-detail">Greenfield opportunity zones</div>
+</div>"""
+            body += "</div>"
+
+            # Data table: top 25 whitespace ZIPs
+            if whitespace_zips:
+                ws_rows = []
+                for z in whitespace_zips[:25]:
+                    ws_rows.append([
+                        z["zip_code"],
+                        z.get("state") or "-",
+                        f'{z["score"]:.1f}',
+                        _fmt_currency(z["avg_agi"]),
+                        _fmt(z["total_returns"]),
+                        f'{z["affluence_score"]:.1f}',
+                    ])
+                body += data_table(
+                    headers=["ZIP", "State", "Score", "Avg AGI", "Tax Returns", "Affluence Score"],
+                    rows=ws_rows,
+                    numeric_columns={2, 3, 4, 5},
+                )
+
+            # Horizontal bar: whitespace by state (top 15)
+            if whitespace_by_state:
+                ws_state_labels = [s["state"] for s in whitespace_by_state[:15]]
+                ws_state_values = [float(s["count"]) for s in whitespace_by_state[:15]]
+                ws_bar_config = build_horizontal_bar_config(
+                    ws_state_labels, ws_state_values, dataset_label="Whitespace ZIPs"
+                )
+                ws_bar_json = json.dumps(ws_bar_config)
+                ws_bar_height = f"{max(len(ws_state_labels) * 48 + 40, 200)}px"
+
+                body += chart_container(
+                    "whitespaceStateChart", ws_bar_json,
+                    build_bar_fallback(ws_state_labels, ws_state_values),
+                    title="Whitespace ZIPs by State (Top 15)",
+                    height=ws_bar_height,
+                )
+                charts_js += chart_init_js("whitespaceStateChart", ws_bar_json)
+
+            body += callout(
+                f"<strong>Opportunity:</strong> {_fmt(ws_count)} high-affluence A-grade ZIPs have "
+                f"no discoverable med-spa businesses — these represent greenfield targets for "
+                f"de novo clinic launches or franchise expansion.",
+                variant="good",
+            )
+        else:
+            body += callout(
+                "<strong>No whitespace data available.</strong> Run ZIP affluence scoring "
+                "and med-spa discovery to populate this analysis.",
+                variant="warn",
+            )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 9: Workforce Economics
+        # ==================================================================
+        body += "\n" + section_start(9, "Workforce Economics", "workforce")
+        body += '<p>BLS Occupational Employment & Wage Statistics for aesthetics-adjacent roles — labor cost trends that impact unit economics.</p>'
+
+        if bls_wages:
+            # Collect all years across all occupations
+            all_years = sorted(set(yr for occ_data in bls_wages.values() for yr in occ_data.keys()))
+
+            # Wage table: occupation × year matrix
+            wage_rows = []
+            for occ in sorted(bls_wages.keys()):
+                yr_data = bls_wages[occ]
+                row_vals = [occ]
+                for yr in all_years:
+                    val = yr_data.get(yr)
+                    row_vals.append(_fmt_currency(val) if val else "-")
+                # Growth column: first year → last year
+                first_val = float(yr_data.get(all_years[0], 0) or 0) if all_years else 0
+                last_val = float(yr_data.get(all_years[-1], 0) or 0) if all_years else 0
+                if first_val > 0 and last_val > 0:
+                    growth = (last_val - first_val) / first_val * 100
+                    row_vals.append(f"{growth:+.1f}%")
+                else:
+                    row_vals.append("-")
+                wage_rows.append(row_vals)
+
+            wage_headers = ["Occupation"] + [str(y) for y in all_years] + ["Growth"]
+            body += data_table(
+                headers=wage_headers,
+                rows=wage_rows,
+                numeric_columns=set(range(1, len(wage_headers))),
+            )
+
+            # Horizontal bar: latest year wages per occupation
+            if all_years:
+                latest_yr = all_years[-1]
+                bar_occs = []
+                bar_wages = []
+                for occ in sorted(bls_wages.keys()):
+                    val = bls_wages[occ].get(latest_yr)
+                    if val:
+                        bar_occs.append(occ)
+                        bar_wages.append(val)
+                if bar_occs:
+                    wage_bar_config = build_horizontal_bar_config(
+                        bar_occs, bar_wages, dataset_label=f"Annual Mean Wage ({latest_yr})"
+                    )
+                    wage_bar_json = json.dumps(wage_bar_config)
+                    wage_bar_height = f"{max(len(bar_occs) * 48 + 40, 200)}px"
+
+                    body += chart_container(
+                        "wageBarChart", wage_bar_json,
+                        build_bar_fallback(bar_occs, [float(v) for v in bar_wages]),
+                        title=f"Annual Mean Wage by Occupation ({latest_yr})",
+                        height=wage_bar_height,
+                    )
+                    charts_js += chart_init_js("wageBarChart", wage_bar_json)
+
+            # Compute insight for NPs and PAs
+            np_growth = None
+            pa_growth = None
+            for occ in bls_wages:
+                yr_data = bls_wages[occ]
+                fv = float(yr_data.get(all_years[0], 0) or 0) if all_years else 0
+                lv = float(yr_data.get(all_years[-1], 0) or 0) if all_years else 0
+                if fv > 0 and lv > 0:
+                    g = (lv - fv) / fv * 100
+                    if "Nurse Practitioner" in occ:
+                        np_growth = g
+                    elif "Physician Assistant" in occ:
+                        pa_growth = g
+
+            insight_parts = []
+            if np_growth is not None:
+                insight_parts.append(f"Nurse Practitioners ({np_growth:+.1f}%)")
+            if pa_growth is not None:
+                insight_parts.append(f"Physician Assistants ({pa_growth:+.1f}%)")
+            if insight_parts:
+                body += callout(
+                    f"<strong>Labor Cost Signal:</strong> Key mid-level providers — "
+                    f"{' and '.join(insight_parts)} — show significant wage growth, "
+                    f"signaling rising talent competition that impacts med-spa unit economics.",
+                )
+            else:
+                body += callout(
+                    "<strong>Labor Cost Signal:</strong> BLS wage data shows multi-year "
+                    "trends in aesthetics-adjacent occupations. Monitor provider wages "
+                    "as a key input to unit economics modeling.",
+                )
+        else:
+            body += callout(
+                "<strong>No BLS wage data available.</strong> Ingest BLS OES data to "
+                "populate workforce economics analysis.",
+                variant="warn",
+            )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 10: Service Category Breakdown
+        # ==================================================================
+        body += "\n" + section_start(10, "Service Category Breakdown", "categories")
+        body += '<p>Disaggregation of discovered prospects by Yelp business category — reveals service mix and niche positioning.</p>'
+
+        if category_breakdown:
+            total_cat_count = sum(c["count"] for c in category_breakdown)
+
+            # Doughnut chart: top 8 categories
+            top_cats = category_breakdown[:8]
+            other_count = sum(c["count"] for c in category_breakdown[8:])
+            cat_labels = [c["category"] for c in top_cats]
+            cat_values = [float(c["count"]) for c in top_cats]
+            if other_count > 0:
+                cat_labels.append("Other")
+                cat_values.append(float(other_count))
+
+            cat_colors = list(CHART_COLORS[:len(cat_labels)])
+            donut_config = build_doughnut_config(cat_labels, cat_values, cat_colors)
+            donut_json = json.dumps(donut_config)
+
+            body += '<div class="chart-row">'
+            body += "<div>"
+            body += chart_container(
+                "categoryDonut", donut_json,
+                build_bar_fallback(cat_labels, cat_values),
+                size="medium",
+                title="Category Distribution",
+            )
+            charts_js += chart_init_js("categoryDonut", donut_json)
+            body += build_chart_legend(cat_labels, cat_values, cat_colors, show_pct=True)
+            body += "</div>"
+            body += "</div>"
+
+            # Data table
+            cat_rows = []
+            for c in category_breakdown[:20]:
+                pct = round(c["count"] / total_cat_count * 100, 1) if total_cat_count > 0 else 0
+                cat_rows.append([
+                    c["category"],
+                    _fmt(c["count"]),
+                    f"{pct}%",
+                    f'{c["avg_score"]:.1f}',
+                    f'{c["avg_rating"]:.1f}',
+                    _fmt(c["avg_reviews"]),
+                ])
+            body += data_table(
+                headers=["Category", "Count", "% Share", "Avg Score", "Avg Rating", "Avg Reviews"],
+                rows=cat_rows,
+                numeric_columns={1, 2, 3, 4, 5},
+            )
+
+            # Insight
+            top_cat = category_breakdown[0] if category_breakdown else None
+            if top_cat:
+                body += callout(
+                    f"<strong>Insight:</strong> <strong>{top_cat['category']}</strong> is the dominant "
+                    f"category with {_fmt(top_cat['count'])} prospects "
+                    f"({round(top_cat['count'] / total_cat_count * 100, 1)}% share). "
+                    f"Niche categories may represent differentiated positioning or "
+                    f"underserved sub-segments worth investigating.",
+                )
+        else:
+            body += callout(
+                "<strong>No category data available.</strong> Prospect categories are populated "
+                "during med-spa discovery.",
+                variant="warn",
+            )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 11: PE Platform Benchmarking
+        # ==================================================================
+        body += "\n" + section_start(11, "PE Platform Benchmarking", "pe-benchmarks")
+        body += '<p>Financial benchmarks for PE-backed aesthetics platforms — revenue, margins, and leverage metrics.</p>'
+
+        if pe_financials:
+            # Metric cards
+            body += '<div class="metric-grid">'
+            avg_em = pe_fin_summary.get("avg_ebitda_margin")
+            avg_rg = pe_fin_summary.get("avg_rev_growth")
+            med_de = pe_fin_summary.get("median_debt_ebitda")
+            body += f"""<div class="metric-card">
+    <div class="metric-label">Avg EBITDA Margin</div>
+    <div class="metric-value">{f'{avg_em:.1f}%' if avg_em is not None else '-'}</div>
+    <div class="metric-detail">Across PE-backed platforms</div>
+</div>"""
+            body += f"""<div class="metric-card">
+    <div class="metric-label">Avg Revenue Growth</div>
+    <div class="metric-value">{f'{avg_rg:+.1f}%' if avg_rg is not None else '-'}</div>
+    <div class="metric-detail">Year-over-year</div>
+</div>"""
+            body += f"""<div class="metric-card">
+    <div class="metric-label">Median Debt/EBITDA</div>
+    <div class="metric-value">{f'{med_de:.1f}x' if med_de is not None else '-'}</div>
+    <div class="metric-detail">Leverage benchmark</div>
+</div>"""
+            body += "</div>"
+
+            # Data table
+            pef_rows = []
+            for f in pe_financials:
+                rev_display = _fmt_currency(f["revenue"]) if f["revenue"] else "-"
+                rg_display = f'{f["rev_growth"]:+.1f}%' if f["rev_growth"] is not None else "-"
+                em_display = f'{f["ebitda_margin"]:.1f}%' if f["ebitda_margin"] is not None else "-"
+                emp_display = _fmt(f["employees"]) if f["employees"] else "-"
+                de_display = f'{f["debt_ebitda"]:.1f}x' if f["debt_ebitda"] is not None else "-"
+                conf_badge = pill_badge(f["confidence"], "public" if f["confidence"] == "high" else "default")
+                pef_rows.append([
+                    f'<span class="company-name">{f["name"]}</span>',
+                    f.get("pe_owner") or "-",
+                    rev_display,
+                    rg_display,
+                    em_display,
+                    emp_display,
+                    de_display,
+                    conf_badge,
+                ])
+            body += data_table(
+                headers=["Company", "PE Owner", "Revenue", "Rev Growth", "EBITDA Margin",
+                         "Employees", "Debt/EBITDA", "Confidence"],
+                rows=pef_rows,
+                numeric_columns={2, 3, 4, 5, 6},
+            )
+
+            # Revenue bar chart (top 8)
+            rev_companies = [f for f in pe_financials if f["revenue"]][:8]
+            if rev_companies:
+                rev_labels = [f["name"] for f in rev_companies]
+                rev_values = [float(f["revenue"]) for f in rev_companies]
+                rev_bar_config = build_horizontal_bar_config(
+                    rev_labels, rev_values, dataset_label="Revenue (USD)"
+                )
+                rev_bar_json = json.dumps(rev_bar_config)
+                rev_bar_height = f"{max(len(rev_labels) * 48 + 40, 200)}px"
+
+                body += chart_container(
+                    "peRevenueChart", rev_bar_json,
+                    build_bar_fallback(rev_labels, rev_values),
+                    title="Revenue by Platform (Top 8)",
+                    height=rev_bar_height,
+                )
+                charts_js += chart_init_js("peRevenueChart", rev_bar_json)
+
+            body += callout(
+                "<strong>Data Confidence Note:</strong> Financial data for private PE-backed "
+                "platforms is estimated based on industry analysis, employee counts, and "
+                "comparable transactions. Treat as directional benchmarks, not audited figures.",
+                variant="warn",
+            )
+        else:
+            body += callout(
+                "<strong>No PE financial data available.</strong> Seed PE company financials "
+                "to populate benchmarking analysis.",
+                variant="warn",
+            )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 12: Review Velocity & Growth Signals
+        # ==================================================================
+        body += "\n" + section_start(12, "Review Velocity & Growth Signals", "growth-signals")
+        body += '<p>Demand momentum signals via review volume, competitive dynamics, and market positioning.</p>'
+
+        if top_by_reviews:
+            # Data table: top 25 by review volume
+            rev_rows = []
+            for t in top_by_reviews:
+                grade_html = _grade_badge(t["grade"])
+                rev_rows.append([
+                    f'<span class="company-name">{t["name"]}</span>',
+                    t.get("city") or "-",
+                    t.get("state") or "-",
+                    _fmt(t["reviews"]),
+                    f'{t["rating"]:.1f}',
+                    f'{t["score"]:.0f}',
+                    grade_html,
+                    str(t["competitors"]),
+                ])
+            body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:16px 0 8px">Top 25 by Review Volume (A/B Grade)</h3>'
+            body += data_table(
+                headers=["Name", "City", "State", "Reviews", "Rating", "Score", "Grade", "Competitors"],
+                rows=rev_rows,
+                numeric_columns={3, 4, 5, 7},
+            )
+
+        # Review distribution chart
+        if review_buckets:
+            bucket_labels = [b["bucket"] for b in review_buckets]
+            bucket_values = [float(b["count"]) for b in review_buckets]
+            bucket_config = {
+                "type": "bar",
+                "data": {
+                    "labels": bucket_labels,
+                    "datasets": [{
+                        "label": "Prospects",
+                        "data": bucket_values,
+                        "backgroundColor": BLUE_LIGHT,
+                        "borderWidth": 0,
+                        "borderRadius": 4,
+                    }],
+                },
+                "options": {
+                    "responsive": True,
+                    "maintainAspectRatio": False,
+                    "plugins": {"legend": {"display": False}},
+                    "scales": {
+                        "x": {"grid": {"display": False}, "ticks": {"color": "#4a5568"}},
+                        "y": {"grid": {"color": "#edf2f7"}, "ticks": {"color": "#4a5568"}, "beginAtZero": True},
+                    },
+                },
+            }
+            bucket_json = json.dumps(bucket_config)
+
+            body += chart_container(
+                "reviewBucketChart", bucket_json,
+                build_bar_fallback(bucket_labels, bucket_values),
+                title="Review Volume Distribution",
+            )
+            charts_js += chart_init_js("reviewBucketChart", bucket_json)
+
+        # Low competition gems
+        if low_competition_gems:
+            body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:16px 0 8px">Low Competition Gems (A/B Grade, \u22643 Competitors)</h3>'
+            gem_rows = []
+            for g in low_competition_gems:
+                grade_html = _grade_badge(g["grade"])
+                gem_rows.append([
+                    f'<span class="company-name">{g["name"]}</span>',
+                    g.get("city") or "-",
+                    g.get("state") or "-",
+                    f'{g["score"]:.0f}',
+                    grade_html,
+                    f'{g["rating"]:.1f}',
+                    _fmt(g["reviews"]),
+                    str(g["competitors"]),
+                ])
+            body += data_table(
+                headers=["Name", "City", "State", "Score", "Grade", "Rating", "Reviews", "Competitors"],
+                rows=gem_rows,
+                numeric_columns={3, 5, 6, 7},
+            )
+
+        # Insight callout
+        high_review_count = sum(1 for t in top_by_reviews if t["reviews"] >= 200)
+        gem_count = len(low_competition_gems)
+        if top_by_reviews or low_competition_gems:
+            body += callout(
+                f"<strong>Demand Signals:</strong> {high_review_count} A/B-grade prospects have 200+ "
+                f"reviews, indicating established consumer demand and brand recognition. "
+                f"{gem_count} prospects are A/B-grade with 3 or fewer competitors in their ZIP — "
+                f"prime bolt-on acquisition targets with limited competitive pressure.",
+                variant="good",
+            )
+        else:
+            body += callout(
+                "<strong>No growth signal data available.</strong> Run med-spa discovery "
+                "to populate review and competition analysis.",
+                variant="warn",
+            )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 13: Deal Model — Unit Economics
+        # ==================================================================
+        body += "\n" + section_start(13, "Deal Model \u2014 Unit Economics", "deal-unit-econ")
+        body += '<p>Estimated portfolio economics for all A-grade acquisition targets using industry benchmark revenue and margins by Yelp price tier.</p>'
+
+        dm_tiers = deal_model.get("tier_economics", [])
+        dm_total_loc = deal_model.get("total_locations", 0)
+        dm_total_rev = deal_model.get("total_revenue", 0)
+        dm_total_ebitda = deal_model.get("total_ebitda", 0)
+        dm_w_margin = deal_model.get("weighted_margin", 0)
+        dm_pnl = deal_model.get("pnl_waterfall", {})
+
+        if dm_tiers:
+            # KPI cards
+            body += '<div class="metric-grid">'
+            body += f"""<div class="metric-card">
+    <div class="metric-label">Total A-Grade Locations</div>
+    <div class="metric-value">{_fmt(dm_total_loc)}</div>
+    <div class="metric-detail">Across all price tiers</div>
+</div>"""
+            body += f"""<div class="metric-card">
+    <div class="metric-label">Est. Portfolio Revenue</div>
+    <div class="metric-value">{_fmt_currency(dm_total_rev)}</div>
+    <div class="metric-detail">Based on industry benchmarks</div>
+</div>"""
+            body += f"""<div class="metric-card">
+    <div class="metric-label">Est. Portfolio EBITDA</div>
+    <div class="metric-value">{_fmt_currency(dm_total_ebitda)}</div>
+    <div class="metric-detail">Weighted avg margin: {dm_w_margin:.1%}</div>
+</div>"""
+            body += "</div>"
+
+            # Price tier distribution table
+            body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:16px 0 8px">Revenue Estimates by Price Tier</h3>'
+
+            tier_rows = []
+            for t in dm_tiers:
+                tier_rows.append([
+                    t["tier"],
+                    _fmt(t["count"]),
+                    _fmt_currency(t["avg_revenue"]),
+                    f'{t["ebitda_margin"]:.0%}',
+                    _fmt_currency(t["avg_ebitda"]),
+                    f'{t["entry_multiple"]:.1f}x',
+                    _fmt_currency(t["total_revenue"]),
+                    _fmt_currency(t["total_ebitda"]),
+                ])
+            # Totals row
+            tier_rows.append([
+                "<strong>Total</strong>",
+                f'<strong>{_fmt(dm_total_loc)}</strong>',
+                "-",
+                f'<strong>{dm_w_margin:.0%}</strong>',
+                "-",
+                "-",
+                f'<strong>{_fmt_currency(dm_total_rev)}</strong>',
+                f'<strong>{_fmt_currency(dm_total_ebitda)}</strong>',
+            ])
+            body += data_table(
+                headers=["Price Tier", "Locations", "Avg Revenue", "EBITDA Margin",
+                         "Avg EBITDA", "Entry Multiple", "Total Revenue", "Total EBITDA"],
+                rows=tier_rows,
+                numeric_columns={1, 2, 3, 4, 5, 6, 7},
+            )
+
+            # Price tier doughnut chart
+            if len(dm_tiers) > 1:
+                tier_labels = [t["tier"] for t in dm_tiers]
+                tier_values = [float(t["count"]) for t in dm_tiers]
+                tier_colors = [BLUE, GREEN, ORANGE, PURPLE, GRAY][:len(tier_labels)]
+                tier_donut_config = build_doughnut_config(tier_labels, tier_values, tier_colors)
+                tier_donut_json = json.dumps(tier_donut_config)
+
+                body += '<div class="chart-row">'
+                body += "<div>"
+                body += chart_container(
+                    "tierDonut", tier_donut_json,
+                    build_bar_fallback(tier_labels, tier_values),
+                    size="medium",
+                    title="A-Grade Locations by Price Tier",
+                )
+                charts_js += chart_init_js("tierDonut", tier_donut_json)
+                body += build_chart_legend(tier_labels, tier_values, tier_colors, show_pct=True)
+                body += "</div>"
+                body += "</div>"
+
+            # P&L waterfall (per average location)
+            if dm_pnl.get("revenue", 0) > 0:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:16px 0 8px">Per-Location P&L Waterfall (Portfolio Average)</h3>'
+
+                pnl_rev = dm_pnl["revenue"]
+                pnl_items = [
+                    ("Revenue", pnl_rev, BLUE),
+                    ("COGS (40%)", dm_pnl["cogs"], RED),
+                    ("Gross Profit", dm_pnl["gross_profit"], GREEN),
+                    ("SG&A (32%)", dm_pnl["sga"], ORANGE),
+                    ("EBITDA", dm_pnl["ebitda"], TEAL),
+                ]
+                max_val = max(v for _, v, _ in pnl_items) if pnl_items else 1
+
+                body += '<div class="pnl-waterfall">'
+                for label, value, color in pnl_items:
+                    bar_h = max(int(value / max_val * 150), 8) if max_val > 0 else 8
+                    body += f"""<div class="waterfall-bar">
+    <div class="bar-value">{_fmt_currency(value)}</div>
+    <div class="bar" style="height:{bar_h}px;background:{color}"></div>
+    <div class="bar-label">{label}</div>
+</div>"""
+                body += "</div>"
+
+            body += callout(
+                "<strong>Methodology:</strong> Revenue and margin estimates are based on AmSpa "
+                "State of the Industry Report, IBISWorld Medspa Industry Analysis, and PE deal "
+                "comps benchmarks. Actual financials will vary by location — these are planning estimates.",
+                variant="warn",
+            )
+        else:
+            body += callout(
+                "<strong>No A-grade targets found.</strong> Run med-spa discovery and scoring "
+                "to populate the deal model.",
+                variant="warn",
+            )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 14: Deal Model — Capital Requirements
+        # ==================================================================
+        body += "\n" + section_start(14, "Deal Model \u2014 Capital Requirements", "deal-capital")
+        body += '<p>Total capital needed to acquire all A-grade targets, including financing structure, transaction costs, and working capital reserves.</p>'
+
+        dm_acq_cost = deal_model.get("total_acquisition_cost", 0)
+        dm_cap = deal_model.get("capital_stack", {})
+        dm_leverage = deal_model.get("leverage_ratio", 0)
+
+        if dm_acq_cost > 0:
+            # Acquisition cost by tier
+            body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:16px 0 8px">Acquisition Cost by Price Tier</h3>'
+
+            acq_rows = []
+            for t in dm_tiers:
+                acq_rows.append([
+                    t["tier"],
+                    _fmt(t["count"]),
+                    _fmt_currency(t["avg_ebitda"]),
+                    f'{t["entry_multiple"]:.1f}x',
+                    _fmt_currency(t["total_acq_cost"]),
+                ])
+            acq_rows.append([
+                "<strong>Total</strong>",
+                f'<strong>{_fmt(dm_total_loc)}</strong>',
+                "-",
+                "-",
+                f'<strong>{_fmt_currency(dm_acq_cost)}</strong>',
+            ])
+            body += data_table(
+                headers=["Price Tier", "Locations", "Avg EBITDA", "Entry Multiple", "Total Acquisition Cost"],
+                rows=acq_rows,
+                numeric_columns={1, 2, 3, 4},
+            )
+
+            # Capital stack KPIs
+            equity = dm_cap.get("equity", 0)
+            debt = dm_cap.get("debt", 0)
+            txn_costs = dm_cap.get("transaction_costs", 0)
+            wc = dm_cap.get("working_capital", 0)
+            total_cap = dm_cap.get("total_capital_required", 0)
+
+            body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:16px 0 8px">Capital Stack</h3>'
+            body += '<div class="metric-grid">'
+            body += f"""<div class="metric-card">
+    <div class="metric-label">Total Acquisition Cost</div>
+    <div class="metric-value">{_fmt_currency(dm_acq_cost)}</div>
+    <div class="metric-detail">{_fmt(dm_total_loc)} locations × avg EBITDA × entry multiple</div>
+</div>"""
+            body += f"""<div class="metric-card">
+    <div class="metric-label">Equity Check (40%)</div>
+    <div class="metric-value">{_fmt_currency(equity)}</div>
+    <div class="metric-detail">Sponsor equity contribution</div>
+</div>"""
+            body += f"""<div class="metric-card">
+    <div class="metric-label">Senior Debt (60%)</div>
+    <div class="metric-value">{_fmt_currency(debt)}</div>
+    <div class="metric-detail">Leverage: {dm_leverage:.1f}x Debt/EBITDA</div>
+</div>"""
+            body += f"""<div class="metric-card">
+    <div class="metric-label">Total Capital Required</div>
+    <div class="metric-value" style="color:{GREEN}">{_fmt_currency(total_cap)}</div>
+    <div class="metric-detail">Equity + transaction costs + working capital</div>
+</div>"""
+            body += "</div>"
+
+            # Detailed capital table
+            cap_rows = [
+                ["Equity Contribution (40%)", _fmt_currency(equity)],
+                ["Senior Debt (60%)", _fmt_currency(debt)],
+                ["Transaction Costs (5%)", _fmt_currency(txn_costs)],
+                [f"Working Capital ({DEAL_ASSUMPTIONS['working_capital_months']}mo SG&A)", _fmt_currency(wc)],
+                ["<strong>Total Capital Required</strong>", f'<strong>{_fmt_currency(total_cap)}</strong>'],
+            ]
+            body += data_table(
+                headers=["Component", "Amount"],
+                rows=cap_rows,
+                numeric_columns={1},
+            )
+
+            # Capital stack visualization (horizontal bar)
+            cap_items = [
+                ("Equity", equity, BLUE),
+                ("Senior Debt", debt, TEAL),
+                ("Transaction Costs", txn_costs, ORANGE),
+                ("Working Capital", wc, GRAY),
+            ]
+            cap_total = sum(v for _, v, _ in cap_items)
+
+            if cap_total > 0:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:16px 0 8px">Capital Stack Breakdown</h3>'
+                body += '<div class="capital-stack">'
+                for label, value, color in cap_items:
+                    pct = value / cap_total * 100
+                    if pct >= 3:  # Only show label if segment is wide enough
+                        body += f'<div class="stack-segment" style="width:{pct:.1f}%;background:{color}" title="{label}: {_fmt_currency(value)}">{label} {_fmt_currency(value)}</div>'
+                    elif pct > 0:
+                        body += f'<div class="stack-segment" style="width:{pct:.1f}%;background:{color}" title="{label}: {_fmt_currency(value)}"></div>'
+                body += '</div>'
+
+                # Chart.js horizontal bar version
+                cap_labels = [c[0] for c in cap_items]
+                cap_values = [c[1] for c in cap_items]
+                cap_bar_config = build_horizontal_bar_config(
+                    cap_labels, cap_values, dataset_label="Capital ($)"
+                )
+                cap_bar_json = json.dumps(cap_bar_config)
+
+                body += chart_container(
+                    "capitalStackChart", cap_bar_json,
+                    build_bar_fallback(cap_labels, cap_values),
+                    title="Capital Stack Components",
+                    height="280px",
+                )
+                charts_js += chart_init_js("capitalStackChart", cap_bar_json)
+
+            # Leverage check callout
+            if dm_leverage > 4:
+                body += callout(
+                    f"<strong>Leverage Warning:</strong> At {dm_leverage:.1f}x Debt/EBITDA, the portfolio "
+                    f"exceeds the typical 4.0x leverage threshold. Consider reducing the debt percentage "
+                    f"or phasing acquisitions to maintain healthy coverage ratios.",
+                    variant="warn",
+                )
+            else:
+                body += callout(
+                    f"<strong>Leverage Check:</strong> At {dm_leverage:.1f}x Debt/EBITDA, the portfolio "
+                    f"is within the typical 4.0x leverage comfort zone for PE-backed healthcare roll-ups.",
+                    variant="good",
+                )
+        else:
+            body += callout(
+                "<strong>No acquisition cost data available.</strong> "
+                "Deal model requires A-grade targets with price tier data.",
+                variant="warn",
+            )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 15: Deal Model — Returns Analysis
+        # ==================================================================
+        body += "\n" + section_start(15, "Deal Model \u2014 Returns Analysis", "deal-returns")
+        body += '<p>Projected returns across three scenarios with varying exit multiples, margin improvement, and hold periods.</p>'
+
+        dm_scenarios = deal_model.get("scenarios", {})
+        dm_a_states = deal_model.get("a_grade_states", [])
+
+        if dm_scenarios:
+            # Scenario cards
+            body += '<div class="deal-scenario-grid">'
+            for scenario_name in ["conservative", "base", "aggressive"]:
+                s = dm_scenarios.get(scenario_name, {})
+                if not s:
+                    continue
+                label_map = {"conservative": "Conservative", "base": "Base Case", "aggressive": "Aggressive"}
+                body += f'<div class="scenario-card {scenario_name}">'
+                body += f'<div class="scenario-label">{label_map.get(scenario_name, scenario_name)}</div>'
+                metrics = [
+                    ("Entry EV", _fmt_currency(s.get("entry_ev", 0))),
+                    ("Exit Multiple", f'{s.get("exit_multiple", 0)}x'),
+                    ("EBITDA Improvement", f'{s.get("margin_improvement", 0):.0%}/yr'),
+                    ("Hold Period", f'{s.get("hold_years", 0)} years'),
+                    ("Exit EV", _fmt_currency(s.get("exit_ev", 0))),
+                    ("Gross MOIC", f'{s.get("gross_moic", 0):.1f}x'),
+                    ("Net IRR", f'{s.get("net_irr", 0):.1%}'),
+                ]
+                for label, value in metrics:
+                    body += f"""<div class="scenario-metric">
+    <span class="label">{label}</span>
+    <span class="value">{value}</span>
+</div>"""
+                body += "</div>"
+            body += "</div>"
+
+            # Scenario comparison table
+            body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:16px 0 8px">Scenario Comparison</h3>'
+
+            scenario_rows = []
+            for scenario_name in ["conservative", "base", "aggressive"]:
+                s = dm_scenarios.get(scenario_name, {})
+                if not s:
+                    continue
+                label_map = {"conservative": "Conservative", "base": "Base Case", "aggressive": "Aggressive"}
+                scenario_rows.append([
+                    f'<strong>{label_map.get(scenario_name)}</strong>',
+                    _fmt_currency(s.get("entry_ev", 0)),
+                    f'{s.get("exit_multiple", 0)}x',
+                    f'{s.get("margin_improvement", 0):.0%}/yr',
+                    f'{s.get("hold_years", 0)} yrs',
+                    _fmt_currency(s.get("exit_ev", 0)),
+                    f'{s.get("gross_moic", 0):.1f}x',
+                    f'{s.get("net_irr", 0):.1%}',
+                ])
+
+            body += data_table(
+                headers=["Scenario", "Entry EV", "Exit Multiple", "EBITDA Improvement",
+                         "Hold Period", "Exit EV", "Gross MOIC", "Net IRR"],
+                rows=scenario_rows,
+                numeric_columns={1, 2, 3, 4, 5, 6, 7},
+            )
+
+            # Synergy callout
+            body += callout(
+                "<strong>Synergy Upside (Not Modeled):</strong> Procurement savings (15-25% on "
+                "injectables/consumables), shared marketing infrastructure, centralized scheduling "
+                "& billing technology platform, and provider network effects could add 300-500bps "
+                "of additional margin improvement beyond baseline projections.",
+                variant="good",
+            )
+
+            # Phased rollout strategy
+            body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:16px 0 8px">Phased Rollout Strategy</h3>'
+            body += """<div class="thesis-box">
+<h3>Recommended Acquisition Cadence</h3>
+<ul>
+    <li><strong>Year 1 — Platform Build (Top 100):</strong> Acquire highest-scoring A-grade targets in top 5 states. Establish shared services infrastructure, negotiate vendor contracts, deploy tech platform.</li>
+    <li><strong>Year 2 — Scale (+200):</strong> Expand to 300 total locations. Leverage platform economics for procurement savings. Begin cross-selling across locations.</li>
+    <li><strong>Years 3-5 — Full Portfolio:</strong> Complete remaining ~{0} acquisitions. Drive margin improvement through operational integration. Prepare for exit.</li>
+</ul>
+</div>""".format(max(dm_total_loc - 300, 0))
+
+            # Exit value by state doughnut
+            if dm_a_states and dm_scenarios.get("base"):
+                base_exit_ev = dm_scenarios["base"].get("exit_ev", 0)
+                total_a = sum(s["count"] for s in dm_a_states)
+
+                if total_a > 0 and base_exit_ev > 0:
+                    top_exit_states = dm_a_states[:10]
+                    other_count = sum(s["count"] for s in dm_a_states[10:])
+
+                    exit_labels = [s["state"] for s in top_exit_states]
+                    exit_values = [round(s["count"] / total_a * base_exit_ev / 1_000_000, 1) for s in top_exit_states]
+                    if other_count > 0:
+                        exit_labels.append("Other")
+                        exit_values.append(round(other_count / total_a * base_exit_ev / 1_000_000, 1))
+
+                    exit_colors = list(CHART_COLORS[:len(exit_labels)])
+                    exit_donut_config = build_doughnut_config(exit_labels, exit_values, exit_colors)
+                    exit_donut_json = json.dumps(exit_donut_config)
+
+                    body += '<div class="chart-row">'
+                    body += "<div>"
+                    body += chart_container(
+                        "exitValueDonut", exit_donut_json,
+                        build_bar_fallback(exit_labels, exit_values),
+                        size="medium",
+                        title="Base Case Exit Value by State ($M)",
+                    )
+                    charts_js += chart_init_js("exitValueDonut", exit_donut_json)
+                    body += build_chart_legend(exit_labels, exit_values, exit_colors, show_pct=True)
+                    body += "</div>"
+                    body += "</div>"
+        else:
+            body += callout(
+                "<strong>No scenario data available.</strong> Deal model requires A-grade "
+                "targets to generate returns analysis.",
+                variant="warn",
+            )
+
+        body += "\n" + section_end()
+
         # ---- Close container ----
         body += "\n</div>"
 
@@ -1387,6 +2903,7 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
             "ZIP affluence model uses IRS Statistics of Income (SOI) ZIP-level data, tax year 2021.",
             "PE competitive landscape data from SEC EDGAR filings and company websites.",
             "Acquisition scores are model-generated estimates and should be validated with on-the-ground diligence.",
+            "Deal model uses industry benchmark economics (AmSpa, IBISWorld) — actual financials require location-level diligence.",
             "This report does not constitute investment advice. All data is from public sources.",
         ]
         body += "\n" + page_footer(
@@ -1589,6 +3106,195 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
         col_widths = {"A": 30, "B": 20, "C": 20, "D": 20, "E": 25, "F": 12, "G": 10}
         for col_letter, width in col_widths.items():
             ws_comps.column_dimensions[col_letter].width = width
+
+        # ---- Sheet 7: Whitespace ZIPs ----
+        ws_ws = wb.create_sheet("Whitespace ZIPs")
+        whitespace_zips = data.get("whitespace_zips", [])
+
+        headers = ["ZIP", "State", "Score", "Avg AGI", "Tax Returns", "Affluence Score"]
+        for col, header in enumerate(headers, 1):
+            cell = ws_ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        for i, z in enumerate(whitespace_zips, 2):
+            ws_ws.cell(row=i, column=1, value=z.get("zip_code"))
+            ws_ws.cell(row=i, column=2, value=z.get("state"))
+            ws_ws.cell(row=i, column=3, value=z.get("score"))
+            ws_ws.cell(row=i, column=4, value=z.get("avg_agi"))
+            ws_ws.cell(row=i, column=5, value=z.get("total_returns"))
+            ws_ws.cell(row=i, column=6, value=z.get("affluence_score"))
+
+        for col_letter in ["A", "B", "C", "D", "E", "F"]:
+            ws_ws.column_dimensions[col_letter].width = 16
+
+        # ---- Sheet 8: Workforce Wages ----
+        ws_wage = wb.create_sheet("Workforce Wages")
+        bls_wages = data.get("bls_wages", {})
+
+        if bls_wages:
+            all_years = sorted(set(yr for occ_data in bls_wages.values() for yr in occ_data.keys()))
+            wage_headers = ["Occupation"] + [str(y) for y in all_years]
+            for col, header in enumerate(wage_headers, 1):
+                cell = ws_wage.cell(row=1, column=col, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+
+            for i, occ in enumerate(sorted(bls_wages.keys()), 2):
+                ws_wage.cell(row=i, column=1, value=occ)
+                for j, yr in enumerate(all_years, 2):
+                    val = bls_wages[occ].get(yr)
+                    ws_wage.cell(row=i, column=j, value=val)
+
+            ws_wage.column_dimensions["A"].width = 25
+            for j in range(2, len(all_years) + 2):
+                from openpyxl.utils import get_column_letter
+                ws_wage.column_dimensions[get_column_letter(j)].width = 14
+
+        # ---- Sheet 9: Growth Signals ----
+        ws_gs = wb.create_sheet("Growth Signals")
+        top_by_reviews = data.get("top_by_reviews", [])
+        low_competition_gems = data.get("low_competition_gems", [])
+
+        # Top by reviews
+        ws_gs["A1"] = "Top Prospects by Review Volume"
+        ws_gs["A1"].font = Font(bold=True, size=13)
+        ws_gs.merge_cells("A1:H1")
+
+        headers = ["Name", "City", "State", "Reviews", "Rating", "Score", "Grade", "Competitors"]
+        for col, header in enumerate(headers, 1):
+            cell = ws_gs.cell(row=2, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        for i, t in enumerate(top_by_reviews, 3):
+            ws_gs.cell(row=i, column=1, value=t.get("name"))
+            ws_gs.cell(row=i, column=2, value=t.get("city"))
+            ws_gs.cell(row=i, column=3, value=t.get("state"))
+            ws_gs.cell(row=i, column=4, value=t.get("reviews"))
+            ws_gs.cell(row=i, column=5, value=t.get("rating"))
+            ws_gs.cell(row=i, column=6, value=t.get("score"))
+            ws_gs.cell(row=i, column=7, value=t.get("grade"))
+            ws_gs.cell(row=i, column=8, value=t.get("competitors"))
+
+        # Low competition gems section
+        gem_start = len(top_by_reviews) + 5
+        ws_gs.cell(row=gem_start, column=1, value="Low Competition Gems (≤3 Competitors)")
+        ws_gs.cell(row=gem_start, column=1).font = Font(bold=True, size=13)
+        ws_gs.merge_cells(f"A{gem_start}:H{gem_start}")
+
+        headers = ["Name", "City", "State", "Score", "Grade", "Rating", "Reviews", "Competitors"]
+        for col, header in enumerate(headers, 1):
+            cell = ws_gs.cell(row=gem_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        for i, g in enumerate(low_competition_gems, gem_start + 2):
+            ws_gs.cell(row=i, column=1, value=g.get("name"))
+            ws_gs.cell(row=i, column=2, value=g.get("city"))
+            ws_gs.cell(row=i, column=3, value=g.get("state"))
+            ws_gs.cell(row=i, column=4, value=g.get("score"))
+            ws_gs.cell(row=i, column=5, value=g.get("grade"))
+            ws_gs.cell(row=i, column=6, value=g.get("rating"))
+            ws_gs.cell(row=i, column=7, value=g.get("reviews"))
+            ws_gs.cell(row=i, column=8, value=g.get("competitors"))
+
+        col_widths = {"A": 35, "B": 18, "C": 8, "D": 10, "E": 8, "F": 8, "G": 10, "H": 14}
+        for col_letter, width in col_widths.items():
+            ws_gs.column_dimensions[col_letter].width = width
+
+        # ---- Sheet 10: Deal Model ----
+        ws_deal = wb.create_sheet("Deal Model")
+        deal_model = data.get("deal_model", {})
+        dm_tiers = deal_model.get("tier_economics", [])
+        dm_scenarios = deal_model.get("scenarios", {})
+        dm_cap = deal_model.get("capital_stack", {})
+
+        ws_deal["A1"] = "Deal Model — Unit Economics"
+        ws_deal["A1"].font = Font(bold=True, size=13)
+        ws_deal.merge_cells("A1:H1")
+
+        # Tier economics table
+        deal_headers = [
+            "Price Tier", "Locations", "Avg Revenue", "EBITDA Margin",
+            "Avg EBITDA", "Entry Multiple", "Total Revenue", "Total EBITDA", "Total Acq Cost",
+        ]
+        for col, header in enumerate(deal_headers, 1):
+            cell = ws_deal.cell(row=2, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        for i, t in enumerate(dm_tiers, 3):
+            ws_deal.cell(row=i, column=1, value=t.get("tier", "Unknown"))
+            ws_deal.cell(row=i, column=2, value=t.get("count", 0))
+            ws_deal.cell(row=i, column=3, value=t.get("avg_revenue", 0))
+            ws_deal.cell(row=i, column=4, value=t.get("ebitda_margin", 0))
+            ws_deal.cell(row=i, column=5, value=t.get("avg_ebitda", 0))
+            ws_deal.cell(row=i, column=6, value=t.get("entry_multiple", 0))
+            ws_deal.cell(row=i, column=7, value=t.get("total_revenue", 0))
+            ws_deal.cell(row=i, column=8, value=t.get("total_ebitda", 0))
+            ws_deal.cell(row=i, column=9, value=t.get("total_acq_cost", 0))
+
+        # Totals row
+        total_row = len(dm_tiers) + 3
+        ws_deal.cell(row=total_row, column=1, value="TOTAL").font = Font(bold=True)
+        ws_deal.cell(row=total_row, column=2, value=deal_model.get("total_locations", 0)).font = Font(bold=True)
+        ws_deal.cell(row=total_row, column=7, value=deal_model.get("total_revenue", 0)).font = Font(bold=True)
+        ws_deal.cell(row=total_row, column=8, value=deal_model.get("total_ebitda", 0)).font = Font(bold=True)
+        ws_deal.cell(row=total_row, column=9, value=deal_model.get("total_acquisition_cost", 0)).font = Font(bold=True)
+
+        # Capital stack section
+        cap_start = total_row + 2
+        ws_deal.cell(row=cap_start, column=1, value="Capital Requirements").font = Font(bold=True, size=13)
+        ws_deal.merge_cells(f"A{cap_start}:D{cap_start}")
+
+        cap_items = [
+            ("Equity Contribution (40%)", dm_cap.get("equity", 0)),
+            ("Senior Debt (60%)", dm_cap.get("debt", 0)),
+            ("Transaction Costs (5%)", dm_cap.get("transaction_costs", 0)),
+            ("Working Capital Reserve", dm_cap.get("working_capital", 0)),
+            ("Total Capital Required", dm_cap.get("total_capital_required", 0)),
+        ]
+        for j, (label, value) in enumerate(cap_items, cap_start + 1):
+            ws_deal.cell(row=j, column=1, value=label)
+            ws_deal.cell(row=j, column=2, value=value)
+            if label.startswith("Total"):
+                ws_deal.cell(row=j, column=1).font = Font(bold=True)
+                ws_deal.cell(row=j, column=2).font = Font(bold=True)
+
+        ws_deal.cell(row=cap_start + len(cap_items) + 1, column=1, value="Leverage (Debt/EBITDA)")
+        ws_deal.cell(row=cap_start + len(cap_items) + 1, column=2, value=deal_model.get("leverage_ratio", 0))
+
+        # Scenarios section
+        sc_start = cap_start + len(cap_items) + 3
+        ws_deal.cell(row=sc_start, column=1, value="Returns Analysis").font = Font(bold=True, size=13)
+        ws_deal.merge_cells(f"A{sc_start}:H{sc_start}")
+
+        sc_headers = ["Scenario", "Entry EV", "Exit Multiple", "Margin Improvement",
+                      "Hold Years", "Exit EV", "Gross MOIC", "Net IRR"]
+        for col, header in enumerate(sc_headers, 1):
+            cell = ws_deal.cell(row=sc_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        sc_row = sc_start + 2
+        for sc_name in ["conservative", "base", "aggressive"]:
+            s = dm_scenarios.get(sc_name, {})
+            if not s:
+                continue
+            ws_deal.cell(row=sc_row, column=1, value=sc_name.title())
+            ws_deal.cell(row=sc_row, column=2, value=s.get("entry_ev", 0))
+            ws_deal.cell(row=sc_row, column=3, value=s.get("exit_multiple", 0))
+            ws_deal.cell(row=sc_row, column=4, value=s.get("margin_improvement", 0))
+            ws_deal.cell(row=sc_row, column=5, value=s.get("hold_years", 0))
+            ws_deal.cell(row=sc_row, column=6, value=s.get("exit_ev", 0))
+            ws_deal.cell(row=sc_row, column=7, value=s.get("gross_moic", 0))
+            ws_deal.cell(row=sc_row, column=8, value=s.get("net_irr", 0))
+            sc_row += 1
+
+        deal_col_widths = {"A": 28, "B": 16, "C": 16, "D": 16, "E": 16, "F": 16, "G": 16, "H": 14, "I": 16}
+        for col_letter, width in deal_col_widths.items():
+            ws_deal.column_dimensions[col_letter].width = width
 
         # Save to bytes
         output = BytesIO()
