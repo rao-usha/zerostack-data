@@ -241,7 +241,14 @@ class BroadbandAvailability(Base):
     source = Column(String(50), default="fcc")
     collected_at = Column(DateTime, default=datetime.utcnow)
 
-    __table_args__ = (Index("idx_broadband_location", "latitude", "longitude"),)
+    __table_args__ = (
+        Index("idx_broadband_location", "latitude", "longitude"),
+        Index(
+            "uq_broadband_provider",
+            "block_geoid", "provider_name", "technology",
+            unique=True,
+        ),
+    )
 
 
 class InternetExchange(Base):
