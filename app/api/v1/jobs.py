@@ -268,6 +268,11 @@ SOURCE_DISPATCH: Dict[str, Tuple[str, str, List[str]]] = {
         "ingest_all_states",
         ["include_summary"],
     ),
+    "fcc_broadband:county": (
+        "app.sources.fcc_broadband.ingest",
+        "ingest_county_coverage",
+        ["county_fips", "include_summary"],
+    ),
     # ── Yelp ──────────────────────────────────────────────────────────────
     "yelp": (
         "app.sources.yelp.ingest",

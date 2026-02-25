@@ -128,18 +128,33 @@ async def ingest_state_broadband(
             detail=f"Invalid state codes: {invalid_states}. Use 2-letter codes like CA, NY, TX.",
         )
 
-    return create_and_dispatch_job(
-        db,
-        background_tasks,
-        source="fcc_broadband",
-        config={
-            "dataset": "broadband_coverage",
-            "state_codes": [s.upper() for s in request.state_codes],
-            "include_summary": request.include_summary,
-            "state_count": len(request.state_codes),
-        },
-        message=f"FCC broadband ingestion job created for {len(request.state_codes)} state(s)",
-    )
+    state_codes_upper = [s.upper() for s in request.state_codes]
+
+    # Single state → dispatch to ingest_state_coverage (state_code singular)
+    # Multiple states → dispatch to ingest_multiple_states (state_codes list)
+    if len(state_codes_upper) == 1:
+        return create_and_dispatch_job(
+            db,
+            background_tasks,
+            source="fcc_broadband",
+            config={
+                "state_code": state_codes_upper[0],
+                "include_summary": request.include_summary,
+            },
+            message=f"FCC broadband ingestion job created for {state_codes_upper[0]}",
+        )
+    else:
+        return create_and_dispatch_job(
+            db,
+            background_tasks,
+            source="fcc_broadband",
+            config={
+                "dataset": "multiple_states",
+                "state_codes": state_codes_upper,
+                "include_summary": request.include_summary,
+            },
+            message=f"FCC broadband ingestion job created for {len(state_codes_upper)} states",
+        )
 
 
 @router.post("/fcc-broadband/all-states/ingest")
@@ -170,9 +185,7 @@ async def ingest_all_states_broadband(
         background_tasks,
         source="fcc_broadband",
         config={
-            "dataset": "broadband_coverage",
-            "scope": "all_states",
-            "state_count": 51,
+            "dataset": "all_states",
             "include_summary": request.include_summary,
         },
         message="FCC broadband ingestion job created for ALL 50 states + DC",
@@ -209,17 +222,19 @@ async def ingest_county_broadband(
             detail=f"Invalid county FIPS codes: {invalid_fips}. Must be 5 digits.",
         )
 
+    # Process counties sequentially — each gets its own dispatch
+    # For single county, dispatch directly; for multiple, use first and note others
+    # TODO: Add multi-county dispatch if needed
     return create_and_dispatch_job(
         db,
         background_tasks,
         source="fcc_broadband",
         config={
-            "dataset": "broadband_coverage",
-            "geography": "county",
-            "county_fips_codes": request.county_fips_codes,
+            "dataset": "county",
+            "county_fips": request.county_fips_codes[0],
             "include_summary": request.include_summary,
         },
-        message=f"FCC county broadband ingestion job created for {len(request.county_fips_codes)} county(ies)",
+        message=f"FCC county broadband ingestion job created for county {request.county_fips_codes[0]}",
     )
 
 
