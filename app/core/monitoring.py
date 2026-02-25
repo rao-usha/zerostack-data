@@ -8,7 +8,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, text
 
 from app.core.models import IngestionJob, JobStatus
 from app.core import webhook_service
@@ -30,30 +30,24 @@ class JobMonitor:
         """
         Get job metrics for the specified time window.
 
-        Args:
-            hours: Time window in hours (default 24)
-            source: Optional filter by source
-
-        Returns:
-            Dictionary with job metrics
+        Uses raw SQL to avoid enum deserialization issues (DB stores lowercase
+        status values but SQLAlchemy enum expects uppercase).
         """
         cutoff = datetime.utcnow() - timedelta(hours=hours)
+        params: Dict[str, Any] = {"cutoff": cutoff}
 
-        # Base query
-        base_query = self.db.query(IngestionJob).filter(
-            IngestionJob.created_at >= cutoff
-        )
+        source_filter = ""
         if source:
-            base_query = base_query.filter(IngestionJob.source == source)
-
-        # Total jobs
-        total_jobs = base_query.count()
+            source_filter = " AND source = :source"
+            params["source"] = source
 
         # Status breakdown
-        status_counts = {}
-        for status in JobStatus:
-            count = base_query.filter(IngestionJob.status == status).count()
-            status_counts[status.value] = count
+        result = self.db.execute(text(
+            f"SELECT LOWER(status) as status, COUNT(*) FROM ingestion_jobs "
+            f"WHERE created_at >= :cutoff{source_filter} GROUP BY status"
+        ), params)
+        status_counts = {str(row[0]): int(row[1]) for row in result.fetchall()}
+        total_jobs = sum(status_counts.values())
 
         # Calculate rates
         success_rate = (
@@ -66,37 +60,38 @@ class JobMonitor:
         )
 
         # Average duration for completed jobs
-        completed_jobs = base_query.filter(
-            and_(
-                IngestionJob.status == JobStatus.SUCCESS,
-                IngestionJob.started_at.isnot(None),
-                IngestionJob.completed_at.isnot(None),
-            )
-        ).all()
+        dur_result = self.db.execute(text(
+            f"SELECT AVG(EXTRACT(EPOCH FROM (completed_at - started_at))) "
+            f"FROM ingestion_jobs WHERE created_at >= :cutoff{source_filter} "
+            f"AND LOWER(status) = 'success' AND started_at IS NOT NULL AND completed_at IS NOT NULL"
+        ), params)
+        avg_duration = dur_result.scalar() or 0
 
-        durations = []
-        for job in completed_jobs:
-            if job.started_at and job.completed_at:
-                duration = (job.completed_at - job.started_at).total_seconds()
-                durations.append(duration)
-
-        avg_duration = sum(durations) / len(durations) if durations else 0
-
-        # Get total rows inserted
-        total_rows = (
-            base_query.filter(IngestionJob.rows_inserted.isnot(None))
-            .with_entities(func.sum(IngestionJob.rows_inserted))
-            .scalar()
-            or 0
-        )
+        # Total rows inserted
+        rows_result = self.db.execute(text(
+            f"SELECT COALESCE(SUM(rows_inserted), 0) FROM ingestion_jobs "
+            f"WHERE created_at >= :cutoff{source_filter} AND rows_inserted IS NOT NULL"
+        ), params)
+        total_rows = int(rows_result.scalar() or 0)
 
         # Recent failures
-        recent_failures = (
-            base_query.filter(IngestionJob.status == JobStatus.FAILED)
-            .order_by(IngestionJob.created_at.desc())
-            .limit(5)
-            .all()
-        )
+        fail_result = self.db.execute(text(
+            f"SELECT id, source, error_message, created_at, retry_count "
+            f"FROM ingestion_jobs WHERE created_at >= :cutoff{source_filter} "
+            f"AND LOWER(status) = 'failed' ORDER BY created_at DESC LIMIT 5"
+        ), params)
+
+        recent_failures = []
+        for row in fail_result.fetchall():
+            err_msg = str(row[2])[:200] if row[2] else None
+            recent_failures.append({
+                "job_id": row[0],
+                "source": row[1],
+                "error_message": err_msg,
+                "created_at": row[3].isoformat() if row[3] else None,
+                "retry_count": row[4],
+                "can_retry": False,
+            })
 
         return {
             "time_window_hours": hours,
@@ -105,21 +100,9 @@ class JobMonitor:
             "status_breakdown": status_counts,
             "success_rate_percent": round(success_rate, 2),
             "failure_rate_percent": round(failure_rate, 2),
-            "avg_duration_seconds": round(avg_duration, 2),
+            "avg_duration_seconds": round(float(avg_duration), 2),
             "total_rows_inserted": total_rows,
-            "recent_failures": [
-                {
-                    "job_id": job.id,
-                    "source": job.source,
-                    "error_message": job.error_message[:200]
-                    if job.error_message
-                    else None,
-                    "created_at": job.created_at.isoformat(),
-                    "retry_count": job.retry_count,
-                    "can_retry": job.can_retry,
-                }
-                for job in recent_failures
-            ],
+            "recent_failures": recent_failures,
             "collected_at": datetime.utcnow().isoformat(),
         }
 
@@ -127,29 +110,49 @@ class JobMonitor:
         """
         Get health status for each data source.
 
-        Returns health score based on recent job success rates.
+        Uses raw SQL to avoid enum deserialization issues.
         """
-        # Get unique sources from recent jobs
         cutoff = datetime.utcnow() - timedelta(hours=24)
 
-        sources = self.db.query(IngestionJob.source).distinct().all()
-        sources = [s[0] for s in sources]
+        # Get all distinct sources
+        src_result = self.db.execute(text(
+            "SELECT DISTINCT source FROM ingestion_jobs"
+        ))
+        sources = [row[0] for row in src_result.fetchall()]
+
+        # Get 24h status counts per source in one query
+        counts_result = self.db.execute(text(
+            "SELECT source, LOWER(status), COUNT(*) FROM ingestion_jobs "
+            "WHERE created_at >= :cutoff GROUP BY source, status"
+        ), {"cutoff": cutoff})
+
+        source_counts: Dict[str, Dict[str, int]] = {}
+        for row in counts_result.fetchall():
+            src, status, cnt = row[0], str(row[1]), int(row[2])
+            source_counts.setdefault(src, {})
+            source_counts[src][status] = cnt
+
+        # Get last success/failure per source
+        last_success_result = self.db.execute(text(
+            "SELECT DISTINCT ON (source) source, completed_at "
+            "FROM ingestion_jobs WHERE LOWER(status) = 'success' AND completed_at IS NOT NULL "
+            "ORDER BY source, completed_at DESC"
+        ))
+        last_success_map = {row[0]: row[1] for row in last_success_result.fetchall()}
+
+        last_fail_result = self.db.execute(text(
+            "SELECT DISTINCT ON (source) source, created_at, error_message "
+            "FROM ingestion_jobs WHERE LOWER(status) = 'failed' "
+            "ORDER BY source, created_at DESC"
+        ))
+        last_fail_map = {row[0]: (row[1], row[2]) for row in last_fail_result.fetchall()}
 
         health_report = {}
         for source in sources:
-            recent_jobs = (
-                self.db.query(IngestionJob)
-                .filter(
-                    and_(
-                        IngestionJob.source == source, IngestionJob.created_at >= cutoff
-                    )
-                )
-                .all()
-            )
-
-            total = len(recent_jobs)
-            success = len([j for j in recent_jobs if j.status == JobStatus.SUCCESS])
-            failed = len([j for j in recent_jobs if j.status == JobStatus.FAILED])
+            counts = source_counts.get(source, {})
+            total = sum(counts.values())
+            success = counts.get("success", 0)
+            failed = counts.get("failed", 0)
 
             if total == 0:
                 health_status = "unknown"
@@ -167,30 +170,8 @@ class JobMonitor:
                 health_status = "warning"
                 health_score = round((success / total) * 100)
 
-            # Get last successful and failed jobs
-            last_success = (
-                self.db.query(IngestionJob)
-                .filter(
-                    and_(
-                        IngestionJob.source == source,
-                        IngestionJob.status == JobStatus.SUCCESS,
-                    )
-                )
-                .order_by(IngestionJob.completed_at.desc())
-                .first()
-            )
-
-            last_failure = (
-                self.db.query(IngestionJob)
-                .filter(
-                    and_(
-                        IngestionJob.source == source,
-                        IngestionJob.status == JobStatus.FAILED,
-                    )
-                )
-                .order_by(IngestionJob.created_at.desc())
-                .first()
-            )
+            last_success_at = last_success_map.get(source)
+            last_fail_info = last_fail_map.get(source)
 
             health_report[source] = {
                 "status": health_status,
@@ -198,14 +179,10 @@ class JobMonitor:
                 "jobs_24h": total,
                 "success_24h": success,
                 "failed_24h": failed,
-                "last_success_at": last_success.completed_at.isoformat()
-                if last_success and last_success.completed_at
-                else None,
-                "last_failure_at": last_failure.created_at.isoformat()
-                if last_failure
-                else None,
-                "last_failure_message": last_failure.error_message[:200]
-                if last_failure and last_failure.error_message
+                "last_success_at": last_success_at.isoformat() if last_success_at else None,
+                "last_failure_at": last_fail_info[0].isoformat() if last_fail_info else None,
+                "last_failure_message": str(last_fail_info[1])[:200]
+                if last_fail_info and last_fail_info[1]
                 else None,
             }
 
@@ -239,103 +216,77 @@ class JobMonitor:
         """
         Check for alert conditions.
 
-        Args:
-            failure_threshold: Number of failures to trigger alert
-            time_window_hours: Time window for failure count
-
-        Returns:
-            List of active alerts
+        Uses raw SQL to avoid enum deserialization issues.
         """
         alerts = []
         cutoff = datetime.utcnow() - timedelta(hours=time_window_hours)
 
-        # Get sources with high failure rates
-        sources = self.db.query(IngestionJob.source).distinct().all()
-        sources = [s[0] for s in sources]
+        # Sources with high failure rates
+        fail_result = self.db.execute(text(
+            "SELECT source, COUNT(*) FROM ingestion_jobs "
+            "WHERE LOWER(status) = 'failed' AND created_at >= :cutoff "
+            "GROUP BY source"
+        ), {"cutoff": cutoff})
 
-        for source in sources:
-            recent_failures = (
-                self.db.query(IngestionJob)
-                .filter(
-                    and_(
-                        IngestionJob.source == source,
-                        IngestionJob.status == JobStatus.FAILED,
-                        IngestionJob.created_at >= cutoff,
-                    )
-                )
-                .count()
-            )
-
+        for row in fail_result.fetchall():
+            source, recent_failures = row[0], int(row[1])
             if recent_failures >= failure_threshold:
-                alerts.append(
-                    {
-                        "alert_type": "high_failure_rate",
-                        "source": source,
-                        "severity": "critical"
-                        if recent_failures >= failure_threshold * 2
-                        else "warning",
-                        "message": f"Source '{source}' has {recent_failures} failures in the last {time_window_hours} hour(s)",
-                        "failure_count": recent_failures,
-                        "threshold": failure_threshold,
-                        "time_window_hours": time_window_hours,
-                        "created_at": datetime.utcnow().isoformat(),
-                    }
-                )
-
-        # Check for jobs stuck in running state
-        stuck_threshold = timedelta(hours=2)
-        stuck_jobs = (
-            self.db.query(IngestionJob)
-            .filter(
-                and_(
-                    IngestionJob.status == JobStatus.RUNNING,
-                    IngestionJob.started_at < datetime.utcnow() - stuck_threshold,
-                )
-            )
-            .all()
-        )
-
-        for job in stuck_jobs:
-            running_time = datetime.utcnow() - job.started_at
-            alerts.append(
-                {
-                    "alert_type": "stuck_job",
-                    "source": job.source,
-                    "severity": "warning",
-                    "message": f"Job {job.id} has been running for {running_time.total_seconds() / 3600:.1f} hours",
-                    "job_id": job.id,
-                    "started_at": job.started_at.isoformat(),
-                    "running_hours": round(running_time.total_seconds() / 3600, 2),
+                alerts.append({
+                    "alert_type": "high_failure_rate",
+                    "source": source,
+                    "severity": "critical"
+                    if recent_failures >= failure_threshold * 2
+                    else "warning",
+                    "message": f"Source '{source}' has {recent_failures} failures in the last {time_window_hours} hour(s)",
+                    "failure_count": recent_failures,
+                    "threshold": failure_threshold,
+                    "time_window_hours": time_window_hours,
                     "created_at": datetime.utcnow().isoformat(),
-                }
-            )
+                })
 
-        # Check for no recent jobs (data staleness)
-        for source in sources:
-            last_job = (
-                self.db.query(IngestionJob)
-                .filter(IngestionJob.source == source)
-                .order_by(IngestionJob.created_at.desc())
-                .first()
-            )
+        # Jobs stuck in running state
+        stuck_threshold = datetime.utcnow() - timedelta(hours=2)
+        stuck_result = self.db.execute(text(
+            "SELECT id, source, started_at FROM ingestion_jobs "
+            "WHERE LOWER(status) = 'running' AND started_at < :stuck"
+        ), {"stuck": stuck_threshold})
 
-            if last_job:
-                time_since_last = datetime.utcnow() - last_job.created_at
-                # Alert if no jobs in 24 hours
+        for row in stuck_result.fetchall():
+            job_id, source, started_at = row[0], row[1], row[2]
+            running_time = datetime.utcnow() - started_at
+            alerts.append({
+                "alert_type": "stuck_job",
+                "source": source,
+                "severity": "warning",
+                "message": f"Job {job_id} has been running for {running_time.total_seconds() / 3600:.1f} hours",
+                "job_id": job_id,
+                "started_at": started_at.isoformat(),
+                "running_hours": round(running_time.total_seconds() / 3600, 2),
+                "created_at": datetime.utcnow().isoformat(),
+            })
+
+        # Data staleness — sources with no recent jobs
+        stale_result = self.db.execute(text(
+            "SELECT source, MAX(created_at) as last_job_at FROM ingestion_jobs "
+            "GROUP BY source"
+        ))
+
+        for row in stale_result.fetchall():
+            source, last_job_at = row[0], row[1]
+            if last_job_at:
+                time_since_last = datetime.utcnow() - last_job_at
                 if time_since_last > timedelta(hours=24):
-                    alerts.append(
-                        {
-                            "alert_type": "data_staleness",
-                            "source": source,
-                            "severity": "info",
-                            "message": f"No jobs for source '{source}' in {time_since_last.days} days, {time_since_last.seconds // 3600} hours",
-                            "last_job_at": last_job.created_at.isoformat(),
-                            "hours_since_last": round(
-                                time_since_last.total_seconds() / 3600, 2
-                            ),
-                            "created_at": datetime.utcnow().isoformat(),
-                        }
-                    )
+                    alerts.append({
+                        "alert_type": "data_staleness",
+                        "source": source,
+                        "severity": "info",
+                        "message": f"No jobs for source '{source}' in {time_since_last.days} days, {time_since_last.seconds // 3600} hours",
+                        "last_job_at": last_job_at.isoformat(),
+                        "hours_since_last": round(
+                            time_since_last.total_seconds() / 3600, 2
+                        ),
+                        "created_at": datetime.utcnow().isoformat(),
+                    })
 
         return alerts
 
