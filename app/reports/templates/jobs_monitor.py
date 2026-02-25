@@ -108,15 +108,13 @@ class JobsMonitorPage:
         q_success_24h = q_24h.get(QueueJobStatus.SUCCESS, 0)
         q_failed_24h = q_24h.get(QueueJobStatus.FAILED, 0)
 
-        # 24h success/failed from ingestion_jobs
+        # 24h success/failed from ingestion_jobs (raw SQL to avoid enum mismatch)
         try:
-            i_24h_rows = (
-                db.query(IngestionJob.status, func.count(IngestionJob.id))
-                .filter(IngestionJob.created_at >= since_24h)
-                .group_by(IngestionJob.status)
-                .all()
-            )
-            i_24h = {_enum_val(s): c for s, c in i_24h_rows}
+            i_24h_result = db.execute(text(
+                "SELECT status, COUNT(*) FROM ingestion_jobs "
+                "WHERE created_at >= :since GROUP BY status"
+            ), {"since": since_24h})
+            i_24h = {str(row[0]).lower(): int(row[1]) for row in i_24h_result.fetchall()}
         except Exception:
             i_24h = {}
 
@@ -151,12 +149,16 @@ class JobsMonitorPage:
         queue_jobs = (
             db.query(JobQueue).order_by(JobQueue.created_at.desc()).limit(50).all()
         )
-        ingest_jobs = (
-            db.query(IngestionJob)
-            .order_by(IngestionJob.created_at.desc())
-            .limit(50)
-            .all()
-        )
+        # Ingestion jobs via raw SQL to avoid enum deserialization issues
+        try:
+            ingest_result = db.execute(text(
+                "SELECT id, source, status, rows_inserted, error_message, "
+                "created_at, started_at, completed_at "
+                "FROM ingestion_jobs ORDER BY created_at DESC LIMIT 50"
+            ))
+            ingest_rows = ingest_result.fetchall()
+        except Exception:
+            ingest_rows = []
 
         history: List[Dict[str, Any]] = []
         for j in queue_jobs:
@@ -174,20 +176,21 @@ class JobsMonitorPage:
                 "completed_at": j.completed_at,
                 "duration_seconds": _duration(j.started_at, j.completed_at),
             })
-        for j in ingest_jobs:
+        for row in ingest_rows:
+            status_str = str(row[2]).lower() if row[2] else "unknown"
             history.append({
-                "id": j.id,
+                "id": row[0],
                 "table": "ingestion_jobs",
-                "job_type": j.source,
-                "status": _enum_val(j.status),
-                "progress_pct": 100.0 if _enum_val(j.status) == "success" else None,
+                "job_type": row[1],
+                "status": status_str,
+                "progress_pct": 100.0 if status_str == "success" else None,
                 "progress_message": None,
-                "rows_inserted": j.rows_inserted,
-                "error_message": j.error_message,
-                "created_at": j.created_at,
-                "started_at": j.started_at,
-                "completed_at": j.completed_at,
-                "duration_seconds": _duration(j.started_at, j.completed_at),
+                "rows_inserted": row[3],
+                "error_message": row[4],
+                "created_at": row[5],
+                "started_at": row[6],
+                "completed_at": row[7],
+                "duration_seconds": _duration(row[6], row[7]),
             })
 
         epoch = datetime(1970, 1, 1)
