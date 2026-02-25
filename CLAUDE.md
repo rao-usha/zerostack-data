@@ -178,6 +178,37 @@ Every ingestion creates an `ingestion_jobs` record: `pending → running → suc
 
 ---
 
+## Session Logging (MANDATORY)
+
+Every session must maintain a daily work log. This is critical for continuity across sessions.
+
+**Log location:** `C:\Users\awron\.claude\projects\C--Users-awron-projects-Nexdata\memory\logs\YYYY-MM-DD.md`
+
+### Automatic behavior:
+
+1. **Session start:** Read today's log file (if it exists) and the last 2 days' logs. Use these to understand recent context and pick up where the previous session left off. Briefly acknowledge what you found (e.g., "Picking up from yesterday — you were working on X").
+
+2. **After each significant task:** Append a timestamped entry to today's log with: what was done, decisions made, files changed, and next steps. A "significant task" = any code change, bug fix, feature addition, investigation with findings, or architectural decision.
+
+3. **Before session ends (if the user says goodbye, thanks, or conversation naturally concludes):** Write a final checkpoint entry summarizing the full session and explicitly noting what to do next.
+
+The `/session-log` skill can also be invoked manually to force a checkpoint at any time.
+
+### Log entry format:
+```markdown
+## HH:MM — [Brief title]
+
+**What:** [1-3 bullets of work done]
+**Decisions:** [Choices made and why]
+**Files changed:** [Specific paths]
+**Next steps:** [What to do next]
+**Blockers:** [Issues, or "None"]
+
+---
+```
+
+---
+
 ## Workflow
 
 1. **Plan** — Record in `docs/plans/PLAN_XXX_<name>.md`, wait for explicit user approval
