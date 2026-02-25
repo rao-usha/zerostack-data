@@ -79,10 +79,19 @@ class ExportService:
 
             try:
                 columns = [col["name"] for col in inspector.get_columns(table_name)]
+                count = row_counts.get(table_name, 0)
+                # pg_stat estimate can be 0 before ANALYZE runs; fall back to exact count
+                if count == 0:
+                    try:
+                        count = self.db.execute(
+                            text(f'SELECT COUNT(*) FROM "{table_name}"')
+                        ).scalar() or 0
+                    except Exception:
+                        pass
                 tables.append(
                     {
                         "table_name": table_name,
-                        "row_count": row_counts.get(table_name, 0),
+                        "row_count": count,
                         "columns": columns,
                     }
                 )
