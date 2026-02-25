@@ -85,9 +85,6 @@ class FCCBroadbandCollector(BaseCollector):
 
     async def collect(self, config: CollectionConfig) -> CollectionResult:
         """Collect FCC broadband data for configured states."""
-        self.create_job(config)
-        self.start_job()
-
         all_records = []
         errors = 0
 
@@ -127,7 +124,7 @@ class FCCBroadbandCollector(BaseCollector):
             f"{inserted} inserted/updated, {errors} state errors"
         )
 
-        result = self.create_result(
+        return self.create_result(
             status=CollectionStatus.SUCCESS
             if inserted > 0
             else CollectionStatus.PARTIAL,
@@ -135,8 +132,6 @@ class FCCBroadbandCollector(BaseCollector):
             processed=len(all_records),
             inserted=inserted,
         )
-        self.complete_job(result)
-        return result
 
     async def _collect_state_broadband(self, state: str) -> List[Dict[str, Any]]:
         """

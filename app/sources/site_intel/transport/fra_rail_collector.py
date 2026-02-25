@@ -116,9 +116,6 @@ class FRARailCollector(BaseCollector):
 
     async def collect(self, config: CollectionConfig) -> CollectionResult:
         """Collect rail network data via ArcGIS pagination."""
-        self.create_job(config)
-        self.start_job()
-
         all_records = []
         errors = 0
         states = config.states if config.states else list(STATE_FIPS.keys())
@@ -157,7 +154,7 @@ class FRARailCollector(BaseCollector):
                 ],
             )
 
-        result = self.create_result(
+        return self.create_result(
             status=CollectionStatus.SUCCESS
             if inserted > 0
             else CollectionStatus.PARTIAL,
@@ -165,8 +162,6 @@ class FRARailCollector(BaseCollector):
             processed=len(all_records),
             inserted=inserted,
         )
-        self.complete_job(result)
-        return result
 
     async def _collect_state_rail(
         self, state: str, fips: str, config: CollectionConfig

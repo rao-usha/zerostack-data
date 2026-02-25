@@ -95,9 +95,6 @@ class USGSEarthquakeCollector(BaseCollector):
 
     async def collect(self, config: CollectionConfig) -> CollectionResult:
         """Collect earthquake events, seismic hazard, and fault data."""
-        self.create_job(config)
-        self.start_job()
-
         total_inserted = 0
         errors = 0
 
@@ -131,7 +128,7 @@ class USGSEarthquakeCollector(BaseCollector):
             self.db.rollback()
             errors += 1
 
-        result = self.create_result(
+        return self.create_result(
             status=CollectionStatus.SUCCESS
             if total_inserted > 0
             else CollectionStatus.PARTIAL,
@@ -139,8 +136,6 @@ class USGSEarthquakeCollector(BaseCollector):
             processed=total_inserted,
             inserted=total_inserted,
         )
-        self.complete_job(result)
-        return result
 
     async def _collect_seismic_hazard(self, config: CollectionConfig) -> Dict[str, Any]:
         """Collect seismic hazard estimates for grid points."""
