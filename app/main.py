@@ -841,7 +841,6 @@ Browse the endpoint sections below to see what's available:
         {"name": "job-chains", "description": "🔗 **Job Dependency Chains** - Create DAG workflows with job dependencies, execute chains, and track progress"},
         {"name": "Job Queue", "description": "Distributed job queue - live streaming, active jobs, and queue status"},
         {"name": "Job Monitor", "description": "Live jobs monitoring dashboard with real-time SSE streaming"},
-        {"name": "Job Monitor", "description": "Live jobs monitoring dashboard"},
         {"name": "webhooks", "description": "🔔 **Webhook Notifications** - Configure webhooks to receive notifications for job events and monitoring alerts"},
         {"name": "rate-limits", "description": "⚡ **Per-Source Rate Limits** - Configure and monitor rate limits for each data source API"},
         {"name": "data-quality", "description": "✅ **Data Quality Rules Engine** - Define and evaluate data quality rules with range, null, regex, freshness checks"},
