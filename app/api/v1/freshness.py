@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -49,13 +49,14 @@ def get_freshness_dashboard(db: Session = Depends(get_db)):
     """
     now = datetime.utcnow()
 
-    # 1. Last successful job per source
+    # 1. Last successful job per source (case-insensitive status match
+    #    because some jobs were written with uppercase status values)
     last_success_subq = (
         db.query(
             IngestionJob.source,
             func.max(IngestionJob.completed_at).label("last_success"),
         )
-        .filter(IngestionJob.status == JobStatus.SUCCESS)
+        .filter(func.lower(IngestionJob.status) == "success")
         .group_by(IngestionJob.source)
         .all()
     )
