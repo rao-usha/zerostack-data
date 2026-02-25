@@ -833,371 +833,149 @@ Browse the endpoint sections below to see what's available:
     },
     license_info={"name": "MIT", "url": "https://opensource.org/licenses/MIT"},
     openapi_tags=[
+        # ── Core / System ──────────────────────────────────────────────
         {"name": "Root", "description": "Service information and health checks"},
-        {
-            "name": "jobs",
-            "description": "⚙️ **Ingestion Job Management** - Start, monitor, and track data ingestion jobs",
-        },
-        {
-            "name": "census",
-            "description": "📊 **U.S. Census Bureau** - Demographics, housing, and economic data",
-        },
-        {
-            "name": "fred",
-            "description": "💰 **Federal Reserve Economic Data** - 800K+ economic time series",
-        },
-        {
-            "name": "eia",
-            "description": "⚡ **Energy Information Administration** - Energy production, prices, and consumption",
-        },
-        {
-            "name": "sec",
-            "description": "🏛️ **Securities and Exchange Commission** - Company financials and Form ADV data",
-        },
-        {
-            "name": "noaa",
-            "description": "🌦️ **NOAA Weather & Climate** - Weather observations and historical climate data",
-        },
-        {
-            "name": "realestate",
-            "description": "🏠 **Real Estate Data** - Zillow home values and rental market data",
-        },
-        {
-            "name": "geojson",
-            "description": "🗺️ **Geographic Boundaries** - GeoJSON boundaries for mapping",
-        },
-        {
-            "name": "family_offices",
-            "description": "💼 **Family Offices** - Investment adviser and family office tracking",
-        },
-        {
-            "name": "family_office_contacts",
-            "description": "👥 **Family Office Contacts** - Contact research and enrichment for family offices",
-        },
-        {
-            "name": "cms",
-            "description": "🏥 **CMS / HHS Healthcare Data** - Medicare utilization, hospital costs, and drug pricing",
-        },
-        {
-            "name": "kaggle",
-            "description": "🏆 **Kaggle Datasets** - Competition datasets (M5 Forecasting, etc.)",
-        },
-        {
-            "name": "international_econ",
-            "description": "🌍 **International Economic Data** - World Bank, IMF, OECD, BIS global economic indicators",
-        },
-        {
-            "name": "fbi_crime",
-            "description": "🚔 **FBI Crime Data** - UCR crime statistics, NIBRS incident data, hate crimes, and LEOKA",
-        },
-        {
-            "name": "bts",
-            "description": "🚚 **Bureau of Transportation Statistics** - Border crossings, freight flows (FAF5), and vehicle miles traveled",
-        },
-        {
-            "name": "bea",
-            "description": "📈 **Bureau of Economic Analysis** - GDP, Personal Income, PCE, Regional economic data, and International transactions",
-        },
-        {
-            "name": "fema",
-            "description": "🌊 **OpenFEMA** - Disaster declarations, Public Assistance grants, and Hazard Mitigation projects",
-        },
-        {
-            "name": "data_commons",
-            "description": "📊 **Google Data Commons** - Unified public data from 200+ sources (demographics, economy, health, crime, etc.)",
-        },
-        {
-            "name": "yelp",
-            "description": "🏪 **Yelp Fusion** - Business listings, reviews, and local business activity (500 calls/day free tier)",
-        },
-        {
-            "name": "us_trade",
-            "description": "🚢 **US International Trade** - Census Bureau trade data: imports/exports by HS code, port, state, and trading partner",
-        },
-        {
-            "name": "CFTC COT",
-            "description": "📈 **CFTC Commitments of Traders** - Weekly futures positioning data: commercial vs non-commercial, managed money, swap dealers",
-        },
-        {
-            "name": "USDA Agriculture",
-            "description": "🌾 **USDA NASS QuickStats** - Agricultural statistics: crop production, yields, prices, livestock inventory",
-        },
-        {
-            "name": "BLS Labor Statistics",
-            "description": "📊 **Bureau of Labor Statistics** - Employment, unemployment, CPI, PPI, JOLTS job openings and labor turnover",
-        },
-        {
-            "name": "FCC Broadband & Telecom",
-            "description": "📡 **FCC National Broadband Map** - Broadband coverage, ISP availability, technology deployment, digital divide metrics",
-        },
-        {
-            "name": "Treasury FiscalData",
-            "description": "💵 **U.S. Treasury FiscalData** - Federal debt, interest rates, revenue/spending, Treasury auction results",
-        },
-        {
-            "name": "FDIC BankFind",
-            "description": "🏦 **FDIC BankFind Suite** - Bank financials, demographics, failed banks, and branch-level deposits for 4,000+ U.S. banks",
-        },
-        {
-            "name": "irs-soi",
-            "description": "💰 **IRS Statistics of Income (SOI)** - Income/wealth distribution by geography: ZIP code income, county income, migration flows, business income",
-        },
-        {
-            "name": "Agentic Portfolio Research",
-            "description": "🤖 **Agentic Portfolio Discovery** - AI-powered portfolio research for LPs and Family Offices using SEC 13F, website scraping, and more",
-        },
-        {
-            "name": "Foot Traffic",
-            "description": "🚶 **Foot Traffic Intelligence** - Location discovery, foot traffic data collection, and competitive benchmarking for retail/hospitality investments",
-        },
-        {
-            "name": "Prediction Markets",
-            "description": "🎲 **Prediction Market Intelligence** - Monitor Kalshi, Polymarket for market consensus on economic, political, sports, and world events",
-        },
-        {
-            "name": "schedules",
-            "description": "📅 **Scheduled Ingestion** - Automated data refresh with cron-based scheduling for all data sources",
-        },
-        {
-            "name": "webhooks",
-            "description": "🔔 **Webhook Notifications** - Configure webhooks to receive notifications for job events and monitoring alerts",
-        },
-        {
-            "name": "job-chains",
-            "description": "🔗 **Job Dependency Chains** - Create DAG workflows with job dependencies, execute chains, and track progress",
-        },
-        {
-            "name": "rate-limits",
-            "description": "⚡ **Per-Source Rate Limits** - Configure and monitor rate limits for each data source API",
-        },
-        {
-            "name": "data-quality",
-            "description": "✅ **Data Quality Rules Engine** - Define and evaluate data quality rules with range, null, regex, freshness checks",
-        },
-        {
-            "name": "templates",
-            "description": "📋 **Bulk Ingestion Templates** - Reusable templates for multi-source data ingestion with variable substitution",
-        },
-        {
-            "name": "lineage",
-            "description": "🔗 **Data Lineage Tracking** - Track data provenance, transformations, dataset versions, and impact analysis",
-        },
-        {
-            "name": "export",
-            "description": "📤 **Data Export** - Export table data to CSV, JSON, or Parquet files",
-        },
-        {
-            "name": "uspto",
-            "description": "🔬 **USPTO Patent Data** - US patent search, inventors, assignees, and CPC classifications via PatentsView API",
-        },
-        {
-            "name": "Watchlists & Saved Searches",
-            "description": "📌 **Watchlists & Saved Searches** - Create watchlists to track investors/companies, save and re-execute search queries",
-        },
-        {
-            "name": "Dashboard Analytics",
-            "description": "📊 **Dashboard Analytics** - Pre-computed analytics for frontend dashboards: system overview, investor insights, trends, and industry breakdowns",
-        },
-        {
-            "name": "Portfolio Comparison",
-            "description": "🔀 **Portfolio Comparison** - Compare investor portfolios side-by-side, track historical changes, and analyze industry allocations",
-        },
-        {
-            "name": "API Keys",
-            "description": "🔑 **API Key Management** - Create, list, update, and revoke API keys for public API access",
-        },
-        {
-            "name": "Public API",
-            "description": "🌐 **Public API** - Protected endpoints for external developers with API key authentication and rate limiting",
-        },
-        {
-            "name": "Trends",
-            "description": "📈 **Investment Trends** - Sector rotation, emerging themes, geographic shifts, and allocation trends across LP portfolios",
-        },
-        {
-            "name": "enrichment",
-            "description": "🔬 **Company Data Enrichment** - Enrich portfolio companies with SEC financials, funding data, employee counts, and industry classification",
-        },
-        {
-            "name": "import",
-            "description": "📥 **Bulk Portfolio Import** - Upload CSV/Excel files to import portfolio data with validation, preview, and rollback",
-        },
-        {
-            "name": "News",
-            "description": "📰 **News & Events** - Aggregated news from SEC EDGAR, Google News, and press releases for investors and portfolio companies",
-        },
-        {
-            "name": "Reports",
-            "description": "📊 **Custom Reports** - Generate investor profiles, portfolio summaries, and trend analysis as HTML/Excel reports",
-        },
-        {
-            "name": "deals",
-            "description": "💼 **Deal Flow Tracker** - Track investment opportunities through pipeline stages from sourcing to close",
-        },
-        {
-            "name": "auth",
-            "description": "🔐 **Authentication** - User registration, login, JWT tokens, and password management",
-        },
-        {
-            "name": "workspaces",
-            "description": "👥 **Workspaces** - Team collaboration spaces with member management and role-based access",
-        },
-        {
-            "name": "corporate-registry",
-            "description": "🏢 **Corporate Registry** - Global company registry data from OpenCorporates (140+ jurisdictions)",
-        },
-        {
-            "name": "form-adv",
-            "description": "📋 **SEC Form ADV** - Investment adviser registrations, AUM, client types, and regulatory information",
-        },
-        {
-            "name": "web-traffic",
-            "description": "📊 **Web Traffic** - Website traffic intelligence from Tranco rankings and SimilarWeb",
-        },
-        {
-            "name": "github",
-            "description": "💻 **GitHub Analytics** - Repository metrics, developer velocity, and contributor trends",
-        },
-        {
-            "name": "Company Scores",
-            "description": "📊 **Company Scoring** - ML-based health scores for portfolio companies (0-100 with category breakdowns)",
-        },
-        {
-            "name": "Glassdoor",
-            "description": "👥 **Glassdoor Data** - Company reviews, ratings, and salary data for talent intelligence",
-        },
-        {
-            "name": "App Store Rankings",
-            "description": "📱 **App Store Rankings** - iOS and Android app metrics, ratings, and ranking history",
-        },
-        {
-            "name": "Deal Predictions",
-            "description": "🎯 **Predictive Deal Scoring** - Win probability predictions, pipeline insights, and similar deal analysis",
-        },
-        {
-            "name": "Agentic Intelligence",
-            "description": "🤖 **Autonomous AI Research** - AI agents that autonomously research companies across all data sources",
-        },
-        {
-            "name": "Due Diligence",
-            "description": "📋 **Automated Due Diligence** - AI-powered risk analysis and DD report generation",
-        },
-        {
-            "name": "Data Hunter",
-            "description": "🎯 **Autonomous Data Hunter** - AI agent that finds and fills missing data with provenance tracking",
-        },
-        {
-            "name": "Anomaly Detection",
-            "description": "🚨 **Anomaly Detection** - AI agent that detects unusual patterns and changes across data sources",
-        },
-        {
-            "name": "Report Generation",
-            "description": "📝 **Report Generation** - AI agent that generates comprehensive natural language reports",
-        },
-        {
-            "name": "LP Collection",
-            "description": "🏦 **LP Data Collection** - Continuous data collection for 100+ institutional investors (pensions, SWFs, endowments)",
-        },
-        {
-            "name": "Family Office Collection",
-            "description": "👨‍👩‍👧 **Family Office Data Collection** - Continuous data collection for 300+ family offices worldwide",
-        },
-        {
-            "name": "People & Leadership",
-            "description": "👥 **People & Leadership** - Executive search, leadership profiles, and career history",
-        },
-        {
-            "name": "Company Leadership",
-            "description": "🏢 **Company Leadership** - Company leadership teams, org charts, and leadership changes",
-        },
-        {
-            "name": "Collection Jobs",
-            "description": "⚙️ **People Collection Jobs** - Manage leadership data collection jobs and batch processing",
-        },
-        {
-            "name": "People Portfolios",
-            "description": "📁 **PE Portfolios** - Track leadership across portfolio companies",
-        },
-        {
-            "name": "Peer Sets & Benchmarking",
-            "description": "📊 **Peer Benchmarking** - Compare leadership structures across peer companies",
-        },
-        {
-            "name": "People Watchlists",
-            "description": "👁️ **Executive Watchlists** - Track specific executives and get change alerts",
-        },
-        {
-            "name": "People Deduplication",
-            "description": "🔗 **People Deduplication** - Scan, review, and merge duplicate person records",
-        },
-        {
-            "name": "LLM Costs",
-            "description": "💰 **LLM Cost Tracking** - Monitor token usage and costs across all LLM-powered features",
-        },
-        {
-            "name": "Source Configuration",
-            "description": "Per-source timeouts, retry policies, and rate limits",
-        },
-        {
-            "name": "Audit Trail",
-            "description": "Collection audit trail - who triggered what, when, and how",
-        },
-        {
-            "name": "Settings",
-            "description": "Application settings - manage external source API keys",
-        },
-        {
-            "name": "Job Queue",
-            "description": "Distributed job queue - live streaming, active jobs, and queue status",
-        },
-        {
-            "name": "freshness",
-            "description": "📊 **Data Freshness** - Monitor source staleness, auto-refresh status, and incremental loading",
-        },
-        {
-            "name": "Nightly Batch",
-            "description": "🌙 **Nightly Batch Collection** - Launch and monitor distributed nightly data collection across all sources",
-        },
-        {
-            "name": "dunl",
-            "description": "🔗 **DUNL (S&P Data Unlocked)** - Open reference data: currencies, ports, UOM, calendars",
-        },
-        {
-            "name": "job_postings",
-            "description": "💼 **Job Posting Intelligence** - Track hiring across companies via ATS APIs (Greenhouse, Lever, Workday, Ashby)",
-        },
-        {
-            "name": "hiring_velocity",
-            "description": "📈 **Hiring Velocity Score** - Cross-reference job postings with BLS baselines for expansion/contraction signals",
-        },
-        {
-            "name": "company_health",
-            "description": "🏥 **Private Company Health Score** - Multi-signal health proxy combining hiring, web traffic, sentiment, and foot traffic",
-        },
-        {
-            "name": "lp_allocation",
-            "description": "📊 **LP Allocation Gap Analysis** - Target vs current allocation gaps showing where LP capital must be deployed",
-        },
-        {
-            "name": "exit_readiness",
-            "description": "🚪 **Exit Readiness Score** - 7-signal composite score for PE portfolio exit timing",
-        },
-        {
-            "name": "acquisition_targets",
-            "description": "🎯 **Acquisition Target Score** - 5-signal score identifying attractive PE acquisition targets",
-        },
-        {
-            "name": "ZIP Intelligence",
-            "description": "📍 **ZIP Med-Spa Score** - Revenue potential scoring for US ZIPs based on IRS SOI income data",
-        },
-        {
-            "name": "Med-Spa Discovery",
-            "description": "💈 **Med-Spa Discovery** - Discover and rank med-spa acquisition prospects via Yelp + ZIP affluence scores",
-        },
-        {
-            "name": "13F Analysis",
-            "description": "📊 **13F Quarterly Analysis** - Quarter-over-quarter holding diffs and cross-investor convergence detection",
-        },
+        {"name": "graphql", "description": "🔗 **GraphQL API** - Flexible query interface for cross-domain data access"},
+        {"name": "jobs", "description": "⚙️ **Ingestion Job Management** - Start, monitor, and track data ingestion jobs"},
+        {"name": "schedules", "description": "📅 **Scheduled Ingestion** - Automated data refresh with cron-based scheduling for all data sources"},
+        {"name": "job-chains", "description": "🔗 **Job Dependency Chains** - Create DAG workflows with job dependencies, execute chains, and track progress"},
+        {"name": "Job Queue", "description": "Distributed job queue - live streaming, active jobs, and queue status"},
+        {"name": "webhooks", "description": "🔔 **Webhook Notifications** - Configure webhooks to receive notifications for job events and monitoring alerts"},
+        {"name": "rate-limits", "description": "⚡ **Per-Source Rate Limits** - Configure and monitor rate limits for each data source API"},
+        {"name": "data-quality", "description": "✅ **Data Quality Rules Engine** - Define and evaluate data quality rules with range, null, regex, freshness checks"},
+        {"name": "templates", "description": "📋 **Bulk Ingestion Templates** - Reusable templates for multi-source data ingestion with variable substitution"},
+        {"name": "lineage", "description": "🔗 **Data Lineage Tracking** - Track data provenance, transformations, dataset versions, and impact analysis"},
+        {"name": "export", "description": "📤 **Data Export** - Export table data to CSV, JSON, or Parquet files"},
+        {"name": "import", "description": "📥 **Bulk Portfolio Import** - Upload CSV/Excel files to import portfolio data with validation, preview, and rollback"},
+        {"name": "freshness", "description": "📊 **Data Freshness** - Monitor source staleness, auto-refresh status, and incremental loading"},
+        {"name": "Source Configuration", "description": "Per-source timeouts, retry policies, and rate limits"},
+        {"name": "Audit Trail", "description": "Collection audit trail - who triggered what, when, and how"},
+        {"name": "Settings", "description": "Application settings - manage external source API keys"},
+        {"name": "LLM Costs", "description": "💰 **LLM Cost Tracking** - Monitor token usage and costs across all LLM-powered features"},
+        {"name": "workflows", "description": "🔄 **Workflows** - Automated multi-step data processing workflows"},
+        # ── Auth & Access ──────────────────────────────────────────────
+        {"name": "auth", "description": "🔐 **Authentication** - User registration, login, JWT tokens, and password management"},
+        {"name": "workspaces", "description": "👥 **Workspaces** - Team collaboration spaces with member management and role-based access"},
+        {"name": "API Keys", "description": "🔑 **API Key Management** - Create, list, update, and revoke API keys for public API access"},
+        {"name": "Public API", "description": "🌐 **Public API** - Protected endpoints for external developers with API key authentication and rate limiting"},
+        # ── Government / Economic Data ─────────────────────────────────
+        {"name": "census-batch", "description": "📊 **U.S. Census Bureau - Batch** - Bulk census data ingestion"},
+        {"name": "census-geography", "description": "📊 **U.S. Census Bureau - Geography** - Geographic hierarchy and FIPS codes"},
+        {"name": "census-metadata", "description": "📊 **U.S. Census Bureau - Metadata** - Dataset catalogs and variable discovery"},
+        {"name": "fred", "description": "💰 **Federal Reserve Economic Data** - 800K+ economic time series"},
+        {"name": "eia", "description": "⚡ **Energy Information Administration** - Energy production, prices, and consumption"},
+        {"name": "bea", "description": "📈 **Bureau of Economic Analysis** - GDP, Personal Income, PCE, Regional economic data, and International transactions"},
+        {"name": "BLS Labor Statistics", "description": "📊 **Bureau of Labor Statistics** - Employment, unemployment, CPI, PPI, JOLTS job openings and labor turnover"},
+        {"name": "bts", "description": "🚚 **Bureau of Transportation Statistics** - Border crossings, freight flows (FAF5), and vehicle miles traveled"},
+        {"name": "fema", "description": "🌊 **OpenFEMA** - Disaster declarations, Public Assistance grants, and Hazard Mitigation projects"},
+        {"name": "fbi_crime", "description": "🚔 **FBI Crime Data** - UCR crime statistics, NIBRS incident data, hate crimes, and LEOKA"},
+        {"name": "irs-soi", "description": "💰 **IRS Statistics of Income (SOI)** - Income/wealth distribution by geography: ZIP code income, county income, migration flows, business income"},
+        {"name": "Treasury FiscalData", "description": "💵 **U.S. Treasury FiscalData** - Federal debt, interest rates, revenue/spending, Treasury auction results"},
+        {"name": "FDIC BankFind", "description": "🏦 **FDIC BankFind Suite** - Bank financials, demographics, failed banks, and branch-level deposits for 4,000+ U.S. banks"},
+        {"name": "FCC Broadband & Telecom", "description": "📡 **FCC National Broadband Map** - Broadband coverage, ISP availability, technology deployment, digital divide metrics"},
+        {"name": "CFTC COT", "description": "📈 **CFTC Commitments of Traders** - Weekly futures positioning data: commercial vs non-commercial, managed money, swap dealers"},
+        {"name": "USDA Agriculture", "description": "🌾 **USDA NASS QuickStats** - Agricultural statistics: crop production, yields, prices, livestock inventory"},
+        {"name": "us_trade", "description": "🚢 **US International Trade** - Census Bureau trade data: imports/exports by HS code, port, state, and trading partner"},
+        {"name": "cms", "description": "🏥 **CMS / HHS Healthcare Data** - Medicare utilization, hospital costs, and drug pricing"},
+        {"name": "data_commons", "description": "📊 **Google Data Commons** - Unified public data from 200+ sources (demographics, economy, health, crime, etc.)"},
+        {"name": "international_econ", "description": "🌍 **International Economic Data** - World Bank, IMF, OECD, BIS global economic indicators"},
+        {"name": "dunl", "description": "🔗 **DUNL (S&P Data Unlocked)** - Open reference data: currencies, ports, UOM, calendars"},
+        # ── Securities / Finance ───────────────────────────────────────
+        {"name": "SEC EDGAR", "description": "🏛️ **SEC EDGAR** - Company filings, financials, and regulatory disclosures"},
+        {"name": "form-adv", "description": "📋 **SEC Form ADV** - Investment adviser registrations, AUM, client types, and regulatory information"},
+        {"name": "Form ADV - Ingestion", "description": "📋 **Form ADV Ingestion** - Bulk ingest Form ADV filings from SEC IAPD"},
+        {"name": "Form ADV - Query", "description": "📋 **Form ADV Query** - Search and filter investment adviser registrations"},
+        {"name": "form-d", "description": "📄 **SEC Form D** - Private placement filings and exempt offering data"},
+        {"name": "benchmarks", "description": "📊 **Financial Benchmarks** - Industry multiples, valuation comps, and financial benchmarks"},
+        {"name": "13F Analysis", "description": "📊 **13F Quarterly Analysis** - Quarter-over-quarter holding diffs and cross-investor convergence detection"},
+        # ── PE Intelligence ────────────────────────────────────────────
+        {"name": "PE Intelligence - Firms", "description": "🏢 **PE Firms** - Private equity firm profiles, fund data, and investment strategies"},
+        {"name": "PE Intelligence - Portfolio Companies", "description": "🏭 **PE Portfolio Companies** - Track portfolio companies across PE firms"},
+        {"name": "PE Intelligence - People", "description": "👥 **PE People** - Investment professionals, operating partners, and advisory boards"},
+        {"name": "PE Intelligence - Deals", "description": "💰 **PE Deals** - M&A transactions, add-ons, exits, and deal multiples"},
+        {"name": "PE Intelligence - Collection", "description": "⚙️ **PE Data Collection** - Automated PE data collection pipelines"},
+        # ── Site Intelligence ──────────────────────────────────────────
+        {"name": "Site Intel - Power", "description": "⚡ **Power Infrastructure** - Power plants, substations, and energy capacity near sites"},
+        {"name": "Site Intel - Telecom", "description": "📡 **Telecom Infrastructure** - Cell towers, fiber routes, and broadband availability"},
+        {"name": "Site Intel - Transport", "description": "🚚 **Transportation** - Highways, rail, ports, airports near industrial sites"},
+        {"name": "Site Intel - Labor", "description": "👷 **Labor Market** - Local workforce availability, wages, and skills"},
+        {"name": "Site Intel - Risk", "description": "⚠️ **Risk Assessment** - Natural hazards, environmental risk, and regulatory risk"},
+        {"name": "Site Intel - Incentives", "description": "💵 **Incentives & Tax Credits** - State/local incentives, opportunity zones, enterprise zones"},
+        {"name": "Site Intel - Logistics", "description": "📦 **Logistics** - Warehousing, 3PL, and supply chain infrastructure"},
+        {"name": "Site Intel - Water & Utilities", "description": "💧 **Water & Utilities** - Water supply, wastewater, and utility infrastructure"},
+        {"name": "Site Intel - Scoring", "description": "📊 **Site Scoring** - Composite site quality scores across all intelligence domains"},
+        # ── People & Leadership ────────────────────────────────────────
+        {"name": "People & Leadership", "description": "👥 **People & Leadership** - Executive search, leadership profiles, and career history"},
+        {"name": "Company Leadership", "description": "🏢 **Company Leadership** - Company leadership teams, org charts, and leadership changes"},
+        {"name": "Collection Jobs", "description": "⚙️ **People Collection Jobs** - Manage leadership data collection jobs and batch processing"},
+        {"name": "People Collection Jobs", "description": "⚙️ **People Collection Jobs** - Batch people data collection and pipeline management"},
+        {"name": "People Portfolios", "description": "📁 **PE Portfolios** - Track leadership across portfolio companies"},
+        {"name": "Peer Sets & Benchmarking", "description": "📊 **Peer Benchmarking** - Compare leadership structures across peer companies"},
+        {"name": "People Watchlists", "description": "👁️ **Executive Watchlists** - Track specific executives and get change alerts"},
+        {"name": "People Deduplication", "description": "🔗 **People Deduplication** - Scan, review, and merge duplicate person records"},
+        {"name": "People Analytics", "description": "📊 **People Analytics** - Leadership analytics, tenure analysis, and executive benchmarking"},
+        {"name": "People Data Quality", "description": "✅ **People Data Quality** - Completeness scoring, stale record detection, and data health metrics"},
+        {"name": "People Reports", "description": "📝 **People Reports** - Generate leadership reports and org chart exports"},
+        # ── Family Offices ─────────────────────────────────────────────
+        {"name": "Family Offices - Query", "description": "💼 **Family Offices - Query** - Search and filter family office data"},
+        {"name": "Family Offices - Tracking", "description": "👥 **Family Offices - Tracking** - Contact research and tracking for family offices"},
+        {"name": "family_office_contacts", "description": "👥 **Family Office Contacts** - Contact research and enrichment for family offices"},
+        {"name": "Family Office Collection", "description": "👨‍👩‍👧 **Family Office Data Collection** - Continuous data collection for 300+ family offices worldwide"},
+        # ── LP / Investor Intelligence ─────────────────────────────────
+        {"name": "LP Collection", "description": "🏦 **LP Data Collection** - Continuous data collection for 100+ institutional investors (pensions, SWFs, endowments)"},
+        {"name": "Agentic Portfolio Research", "description": "🤖 **Agentic Portfolio Discovery** - AI-powered portfolio research for LPs and Family Offices using SEC 13F, website scraping, and more"},
+        {"name": "lp_allocation", "description": "📊 **LP Allocation Gap Analysis** - Target vs current allocation gaps showing where LP capital must be deployed"},
+        {"name": "Portfolio Comparison", "description": "🔀 **Portfolio Comparison** - Compare investor portfolios side-by-side, track historical changes, and analyze industry allocations"},
+        {"name": "Portfolio Alerts", "description": "🔔 **Portfolio Alerts** - Automated alerts for portfolio changes, position shifts, and new filings"},
+        {"name": "Watchlists & Saved Searches", "description": "📌 **Watchlists & Saved Searches** - Create watchlists to track investors/companies, save and re-execute search queries"},
+        # ── Discovery & Search ─────────────────────────────────────────
+        {"name": "Discovery & Recommendations", "description": "🔍 **Discovery & Recommendations** - AI-powered deal sourcing and investment recommendations"},
+        {"name": "Search", "description": "🔎 **Search** - Full-text and semantic search across all data sources"},
+        {"name": "Market Scanner", "description": "📡 **Market Scanner** - Scan markets for investment signals and opportunities"},
+        {"name": "Competitive Intelligence", "description": "🏆 **Competitive Intelligence** - Competitive landscape analysis and market positioning"},
+        {"name": "Entity Resolution", "description": "🔗 **Entity Resolution** - Match and deduplicate companies across data sources"},
+        # ── Deals & Scoring ────────────────────────────────────────────
+        {"name": "deals", "description": "💼 **Deal Flow Tracker** - Track investment opportunities through pipeline stages from sourcing to close"},
+        {"name": "Deal Predictions", "description": "🎯 **Predictive Deal Scoring** - Win probability predictions, pipeline insights, and similar deal analysis"},
+        {"name": "exit_readiness", "description": "🚪 **Exit Readiness Score** - 7-signal composite score for PE portfolio exit timing"},
+        {"name": "acquisition_targets", "description": "🎯 **Acquisition Target Score** - 5-signal score identifying attractive PE acquisition targets"},
+        {"name": "Company Scores", "description": "📊 **Company Scoring** - ML-based health scores for portfolio companies (0-100 with category breakdowns)"},
+        {"name": "company_health", "description": "🏥 **Private Company Health Score** - Multi-signal health proxy combining hiring, web traffic, sentiment, and foot traffic"},
+        # ── AI Agents ──────────────────────────────────────────────────
+        {"name": "Agentic Intelligence", "description": "🤖 **Autonomous AI Research** - AI agents that autonomously research companies across all data sources"},
+        {"name": "Due Diligence", "description": "📋 **Automated Due Diligence** - AI-powered risk analysis and DD report generation"},
+        {"name": "Data Hunter", "description": "🎯 **Autonomous Data Hunter** - AI agent that finds and fills missing data with provenance tracking"},
+        {"name": "Anomaly Detection", "description": "🚨 **Anomaly Detection** - AI agent that detects unusual patterns and changes across data sources"},
+        {"name": "Report Generation", "description": "📝 **Report Generation** - AI agent that generates comprehensive natural language reports"},
+        # ── Alternative Data ───────────────────────────────────────────
+        {"name": "yelp", "description": "🏪 **Yelp Fusion** - Business listings, reviews, and local business activity (500 calls/day free tier)"},
+        {"name": "Foot Traffic", "description": "🚶 **Foot Traffic Intelligence** - Location discovery, foot traffic data collection, and competitive benchmarking for retail/hospitality investments"},
+        {"name": "Prediction Markets", "description": "🎲 **Prediction Market Intelligence** - Monitor Kalshi, Polymarket for market consensus on economic, political, sports, and world events"},
+        {"name": "Glassdoor", "description": "👥 **Glassdoor Data** - Company reviews, ratings, and salary data for talent intelligence"},
+        {"name": "App Store Rankings", "description": "📱 **App Store Rankings** - iOS and Android app metrics, ratings, and ranking history"},
+        {"name": "App Stores", "description": "📱 **App Stores** - App store data collection and monitoring"},
+        {"name": "web-traffic", "description": "📊 **Web Traffic** - Website traffic intelligence from Tranco rankings and SimilarWeb"},
+        {"name": "github", "description": "💻 **GitHub Analytics** - Repository metrics, developer velocity, and contributor trends"},
+        {"name": "job_postings", "description": "💼 **Job Posting Intelligence** - Track hiring across companies via ATS APIs (Greenhouse, Lever, Workday, Ashby)"},
+        {"name": "hiring_velocity", "description": "📈 **Hiring Velocity Score** - Cross-reference job postings with BLS baselines for expansion/contraction signals"},
+        {"name": "News", "description": "📰 **News & Events** - Aggregated news from SEC EDGAR, Google News, and press releases for investors and portfolio companies"},
+        {"name": "News Monitor", "description": "📰 **News Monitor** - Continuous news monitoring and alerting for tracked entities"},
+        # ── Verticals ──────────────────────────────────────────────────
+        {"name": "Real Estate / Housing", "description": "🏠 **Real Estate / Housing** - Zillow home values, rental market data, and housing analytics"},
+        {"name": "ZIP Intelligence", "description": "📍 **ZIP Med-Spa Score** - Revenue potential scoring for US ZIPs based on IRS SOI income data"},
+        {"name": "Med-Spa Discovery", "description": "💈 **Med-Spa Discovery** - Discover and rank med-spa acquisition prospects via Yelp + ZIP affluence scores"},
+        # ── Other Data Sources ─────────────────────────────────────────
+        {"name": "geojson", "description": "🗺️ **Geographic Boundaries** - GeoJSON boundaries for mapping"},
+        {"name": "kaggle", "description": "🏆 **Kaggle Datasets** - Competition datasets (M5 Forecasting, etc.)"},
+        {"name": "uspto", "description": "🔬 **USPTO Patent Data** - US patent search, inventors, assignees, and CPC classifications via PatentsView API"},
+        {"name": "corporate-registry", "description": "🏢 **Corporate Registry** - Global company registry data from OpenCorporates (140+ jurisdictions)"},
+        {"name": "OpenCorporates", "description": "🏢 **OpenCorporates** - Open corporate data search and entity lookup"},
+        {"name": "network", "description": "🔗 **Network Analysis** - Relationship mapping and network visualization across entities"},
+        # ── Analytics & Reporting ──────────────────────────────────────
+        {"name": "Dashboard Analytics", "description": "📊 **Dashboard Analytics** - Pre-computed analytics for frontend dashboards: system overview, investor insights, trends, and industry breakdowns"},
+        {"name": "Trends", "description": "📈 **Investment Trends** - Sector rotation, emerging themes, geographic shifts, and allocation trends across LP portfolios"},
+        {"name": "enrichment", "description": "🔬 **Company Data Enrichment** - Enrich portfolio companies with SEC financials, funding data, employee counts, and industry classification"},
+        {"name": "Reports", "description": "📊 **Custom Reports** - Generate investor profiles, portfolio summaries, and trend analysis as HTML/Excel reports"},
     ],
 )
 
