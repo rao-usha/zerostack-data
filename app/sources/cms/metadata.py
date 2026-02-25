@@ -155,7 +155,7 @@ DATASETS = {
         "display_name": "Medicare Part D Drug Spending",
         "description": "Medicare Part D prescription drug costs and utilization by brand name and generic drugs",
         "socrata_dataset_id": None,  # DEPRECATED: CMS moved to DKAN format
-        "dkan_dataset_id": None,  # TODO: Get current ID from data.cms.gov
+        "dkan_dataset_id": "7e0b4365-fd63-4a29-8f5e-e0ac9f66a81b",
         "source_url": "https://data.cms.gov/medicare-drug-spending",
         "columns": {
             "brnd_name": {"type": "TEXT", "description": "Brand Name"},

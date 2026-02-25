@@ -29,7 +29,7 @@ class CMSClient:
     # CMS API base URLs
     SOCRATA_BASE_URL = "https://data.cms.gov/resource"
     DKAN_BASE_URL = "https://data.cms.gov/data-api/v1/dataset"
-    BULK_DOWNLOAD_BASE_URL = "https://www.cms.gov/files"
+    BULK_DOWNLOAD_BASE_URL = "https://downloads.cms.gov/FILES/HCRIS"
 
     def __init__(
         self,

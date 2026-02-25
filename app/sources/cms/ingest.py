@@ -5,7 +5,8 @@ High-level functions that coordinate data fetching, table creation, and data loa
 """
 
 import logging
-from typing import Dict, Any, Optional
+import re
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -225,7 +226,7 @@ async def ingest_hospital_cost_reports(
     try:
         # 4. Build HCRIS URL for requested year
         hcris_year = year or 2022
-        hcris_url = f"https://www.cms.gov/files/zip/hosp{hcris_year}alphav26.zip"
+        hcris_url = f"https://downloads.cms.gov/FILES/HCRIS/HOSP10FY{hcris_year}.ZIP"
 
         # 5. Download the ZIP file
         client = CMSClient(
@@ -381,18 +382,21 @@ async def ingest_drug_pricing(
             # 5. Fetch data via DKAN or Socrata
             if use_dkan:
                 dkan_filters = {}
-                if year:
-                    dkan_filters["Year"] = str(year)
+                # NOTE: DKAN drug spending has no 'Year' column — data is wide-format
+                # with year-suffixed columns. Year filtering happens post-unpivot.
                 if brand_name:
                     dkan_filters["Brnd_Name"] = brand_name
 
                 logger.info(f"Fetching data from DKAN dataset {dkan_dataset_id}")
-                records = await client.fetch_dkan_data(
+                wide_records = await client.fetch_dkan_data(
                     dataset_id=dkan_dataset_id,
                     size=1000,
                     filters=dkan_filters if dkan_filters else None,
                     max_records=limit,
                 )
+
+                # Unpivot wide-format DKAN data to long format matching DB schema
+                records = _unpivot_drug_spending_records(wide_records, year_filter=year)
             else:
                 # Legacy Socrata path
                 where_clauses = []
@@ -457,6 +461,68 @@ async def ingest_drug_pricing(
             job.completed_at = datetime.utcnow()
             db.commit()
         raise
+
+
+def _unpivot_drug_spending_records(
+    wide_records: List[Dict[str, Any]],
+    year_filter: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Convert DKAN wide-format drug spending records to long format.
+
+    DKAN returns columns like tot_spndng_2019, tot_spndng_2020, etc.
+    DB schema expects one row per drug per year with a 'year' column.
+    """
+    # Map of DKAN column prefix -> DB column name
+    PREFIX_MAP = {
+        "tot_spndng": "tot_spndng",
+        "tot_dsg_unts": "tot_dsg_unts",
+        "tot_clms": "tot_clms",
+        "tot_benes": "tot_benes",
+        "avg_spnd_per_dsg_unt_wghtd": "spndng_per_dsg_unt",
+        "avg_spnd_per_clm": "spndng_per_clm",
+        "avg_spnd_per_bene": "spndng_per_bene",
+        "outlier_flag": "outlier_flag",
+    }
+
+    # Detect which years are present by scanning column names
+    year_pattern = re.compile(r"_(\d{4})$")
+    years_found: set = set()
+    if wide_records:
+        for col in wide_records[0]:
+            m = year_pattern.search(col)
+            if m:
+                years_found.add(int(m.group(1)))
+
+    if not years_found:
+        logger.warning("No year-suffixed columns found in DKAN drug spending data")
+        return wide_records  # Fall back to raw data
+
+    logger.info(f"Unpivoting drug spending data for years: {sorted(years_found)}")
+
+    long_records: List[Dict[str, Any]] = []
+    for rec in wide_records:
+        for yr in sorted(years_found):
+            if year_filter and yr != year_filter:
+                continue
+
+            row: Dict[str, Any] = {
+                "brnd_name": rec.get("brnd_name"),
+                "gnrc_name": rec.get("gnrc_name"),
+                "year": yr,
+            }
+
+            # Map each wide column to its long-format DB column
+            for prefix, db_col in PREFIX_MAP.items():
+                wide_key = f"{prefix}_{yr}"
+                row[db_col] = rec.get(wide_key)
+
+            long_records.append(row)
+
+    logger.info(
+        f"Unpivoted {len(wide_records)} wide rows into {len(long_records)} long rows"
+    )
+    return long_records
 
 
 async def _batch_insert_data(
