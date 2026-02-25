@@ -71,6 +71,9 @@ services:
         INSTALL_BROWSERS: ${INSTALL_BROWSERS:-0}
     ports:
       - "8001:8000"  # Use port 8001 on host to avoid conflicts
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     environment:
       DATABASE_URL: postgresql://nexdata:nexdata_dev_password@postgres:5432/nexdata
       <<: *api-keys
@@ -112,6 +115,9 @@ services:
     volumes:
       - ./app:/app/app
       - ./data/seeds:/app/data/seeds
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     command: python -m app.worker.main
     # Scale with: docker-compose up --scale worker=4
     deploy:
