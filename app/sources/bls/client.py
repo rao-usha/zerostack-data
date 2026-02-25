@@ -339,10 +339,44 @@ PPI_SERIES = {
 }
 
 # Occupational Employment Statistics (OES)
+# Series ID format: OEUN + area(7) + industry(6) + occupation(6) + datatype(2)
+# National, all-industries: prefix=OEUN, area=0000000, industry=000000
+# Data types: 01=employment, 03=hourly_mean, 04=annual_mean,
+#             08=hourly_median, 13=annual_median
 OES_SERIES = {
-    # Note: OES uses a different series ID structure
-    # These are examples - actual implementation may vary
-    "median_wage_all": "OEUM000000000000000000001",  # Median hourly wage, all occupations
+    # ── Aesthetics-adjacent occupations (national, all industries) ──
+    # Physicians, All Other (29-1229) — includes dermatologists
+    "physicians_employment": "OEUN000000000000029122901",
+    "physicians_annual_mean_wage": "OEUN000000000000029122904",
+    "physicians_annual_median_wage": "OEUN000000000000029122913",
+    # Registered Nurses (29-1141)
+    "rn_employment": "OEUN000000000000029114101",
+    "rn_annual_mean_wage": "OEUN000000000000029114104",
+    "rn_annual_median_wage": "OEUN000000000000029114113",
+    # Nurse Practitioners (29-1171)
+    "np_employment": "OEUN000000000000029117101",
+    "np_annual_mean_wage": "OEUN000000000000029117104",
+    "np_annual_median_wage": "OEUN000000000000029117113",
+    # Physician Assistants (29-1071)
+    "pa_employment": "OEUN000000000000029107101",
+    "pa_annual_mean_wage": "OEUN000000000000029107104",
+    "pa_annual_median_wage": "OEUN000000000000029107113",
+    # Massage Therapists (31-9011)
+    "massage_employment": "OEUN000000000000031901101",
+    "massage_annual_mean_wage": "OEUN000000000000031901104",
+    "massage_annual_median_wage": "OEUN000000000000031901113",
+    # Hairdressers, Hairstylists, Cosmetologists (39-5012)
+    "hairdresser_employment": "OEUN000000000000039501201",
+    "hairdresser_annual_mean_wage": "OEUN000000000000039501204",
+    "hairdresser_annual_median_wage": "OEUN000000000000039501213",
+    # Healthcare Support Workers, All Other (31-9099)
+    "healthcare_support_employment": "OEUN000000000000031909901",
+    "healthcare_support_annual_mean_wage": "OEUN000000000000031909904",
+    "healthcare_support_annual_median_wage": "OEUN000000000000031909913",
+    # Health Technologists & Technicians, All Other (29-2099)
+    "health_tech_employment": "OEUN000000000000029209901",
+    "health_tech_annual_mean_wage": "OEUN000000000000029209904",
+    "health_tech_annual_median_wage": "OEUN000000000000029209913",
 }
 
 

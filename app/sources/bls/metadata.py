@@ -475,6 +475,27 @@ ALL_SERIES_REFERENCE = {
             "PCU23----23----": "PPI Construction",
         },
     },
+    "oes": {
+        "description": "Occupational Employment and Wage Statistics - Aesthetics-Adjacent Occupations",
+        "series": {
+            "OEUN000000000000029122901": "Employment - Physicians, All Other (incl. Dermatologists)",
+            "OEUN000000000000029122904": "Annual Mean Wage - Physicians, All Other",
+            "OEUN000000000000029114101": "Employment - Registered Nurses",
+            "OEUN000000000000029114104": "Annual Mean Wage - Registered Nurses",
+            "OEUN000000000000029117101": "Employment - Nurse Practitioners",
+            "OEUN000000000000029117104": "Annual Mean Wage - Nurse Practitioners",
+            "OEUN000000000000029107101": "Employment - Physician Assistants",
+            "OEUN000000000000029107104": "Annual Mean Wage - Physician Assistants",
+            "OEUN000000000000031901101": "Employment - Massage Therapists",
+            "OEUN000000000000031901104": "Annual Mean Wage - Massage Therapists",
+            "OEUN000000000000039501201": "Employment - Hairdressers/Hairstylists/Cosmetologists",
+            "OEUN000000000000039501204": "Annual Mean Wage - Hairdressers/Hairstylists/Cosmetologists",
+            "OEUN000000000000031909901": "Employment - Healthcare Support Workers, All Other",
+            "OEUN000000000000031909904": "Annual Mean Wage - Healthcare Support Workers, All Other",
+            "OEUN000000000000029209901": "Employment - Health Technologists & Technicians, All Other",
+            "OEUN000000000000029209904": "Annual Mean Wage - Health Technologists & Technicians, All Other",
+        },
+    },
 }
 
 
