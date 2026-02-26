@@ -22,6 +22,8 @@ Sections:
   13. Deal Model — Unit Economics
   14. Deal Model — Capital Requirements
   15. Deal Model — Returns Analysis
+  16. Stealth Wealth Signal (IRS SOI non-wage income analysis)
+  17. Migration Alpha (IRS county-to-county wealth flow leading indicator)
 """
 
 import json
@@ -289,6 +291,29 @@ MEDSPA_EXTRA_CSS = """
     color: var(--gray-900);
     margin-bottom: 4px;
 }
+
+/* Stealth Wealth & Migration Alpha Sections */
+.wealth-composition-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin: 16px 0;
+    align-items: start;
+}
+@media (max-width: 768px) {
+    .wealth-composition-grid { grid-template-columns: 1fr; }
+}
+.highlight-table tr.emerging-highlight {
+    background: rgba(72, 187, 120, 0.08);
+}
+.highlight-table tr.emerging-highlight td:first-child {
+    border-left: 3px solid #48bb78;
+}
+[data-theme="dark"] .highlight-table tr.emerging-highlight {
+    background: rgba(72, 187, 120, 0.12);
+}
+.migration-bar-pos { background: #48bb78; }
+.migration-bar-neg { background: #fc8181; }
 """
 
 
@@ -364,6 +389,10 @@ class MedSpaMarketTemplate:
             **self._get_growth_signals(db, state_filter),
             # Sections 13-15: Deal Model
             "deal_model": self._get_deal_model_data(db, state_filter),
+            # Section 16: Stealth Wealth Signal
+            **self._get_stealth_wealth_data(db, state_filter),
+            # Section 17: Migration Alpha
+            **self._get_migration_alpha_data(db, state_filter),
         }
 
         return data
@@ -898,6 +927,48 @@ class MedSpaMarketTemplate:
         except Exception:
             db.rollback()
 
+        # IRS SOI ZIP Income freshness
+        try:
+            result = db.execute(
+                text("""
+                    SELECT
+                        MIN(tax_year) as earliest_year,
+                        MAX(tax_year) as latest_year,
+                        COUNT(*) as total
+                    FROM irs_soi_zip_income
+                """),
+            )
+            row = result.fetchone()
+            if row and row[2]:
+                freshness["irs_soi_zip_income"] = {
+                    "earliest": str(row[0]) if row[0] else None,
+                    "latest": str(row[1]) if row[1] else None,
+                    "total": row[2],
+                }
+        except Exception:
+            db.rollback()
+
+        # IRS SOI Migration freshness
+        try:
+            result = db.execute(
+                text("""
+                    SELECT
+                        MIN(tax_year) as earliest_year,
+                        MAX(tax_year) as latest_year,
+                        COUNT(*) as total
+                    FROM irs_soi_migration
+                """),
+            )
+            row = result.fetchone()
+            if row and row[2]:
+                freshness["irs_soi_migration"] = {
+                    "earliest": str(row[0]) if row[0] else None,
+                    "latest": str(row[1]) if row[1] else None,
+                    "total": row[2],
+                }
+        except Exception:
+            db.rollback()
+
         return freshness
 
     # ------------------------------------------------------------------
@@ -1422,6 +1493,360 @@ class MedSpaMarketTemplate:
             }
 
     # ------------------------------------------------------------------
+    # Section 16: Stealth Wealth Signal
+    # ------------------------------------------------------------------
+
+    def _get_stealth_wealth_data(self, db: Session, state: Optional[str]) -> Dict:
+        """Cross-reference IRS SOI non-wage income with medspa scores to find hidden demand."""
+        try:
+            # Check if table exists
+            check = db.execute(text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_name = 'irs_soi_zip_income'"
+            ))
+            if not check.fetchone():
+                return {"stealth_wealth": {}}
+
+            # Get latest tax year
+            yr_row = db.execute(text(
+                "SELECT MAX(tax_year) FROM irs_soi_zip_income"
+            )).fetchone()
+            if not yr_row or not yr_row[0]:
+                return {"stealth_wealth": {}}
+            latest_year = yr_row[0]
+
+            state_clause = "AND zi.state_abbr = :state" if state else ""
+            params: Dict[str, Any] = {"year": latest_year}
+            if state:
+                params["state"] = state.upper()
+
+            # --- Wealth composition summary (national/state) ---
+            comp_row = db.execute(text(f"""
+                SELECT
+                    SUM(total_wages) AS wages,
+                    SUM(total_capital_gains) AS cap_gains,
+                    SUM(total_dividends) AS dividends,
+                    SUM(total_business_income) AS biz_income,
+                    SUM(total_agi) AS total_agi,
+                    SUM(num_returns) AS total_returns
+                FROM irs_soi_zip_income zi
+                WHERE tax_year = :year AND agi_class = '0'
+                    {state_clause}
+            """), params).fetchone()
+
+            wealth_composition = {}
+            if comp_row and comp_row[4] and float(comp_row[4]) > 0:
+                total_agi = float(comp_row[4])
+                wages = float(comp_row[0] or 0)
+                cap_gains = float(comp_row[1] or 0)
+                dividends = float(comp_row[2] or 0)
+                biz_income = float(comp_row[3] or 0)
+                other = total_agi - wages - cap_gains - dividends - biz_income
+                wealth_composition = {
+                    "wages_pct": round(wages / total_agi * 100, 1),
+                    "cap_gains_pct": round(cap_gains / total_agi * 100, 1),
+                    "dividends_pct": round(dividends / total_agi * 100, 1),
+                    "biz_income_pct": round(biz_income / total_agi * 100, 1),
+                    "other_pct": round(max(other, 0) / total_agi * 100, 1),
+                    "total_returns": int(comp_row[5] or 0),
+                    "total_agi_billions": round(total_agi * 1000 / 1e9, 1),
+                    "tax_year": latest_year,
+                }
+
+            # --- Stealth ZIPs: high non-wage income but low medspa score ---
+            stealth_rows = db.execute(text(f"""
+                WITH zip_wealth AS (
+                    SELECT
+                        zi.zip_code,
+                        zi.state_abbr,
+                        zi.num_returns,
+                        zi.total_agi,
+                        zi.total_wages,
+                        (COALESCE(zi.total_capital_gains, 0)
+                         + COALESCE(zi.total_dividends, 0)
+                         + COALESCE(zi.total_business_income, 0)) AS non_wage_total,
+                        CASE WHEN zi.num_returns > 0
+                            THEN (COALESCE(zi.total_capital_gains, 0)
+                                  + COALESCE(zi.total_dividends, 0)
+                                  + COALESCE(zi.total_business_income, 0))
+                                 * 1000.0 / zi.num_returns
+                            ELSE 0 END AS non_wage_per_return,
+                        CASE WHEN zi.total_agi > 0
+                            THEN (COALESCE(zi.total_capital_gains, 0)
+                                  + COALESCE(zi.total_dividends, 0)
+                                  + COALESCE(zi.total_business_income, 0))
+                                 * 100.0 / zi.total_agi
+                            ELSE 0 END AS non_wage_pct
+                    FROM irs_soi_zip_income zi
+                    WHERE zi.tax_year = :year
+                        AND zi.agi_class = '0'
+                        AND zi.num_returns > 100
+                        {state_clause}
+                )
+                SELECT
+                    zw.zip_code,
+                    zw.state_abbr,
+                    ROUND(zw.non_wage_per_return::numeric, 0) AS non_wage_per_return,
+                    ROUND(zw.non_wage_pct::numeric, 1) AS non_wage_pct,
+                    zw.num_returns,
+                    ROUND(zw.total_agi * 1000.0 / NULLIF(zw.num_returns, 0), 0) AS avg_agi,
+                    COALESCE(zms.overall_score, 0) AS medspa_score,
+                    COALESCE(zms.grade, '-') AS medspa_grade,
+                    COALESCE(mp_cnt.a_count, 0) AS a_grade_medspas
+                FROM zip_wealth zw
+                LEFT JOIN zip_medspa_scores zms ON zms.zip_code = zw.zip_code
+                LEFT JOIN (
+                    SELECT zip_code, COUNT(*) AS a_count
+                    FROM medspa_prospects
+                    WHERE acquisition_grade = 'A'
+                    GROUP BY zip_code
+                ) mp_cnt ON mp_cnt.zip_code = zw.zip_code
+                WHERE zw.non_wage_pct > 25
+                    AND COALESCE(zms.overall_score, 0) < 70
+                ORDER BY zw.non_wage_per_return DESC
+                LIMIT 50
+            """), params).fetchall()
+
+            stealth_zips = [
+                {
+                    "zip_code": r[0],
+                    "state": r[1],
+                    "non_wage_per_return": float(r[2] or 0),
+                    "non_wage_pct": float(r[3] or 0),
+                    "num_returns": int(r[4] or 0),
+                    "avg_agi": float(r[5] or 0),
+                    "medspa_score": float(r[6] or 0),
+                    "medspa_grade": r[7] or "-",
+                    "a_grade_medspas": int(r[8] or 0),
+                }
+                for r in stealth_rows
+            ]
+
+            # Count validated ZIPs (high non-wage AND high medspa score)
+            validated_row = db.execute(text(f"""
+                SELECT COUNT(*)
+                FROM irs_soi_zip_income zi
+                JOIN zip_medspa_scores zms ON zms.zip_code = zi.zip_code
+                WHERE zi.tax_year = :year AND zi.agi_class = '0'
+                    AND zi.num_returns > 100
+                    AND zms.overall_score >= 70
+                    AND (COALESCE(zi.total_capital_gains, 0)
+                         + COALESCE(zi.total_dividends, 0)
+                         + COALESCE(zi.total_business_income, 0))
+                         * 100.0 / NULLIF(zi.total_agi, 0) > 25
+                    {state_clause}
+            """), params).fetchone()
+            validated_count = int(validated_row[0]) if validated_row else 0
+
+            # Top states by stealth ZIP count
+            top_states_rows = db.execute(text(f"""
+                WITH zip_wealth AS (
+                    SELECT zi.zip_code, zi.state_abbr,
+                        CASE WHEN zi.total_agi > 0
+                            THEN (COALESCE(zi.total_capital_gains, 0)
+                                  + COALESCE(zi.total_dividends, 0)
+                                  + COALESCE(zi.total_business_income, 0))
+                                 * 100.0 / zi.total_agi
+                            ELSE 0 END AS non_wage_pct
+                    FROM irs_soi_zip_income zi
+                    WHERE zi.tax_year = :year AND zi.agi_class = '0'
+                        AND zi.num_returns > 100
+                        {state_clause}
+                )
+                SELECT zw.state_abbr, COUNT(*) AS stealth_count
+                FROM zip_wealth zw
+                LEFT JOIN zip_medspa_scores zms ON zms.zip_code = zw.zip_code
+                WHERE zw.non_wage_pct > 25
+                    AND COALESCE(zms.overall_score, 0) < 70
+                GROUP BY zw.state_abbr
+                ORDER BY stealth_count DESC
+                LIMIT 15
+            """), params).fetchall()
+
+            top_states = [
+                {"state": r[0], "count": int(r[1])}
+                for r in top_states_rows
+            ]
+
+            avg_non_wage = (
+                round(sum(z["non_wage_per_return"] for z in stealth_zips) / len(stealth_zips), 0)
+                if stealth_zips else 0
+            )
+
+            return {
+                "stealth_wealth": {
+                    "stealth_zips": stealth_zips,
+                    "validated_count": validated_count,
+                    "wealth_composition": wealth_composition,
+                    "top_states": top_states,
+                    "summary": {
+                        "total_stealth": len(stealth_zips),
+                        "validated": validated_count,
+                        "avg_non_wage_income": avg_non_wage,
+                        "tax_year": latest_year,
+                    },
+                }
+            }
+        except Exception as e:
+            logger.warning(f"Could not compute stealth wealth data: {e}")
+            db.rollback()
+            return {"stealth_wealth": {}}
+
+    # ------------------------------------------------------------------
+    # Section 17: Migration Alpha
+    # ------------------------------------------------------------------
+
+    def _get_migration_alpha_data(self, db: Session, state: Optional[str]) -> Dict:
+        """Use IRS county-to-county migration to identify wealth inflow vs medspa density."""
+        try:
+            # Check if table exists
+            check = db.execute(text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_name = 'irs_soi_migration'"
+            ))
+            if not check.fetchone():
+                return {"migration_alpha": {}}
+
+            # Get latest tax year
+            yr_row = db.execute(text(
+                "SELECT MAX(tax_year) FROM irs_soi_migration"
+            )).fetchone()
+            if not yr_row or not yr_row[0]:
+                return {"migration_alpha": {}}
+            latest_year = yr_row[0]
+
+            state_clause_dest = "AND m.dest_state_abbr = :state" if state else ""
+            params: Dict[str, Any] = {"year": latest_year}
+            if state:
+                params["state"] = state.upper()
+
+            # --- State-level net AGI flows ---
+            state_flows_rows = db.execute(text(f"""
+                WITH inflows AS (
+                    SELECT dest_state_abbr AS state_abbr,
+                           SUM(total_agi) AS inflow_agi,
+                           SUM(num_returns) AS inflow_returns
+                    FROM irs_soi_migration m
+                    WHERE tax_year = :year AND flow_type = 'inflow'
+                        {state_clause_dest}
+                    GROUP BY dest_state_abbr
+                ),
+                outflows AS (
+                    SELECT dest_state_abbr AS state_abbr,
+                           SUM(total_agi) AS outflow_agi,
+                           SUM(num_returns) AS outflow_returns
+                    FROM irs_soi_migration m
+                    WHERE tax_year = :year AND flow_type = 'outflow'
+                        {state_clause_dest}
+                    GROUP BY dest_state_abbr
+                ),
+                medspa_density AS (
+                    SELECT state, COUNT(*) AS total_medspas,
+                           COUNT(*) FILTER (WHERE acquisition_grade = 'A') AS a_grade_count
+                    FROM medspa_prospects
+                    GROUP BY state
+                )
+                SELECT
+                    COALESCE(i.state_abbr, o.state_abbr) AS state_abbr,
+                    COALESCE(i.inflow_agi, 0) AS inflow_agi,
+                    COALESCE(o.outflow_agi, 0) AS outflow_agi,
+                    (COALESCE(i.inflow_agi, 0) - COALESCE(o.outflow_agi, 0)) AS net_agi,
+                    COALESCE(i.inflow_returns, 0) AS inflow_returns,
+                    COALESCE(o.outflow_returns, 0) AS outflow_returns,
+                    COALESCE(md.total_medspas, 0) AS total_medspas,
+                    COALESCE(md.a_grade_count, 0) AS a_grade_count,
+                    CASE WHEN COALESCE(md.a_grade_count, 0) > 0
+                        THEN (COALESCE(i.inflow_agi, 0) - COALESCE(o.outflow_agi, 0))
+                             * 1.0 / md.a_grade_count
+                        ELSE (COALESCE(i.inflow_agi, 0) - COALESCE(o.outflow_agi, 0)) * 1.0
+                    END AS migration_alpha
+                FROM inflows i
+                FULL OUTER JOIN outflows o ON i.state_abbr = o.state_abbr
+                LEFT JOIN medspa_density md
+                    ON md.state = COALESCE(i.state_abbr, o.state_abbr)
+                WHERE COALESCE(i.state_abbr, o.state_abbr) IS NOT NULL
+                ORDER BY net_agi DESC
+            """), params).fetchall()
+
+            state_flows = [
+                {
+                    "state": r[0],
+                    "inflow_agi_m": round(float(r[1] or 0) * 1000 / 1e6, 1),
+                    "outflow_agi_m": round(float(r[2] or 0) * 1000 / 1e6, 1),
+                    "net_agi_m": round(float(r[3] or 0) * 1000 / 1e6, 1),
+                    "inflow_returns": int(r[4] or 0),
+                    "outflow_returns": int(r[5] or 0),
+                    "total_medspas": int(r[6] or 0),
+                    "a_grade_count": int(r[7] or 0),
+                    "migration_alpha": round(float(r[8] or 0), 1),
+                }
+                for r in state_flows_rows
+            ]
+
+            # --- Top county-level inflows ---
+            county_rows = db.execute(text(f"""
+                SELECT
+                    m.dest_state_abbr,
+                    m.dest_county_name,
+                    m.orig_state_abbr,
+                    SUM(m.total_agi) AS inflow_agi,
+                    SUM(m.num_returns) AS inflow_returns
+                FROM irs_soi_migration m
+                WHERE m.tax_year = :year AND m.flow_type = 'inflow'
+                    {state_clause_dest}
+                GROUP BY m.dest_state_abbr, m.dest_county_name, m.orig_state_abbr
+                ORDER BY inflow_agi DESC
+                LIMIT 20
+            """), params).fetchall()
+
+            top_county_inflows = [
+                {
+                    "dest_state": r[0],
+                    "county": r[1],
+                    "orig_state": r[2],
+                    "agi_m": round(float(r[3] or 0) * 1000 / 1e6, 1),
+                    "returns": int(r[4] or 0),
+                }
+                for r in county_rows
+            ]
+
+            # --- Classify emerging markets ---
+            emerging = [
+                s for s in state_flows
+                if s["net_agi_m"] > 0 and s["a_grade_count"] < 20
+            ]
+            emerging.sort(key=lambda x: x["migration_alpha"], reverse=True)
+
+            # --- Summary stats ---
+            total_net = sum(s["net_agi_m"] for s in state_flows)
+            top_gainer = state_flows[0]["state"] if state_flows and state_flows[0]["net_agi_m"] > 0 else "-"
+            top_loser = state_flows[-1]["state"] if state_flows and state_flows[-1]["net_agi_m"] < 0 else "-"
+
+            # Wealth exodus: states losing the most
+            wealth_exodus = [s for s in state_flows if s["net_agi_m"] < 0]
+            wealth_exodus.sort(key=lambda x: x["net_agi_m"])
+
+            return {
+                "migration_alpha": {
+                    "state_flows": state_flows,
+                    "top_county_inflows": top_county_inflows,
+                    "wealth_exodus": wealth_exodus[:10],
+                    "emerging_markets": emerging[:15],
+                    "summary": {
+                        "total_net_agi_m": round(total_net, 1),
+                        "top_gainer": top_gainer,
+                        "top_loser": top_loser,
+                        "emerging_count": len(emerging),
+                        "tax_year": latest_year,
+                    },
+                }
+            }
+        except Exception as e:
+            logger.warning(f"Could not compute migration alpha data: {e}")
+            db.rollback()
+            return {"migration_alpha": {}}
+
+    # ------------------------------------------------------------------
     # HTML Rendering
     # ------------------------------------------------------------------
 
@@ -1458,6 +1883,10 @@ class MedSpaMarketTemplate:
 
         # Deal model data (sections 13-15)
         deal_model = data.get("deal_model", {})
+
+        # Sections 16-17 data
+        stealth_wealth = data.get("stealth_wealth", {})
+        migration_alpha = data.get("migration_alpha", {})
 
         charts_js = ""
         body = ""
@@ -1501,6 +1930,8 @@ class MedSpaMarketTemplate:
             {"number": 13, "id": "deal-unit-econ", "title": "Deal Model \u2014 Unit Economics"},
             {"number": 14, "id": "deal-capital", "title": "Deal Model \u2014 Capital Requirements"},
             {"number": 15, "id": "deal-returns", "title": "Deal Model \u2014 Returns Analysis"},
+            {"number": 16, "id": "stealth-wealth", "title": "Stealth Wealth Signal"},
+            {"number": 17, "id": "migration-alpha", "title": "Migration Alpha"},
         ]
         body += "\n" + toc(toc_items)
 
@@ -2030,6 +2461,22 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
             "-",
             "-",
         ])
+        if data_fresh.get("irs_soi_zip_income"):
+            iz = data_fresh["irs_soi_zip_income"]
+            freshness_rows.append([
+                "IRS SOI ZIP Income (Stealth Wealth)",
+                f"IRS SOI, tax years {iz.get('earliest', '?')}-{iz.get('latest', '?')}",
+                _fmt(iz.get("total")),
+                iz.get("latest", "-"),
+            ])
+        if data_fresh.get("irs_soi_migration"):
+            im = data_fresh["irs_soi_migration"]
+            freshness_rows.append([
+                "IRS SOI Migration (Migration Alpha)",
+                f"IRS SOI, tax years {im.get('earliest', '?')}-{im.get('latest', '?')}",
+                _fmt(im.get("total")),
+                im.get("latest", "-"),
+            ])
 
         body += data_table(
             headers=["Dataset", "Source", "Records", "Last Updated"],
@@ -2894,6 +3341,303 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
 
         body += "\n" + section_end()
 
+        # ==================================================================
+        # Section 16: Stealth Wealth Signal
+        # ==================================================================
+        body += "\n" + section_start(16, "Stealth Wealth Signal", "stealth-wealth")
+
+        sw_summary = stealth_wealth.get("summary", {})
+        sw_zips = stealth_wealth.get("stealth_zips", [])
+        sw_comp = stealth_wealth.get("wealth_composition", {})
+        sw_states = stealth_wealth.get("top_states", [])
+
+        if not stealth_wealth:
+            body += callout(
+                "<strong>IRS SOI ZIP income data not yet ingested.</strong> "
+                "Run <code>POST /api/v1/irs-soi/zip-income/ingest</code> to enable "
+                "stealth wealth analysis. This cross-references non-wage income "
+                "(capital gains, dividends, partnership income) with medspa scores "
+                "to reveal hidden demand in affluent ZIPs.",
+                variant="info",
+            )
+        else:
+            # KPI cards
+            sw_cards = ""
+            sw_cards += kpi_card("ZIPs Analyzed", _fmt(sw_comp.get("total_returns")))
+            sw_cards += kpi_card(
+                "Stealth ZIPs Found",
+                _fmt(sw_summary.get("total_stealth")),
+            )
+            sw_cards += kpi_card(
+                "Validated (High Score)",
+                _fmt(sw_summary.get("validated")),
+            )
+            sw_cards += kpi_card(
+                "Avg Non-Wage Income",
+                _fmt_currency(sw_summary.get("avg_non_wage_income", 0)),
+            )
+            body += kpi_strip(sw_cards)
+
+            body += f"""<p style="margin:12px 0;font-size:14px;color:var(--gray-600)">
+Stealth wealth ZIPs have <strong>&gt;25% non-wage income</strong> (capital gains + dividends +
+partnership income) but a medspa score below 70 — indicating affluent populations
+underserved by current med-spa supply. Tax year: <strong>{sw_summary.get('tax_year', '?')}</strong>.</p>"""
+
+            # Wealth composition doughnut + explanation
+            if sw_comp:
+                body += '<div class="wealth-composition-grid">'
+
+                # Doughnut chart
+                comp_labels = ["W-2 Wages", "Capital Gains", "Dividends", "Business/Partnership", "Other"]
+                comp_values = [
+                    sw_comp.get("wages_pct", 0),
+                    sw_comp.get("cap_gains_pct", 0),
+                    sw_comp.get("dividends_pct", 0),
+                    sw_comp.get("biz_income_pct", 0),
+                    sw_comp.get("other_pct", 0),
+                ]
+                comp_colors = [BLUE, GREEN, ORANGE, PURPLE, GRAY]
+                comp_config = build_doughnut_config(comp_labels, comp_values, comp_colors)
+                comp_json = json.dumps(comp_config)
+
+                body += "<div>"
+                body += chart_container(
+                    "wealthCompDonut", comp_json,
+                    build_bar_fallback(comp_labels, comp_values),
+                    size="medium",
+                    title="Income Composition (% of AGI)",
+                )
+                charts_js += chart_init_js("wealthCompDonut", comp_json)
+                body += build_chart_legend(comp_labels, comp_values, comp_colors, show_pct=True)
+                body += "</div>"
+
+                # Explanation card
+                body += """<div>
+<div class="thesis-box">
+    <h3>Why Non-Wage Income Matters</h3>
+    <ul>
+        <li><strong>Capital gains &amp; dividends</strong> indicate investable wealth — these households have assets producing returns, not just paychecks.</li>
+        <li><strong>Partnership/business income</strong> signals entrepreneurs and professionals with high discretionary spend.</li>
+        <li>Traditional models use W-2 wages or median household income, <strong>missing 25-40% of actual purchasing power</strong> in wealthy ZIPs.</li>
+        <li>Stealth wealth ZIPs are undervalued by competitors using standard data — a <strong>first-mover advantage</strong> for informed acquirers.</li>
+    </ul>
+</div>
+</div>"""
+                body += "</div>"  # close wealth-composition-grid
+
+            # Stealth ZIPs data table
+            if sw_zips:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">Top Stealth Wealth ZIPs</h3>'
+                sw_rows = []
+                for z in sw_zips[:25]:
+                    sw_rows.append([
+                        z["zip_code"],
+                        z["state"],
+                        _fmt_currency(z["non_wage_per_return"]),
+                        f"{z['non_wage_pct']:.1f}%",
+                        _fmt(z["num_returns"]),
+                        _fmt_currency(z["avg_agi"]),
+                        str(z["medspa_score"]),
+                        z["medspa_grade"],
+                        str(z["a_grade_medspas"]),
+                    ])
+                body += data_table(
+                    headers=[
+                        "ZIP", "State", "Non-Wage/Return", "Non-Wage %",
+                        "Returns", "Avg AGI", "Medspa Score", "Grade", "A-Grade Medspas",
+                    ],
+                    rows=sw_rows,
+                )
+
+            # States bar chart
+            if sw_states:
+                st_labels = [s["state"] for s in sw_states[:12]]
+                st_values = [s["count"] for s in sw_states[:12]]
+                st_colors = [BLUE] * len(st_labels)
+                st_config = build_horizontal_bar_config(
+                    st_labels, st_values, st_colors,
+                    dataset_label="Stealth ZIPs",
+                )
+                st_json = json.dumps(st_config)
+
+                body += chart_container(
+                    "stealthByState", st_json,
+                    build_bar_fallback(st_labels, st_values),
+                    size="large",
+                    title="Stealth Wealth ZIPs by State",
+                )
+                charts_js += chart_init_js("stealthByState", st_json)
+
+            # Methodology callout
+            body += callout(
+                "<strong>Methodology:</strong> ZIPs are flagged as \"stealth\" when &gt;25% of total AGI "
+                "comes from non-wage sources (capital gains + dividends + business income) AND the "
+                "current medspa acquisition score is below 70. This identifies affluent areas where "
+                "traditional income-based models underestimate demand. Minimum 100 tax returns per ZIP "
+                "to ensure statistical significance.",
+                variant="info",
+            )
+
+            # Opportunity callout
+            if sw_zips:
+                body += callout(
+                    f"<strong>Opportunity:</strong> {sw_summary.get('total_stealth', 0)} stealth wealth ZIPs "
+                    f"identified with an average non-wage income of "
+                    f"{_fmt_currency(sw_summary.get('avg_non_wage_income', 0))} per return. "
+                    f"These ZIPs represent a first-mover acquisition opportunity invisible to "
+                    f"competitors using standard income data.",
+                    variant="tip",
+                )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 17: Migration Alpha
+        # ==================================================================
+        body += "\n" + section_start(17, "Migration Alpha", "migration-alpha")
+
+        ma_summary = migration_alpha.get("summary", {})
+        ma_flows = migration_alpha.get("state_flows", [])
+        ma_emerging = migration_alpha.get("emerging_markets", [])
+        ma_counties = migration_alpha.get("top_county_inflows", [])
+        ma_exodus = migration_alpha.get("wealth_exodus", [])
+
+        if not migration_alpha:
+            body += callout(
+                "<strong>IRS SOI migration data not yet ingested.</strong> "
+                "Run <code>POST /api/v1/irs-soi/migration/ingest</code> to enable "
+                "migration alpha analysis. This uses county-to-county wealth flows "
+                "as a 2-3 year leading indicator of medspa demand.",
+                variant="info",
+            )
+        else:
+            # KPI cards
+            ma_cards = ""
+            ma_cards += kpi_card(
+                "Net Wealth Movement",
+                f"${abs(ma_summary.get('total_net_agi_m', 0)):,.0f}M",
+            )
+            ma_cards += kpi_card("Top Gainer", ma_summary.get("top_gainer", "-"))
+            ma_cards += kpi_card("Top Loser", ma_summary.get("top_loser", "-"))
+            ma_cards += kpi_card(
+                "Emerging Markets",
+                _fmt(ma_summary.get("emerging_count")),
+            )
+            body += kpi_strip(ma_cards)
+
+            body += f"""<p style="margin:12px 0;font-size:14px;color:var(--gray-600)">
+Migration Alpha measures <strong>net wealth inflows</strong> relative to existing medspa density.
+States receiving large AGI inflows but with few A-grade medspas represent a
+<strong>2-3 year leading indicator</strong> of unmet demand. Tax year: <strong>{ma_summary.get('tax_year', '?')}</strong>.</p>"""
+
+            # Dual-color horizontal bar: top 15 net flows
+            if ma_flows:
+                top_flow_states = ma_flows[:10]
+                bottom_flow_states = sorted(ma_flows, key=lambda x: x["net_agi_m"])[:5]
+                bar_states = top_flow_states + [s for s in bottom_flow_states if s not in top_flow_states]
+                bar_states.sort(key=lambda x: x["net_agi_m"], reverse=True)
+
+                bar_labels = [s["state"] for s in bar_states]
+                bar_values = [s["net_agi_m"] for s in bar_states]
+                bar_colors = ["#48bb78" if v >= 0 else "#fc8181" for v in bar_values]
+                bar_config = build_horizontal_bar_config(
+                    bar_labels, bar_values, bar_colors,
+                    dataset_label="Net AGI ($M)",
+                )
+                bar_json = json.dumps(bar_config)
+
+                body += chart_container(
+                    "migrationNetFlow", bar_json,
+                    build_bar_fallback(bar_labels, bar_values),
+                    size="large",
+                    title="Net Wealth Migration by State ($M AGI)",
+                )
+                charts_js += chart_init_js("migrationNetFlow", bar_json)
+
+            # State flows table
+            if ma_flows:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">State Wealth Flows</h3>'
+                flow_rows = []
+                for s in ma_flows[:20]:
+                    net_color = "color:#48bb78" if s["net_agi_m"] >= 0 else "color:#fc8181"
+                    flow_rows.append([
+                        s["state"],
+                        f"${s['inflow_agi_m']:,.1f}M",
+                        f"${s['outflow_agi_m']:,.1f}M",
+                        f'<span style="{net_color};font-weight:600">${s["net_agi_m"]:+,.1f}M</span>',
+                        _fmt(s["inflow_returns"]),
+                        _fmt(s["total_medspas"]),
+                        _fmt(s["a_grade_count"]),
+                        f"{s['migration_alpha']:,.0f}",
+                    ])
+                body += data_table(
+                    headers=[
+                        "State", "Inflow AGI", "Outflow AGI", "Net AGI",
+                        "Inflow Returns", "Medspas", "A-Grade", "Migration Alpha",
+                    ],
+                    rows=flow_rows,
+                )
+
+            # Emerging markets highlight table
+            if ma_emerging:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">Emerging Markets (Positive Inflow, &lt;20 A-Grade Medspas)</h3>'
+                em_rows = []
+                for s in ma_emerging[:10]:
+                    em_rows.append([
+                        f'<strong>{s["state"]}</strong>',
+                        f"${s['net_agi_m']:+,.1f}M",
+                        _fmt(s["inflow_returns"]),
+                        _fmt(s["total_medspas"]),
+                        _fmt(s["a_grade_count"]),
+                        f"{s['migration_alpha']:,.0f}",
+                    ])
+                body += '<div class="highlight-table">'
+                body += data_table(
+                    headers=[
+                        "State", "Net AGI", "Inflow Returns",
+                        "Total Medspas", "A-Grade", "Migration Alpha",
+                    ],
+                    rows=em_rows,
+                )
+                body += "</div>"
+
+                body += callout(
+                    f"<strong>{len(ma_emerging)} emerging markets identified.</strong> "
+                    "These states are receiving net wealth inflows but have fewer than 20 "
+                    "A-grade medspa targets — signaling greenfield opportunity before "
+                    "competitors recognize the demand shift.",
+                    variant="tip",
+                )
+
+            # County drill-down
+            if ma_counties:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">Top County-Level Inflows</h3>'
+                county_rows = []
+                for c in ma_counties[:15]:
+                    county_rows.append([
+                        c["dest_state"],
+                        c["county"],
+                        c["orig_state"],
+                        f"${c['agi_m']:,.1f}M",
+                        _fmt(c["returns"]),
+                    ])
+                body += data_table(
+                    headers=["Dest State", "County", "Origin State", "AGI Inflow", "Returns"],
+                    rows=county_rows,
+                )
+
+            # Leading indicator callout
+            body += callout(
+                "<strong>Leading Indicator:</strong> Wealth migration is a 2-3 year "
+                "leading indicator of local service demand. High-AGI movers "
+                "typically establish primary residence before seeking premium "
+                "services like med-spas. States with high migration alpha today "
+                "will see increased medspa demand in 2-3 years.",
+                variant="info",
+            )
+
+        body += "\n" + section_end()
+
         # ---- Close container ----
         body += "\n</div>"
 
@@ -2904,6 +3648,8 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
             "PE competitive landscape data from SEC EDGAR filings and company websites.",
             "Acquisition scores are model-generated estimates and should be validated with on-the-ground diligence.",
             "Deal model uses industry benchmark economics (AmSpa, IBISWorld) — actual financials require location-level diligence.",
+            "Stealth Wealth Signal uses IRS SOI ZIP-level income composition; dollar amounts reported in thousands.",
+            "Migration Alpha uses IRS SOI county-to-county migration flows as a 2-3 year leading indicator.",
             "This report does not constitute investment advice. All data is from public sources.",
         ]
         body += "\n" + page_footer(
@@ -3295,6 +4041,141 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
         deal_col_widths = {"A": 28, "B": 16, "C": 16, "D": 16, "E": 16, "F": 16, "G": 16, "H": 14, "I": 16}
         for col_letter, width in deal_col_widths.items():
             ws_deal.column_dimensions[col_letter].width = width
+
+        # ---- Sheet 11: Stealth Wealth ----
+        ws_sw = wb.create_sheet("Stealth Wealth")
+        stealth_wealth = data.get("stealth_wealth", {})
+        sw_comp = stealth_wealth.get("wealth_composition", {})
+        sw_zips = stealth_wealth.get("stealth_zips", [])
+        sw_summary = stealth_wealth.get("summary", {})
+
+        ws_sw["A1"] = "Stealth Wealth Signal"
+        ws_sw["A1"].font = Font(bold=True, size=13)
+        ws_sw.merge_cells("A1:E1")
+
+        # Summary stats
+        ws_sw["A3"] = "Tax Year"
+        ws_sw["B3"] = sw_summary.get("tax_year", "-")
+        ws_sw["A4"] = "Stealth ZIPs Found"
+        ws_sw["B4"] = sw_summary.get("total_stealth", 0)
+        ws_sw["A5"] = "Validated (Score ≥70)"
+        ws_sw["B5"] = sw_summary.get("validated", 0)
+        ws_sw["A6"] = "Avg Non-Wage Income"
+        ws_sw["B6"] = sw_summary.get("avg_non_wage_income", 0)
+        for r in range(3, 7):
+            ws_sw[f"A{r}"].font = Font(bold=True)
+
+        # Wealth composition
+        if sw_comp:
+            ws_sw["A8"] = "Income Composition"
+            ws_sw["A8"].font = Font(bold=True, size=11)
+            ws_sw["A9"] = "W-2 Wages %"
+            ws_sw["B9"] = sw_comp.get("wages_pct", 0)
+            ws_sw["A10"] = "Capital Gains %"
+            ws_sw["B10"] = sw_comp.get("cap_gains_pct", 0)
+            ws_sw["A11"] = "Dividends %"
+            ws_sw["B11"] = sw_comp.get("dividends_pct", 0)
+            ws_sw["A12"] = "Business/Partnership %"
+            ws_sw["B12"] = sw_comp.get("biz_income_pct", 0)
+            ws_sw["A13"] = "Other %"
+            ws_sw["B13"] = sw_comp.get("other_pct", 0)
+
+        # Stealth ZIPs table
+        sw_start = 15
+        ws_sw.cell(row=sw_start, column=1, value="Top Stealth Wealth ZIPs").font = Font(bold=True, size=11)
+        sw_headers = [
+            "ZIP", "State", "Non-Wage/Return", "Non-Wage %",
+            "Returns", "Avg AGI", "Medspa Score", "Grade", "A-Grade Medspas",
+        ]
+        for col, header in enumerate(sw_headers, 1):
+            cell = ws_sw.cell(row=sw_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        for i, z in enumerate(sw_zips, sw_start + 2):
+            ws_sw.cell(row=i, column=1, value=z.get("zip_code"))
+            ws_sw.cell(row=i, column=2, value=z.get("state"))
+            ws_sw.cell(row=i, column=3, value=z.get("non_wage_per_return", 0))
+            ws_sw.cell(row=i, column=4, value=z.get("non_wage_pct", 0))
+            ws_sw.cell(row=i, column=5, value=z.get("num_returns", 0))
+            ws_sw.cell(row=i, column=6, value=z.get("avg_agi", 0))
+            ws_sw.cell(row=i, column=7, value=z.get("medspa_score", 0))
+            ws_sw.cell(row=i, column=8, value=z.get("medspa_grade", "-"))
+            ws_sw.cell(row=i, column=9, value=z.get("a_grade_medspas", 0))
+
+        sw_col_widths = {"A": 12, "B": 8, "C": 16, "D": 12, "E": 10, "F": 12, "G": 14, "H": 8, "I": 16}
+        for col_letter, width in sw_col_widths.items():
+            ws_sw.column_dimensions[col_letter].width = width
+
+        # ---- Sheet 12: Migration Alpha ----
+        ws_ma = wb.create_sheet("Migration Alpha")
+        migration_alpha = data.get("migration_alpha", {})
+        ma_flows = migration_alpha.get("state_flows", [])
+        ma_emerging = migration_alpha.get("emerging_markets", [])
+        ma_summary = migration_alpha.get("summary", {})
+
+        ws_ma["A1"] = "Migration Alpha"
+        ws_ma["A1"].font = Font(bold=True, size=13)
+        ws_ma.merge_cells("A1:E1")
+
+        ws_ma["A3"] = "Tax Year"
+        ws_ma["B3"] = ma_summary.get("tax_year", "-")
+        ws_ma["A4"] = "Top Gainer"
+        ws_ma["B4"] = ma_summary.get("top_gainer", "-")
+        ws_ma["A5"] = "Top Loser"
+        ws_ma["B5"] = ma_summary.get("top_loser", "-")
+        ws_ma["A6"] = "Emerging Markets"
+        ws_ma["B6"] = ma_summary.get("emerging_count", 0)
+        for r in range(3, 7):
+            ws_ma[f"A{r}"].font = Font(bold=True)
+
+        # State flows table
+        ma_start = 8
+        ws_ma.cell(row=ma_start, column=1, value="State Wealth Flows").font = Font(bold=True, size=11)
+        ma_headers = [
+            "State", "Inflow AGI ($M)", "Outflow AGI ($M)", "Net AGI ($M)",
+            "Inflow Returns", "Total Medspas", "A-Grade", "Migration Alpha",
+        ]
+        for col, header in enumerate(ma_headers, 1):
+            cell = ws_ma.cell(row=ma_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        for i, s in enumerate(ma_flows, ma_start + 2):
+            ws_ma.cell(row=i, column=1, value=s.get("state"))
+            ws_ma.cell(row=i, column=2, value=s.get("inflow_agi_m", 0))
+            ws_ma.cell(row=i, column=3, value=s.get("outflow_agi_m", 0))
+            ws_ma.cell(row=i, column=4, value=s.get("net_agi_m", 0))
+            ws_ma.cell(row=i, column=5, value=s.get("inflow_returns", 0))
+            ws_ma.cell(row=i, column=6, value=s.get("total_medspas", 0))
+            ws_ma.cell(row=i, column=7, value=s.get("a_grade_count", 0))
+            ws_ma.cell(row=i, column=8, value=s.get("migration_alpha", 0))
+
+        # Emerging markets highlight
+        em_start = ma_start + len(ma_flows) + 4
+        ws_ma.cell(row=em_start, column=1, value="Emerging Markets (<20 A-Grade, Positive Inflow)").font = Font(bold=True, size=11)
+        ws_ma.merge_cells(f"A{em_start}:F{em_start}")
+
+        em_headers = ["State", "Net AGI ($M)", "Inflow Returns", "Total Medspas", "A-Grade", "Migration Alpha"]
+        for col, header in enumerate(em_headers, 1):
+            cell = ws_ma.cell(row=em_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        green_fill = PatternFill(start_color="E6F4EA", end_color="E6F4EA", fill_type="solid")
+        for i, s in enumerate(ma_emerging, em_start + 2):
+            ws_ma.cell(row=i, column=1, value=s.get("state"))
+            ws_ma.cell(row=i, column=2, value=s.get("net_agi_m", 0))
+            ws_ma.cell(row=i, column=3, value=s.get("inflow_returns", 0))
+            ws_ma.cell(row=i, column=4, value=s.get("total_medspas", 0))
+            ws_ma.cell(row=i, column=5, value=s.get("a_grade_count", 0))
+            ws_ma.cell(row=i, column=6, value=s.get("migration_alpha", 0))
+            for c in range(1, 7):
+                ws_ma.cell(row=i, column=c).fill = green_fill
+
+        ma_col_widths = {"A": 12, "B": 16, "C": 16, "D": 14, "E": 14, "F": 14, "G": 10, "H": 16}
+        for col_letter, width in ma_col_widths.items():
+            ws_ma.column_dimensions[col_letter].width = width
 
         # Save to bytes
         output = BytesIO()
