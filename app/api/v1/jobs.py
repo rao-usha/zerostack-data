@@ -569,6 +569,27 @@ async def _run_quality_gate(db, job: IngestionJob):
                 f"Quality gate {report.overall_status} for job {job.id} ({job.source}): "
                 f"{report.errors_count} errors, {report.warnings_count} warnings"
             )
+
+        # Phase 1: Auto-profile table after ingestion
+        try:
+            from app.core.data_profiling_service import profile_table
+            snapshot = profile_table(db, registry.table_name, job_id=job.id, source=job.source)
+            if snapshot:
+                logger.info(f"Quality gate: profiled {registry.table_name} ({snapshot.row_count} rows)")
+
+                # Phase 2: Run anomaly detection against the new profile
+                try:
+                    from app.core.anomaly_detection_service import detect_anomalies
+                    anomalies = detect_anomalies(db, snapshot, registry.table_name)
+                    if anomalies:
+                        logger.warning(
+                            f"Quality gate: {len(anomalies)} anomalies for {registry.table_name}"
+                        )
+                except Exception as ae:
+                    logger.warning(f"Anomaly detection error for job {job.id}: {ae}")
+        except Exception as pe:
+            logger.warning(f"Profiling error for job {job.id}: {pe}")
+
     except Exception as e:
         logger.warning(f"Quality gate error for job {job.id}: {e}")
 

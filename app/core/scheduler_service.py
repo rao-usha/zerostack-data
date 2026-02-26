@@ -1423,3 +1423,128 @@ def register_freshness_checker(interval_minutes: int = 60) -> bool:
     except Exception as e:
         logger.error(f"Failed to register freshness checker: {e}")
         return False
+
+
+# =============================================================================
+# Cross-Source Validation (every 6 hours)
+# =============================================================================
+
+
+def register_cross_source_validation(interval_hours: int = 6) -> bool:
+    """
+    Register cross-source validation as a scheduled job.
+
+    Args:
+        interval_hours: How often to run (default 6 hours)
+
+    Returns:
+        True if registered successfully
+    """
+    scheduler = get_scheduler()
+    job_id = "system_cross_source_validation"
+
+    try:
+        existing_job = scheduler.get_job(job_id)
+        if existing_job:
+            scheduler.remove_job(job_id)
+
+        from app.core.cross_source_validation_service import scheduled_cross_source_validation
+
+        scheduler.add_job(
+            scheduled_cross_source_validation,
+            trigger=IntervalTrigger(hours=interval_hours),
+            id=job_id,
+            name="Cross-Source Validation",
+            replace_existing=True,
+        )
+
+        logger.info(
+            f"Registered cross-source validation to run every {interval_hours} hours"
+        )
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to register cross-source validation: {e}")
+        return False
+
+
+# =============================================================================
+# Daily Quality Snapshots (2 AM)
+# =============================================================================
+
+
+def register_daily_quality_snapshots(hour: int = 2) -> bool:
+    """
+    Register daily quality snapshot computation.
+
+    Args:
+        hour: Hour to run (default 2 AM)
+
+    Returns:
+        True if registered successfully
+    """
+    scheduler = get_scheduler()
+    job_id = "system_daily_quality_snapshots"
+
+    try:
+        existing_job = scheduler.get_job(job_id)
+        if existing_job:
+            scheduler.remove_job(job_id)
+
+        from app.core.quality_trending_service import scheduled_daily_quality_snapshots
+
+        scheduler.add_job(
+            scheduled_daily_quality_snapshots,
+            trigger=CronTrigger(hour=hour, minute=0),
+            id=job_id,
+            name="Daily Quality Snapshots",
+            replace_existing=True,
+        )
+
+        logger.info(f"Registered daily quality snapshots at {hour}:00")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to register daily quality snapshots: {e}")
+        return False
+
+
+# =============================================================================
+# Degradation Checker (3 AM)
+# =============================================================================
+
+
+def register_degradation_checker(hour: int = 3) -> bool:
+    """
+    Register daily quality degradation checker.
+
+    Args:
+        hour: Hour to run (default 3 AM)
+
+    Returns:
+        True if registered successfully
+    """
+    scheduler = get_scheduler()
+    job_id = "system_degradation_checker"
+
+    try:
+        existing_job = scheduler.get_job(job_id)
+        if existing_job:
+            scheduler.remove_job(job_id)
+
+        from app.core.quality_trending_service import scheduled_degradation_checker
+
+        scheduler.add_job(
+            scheduled_degradation_checker,
+            trigger=CronTrigger(hour=hour, minute=0),
+            id=job_id,
+            name="Quality Degradation Checker",
+            replace_existing=True,
+        )
+
+        logger.info(f"Registered degradation checker at {hour}:00")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to register degradation checker: {e}")
+        return False

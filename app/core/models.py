@@ -10,9 +10,12 @@ from sqlalchemy import (
     Integer,
     String,
     DateTime,
+    Date,
+    Float,
     Text,
     JSON,
     Enum,
+    ForeignKey,
     UniqueConstraint,
     Index,
     Numeric,
@@ -2111,6 +2114,7 @@ class RuleType(str, enum.Enum):
     CUSTOM_SQL = "custom_sql"  # Custom SQL condition
     ENUM = "enum"  # Value must be in allowed list
     COMPARISON = "comparison"  # Compare two columns
+    CROSS_SOURCE = "cross_source"  # Cross-source validation
 
 
 class RuleSeverity(str, enum.Enum):
@@ -2298,6 +2302,385 @@ class DataQualityReport(Base):
         return (
             f"<DataQualityReport(id={self.id}, job_id={self.job_id}, "
             f"status='{self.overall_status}', passed={self.rules_passed}/{self.total_rules})>"
+        )
+
+
+# =============================================================================
+# DATA PROFILING MODELS
+# =============================================================================
+
+
+class DataProfileSnapshot(Base):
+    """
+    Snapshot of a table profiling run.
+
+    One row per (table, profiling run). Stores table-level statistics
+    and a schema snapshot for drift detection.
+    """
+
+    __tablename__ = "data_profile_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    table_name = Column(String(255), nullable=False, index=True)
+    source = Column(String(50), nullable=True)
+    domain = Column(String(50), nullable=True)
+    job_id = Column(Integer, nullable=True)
+
+    # Table-level stats
+    row_count = Column(Integer, nullable=False, default=0)
+    column_count = Column(Integer, nullable=False, default=0)
+    total_null_count = Column(Integer, nullable=False, default=0)
+    overall_completeness_pct = Column(Float, nullable=True)
+
+    # Schema snapshot for drift detection
+    schema_snapshot = Column(JSON, nullable=True)  # [{name, type, nullable}]
+
+    # Metadata
+    profiled_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    execution_time_ms = Column(Integer, nullable=True)
+
+    __table_args__ = (
+        Index("idx_profile_snap_table_date", "table_name", "profiled_at"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<DataProfileSnapshot(id={self.id}, table='{self.table_name}', "
+            f"rows={self.row_count}, completeness={self.overall_completeness_pct}%)>"
+        )
+
+
+class DataProfileColumn(Base):
+    """
+    Per-column statistics for a profiling snapshot.
+
+    Stores type-specific statistics in a JSON 'stats' field.
+    """
+
+    __tablename__ = "data_profile_columns"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    snapshot_id = Column(
+        Integer, ForeignKey("data_profile_snapshots.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    column_name = Column(String(255), nullable=False)
+    data_type = Column(String(100), nullable=True)
+
+    # Basic stats
+    null_count = Column(Integer, nullable=False, default=0)
+    null_pct = Column(Float, nullable=True)
+    distinct_count = Column(Integer, nullable=True)
+    cardinality_ratio = Column(Float, nullable=True)  # distinct / total
+
+    # Type-specific stats (JSON)
+    # Numeric: {min, max, mean, median, stddev, p25, p75}
+    # String: {min_length, max_length, avg_length, top_values: [{value, count}]}
+    # Temporal: {min_date, max_date, date_range_days}
+    stats = Column(JSON, nullable=True)
+
+    __table_args__ = (
+        Index("idx_profile_col_snapshot", "snapshot_id"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<DataProfileColumn(id={self.id}, col='{self.column_name}', "
+            f"null_pct={self.null_pct}%, distinct={self.distinct_count})>"
+        )
+
+
+# =============================================================================
+# ANOMALY DETECTION MODELS
+# =============================================================================
+
+
+class AnomalyAlertType(str, enum.Enum):
+    """Types of anomaly alerts detected by the quality engine."""
+
+    ROW_COUNT_SWING = "row_count_swing"
+    NULL_RATE_SPIKE = "null_rate_spike"
+    DISTRIBUTION_SHIFT = "distribution_shift"
+    SCHEMA_DRIFT = "schema_drift"
+    NEW_COLUMN = "new_column"
+    DROPPED_COLUMN = "dropped_column"
+    TYPE_CHANGE = "type_change"
+    VALUE_RANGE_SHIFT = "value_range_shift"
+    QUALITY_DEGRADATION = "quality_degradation"  # Phase 4: sustained drops
+
+
+class AnomalyAlertStatus(str, enum.Enum):
+    """Lifecycle status of an anomaly alert."""
+
+    OPEN = "open"
+    ACKNOWLEDGED = "acknowledged"
+    RESOLVED = "resolved"
+    FALSE_POSITIVE = "false_positive"
+
+
+class DQAnomalyAlert(Base):
+    """
+    Individual anomaly detection results.
+
+    Generated when current data deviates from historical baseline.
+    """
+
+    __tablename__ = "dq_anomaly_alerts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    table_name = Column(String(255), nullable=False, index=True)
+    source = Column(String(50), nullable=True)
+    column_name = Column(String(255), nullable=True)  # null = table-level
+
+    # Classification
+    alert_type = Column(
+        Enum(AnomalyAlertType, native_enum=False, length=30), nullable=False
+    )
+    status = Column(
+        Enum(AnomalyAlertStatus, native_enum=False, length=20),
+        nullable=False, default=AnomalyAlertStatus.OPEN,
+    )
+    severity = Column(
+        Enum(RuleSeverity, native_enum=False, length=20),
+        nullable=False, default=RuleSeverity.WARNING,
+    )
+
+    # Details
+    message = Column(Text, nullable=True)
+    current_value = Column(Text, nullable=True)
+    baseline_value = Column(Text, nullable=True)
+    deviation_sigma = Column(Float, nullable=True)
+    details = Column(JSON, nullable=True)  # previous values, thresholds, context
+
+    # References
+    snapshot_id = Column(Integer, nullable=True)
+    job_id = Column(Integer, nullable=True)
+
+    # Resolution
+    resolved_at = Column(DateTime, nullable=True)
+    resolution_notes = Column(Text, nullable=True)
+
+    detected_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_anomaly_table", "table_name"),
+        Index("idx_anomaly_status", "status"),
+        Index("idx_anomaly_type", "alert_type"),
+        Index("idx_anomaly_detected", "detected_at"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<DQAnomalyAlert(id={self.id}, table='{self.table_name}', "
+            f"type='{self.alert_type}', status='{self.status}')>"
+        )
+
+
+class DQAnomalyThreshold(Base):
+    """
+    Configurable anomaly detection sensitivity per source/table.
+
+    Supports cascading: table-specific -> source-specific -> global default.
+    """
+
+    __tablename__ = "dq_anomaly_thresholds"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source = Column(String(50), nullable=True)  # null = global default
+    table_pattern = Column(String(255), nullable=True)  # regex
+
+    # Sigma thresholds (number of standard deviations)
+    row_count_sigma = Column(Float, nullable=False, default=2.0)
+    null_rate_sigma = Column(Float, nullable=False, default=2.0)
+    distribution_sigma = Column(Float, nullable=False, default=3.0)
+
+    # Feature flags
+    schema_drift_enabled = Column(Integer, nullable=False, default=1)
+    is_enabled = Column(Integer, nullable=False, default=1)
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<DQAnomalyThreshold(id={self.id}, source='{self.source}', "
+            f"pattern='{self.table_pattern}')>"
+        )
+
+
+# =============================================================================
+# CROSS-SOURCE VALIDATION MODELS
+# =============================================================================
+
+
+class DQCrossSourceValidation(Base):
+    """
+    Declarative cross-source validation definitions.
+
+    Defines how to check consistency between two data sources.
+    """
+
+    __tablename__ = "dq_cross_source_validations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+
+    # Validation type
+    validation_type = Column(
+        String(50), nullable=False
+    )  # fips_consistency, identifier_match, geo_coherence, temporal_consistency
+
+    # Configuration (left/right table, columns, join type)
+    config = Column(JSON, nullable=False)
+
+    severity = Column(
+        Enum(RuleSeverity, native_enum=False, length=20),
+        nullable=False, default=RuleSeverity.WARNING,
+    )
+    is_enabled = Column(Integer, nullable=False, default=1)
+
+    # Statistics
+    times_evaluated = Column(Integer, nullable=False, default=0)
+    last_evaluated_at = Column(DateTime, nullable=True)
+    last_pass_rate = Column(Float, nullable=True)
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<DQCrossSourceValidation(id={self.id}, name='{self.name}', "
+            f"type='{self.validation_type}', pass_rate={self.last_pass_rate})>"
+        )
+
+
+class DQCrossSourceResult(Base):
+    """
+    Results of a cross-source validation run.
+    """
+
+    __tablename__ = "dq_cross_source_results"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    validation_id = Column(
+        Integer, ForeignKey("dq_cross_source_validations.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+
+    # Result
+    passed = Column(Integer, nullable=False)  # 1=passed, 0=failed
+    left_count = Column(Integer, nullable=True)
+    right_count = Column(Integer, nullable=True)
+    matched_count = Column(Integer, nullable=True)
+    orphan_left = Column(Integer, nullable=True)
+    orphan_right = Column(Integer, nullable=True)
+    match_rate = Column(Float, nullable=True)
+
+    # Details
+    sample_orphans = Column(JSON, nullable=True)
+    message = Column(Text, nullable=True)
+    execution_time_ms = Column(Integer, nullable=True)
+
+    evaluated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_xsrc_result_validation", "validation_id"),
+        Index("idx_xsrc_result_evaluated", "evaluated_at"),
+    )
+
+    def __repr__(self) -> str:
+        status = "PASSED" if self.passed else "FAILED"
+        return (
+            f"<DQCrossSourceResult(id={self.id}, validation={self.validation_id}, "
+            f"status={status}, match_rate={self.match_rate})>"
+        )
+
+
+# =============================================================================
+# QUALITY TRENDING MODELS
+# =============================================================================
+
+
+class DQQualitySnapshot(Base):
+    """
+    Daily quality scores per source/table.
+
+    Tracks quality metrics over time for trend analysis and SLA compliance.
+    """
+
+    __tablename__ = "dq_quality_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    snapshot_date = Column(Date, nullable=False)  # Truncated to day
+    source = Column(String(50), nullable=True)
+    table_name = Column(String(255), nullable=True)
+    domain = Column(String(50), nullable=True)
+
+    # Quality scores (0-100)
+    quality_score = Column(Float, nullable=True)  # Composite
+    completeness_score = Column(Float, nullable=True)
+    freshness_score = Column(Float, nullable=True)
+    validity_score = Column(Float, nullable=True)
+    consistency_score = Column(Float, nullable=True)
+
+    # Metrics
+    row_count = Column(Integer, nullable=True)
+    rule_pass_rate = Column(Float, nullable=True)
+    anomaly_count = Column(Integer, nullable=True, default=0)
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("snapshot_date", "source", "table_name", name="uq_dq_quality_snap"),
+        Index("idx_dq_qsnap_date", "snapshot_date"),
+        Index("idx_dq_qsnap_source", "source"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<DQQualitySnapshot(id={self.id}, date={self.snapshot_date}, "
+            f"source='{self.source}', score={self.quality_score})>"
+        )
+
+
+class DQSLATarget(Base):
+    """
+    Quality SLA targets for sources/tables.
+
+    Used to check compliance and trigger degradation alerts.
+    """
+
+    __tablename__ = "dq_sla_targets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source = Column(String(50), nullable=True)  # null = global
+    table_pattern = Column(String(255), nullable=True)  # regex
+
+    # Targets (0-100)
+    target_quality_score = Column(Float, nullable=False, default=80.0)
+    target_completeness = Column(Float, nullable=False, default=85.0)
+    target_freshness = Column(Float, nullable=False, default=90.0)
+    target_validity = Column(Float, nullable=False, default=90.0)
+
+    # Degradation detection
+    consecutive_drops_threshold = Column(Integer, nullable=False, default=3)
+
+    is_enabled = Column(Integer, nullable=False, default=1)
+
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<DQSLATarget(id={self.id}, source='{self.source}', "
+            f"target={self.target_quality_score})>"
         )
 
 

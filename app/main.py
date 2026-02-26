@@ -233,6 +233,18 @@ async def lifespan(app: FastAPI):
         scheduler_service.register_freshness_checker(interval_minutes=60)
         logger.info("Freshness auto-refresh checker registered")
 
+        # Register cross-source validation (runs every 6 hours)
+        scheduler_service.register_cross_source_validation(interval_hours=6)
+        logger.info("Cross-source validation registered")
+
+        # Register daily quality snapshots (runs at 2 AM)
+        scheduler_service.register_daily_quality_snapshots(hour=2)
+        logger.info("Daily quality snapshots registered")
+
+        # Register quality degradation checker (runs at 3 AM)
+        scheduler_service.register_degradation_checker(hour=3)
+        logger.info("Quality degradation checker registered")
+
         # Register people collection schedules
         try:
             from app.jobs.people_collection_scheduler import (
