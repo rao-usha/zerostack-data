@@ -24,6 +24,10 @@ Sections:
   15. Deal Model — Returns Analysis
   16. Stealth Wealth Signal (IRS SOI non-wage income analysis)
   17. Migration Alpha (IRS county-to-county wealth flow leading indicator)
+  18. Medical Provider Density Signal (CMS Medicare provider-to-medspa imbalance)
+  19. Real Estate Appreciation Alpha (Redfin/FHFA home price timing signal)
+  20. Deposit Wealth Concentration (FDIC branch deposits per capita)
+  21. Business Formation Velocity (IRS SOI business income density)
 """
 
 import json
@@ -314,6 +318,27 @@ MEDSPA_EXTRA_CSS = """
 }
 .migration-bar-pos { background: #48bb78; }
 .migration-bar-neg { background: #fc8181; }
+
+/* Sections 18-21: Provider / RE / Deposit / Business Formation */
+.provider-split-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin: 16px 0;
+    align-items: start;
+}
+@media (max-width: 768px) {
+    .provider-split-grid { grid-template-columns: 1fr; }
+}
+.highlight-table tr.opportunity-highlight {
+    background: rgba(66, 153, 225, 0.08);
+}
+.highlight-table tr.opportunity-highlight td:first-child {
+    border-left: 3px solid #4299e1;
+}
+[data-theme="dark"] .highlight-table tr.opportunity-highlight {
+    background: rgba(66, 153, 225, 0.12);
+}
 """
 
 
