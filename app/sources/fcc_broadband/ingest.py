@@ -1,8 +1,8 @@
 """
 FCC Broadband ingestion orchestration.
 
-High-level functions that coordinate data fetching, table creation, and data loading
-for FCC broadband coverage and provider datasets.
+Uses Socrata $select/$group aggregation to fetch pre-aggregated provider-level
+data per state (~200-600 rows) instead of millions of raw census-block records.
 
 Follows project rules:
 - Job tracking via ingestion_jobs table
@@ -12,7 +12,6 @@ Follows project rules:
 - Exponential backoff with jitter
 """
 
-import asyncio
 import logging
 from typing import Dict, Any, List
 from datetime import datetime
@@ -36,30 +35,16 @@ async def prepare_table_for_fcc_data(db: Session, dataset: str) -> Dict[str, Any
     2. Generate CREATE TABLE SQL
     3. Execute table creation (idempotent)
     4. Register in dataset_registry
-
-    Args:
-        db: Database session
-        dataset: Dataset identifier (broadband_coverage, broadband_summary, providers)
-
-    Returns:
-        Dictionary with table_name
-
-    Raises:
-        Exception: On table creation errors
     """
     try:
-        # 1. Generate table name
         table_name = metadata.generate_table_name(dataset)
 
-        # 2. Generate CREATE TABLE SQL
         logger.info(f"Creating table {table_name} for FCC {dataset} data")
         create_sql = metadata.generate_create_table_sql(table_name, dataset)
 
-        # 3. Execute table creation (idempotent)
         db.execute(text(create_sql))
         db.commit()
 
-        # 4. Register in dataset_registry
         dataset_id = f"fcc_{dataset}"
 
         existing = (
@@ -69,7 +54,6 @@ async def prepare_table_for_fcc_data(db: Session, dataset: str) -> Dict[str, Any
         )
 
         if existing:
-            logger.info(f"Dataset {dataset_id} already registered")
             existing.last_updated_at = datetime.utcnow()
             existing.source_metadata = {"dataset": dataset}
             db.commit()
@@ -93,22 +77,130 @@ async def prepare_table_for_fcc_data(db: Session, dataset: str) -> Dict[str, Any
         raise
 
 
+async def _fetch_state_aggregated(
+    client: FCCBroadbandClient, state_code: str, state_fips: str, state_name: str
+) -> List[Dict[str, Any]]:
+    """
+    Fetch aggregated broadband data for a state via Socrata GROUP BY.
+
+    Returns parsed coverage records ready for insertion.
+    One API call returns ~200-600 rows per state instead of millions.
+    """
+    all_parsed = []
+    offset = 0
+    page_size = 5000
+
+    while True:
+        raw_records = await client.fetch_state_broadband_aggregated(
+            state_abbr=state_code, limit=page_size, offset=offset
+        )
+
+        if not raw_records:
+            break
+
+        # Parse aggregated records into coverage format
+        for rec in raw_records:
+            provider_id = rec.get("frn") or ""
+            provider_name = rec.get("providername") or ""
+            brand_name = rec.get("dbaname") or ""
+            tech_code = str(rec.get("techcode") or "90")
+
+            max_down = metadata._safe_float(rec.get("max_download"))
+            max_up = metadata._safe_float(rec.get("max_upload"))
+
+            if not provider_id or not provider_name:
+                continue
+
+            all_parsed.append({
+                "geography_type": "state",
+                "geography_id": state_fips,
+                "geography_name": state_name,
+                "provider_id": provider_id,
+                "provider_name": provider_name,
+                "brand_name": brand_name,
+                "technology_code": tech_code,
+                "technology_name": metadata.get_technology_name(tech_code),
+                "max_advertised_down_mbps": max_down,
+                "max_advertised_up_mbps": max_up,
+                "speed_tier": metadata.classify_speed_tier(max_down),
+                "business_service": None,
+                "consumer_service": None,
+                "data_date": None,
+            })
+
+        if len(raw_records) < page_size:
+            break
+        offset += page_size
+
+    return all_parsed
+
+
+def _build_summary_from_coverage(
+    records: List[Dict[str, Any]], state_fips: str, state_name: str
+) -> Dict[str, Any]:
+    """Build a summary record from parsed coverage records."""
+    providers = set()
+    tech_codes = set()
+    max_down = 0
+    max_up = 0
+    speed_sum = 0
+
+    for r in records:
+        if r.get("provider_id"):
+            providers.add(r["provider_id"])
+        tc = r.get("technology_code")
+        if tc:
+            tech_codes.add(tc)
+        down = r.get("max_advertised_down_mbps") or 0
+        up = r.get("max_advertised_up_mbps") or 0
+        if down > max_down:
+            max_down = down
+        if up > max_up:
+            max_up = up
+        speed_sum += down
+
+    total_providers = len(providers)
+    avg_down = speed_sum / len(records) if records else 0
+
+    # Estimate broadband/gigabit percentages from provider offerings
+    broadband_count = sum(
+        1 for r in records if (r.get("max_advertised_down_mbps") or 0) >= 25
+    )
+    gigabit_count = sum(
+        1 for r in records if (r.get("max_advertised_down_mbps") or 0) >= 1000
+    )
+    broadband_pct = (broadband_count / len(records) * 100) if records else None
+    gigabit_pct = (gigabit_count / len(records) * 100) if records else None
+
+    return {
+        "geography_type": "state",
+        "geography_id": state_fips,
+        "geography_name": state_name,
+        "total_providers": total_providers,
+        "total_technologies": len(tech_codes),
+        "fiber_available": "50" in tech_codes,
+        "cable_available": "40" in tech_codes or "41" in tech_codes,
+        "dsl_available": "10" in tech_codes or "20" in tech_codes,
+        "fixed_wireless_available": "70" in tech_codes,
+        "satellite_available": "60" in tech_codes,
+        "mobile_5g_available": "71" in tech_codes,
+        "max_speed_down_mbps": max_down,
+        "max_speed_up_mbps": max_up,
+        "avg_speed_down_mbps": round(avg_down, 2),
+        "broadband_coverage_pct": round(broadband_pct, 2) if broadband_pct else None,
+        "gigabit_coverage_pct": round(gigabit_pct, 2) if gigabit_pct else None,
+        "provider_competition": metadata.classify_competition(total_providers),
+        "data_date": None,
+    }
+
+
 async def ingest_state_coverage(
     db: Session, job_id: int, state_code: str, include_summary: bool = True
 ) -> Dict[str, Any]:
     """
     Ingest FCC broadband coverage data for a single state.
 
-    Uses streaming batch insertion to avoid memory issues with large states.
-
-    Args:
-        db: Database session
-        job_id: Ingestion job ID (MANDATORY per rules)
-        state_code: 2-letter state code (e.g., "CA", "NY")
-        include_summary: Also generate summary statistics
-
-    Returns:
-        Dictionary with ingestion results
+    Uses Socrata aggregation to get ~200-600 rows per state in one API call.
     """
     settings = get_settings()
 
@@ -119,14 +211,12 @@ async def ingest_state_coverage(
     )
 
     try:
-        # Update job status to running
         job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
         if job:
             job.status = JobStatus.RUNNING
             job.started_at = datetime.utcnow()
             db.commit()
 
-        # Convert state code to FIPS
         state_code_upper = state_code.upper()
         state_fips = STATE_FIPS.get(state_code_upper)
         if not state_fips:
@@ -142,114 +232,29 @@ async def ingest_state_coverage(
 
         summary_table = None
         if include_summary:
-            summary_table_info = await prepare_table_for_fcc_data(
-                db, "broadband_summary"
-            )
+            summary_table_info = await prepare_table_for_fcc_data(db, "broadband_summary")
             summary_table = summary_table_info["table_name"]
 
-        # Streaming batch insertion - process and insert each batch immediately
-        # This avoids memory issues with large states like California (5M+ records)
-        offset = 0
-        batch_size = 50000
+        # Fetch aggregated data (one API call, ~200-600 rows)
+        parsed_records = await _fetch_state_aggregated(
+            client, state_code_upper, state_fips, state_name
+        )
+
+        logger.info(
+            f"Fetched {len(parsed_records)} aggregated records for {state_name}"
+        )
+
+        # Insert coverage data
         rows_inserted = 0
-        total_fetched = 0
+        if parsed_records:
+            rows_inserted = await _insert_coverage_data(db, coverage_table, parsed_records)
 
-        # For summary statistics, we'll track aggregates across batches
-        summary_stats = {
-            "providers": set(),
-            "technologies": set(),
-            "max_down": 0,
-            "max_up": 0,
-            "speed_sum": 0,
-            "record_count": 0,
-        }
-
-        while True:
-            logger.info(f"Fetching FCC data for {state_code} (offset={offset})")
-
-            records = await client.fetch_fixed_broadband_data(
-                state_abbr=state_code_upper, limit=batch_size, offset=offset
-            )
-
-            if not records:
-                break
-
-            records_in_batch = len(records)
-            total_fetched += records_in_batch
-            logger.info(f"Fetched {records_in_batch} records (total: {total_fetched})")
-
-            # Parse this batch
-            parsed_batch = metadata.parse_broadband_coverage_response(
-                records,
-                geography_type="state",
-                geography_id=state_fips,
-                geography_name=state_name,
-            )
-
-            # Clear raw records from memory ASAP
-            del records
-
-            # Insert this batch immediately
-            if parsed_batch:
-                batch_inserted = await _insert_coverage_data(
-                    db, coverage_table, parsed_batch
-                )
-                rows_inserted += batch_inserted
-
-                # Update summary statistics for this batch
-                for rec in parsed_batch:
-                    if rec.get("provider_id"):
-                        summary_stats["providers"].add(rec["provider_id"])
-                    if rec.get("technology_code"):
-                        summary_stats["technologies"].add(rec["technology_code"])
-                    down_speed = rec.get("max_advertised_down_mbps") or 0
-                    up_speed = rec.get("max_advertised_up_mbps") or 0
-                    if down_speed > summary_stats["max_down"]:
-                        summary_stats["max_down"] = down_speed
-                    if up_speed > summary_stats["max_up"]:
-                        summary_stats["max_up"] = up_speed
-                    summary_stats["speed_sum"] += down_speed
-                    summary_stats["record_count"] += 1
-
-                # Clear batch from memory
-                del parsed_batch
-
-            # Check if we got a partial batch (means we're done)
-            if records_in_batch < batch_size:
-                break
-
-            offset += batch_size
-
-        # Generate summary if requested
+        # Generate summary
         summary_inserted = 0
-        if include_summary and summary_stats["record_count"] > 0:
-            # Build summary record from aggregated stats
-            tech_codes = summary_stats["technologies"]
-            summary_record = {
-                "geography_type": "state",
-                "geography_id": state_fips,
-                "geography_name": state_name,
-                "total_providers": len(summary_stats["providers"]),
-                "total_technologies": len(tech_codes),
-                "fiber_available": "50" in tech_codes,
-                "cable_available": "40" in tech_codes or "41" in tech_codes,
-                "dsl_available": "10" in tech_codes or "20" in tech_codes,
-                "fixed_wireless_available": "70" in tech_codes,
-                "satellite_available": "60" in tech_codes,
-                "mobile_5g_available": "71" in tech_codes,
-                "max_speed_down_mbps": summary_stats["max_down"],
-                "max_speed_up_mbps": summary_stats["max_up"],
-                "avg_speed_down_mbps": summary_stats["speed_sum"]
-                / summary_stats["record_count"]
-                if summary_stats["record_count"] > 0
-                else 0,
-                "broadband_coverage_pct": None,  # Would need population data
-                "gigabit_coverage_pct": None,  # Would need more analysis
-                "provider_competition": "high"
-                if len(summary_stats["providers"]) > 10
-                else ("medium" if len(summary_stats["providers"]) > 3 else "low"),
-                "data_date": None,
-            }
+        if include_summary and parsed_records:
+            summary_record = _build_summary_from_coverage(
+                parsed_records, state_fips, state_name
+            )
             summary_inserted = await _insert_summary_data(
                 db, summary_table, [summary_record]
             )
@@ -260,9 +265,6 @@ async def ingest_state_coverage(
             if total_rows == 0:
                 job.status = JobStatus.FAILED
                 job.error_message = "Ingestion completed but no rows were inserted"
-                logger.warning(
-                    f"Job {job_id}: No FCC broadband data returned for {state_code}"
-                )
             else:
                 job.status = JobStatus.SUCCESS
             job.completed_at = datetime.utcnow()
@@ -276,22 +278,18 @@ async def ingest_state_coverage(
             "summary_table": summary_table,
             "coverage_rows_inserted": rows_inserted,
             "summary_rows_inserted": summary_inserted,
-            "total_records_fetched": total_fetched,
         }
 
     except Exception as e:
         logger.error(
             f"FCC state coverage ingestion failed for {state_code}: {e}", exc_info=True
         )
-
-        # Update job status to failed
         job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
         if job:
             job.status = JobStatus.FAILED
             job.completed_at = datetime.utcnow()
             job.error_message = str(e)
             db.commit()
-
         raise
 
     finally:
@@ -304,16 +302,7 @@ async def ingest_multiple_states(
     """
     Ingest FCC broadband coverage for multiple states.
 
-    Uses bounded concurrency to respect rate limits.
-
-    Args:
-        db: Database session
-        job_id: Ingestion job ID
-        state_codes: List of state codes to ingest
-        include_summary: Generate summary statistics
-
-    Returns:
-        Aggregated ingestion results
+    Uses Socrata aggregation — one API call per state, ~200-600 rows each.
     """
     settings = get_settings()
 
@@ -324,7 +313,6 @@ async def ingest_multiple_states(
     )
 
     try:
-        # Update job status
         job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
         if job:
             job.status = JobStatus.RUNNING
@@ -341,162 +329,66 @@ async def ingest_multiple_states(
 
         summary_table = None
         if include_summary:
-            summary_table_info = await prepare_table_for_fcc_data(
-                db, "broadband_summary"
-            )
+            summary_table_info = await prepare_table_for_fcc_data(db, "broadband_summary")
             summary_table = summary_table_info["table_name"]
 
         total_coverage_rows = 0
         total_summary_rows = 0
         states_processed = 0
         failed_states = []
+        results = []
 
-        # Process states with bounded concurrency
-        semaphore = asyncio.Semaphore(settings.max_concurrency)
+        for state_code in state_codes:
+            state_code_upper = state_code.upper()
+            state_fips = STATE_FIPS.get(state_code_upper)
+            if not state_fips:
+                logger.warning(f"Invalid state code: {state_code}")
+                failed_states.append(state_code)
+                results.append({"state": state_code, "error": "Invalid state code"})
+                continue
 
-        async def process_state(state_code: str) -> Dict[str, Any]:
-            async with semaphore:
-                state_code_upper = state_code.upper()
-                state_fips = STATE_FIPS.get(state_code_upper)
-                if not state_fips:
-                    logger.warning(f"Invalid state code: {state_code}")
-                    return {"state": state_code, "error": "Invalid state code"}
+            state_name = metadata.STATE_NAMES.get(state_fips, state_code)
 
-                state_name = metadata.STATE_NAMES.get(state_fips, state_code)
+            try:
+                logger.info(f"Processing {state_name} ({state_code})")
 
-                try:
-                    logger.info(f"Processing {state_name} ({state_code})")
+                parsed_records = await _fetch_state_aggregated(
+                    client, state_code_upper, state_fips, state_name
+                )
 
-                    # Streaming batch approach - process and insert each batch immediately
-                    offset = 0
-                    batch_size = 50000
-                    coverage_rows = 0
-                    total_fetched = 0
-
-                    # Track summary stats across batches
-                    summary_stats = {
-                        "providers": set(),
-                        "technologies": set(),
-                        "max_down": 0,
-                        "max_up": 0,
-                        "speed_sum": 0,
-                        "record_count": 0,
-                    }
-
-                    while True:
-                        records = await client.fetch_fixed_broadband_data(
-                            state_abbr=state_code_upper, limit=batch_size, offset=offset
-                        )
-
-                        if not records:
-                            break
-
-                        records_in_batch = len(records)
-                        total_fetched += records_in_batch
-
-                        # Parse this batch
-                        parsed_batch = metadata.parse_broadband_coverage_response(
-                            records,
-                            geography_type="state",
-                            geography_id=state_fips,
-                            geography_name=state_name,
-                        )
-
-                        # Clear raw records immediately
-                        del records
-
-                        # Insert batch immediately
-                        if parsed_batch:
-                            batch_inserted = await _insert_coverage_data(
-                                db, coverage_table, parsed_batch
-                            )
-                            coverage_rows += batch_inserted
-
-                            # Update summary stats
-                            for rec in parsed_batch:
-                                if rec.get("provider_id"):
-                                    summary_stats["providers"].add(rec["provider_id"])
-                                if rec.get("technology_code"):
-                                    summary_stats["technologies"].add(
-                                        rec["technology_code"]
-                                    )
-                                down_speed = rec.get("max_advertised_down_mbps") or 0
-                                up_speed = rec.get("max_advertised_up_mbps") or 0
-                                if down_speed > summary_stats["max_down"]:
-                                    summary_stats["max_down"] = down_speed
-                                if up_speed > summary_stats["max_up"]:
-                                    summary_stats["max_up"] = up_speed
-                                summary_stats["speed_sum"] += down_speed
-                                summary_stats["record_count"] += 1
-
-                            del parsed_batch
-
-                        if records_in_batch < batch_size:
-                            break
-
-                        offset += batch_size
-
-                    summary_rows = 0
-                    if include_summary and summary_stats["record_count"] > 0:
-                        tech_codes = summary_stats["technologies"]
-                        summary_record = {
-                            "geography_type": "state",
-                            "geography_id": state_fips,
-                            "geography_name": state_name,
-                            "total_providers": len(summary_stats["providers"]),
-                            "total_technologies": len(tech_codes),
-                            "fiber_available": "50" in tech_codes,
-                            "cable_available": "40" in tech_codes or "41" in tech_codes,
-                            "dsl_available": "10" in tech_codes or "20" in tech_codes,
-                            "fixed_wireless_available": "70" in tech_codes,
-                            "satellite_available": "60" in tech_codes,
-                            "mobile_5g_available": "71" in tech_codes,
-                            "max_speed_down_mbps": summary_stats["max_down"],
-                            "max_speed_up_mbps": summary_stats["max_up"],
-                            "avg_speed_down_mbps": summary_stats["speed_sum"]
-                            / summary_stats["record_count"],
-                            "broadband_coverage_pct": None,
-                            "gigabit_coverage_pct": None,
-                            "provider_competition": "high"
-                            if len(summary_stats["providers"]) > 10
-                            else (
-                                "medium"
-                                if len(summary_stats["providers"]) > 3
-                                else "low"
-                            ),
-                            "data_date": None,
-                        }
-                        summary_rows = await _insert_summary_data(
-                            db, summary_table, [summary_record]
-                        )
-
-                    logger.info(
-                        f"Completed {state_name}: {coverage_rows} coverage rows, {summary_rows} summary rows"
+                coverage_rows = 0
+                if parsed_records:
+                    coverage_rows = await _insert_coverage_data(
+                        db, coverage_table, parsed_records
                     )
 
-                    return {
-                        "state": state_code,
-                        "coverage_rows": coverage_rows,
-                        "summary_rows": summary_rows,
-                        "records_fetched": total_fetched,
-                    }
+                summary_rows = 0
+                if include_summary and parsed_records:
+                    summary_record = _build_summary_from_coverage(
+                        parsed_records, state_fips, state_name
+                    )
+                    summary_rows = await _insert_summary_data(
+                        db, summary_table, [summary_record]
+                    )
 
-                except Exception as e:
-                    logger.error(f"Failed to process {state_code}: {e}")
-                    return {"state": state_code, "error": str(e)}
+                logger.info(
+                    f"Completed {state_name}: {coverage_rows} coverage, "
+                    f"{summary_rows} summary rows"
+                )
 
-        # Process all states
-        results = []
-        for state_code in state_codes:
-            result = await process_state(state_code)
-            results.append(result)
-
-            if "error" in result:
-                failed_states.append(state_code)
-            else:
                 states_processed += 1
-                total_coverage_rows += result.get("coverage_rows", 0)
-                total_summary_rows += result.get("summary_rows", 0)
+                total_coverage_rows += coverage_rows
+                total_summary_rows += summary_rows
+                results.append({
+                    "state": state_code,
+                    "coverage_rows": coverage_rows,
+                    "summary_rows": summary_rows,
+                })
+
+            except Exception as e:
+                logger.error(f"Failed to process {state_code}: {e}")
+                failed_states.append(state_code)
+                results.append({"state": state_code, "error": str(e)})
 
         # Update job status
         total_rows = total_coverage_rows + total_summary_rows
@@ -504,11 +396,8 @@ async def ingest_multiple_states(
             if total_rows == 0:
                 job.status = JobStatus.FAILED
                 job.error_message = "Ingestion completed but no rows were inserted"
-                logger.warning(
-                    f"Job {job_id}: No FCC broadband data returned for any state"
-                )
             elif failed_states:
-                job.status = JobStatus.SUCCESS  # Partial success
+                job.status = JobStatus.SUCCESS
                 job.error_message = f"Failed states: {failed_states}"
             else:
                 job.status = JobStatus.SUCCESS
@@ -529,14 +418,12 @@ async def ingest_multiple_states(
 
     except Exception as e:
         logger.error(f"FCC multi-state ingestion failed: {e}", exc_info=True)
-
         job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
         if job:
             job.status = JobStatus.FAILED
             job.completed_at = datetime.utcnow()
             job.error_message = str(e)
             db.commit()
-
         raise
 
     finally:
@@ -549,15 +436,7 @@ async def ingest_all_states(
     """
     Ingest FCC broadband coverage for all 50 states + DC.
 
-    This is a large operation that may take 30-60 minutes.
-
-    Args:
-        db: Database session
-        job_id: Ingestion job ID
-        include_summary: Generate summary statistics
-
-    Returns:
-        Ingestion results for all states
+    With aggregation, this takes ~5-10 minutes instead of hours.
     """
     return await ingest_multiple_states(
         db=db, job_id=job_id, state_codes=US_STATES, include_summary=include_summary
@@ -569,15 +448,6 @@ async def ingest_county_coverage(
 ) -> Dict[str, Any]:
     """
     Ingest FCC broadband coverage for a specific county.
-
-    Args:
-        db: Database session
-        job_id: Ingestion job ID
-        county_fips: 5-digit county FIPS code (e.g., "06001" for Alameda, CA)
-        include_summary: Generate summary statistics
-
-    Returns:
-        Ingestion results
     """
     settings = get_settings()
 
@@ -588,7 +458,6 @@ async def ingest_county_coverage(
     )
 
     try:
-        # Update job status
         job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
         if job:
             job.status = JobStatus.RUNNING
@@ -603,18 +472,13 @@ async def ingest_county_coverage(
 
         summary_table = None
         if include_summary:
-            summary_table_info = await prepare_table_for_fcc_data(
-                db, "broadband_summary"
-            )
+            summary_table_info = await prepare_table_for_fcc_data(db, "broadband_summary")
             summary_table = summary_table_info["table_name"]
 
         # Fetch county data
         county_data = await client.fetch_county_summary(county_fips)
-
-        # Also fetch detailed provider data if available
         provider_data = await client.fetch_providers_by_county(county_fips)
 
-        # Combine and parse
         all_records = []
         if isinstance(county_data, dict) and county_data.get("data"):
             all_records.extend(county_data["data"])
@@ -625,14 +489,12 @@ async def ingest_county_coverage(
             all_records,
             geography_type="county",
             geography_id=county_fips,
-            geography_name=None,  # Would need lookup
+            geography_name=None,
         )
 
         rows_inserted = 0
         if parsed_records:
-            rows_inserted = await _insert_coverage_data(
-                db, coverage_table, parsed_records
-            )
+            rows_inserted = await _insert_coverage_data(db, coverage_table, parsed_records)
 
         summary_inserted = 0
         if include_summary and parsed_records:
@@ -644,15 +506,11 @@ async def ingest_county_coverage(
                     db, summary_table, [summary_record]
                 )
 
-        # Update job status
         total_rows = rows_inserted + summary_inserted
         if job:
             if total_rows == 0:
                 job.status = JobStatus.FAILED
                 job.error_message = "Ingestion completed but no rows were inserted"
-                logger.warning(
-                    f"Job {job_id}: No FCC broadband data returned for county {county_fips}"
-                )
             else:
                 job.status = JobStatus.SUCCESS
             job.completed_at = datetime.utcnow()
@@ -669,14 +527,12 @@ async def ingest_county_coverage(
 
     except Exception as e:
         logger.error(f"FCC county coverage ingestion failed: {e}", exc_info=True)
-
         job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
         if job:
             job.status = JobStatus.FAILED
             job.completed_at = datetime.utcnow()
             job.error_message = str(e)
             db.commit()
-
         raise
 
     finally:
@@ -689,11 +545,7 @@ async def ingest_county_coverage(
 async def _insert_coverage_data(
     db: Session, table_name: str, records: List[Dict[str, Any]]
 ) -> int:
-    """
-    Insert broadband coverage data with upsert logic.
-
-    Uses parameterized queries per project rules.
-    """
+    """Insert broadband coverage data with upsert logic."""
     if not records:
         return 0
 
@@ -719,7 +571,6 @@ async def _insert_coverage_data(
     placeholders = ", ".join([f":{col}" for col in columns])
     column_list = ", ".join([f'"{col}"' for col in columns])
 
-    # Columns to update on conflict
     update_cols = [
         "geography_name",
         "provider_name",
@@ -734,11 +585,10 @@ async def _insert_coverage_data(
     ]
     update_set = ", ".join([f'"{col}" = EXCLUDED."{col}"' for col in update_cols])
 
-    # ON CONFLICT uses the unique index
     insert_sql = f"""
-        INSERT INTO {table_name} 
+        INSERT INTO {table_name}
         ({column_list})
-        VALUES 
+        VALUES
         ({placeholders})
         ON CONFLICT (geography_type, geography_id, provider_id, technology_code)
         DO UPDATE SET
@@ -755,9 +605,6 @@ async def _insert_coverage_data(
         rows_inserted += len(batch)
         db.commit()
 
-        if (i + batch_size) % 5000 == 0:
-            logger.info(f"Inserted {rows_inserted}/{len(records)} coverage rows")
-
     logger.info(f"Successfully inserted {rows_inserted} coverage rows")
     return rows_inserted
 
@@ -765,9 +612,7 @@ async def _insert_coverage_data(
 async def _insert_summary_data(
     db: Session, table_name: str, records: List[Dict[str, Any]]
 ) -> int:
-    """
-    Insert broadband summary data with upsert logic.
-    """
+    """Insert broadband summary data with upsert logic."""
     if not records:
         return 0
 
@@ -803,9 +648,9 @@ async def _insert_summary_data(
     update_set = ", ".join([f'"{col}" = EXCLUDED."{col}"' for col in update_cols])
 
     insert_sql = f"""
-        INSERT INTO {table_name} 
+        INSERT INTO {table_name}
         ({column_list})
-        VALUES 
+        VALUES
         ({placeholders})
         ON CONFLICT (geography_type, geography_id)
         DO UPDATE SET

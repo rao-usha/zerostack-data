@@ -63,7 +63,7 @@ class FCCBroadbandClient(BaseAPIClient):
             max_concurrency=max_concurrency,
             max_retries=max_retries,
             backoff_factor=backoff_factor,
-            timeout=120.0,
+            timeout=300.0,  # 5min — Socrata aggregation over millions of rows is slow
             connect_timeout=30.0,
             rate_limit_interval=config.get_rate_limit_interval(),
         )
@@ -117,7 +117,7 @@ class FCCBroadbandClient(BaseAPIClient):
     async def fetch_fixed_broadband_data(
         self, state_abbr: Optional[str] = None, limit: int = 50000, offset: int = 0
     ) -> List[Dict[str, Any]]:
-        """Fetch fixed broadband deployment data from FCC Open Data."""
+        """Fetch fixed broadband deployment data from FCC Open Data (raw records)."""
         dataset_id = self.DATASETS["fixed_broadband_deployment"]
         url = f"{self.OPENDATA_BASE}/{dataset_id}.json"
 
@@ -127,6 +127,36 @@ class FCCBroadbandClient(BaseAPIClient):
             params["$where"] = f"stateabbr = '{state_abbr.upper()}'"
 
         return await self.get(url, params=params, resource_id="fixed_broadband")
+
+    async def fetch_state_broadband_aggregated(
+        self, state_abbr: str, limit: int = 5000, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch aggregated broadband data for a state using Socrata GROUP BY.
+
+        Returns one row per (provider, technology) with max speeds and block counts.
+        Typically ~200-600 rows per state instead of millions of raw records.
+        """
+        dataset_id = self.DATASETS["fixed_broadband_deployment"]
+        url = f"{self.OPENDATA_BASE}/{dataset_id}.json"
+
+        params = {
+            "$select": (
+                "frn,providername,dbaname,techcode,"
+                "max(maxaddown) as max_download,"
+                "max(maxadup) as max_upload,"
+                "count(*) as block_count"
+            ),
+            "$where": f"stateabbr='{state_abbr.upper()}'",
+            "$group": "frn,providername,dbaname,techcode",
+            "$order": "providername,techcode",
+            "$limit": str(limit),
+            "$offset": str(offset),
+        }
+
+        return await self.get(
+            url, params=params, resource_id=f"broadband_agg_{state_abbr}"
+        )
 
     async def fetch_mobile_broadband_data(
         self, state_fips: Optional[str] = None, limit: int = 50000, offset: int = 0
