@@ -418,6 +418,14 @@ class MedSpaMarketTemplate:
             **self._get_stealth_wealth_data(db, state_filter),
             # Section 17: Migration Alpha
             **self._get_migration_alpha_data(db, state_filter),
+            # Section 18: Medical Provider Density Signal
+            **self._get_provider_density_data(db, state_filter),
+            # Section 19: Real Estate Appreciation Alpha
+            **self._get_real_estate_alpha_data(db, state_filter),
+            # Section 20: Deposit Wealth Concentration
+            **self._get_deposit_wealth_data(db, state_filter),
+            # Section 21: Business Formation Velocity
+            **self._get_business_formation_data(db, state_filter),
         }
 
         return data
@@ -987,6 +995,95 @@ class MedSpaMarketTemplate:
             row = result.fetchone()
             if row and row[2]:
                 freshness["irs_soi_migration"] = {
+                    "earliest": str(row[0]) if row[0] else None,
+                    "latest": str(row[1]) if row[1] else None,
+                    "total": row[2],
+                }
+        except Exception:
+            db.rollback()
+
+        # CMS Medicare Utilization freshness
+        try:
+            result = db.execute(
+                text("SELECT COUNT(*) as total FROM cms_medicare_utilization"),
+            )
+            row = result.fetchone()
+            if row and row[0]:
+                freshness["cms_medicare"] = {
+                    "earliest": None, "latest": None, "total": row[0],
+                }
+        except Exception:
+            db.rollback()
+
+        # Redfin freshness
+        try:
+            result = db.execute(
+                text("""
+                    SELECT MIN(period_end) as earliest, MAX(period_end) as latest,
+                           COUNT(*) as total
+                    FROM realestate_redfin
+                """),
+            )
+            row = result.fetchone()
+            if row and row[2]:
+                freshness["redfin"] = {
+                    "earliest": row[0].isoformat() if row[0] else None,
+                    "latest": row[1].isoformat() if row[1] else None,
+                    "total": row[2],
+                }
+        except Exception:
+            db.rollback()
+
+        # FHFA HPI freshness
+        try:
+            result = db.execute(
+                text("""
+                    SELECT MIN(year) as earliest, MAX(year) as latest,
+                           COUNT(*) as total
+                    FROM realestate_fhfa_hpi
+                """),
+            )
+            row = result.fetchone()
+            if row and row[2]:
+                freshness["fhfa_hpi"] = {
+                    "earliest": str(row[0]) if row[0] else None,
+                    "latest": str(row[1]) if row[1] else None,
+                    "total": row[2],
+                }
+        except Exception:
+            db.rollback()
+
+        # FDIC Summary Deposits freshness
+        try:
+            result = db.execute(
+                text("""
+                    SELECT MIN(year) as earliest, MAX(year) as latest,
+                           COUNT(*) as total
+                    FROM fdic_summary_deposits
+                """),
+            )
+            row = result.fetchone()
+            if row and row[2]:
+                freshness["fdic_deposits"] = {
+                    "earliest": str(row[0]) if row[0] else None,
+                    "latest": str(row[1]) if row[1] else None,
+                    "total": row[2],
+                }
+        except Exception:
+            db.rollback()
+
+        # IRS SOI Business Income freshness
+        try:
+            result = db.execute(
+                text("""
+                    SELECT MIN(tax_year) as earliest, MAX(tax_year) as latest,
+                           COUNT(*) as total
+                    FROM irs_soi_business_income
+                """),
+            )
+            row = result.fetchone()
+            if row and row[2]:
+                freshness["irs_soi_business_income"] = {
                     "earliest": str(row[0]) if row[0] else None,
                     "latest": str(row[1]) if row[1] else None,
                     "total": row[2],
@@ -1872,6 +1969,687 @@ class MedSpaMarketTemplate:
             return {"migration_alpha": {}}
 
     # ------------------------------------------------------------------
+    # Section 18: Medical Provider Density Signal (CMS Medicare)
+    # ------------------------------------------------------------------
+
+    def _get_provider_density_data(self, db: Session, state: Optional[str]) -> Dict:
+        """Cross-reference CMS Medicare provider counts with medspa density by ZIP."""
+        try:
+            check = db.execute(text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_name = 'cms_medicare_utilization'"
+            ))
+            if not check.fetchone():
+                return {"provider_density": {}}
+
+            aesthetics_types = [
+                'Dermatology',
+                'Plastic and Reconstructive Surgery',
+                'Nurse Practitioner',
+                'Physician Assistant',
+            ]
+
+            state_clause = "AND cu.rndrng_prvdr_state_abrvtn = :state" if state else ""
+            params: Dict[str, Any] = {"provider_types": aesthetics_types}
+            if state:
+                params["state"] = state.upper()
+
+            # Provider counts by type (for bar chart)
+            type_rows = db.execute(text(f"""
+                SELECT
+                    cu.rndrng_prvdr_type,
+                    COUNT(DISTINCT cu.rndrng_npi) AS provider_count,
+                    SUM(cu.tot_benes) AS total_benes
+                FROM cms_medicare_utilization cu
+                WHERE cu.rndrng_prvdr_type = ANY(:provider_types)
+                    {state_clause}
+                GROUP BY cu.rndrng_prvdr_type
+                ORDER BY provider_count DESC
+            """), params).fetchall()
+
+            provider_by_type = [
+                {
+                    "type": r[0],
+                    "count": int(r[1] or 0),
+                    "beneficiaries": int(r[2] or 0),
+                }
+                for r in type_rows
+            ]
+
+            # ZIP-level aggregation with medspa cross-reference
+            zip_rows = db.execute(text(f"""
+                WITH zip_providers AS (
+                    SELECT
+                        cu.rndrng_prvdr_zip5 AS zip_code,
+                        COUNT(DISTINCT cu.rndrng_npi) AS provider_count,
+                        SUM(cu.tot_benes) AS total_benes,
+                        STRING_AGG(DISTINCT cu.rndrng_prvdr_type, ', ') AS provider_types
+                    FROM cms_medicare_utilization cu
+                    WHERE cu.rndrng_prvdr_type = ANY(:provider_types)
+                        {state_clause}
+                    GROUP BY cu.rndrng_prvdr_zip5
+                    HAVING COUNT(DISTINCT cu.rndrng_npi) >= 3
+                )
+                SELECT
+                    zp.zip_code,
+                    zp.provider_count,
+                    zp.total_benes,
+                    zp.provider_types,
+                    COALESCE(zms.overall_score, 0) AS medspa_score,
+                    COALESCE(zms.grade, '-') AS medspa_grade,
+                    COALESCE(mp_cnt.medspa_count, 0) AS medspa_count,
+                    CASE WHEN COALESCE(mp_cnt.medspa_count, 0) > 0
+                        THEN ROUND(zp.provider_count * 1.0 / mp_cnt.medspa_count, 1)
+                        ELSE zp.provider_count * 1.0
+                    END AS imbalance_score,
+                    COALESCE(irs.num_returns, 0) AS num_returns
+                FROM zip_providers zp
+                LEFT JOIN zip_medspa_scores zms ON zms.zip_code = zp.zip_code
+                LEFT JOIN (
+                    SELECT zip_code, COUNT(*) AS medspa_count
+                    FROM medspa_prospects
+                    GROUP BY zip_code
+                ) mp_cnt ON mp_cnt.zip_code = zp.zip_code
+                LEFT JOIN (
+                    SELECT zip_code, num_returns
+                    FROM irs_soi_zip_income
+                    WHERE agi_class = '0'
+                        AND tax_year = (SELECT MAX(tax_year) FROM irs_soi_zip_income)
+                ) irs ON irs.zip_code = zp.zip_code
+                ORDER BY imbalance_score DESC
+                LIMIT 50
+            """), params).fetchall()
+
+            opportunity_zips = [
+                {
+                    "zip_code": r[0],
+                    "provider_count": int(r[1] or 0),
+                    "beneficiaries": int(r[2] or 0),
+                    "provider_types": r[3] or "",
+                    "medspa_score": float(r[4] or 0),
+                    "medspa_grade": r[5] or "-",
+                    "medspa_count": int(r[6] or 0),
+                    "imbalance_score": float(r[7] or 0),
+                    "num_returns": int(r[8] or 0),
+                }
+                for r in zip_rows
+            ]
+
+            # Filter true opportunity ZIPs (low medspa score)
+            opp_zips = [z for z in opportunity_zips if z["medspa_score"] < 60]
+
+            total_providers = sum(t["count"] for t in provider_by_type)
+            total_benes = sum(t["beneficiaries"] for t in provider_by_type)
+            avg_per_zip = (
+                round(total_providers / len(opportunity_zips), 1)
+                if opportunity_zips else 0
+            )
+            top_type = provider_by_type[0]["type"] if provider_by_type else "-"
+
+            return {
+                "provider_density": {
+                    "opportunity_zips": opportunity_zips,
+                    "provider_by_type": provider_by_type,
+                    "summary": {
+                        "total_provider_zip_pairs": len(opportunity_zips),
+                        "opportunity_zips": len(opp_zips),
+                        "avg_providers_per_zip": avg_per_zip,
+                        "top_provider_type": top_type,
+                        "total_providers": total_providers,
+                        "total_beneficiaries": total_benes,
+                    },
+                }
+            }
+        except Exception as e:
+            logger.warning(f"Could not compute provider density data: {e}")
+            db.rollback()
+            return {"provider_density": {}}
+
+    # ------------------------------------------------------------------
+    # Section 19: Real Estate Appreciation Alpha (Redfin / FHFA)
+    # ------------------------------------------------------------------
+
+    def _get_real_estate_alpha_data(self, db: Session, state: Optional[str]) -> Dict:
+        """Cross-reference real estate appreciation with medspa scores for timing signals."""
+        try:
+            from collections import defaultdict
+
+            # Try Redfin first (ZIP-level), fall back to FHFA (ZIP3-level)
+            source_used = None
+
+            # Check Redfin
+            check_redfin = db.execute(text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_name = 'realestate_redfin'"
+            ))
+            has_redfin = check_redfin.fetchone() is not None
+
+            # Check FHFA
+            check_fhfa = db.execute(text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_name = 'realestate_fhfa_hpi'"
+            ))
+            has_fhfa = check_fhfa.fetchone() is not None
+
+            if not has_redfin and not has_fhfa:
+                return {"real_estate_alpha": {}}
+
+            state_clause = ""
+            params: Dict[str, Any] = {}
+            if state:
+                params["state"] = state.upper()
+
+            zip_re_data = []
+
+            if has_redfin:
+                source_used = "Redfin"
+                state_clause = "AND r.state_code = :state" if state else ""
+                rows = db.execute(text(f"""
+                    WITH latest AS (
+                        SELECT
+                            r.zip_code,
+                            r.state_code,
+                            r.median_sale_price,
+                            r.period_end,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY r.zip_code
+                                ORDER BY r.period_end DESC
+                            ) AS rn
+                        FROM realestate_redfin r
+                        WHERE r.median_sale_price IS NOT NULL
+                            AND r.zip_code IS NOT NULL
+                            {state_clause}
+                    ),
+                    prior_year AS (
+                        SELECT
+                            r.zip_code,
+                            r.median_sale_price AS prior_price,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY r.zip_code
+                                ORDER BY r.period_end DESC
+                            ) AS rn
+                        FROM realestate_redfin r
+                        WHERE r.median_sale_price IS NOT NULL
+                            AND r.zip_code IS NOT NULL
+                            AND r.period_end <= (
+                                SELECT MAX(period_end) - INTERVAL '11 months'
+                                FROM realestate_redfin
+                            )
+                            {state_clause}
+                    )
+                    SELECT
+                        l.zip_code,
+                        l.state_code,
+                        l.median_sale_price,
+                        p.prior_price,
+                        CASE WHEN p.prior_price > 0
+                            THEN ROUND(((l.median_sale_price - p.prior_price)
+                                 * 100.0 / p.prior_price)::numeric, 1)
+                            ELSE NULL
+                        END AS yoy_change
+                    FROM latest l
+                    LEFT JOIN prior_year p ON p.zip_code = l.zip_code AND p.rn = 1
+                    WHERE l.rn = 1
+                    ORDER BY l.median_sale_price DESC
+                """), params).fetchall()
+
+                zip_re_data = [
+                    {
+                        "zip_code": r[0],
+                        "state": r[1],
+                        "median_price": float(r[2] or 0),
+                        "yoy_change": float(r[4]) if r[4] is not None else None,
+                    }
+                    for r in rows
+                ]
+            elif has_fhfa:
+                source_used = "FHFA"
+                state_clause = "AND h.state_abbr = :state" if state else ""
+                rows = db.execute(text(f"""
+                    WITH latest AS (
+                        SELECT
+                            h.geography_id AS zip3,
+                            h.state_abbr,
+                            h.index_value,
+                            h.year,
+                            h.quarter,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY h.geography_id
+                                ORDER BY h.year DESC, h.quarter DESC
+                            ) AS rn
+                        FROM realestate_fhfa_hpi h
+                        WHERE h.geography_type = 'ZIP3'
+                            AND h.index_value IS NOT NULL
+                            {state_clause}
+                    ),
+                    prior AS (
+                        SELECT
+                            h.geography_id AS zip3,
+                            h.index_value AS prior_value,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY h.geography_id
+                                ORDER BY h.year DESC, h.quarter DESC
+                            ) AS rn
+                        FROM realestate_fhfa_hpi h
+                        WHERE h.geography_type = 'ZIP3'
+                            AND h.index_value IS NOT NULL
+                            AND (h.year * 4 + h.quarter) <= (
+                                (SELECT MAX(year) FROM realestate_fhfa_hpi
+                                 WHERE geography_type = 'ZIP3') * 4
+                                + (SELECT MAX(quarter) FROM realestate_fhfa_hpi
+                                   WHERE geography_type = 'ZIP3'
+                                   AND year = (SELECT MAX(year) FROM realestate_fhfa_hpi
+                                               WHERE geography_type = 'ZIP3'))
+                            ) - 4
+                            {state_clause}
+                    )
+                    SELECT
+                        l.zip3,
+                        l.state_abbr,
+                        l.index_value,
+                        p.prior_value,
+                        CASE WHEN p.prior_value > 0
+                            THEN ROUND(((l.index_value - p.prior_value)
+                                 * 100.0 / p.prior_value)::numeric, 1)
+                            ELSE NULL
+                        END AS yoy_change
+                    FROM latest l
+                    LEFT JOIN prior p ON p.zip3 = l.zip3 AND p.rn = 1
+                    WHERE l.rn = 1
+                    ORDER BY l.index_value DESC
+                """), params).fetchall()
+
+                zip_re_data = [
+                    {
+                        "zip_code": r[0],
+                        "state": r[1],
+                        "median_price": float(r[2] or 0),
+                        "yoy_change": float(r[4]) if r[4] is not None else None,
+                    }
+                    for r in rows
+                ]
+
+            if not zip_re_data:
+                return {"real_estate_alpha": {}}
+
+            # Load medspa scores for cross-reference (client-side join)
+            score_rows = db.execute(text(
+                "SELECT zip_code, overall_score, grade FROM zip_medspa_scores"
+            )).fetchall()
+            score_map = {r[0]: {"score": float(r[1] or 0), "grade": r[2] or "-"} for r in score_rows}
+
+            # Enrich with medspa scores
+            for z in zip_re_data:
+                zk = z["zip_code"]
+                ms = score_map.get(zk, {"score": 0, "grade": "-"})
+                z["medspa_score"] = ms["score"]
+                z["medspa_grade"] = ms["grade"]
+
+            # Timing opportunity ZIPs: appreciating + medspa score < 60
+            timing_zips = [
+                z for z in zip_re_data
+                if z.get("yoy_change") is not None
+                and z["yoy_change"] > 0
+                and z["medspa_score"] < 60
+            ]
+            timing_zips.sort(key=lambda x: x["yoy_change"], reverse=True)
+
+            # State-level summary
+            state_agg = defaultdict(lambda: {"prices": [], "yoys": []})
+            for z in zip_re_data:
+                st = z.get("state")
+                if st:
+                    state_agg[st]["prices"].append(z["median_price"])
+                    if z.get("yoy_change") is not None:
+                        state_agg[st]["yoys"].append(z["yoy_change"])
+
+            state_summary = []
+            for st, vals in state_agg.items():
+                avg_price = round(sum(vals["prices"]) / len(vals["prices"]), 0) if vals["prices"] else 0
+                avg_yoy = round(sum(vals["yoys"]) / len(vals["yoys"]), 1) if vals["yoys"] else 0
+                state_summary.append({
+                    "state": st,
+                    "avg_median_price": avg_price,
+                    "avg_yoy_change": avg_yoy,
+                    "zip_count": len(vals["prices"]),
+                })
+            state_summary.sort(key=lambda x: x["avg_yoy_change"], reverse=True)
+
+            # Summary KPIs
+            all_prices = [z["median_price"] for z in zip_re_data if z["median_price"] > 0]
+            all_yoys = [z["yoy_change"] for z in zip_re_data if z.get("yoy_change") is not None]
+            avg_price = round(sum(all_prices) / len(all_prices), 0) if all_prices else 0
+            avg_yoy = round(sum(all_yoys) / len(all_yoys), 1) if all_yoys else 0
+            hottest = state_summary[0]["state"] if state_summary else "-"
+
+            return {
+                "real_estate_alpha": {
+                    "timing_zips": timing_zips[:50],
+                    "state_summary": state_summary,
+                    "source": source_used,
+                    "summary": {
+                        "avg_median_price": avg_price,
+                        "avg_yoy_change": avg_yoy,
+                        "timing_opportunity_zips": len(timing_zips),
+                        "hottest_state": hottest,
+                        "zips_analyzed": len(zip_re_data),
+                    },
+                }
+            }
+        except Exception as e:
+            logger.warning(f"Could not compute real estate alpha data: {e}")
+            db.rollback()
+            return {"real_estate_alpha": {}}
+
+    # ------------------------------------------------------------------
+    # Section 20: Deposit Wealth Concentration (FDIC)
+    # ------------------------------------------------------------------
+
+    def _get_deposit_wealth_data(self, db: Session, state: Optional[str]) -> Dict:
+        """Cross-reference FDIC branch deposits with medspa scores for wealth signals."""
+        try:
+            check = db.execute(text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_name = 'fdic_summary_deposits'"
+            ))
+            if not check.fetchone():
+                return {"deposit_wealth": {}}
+
+            # Get latest year
+            yr_row = db.execute(text(
+                "SELECT MAX(year) FROM fdic_summary_deposits"
+            )).fetchone()
+            if not yr_row or not yr_row[0]:
+                return {"deposit_wealth": {}}
+            latest_year = yr_row[0]
+
+            state_clause = "AND fd.stalpbr = :state" if state else ""
+            params: Dict[str, Any] = {"year": latest_year}
+            if state:
+                params["state"] = state.upper()
+
+            # ZIP-level deposit aggregation
+            zip_rows = db.execute(text(f"""
+                WITH zip_deposits AS (
+                    SELECT
+                        fd.zipbr AS zip_code,
+                        fd.stalpbr AS state_abbr,
+                        SUM(fd.depsum) AS total_deposits,
+                        COUNT(*) AS branch_count
+                    FROM fdic_summary_deposits fd
+                    WHERE fd.year = :year
+                        AND LENGTH(fd.zipbr) = 5
+                        {state_clause}
+                    GROUP BY fd.zipbr, fd.stalpbr
+                )
+                SELECT
+                    zd.zip_code,
+                    zd.state_abbr,
+                    zd.total_deposits,
+                    zd.branch_count,
+                    COALESCE(irs.num_returns, 0) AS num_returns,
+                    CASE WHEN COALESCE(irs.num_returns, 0) > 0
+                        THEN ROUND((zd.total_deposits / irs.num_returns)::numeric, 0)
+                        ELSE 0
+                    END AS deposits_per_return,
+                    COALESCE(zms.overall_score, 0) AS medspa_score,
+                    COALESCE(zms.grade, '-') AS medspa_grade
+                FROM zip_deposits zd
+                LEFT JOIN (
+                    SELECT zip_code, num_returns
+                    FROM irs_soi_zip_income
+                    WHERE agi_class = '0'
+                        AND tax_year = (SELECT MAX(tax_year) FROM irs_soi_zip_income)
+                ) irs ON irs.zip_code = zd.zip_code
+                LEFT JOIN zip_medspa_scores zms ON zms.zip_code = zd.zip_code
+                WHERE zd.total_deposits > 0
+                ORDER BY deposits_per_return DESC
+                LIMIT 100
+            """), params).fetchall()
+
+            all_zips = [
+                {
+                    "zip_code": r[0],
+                    "state": r[1],
+                    "total_deposits": float(r[2] or 0),
+                    "branch_count": int(r[3] or 0),
+                    "num_returns": int(r[4] or 0),
+                    "deposits_per_return": float(r[5] or 0),
+                    "medspa_score": float(r[6] or 0),
+                    "medspa_grade": r[7] or "-",
+                }
+                for r in zip_rows
+            ]
+
+            # Underserved = high deposits + medspa score < 60
+            underserved = [z for z in all_zips if z["medspa_score"] < 60]
+
+            # State deposit concentration
+            state_dep_rows = db.execute(text(f"""
+                SELECT
+                    fd.stalpbr AS state_abbr,
+                    SUM(fd.depsum) AS total_deposits
+                FROM fdic_summary_deposits fd
+                WHERE fd.year = :year
+                    AND LENGTH(fd.zipbr) = 5
+                    {state_clause}
+                GROUP BY fd.stalpbr
+                ORDER BY total_deposits DESC
+            """), params).fetchall()
+
+            state_deposits = [
+                {"state": r[0], "deposits": float(r[1] or 0)}
+                for r in state_dep_rows
+            ]
+
+            # Summary KPIs
+            total_deposits = sum(s["deposits"] for s in state_deposits)
+            avg_dpr = (
+                round(sum(z["deposits_per_return"] for z in all_zips if z["deposits_per_return"] > 0)
+                      / max(len([z for z in all_zips if z["deposits_per_return"] > 0]), 1), 0)
+            )
+
+            return {
+                "deposit_wealth": {
+                    "underserved_zips": underserved[:50],
+                    "all_zips": all_zips[:50],
+                    "state_deposits": state_deposits,
+                    "summary": {
+                        "zips_analyzed": len(all_zips),
+                        "total_deposits_t": round(total_deposits / 1e12, 2),
+                        "avg_deposits_per_return": avg_dpr,
+                        "underserved_zips": len(underserved),
+                        "year": latest_year,
+                    },
+                }
+            }
+        except Exception as e:
+            logger.warning(f"Could not compute deposit wealth data: {e}")
+            db.rollback()
+            return {"deposit_wealth": {}}
+
+    # ------------------------------------------------------------------
+    # Section 21: Business Formation Velocity (IRS SOI Business Income)
+    # ------------------------------------------------------------------
+
+    def _get_business_formation_data(self, db: Session, state: Optional[str]) -> Dict:
+        """Compute business density from IRS SOI business income data vs medspa scores."""
+        try:
+            check = db.execute(text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_name = 'irs_soi_business_income'"
+            ))
+            if not check.fetchone():
+                return {"business_formation": {}}
+
+            # Get latest and prior tax years
+            yr_rows = db.execute(text(
+                "SELECT DISTINCT tax_year FROM irs_soi_business_income "
+                "ORDER BY tax_year DESC LIMIT 2"
+            )).fetchall()
+            if not yr_rows:
+                return {"business_formation": {}}
+
+            latest_year = yr_rows[0][0]
+            prior_year = yr_rows[1][0] if len(yr_rows) > 1 else None
+
+            state_clause = "AND bi.state_abbr = :state" if state else ""
+            params: Dict[str, Any] = {"year": latest_year}
+            if state:
+                params["state"] = state.upper()
+
+            has_prior = prior_year is not None
+            if has_prior:
+                params["prior_year"] = prior_year
+                prior_join = """
+                    LEFT JOIN irs_soi_business_income bp
+                        ON bp.zip_code = bi.zip_code
+                        AND bp.tax_year = :prior_year
+                        AND bp.num_returns > 100
+                """
+                prior_select = """,
+                    CASE WHEN bp.num_returns > 0
+                        THEN ROUND((bp.num_with_business_income * 100.0
+                              / bp.num_returns)::numeric, 1)
+                        ELSE NULL
+                    END AS prior_biz_density
+                """
+            else:
+                prior_join = ""
+                prior_select = ", NULL AS prior_biz_density"
+
+            zip_rows = db.execute(text(f"""
+                SELECT
+                    bi.zip_code,
+                    bi.state_abbr,
+                    bi.num_returns,
+                    bi.num_with_business_income,
+                    ROUND((bi.num_with_business_income * 100.0
+                          / NULLIF(bi.num_returns, 0))::numeric, 1) AS biz_density,
+                    COALESCE(bi.total_schedule_c_income, 0) * 1000 AS schedule_c,
+                    COALESCE(bi.total_partnership_income, 0) * 1000 AS partnership,
+                    COALESCE(bi.total_scorp_income, 0) * 1000 AS scorp,
+                    COALESCE(zms.overall_score, 0) AS medspa_score,
+                    COALESCE(zms.grade, '-') AS medspa_grade
+                    {prior_select}
+                FROM irs_soi_business_income bi
+                {prior_join}
+                LEFT JOIN zip_medspa_scores zms ON zms.zip_code = bi.zip_code
+                WHERE bi.tax_year = :year
+                    AND bi.num_returns > 100
+                    {state_clause}
+                ORDER BY biz_density DESC
+                LIMIT 100
+            """), params).fetchall()
+
+            all_zips = []
+            for r in zip_rows:
+                biz_density = float(r[4] or 0)
+                prior_density = float(r[10]) if r[10] is not None else None
+                yoy_growth = None
+                if prior_density is not None and prior_density > 0:
+                    yoy_growth = round(
+                        (biz_density - prior_density) / prior_density * 100, 1
+                    )
+                all_zips.append({
+                    "zip_code": r[0],
+                    "state": r[1],
+                    "num_returns": int(r[2] or 0),
+                    "num_with_biz": int(r[3] or 0),
+                    "biz_density": biz_density,
+                    "schedule_c": float(r[5] or 0),
+                    "partnership": float(r[6] or 0),
+                    "scorp": float(r[7] or 0),
+                    "medspa_score": float(r[8] or 0),
+                    "medspa_grade": r[9] or "-",
+                    "yoy_growth": yoy_growth,
+                })
+
+            # Entrepreneurial ZIPs: biz_density > 20% and medspa < 60
+            entrepreneurial = [
+                z for z in all_zips
+                if z["biz_density"] > 20 and z["medspa_score"] < 60
+            ]
+
+            # State-level avg biz density
+            state_density_rows = db.execute(text(f"""
+                SELECT
+                    bi.state_abbr,
+                    ROUND(AVG(CASE WHEN bi.num_returns > 0
+                        THEN bi.num_with_business_income * 100.0 / bi.num_returns
+                        ELSE 0 END)::numeric, 1) AS avg_biz_density,
+                    COUNT(*) AS zip_count
+                FROM irs_soi_business_income bi
+                WHERE bi.tax_year = :year
+                    AND bi.num_returns > 100
+                    {state_clause}
+                GROUP BY bi.state_abbr
+                ORDER BY avg_biz_density DESC
+            """), params).fetchall()
+
+            state_density = [
+                {"state": r[0], "avg_density": float(r[1] or 0), "zip_count": int(r[2] or 0)}
+                for r in state_density_rows
+            ]
+
+            # Income type composition (national)
+            comp_row = db.execute(text(f"""
+                SELECT
+                    SUM(COALESCE(total_schedule_c_income, 0)) AS schedule_c,
+                    SUM(COALESCE(total_partnership_income, 0)) AS partnership,
+                    SUM(COALESCE(total_scorp_income, 0)) AS scorp
+                FROM irs_soi_business_income bi
+                WHERE bi.tax_year = :year
+                    AND bi.num_returns > 100
+                    {state_clause}
+            """), params).fetchone()
+
+            income_composition = {}
+            if comp_row:
+                sc = float(comp_row[0] or 0)
+                pt = float(comp_row[1] or 0)
+                sp = float(comp_row[2] or 0)
+                total_biz = sc + pt + sp
+                if total_biz > 0:
+                    income_composition = {
+                        "schedule_c_pct": round(sc / total_biz * 100, 1),
+                        "partnership_pct": round(pt / total_biz * 100, 1),
+                        "scorp_pct": round(sp / total_biz * 100, 1),
+                    }
+
+            # Summary KPIs
+            avg_density = (
+                round(sum(z["biz_density"] for z in all_zips) / len(all_zips), 1)
+                if all_zips else 0
+            )
+            high_growth = [z for z in all_zips if z.get("yoy_growth") is not None and z["yoy_growth"] > 10]
+            avg_sc = (
+                round(sum(z["schedule_c"] for z in all_zips) / len(all_zips), 0)
+                if all_zips else 0
+            )
+
+            return {
+                "business_formation": {
+                    "entrepreneurial_zips": entrepreneurial[:50],
+                    "all_zips": all_zips[:50],
+                    "state_density": state_density,
+                    "income_composition": income_composition,
+                    "summary": {
+                        "zips_analyzed": len(all_zips),
+                        "avg_biz_density": avg_density,
+                        "high_growth_zips": len(high_growth),
+                        "avg_schedule_c": avg_sc,
+                        "tax_year": latest_year,
+                        "has_prior_year": has_prior,
+                    },
+                }
+            }
+        except Exception as e:
+            logger.warning(f"Could not compute business formation data: {e}")
+            db.rollback()
+            return {"business_formation": {}}
+
+    # ------------------------------------------------------------------
     # HTML Rendering
     # ------------------------------------------------------------------
 
@@ -1912,6 +2690,12 @@ class MedSpaMarketTemplate:
         # Sections 16-17 data
         stealth_wealth = data.get("stealth_wealth", {})
         migration_alpha = data.get("migration_alpha", {})
+
+        # Sections 18-21 data
+        provider_density = data.get("provider_density", {})
+        real_estate_alpha = data.get("real_estate_alpha", {})
+        deposit_wealth = data.get("deposit_wealth", {})
+        business_formation = data.get("business_formation", {})
 
         charts_js = ""
         body = ""
@@ -1957,6 +2741,10 @@ class MedSpaMarketTemplate:
             {"number": 15, "id": "deal-returns", "title": "Deal Model \u2014 Returns Analysis"},
             {"number": 16, "id": "stealth-wealth", "title": "Stealth Wealth Signal"},
             {"number": 17, "id": "migration-alpha", "title": "Migration Alpha"},
+            {"number": 18, "id": "provider-density", "title": "Medical Provider Density Signal"},
+            {"number": 19, "id": "re-alpha", "title": "Real Estate Appreciation Alpha"},
+            {"number": 20, "id": "deposit-wealth", "title": "Deposit Wealth Concentration"},
+            {"number": 21, "id": "biz-formation", "title": "Business Formation Velocity"},
         ]
         body += "\n" + toc(toc_items)
 
@@ -2501,6 +3289,46 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
                 f"IRS SOI, tax years {im.get('earliest', '?')}-{im.get('latest', '?')}",
                 _fmt(im.get("total")),
                 im.get("latest", "-"),
+            ])
+        if data_fresh.get("cms_medicare"):
+            cm = data_fresh["cms_medicare"]
+            freshness_rows.append([
+                "CMS Medicare Utilization (Provider Density)",
+                "CMS Medicare Provider Utilization",
+                _fmt(cm.get("total")),
+                "-",
+            ])
+        if data_fresh.get("redfin"):
+            rf = data_fresh["redfin"]
+            freshness_rows.append([
+                "Redfin Real Estate (RE Alpha)",
+                "Redfin Housing Market Data",
+                _fmt(rf.get("total")),
+                rf.get("latest", "-"),
+            ])
+        if data_fresh.get("fhfa_hpi"):
+            fh = data_fresh["fhfa_hpi"]
+            freshness_rows.append([
+                "FHFA HPI (RE Alpha fallback)",
+                f"FHFA House Price Index, {fh.get('earliest', '?')}-{fh.get('latest', '?')}",
+                _fmt(fh.get("total")),
+                fh.get("latest", "-"),
+            ])
+        if data_fresh.get("fdic_deposits"):
+            fd = data_fresh["fdic_deposits"]
+            freshness_rows.append([
+                "FDIC Summary Deposits (Deposit Wealth)",
+                f"FDIC SOD, years {fd.get('earliest', '?')}-{fd.get('latest', '?')}",
+                _fmt(fd.get("total")),
+                fd.get("latest", "-"),
+            ])
+        if data_fresh.get("irs_soi_business_income"):
+            ib = data_fresh["irs_soi_business_income"]
+            freshness_rows.append([
+                "IRS SOI Business Income (Biz Formation)",
+                f"IRS SOI, tax years {ib.get('earliest', '?')}-{ib.get('latest', '?')}",
+                _fmt(ib.get("total")),
+                ib.get("latest", "-"),
             ])
 
         body += data_table(
@@ -3663,6 +4491,477 @@ States receiving large AGI inflows but with few A-grade medspas represent a
 
         body += "\n" + section_end()
 
+        # ==================================================================
+        # Section 18: Medical Provider Density Signal
+        # ==================================================================
+        body += "\n" + section_start(18, "Medical Provider Density Signal", "provider-density")
+
+        pd_summary = provider_density.get("summary", {})
+        pd_opp_zips = provider_density.get("opportunity_zips", [])
+        pd_by_type = provider_density.get("provider_by_type", [])
+
+        if not provider_density:
+            body += callout(
+                "<strong>CMS Medicare utilization data not yet ingested.</strong> "
+                "Run <code>POST /api/v1/cms/ingest/medicare-utilization</code> to enable "
+                "provider density analysis. This cross-references dermatologists, plastic "
+                "surgeons, NPs, and PAs billing Medicare with medspa density to find "
+                "referral opportunity ZIPs.",
+                variant="info",
+            )
+        else:
+            # KPI cards
+            pd_cards = ""
+            pd_cards += kpi_card("Provider-ZIP Pairs", _fmt(pd_summary.get("total_provider_zip_pairs")))
+            pd_cards += kpi_card(
+                "Opportunity ZIPs",
+                _fmt(pd_summary.get("opportunity_zips")),
+                delta="Medspa score < 60",
+            )
+            pd_cards += kpi_card("Avg Providers/ZIP", str(pd_summary.get("avg_providers_per_zip", 0)))
+            pd_cards += kpi_card("Top Provider Type", pd_summary.get("top_provider_type", "-"))
+            body += "\n" + kpi_strip(pd_cards)
+
+            body += """<p style="font-size:14px;color:var(--gray-600);margin:12px 0">
+            <strong>Provider-rich, medspa-poor ZIPs</strong> represent referral corridors where
+            medical providers (dermatologists, plastic surgeons, NPs, PAs) are billing Medicare
+            but few medspas exist to capture the aesthetics crossover demand. Higher imbalance
+            scores indicate greater unmet demand.</p>"""
+
+            # Charts: provider bar + beneficiary doughnut
+            if pd_by_type:
+                body += '<div class="provider-split-grid">'
+                # Horizontal bar: provider counts by type
+                bar_labels = [t["type"] for t in pd_by_type]
+                bar_values = [t["count"] for t in pd_by_type]
+                bar_colors = [BLUE, TEAL, PURPLE, ORANGE][:len(pd_by_type)]
+                bar_config = build_horizontal_bar_config(
+                    bar_labels, bar_values, bar_colors,
+                    dataset_label="Provider Count",
+                )
+                bar_json = json.dumps(bar_config)
+                body += "<div>"
+                body += chart_container(
+                    "providerTypeBar", bar_json,
+                    build_bar_fallback(bar_labels, bar_values),
+                    size="medium",
+                    title="Provider Counts by Specialty",
+                )
+                charts_js += chart_init_js("providerTypeBar", bar_json)
+                body += "</div>"
+
+                # Doughnut: beneficiary mix by type
+                bene_labels = [t["type"] for t in pd_by_type]
+                bene_values = [t["beneficiaries"] for t in pd_by_type]
+                bene_colors = [BLUE, TEAL, PURPLE, ORANGE][:len(pd_by_type)]
+                donut_config = build_doughnut_config(bene_labels, bene_values, bene_colors)
+                donut_json = json.dumps(donut_config)
+                body += "<div>"
+                body += chart_container(
+                    "providerBeneDonut", donut_json,
+                    build_bar_fallback(bene_labels, bene_values),
+                    size="medium",
+                    title="Beneficiary Mix by Provider Type",
+                )
+                charts_js += chart_init_js("providerBeneDonut", donut_json)
+                body += build_chart_legend(bene_labels, bene_values, bene_colors, show_pct=True)
+                body += "</div>"
+                body += "</div>"
+
+            # Data table: top 25 opportunity ZIPs
+            if pd_opp_zips:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">Top Opportunity ZIPs (Provider-Rich, Medspa-Poor)</h3>'
+                pd_rows = []
+                for z in pd_opp_zips[:25]:
+                    pd_rows.append([
+                        z["zip_code"],
+                        str(z["provider_count"]),
+                        z["provider_types"][:40],
+                        _fmt(z["beneficiaries"]),
+                        str(z["medspa_count"]),
+                        f"{z['imbalance_score']:.1f}",
+                        f"{z['medspa_score']:.0f}",
+                        z["medspa_grade"],
+                    ])
+                body += '<div class="highlight-table">'
+                body += data_table(
+                    headers=["ZIP", "Providers", "Types", "Benes", "Medspas",
+                             "Imbalance", "Score", "Grade"],
+                    rows=pd_rows,
+                )
+                body += "</div>"
+
+            body += callout(
+                f"<strong>{pd_summary.get('opportunity_zips', 0)} opportunity ZIPs identified</strong> "
+                "where medical providers outnumber medspas. These represent referral corridors — "
+                "an acquiring platform can build provider relationships for patient referrals "
+                "in aesthetics-adjacent treatments.",
+                variant="tip",
+            )
+
+            body += callout(
+                "<strong>Methodology:</strong> CMS Medicare Provider Utilization data filtered "
+                "for Dermatology, Plastic Surgery, Nurse Practitioners, and Physician Assistants. "
+                "Imbalance score = providers ÷ medspas per ZIP (higher = more opportunity).",
+                variant="info",
+            )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 19: Real Estate Appreciation Alpha
+        # ==================================================================
+        body += "\n" + section_start(19, "Real Estate Appreciation Alpha", "re-alpha")
+
+        re_summary = real_estate_alpha.get("summary", {})
+        re_timing = real_estate_alpha.get("timing_zips", [])
+        re_states = real_estate_alpha.get("state_summary", [])
+        re_source = real_estate_alpha.get("source", "")
+
+        if not real_estate_alpha:
+            body += callout(
+                "<strong>Real estate data not yet ingested.</strong> "
+                "Run <code>POST /api/v1/realestate/redfin/ingest</code> (preferred) or "
+                "<code>POST /api/v1/realestate/fhfa/ingest</code> (fallback) to enable "
+                "real estate appreciation alpha. This identifies appreciating ZIPs with "
+                "low medspa penetration — timing signals for market entry.",
+                variant="info",
+            )
+        else:
+            # KPI cards
+            re_cards = ""
+            re_cards += kpi_card("Avg Median Price", _fmt_currency(re_summary.get("avg_median_price", 0)))
+            re_cards += kpi_card(
+                "Avg YoY Appreciation",
+                f"{re_summary.get('avg_yoy_change', 0):+.1f}%",
+            )
+            re_cards += kpi_card(
+                "Timing Opportunity ZIPs",
+                _fmt(re_summary.get("timing_opportunity_zips")),
+                delta="Appreciating + score < 60",
+            )
+            re_cards += kpi_card("Hottest State", re_summary.get("hottest_state", "-"))
+            body += "\n" + kpi_strip(re_cards)
+
+            body += f"""<p style="font-size:14px;color:var(--gray-600);margin:12px 0">
+            <strong>Timing opportunity ZIPs</strong> are areas where home values are appreciating
+            (indicating growing wealth) but medspa penetration remains low (score &lt; 60).
+            Rising property values are a 1-2 year leading indicator of premium service demand.
+            Source: <strong>{re_source}</strong>{"" if re_source == "Redfin" else " (ZIP3-level, less granular)"}.</p>"""
+
+            # Chart: top 15 states by avg YoY appreciation
+            if re_states:
+                top_15 = re_states[:15]
+                bar_labels = [s["state"] for s in top_15]
+                bar_values = [s["avg_yoy_change"] for s in top_15]
+                bar_colors = [GREEN if v >= 0 else RED for v in bar_values]
+                bar_config = build_horizontal_bar_config(
+                    bar_labels, bar_values, bar_colors,
+                    dataset_label="Avg YoY Appreciation %",
+                )
+                bar_json = json.dumps(bar_config)
+                body += chart_container(
+                    "reAlphaBar", bar_json,
+                    build_bar_fallback(bar_labels, [f"{v:+.1f}%" for v in bar_values]),
+                    size="large",
+                    title="Top States by Avg Home Price Appreciation (YoY %)",
+                )
+                charts_js += chart_init_js("reAlphaBar", bar_json)
+
+            # Data table: top 25 timing opportunity ZIPs
+            if re_timing:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">Top Timing Opportunity ZIPs</h3>'
+                re_rows = []
+                for z in re_timing[:25]:
+                    re_rows.append([
+                        z["zip_code"],
+                        z.get("state", "-"),
+                        _fmt_currency(z["median_price"]),
+                        f"{z['yoy_change']:+.1f}%" if z.get("yoy_change") is not None else "-",
+                        f"{z['medspa_score']:.0f}",
+                        z.get("medspa_grade", "-"),
+                    ])
+                body += '<div class="highlight-table">'
+                body += data_table(
+                    headers=["ZIP", "State", "Median Price", "YoY Change",
+                             "Medspa Score", "Grade"],
+                    rows=re_rows,
+                )
+                body += "</div>"
+
+            body += callout(
+                f"<strong>{re_summary.get('timing_opportunity_zips', 0)} timing opportunities</strong> "
+                "where home prices are rising but medspa competition remains thin. "
+                "Early movers in appreciating markets capture affluent demographics before "
+                "competitors recognize the demand signal.",
+                variant="tip",
+            )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 20: Deposit Wealth Concentration
+        # ==================================================================
+        body += "\n" + section_start(20, "Deposit Wealth Concentration", "deposit-wealth")
+
+        dw_summary = deposit_wealth.get("summary", {})
+        dw_underserved = deposit_wealth.get("underserved_zips", [])
+        dw_state_deps = deposit_wealth.get("state_deposits", [])
+
+        if not deposit_wealth:
+            body += callout(
+                "<strong>FDIC deposit data not yet ingested.</strong> "
+                "Run <code>POST /api/v1/fdic/deposits/ingest</code> to enable "
+                "deposit wealth analysis. This identifies ZIPs with high bank deposits "
+                "per capita but low medspa penetration — liquid wealth signals.",
+                variant="info",
+            )
+        else:
+            # KPI cards
+            dw_cards = ""
+            dw_cards += kpi_card("ZIPs Analyzed", _fmt(dw_summary.get("zips_analyzed")))
+            dw_cards += kpi_card(
+                "Total Deposits",
+                f"${dw_summary.get('total_deposits_t', 0):.2f}T",
+            )
+            dw_cards += kpi_card(
+                "Avg Deposits/Return",
+                _fmt_currency(dw_summary.get("avg_deposits_per_return", 0)),
+            )
+            dw_cards += kpi_card(
+                "Underserved ZIPs",
+                _fmt(dw_summary.get("underserved_zips")),
+                delta="High deposits + score < 60",
+            )
+            body += "\n" + kpi_strip(dw_cards)
+
+            body += """<p style="font-size:14px;color:var(--gray-600);margin:12px 0">
+            <strong>Deposit wealth concentration</strong> measures liquid wealth (bank deposits)
+            per tax return by ZIP. ZIPs with high deposits but low medspa scores represent
+            underserved affluent populations with disposable income for aesthetic services.</p>"""
+
+            # Charts: doughnut (state concentration) + bar (top ZIPs by deposits/return)
+            if dw_state_deps:
+                body += '<div class="provider-split-grid">'
+
+                # Doughnut: top 10 states + other
+                top_10 = dw_state_deps[:10]
+                other_total = sum(s["deposits"] for s in dw_state_deps[10:])
+                donut_labels = [s["state"] for s in top_10]
+                donut_values = [round(s["deposits"] / 1e9, 1) for s in top_10]
+                if other_total > 0:
+                    donut_labels.append("Other")
+                    donut_values.append(round(other_total / 1e9, 1))
+                donut_colors = list(CHART_COLORS[:len(donut_labels)])
+                donut_config = build_doughnut_config(donut_labels, donut_values, donut_colors)
+                donut_json = json.dumps(donut_config)
+                body += "<div>"
+                body += chart_container(
+                    "depositStateDonut", donut_json,
+                    build_bar_fallback(donut_labels, [f"${v}B" for v in donut_values]),
+                    size="medium",
+                    title="State Deposit Concentration ($B)",
+                )
+                charts_js += chart_init_js("depositStateDonut", donut_json)
+                body += build_chart_legend(donut_labels, donut_values, donut_colors, show_pct=True)
+                body += "</div>"
+
+                # Bar: top ZIPs by deposits/return
+                if dw_underserved:
+                    top_bar = dw_underserved[:15]
+                    bar_labels = [z["zip_code"] for z in top_bar]
+                    bar_values = [z["deposits_per_return"] for z in top_bar]
+                    bar_colors = [BLUE] * len(top_bar)
+                    bar_config = build_horizontal_bar_config(
+                        bar_labels, bar_values, bar_colors,
+                        dataset_label="Deposits per Return ($)",
+                    )
+                    bar_json = json.dumps(bar_config)
+                    body += "<div>"
+                    body += chart_container(
+                        "depositZipBar", bar_json,
+                        build_bar_fallback(bar_labels, [_fmt_currency(v) for v in bar_values]),
+                        size="medium",
+                        title="Top Underserved ZIPs by Deposits/Return",
+                    )
+                    charts_js += chart_init_js("depositZipBar", bar_json)
+                    body += "</div>"
+
+                body += "</div>"
+
+            # Data table: top 25 underserved ZIPs
+            if dw_underserved:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">Top Underserved ZIPs (High Deposits, Low Medspa Score)</h3>'
+                dw_rows = []
+                for z in dw_underserved[:25]:
+                    dw_rows.append([
+                        z["zip_code"],
+                        z.get("state", "-"),
+                        _fmt_currency(z["total_deposits"]),
+                        _fmt_currency(z["deposits_per_return"]),
+                        str(z["branch_count"]),
+                        f"{z['medspa_score']:.0f}",
+                        z.get("medspa_grade", "-"),
+                    ])
+                body += '<div class="highlight-table">'
+                body += data_table(
+                    headers=["ZIP", "State", "Total Deposits", "Deposits/Return",
+                             "Branches", "Medspa Score", "Grade"],
+                    rows=dw_rows,
+                )
+                body += "</div>"
+
+            body += callout(
+                f"<strong>{dw_summary.get('underserved_zips', 0)} underserved ZIPs</strong> "
+                "with high deposit concentrations but low medspa penetration. "
+                "Bank deposits represent liquid, discretionary wealth — a direct proxy "
+                "for medspa spending capacity.",
+                variant="tip",
+            )
+
+            body += callout(
+                f"<strong>Methodology:</strong> FDIC Summary of Deposits ({dw_summary.get('year', '-')}), "
+                "aggregated by ZIP. Deposits per return normalized using IRS SOI return counts "
+                "where available. Underserved = deposits/return in top quartile + medspa score < 60.",
+                variant="info",
+            )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 21: Business Formation Velocity
+        # ==================================================================
+        body += "\n" + section_start(21, "Business Formation Velocity", "biz-formation")
+
+        bf_summary = business_formation.get("summary", {})
+        bf_entrep = business_formation.get("entrepreneurial_zips", [])
+        bf_states = business_formation.get("state_density", [])
+        bf_comp = business_formation.get("income_composition", {})
+
+        if not business_formation:
+            body += callout(
+                "<strong>IRS SOI business income data not yet ingested.</strong> "
+                "Run <code>POST /api/v1/irs-soi/business-income/ingest</code> to enable "
+                "business formation analysis. This identifies ZIPs with high entrepreneurial "
+                "density (Schedule C, partnerships, S-corps) where affluent business owners "
+                "would be natural medspa clientele.",
+                variant="info",
+            )
+        else:
+            # KPI cards
+            bf_cards = ""
+            bf_cards += kpi_card("ZIPs Analyzed", _fmt(bf_summary.get("zips_analyzed")))
+            bf_cards += kpi_card(
+                "Avg Business Density",
+                f"{bf_summary.get('avg_biz_density', 0):.1f}%",
+            )
+            bf_cards += kpi_card(
+                "High-Growth ZIPs",
+                _fmt(bf_summary.get("high_growth_zips")),
+                delta=">10% YoY growth",
+            )
+            bf_cards += kpi_card(
+                "Avg Schedule C Income",
+                _fmt_currency(bf_summary.get("avg_schedule_c", 0)),
+            )
+            body += "\n" + kpi_strip(bf_cards)
+
+            body += """<p style="font-size:14px;color:var(--gray-600);margin:12px 0">
+            <strong>Business formation velocity</strong> measures the percentage of tax returns
+            reporting business income (Schedule C, partnerships, S-corps) per ZIP.
+            ZIPs with high entrepreneurial density and low medspa penetration signal
+            affluent, self-employed populations with flexible schedules and disposable income —
+            ideal medspa demographics.</p>"""
+
+            # Charts: bar (states by density) + doughnut (income type mix)
+            body += '<div class="provider-split-grid">'
+
+            if bf_states:
+                top_15 = bf_states[:15]
+                bar_labels = [s["state"] for s in top_15]
+                bar_values = [s["avg_density"] for s in top_15]
+                bar_colors = [TEAL] * len(top_15)
+                bar_config = build_horizontal_bar_config(
+                    bar_labels, bar_values, bar_colors,
+                    dataset_label="Avg Business Density %",
+                )
+                bar_json = json.dumps(bar_config)
+                body += "<div>"
+                body += chart_container(
+                    "bizDensityBar", bar_json,
+                    build_bar_fallback(bar_labels, [f"{v}%" for v in bar_values]),
+                    size="medium",
+                    title="Top States by Avg Business Density",
+                )
+                charts_js += chart_init_js("bizDensityBar", bar_json)
+                body += "</div>"
+
+            if bf_comp:
+                comp_labels = ["Schedule C (Sole Props)", "Partnerships", "S-Corps"]
+                comp_values = [
+                    bf_comp.get("schedule_c_pct", 0),
+                    bf_comp.get("partnership_pct", 0),
+                    bf_comp.get("scorp_pct", 0),
+                ]
+                comp_colors = [ORANGE, PURPLE, TEAL]
+                donut_config = build_doughnut_config(comp_labels, comp_values, comp_colors)
+                donut_json = json.dumps(donut_config)
+                body += "<div>"
+                body += chart_container(
+                    "bizCompDonut", donut_json,
+                    build_bar_fallback(comp_labels, [f"{v}%" for v in comp_values]),
+                    size="medium",
+                    title="Business Income Type Composition",
+                )
+                charts_js += chart_init_js("bizCompDonut", donut_json)
+                body += build_chart_legend(comp_labels, comp_values, comp_colors, show_pct=True)
+                body += "</div>"
+
+            body += "</div>"
+
+            # Data table: top 25 entrepreneurial ZIPs
+            if bf_entrep:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">Top Entrepreneurial ZIPs (High Biz Density, Low Medspa Score)</h3>'
+                bf_rows = []
+                for z in bf_entrep[:25]:
+                    yoy_str = f"{z['yoy_growth']:+.1f}%" if z.get("yoy_growth") is not None else "-"
+                    bf_rows.append([
+                        z["zip_code"],
+                        z.get("state", "-"),
+                        f"{z['biz_density']:.1f}%",
+                        _fmt_currency(z["schedule_c"]),
+                        _fmt_currency(z["partnership"]),
+                        yoy_str,
+                        f"{z['medspa_score']:.0f}",
+                        z.get("medspa_grade", "-"),
+                    ])
+                body += '<div class="highlight-table">'
+                body += data_table(
+                    headers=["ZIP", "State", "Biz Density", "Sched C", "Partnership",
+                             "YoY Growth", "Medspa Score", "Grade"],
+                    rows=bf_rows,
+                )
+                body += "</div>"
+
+            body += callout(
+                f"<strong>{len(bf_entrep)} entrepreneurial ZIPs identified</strong> "
+                "with business density >20% and medspa score <60. "
+                "Entrepreneurial populations correlate with premium service demand — "
+                "these ZIPs have affluent, time-flexible residents underserved by medspas.",
+                variant="tip",
+            )
+
+            body += callout(
+                f"<strong>Methodology:</strong> IRS SOI Business Income "
+                f"(tax year {bf_summary.get('tax_year', '-')}). "
+                "Business density = returns with business income ÷ total returns. "
+                "Dollar amounts reported in actual dollars (source data × 1,000). "
+                "Minimum 100 returns per ZIP for statistical significance.",
+                variant="info",
+            )
+
+        body += "\n" + section_end()
+
         # ---- Close container ----
         body += "\n</div>"
 
@@ -3675,6 +4974,10 @@ States receiving large AGI inflows but with few A-grade medspas represent a
             "Deal model uses industry benchmark economics (AmSpa, IBISWorld) — actual financials require location-level diligence.",
             "Stealth Wealth Signal uses IRS SOI ZIP-level income composition; dollar amounts reported in thousands.",
             "Migration Alpha uses IRS SOI county-to-county migration flows as a 2-3 year leading indicator.",
+            "Provider Density Signal uses CMS Medicare Provider Utilization data for aesthetics-adjacent specialties.",
+            "Real Estate Alpha uses Redfin ZIP-level data (preferred) or FHFA House Price Index (ZIP3 fallback).",
+            "Deposit Wealth uses FDIC Summary of Deposits; deposit amounts are actual dollars.",
+            "Business Formation uses IRS SOI Business Income; dollar amounts multiplied by 1,000 from source.",
             "This report does not constitute investment advice. All data is from public sources.",
         ]
         body += "\n" + page_footer(
@@ -4201,6 +5504,229 @@ States receiving large AGI inflows but with few A-grade medspas represent a
         ma_col_widths = {"A": 12, "B": 16, "C": 16, "D": 14, "E": 14, "F": 14, "G": 10, "H": 16}
         for col_letter, width in ma_col_widths.items():
             ws_ma.column_dimensions[col_letter].width = width
+
+        # ---- Sheet 13: Provider Density ----
+        ws_pd = wb.create_sheet("Provider Density")
+        provider_density = data.get("provider_density", {})
+        pd_opp_zips = provider_density.get("opportunity_zips", [])
+        pd_summary = provider_density.get("summary", {})
+        pd_by_type = provider_density.get("provider_by_type", [])
+
+        ws_pd["A1"] = "Medical Provider Density Signal"
+        ws_pd["A1"].font = Font(bold=True, size=13)
+        ws_pd.merge_cells("A1:E1")
+
+        ws_pd["A3"] = "Provider-ZIP Pairs"
+        ws_pd["B3"] = pd_summary.get("total_provider_zip_pairs", 0)
+        ws_pd["A4"] = "Opportunity ZIPs (score < 60)"
+        ws_pd["B4"] = pd_summary.get("opportunity_zips", 0)
+        ws_pd["A5"] = "Avg Providers/ZIP"
+        ws_pd["B5"] = pd_summary.get("avg_providers_per_zip", 0)
+        ws_pd["A6"] = "Top Provider Type"
+        ws_pd["B6"] = pd_summary.get("top_provider_type", "-")
+        for r in range(3, 7):
+            ws_pd[f"A{r}"].font = Font(bold=True)
+
+        # Provider type breakdown
+        if pd_by_type:
+            ws_pd["A8"] = "Provider Counts by Specialty"
+            ws_pd["A8"].font = Font(bold=True, size=11)
+            for i, t in enumerate(pd_by_type, 9):
+                ws_pd.cell(row=i, column=1, value=t.get("type"))
+                ws_pd.cell(row=i, column=2, value=t.get("count", 0))
+                ws_pd.cell(row=i, column=3, value=t.get("beneficiaries", 0))
+
+        pd_start = 9 + len(pd_by_type) + 2
+        ws_pd.cell(row=pd_start, column=1, value="Opportunity ZIPs").font = Font(bold=True, size=11)
+        pd_headers = [
+            "ZIP", "Providers", "Types", "Beneficiaries", "Medspas",
+            "Imbalance Score", "Medspa Score", "Grade",
+        ]
+        for col, header in enumerate(pd_headers, 1):
+            cell = ws_pd.cell(row=pd_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        for i, z in enumerate(pd_opp_zips, pd_start + 2):
+            ws_pd.cell(row=i, column=1, value=z.get("zip_code"))
+            ws_pd.cell(row=i, column=2, value=z.get("provider_count", 0))
+            ws_pd.cell(row=i, column=3, value=z.get("provider_types", ""))
+            ws_pd.cell(row=i, column=4, value=z.get("beneficiaries", 0))
+            ws_pd.cell(row=i, column=5, value=z.get("medspa_count", 0))
+            ws_pd.cell(row=i, column=6, value=z.get("imbalance_score", 0))
+            ws_pd.cell(row=i, column=7, value=z.get("medspa_score", 0))
+            ws_pd.cell(row=i, column=8, value=z.get("medspa_grade", "-"))
+
+        pd_col_widths = {"A": 12, "B": 12, "C": 35, "D": 14, "E": 10, "F": 16, "G": 14, "H": 8}
+        for col_letter, width in pd_col_widths.items():
+            ws_pd.column_dimensions[col_letter].width = width
+
+        # ---- Sheet 14: RE Appreciation Alpha ----
+        ws_re = wb.create_sheet("RE Appreciation Alpha")
+        real_estate_alpha = data.get("real_estate_alpha", {})
+        re_timing = real_estate_alpha.get("timing_zips", [])
+        re_states = real_estate_alpha.get("state_summary", [])
+        re_summary = real_estate_alpha.get("summary", {})
+
+        ws_re["A1"] = "Real Estate Appreciation Alpha"
+        ws_re["A1"].font = Font(bold=True, size=13)
+        ws_re.merge_cells("A1:E1")
+
+        ws_re["A3"] = "Source"
+        ws_re["B3"] = real_estate_alpha.get("source", "-")
+        ws_re["A4"] = "Avg Median Price"
+        ws_re["B4"] = re_summary.get("avg_median_price", 0)
+        ws_re["A5"] = "Avg YoY Appreciation %"
+        ws_re["B5"] = re_summary.get("avg_yoy_change", 0)
+        ws_re["A6"] = "Timing Opportunity ZIPs"
+        ws_re["B6"] = re_summary.get("timing_opportunity_zips", 0)
+        ws_re["A7"] = "Hottest State"
+        ws_re["B7"] = re_summary.get("hottest_state", "-")
+        for r in range(3, 8):
+            ws_re[f"A{r}"].font = Font(bold=True)
+
+        # State summary
+        re_st_start = 9
+        ws_re.cell(row=re_st_start, column=1, value="State Summary").font = Font(bold=True, size=11)
+        st_headers = ["State", "Avg Median Price", "Avg YoY %", "ZIP Count"]
+        for col, header in enumerate(st_headers, 1):
+            cell = ws_re.cell(row=re_st_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+        for i, s in enumerate(re_states, re_st_start + 2):
+            ws_re.cell(row=i, column=1, value=s.get("state"))
+            ws_re.cell(row=i, column=2, value=s.get("avg_median_price", 0))
+            ws_re.cell(row=i, column=3, value=s.get("avg_yoy_change", 0))
+            ws_re.cell(row=i, column=4, value=s.get("zip_count", 0))
+
+        # Timing ZIPs
+        re_tz_start = re_st_start + len(re_states) + 4
+        ws_re.cell(row=re_tz_start, column=1, value="Timing Opportunity ZIPs").font = Font(bold=True, size=11)
+        tz_headers = ["ZIP", "State", "Median Price", "YoY Change %", "Medspa Score", "Grade"]
+        for col, header in enumerate(tz_headers, 1):
+            cell = ws_re.cell(row=re_tz_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+        for i, z in enumerate(re_timing, re_tz_start + 2):
+            ws_re.cell(row=i, column=1, value=z.get("zip_code"))
+            ws_re.cell(row=i, column=2, value=z.get("state", "-"))
+            ws_re.cell(row=i, column=3, value=z.get("median_price", 0))
+            ws_re.cell(row=i, column=4, value=z.get("yoy_change"))
+            ws_re.cell(row=i, column=5, value=z.get("medspa_score", 0))
+            ws_re.cell(row=i, column=6, value=z.get("medspa_grade", "-"))
+
+        re_col_widths = {"A": 12, "B": 10, "C": 16, "D": 14, "E": 14, "F": 8}
+        for col_letter, width in re_col_widths.items():
+            ws_re.column_dimensions[col_letter].width = width
+
+        # ---- Sheet 15: Deposit Wealth ----
+        ws_dw = wb.create_sheet("Deposit Wealth")
+        deposit_wealth = data.get("deposit_wealth", {})
+        dw_underserved = deposit_wealth.get("underserved_zips", [])
+        dw_summary = deposit_wealth.get("summary", {})
+
+        ws_dw["A1"] = "Deposit Wealth Concentration"
+        ws_dw["A1"].font = Font(bold=True, size=13)
+        ws_dw.merge_cells("A1:E1")
+
+        ws_dw["A3"] = "Year"
+        ws_dw["B3"] = dw_summary.get("year", "-")
+        ws_dw["A4"] = "ZIPs Analyzed"
+        ws_dw["B4"] = dw_summary.get("zips_analyzed", 0)
+        ws_dw["A5"] = "Total Deposits ($T)"
+        ws_dw["B5"] = dw_summary.get("total_deposits_t", 0)
+        ws_dw["A6"] = "Avg Deposits/Return"
+        ws_dw["B6"] = dw_summary.get("avg_deposits_per_return", 0)
+        ws_dw["A7"] = "Underserved ZIPs"
+        ws_dw["B7"] = dw_summary.get("underserved_zips", 0)
+        for r in range(3, 8):
+            ws_dw[f"A{r}"].font = Font(bold=True)
+
+        dw_start = 9
+        ws_dw.cell(row=dw_start, column=1, value="Underserved ZIPs (High Deposits, Low Medspa Score)").font = Font(bold=True, size=11)
+        ws_dw.merge_cells(f"A{dw_start}:F{dw_start}")
+        dw_headers = [
+            "ZIP", "State", "Total Deposits", "Deposits/Return",
+            "Branches", "Medspa Score", "Grade",
+        ]
+        for col, header in enumerate(dw_headers, 1):
+            cell = ws_dw.cell(row=dw_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        for i, z in enumerate(dw_underserved, dw_start + 2):
+            ws_dw.cell(row=i, column=1, value=z.get("zip_code"))
+            ws_dw.cell(row=i, column=2, value=z.get("state", "-"))
+            ws_dw.cell(row=i, column=3, value=z.get("total_deposits", 0))
+            ws_dw.cell(row=i, column=4, value=z.get("deposits_per_return", 0))
+            ws_dw.cell(row=i, column=5, value=z.get("branch_count", 0))
+            ws_dw.cell(row=i, column=6, value=z.get("medspa_score", 0))
+            ws_dw.cell(row=i, column=7, value=z.get("medspa_grade", "-"))
+
+        dw_col_widths = {"A": 12, "B": 8, "C": 18, "D": 16, "E": 10, "F": 14, "G": 8}
+        for col_letter, width in dw_col_widths.items():
+            ws_dw.column_dimensions[col_letter].width = width
+
+        # ---- Sheet 16: Business Formation ----
+        ws_bf = wb.create_sheet("Business Formation")
+        business_formation = data.get("business_formation", {})
+        bf_entrep = business_formation.get("entrepreneurial_zips", [])
+        bf_summary = business_formation.get("summary", {})
+        bf_comp = business_formation.get("income_composition", {})
+
+        ws_bf["A1"] = "Business Formation Velocity"
+        ws_bf["A1"].font = Font(bold=True, size=13)
+        ws_bf.merge_cells("A1:E1")
+
+        ws_bf["A3"] = "Tax Year"
+        ws_bf["B3"] = bf_summary.get("tax_year", "-")
+        ws_bf["A4"] = "ZIPs Analyzed"
+        ws_bf["B4"] = bf_summary.get("zips_analyzed", 0)
+        ws_bf["A5"] = "Avg Business Density"
+        ws_bf["B5"] = bf_summary.get("avg_biz_density", 0)
+        ws_bf["A6"] = "High-Growth ZIPs (>10% YoY)"
+        ws_bf["B6"] = bf_summary.get("high_growth_zips", 0)
+        ws_bf["A7"] = "Avg Schedule C Income"
+        ws_bf["B7"] = bf_summary.get("avg_schedule_c", 0)
+        for r in range(3, 8):
+            ws_bf[f"A{r}"].font = Font(bold=True)
+
+        # Income composition
+        if bf_comp:
+            ws_bf["A9"] = "Business Income Composition"
+            ws_bf["A9"].font = Font(bold=True, size=11)
+            ws_bf["A10"] = "Schedule C (Sole Props) %"
+            ws_bf["B10"] = bf_comp.get("schedule_c_pct", 0)
+            ws_bf["A11"] = "Partnerships %"
+            ws_bf["B11"] = bf_comp.get("partnership_pct", 0)
+            ws_bf["A12"] = "S-Corps %"
+            ws_bf["B12"] = bf_comp.get("scorp_pct", 0)
+
+        bf_start = 14
+        ws_bf.cell(row=bf_start, column=1, value="Entrepreneurial ZIPs (Biz Density >20%, Medspa Score <60)").font = Font(bold=True, size=11)
+        ws_bf.merge_cells(f"A{bf_start}:G{bf_start}")
+        bf_headers = [
+            "ZIP", "State", "Biz Density %", "Schedule C", "Partnership",
+            "YoY Growth %", "Medspa Score", "Grade",
+        ]
+        for col, header in enumerate(bf_headers, 1):
+            cell = ws_bf.cell(row=bf_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        for i, z in enumerate(bf_entrep, bf_start + 2):
+            ws_bf.cell(row=i, column=1, value=z.get("zip_code"))
+            ws_bf.cell(row=i, column=2, value=z.get("state", "-"))
+            ws_bf.cell(row=i, column=3, value=z.get("biz_density", 0))
+            ws_bf.cell(row=i, column=4, value=z.get("schedule_c", 0))
+            ws_bf.cell(row=i, column=5, value=z.get("partnership", 0))
+            ws_bf.cell(row=i, column=6, value=z.get("yoy_growth"))
+            ws_bf.cell(row=i, column=7, value=z.get("medspa_score", 0))
+            ws_bf.cell(row=i, column=8, value=z.get("medspa_grade", "-"))
+
+        bf_col_widths = {"A": 12, "B": 8, "C": 14, "D": 14, "E": 14, "F": 14, "G": 14, "H": 8}
+        for col_letter, width in bf_col_widths.items():
+            ws_bf.column_dimensions[col_letter].width = width
 
         # Save to bytes
         output = BytesIO()
