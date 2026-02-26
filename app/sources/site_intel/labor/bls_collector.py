@@ -322,7 +322,9 @@ class BLSLaborCollector(BaseCollector):
                     continue
 
                 # Build series IDs for this state
-                # OES format: OEUS{state_fips}00000{occ_code}
+                # OES series ID: OEUS + area(7) + industry(6) + occ(6) + datatype(2) = 25 chars
+                # area = state_fips + "00000" (statewide), industry = "000000" (all)
+                # datatype 13 = annual mean wage
                 series_ids = []
                 occ_map = {}
 
@@ -330,7 +332,7 @@ class BLSLaborCollector(BaseCollector):
                     # Mean annual wage series
                     clean_code = occ_code.replace("-", "")
                     series_id = (
-                        f"OEUS{fips}000000{clean_code}04"  # 04 = annual mean wage
+                        f"OEUS{fips}00000000000{clean_code}13"
                     )
                     series_ids.append(series_id)
                     occ_map[series_id] = (occ_code, occ_name)
@@ -341,7 +343,7 @@ class BLSLaborCollector(BaseCollector):
                 try:
                     response = await self._fetch_bls_timeseries(
                         series_ids,
-                        start_year=datetime.now().year - 1,
+                        start_year=datetime.now().year - 3,  # OES releases with ~1yr lag
                         end_year=datetime.now().year,
                     )
 
