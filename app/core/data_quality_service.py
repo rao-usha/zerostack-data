@@ -571,6 +571,198 @@ def evaluate_regex_rule(
         )
 
 
+# DDL/DML keywords forbidden in custom SQL rules
+_FORBIDDEN_SQL_KEYWORDS = re.compile(
+    r"\b(CREATE|DROP|ALTER|TRUNCATE|INSERT|UPDATE|DELETE|GRANT|REVOKE|EXEC|EXECUTE)\b",
+    re.IGNORECASE,
+)
+
+
+def evaluate_custom_sql_rule(
+    db: Session, rule: DataQualityRule, table_name: str
+) -> RuleEvaluationResult:
+    """
+    Evaluate a custom SQL rule.
+
+    The user provides SQL via parameters.condition with a {table} placeholder.
+    SQL must return a single integer (violation count); 0 = pass.
+
+    Parameters:
+        condition: SQL query with {table} placeholder
+        timeout_seconds: Max execution time (default 30, max 60)
+    """
+    start_time = time.time()
+    params = rule.parameters or {}
+    condition = params.get("condition", "")
+    timeout_seconds = min(params.get("timeout_seconds", 30), 60)
+
+    if not condition:
+        return RuleEvaluationResult(
+            rule_id=rule.id,
+            rule_name=rule.name,
+            passed=False,
+            severity=rule.severity,
+            message="No SQL condition specified in parameters.condition",
+            execution_time_ms=int((time.time() - start_time) * 1000),
+        )
+
+    # Safety: reject DDL/DML keywords
+    if _FORBIDDEN_SQL_KEYWORDS.search(condition):
+        return RuleEvaluationResult(
+            rule_id=rule.id,
+            rule_name=rule.name,
+            passed=False,
+            severity=rule.severity,
+            message="Rejected: SQL contains forbidden DDL/DML keywords",
+            execution_time_ms=int((time.time() - start_time) * 1000),
+        )
+
+    # Substitute {table} placeholder
+    sql = condition.replace("{table}", f'"{table_name}"')
+
+    try:
+        # Set statement timeout and read-only transaction
+        db.execute(
+            text(f"SET LOCAL statement_timeout = '{timeout_seconds * 1000}'")
+        )
+        result = db.execute(text(sql)).fetchone()
+
+        if result is None or len(result) == 0:
+            db.rollback()
+            return RuleEvaluationResult(
+                rule_id=rule.id,
+                rule_name=rule.name,
+                passed=False,
+                severity=rule.severity,
+                message="Custom SQL returned no results (expected single integer)",
+                execution_time_ms=int((time.time() - start_time) * 1000),
+            )
+
+        violation_count = int(result[0])
+        passed = violation_count == 0
+
+        return RuleEvaluationResult(
+            rule_id=rule.id,
+            rule_name=rule.name,
+            passed=passed,
+            severity=rule.severity,
+            message=f"Custom SQL found {violation_count} violations"
+            if not passed
+            else "Custom SQL check passed (0 violations)",
+            actual_value=str(violation_count),
+            expected_value="0",
+            rows_failed=violation_count,
+            execution_time_ms=int((time.time() - start_time) * 1000),
+        )
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error evaluating custom SQL rule: {e}")
+        return RuleEvaluationResult(
+            rule_id=rule.id,
+            rule_name=rule.name,
+            passed=False,
+            severity=rule.severity,
+            message=f"Error evaluating custom SQL: {str(e)}",
+            execution_time_ms=int((time.time() - start_time) * 1000),
+        )
+
+
+def evaluate_comparison_rule(
+    db: Session, rule: DataQualityRule, table_name: str, column_name: str
+) -> RuleEvaluationResult:
+    """
+    Evaluate a comparison rule (compare two columns).
+
+    Parameters:
+        operator: One of <, >, <=, >=, =, !=
+        compare_column: Column to compare against
+    """
+    start_time = time.time()
+    params = rule.parameters or {}
+    operator = params.get("operator")
+    compare_column = params.get("compare_column")
+
+    valid_operators = {"<", ">", "<=", ">=", "=", "!="}
+    if not operator or operator not in valid_operators:
+        return RuleEvaluationResult(
+            rule_id=rule.id,
+            rule_name=rule.name,
+            passed=False,
+            severity=rule.severity,
+            message=f"Invalid or missing operator. Must be one of: {valid_operators}",
+            execution_time_ms=int((time.time() - start_time) * 1000),
+        )
+
+    if not compare_column:
+        return RuleEvaluationResult(
+            rule_id=rule.id,
+            rule_name=rule.name,
+            passed=False,
+            severity=rule.severity,
+            message="Missing compare_column parameter",
+            execution_time_ms=int((time.time() - start_time) * 1000),
+        )
+
+    # Count rows where the comparison is NOT true (both columns non-null)
+    query = text(f"""
+        SELECT COUNT(*) as total,
+               SUM(CASE WHEN NOT ("{column_name}" {operator} "{compare_column}") THEN 1 ELSE 0 END) as violations
+        FROM "{table_name}"
+        WHERE "{column_name}" IS NOT NULL AND "{compare_column}" IS NOT NULL
+    """)
+
+    try:
+        result = db.execute(query).fetchone()
+        total = result[0] or 0
+        violations = result[1] or 0
+
+        passed = violations == 0
+
+        # Get sample failures
+        sample_failures = None
+        if violations > 0:
+            sample_query = text(f"""
+                SELECT "{column_name}", "{compare_column}"
+                FROM "{table_name}"
+                WHERE "{column_name}" IS NOT NULL AND "{compare_column}" IS NOT NULL
+                  AND NOT ("{column_name}" {operator} "{compare_column}")
+                LIMIT 5
+            """)
+            samples = db.execute(sample_query).fetchall()
+            sample_failures = [
+                f"{column_name}={s[0]}, {compare_column}={s[1]}" for s in samples
+            ]
+
+        return RuleEvaluationResult(
+            rule_id=rule.id,
+            rule_name=rule.name,
+            passed=passed,
+            severity=rule.severity,
+            message=f"Found {violations} rows where {column_name} {operator} {compare_column} is false"
+            if not passed
+            else f"All {total} rows satisfy {column_name} {operator} {compare_column}",
+            actual_value=f"{violations} violations",
+            expected_value=f"{column_name} {operator} {compare_column}",
+            rows_checked=total,
+            rows_passed=total - violations,
+            rows_failed=violations,
+            sample_failures=sample_failures,
+            execution_time_ms=int((time.time() - start_time) * 1000),
+        )
+
+    except Exception as e:
+        logger.error(f"Error evaluating comparison rule: {e}")
+        return RuleEvaluationResult(
+            rule_id=rule.id,
+            rule_name=rule.name,
+            passed=False,
+            severity=rule.severity,
+            message=f"Error evaluating rule: {str(e)}",
+            execution_time_ms=int((time.time() - start_time) * 1000),
+        )
+
+
 # =============================================================================
 # Rule Matching
 # =============================================================================
@@ -716,6 +908,20 @@ def evaluate_rule(
                 message="Regex rule requires column_name",
             )
         return evaluate_regex_rule(db, rule, table_name, column_name)
+
+    elif rule.rule_type == RuleType.CUSTOM_SQL:
+        return evaluate_custom_sql_rule(db, rule, table_name)
+
+    elif rule.rule_type == RuleType.COMPARISON:
+        if not column_name:
+            return RuleEvaluationResult(
+                rule_id=rule.id,
+                rule_name=rule.name,
+                passed=False,
+                severity=rule.severity,
+                message="Comparison rule requires column_name",
+            )
+        return evaluate_comparison_rule(db, rule, table_name, column_name)
 
     else:
         return RuleEvaluationResult(
@@ -929,3 +1135,178 @@ def get_job_report(db: Session, job_id: int) -> Optional[DataQualityReport]:
         .order_by(DataQualityReport.started_at.desc())
         .first()
     )
+
+
+# =============================================================================
+# Evaluate All Rules
+# =============================================================================
+
+
+def evaluate_all_rules(db: Session) -> Dict[str, Any]:
+    """
+    Evaluate all enabled rules against their target tables.
+
+    For each rule, resolves target tables from DatasetRegistry
+    (by rule.source + rule.dataset_pattern regex), evaluates each
+    (rule, table) pair, stores results, and creates a DataQualityReport.
+
+    Returns:
+        Summary dict with total/passed/failed counts
+    """
+    from app.core.models import DatasetRegistry
+
+    start_time = time.time()
+
+    # Get all enabled rules
+    rules = (
+        db.query(DataQualityRule)
+        .filter(DataQualityRule.is_enabled == 1)
+        .order_by(DataQualityRule.priority)
+        .all()
+    )
+
+    if not rules:
+        return {
+            "total_rules": 0,
+            "evaluations": 0,
+            "passed": 0,
+            "failed": 0,
+            "errors": 0,
+            "execution_time_ms": int((time.time() - start_time) * 1000),
+        }
+
+    # Get all registered tables
+    all_datasets = db.query(DatasetRegistry).all()
+    table_by_source: Dict[str, List[str]] = {}
+    for ds in all_datasets:
+        table_by_source.setdefault(ds.source, []).append(ds.table_name)
+
+    # All table names for rules without a source filter
+    all_table_names = [ds.table_name for ds in all_datasets]
+
+    total_evaluations = 0
+    total_passed = 0
+    total_failed = 0
+    total_errors = 0
+    failed_rules_list = []
+
+    for rule in rules:
+        # Resolve target tables
+        if rule.source:
+            candidate_tables = table_by_source.get(rule.source, [])
+        else:
+            candidate_tables = all_table_names
+
+        # Filter by dataset_pattern regex
+        if rule.dataset_pattern:
+            try:
+                pattern = re.compile(rule.dataset_pattern)
+                candidate_tables = [t for t in candidate_tables if pattern.match(t)]
+            except re.error:
+                logger.warning(
+                    f"Invalid dataset pattern in rule {rule.id}: {rule.dataset_pattern}"
+                )
+                continue
+
+        for table_name in candidate_tables:
+            try:
+                eval_result = evaluate_rule(db, rule, table_name)
+                total_evaluations += 1
+
+                # Store result
+                db_result = DataQualityResult(
+                    rule_id=rule.id,
+                    source=rule.source or "all",
+                    dataset_name=table_name,
+                    column_name=rule.column_name,
+                    passed=1 if eval_result.passed else 0,
+                    severity=eval_result.severity,
+                    message=eval_result.message,
+                    actual_value=eval_result.actual_value,
+                    expected_value=eval_result.expected_value,
+                    sample_failures=eval_result.sample_failures,
+                    rows_checked=eval_result.rows_checked,
+                    rows_passed=eval_result.rows_passed,
+                    rows_failed=eval_result.rows_failed,
+                    execution_time_ms=eval_result.execution_time_ms,
+                )
+                db.add(db_result)
+
+                # Update rule statistics
+                rule.times_evaluated += 1
+                if eval_result.passed:
+                    rule.times_passed += 1
+                    total_passed += 1
+                else:
+                    rule.times_failed += 1
+                    total_failed += 1
+                    failed_rules_list.append(
+                        {"id": rule.id, "name": rule.name, "table": table_name}
+                    )
+                rule.last_evaluated_at = datetime.utcnow()
+
+            except Exception as e:
+                total_errors += 1
+                logger.error(
+                    f"Error evaluating rule {rule.id} on {table_name}: {e}"
+                )
+
+    # Create report record
+    exec_ms = int((time.time() - start_time) * 1000)
+
+    if total_failed > 0:
+        overall_status = "failed"
+    elif total_errors > 0:
+        overall_status = "warning"
+    else:
+        overall_status = "passed"
+
+    report = DataQualityReport(
+        source="all",
+        report_type="scheduled",
+        total_rules=len(rules),
+        rules_passed=total_passed,
+        rules_failed=total_failed,
+        overall_status=overall_status,
+        failed_rules=failed_rules_list[:50] if failed_rules_list else None,
+        completed_at=datetime.utcnow(),
+        execution_time_ms=exec_ms,
+    )
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+
+    logger.info(
+        f"Evaluate-all completed: {total_evaluations} evaluations, "
+        f"{total_passed} passed, {total_failed} failed, {total_errors} errors "
+        f"in {exec_ms}ms"
+    )
+
+    return {
+        "report_id": report.id,
+        "total_rules": len(rules),
+        "evaluations": total_evaluations,
+        "passed": total_passed,
+        "failed": total_failed,
+        "errors": total_errors,
+        "overall_status": overall_status,
+        "execution_time_ms": exec_ms,
+    }
+
+
+def scheduled_rule_evaluation():
+    """Entry point for scheduled rule evaluation (called by APScheduler)."""
+    from app.core.database import get_session_factory
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+    try:
+        result = evaluate_all_rules(db)
+        logger.info(
+            f"Scheduled rule evaluation: {result['evaluations']} evaluations, "
+            f"{result['passed']} passed, {result['failed']} failed"
+        )
+    except Exception as e:
+        logger.error(f"Scheduled rule evaluation failed: {e}")
+    finally:
+        db.close()

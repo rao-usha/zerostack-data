@@ -245,6 +245,10 @@ async def lifespan(app: FastAPI):
         scheduler_service.register_degradation_checker(hour=3)
         logger.info("Quality degradation checker registered")
 
+        # Register rule evaluation (runs at 4 AM — after snapshots & degradation)
+        scheduler_service.register_rule_evaluation(hour=4)
+        logger.info("Rule evaluation registered")
+
         # Register people collection schedules
         try:
             from app.jobs.people_collection_scheduler import (

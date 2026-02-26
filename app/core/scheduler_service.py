@@ -1548,3 +1548,46 @@ def register_degradation_checker(hour: int = 3) -> bool:
     except Exception as e:
         logger.error(f"Failed to register degradation checker: {e}")
         return False
+
+
+# =============================================================================
+# Rule Evaluation (4 AM — after snapshots at 2 AM, degradation at 3 AM)
+# =============================================================================
+
+
+def register_rule_evaluation(hour: int = 4) -> bool:
+    """
+    Register daily rule evaluation as a scheduled job.
+
+    Runs after profiling snapshots (2 AM) and degradation checks (3 AM).
+
+    Args:
+        hour: Hour to run (default 4 AM)
+
+    Returns:
+        True if registered successfully
+    """
+    scheduler = get_scheduler()
+    job_id = "system_rule_evaluation"
+
+    try:
+        existing_job = scheduler.get_job(job_id)
+        if existing_job:
+            scheduler.remove_job(job_id)
+
+        from app.core.data_quality_service import scheduled_rule_evaluation
+
+        scheduler.add_job(
+            scheduled_rule_evaluation,
+            trigger=CronTrigger(hour=hour, minute=0),
+            id=job_id,
+            name="Data Quality Rule Evaluation",
+            replace_existing=True,
+        )
+
+        logger.info(f"Registered rule evaluation at {hour}:00")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to register rule evaluation: {e}")
+        return False

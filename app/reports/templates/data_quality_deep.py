@@ -1,9 +1,9 @@
 """
 Deep Data Quality Report Template — Transparency Rebuild.
 
-14-section report with full scoring methodology disclosure, column-level
+15-section report with full scoring methodology disclosure, column-level
 profiling, anomaly context (sigma values, baselines), cross-source orphan
-examples, schema drift history, and programmatic recommendations.
+examples, schema drift history, programmatic recommendations, and rules engine.
 """
 
 import json as _json
@@ -31,6 +31,8 @@ from app.core.models import (
     DQQualitySnapshot, DQSLATarget,
     AnomalyAlertStatus, AnomalyAlertType,
     IngestionJob, JobStatus,
+    DataQualityRule, DataQualityResult,
+    DatasetRegistry,
 )
 from app.core.domains import classify_table, DOMAIN_LABELS, DOMAIN_COLORS
 
@@ -443,6 +445,65 @@ class DataQualityDeepTemplate:
         )
         data["schema_alerts"] = schema_alerts
 
+        # ── 12. Rules engine data ────────────────────────────────────
+        all_rules = db.query(DataQualityRule).all()
+        data["rules_all"] = all_rules
+        data["rules_total"] = len(all_rules)
+        data["rules_enabled"] = sum(1 for r in all_rules if r.is_enabled)
+        data["rules_auto"] = sum(1 for r in all_rules if (r.name or "").startswith("auto_"))
+        data["rules_manual"] = data["rules_total"] - data["rules_auto"]
+
+        # Rules by type
+        rules_by_type: Dict[str, int] = {}
+        for r in all_rules:
+            rt = r.rule_type.value if r.rule_type else "unknown"
+            rules_by_type[rt] = rules_by_type.get(rt, 0) + 1
+        data["rules_by_type"] = rules_by_type
+
+        # Recent results (last 7 days)
+        results_cutoff = now - timedelta(days=7)
+        recent_results = (
+            db.query(DataQualityResult)
+            .filter(DataQualityResult.evaluated_at >= results_cutoff)
+            .all()
+        )
+        data["rules_results_7d"] = recent_results
+        data["rules_pass_count_7d"] = sum(1 for r in recent_results if r.passed)
+        data["rules_fail_count_7d"] = sum(1 for r in recent_results if not r.passed)
+        total_7d = len(recent_results)
+        data["rules_pass_rate_7d"] = (
+            round(data["rules_pass_count_7d"] / total_7d * 100, 1) if total_7d > 0 else None
+        )
+
+        # Top failing rules
+        top_failing = sorted(
+            [r for r in all_rules if r.times_failed > 0],
+            key=lambda r: r.times_failed,
+            reverse=True,
+        )[:10]
+        data["rules_top_failing"] = top_failing
+
+        # Rule coverage: tables with rules vs without
+        all_registered = db.query(DatasetRegistry.table_name).all()
+        all_table_names_set = {t[0] for t in all_registered}
+        tables_with_rules = set()
+        for r in all_rules:
+            if r.dataset_pattern:
+                try:
+                    import re as _re
+                    pat = _re.compile(r.dataset_pattern)
+                    for tn in all_table_names_set:
+                        if pat.match(tn):
+                            tables_with_rules.add(tn)
+                except Exception:
+                    pass
+        data["rules_tables_covered"] = len(tables_with_rules)
+        data["rules_tables_uncovered"] = len(all_table_names_set) - len(tables_with_rules)
+        data["rules_coverage_pct"] = (
+            round(len(tables_with_rules) / len(all_table_names_set) * 100, 1)
+            if all_table_names_set else 0
+        )
+
         return data
 
     # ── render_html ──────────────────────────────────────────────────────
@@ -475,6 +536,7 @@ class DataQualityDeepTemplate:
             {"number": "12", "id": "sla-compliance", "title": "SLA Compliance Detail"},
             {"number": "13", "id": "schema-drift", "title": "Schema Drift History"},
             {"number": "14", "id": "recommendations", "title": "Recommendations & Action Items"},
+            {"number": "15", "id": "rules-engine", "title": "Data Quality Rules Engine"},
         ]
         body += toc(toc_items)
 
@@ -524,6 +586,10 @@ class DataQualityDeepTemplate:
 
         # ── Section 14: Recommendations & Action Items ───────────────
         body += self._render_section_14(data)
+
+        # ── Section 15: Data Quality Rules Engine ─────────────────────
+        body += self._render_section_15(data)
+        charts_js += self._charts_section_15(data)
 
         body += page_footer(
             notes=[
@@ -1750,10 +1816,133 @@ class DataQualityDeepTemplate:
         s += section_end()
         return s
 
+    # ── Section 15: Data Quality Rules Engine ─────────────────────────
+
+    def _render_section_15(self, data: Dict[str, Any]) -> str:
+        s = ""
+        s += section_start(15, "Data Quality Rules Engine", "rules-engine")
+
+        total = data.get("rules_total", 0)
+        enabled = data.get("rules_enabled", 0)
+        pass_rate = data.get("rules_pass_rate_7d")
+        coverage = data.get("rules_coverage_pct", 0)
+        auto_count = data.get("rules_auto", 0)
+        manual_count = data.get("rules_manual", 0)
+
+        if total == 0:
+            s += callout(
+                "<strong>No Rules Defined.</strong> Use <code>POST /data-quality/rules/seed</code> "
+                "to auto-generate rules from profiling data, or create manual rules via the API.",
+                "info",
+            )
+            s += section_end()
+            return s
+
+        # KPIs
+        pass_rate_str = f"{pass_rate:.1f}%" if pass_rate is not None else "N/A"
+        s += kpi_strip([
+            kpi_card("Total Rules", str(total)),
+            kpi_card("Enabled", str(enabled)),
+            kpi_card("Pass Rate (7d)", pass_rate_str),
+            kpi_card("Coverage", f"{coverage:.0f}%"),
+        ])
+
+        # Auto vs manual callout
+        s += callout(
+            f"<strong>Rule Sources:</strong> {auto_count} auto-generated, {manual_count} manually created. "
+            f"Coverage: {data.get('rules_tables_covered', 0)} tables have rules, "
+            f"{data.get('rules_tables_uncovered', 0)} tables have none.",
+            "info",
+        )
+
+        # Rules by type table
+        rules_by_type = data.get("rules_by_type", {})
+        if rules_by_type:
+            # Calculate pass rate per type from recent results
+            results_7d = data.get("rules_results_7d", [])
+            all_rules = data.get("rules_all", [])
+            rule_type_map = {r.id: r.rule_type.value for r in all_rules if r.rule_type}
+
+            type_pass: Dict[str, int] = {}
+            type_total: Dict[str, int] = {}
+            for res in results_7d:
+                rt = rule_type_map.get(res.rule_id, "unknown")
+                type_total[rt] = type_total.get(rt, 0) + 1
+                if res.passed:
+                    type_pass[rt] = type_pass.get(rt, 0) + 1
+
+            rows = []
+            for rt, count in sorted(rules_by_type.items(), key=lambda x: -x[1]):
+                t_total = type_total.get(rt, 0)
+                t_pass = type_pass.get(rt, 0)
+                rate = f"{t_pass / t_total * 100:.0f}%" if t_total > 0 else "—"
+                rows.append([rt, str(count), str(t_total), str(t_pass), rate])
+
+            s += data_table(
+                headers=["Rule Type", "Count", "Evals (7d)", "Passed (7d)", "Pass Rate"],
+                rows=rows,
+                caption="Rules by Type",
+                col_widths=["25%", "15%", "15%", "15%", "15%"],
+            )
+
+        # Doughnut chart placeholder
+        s += chart_container("rules-type-doughnut", "Rules by Type")
+
+        # Top failing rules table
+        top_failing = data.get("rules_top_failing", [])
+        if top_failing:
+            rows = []
+            for r in top_failing:
+                total_evals = r.times_evaluated or 0
+                failed = r.times_failed or 0
+                fail_rate = f"{failed / total_evals * 100:.0f}%" if total_evals > 0 else "—"
+                rows.append([
+                    r.name,
+                    r.rule_type.value if r.rule_type else "—",
+                    r.severity.value if r.severity else "—",
+                    str(failed),
+                    str(total_evals),
+                    fail_rate,
+                ])
+
+            s += data_table(
+                headers=["Rule Name", "Type", "Severity", "Failures", "Evaluations", "Fail Rate"],
+                rows=rows,
+                caption="Top 10 Failing Rules",
+                col_widths=["30%", "12%", "12%", "12%", "12%", "12%"],
+            )
+        else:
+            s += callout(
+                "<strong>No failing rules.</strong> All evaluated rules have passed.",
+                "good",
+            )
+
+        s += section_end()
+        return s
+
+    def _charts_section_15(self, data: Dict[str, Any]) -> str:
+        rules_by_type = data.get("rules_by_type", {})
+        if not rules_by_type:
+            return ""
+
+        labels = list(rules_by_type.keys())
+        values = list(rules_by_type.values())
+        colors = [BLUE, GREEN, ORANGE, RED, GRAY, "#9F7AEA", "#38B2AC", "#ED8936", "#E53E3E"]
+        bg = colors[:len(labels)]
+
+        config = build_doughnut_config(
+            labels=labels,
+            data=values,
+            background_colors=bg,
+            title="Rules by Type",
+        )
+
+        return chart_init_js("rules-type-doughnut", config)
+
     # ── render_excel ─────────────────────────────────────────────────
 
     def render_excel(self, data: Dict[str, Any]) -> bytes:
-        """Render the deep quality report as Excel with 10 sheets."""
+        """Render the deep quality report as Excel with 11 sheets."""
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill
 
@@ -1937,6 +2126,30 @@ class DataQualityDeepTemplate:
             ws10.cell(row=idx, column=3, value=a.column_name or "")
             ws10.cell(row=idx, column=4, value=(a.message or "")[:200])
             ws10.cell(row=idx, column=5, value=a.detected_at.strftime("%Y-%m-%d %H:%M") if a.detected_at else "")
+
+        # ── Sheet 11: Rules Engine ────────────────────────────────────
+        ws11 = wb.create_sheet("Rules Engine")
+        headers = [
+            "Rule Name", "Type", "Severity", "Source", "Column",
+            "Enabled", "Priority", "Evaluated", "Passed", "Failed",
+            "Last Evaluated",
+        ]
+        _write_headers(ws11, headers)
+        for idx, r in enumerate(data.get("rules_all", []), 2):
+            ws11.cell(row=idx, column=1, value=r.name or "")
+            ws11.cell(row=idx, column=2, value=r.rule_type.value if r.rule_type else "")
+            ws11.cell(row=idx, column=3, value=r.severity.value if r.severity else "")
+            ws11.cell(row=idx, column=4, value=r.source or "all")
+            ws11.cell(row=idx, column=5, value=r.column_name or "—")
+            ws11.cell(row=idx, column=6, value="Yes" if r.is_enabled else "No")
+            ws11.cell(row=idx, column=7, value=r.priority or 5)
+            ws11.cell(row=idx, column=8, value=r.times_evaluated or 0)
+            ws11.cell(row=idx, column=9, value=r.times_passed or 0)
+            ws11.cell(row=idx, column=10, value=r.times_failed or 0)
+            ws11.cell(
+                row=idx, column=11,
+                value=r.last_evaluated_at.strftime("%Y-%m-%d %H:%M") if r.last_evaluated_at else "",
+            )
 
         buf = BytesIO()
         wb.save(buf)

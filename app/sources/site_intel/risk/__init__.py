@@ -16,5 +16,11 @@ from app.sources.site_intel.risk.usgs_earthquake_collector import (
 from app.sources.site_intel.risk.epa_envirofacts_collector import (
     EPAEnvirofactsCollector,
 )
+from app.sources.site_intel.risk.fema_nfhl_collector import FEMANFHLFloodCollector
 
-__all__ = ["FEMARiskCollector", "USGSEarthquakeCollector", "EPAEnvirofactsCollector"]
+__all__ = [
+    "FEMARiskCollector",
+    "USGSEarthquakeCollector",
+    "EPAEnvirofactsCollector",
+    "FEMANFHLFloodCollector",
+]

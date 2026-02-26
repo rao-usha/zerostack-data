@@ -9,5 +9,6 @@ Data sources:
 """
 
 from app.sources.site_intel.labor.bls_collector import BLSLaborCollector
+from app.sources.site_intel.labor.bls_qcew_collector import BLSQCEWCollector
 
-__all__ = ["BLSLaborCollector"]
+__all__ = ["BLSLaborCollector", "BLSQCEWCollector"]

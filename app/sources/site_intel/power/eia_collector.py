@@ -19,7 +19,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.models_site_intel import PowerPlant, ElectricityPrice
+from app.core.models_site_intel import PowerPlant, ElectricityPrice, UtilityTerritory
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
     SiteIntelDomain,
@@ -100,6 +100,16 @@ class EIAPowerCollector(BaseCollector):
             if prices_result.get("error"):
                 errors.append(
                     {"source": "electricity_prices", "error": prices_result["error"]}
+                )
+
+            # Collect utility territories
+            logger.info("Collecting EIA utility territory data...")
+            territory_result = await self._collect_utility_territories(config)
+            total_inserted += territory_result.get("inserted", 0)
+            total_processed += territory_result.get("processed", 0)
+            if territory_result.get("error"):
+                errors.append(
+                    {"source": "utility_territories", "error": territory_result["error"]}
                 )
 
             status = (
@@ -373,6 +383,156 @@ class EIAPowerCollector(BaseCollector):
             "source": "eia",
             "collected_at": datetime.utcnow(),
         }
+
+    async def _collect_utility_territories(
+        self, config: CollectionConfig
+    ) -> Dict[str, Any]:
+        """
+        Collect utility territory data from EIA retail-sales endpoint.
+
+        Aggregates customer counts, revenue, sales, and prices by state+sector
+        into UtilityTerritory records (one row per sectorid+state).
+        """
+        try:
+            all_records = []
+            offset = 0
+            page_size = 5000
+
+            current_year = datetime.now().year
+
+            while True:
+                params = {
+                    "api_key": self.api_key,
+                    "frequency": "annual",
+                    "data[0]": "customers",
+                    "data[1]": "revenue",
+                    "data[2]": "sales",
+                    "data[3]": "price",
+                    "start": str(current_year - 2),
+                    "end": str(current_year),
+                    "sort[0][column]": "period",
+                    "sort[0][direction]": "desc",
+                    "offset": offset,
+                    "length": page_size,
+                }
+
+                if config.states:
+                    for i, state in enumerate(config.states):
+                        params[f"facets[stateid][{i}]"] = state
+
+                response = await self.fetch_json(
+                    "/electricity/retail-sales/data/",
+                    params=params,
+                )
+
+                data = response.get("response", {}).get("data", [])
+                if not data:
+                    break
+
+                all_records.extend(data)
+                logger.info(
+                    f"Fetched {len(data)} utility territory records (total: {len(all_records)})"
+                )
+
+                if len(data) < page_size:
+                    break
+
+                offset += page_size
+
+            # Aggregate by state — build one UtilityTerritory per state
+            # using the latest year with data for each sector
+            territories_by_state: Dict[str, Dict[str, Any]] = {}
+
+            for record in all_records:
+                state_id = record.get("stateid")
+                if not state_id or state_id == "US":
+                    continue
+
+                # Skip non-state entries (census regions like WNC, WSC, etc.)
+                if len(state_id) != 2:
+                    continue
+
+                sector_id = record.get("sectorid", "")
+                if state_id not in territories_by_state:
+                    territories_by_state[state_id] = {
+                        "eia_utility_id": None,
+                        "utility_name": None,
+                        "state": state_id,
+                        "customers_residential": None,
+                        "customers_commercial": None,
+                        "customers_industrial": None,
+                        "avg_rate_residential": None,
+                        "avg_rate_commercial": None,
+                        "avg_rate_industrial": None,
+                        "_year": None,
+                    }
+
+                entry = territories_by_state[state_id]
+                year = int(record.get("period", "0")[:4]) if record.get("period") else 0
+
+                # Only use most recent year
+                if entry["_year"] and year < entry["_year"]:
+                    continue
+                if year > (entry["_year"] or 0):
+                    entry["_year"] = year
+
+                customers = self._safe_int(record.get("customers"))
+                price = self._safe_float(record.get("price"))
+
+                if sector_id == "RES":
+                    entry["customers_residential"] = customers
+                    entry["avg_rate_residential"] = (
+                        round(price / 100, 4) if price else None
+                    )  # cents/kWh → $/kWh
+                elif sector_id == "COM":
+                    entry["customers_commercial"] = customers
+                    entry["avg_rate_commercial"] = (
+                        round(price / 100, 4) if price else None
+                    )
+                elif sector_id == "IND":
+                    entry["customers_industrial"] = customers
+                    entry["avg_rate_industrial"] = (
+                        round(price / 100, 4) if price else None
+                    )
+                elif sector_id == "ALL":
+                    # Use ALL sector to set utility-level info
+                    entry["eia_utility_id"] = hash(state_id) % 999999
+                    entry["utility_name"] = record.get("stateDescription", state_id)
+
+            # Build final records
+            records = []
+            for state_id, entry in territories_by_state.items():
+                entry.pop("_year", None)
+                if not entry.get("eia_utility_id"):
+                    entry["eia_utility_id"] = hash(state_id) % 999999
+                if not entry.get("utility_name"):
+                    entry["utility_name"] = f"{state_id} Aggregate"
+                entry["utility_type"] = "aggregate"
+                entry["source"] = "eia"
+                entry["collected_at"] = datetime.utcnow()
+                records.append(entry)
+
+            if records:
+                inserted, updated = self.bulk_upsert(
+                    UtilityTerritory,
+                    records,
+                    unique_columns=["eia_utility_id", "state"],
+                    update_columns=[
+                        "utility_name", "utility_type",
+                        "customers_residential", "customers_commercial",
+                        "customers_industrial",
+                        "avg_rate_residential", "avg_rate_commercial",
+                        "avg_rate_industrial",
+                        "source", "collected_at",
+                    ],
+                )
+                return {"processed": len(all_records), "inserted": inserted + updated}
+
+            return {"processed": 0, "inserted": 0}
+
+        except Exception as e:
+            logger.error(f"Failed to collect utility territories: {e}", exc_info=True)
+            return {"processed": 0, "inserted": 0, "error": str(e)}
 
     def _map_fuel_type(self, code: Optional[str]) -> Optional[str]:
         """Map EIA fuel codes to readable names."""

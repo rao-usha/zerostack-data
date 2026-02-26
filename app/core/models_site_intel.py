@@ -107,6 +107,12 @@ class UtilityTerritory(Base):
     """Utility service territories from EIA."""
 
     __tablename__ = "utility_territory"
+    __table_args__ = (
+        UniqueConstraint(
+            "eia_utility_id", "state",
+            name="uq_utility_territory_key",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     eia_utility_id = Column(Integer, index=True)
@@ -587,6 +593,12 @@ class IndustryEmployment(Base):
     """Industry employment by county from BLS QCEW."""
 
     __tablename__ = "industry_employment"
+    __table_args__ = (
+        UniqueConstraint(
+            "area_fips", "industry_code", "ownership", "period_year", "period_quarter",
+            name="uq_industry_employment_key",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     area_fips = Column(String(10), index=True)
@@ -653,6 +665,12 @@ class FloodZone(Base):
     """Flood zones from FEMA NFHL."""
 
     __tablename__ = "flood_zone"
+    __table_args__ = (
+        UniqueConstraint(
+            "zone_code", "state", "county",
+            name="uq_flood_zone_key",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     zone_code = Column(String(20))  # A, AE, AH, AO, V, VE, X
@@ -869,6 +887,12 @@ class IncentiveProgram(Base):
     """State/local incentive programs."""
 
     __tablename__ = "incentive_program"
+    __table_args__ = (
+        UniqueConstraint(
+            "program_name", "state",
+            name="uq_incentive_program_key",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     program_name = Column(String(500), nullable=False)
