@@ -264,7 +264,6 @@ class DataQualityDeepTemplate:
             title="Deep Data Quality Report",
             subtitle=f"{data.get('tables_tracked', 0)} tables tracked | "
                      f"{data.get('window_days', 30)}-day analysis window",
-            generated_at=data.get("generated_at", ""),
         )
 
         # ── Section 1: Platform Quality Score Dashboard ──
@@ -272,29 +271,29 @@ class DataQualityDeepTemplate:
 
         kpis = [
             kpi_card(
-                f"{platform_score:.1f}" if platform_score else "N/A",
                 "Quality Score",
-                subtitle=f"Grade: {platform_grade}",
+                f"{platform_score:.1f}" if platform_score else "N/A",
+                delta=f"Grade: {platform_grade}",
             ),
             kpi_card(
-                f"{data.get('avg_completeness', 'N/A')}",
                 "Completeness",
-                subtitle="30% weight",
+                f"{data.get('avg_completeness', 'N/A')}",
+                delta="30% weight",
             ),
             kpi_card(
-                f"{data.get('avg_freshness', 'N/A')}",
                 "Freshness",
-                subtitle="20% weight",
+                f"{data.get('avg_freshness', 'N/A')}",
+                delta="20% weight",
             ),
             kpi_card(
-                f"{data.get('avg_validity', 'N/A')}",
                 "Validity",
-                subtitle="30% weight",
+                f"{data.get('avg_validity', 'N/A')}",
+                delta="30% weight",
             ),
             kpi_card(
-                f"{data.get('avg_consistency', 'N/A')}",
                 "Consistency",
-                subtitle="20% weight",
+                f"{data.get('avg_consistency', 'N/A')}",
+                delta="20% weight",
             ),
         ]
         body += kpi_strip(kpis)
@@ -326,9 +325,9 @@ class DataQualityDeepTemplate:
         open_count = data.get("open_anomalies", 0)
 
         anomaly_kpis = [
-            kpi_card(str(open_count), "Open Alerts",
-                     subtitle="Requires attention" if open_count > 0 else "All clear"),
-            kpi_card(str(len(data.get("recent_anomalies", []))), "Last 7 Days"),
+            kpi_card("Open Alerts", str(open_count),
+                     delta="Requires attention" if open_count > 0 else "All clear"),
+            kpi_card("Last 7 Days", str(len(data.get("recent_anomalies", [])))),
         ]
         body += kpi_strip(anomaly_kpis)
 
@@ -382,61 +381,62 @@ class DataQualityDeepTemplate:
         body += section_start("trending", "5", "Quality Trending")
         trend = data.get("trend", [])
         if trend:
-            # Chart.js line chart
+            import json as _json
+
             labels = [t["date"] for t in trend]
             quality_vals = [t.get("quality") for t in trend]
             completeness_vals = [t.get("completeness") for t in trend]
             freshness_vals = [t.get("freshness") for t in trend]
             validity_vals = [t.get("validity") for t in trend]
 
-            chart_id = "qualityTrendChart"
-            body += chart_container(chart_id, height=350)
-            charts_js += f"""
-            new Chart(document.getElementById('{chart_id}'), {{
-                type: 'line',
-                data: {{
-                    labels: {labels},
-                    datasets: [
-                        {{
-                            label: 'Quality Score',
-                            data: {quality_vals},
-                            borderColor: '{BLUE}',
-                            backgroundColor: '{BLUE}22',
-                            fill: true,
-                            tension: 0.3,
-                        }},
-                        {{
-                            label: 'Completeness',
-                            data: {completeness_vals},
-                            borderColor: '{GREEN}',
-                            tension: 0.3,
-                        }},
-                        {{
-                            label: 'Freshness',
-                            data: {freshness_vals},
-                            borderColor: '{ORANGE}',
-                            tension: 0.3,
-                        }},
-                        {{
-                            label: 'Validity',
-                            data: {validity_vals},
-                            borderColor: '#8B5CF6',
-                            tension: 0.3,
-                        }},
-                    ]
-                }},
-                options: {{
-                    responsive: true,
-                    plugins: {{
-                        legend: {{ position: 'top' }},
-                        title: {{ display: true, text: 'Quality Score Trends ({data.get("window_days", 30)} days)' }}
-                    }},
-                    scales: {{
-                        y: {{ min: 0, max: 100, title: {{ display: true, text: 'Score' }} }}
-                    }}
-                }}
-            }});
-            """
+            window = data.get("window_days", 30)
+            chart_config = _json.dumps({
+                "type": "line",
+                "data": {
+                    "labels": labels,
+                    "datasets": [
+                        {
+                            "label": "Quality Score",
+                            "data": quality_vals,
+                            "borderColor": BLUE,
+                            "backgroundColor": BLUE + "22",
+                            "fill": True,
+                            "tension": 0.3,
+                        },
+                        {
+                            "label": "Completeness",
+                            "data": completeness_vals,
+                            "borderColor": GREEN,
+                            "tension": 0.3,
+                        },
+                        {
+                            "label": "Freshness",
+                            "data": freshness_vals,
+                            "borderColor": ORANGE,
+                            "tension": 0.3,
+                        },
+                        {
+                            "label": "Validity",
+                            "data": validity_vals,
+                            "borderColor": "#8B5CF6",
+                            "tension": 0.3,
+                        },
+                    ],
+                },
+                "options": {
+                    "responsive": True,
+                    "plugins": {
+                        "legend": {"position": "top"},
+                        "title": {"display": True, "text": f"Quality Score Trends ({window} days)"},
+                    },
+                    "scales": {
+                        "y": {"min": 0, "max": 100, "title": {"display": True, "text": "Score"}},
+                    },
+                },
+            })
+
+            body += chart_container("qualityTrendChart", chart_config, title="Quality Trends")
+            charts_js += chart_init_js("qualityTrendChart", chart_config)
         else:
             body += callout("No trend data available. Run /data-quality/trends/compute to generate snapshots.", "info")
         body += section_end()
@@ -450,8 +450,8 @@ class DataQualityDeepTemplate:
         if sla_results:
             compliance_pct = (sla_met / sla_total * 100) if sla_total > 0 else 0
             sla_kpis = [
-                kpi_card(f"{compliance_pct:.0f}%", "SLA Compliance"),
-                kpi_card(f"{sla_met}/{sla_total}", "Targets Met"),
+                kpi_card("SLA Compliance", f"{compliance_pct:.0f}%"),
+                kpi_card("Targets Met", f"{sla_met}/{sla_total}"),
             ]
             body += kpi_strip(sla_kpis)
 
@@ -501,13 +501,13 @@ class DataQualityDeepTemplate:
 
         # ── TOC ──
         toc_items = [
-            ("platform-quality", "Platform Quality Score"),
-            ("domains", "Domain Breakdown"),
-            ("anomalies", "Anomaly Alerts"),
-            ("cross-source", "Cross-Source Validation"),
-            ("trending", "Quality Trending"),
-            ("sla", "SLA Compliance"),
-            ("profiles", "Recent Profiles"),
+            {"number": "1", "id": "platform-quality", "title": "Platform Quality Score"},
+            {"number": "2", "id": "domains", "title": "Domain Breakdown"},
+            {"number": "3", "id": "anomalies", "title": "Anomaly Alerts"},
+            {"number": "4", "id": "cross-source", "title": "Cross-Source Validation"},
+            {"number": "5", "id": "trending", "title": "Quality Trending"},
+            {"number": "6", "id": "sla", "title": "SLA Compliance"},
+            {"number": "7", "id": "profiles", "title": "Recent Profiles"},
         ]
         toc_html = toc(toc_items)
 
@@ -515,9 +515,8 @@ class DataQualityDeepTemplate:
 
         return html_document(
             title="Deep Data Quality Report",
-            toc=toc_html,
-            body=body,
-            charts_js=chart_init_js() + f"<script>{charts_js}</script>" if charts_js else "",
+            body_content=toc_html + body,
+            charts_js=charts_js,
         )
 
     def render_excel(self, data: Dict[str, Any]) -> bytes:

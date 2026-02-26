@@ -47,6 +47,12 @@ STRING_TYPES = {
     "name", "citext", "uuid",
 }
 
+# Types that don't support equality comparison (skip COUNT(DISTINCT))
+NON_COMPARABLE_TYPES = {
+    "json", "jsonb", "xml", "bytea", "tsvector", "tsquery",
+    "point", "line", "lseg", "box", "path", "polygon", "circle",
+}
+
 
 def _classify_column_type(pg_type: str) -> str:
     """Classify a PostgreSQL column type into numeric/temporal/string/other."""
@@ -54,6 +60,8 @@ def _classify_column_type(pg_type: str) -> str:
     # Strip length specifiers like varchar(255)
     base_type = pg_type_lower.split("(")[0].strip()
 
+    if base_type in NON_COMPARABLE_TYPES:
+        return "skip"
     if base_type in NUMERIC_TYPES:
         return "numeric"
     if base_type in TEMPORAL_TYPES:
@@ -262,6 +270,30 @@ def profile_table(
             col_name = col_info["name"]
             col_type = _classify_column_type(col_info.get("udt_name", col_info["type"]))
 
+            # Skip non-comparable types (json, jsonb, xml, etc.)
+            if col_type == "skip":
+                # Only count nulls for these columns
+                try:
+                    safe_col = f'"{col_name}"'
+                    null_result = db.execute(
+                        text(f'SELECT COUNT(*) - COUNT({safe_col}) FROM {from_clause}')
+                    ).scalar()
+                    nc = int(null_result) if null_result else 0
+                    total_null_count += nc
+                    column_profiles.append({
+                        "column_name": col_name,
+                        "data_type": col_info["type"],
+                        "classified_type": col_type,
+                        "null_count": nc,
+                        "null_pct": round((nc / row_count * 100) if row_count > 0 else 0, 2),
+                        "distinct_count": None,
+                        "cardinality_ratio": None,
+                        "stats": {},
+                    })
+                except Exception:
+                    db.rollback()
+                continue
+
             try:
                 if col_type == "numeric":
                     sql = _build_numeric_stats_sql(col_name, from_clause)
@@ -323,6 +355,7 @@ def profile_table(
                 })
 
             except Exception as e:
+                db.rollback()  # Recover from failed SQL transaction
                 logger.warning(f"Error profiling column {col_name} in {table_name}: {e}")
                 continue
 

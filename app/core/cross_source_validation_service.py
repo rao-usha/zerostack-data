@@ -352,10 +352,11 @@ def run_validation(
     try:
         result_data = handler(db, validation.config)
     except Exception as e:
+        db.rollback()  # Recover from failed SQL transaction
         logger.error(f"Validation {validation.name} failed: {e}")
         result_data = {
             "passed": False,
-            "message": f"Error: {str(e)}",
+            "message": f"Error: {str(e)[:200]}",
             "left_count": 0, "right_count": 0, "matched_count": 0,
             "orphan_left": 0, "orphan_right": 0, "match_rate": 0,
         }
@@ -407,6 +408,7 @@ def run_all_validations(db: Session) -> List[DQCrossSourceResult]:
             result = run_validation(db, v)
             results.append(result)
         except Exception as e:
+            db.rollback()  # Recover so next validation can proceed
             logger.error(f"Failed to run validation {v.name}: {e}")
             continue
 
