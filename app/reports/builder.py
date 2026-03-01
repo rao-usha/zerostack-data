@@ -76,7 +76,7 @@ class ReportBuilder:
             {
                 "name": name,
                 "description": template.description,
-                "formats": ["html", "excel"],
+                "formats": ["html", "excel", "pdf", "pptx"],
             }
             for name, template in self.templates.items()
         ]
@@ -107,7 +107,7 @@ class ReportBuilder:
         template = self.templates[template_name]
 
         # Validate format
-        if format not in ["html", "excel"]:
+        if format not in ["html", "excel", "pdf", "pptx"]:
             raise ValueError(f"Unsupported format: {format}")
 
         # Create report record
@@ -141,6 +141,15 @@ class ReportBuilder:
                 content = template.render_html(data)
                 ext = "html"
                 file_content = content.encode("utf-8")
+            elif format == "pdf":
+                from app.reports.pdf_renderer import render_pdf
+                html_content = template.render_html(data)
+                file_content = render_pdf(html_content)
+                ext = "pdf"
+            elif format == "pptx":
+                from app.reports.pptx_renderer import render_pptx
+                file_content = render_pptx(template_name, data)
+                ext = "pptx"
             else:  # excel
                 file_content = template.render_excel(data)
                 ext = "xlsx"

@@ -58,6 +58,8 @@ def generate_report(
     Supported formats:
     - html: HTML file (viewable in browser)
     - excel: Excel workbook with multiple sheets
+    - pdf: PDF document (paginated, print-ready)
+    - pptx: PowerPoint deck (IC memo format)
 
     Example params for investor_profile:
     {"investor_id": 1, "investor_type": "lp"}
@@ -108,7 +110,7 @@ def download_report(
     """
     Download a generated report file.
 
-    Returns the report file (HTML or Excel).
+    Returns the report file (HTML, Excel, or PDF).
     """
     builder = ReportBuilder(db)
     report = builder.get_report(report_id)
@@ -129,6 +131,12 @@ def download_report(
     if report["format"] == "excel":
         media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         filename = f"{report['title']}.xlsx"
+    elif report["format"] == "pdf":
+        media_type = "application/pdf"
+        filename = f"{report['title']}.pdf"
+    elif report["format"] == "pptx":
+        media_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        filename = f"{report['title']}.pptx"
     else:
         media_type = "text/html"
         filename = f"{report['title']}.html"
