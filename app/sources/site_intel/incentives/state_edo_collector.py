@@ -1032,6 +1032,10 @@ class StateEDOIncentiveCollector(BaseCollector):
 
         except Exception as e:
             logger.error(f"State EDO collection failed: {e}", exc_info=True)
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
             return self.create_result(
                 status=CollectionStatus.FAILED,
                 error_message=str(e),

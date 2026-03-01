@@ -288,7 +288,7 @@ class BLSQCEWCollector(BaseCollector):
             return None
 
     def _safe_bigint(self, value: Any) -> Optional[int]:
-        """Convert to int, dividing by 1000 for wages (stored as thousands)."""
+        """Convert to int, dividing by 1000 (QCEW CSV is whole dollars → DB stores thousands)."""
         raw = self._safe_int(value)
         if raw is not None:
             return raw // 1000

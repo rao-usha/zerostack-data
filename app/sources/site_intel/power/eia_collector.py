@@ -496,7 +496,8 @@ class EIAPowerCollector(BaseCollector):
                     )
                 elif sector_id == "ALL":
                     # Use ALL sector to set utility-level info
-                    entry["eia_utility_id"] = hash(state_id) % 999999
+                    # Deterministic ID: 900000 + ASCII values of state code
+                    entry["eia_utility_id"] = 900000 + ord(state_id[0]) * 100 + ord(state_id[1])
                     entry["utility_name"] = record.get("stateDescription", state_id)
 
             # Build final records
@@ -504,7 +505,7 @@ class EIAPowerCollector(BaseCollector):
             for state_id, entry in territories_by_state.items():
                 entry.pop("_year", None)
                 if not entry.get("eia_utility_id"):
-                    entry["eia_utility_id"] = hash(state_id) % 999999
+                    entry["eia_utility_id"] = 900000 + ord(state_id[0]) * 100 + ord(state_id[1])
                 if not entry.get("utility_name"):
                     entry["utility_name"] = f"{state_id} Aggregate"
                 entry["utility_type"] = "aggregate"
@@ -532,6 +533,10 @@ class EIAPowerCollector(BaseCollector):
 
         except Exception as e:
             logger.error(f"Failed to collect utility territories: {e}", exc_info=True)
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
             return {"processed": 0, "inserted": 0, "error": str(e)}
 
     def _map_fuel_type(self, code: Optional[str]) -> Optional[str]:
