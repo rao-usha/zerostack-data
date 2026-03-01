@@ -297,6 +297,82 @@ def list_rule_types():
     }
 
 
+# =============================================================================
+# Rule Seeder & Evaluate-All Endpoints
+# (Must be before /rules/{rule_id} routes to avoid path conflicts)
+# =============================================================================
+
+
+class SeedRequest(BaseModel):
+    """Request schema for rule seeding."""
+
+    source: Optional[str] = Field(default=None, description="Filter by source")
+    table_name: Optional[str] = Field(default=None, description="Filter by table name")
+    dry_run: bool = Field(default=False, description="Preview without creating rules")
+
+
+@router.post("/rules/seed")
+def seed_rules(
+    request: SeedRequest = SeedRequest(),
+    db: Session = Depends(get_db),
+):
+    """
+    Auto-generate data quality rules from profiling data.
+
+    Analyzes column profiles and creates NOT_NULL, RANGE, ENUM, REGEX,
+    ROW_COUNT, and FRESHNESS rules. Idempotent — skips rules that already exist.
+    """
+    try:
+        result = rule_seeder_service.seed_rules_from_profiles(
+            db=db,
+            source_filter=request.source,
+            table_filter=request.table_name,
+            dry_run=request.dry_run,
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error seeding rules: {e}")
+        raise HTTPException(status_code=500, detail=f"Error seeding rules: {str(e)}")
+
+
+@router.delete("/rules/auto-generated")
+def delete_auto_generated_rules(db: Session = Depends(get_db)):
+    """
+    Delete all auto-generated rules (names starting with 'auto_').
+    """
+    try:
+        result = rule_seeder_service.delete_auto_generated_rules(db)
+        return {"message": f"Deleted {result['deleted']} auto-generated rules", **result}
+    except Exception as e:
+        logger.error(f"Error deleting auto-generated rules: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error deleting rules: {str(e)}"
+        )
+
+
+@router.post("/evaluate-all")
+def evaluate_all_rules(db: Session = Depends(get_db)):
+    """
+    Evaluate all enabled rules against their target tables.
+
+    Resolves target tables from DatasetRegistry, evaluates each (rule, table)
+    pair, stores results, and creates a DataQualityReport.
+    """
+    try:
+        result = data_quality_service.evaluate_all_rules(db)
+        return result
+    except Exception as e:
+        logger.error(f"Error evaluating all rules: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error evaluating all rules: {str(e)}"
+        )
+
+
+# =============================================================================
+# Rule CRUD Endpoints (continued)
+# =============================================================================
+
+
 @router.post("/rules", response_model=RuleResponse, status_code=201)
 def create_rule(
     rule_request: RuleCreate, db: Session = Depends(get_db)
@@ -595,76 +671,6 @@ def evaluate_single_rule(
     except Exception as e:
         logger.error(f"Error evaluating rule: {e}")
         raise HTTPException(status_code=500, detail=f"Error evaluating rule: {str(e)}")
-
-
-# =============================================================================
-# Rule Seeder & Evaluate-All Endpoints
-# =============================================================================
-
-
-class SeedRequest(BaseModel):
-    """Request schema for rule seeding."""
-
-    source: Optional[str] = Field(default=None, description="Filter by source")
-    table_name: Optional[str] = Field(default=None, description="Filter by table name")
-    dry_run: bool = Field(default=False, description="Preview without creating rules")
-
-
-@router.post("/rules/seed")
-def seed_rules(
-    request: SeedRequest = SeedRequest(),
-    db: Session = Depends(get_db),
-):
-    """
-    Auto-generate data quality rules from profiling data.
-
-    Analyzes column profiles and creates NOT_NULL, RANGE, ENUM, REGEX,
-    ROW_COUNT, and FRESHNESS rules. Idempotent — skips rules that already exist.
-    """
-    try:
-        result = rule_seeder_service.seed_rules_from_profiles(
-            db=db,
-            source_filter=request.source,
-            table_filter=request.table_name,
-            dry_run=request.dry_run,
-        )
-        return result
-    except Exception as e:
-        logger.error(f"Error seeding rules: {e}")
-        raise HTTPException(status_code=500, detail=f"Error seeding rules: {str(e)}")
-
-
-@router.delete("/rules/auto-generated")
-def delete_auto_generated_rules(db: Session = Depends(get_db)):
-    """
-    Delete all auto-generated rules (names starting with 'auto_').
-    """
-    try:
-        result = rule_seeder_service.delete_auto_generated_rules(db)
-        return {"message": f"Deleted {result['deleted']} auto-generated rules", **result}
-    except Exception as e:
-        logger.error(f"Error deleting auto-generated rules: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error deleting rules: {str(e)}"
-        )
-
-
-@router.post("/evaluate-all")
-def evaluate_all_rules(db: Session = Depends(get_db)):
-    """
-    Evaluate all enabled rules against their target tables.
-
-    Resolves target tables from DatasetRegistry, evaluates each (rule, table)
-    pair, stores results, and creates a DataQualityReport.
-    """
-    try:
-        result = data_quality_service.evaluate_all_rules(db)
-        return result
-    except Exception as e:
-        logger.error(f"Error evaluating all rules: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error evaluating all rules: {str(e)}"
-        )
 
 
 # =============================================================================

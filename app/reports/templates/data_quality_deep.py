@@ -1881,12 +1881,21 @@ class DataQualityDeepTemplate:
             s += data_table(
                 headers=["Rule Type", "Count", "Evals (7d)", "Passed (7d)", "Pass Rate"],
                 rows=rows,
-                caption="Rules by Type",
-                col_widths=["25%", "15%", "15%", "15%", "15%"],
             )
 
-        # Doughnut chart placeholder
-        s += chart_container("rules-type-doughnut", "Rules by Type")
+        # Doughnut chart
+        if rules_by_type:
+            labels = list(rules_by_type.keys())
+            values = list(rules_by_type.values())
+            colors = [BLUE, GREEN, ORANGE, RED, GRAY, "#9F7AEA", "#38B2AC", "#ED8936", "#E53E3E"]
+            bg = colors[:len(labels)]
+            doughnut_config = build_doughnut_config(labels, values, bg)
+            doughnut_json = _json.dumps(doughnut_config)
+            s += chart_container(
+                "rulesTypeDoughnut", doughnut_json,
+                fallback_html=build_chart_legend(labels, values, bg),
+                size="medium", title="Rules by Type",
+            )
 
         # Top failing rules table
         top_failing = data.get("rules_top_failing", [])
@@ -1908,8 +1917,6 @@ class DataQualityDeepTemplate:
             s += data_table(
                 headers=["Rule Name", "Type", "Severity", "Failures", "Evaluations", "Fail Rate"],
                 rows=rows,
-                caption="Top 10 Failing Rules",
-                col_widths=["30%", "12%", "12%", "12%", "12%", "12%"],
             )
         else:
             s += callout(
@@ -1930,14 +1937,8 @@ class DataQualityDeepTemplate:
         colors = [BLUE, GREEN, ORANGE, RED, GRAY, "#9F7AEA", "#38B2AC", "#ED8936", "#E53E3E"]
         bg = colors[:len(labels)]
 
-        config = build_doughnut_config(
-            labels=labels,
-            data=values,
-            background_colors=bg,
-            title="Rules by Type",
-        )
-
-        return chart_init_js("rules-type-doughnut", config)
+        config = build_doughnut_config(labels, values, bg)
+        return chart_init_js("rulesTypeDoughnut", _json.dumps(config))
 
     # ── render_excel ─────────────────────────────────────────────────
 
