@@ -21,7 +21,7 @@ from app.reports.design_system import (
     data_table, pill_badge, callout,
     chart_container, chart_init_js, page_footer,
     build_doughnut_config, build_horizontal_bar_config,
-    build_bar_fallback, build_chart_legend,
+    build_bar_fallback, build_chart_legend, topval_card,
     GREEN, ORANGE, RED, GRAY, BLUE,
 )
 from app.core.models import (
@@ -515,7 +515,7 @@ class DataQualityDeepTemplate:
 
         # ── Page Header ──────────────────────────────────────────────
         body += page_header(
-            title="Deep Data Quality Report",
+            title=data.get("report_title", "Data Availability Report"),
             subtitle=f"{data.get('tables_tracked', 0)} tables tracked | "
                      f"{data.get('window_days', 30)}-day analysis window",
         )
@@ -602,7 +602,7 @@ class DataQualityDeepTemplate:
         )
 
         return html_document(
-            title="Deep Data Quality Report",
+            title=data.get("report_title", "Data Availability Report"),
             body_content=body,
             charts_js=charts_js,
             extra_css=EXTRA_CSS,
@@ -1100,17 +1100,19 @@ class DataQualityDeepTemplate:
         # Top values for string columns
         top_val_cols = [c for c in column_profiles
                         if c.stats and isinstance(c.stats, dict)
-                        and c.stats.get("top_values")][:5]
+                        and c.stats.get("top_values")][:12]
         if top_val_cols:
             s += '<h3 style="font-size:15px;font-weight:600;color:var(--gray-900);margin:20px 0 8px">Top Values (String Columns)</h3>'
+            cards = []
             for c in top_val_cols:
                 table_name = snap_table_map.get(c.snapshot_id, "?")
-                s += f'<p style="font-size:13px;font-weight:600;color:var(--gray-700);margin:12px 0 4px">{table_name}.{c.column_name}</p>'
                 top_vals = c.stats.get("top_values", [])[:5]
                 labels = [str(tv.get("value", "?")) for tv in top_vals]
                 counts = [float(tv.get("count", 0)) for tv in top_vals]
                 if labels and counts:
-                    s += build_bar_fallback(labels, counts)
+                    cards.append(topval_card(f"{table_name}.{c.column_name}", labels, counts))
+            if cards:
+                s += f'<div class="topval-grid">{"".join(cards)}</div>'
 
         # Date ranges
         date_cols = [c for c in column_profiles

@@ -135,6 +135,7 @@ class ReportBuilder:
         try:
             # Gather data
             data = template.gather_data(self.db, params)
+            data["report_title"] = title or f"{template_name} Report"
 
             # Generate file
             if format == "html":

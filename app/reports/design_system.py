@@ -87,8 +87,11 @@ body {
 /* KPI Strip */
 .kpi-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
+  margin: 0 0 24px 0;
+}
+.page-header + .container > .kpi-strip {
   margin: -32px 0 32px 0;
   position: relative;
   z-index: 10;
@@ -261,11 +264,15 @@ body {
 }
 
 /* Tables */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 12px;
+}
 .data-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-  margin-top: 12px;
 }
 .data-table thead th {
   background: var(--gray-100);
@@ -490,6 +497,68 @@ body {
 }
 .page-footer .notes ul { padding-left: 20px; }
 .page-footer .notes li { margin-bottom: 4px; font-size: 12px; color: var(--gray-500); }
+
+/* Top-values cards */
+.topval-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 12px 0;
+}
+.topval-card {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.topval-card .tv-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topval-card .tv-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.topval-card .tv-row:last-child { margin-bottom: 0; }
+.topval-card .tv-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--gray-700);
+}
+.topval-card .tv-bar {
+  width: 60px;
+  height: 6px;
+  background: var(--gray-200);
+  border-radius: 3px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.topval-card .tv-bar-fill {
+  height: 100%;
+  background: var(--primary-light);
+  border-radius: 3px;
+}
+.topval-card .tv-count {
+  min-width: 48px;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--gray-900);
+  font-size: 12px;
+}
 
 /* Footnote */
 .footnote {
@@ -782,9 +851,11 @@ def page_header(
 </div>"""
 
 
-def kpi_strip(cards_html: str) -> str:
-    """Wrap kpi_card outputs in a KPI strip grid."""
-    return f'<div class="kpi-strip">{cards_html}</div>'
+def kpi_strip(cards_html) -> str:
+    """Wrap kpi_card outputs in a KPI strip grid. Accepts a string or list of strings."""
+    if isinstance(cards_html, list):
+        cards_html = "\n".join(cards_html)
+    return f'<div class="container"><div class="kpi-strip">{cards_html}</div></div>'
 
 
 def kpi_card(
@@ -811,17 +882,17 @@ def toc(items: List[Dict[str, Any]]) -> str:
         sid = item.get("id", "")
         title = item.get("title", "")
         links += f'<a href="#{_esc(sid)}"><span class="toc-num">{num}</span> {_esc(title)}</a>\n'
-    return f"""<div class="toc">
+    return f"""<div class="container"><div class="toc">
     <h2>Contents</h2>
     <div class="toc-grid">
         {links}
     </div>
-</div>"""
+</div></div>"""
 
 
 def section_start(number: int, title: str, section_id: str) -> str:
     """Open a numbered section card. Must be closed with section_end()."""
-    return f"""<div class="section" id="{_esc(section_id)}">
+    return f"""<div class="container"><div class="section" id="{_esc(section_id)}">
     <div class="section-header">
         <div class="section-number">{number}</div>
         <h2>{_esc(title)}</h2>
@@ -832,7 +903,7 @@ def section_start(number: int, title: str, section_id: str) -> str:
 def section_end() -> str:
     """Close a numbered section card."""
     return """    </div>
-</div>"""
+</div></div>"""
 
 
 def data_table(
@@ -870,10 +941,10 @@ def data_table(
         )
         tfoot = f"\n    <tfoot><tr>{foot_cells}</tr></tfoot>"
 
-    return f"""<table class="data-table">
+    return f"""<div class="table-wrap"><table class="data-table">
     <thead><tr>{th_cells}</tr></thead>
     <tbody>{tbody}</tbody>{tfoot}
-</table>"""
+</table></div>"""
 
 
 def callout(content: str, variant: str = "info") -> str:
@@ -1156,3 +1227,24 @@ def build_chart_legend(
             f'</div>'
         )
     return '<div class="chart-legend">' + "\n".join(rows) + "</div>"
+
+
+def topval_card(title: str, labels: List[str], counts: List[float]) -> str:
+    """Card showing top values for a column with mini bar chart rows."""
+    max_count = max(counts) if counts else 1
+    rows = []
+    for label, count in zip(labels, counts):
+        pct = (count / max_count * 100) if max_count > 0 else 0
+        rows.append(
+            f'<div class="tv-row">'
+            f'<span class="tv-label" title="{_esc(label)}">{_esc(label)}</span>'
+            f'<div class="tv-bar"><div class="tv-bar-fill" style="width:{pct:.0f}%"></div></div>'
+            f'<span class="tv-count">{count:,.0f}</span>'
+            f'</div>'
+        )
+    return (
+        f'<div class="topval-card">'
+        f'<div class="tv-title" title="{_esc(title)}">{_esc(title)}</div>'
+        f'{"".join(rows)}'
+        f'</div>'
+    )
