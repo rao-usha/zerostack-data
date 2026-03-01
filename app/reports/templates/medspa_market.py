@@ -1558,138 +1558,54 @@ class MedSpaMarketTemplate:
     # ------------------------------------------------------------------
 
     def _get_deal_model_data(self, db: Session, state: Optional[str]) -> Dict:
-        """Build full PE roll-up deal model from A-grade prospects and industry benchmarks."""
-        state_clause = "AND state = :state" if state else ""
-        params: Dict[str, Any] = {}
-        if state:
-            params["state"] = state.upper()
+        """Build full PE roll-up deal model from A-grade prospects and industry benchmarks.
 
+        Delegates to DealEngine for core calculations while preserving the same
+        return shape for backward compatibility with existing report sections.
+        """
         try:
-            # Count A-grade prospects by price tier
-            result = db.execute(
-                text(f"""
-                    SELECT price, COUNT(*) as cnt
-                    FROM medspa_prospects
-                    WHERE acquisition_grade = 'A' {state_clause}
-                    GROUP BY price
-                    ORDER BY cnt DESC
-                """),
-                params,
+            from app.services.deal_engine import DealEngine
+
+            engine = DealEngine(db)
+            portfolio = engine.get_target_portfolio(state=state)
+            economics = engine.compute_tier_economics(portfolio["tier_counts"])
+            capital = engine.compute_capital_stack(
+                economics["total_acquisition_cost"],
+                economics["total_ebitda"],
+                economics["total_revenue"],
             )
-            tier_counts: Dict[Optional[str], int] = {}
-            for row in result.fetchall():
-                tier_counts[row[0]] = row[1]
+            # Use the report's own DEAL_ASSUMPTIONS for backward compatibility
+            scenarios = engine.run_scenarios(economics, DEAL_ASSUMPTIONS["scenarios"])
 
-            # A-grade by state for geographic breakdown
-            result = db.execute(
-                text(f"""
-                    SELECT state, COUNT(*) as cnt
-                    FROM medspa_prospects
-                    WHERE acquisition_grade = 'A' AND state IS NOT NULL {state_clause}
-                    GROUP BY state
-                    ORDER BY cnt DESC
-                """),
-                params,
-            )
-            a_grade_states = [{"state": row[0], "count": row[1]} for row in result.fetchall()]
-
-            # Build per-tier economics
-            tier_economics = []
-            total_locations = 0
-            total_revenue = 0
-            total_ebitda = 0
-            total_acquisition_cost = 0
-
-            for tier, count in tier_counts.items():
-                benchmarks = MEDSPA_BENCHMARKS.get(tier, MEDSPA_BENCHMARKS[None])
-                rev = benchmarks["revenue"]
-                margin = benchmarks["ebitda_margin"]
-                ebitda = rev * margin
-                multiple = benchmarks["entry_multiple"]
-                acq_cost = ebitda * multiple
-
-                tier_economics.append({
-                    "tier": tier or "Unknown",
-                    "count": count,
-                    "avg_revenue": rev,
-                    "ebitda_margin": margin,
-                    "avg_ebitda": ebitda,
-                    "entry_multiple": multiple,
-                    "total_revenue": rev * count,
-                    "total_ebitda": ebitda * count,
-                    "total_acq_cost": acq_cost * count,
-                })
-                total_locations += count
-                total_revenue += rev * count
-                total_ebitda += ebitda * count
-                total_acquisition_cost += acq_cost * count
-
-            # Weighted average margin
-            weighted_margin = total_ebitda / total_revenue if total_revenue > 0 else 0
-
-            # Capital stack
+            # P&L waterfall per average location
             da = DEAL_ASSUMPTIONS
-            debt = total_acquisition_cost * da["debt_pct"]
-            equity = total_acquisition_cost * da["equity_pct"]
-            transaction_costs = total_acquisition_cost * da["transaction_cost_pct"]
-            monthly_sga = total_revenue * da["sga_pct"] / 12
-            working_capital = monthly_sga * da["working_capital_months"]
-            total_capital_required = equity + transaction_costs + working_capital
-
-            # Leverage check
-            leverage_ratio = debt / total_ebitda if total_ebitda > 0 else 0
-
-            # P&L waterfall (per average location)
-            avg_revenue = total_revenue / total_locations if total_locations > 0 else 0
-            avg_cogs = avg_revenue * da["cogs_pct"]
-            avg_gross_profit = avg_revenue - avg_cogs
-            avg_sga = avg_revenue * da["sga_pct"]
-            avg_ebitda = avg_gross_profit - avg_sga
-
-            # Scenario returns
-            scenarios = {}
-            for name, s in da["scenarios"].items():
-                improved_ebitda = total_ebitda * (1 + s["margin_improvement"]) ** s["hold_years"]
-                exit_ev = improved_ebitda * s["exit_multiple"]
-                entry_ev = total_acquisition_cost
-                gross_moic = exit_ev / entry_ev if entry_ev > 0 else 0
-                # Net IRR approximation: (MOIC)^(1/years) - 1
-                net_irr = (gross_moic ** (1.0 / s["hold_years"]) - 1) if gross_moic > 0 and s["hold_years"] > 0 else 0
-                scenarios[name] = {
-                    "entry_ev": entry_ev,
-                    "exit_ev": exit_ev,
-                    "exit_multiple": s["exit_multiple"],
-                    "margin_improvement": s["margin_improvement"],
-                    "hold_years": s["hold_years"],
-                    "improved_ebitda": improved_ebitda,
-                    "gross_moic": gross_moic,
-                    "net_irr": net_irr,
-                }
+            total_locs = economics["total_locations"]
+            avg_rev = economics["total_revenue"] / total_locs if total_locs > 0 else 0
 
             return {
-                "tier_economics": tier_economics,
-                "total_locations": total_locations,
-                "total_revenue": total_revenue,
-                "total_ebitda": total_ebitda,
-                "weighted_margin": weighted_margin,
-                "total_acquisition_cost": total_acquisition_cost,
+                "tier_economics": economics["tier_economics"],
+                "total_locations": economics["total_locations"],
+                "total_revenue": economics["total_revenue"],
+                "total_ebitda": economics["total_ebitda"],
+                "weighted_margin": economics["weighted_margin"],
+                "total_acquisition_cost": economics["total_acquisition_cost"],
                 "capital_stack": {
-                    "debt": debt,
-                    "equity": equity,
-                    "transaction_costs": transaction_costs,
-                    "working_capital": working_capital,
-                    "total_capital_required": total_capital_required,
+                    "debt": capital["debt"],
+                    "equity": capital["equity"],
+                    "transaction_costs": capital["transaction_costs"],
+                    "working_capital": capital["working_capital"],
+                    "total_capital_required": capital["total_capital_required"],
                 },
-                "leverage_ratio": leverage_ratio,
+                "leverage_ratio": capital["leverage_ratio"],
                 "pnl_waterfall": {
-                    "revenue": avg_revenue,
-                    "cogs": avg_cogs,
-                    "gross_profit": avg_gross_profit,
-                    "sga": avg_sga,
-                    "ebitda": avg_ebitda,
+                    "revenue": avg_rev,
+                    "cogs": avg_rev * da["cogs_pct"],
+                    "gross_profit": avg_rev * (1 - da["cogs_pct"]),
+                    "sga": avg_rev * da["sga_pct"],
+                    "ebitda": avg_rev * (1 - da["cogs_pct"]) - avg_rev * da["sga_pct"],
                 },
                 "scenarios": scenarios,
-                "a_grade_states": a_grade_states,
+                "a_grade_states": portfolio["a_grade_states"],
             }
         except Exception as e:
             logger.warning(f"Could not compute deal model data: {e}")

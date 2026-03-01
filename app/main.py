@@ -123,6 +123,7 @@ from app.api.v1 import (
     quarterly_diff,
     zip_scores,
     medspa_discovery,
+    deal_models,
 )
 
 # Job Queue Streaming & Monitor
@@ -954,6 +955,7 @@ Browse the endpoint sections below to see what's available:
         # ── Deals & Scoring ────────────────────────────────────────────
         {"name": "deals", "description": "💼 **Deal Flow Tracker** - Track investment opportunities through pipeline stages from sourcing to close"},
         {"name": "Deal Predictions", "description": "🎯 **Predictive Deal Scoring** - Win probability predictions, pipeline insights, and similar deal analysis"},
+        {"name": "Deal Models", "description": "📈 **Deal Modeling** - PE roll-up deal modeling, scenarios, sensitivity analysis, and IC memo generation"},
         {"name": "exit_readiness", "description": "🚪 **Exit Readiness Score** - 7-signal composite score for PE portfolio exit timing"},
         {"name": "acquisition_targets", "description": "🎯 **Acquisition Target Score** - 5-signal score identifying attractive PE acquisition targets"},
         {"name": "Company Scores", "description": "📊 **Company Scoring** - ML-based health scores for portfolio companies (0-100 with category breakdowns)"},
@@ -1164,6 +1166,7 @@ app.include_router(exit_readiness.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(acquisition_targets.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(zip_scores.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(medspa_discovery.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(deal_models.router, prefix="/api/v1", dependencies=_auth)
 
 # Site Intelligence Platform
 app.include_router(site_intel_power.router, prefix="/api/v1", dependencies=_auth)
