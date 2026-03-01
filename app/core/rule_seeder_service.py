@@ -167,8 +167,38 @@ def seed_rules_from_profiles(
                     mean_f = float(mean)
                     stddev_f = float(stddev)
                     if stddev_f > 0:
-                        range_min = round(mean_f - 4 * stddev_f, 4)
-                        range_max = round(mean_f + 4 * stddev_f, 4)
+                        # Detect skewed distributions: if stddev >> mean, data is
+                        # heavily skewed (e.g., populations, dollar amounts). Use
+                        # percentile-based bounds when available, otherwise widen
+                        # the multiplier to avoid false positives.
+                        p25 = stats.get("p25")
+                        p75 = stats.get("p75")
+                        median = stats.get("median")
+                        stat_min = stats.get("min")
+                        stat_max = stats.get("max")
+
+                        # Coefficient of variation > 1.5 = highly skewed
+                        cv = stddev_f / abs(mean_f) if mean_f != 0 else float("inf")
+                        is_skewed = cv > 1.5
+
+                        if is_skewed and p25 is not None and p75 is not None:
+                            # Use IQR-based range: wider and handles skew better
+                            iqr = float(p75) - float(p25)
+                            range_min = round(float(p25) - 6 * iqr, 4)
+                            range_max = round(float(p75) + 6 * iqr, 4)
+                            method = "IQR×6"
+                        elif is_skewed and stat_min is not None and stat_max is not None:
+                            # Fallback for skewed: use actual min/max with 50% headroom
+                            actual_range = float(stat_max) - float(stat_min)
+                            range_min = round(float(stat_min) - 0.5 * actual_range, 4)
+                            range_max = round(float(stat_max) + 0.5 * actual_range, 4)
+                            method = "min/max×1.5"
+                        else:
+                            # Normal distribution: mean ± 4σ
+                            range_min = round(mean_f - 4 * stddev_f, 4)
+                            range_max = round(mean_f + 4 * stddev_f, 4)
+                            method = "mean±4σ"
+
                         rule_spec = _make_rule_spec(
                             name=f"auto_range_{table_name}_{col_name}",
                             rule_type=RuleType.RANGE,
@@ -179,7 +209,7 @@ def seed_rules_from_profiles(
                             parameters={"min": range_min, "max": range_max},
                             description=(
                                 f"[Auto-generated] {table_name}.{col_name} range check "
-                                f"(mean={mean_f:.2f} ± 4×stddev={stddev_f:.2f})"
+                                f"({method}, cv={cv:.1f})"
                             ),
                         )
                         proposed_rules.append(rule_spec)
