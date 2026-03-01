@@ -72,6 +72,17 @@ backup/
 # Docker
 docker-compose.override.yml
 
+# Generated report outputs
+report_*.html
+report_*.xlsx
+report_*.json
+medspa_test_output.*
+medspa_test_response.json
+plan_output.txt
+*.pdf
+*.pptx
+~$*
+
 # OS
 Thumbs.db
 .DS_Store
