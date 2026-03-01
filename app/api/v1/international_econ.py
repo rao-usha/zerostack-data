@@ -233,7 +233,7 @@ async def ingest_worldbank_wdi_data(
     return create_and_dispatch_job(
         db,
         background_tasks,
-        source="international_econ_worldbank",
+        source="international_econ",
         config={
             "source": "worldbank",
             "dataset": "wdi",
@@ -266,10 +266,10 @@ async def ingest_worldbank_countries_data(
     return create_and_dispatch_job(
         db,
         background_tasks,
-        source="international_econ_worldbank",
+        source="international_econ",
         config={
             "source": "worldbank",
-            "dataset": "countries",
+            "dataset": "worldbank_countries",
         },
         message="World Bank countries metadata ingestion job created",
     )
@@ -296,10 +296,10 @@ async def ingest_worldbank_indicators_metadata(
     return create_and_dispatch_job(
         db,
         background_tasks,
-        source="international_econ_worldbank",
+        source="international_econ",
         config={
             "source": "worldbank",
-            "dataset": "indicators",
+            "dataset": "worldbank_indicators",
             "search": request.search,
             "max_results": request.max_results,
         },
@@ -366,10 +366,10 @@ async def ingest_imf_ifs_data(
     return create_and_dispatch_job(
         db,
         background_tasks,
-        source="international_econ_imf",
+        source="international_econ",
         config={
             "source": "imf",
-            "dataset": "ifs",
+            "dataset": "imf_ifs",
             "indicator": request.indicator,
             "countries": request.countries,
             "start_year": request.start_year,
@@ -421,10 +421,10 @@ async def ingest_oecd_mei_data(
     return create_and_dispatch_job(
         db,
         background_tasks,
-        source="international_econ_oecd",
+        source="international_econ",
         config={
             "source": "oecd",
-            "dataset": "mei",
+            "dataset": "oecd_mei",
             "countries": request.countries,
             "subjects": request.subjects,
             "start_period": request.start_period,
@@ -455,10 +455,10 @@ async def ingest_oecd_kei_data(
     return create_and_dispatch_job(
         db,
         background_tasks,
-        source="international_econ_oecd",
+        source="international_econ",
         config={
             "source": "oecd",
-            "dataset": "kei",
+            "dataset": "oecd_kei",
             "countries": request.countries,
             "start_period": request.start_period,
             "end_period": request.end_period,
@@ -487,10 +487,10 @@ async def ingest_oecd_labor_data(
     return create_and_dispatch_job(
         db,
         background_tasks,
-        source="international_econ_oecd",
+        source="international_econ",
         config={
             "source": "oecd",
-            "dataset": "alfs",
+            "dataset": "oecd_labor",
             "countries": request.countries,
             "start_period": request.start_period,
             "end_period": request.end_period,
@@ -518,10 +518,10 @@ async def ingest_oecd_trade_data(
     return create_and_dispatch_job(
         db,
         background_tasks,
-        source="international_econ_oecd",
+        source="international_econ",
         config={
             "source": "oecd",
-            "dataset": "batis",
+            "dataset": "oecd_trade",
             "countries": request.countries,
             "start_period": request.start_period,
             "end_period": request.end_period,
@@ -551,10 +551,10 @@ async def ingest_oecd_tax_data(
     return create_and_dispatch_job(
         db,
         background_tasks,
-        source="international_econ_oecd",
+        source="international_econ",
         config={
             "source": "oecd",
-            "dataset": "tax",
+            "dataset": "oecd_tax",
             "countries": request.countries,
             "start_period": request.start_period,
             "end_period": request.end_period,
@@ -592,10 +592,10 @@ async def ingest_bis_eer_data(
     return create_and_dispatch_job(
         db,
         background_tasks,
-        source="international_econ_bis",
+        source="international_econ",
         config={
             "source": "bis",
-            "dataset": "eer",
+            "dataset": "bis_eer",
             "countries": request.countries,
             "eer_type": request.eer_type,
             "start_period": request.start_period,
@@ -630,10 +630,10 @@ async def ingest_bis_property_data(
     return create_and_dispatch_job(
         db,
         background_tasks,
-        source="international_econ_bis",
+        source="international_econ",
         config={
             "source": "bis",
-            "dataset": "property",
+            "dataset": "bis_property",
             "countries": request.countries,
             "start_period": request.start_period,
             "end_period": request.end_period,
