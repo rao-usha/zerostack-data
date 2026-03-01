@@ -28,6 +28,12 @@ Sections:
   19. Real Estate Appreciation Alpha (Redfin/FHFA home price timing signal)
   20. Deposit Wealth Concentration (FDIC branch deposits per capita)
   21. Business Formation Velocity (IRS SOI business income density)
+  22. Opportunity Zone Overlay (tax-advantaged roll-up targets)
+  23. Demographic Demand Model (education-driven demand proxy)
+  24. PE Competitive Heat Map (aesthetics deal activity)
+  25. Construction Momentum Signal (HUD permit growth leading indicator)
+  26. Medical CPI Pricing Power (medical vs general inflation spread)
+  27. Talent Pipeline Pressure (healthcare JOLTS labor scarcity)
 """
 
 import json
@@ -319,6 +325,18 @@ MEDSPA_EXTRA_CSS = """
 .migration-bar-pos { background: #48bb78; }
 .migration-bar-neg { background: #fc8181; }
 
+/* Fix: kpi-strip inside sections should not use page-header's negative margin */
+.section-body .kpi-strip {
+    margin: 0 0 20px 0;
+}
+
+/* Fix: chart-container.large was missing a height rule */
+.chart-container.large { height: 400px; }
+
+/* Fix: prevent chart/legend overflow into adjacent content */
+.chart-container { overflow: hidden; }
+.chart-row { overflow: hidden; align-items: start; }
+
 /* Sections 18-21: Provider / RE / Deposit / Business Formation */
 .provider-split-grid {
     display: grid;
@@ -426,6 +444,18 @@ class MedSpaMarketTemplate:
             **self._get_deposit_wealth_data(db, state_filter),
             # Section 21: Business Formation Velocity
             **self._get_business_formation_data(db, state_filter),
+            # Section 22: Opportunity Zone Overlay
+            **self._get_opportunity_zone_data(db, state_filter),
+            # Section 23: Demographic Demand Model
+            **self._get_demographic_demand_data(db, state_filter),
+            # Section 24: PE Competitive Heat Map
+            **self._get_pe_competitive_data(db, state_filter),
+            # Section 25: Construction Momentum Signal
+            **self._get_construction_momentum_data(db, state_filter),
+            # Section 26: Medical CPI Pricing Power (national)
+            **self._get_medical_cpi_data(db),
+            # Section 27: Talent Pipeline Pressure (national)
+            **self._get_talent_pipeline_data(db),
         }
 
         return data
@@ -1084,6 +1114,76 @@ class MedSpaMarketTemplate:
             row = result.fetchone()
             if row and row[2]:
                 freshness["irs_soi_business_income"] = {
+                    "earliest": str(row[0]) if row[0] else None,
+                    "latest": str(row[1]) if row[1] else None,
+                    "total": row[2],
+                }
+        except Exception:
+            db.rollback()
+
+        # Opportunity Zone freshness
+        try:
+            result = db.execute(
+                text("SELECT COUNT(*) as total FROM opportunity_zone"),
+            )
+            row = result.fetchone()
+            if row and row[0]:
+                freshness["opportunity_zone"] = {
+                    "earliest": None, "latest": None, "total": row[0],
+                }
+        except Exception:
+            db.rollback()
+
+        # Educational Attainment freshness
+        try:
+            result = db.execute(
+                text("""
+                    SELECT MIN(period_year) as earliest, MAX(period_year) as latest,
+                           COUNT(*) as total
+                    FROM educational_attainment
+                """),
+            )
+            row = result.fetchone()
+            if row and row[2]:
+                freshness["educational_attainment"] = {
+                    "earliest": str(row[0]) if row[0] else None,
+                    "latest": str(row[1]) if row[1] else None,
+                    "total": row[2],
+                }
+        except Exception:
+            db.rollback()
+
+        # HUD Building Permits freshness
+        try:
+            result = db.execute(
+                text("""
+                    SELECT MIN(date) as earliest, MAX(date) as latest,
+                           COUNT(*) as total
+                    FROM realestate_hud_permits
+                """),
+            )
+            row = result.fetchone()
+            if row and row[2]:
+                freshness["hud_permits"] = {
+                    "earliest": row[0].isoformat() if row[0] else None,
+                    "latest": row[1].isoformat() if row[1] else None,
+                    "total": row[2],
+                }
+        except Exception:
+            db.rollback()
+
+        # BLS CPI freshness
+        try:
+            result = db.execute(
+                text("""
+                    SELECT MIN(year) as earliest, MAX(year) as latest,
+                           COUNT(*) as total
+                    FROM bls_cpi
+                """),
+            )
+            row = result.fetchone()
+            if row and row[2]:
+                freshness["bls_cpi"] = {
                     "earliest": str(row[0]) if row[0] else None,
                     "latest": str(row[1]) if row[1] else None,
                     "total": row[2],
@@ -2650,6 +2750,770 @@ class MedSpaMarketTemplate:
             return {"business_formation": {}}
 
     # ------------------------------------------------------------------
+    # Section 22: Opportunity Zone Overlay
+    # ------------------------------------------------------------------
+
+    def _get_opportunity_zone_data(self, db: Session, state: Optional[str]) -> Dict:
+        """Cross-reference Opportunity Zone tracts with medspa prospect states."""
+        try:
+            check = db.execute(text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_name = 'opportunity_zone'"
+            ))
+            if not check.fetchone():
+                return {"opportunity_zones": {}}
+
+            state_clause = "AND oz.state = :state" if state else ""
+            params: Dict[str, Any] = {}
+            if state:
+                params["state"] = state.upper()
+
+            # Aggregate OZ tracts by state + cross with medspa prospect counts
+            rows = db.execute(text(f"""
+                SELECT
+                    oz.state,
+                    COUNT(*) AS oz_tracts,
+                    SUM(CASE WHEN oz.is_low_income THEN 1 ELSE 0 END) AS low_income_tracts,
+                    SUM(CASE WHEN NOT oz.is_low_income THEN 1 ELSE 0 END) AS contiguous_tracts,
+                    COALESCE(mp.prospect_count, 0) AS prospect_count,
+                    COALESCE(mp.a_grade_count, 0) AS a_grade_count
+                FROM opportunity_zone oz
+                LEFT JOIN (
+                    SELECT state,
+                           COUNT(*) AS prospect_count,
+                           COUNT(*) FILTER (WHERE acquisition_grade = 'A') AS a_grade_count
+                    FROM medspa_prospects
+                    GROUP BY state
+                ) mp ON mp.state = oz.state
+                WHERE 1=1 {state_clause}
+                GROUP BY oz.state, mp.prospect_count, mp.a_grade_count
+                ORDER BY oz_tracts DESC
+            """), params).fetchall()
+
+            if not rows:
+                return {"opportunity_zones": {}}
+
+            state_data = []
+            total_tracts = 0
+            total_low_income = 0
+            total_contiguous = 0
+            states_with_oz = 0
+            medspa_oz_states = 0
+            tax_advantaged_states = 0
+
+            for r in rows:
+                tracts = int(r[1] or 0)
+                low_income = int(r[2] or 0)
+                contiguous = int(r[3] or 0)
+                prospects = int(r[4] or 0)
+                a_grade = int(r[5] or 0)
+                oz_per_prospect = round(tracts / prospects, 2) if prospects > 0 else 0
+
+                state_data.append({
+                    "state": r[0],
+                    "oz_tracts": tracts,
+                    "low_income_tracts": low_income,
+                    "contiguous_tracts": contiguous,
+                    "prospect_count": prospects,
+                    "a_grade_count": a_grade,
+                    "oz_per_prospect": oz_per_prospect,
+                })
+
+                total_tracts += tracts
+                total_low_income += low_income
+                total_contiguous += contiguous
+                states_with_oz += 1
+                if prospects > 0:
+                    medspa_oz_states += 1
+                if a_grade > 5 and tracts > 50:
+                    tax_advantaged_states += 1
+
+            return {
+                "opportunity_zones": {
+                    "state_data": state_data,
+                    "summary": {
+                        "total_tracts": total_tracts,
+                        "states_with_oz": states_with_oz,
+                        "medspa_oz_states": medspa_oz_states,
+                        "tax_advantaged_states": tax_advantaged_states,
+                        "total_low_income": total_low_income,
+                        "total_contiguous": total_contiguous,
+                    },
+                }
+            }
+        except Exception as e:
+            logger.warning(f"Could not compute opportunity zone data: {e}")
+            db.rollback()
+            return {"opportunity_zones": {}}
+
+    # ------------------------------------------------------------------
+    # Section 23: Demographic Demand Model
+    # ------------------------------------------------------------------
+
+    def _get_demographic_demand_data(self, db: Session, state: Optional[str]) -> Dict:
+        """Cross-reference educational attainment with medspa prospect density."""
+        try:
+            check = db.execute(text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_name = 'educational_attainment'"
+            ))
+            if not check.fetchone():
+                return {"demographic_demand": {}}
+
+            # Get latest period year
+            yr_row = db.execute(text(
+                "SELECT MAX(period_year) FROM educational_attainment"
+            )).fetchone()
+            if not yr_row or not yr_row[0]:
+                return {"demographic_demand": {}}
+
+            latest_year = yr_row[0]
+            state_clause = "AND LEFT(ea.area_fips, 2) = :state_fips" if state else ""
+            params: Dict[str, Any] = {"year": latest_year}
+
+            # State FIPS lookup for filtering (only needed if state filter active)
+            if state:
+                fips_row = db.execute(text(
+                    "SELECT DISTINCT LEFT(area_fips, 2) FROM educational_attainment "
+                    "WHERE area_name ILIKE :state_name LIMIT 1"
+                ), {"state_name": f"%{state}%"}).fetchone()
+                if fips_row:
+                    params["state_fips"] = fips_row[0]
+                else:
+                    return {"demographic_demand": {}}
+
+            # Aggregate by state-level: use area_type that gives state-level data
+            rows = db.execute(text(f"""
+                WITH state_edu AS (
+                    SELECT
+                        CASE WHEN ea.area_type IN ('State', 'state')
+                            THEN ea.area_name
+                            ELSE ea.area_name
+                        END AS state_name,
+                        LEFT(ea.area_fips, 2) AS state_fips,
+                        AVG(ea.pct_bachelors) AS avg_bachelors,
+                        AVG(ea.pct_graduate) AS avg_graduate,
+                        SUM(ea.population_25_plus) AS total_pop_25plus,
+                        COUNT(*) AS area_count
+                    FROM educational_attainment ea
+                    WHERE ea.period_year = :year
+                        {state_clause}
+                    GROUP BY LEFT(ea.area_fips, 2), ea.area_name
+                    HAVING AVG(ea.pct_bachelors) IS NOT NULL
+                )
+                SELECT
+                    se.state_name,
+                    se.state_fips,
+                    ROUND(se.avg_bachelors::numeric, 1) AS avg_bachelors,
+                    ROUND(se.avg_graduate::numeric, 1) AS avg_graduate,
+                    se.total_pop_25plus,
+                    se.area_count,
+                    COALESCE(mp.prospect_count, 0) AS prospect_count,
+                    COALESCE(mp.a_grade_count, 0) AS a_grade_count
+                FROM state_edu se
+                LEFT JOIN (
+                    SELECT state,
+                           COUNT(*) AS prospect_count,
+                           COUNT(*) FILTER (WHERE acquisition_grade = 'A') AS a_grade_count
+                    FROM medspa_prospects
+                    GROUP BY state
+                ) mp ON mp.state = se.state_fips
+                ORDER BY avg_bachelors DESC
+            """), params).fetchall()
+
+            if not rows:
+                return {"demographic_demand": {}}
+
+            state_data = []
+            all_bachelors = []
+            all_graduate = []
+            underserved_educated = 0
+
+            for r in rows:
+                bachelors = float(r[2] or 0)
+                graduate = float(r[3] or 0)
+                prospects = int(r[6] or 0)
+                a_grade = int(r[7] or 0)
+                # Gap score: high education rank - low medspa density = opportunity
+                edu_score = bachelors + graduate
+                gap_score = round(edu_score - (prospects * 0.1), 1) if prospects < 200 else 0
+
+                state_data.append({
+                    "state_name": r[0],
+                    "state_fips": r[1],
+                    "avg_bachelors": bachelors,
+                    "avg_graduate": graduate,
+                    "total_pop_25plus": int(r[4] or 0),
+                    "area_count": int(r[5] or 0),
+                    "prospect_count": prospects,
+                    "a_grade_count": a_grade,
+                    "gap_score": gap_score,
+                })
+                all_bachelors.append(bachelors)
+                all_graduate.append(graduate)
+                if bachelors > 30 and prospects < 50:
+                    underserved_educated += 1
+
+            avg_b = round(sum(all_bachelors) / len(all_bachelors), 1) if all_bachelors else 0
+            avg_g = round(sum(all_graduate) / len(all_graduate), 1) if all_graduate else 0
+
+            return {
+                "demographic_demand": {
+                    "state_data": state_data,
+                    "summary": {
+                        "avg_bachelors_pct": avg_b,
+                        "avg_graduate_pct": avg_g,
+                        "states_analyzed": len(state_data),
+                        "underserved_educated": underserved_educated,
+                        "period_year": latest_year,
+                    },
+                }
+            }
+        except Exception as e:
+            logger.warning(f"Could not compute demographic demand data: {e}")
+            db.rollback()
+            return {"demographic_demand": {}}
+
+    # ------------------------------------------------------------------
+    # Section 24: PE Competitive Heat Map
+    # ------------------------------------------------------------------
+
+    def _get_pe_competitive_data(self, db: Session, state: Optional[str]) -> Dict:
+        """Filter PE deals for aesthetics-related keywords and compute competitive landscape."""
+        try:
+            check = db.execute(text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_name = 'pe_portfolio_companies'"
+            ))
+            if not check.fetchone():
+                return {"pe_competitive": {}}
+
+            aesthetics_filter = """
+                (pc.industry ILIKE '%aesthetic%'
+                 OR pc.industry ILIKE '%medspa%'
+                 OR pc.industry ILIKE '%med spa%'
+                 OR pc.industry ILIKE '%dermatolog%'
+                 OR pc.industry ILIKE '%cosmetic%'
+                 OR pc.industry ILIKE '%skin%'
+                 OR pc.industry ILIKE '%beauty%'
+                 OR pc.industry ILIKE '%wellness%'
+                 OR pc.sub_industry ILIKE '%aesthetic%'
+                 OR pc.sub_industry ILIKE '%medspa%'
+                 OR pc.sub_industry ILIKE '%med spa%'
+                 OR pc.sub_industry ILIKE '%dermatolog%'
+                 OR pc.sub_industry ILIKE '%cosmetic%'
+                 OR pc.sub_industry ILIKE '%skin%'
+                 OR pc.sub_industry ILIKE '%beauty%'
+                 OR pc.sub_industry ILIKE '%wellness%')
+            """
+            state_clause = "AND pc.headquarters_state = :state" if state else ""
+            params: Dict[str, Any] = {}
+            if state:
+                params["state"] = state.upper()
+
+            # Get aesthetics PE portfolio companies with deal info
+            rows = db.execute(text(f"""
+                SELECT
+                    pc.name,
+                    pc.industry,
+                    pc.sub_industry,
+                    pc.headquarters_state,
+                    pc.headquarters_city,
+                    pc.current_pe_owner,
+                    pc.employee_count,
+                    pc.ownership_status,
+                    pc.is_platform_company,
+                    d.deal_type,
+                    d.enterprise_value_usd,
+                    d.ev_ebitda_multiple,
+                    d.announced_date,
+                    d.buyer_name,
+                    d.status AS deal_status
+                FROM pe_portfolio_companies pc
+                LEFT JOIN pe_deals d ON d.company_id = pc.id
+                WHERE {aesthetics_filter}
+                    {state_clause}
+                ORDER BY d.announced_date DESC NULLS LAST
+                LIMIT 100
+            """), params).fetchall()
+
+            if not rows:
+                return {"pe_competitive": {}}
+
+            deals = []
+            multiples = []
+            total_ev = 0
+            deal_types: Dict[str, int] = {}
+            state_counts: Dict[str, int] = {}
+            buyers: Dict[str, int] = {}
+
+            for r in rows:
+                deal_type = r[9] or "Unknown"
+                ev = float(r[10] or 0)
+                multiple = float(r[11] or 0)
+                buyer = r[13] or r[5] or "Unknown"
+
+                deals.append({
+                    "company": r[0],
+                    "industry": r[1] or "-",
+                    "state": r[3] or "-",
+                    "city": r[4] or "-",
+                    "pe_owner": r[5] or "-",
+                    "deal_type": deal_type,
+                    "ev_usd": ev,
+                    "ev_ebitda": multiple,
+                    "date": r[12].isoformat() if r[12] else "-",
+                    "buyer": buyer,
+                    "is_platform": bool(r[8]),
+                })
+
+                if multiple > 0:
+                    multiples.append(multiple)
+                if ev > 0:
+                    total_ev += ev
+                deal_types[deal_type] = deal_types.get(deal_type, 0) + 1
+                if r[3]:
+                    state_counts[r[3]] = state_counts.get(r[3], 0) + 1
+                buyers[buyer] = buyers.get(buyer, 0) + 1
+
+            # Deal timeline by year
+            year_counts: Dict[str, int] = {}
+            for d in deals:
+                if d["date"] != "-":
+                    yr = d["date"][:4]
+                    year_counts[yr] = year_counts.get(yr, 0) + 1
+
+            avg_multiple = round(sum(multiples) / len(multiples), 1) if multiples else 0
+            most_active = max(buyers, key=buyers.get) if buyers else "-"
+            platforms = sum(1 for d in deals if d["is_platform"])
+
+            return {
+                "pe_competitive": {
+                    "deals": deals[:50],
+                    "deal_type_breakdown": deal_types,
+                    "state_counts": dict(sorted(state_counts.items(), key=lambda x: x[1], reverse=True)),
+                    "year_counts": dict(sorted(year_counts.items())),
+                    "summary": {
+                        "pe_platforms": platforms,
+                        "avg_ev_ebitda": avg_multiple,
+                        "total_deal_value": total_ev,
+                        "most_active_buyer": most_active,
+                        "total_deals": len(deals),
+                    },
+                }
+            }
+        except Exception as e:
+            logger.warning(f"Could not compute PE competitive data: {e}")
+            db.rollback()
+            return {"pe_competitive": {}}
+
+    # ------------------------------------------------------------------
+    # Section 25: Construction Momentum Signal
+    # ------------------------------------------------------------------
+
+    def _get_construction_momentum_data(self, db: Session, state: Optional[str]) -> Dict:
+        """Compute YoY building permit growth and cross with medspa density."""
+        try:
+            check = db.execute(text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_name = 'realestate_hud_permits'"
+            ))
+            if not check.fetchone():
+                return {"construction_momentum": {}}
+
+            # Get latest two years of state-level data
+            yr_rows = db.execute(text("""
+                SELECT DISTINCT EXTRACT(YEAR FROM date)::int AS yr
+                FROM realestate_hud_permits
+                WHERE geography_type = 'State'
+                ORDER BY yr DESC LIMIT 2
+            """)).fetchall()
+            if not yr_rows:
+                return {"construction_momentum": {}}
+
+            latest_year = yr_rows[0][0]
+            prior_year = yr_rows[1][0] if len(yr_rows) > 1 else None
+
+            state_clause = "AND hp.geography_name ILIKE :state_name" if state else ""
+            params: Dict[str, Any] = {"latest_year": latest_year}
+            if state:
+                params["state_name"] = f"%{state}%"
+
+            has_prior = prior_year is not None
+            if has_prior:
+                params["prior_year"] = prior_year
+
+            prior_join = ""
+            prior_select = ", NULL AS prior_permits"
+            if has_prior:
+                prior_join = """
+                    LEFT JOIN (
+                        SELECT geography_name,
+                               SUM(permits_total) AS prior_total
+                        FROM realestate_hud_permits
+                        WHERE EXTRACT(YEAR FROM date) = :prior_year
+                            AND geography_type = 'State'
+                        GROUP BY geography_name
+                    ) pp ON pp.geography_name = hp.geography_name
+                """
+                prior_select = ", pp.prior_total AS prior_permits"
+
+            rows = db.execute(text(f"""
+                SELECT
+                    hp.geography_name,
+                    SUM(hp.permits_total) AS total_permits,
+                    SUM(hp.permits_1unit) AS permits_1unit,
+                    SUM(COALESCE(hp.permits_2to4units, 0)) AS permits_2to4,
+                    SUM(hp.permits_5plus) AS permits_5plus
+                    {prior_select}
+                FROM realestate_hud_permits hp
+                {prior_join}
+                WHERE EXTRACT(YEAR FROM date) = :latest_year
+                    AND hp.geography_type = 'State'
+                    {state_clause}
+                GROUP BY hp.geography_name
+                    {', pp.prior_total' if has_prior else ''}
+                ORDER BY total_permits DESC
+            """), params).fetchall()
+
+            if not rows:
+                return {"construction_momentum": {}}
+
+            # Cross with medspa prospect counts
+            medspa_counts = {}
+            try:
+                ms_rows = db.execute(text(
+                    "SELECT state, COUNT(*) AS cnt, "
+                    "COUNT(*) FILTER (WHERE acquisition_grade = 'A') AS a_cnt "
+                    "FROM medspa_prospects GROUP BY state"
+                )).fetchall()
+                for mr in ms_rows:
+                    medspa_counts[mr[0]] = {"count": int(mr[1]), "a_grade": int(mr[2])}
+            except Exception:
+                pass
+
+            state_data = []
+            yoy_values = []
+            total_permits_all = 0
+            high_growth_count = 0
+
+            for r in rows:
+                geo_name = r[0] or ""
+                total_permits = int(r[1] or 0)
+                p_1unit = int(r[2] or 0)
+                p_2to4 = int(r[3] or 0)
+                p_5plus = int(r[4] or 0)
+                prior_permits = int(r[5]) if r[5] is not None else None
+
+                yoy_growth = None
+                if prior_permits is not None and prior_permits > 0:
+                    yoy_growth = round(
+                        (total_permits - prior_permits) / prior_permits * 100, 1
+                    )
+                    yoy_values.append(yoy_growth)
+                    if yoy_growth > 10:
+                        high_growth_count += 1
+
+                # Try to match state abbreviation from geography_name
+                # geography_name is usually full state name
+                state_abbr = geo_name[:2].upper() if len(geo_name) == 2 else ""
+                ms = medspa_counts.get(state_abbr, {})
+
+                state_data.append({
+                    "state_name": geo_name,
+                    "state_abbr": state_abbr,
+                    "total_permits": total_permits,
+                    "permits_1unit": p_1unit,
+                    "permits_2to4": p_2to4,
+                    "permits_5plus": p_5plus,
+                    "yoy_growth": yoy_growth,
+                    "medspa_count": ms.get("count", 0),
+                    "a_grade_count": ms.get("a_grade", 0),
+                })
+                total_permits_all += total_permits
+
+            # Sort by YoY growth for display
+            state_data.sort(key=lambda x: x.get("yoy_growth") or -999, reverse=True)
+
+            avg_yoy = round(sum(yoy_values) / len(yoy_values), 1) if yoy_values else 0
+            top_state = state_data[0]["state_name"] if state_data else "-"
+
+            # Permit type composition
+            total_1unit = sum(s["permits_1unit"] for s in state_data)
+            total_2to4 = sum(s["permits_2to4"] for s in state_data)
+            total_5plus = sum(s["permits_5plus"] for s in state_data)
+            total_all = total_1unit + total_2to4 + total_5plus
+            permit_composition = {}
+            if total_all > 0:
+                permit_composition = {
+                    "single_family_pct": round(total_1unit / total_all * 100, 1),
+                    "two_to_four_pct": round(total_2to4 / total_all * 100, 1),
+                    "five_plus_pct": round(total_5plus / total_all * 100, 1),
+                }
+
+            return {
+                "construction_momentum": {
+                    "state_data": state_data,
+                    "permit_composition": permit_composition,
+                    "summary": {
+                        "states_analyzed": len(state_data),
+                        "avg_yoy_growth": avg_yoy,
+                        "high_growth_states": high_growth_count,
+                        "top_state": top_state,
+                        "latest_year": latest_year,
+                        "has_prior_year": has_prior,
+                    },
+                }
+            }
+        except Exception as e:
+            logger.warning(f"Could not compute construction momentum data: {e}")
+            db.rollback()
+            return {"construction_momentum": {}}
+
+    # ------------------------------------------------------------------
+    # Section 26: Medical CPI Pricing Power
+    # ------------------------------------------------------------------
+
+    def _get_medical_cpi_data(self, db: Session) -> Dict:
+        """Compare medical care CPI vs general CPI for pricing power analysis."""
+        try:
+            check = db.execute(text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_name = 'bls_cpi'"
+            ))
+            if not check.fetchone():
+                return {"medical_cpi": {}}
+
+            # Query medical care (CUSR0000SAM) and all items (CUSR0000SA0)
+            # Use annual average (period='M13') or December (period='M12') as fallback
+            rows = db.execute(text("""
+                SELECT
+                    series_id,
+                    year,
+                    period,
+                    value
+                FROM bls_cpi
+                WHERE series_id IN ('CUSR0000SAM', 'CUSR0000SA0')
+                    AND (period = 'M13' OR period = 'M12')
+                ORDER BY series_id, year DESC, period DESC
+            """)).fetchall()
+
+            if not rows:
+                return {"medical_cpi": {}}
+
+            # Organize by series and year (prefer M13 over M12)
+            medical: Dict[int, float] = {}
+            general: Dict[int, float] = {}
+
+            for r in rows:
+                series = r[0]
+                year = int(r[1])
+                value = float(r[3])
+                target = medical if series == 'CUSR0000SAM' else general
+                if year not in target:  # First hit wins (M13 preferred due to ORDER BY)
+                    target[year] = value
+
+            if not medical or not general:
+                return {"medical_cpi": {}}
+
+            # Compute annual comparisons for overlapping years
+            common_years = sorted(set(medical.keys()) & set(general.keys()), reverse=True)
+            if not common_years:
+                return {"medical_cpi": {}}
+
+            annual_data = []
+            cumulative_divergence = 0
+            for i, year in enumerate(common_years[:6]):  # Last 6 years
+                med_val = medical[year]
+                gen_val = general[year]
+                spread = round(med_val - gen_val, 2)
+
+                # YoY change
+                med_yoy = None
+                gen_yoy = None
+                if i + 1 < len(common_years):
+                    prior_year = common_years[i + 1]
+                    if prior_year in medical and medical[prior_year] > 0:
+                        med_yoy = round(
+                            (med_val - medical[prior_year]) / medical[prior_year] * 100, 2
+                        )
+                    if prior_year in general and general[prior_year] > 0:
+                        gen_yoy = round(
+                            (gen_val - general[prior_year]) / general[prior_year] * 100, 2
+                        )
+
+                yoy_spread = round(med_yoy - gen_yoy, 2) if med_yoy is not None and gen_yoy is not None else None
+                if yoy_spread is not None:
+                    cumulative_divergence += yoy_spread
+
+                annual_data.append({
+                    "year": year,
+                    "medical_cpi": med_val,
+                    "general_cpi": gen_val,
+                    "spread": spread,
+                    "medical_yoy": med_yoy,
+                    "general_yoy": gen_yoy,
+                    "yoy_spread": yoy_spread,
+                    "cumulative_divergence": round(cumulative_divergence, 2),
+                })
+
+            # Current values
+            latest_year = common_years[0]
+            current_medical = medical[latest_year]
+            latest_med_yoy = annual_data[0].get("medical_yoy", 0) if annual_data else 0
+            latest_spread = annual_data[0].get("yoy_spread", 0) if annual_data else 0
+
+            # 5-year CAGR if available
+            cagr_5yr = None
+            if len(common_years) >= 6:
+                start_val = medical[common_years[5]]
+                end_val = medical[common_years[0]]
+                if start_val > 0:
+                    cagr_5yr = round(
+                        ((end_val / start_val) ** (1 / 5) - 1) * 100, 2
+                    )
+
+            return {
+                "medical_cpi": {
+                    "annual_data": annual_data,
+                    "summary": {
+                        "current_medical_cpi": current_medical,
+                        "yoy_medical_change": latest_med_yoy,
+                        "medical_vs_general_spread": latest_spread,
+                        "cagr_5yr": cagr_5yr,
+                        "latest_year": latest_year,
+                    },
+                }
+            }
+        except Exception as e:
+            logger.warning(f"Could not compute medical CPI data: {e}")
+            db.rollback()
+            return {"medical_cpi": {}}
+
+    # ------------------------------------------------------------------
+    # Section 27: Talent Pipeline Pressure
+    # ------------------------------------------------------------------
+
+    def _get_talent_pipeline_data(self, db: Session) -> Dict:
+        """Analyze healthcare JOLTS data for talent scarcity signals."""
+        try:
+            check = db.execute(text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_name = 'bls_jolts'"
+            ))
+            if not check.fetchone():
+                return {"talent_pipeline": {}}
+
+            # Healthcare openings: JTU6200000000000JOL, hires: JTU6200000000000HIR
+            rows = db.execute(text("""
+                SELECT
+                    series_id,
+                    year,
+                    period,
+                    value
+                FROM bls_jolts
+                WHERE series_id IN ('JTU6200000000000JOL', 'JTU6200000000000HIR')
+                    AND period LIKE 'M%%'
+                ORDER BY year DESC, period DESC
+            """)).fetchall()
+
+            if not rows:
+                return {"talent_pipeline": {}}
+
+            # Organize by series, year, and month
+            openings_monthly: Dict[str, float] = {}  # "YYYY-MM" -> value
+            hires_monthly: Dict[str, float] = {}
+
+            for r in rows:
+                series = r[0]
+                year = int(r[1])
+                period = r[2]  # M01, M02, etc.
+                value = float(r[3])
+                key = f"{year}-{period}"
+                if series == 'JTU6200000000000JOL':
+                    openings_monthly[key] = value
+                else:
+                    hires_monthly[key] = value
+
+            if not openings_monthly:
+                return {"talent_pipeline": {}}
+
+            # Build quarterly data from monthly (Q = avg of 3 months)
+            quarterly_data = []
+            all_keys = sorted(openings_monthly.keys(), reverse=True)
+
+            # Group by quarter
+            quarter_map: Dict[str, List[float]] = {}
+            quarter_hires_map: Dict[str, List[float]] = {}
+            for key in all_keys:
+                parts = key.split("-")
+                year = parts[0]
+                month = int(parts[1].replace("M", ""))
+                q = (month - 1) // 3 + 1
+                q_key = f"{year}-Q{q}"
+                quarter_map.setdefault(q_key, []).append(openings_monthly[key])
+                if key in hires_monthly:
+                    quarter_hires_map.setdefault(q_key, []).append(hires_monthly[key])
+
+            sorted_quarters = sorted(quarter_map.keys(), reverse=True)
+            for q_key in sorted_quarters[:12]:  # Last 12 quarters
+                avg_openings = round(sum(quarter_map[q_key]) / len(quarter_map[q_key]), 1)
+                avg_hires = 0
+                if q_key in quarter_hires_map and quarter_hires_map[q_key]:
+                    avg_hires = round(
+                        sum(quarter_hires_map[q_key]) / len(quarter_hires_map[q_key]), 1
+                    )
+                ratio = round(avg_openings / avg_hires, 2) if avg_hires > 0 else 0
+
+                quarterly_data.append({
+                    "period": q_key,
+                    "openings": avg_openings,
+                    "hires": avg_hires,
+                    "ratio": ratio,
+                })
+
+            # YoY change for latest quarter
+            yoy_change = None
+            if len(quarterly_data) >= 5:
+                current = quarterly_data[0]["openings"]
+                year_ago = quarterly_data[4]["openings"]
+                if year_ago > 0:
+                    yoy_change = round(
+                        (current - year_ago) / year_ago * 100, 1
+                    )
+
+            # Trend: compare first half ratios vs second half
+            trend = "stable"
+            if len(quarterly_data) >= 4:
+                recent_ratios = [q["ratio"] for q in quarterly_data[:4] if q["ratio"] > 0]
+                older_ratios = [q["ratio"] for q in quarterly_data[4:8] if q["ratio"] > 0]
+                if recent_ratios and older_ratios:
+                    recent_avg = sum(recent_ratios) / len(recent_ratios)
+                    older_avg = sum(older_ratios) / len(older_ratios)
+                    if recent_avg > older_avg * 1.05:
+                        trend = "tightening"
+                    elif recent_avg < older_avg * 0.95:
+                        trend = "easing"
+
+            latest = quarterly_data[0] if quarterly_data else {}
+
+            return {
+                "talent_pipeline": {
+                    "quarterly_data": quarterly_data,
+                    "summary": {
+                        "latest_openings": latest.get("openings", 0),
+                        "openings_to_hires_ratio": latest.get("ratio", 0),
+                        "yoy_change": yoy_change,
+                        "trend": trend,
+                    },
+                }
+            }
+        except Exception as e:
+            logger.warning(f"Could not compute talent pipeline data: {e}")
+            db.rollback()
+            return {"talent_pipeline": {}}
+
+    # ------------------------------------------------------------------
     # HTML Rendering
     # ------------------------------------------------------------------
 
@@ -2696,6 +3560,14 @@ class MedSpaMarketTemplate:
         real_estate_alpha = data.get("real_estate_alpha", {})
         deposit_wealth = data.get("deposit_wealth", {})
         business_formation = data.get("business_formation", {})
+
+        # Sections 22-27 data
+        opportunity_zones = data.get("opportunity_zones", {})
+        demographic_demand = data.get("demographic_demand", {})
+        pe_competitive = data.get("pe_competitive", {})
+        construction_momentum = data.get("construction_momentum", {})
+        medical_cpi = data.get("medical_cpi", {})
+        talent_pipeline = data.get("talent_pipeline", {})
 
         charts_js = ""
         body = ""
@@ -2745,6 +3617,12 @@ class MedSpaMarketTemplate:
             {"number": 19, "id": "re-alpha", "title": "Real Estate Appreciation Alpha"},
             {"number": 20, "id": "deposit-wealth", "title": "Deposit Wealth Concentration"},
             {"number": 21, "id": "biz-formation", "title": "Business Formation Velocity"},
+            {"number": 22, "id": "oz-overlay", "title": "Opportunity Zone Overlay"},
+            {"number": 23, "id": "demographic-demand", "title": "Demographic Demand Model"},
+            {"number": 24, "id": "pe-heatmap", "title": "PE Competitive Heat Map"},
+            {"number": 25, "id": "construction-momentum", "title": "Construction Momentum Signal"},
+            {"number": 26, "id": "medical-cpi", "title": "Medical CPI Pricing Power"},
+            {"number": 27, "id": "talent-pipeline", "title": "Talent Pipeline Pressure"},
         ]
         body += "\n" + toc(toc_items)
 
@@ -3329,6 +4207,38 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
                 f"IRS SOI, tax years {ib.get('earliest', '?')}-{ib.get('latest', '?')}",
                 _fmt(ib.get("total")),
                 ib.get("latest", "-"),
+            ])
+        if data_fresh.get("opportunity_zone"):
+            oz = data_fresh["opportunity_zone"]
+            freshness_rows.append([
+                "Opportunity Zones (OZ Overlay)",
+                "CDFI Fund / Treasury Dept",
+                _fmt(oz.get("total")),
+                "-",
+            ])
+        if data_fresh.get("educational_attainment"):
+            ea = data_fresh["educational_attainment"]
+            freshness_rows.append([
+                "Educational Attainment (Demographic Demand)",
+                f"Census ACS, years {ea.get('earliest', '?')}-{ea.get('latest', '?')}",
+                _fmt(ea.get("total")),
+                ea.get("latest", "-"),
+            ])
+        if data_fresh.get("hud_permits"):
+            hp = data_fresh["hud_permits"]
+            freshness_rows.append([
+                "HUD Building Permits (Construction Momentum)",
+                "HUD State of the Cities Data Systems",
+                _fmt(hp.get("total")),
+                hp.get("latest", "-"),
+            ])
+        if data_fresh.get("bls_cpi"):
+            bc = data_fresh["bls_cpi"]
+            freshness_rows.append([
+                "BLS CPI (Medical Pricing Power)",
+                f"BLS Consumer Price Index, {bc.get('earliest', '?')}-{bc.get('latest', '?')}",
+                _fmt(bc.get("total")),
+                bc.get("latest", "-"),
             ])
 
         body += data_table(
@@ -4962,6 +5872,691 @@ States receiving large AGI inflows but with few A-grade medspas represent a
 
         body += "\n" + section_end()
 
+        # ==================================================================
+        # Section 22: Opportunity Zone Overlay
+        # ==================================================================
+        body += "\n" + section_start(22, "Opportunity Zone Overlay", "oz-overlay")
+
+        oz_summary = opportunity_zones.get("summary", {})
+        oz_states = opportunity_zones.get("state_data", [])
+
+        if not opportunity_zones:
+            body += callout(
+                "<strong>Opportunity Zone data not yet ingested.</strong> "
+                "Run <code>POST /api/v1/site-intel/opportunity-zones/ingest</code> to enable "
+                "OZ overlay analysis. This identifies states where Qualified Opportunity Zones "
+                "overlap with medspa acquisition targets — unlocking 10-year capital gains "
+                "deferral for PE roll-up investments.",
+                variant="info",
+            )
+        else:
+            oz_cards = ""
+            oz_cards += kpi_card("Total OZ Tracts", _fmt(oz_summary.get("total_tracts")))
+            oz_cards += kpi_card("States with OZs", _fmt(oz_summary.get("states_with_oz")))
+            oz_cards += kpi_card(
+                "OZ Tracts in Medspa States",
+                _fmt(oz_summary.get("medspa_oz_states")),
+            )
+            oz_cards += kpi_card(
+                "Tax-Advantaged States",
+                _fmt(oz_summary.get("tax_advantaged_states")),
+                delta=">5 A-grade + >50 OZ tracts",
+            )
+            body += "\n" + kpi_strip(oz_cards)
+
+            body += """<p style="font-size:14px;color:var(--gray-600);margin:12px 0">
+            <strong>Opportunity Zones</strong> offer 10-year capital gains tax deferral for
+            investments in designated Census tracts. States with high OZ density AND high
+            A-grade medspa counts represent <strong>tax-advantaged roll-up targets</strong> —
+            PE investors can defer gains while building platform value.</p>"""
+
+            # Charts: bar (top 15 states by OZ tracts) + doughnut (low-income vs contiguous)
+            body += '<div class="provider-split-grid">'
+
+            if oz_states:
+                top_15 = oz_states[:15]
+                bar_labels = [s["state"] for s in top_15]
+                bar_values = [float(s["oz_tracts"]) for s in top_15]
+                bar_config = build_horizontal_bar_config(
+                    bar_labels, bar_values,
+                    dataset_label="OZ Tracts",
+                )
+                bar_json = json.dumps(bar_config)
+                body += "<div>"
+                body += chart_container(
+                    "ozStateBar", bar_json,
+                    build_bar_fallback(bar_labels, bar_values),
+                    size="medium",
+                    title="Top 15 States by OZ Tract Count",
+                )
+                charts_js += chart_init_js("ozStateBar", bar_json)
+                body += "</div>"
+
+            total_li = oz_summary.get("total_low_income", 0)
+            total_ct = oz_summary.get("total_contiguous", 0)
+            if total_li or total_ct:
+                donut_labels = ["Low-Income Tracts", "Contiguous Tracts"]
+                donut_values = [float(total_li), float(total_ct)]
+                donut_colors = [BLUE, ORANGE]
+                donut_config = build_doughnut_config(donut_labels, donut_values, donut_colors)
+                donut_json = json.dumps(donut_config)
+                body += "<div>"
+                body += chart_container(
+                    "ozDesignDonut", donut_json,
+                    build_bar_fallback(donut_labels, donut_values),
+                    size="medium",
+                    title="OZ Designation Type",
+                )
+                charts_js += chart_init_js("ozDesignDonut", donut_json)
+                body += build_chart_legend(donut_labels, donut_values, donut_colors, show_pct=True)
+                body += "</div>"
+
+            body += "</div>"
+
+            # Data table: top 25 states
+            if oz_states:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">Top States: OZ Tracts vs Medspa Prospects</h3>'
+                oz_rows = []
+                for s in oz_states[:25]:
+                    oz_rows.append([
+                        s["state"],
+                        _fmt(s["oz_tracts"]),
+                        _fmt(s["low_income_tracts"]),
+                        _fmt(s["prospect_count"]),
+                        _fmt(s["a_grade_count"]),
+                        f"{s['oz_per_prospect']:.1f}" if s["oz_per_prospect"] else "-",
+                    ])
+                body += '<div class="highlight-table">'
+                body += data_table(
+                    headers=["State", "OZ Tracts", "Low-Income", "Medspa Prospects",
+                             "A-Grade", "OZ/Prospect Ratio"],
+                    rows=oz_rows,
+                )
+                body += "</div>"
+
+            body += callout(
+                f"<strong>{oz_summary.get('tax_advantaged_states', 0)} tax-advantaged states</strong> "
+                "identified with both significant OZ density and A-grade medspa targets. "
+                "Qualified Opportunity Fund investments in these zones can defer and reduce "
+                "capital gains taxes — a powerful PE incentive for location selection.",
+                variant="tip",
+            )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 23: Demographic Demand Model
+        # ==================================================================
+        body += "\n" + section_start(23, "Demographic Demand Model", "demographic-demand")
+
+        dd_summary = demographic_demand.get("summary", {})
+        dd_states = demographic_demand.get("state_data", [])
+
+        if not demographic_demand:
+            body += callout(
+                "<strong>Educational attainment data not yet ingested.</strong> "
+                "Run <code>POST /api/v1/site-intel/educational-attainment/ingest</code> to enable "
+                "demographic demand modeling. Bachelor's+ education density is the strongest "
+                "proxy for medspa demand — correlated with income, health awareness, and "
+                "aesthetics spending.",
+                variant="info",
+            )
+        else:
+            dd_cards = ""
+            dd_cards += kpi_card(
+                "Avg Bachelor's+ %",
+                f"{dd_summary.get('avg_bachelors_pct', 0):.1f}%",
+            )
+            dd_cards += kpi_card(
+                "Avg Graduate %",
+                f"{dd_summary.get('avg_graduate_pct', 0):.1f}%",
+            )
+            dd_cards += kpi_card("States Analyzed", _fmt(dd_summary.get("states_analyzed")))
+            dd_cards += kpi_card(
+                "Underserved Educated States",
+                _fmt(dd_summary.get("underserved_educated")),
+                delta="Bachelor's >30%, <50 prospects",
+            )
+            body += "\n" + kpi_strip(dd_cards)
+
+            body += f"""<p style="font-size:14px;color:var(--gray-600);margin:12px 0">
+            <strong>Demographic demand modeling</strong> uses educational attainment as the
+            strongest medspa demand proxy. Bachelor's+ populations correlate with higher income,
+            health consciousness, and aesthetics spending. States with high education but low
+            medspa penetration signal <strong>underserved demand</strong>.
+            Period: <strong>{dd_summary.get('period_year', '?')}</strong>.</p>"""
+
+            # Charts: bar (top 15 by bachelor's %) + doughnut (education distribution)
+            body += '<div class="provider-split-grid">'
+
+            if dd_states:
+                top_15 = dd_states[:15]
+                bar_labels = [s["state_name"][:20] for s in top_15]
+                bar_values = [s["avg_bachelors"] for s in top_15]
+                bar_config = build_horizontal_bar_config(
+                    bar_labels, bar_values,
+                    dataset_label="Bachelor's+ %",
+                )
+                bar_json = json.dumps(bar_config)
+                body += "<div>"
+                body += chart_container(
+                    "demoEduBar", bar_json,
+                    build_bar_fallback(bar_labels, bar_values),
+                    size="medium",
+                    title="Top 15 States by Bachelor's+ %",
+                )
+                charts_js += chart_init_js("demoEduBar", bar_json)
+                body += "</div>"
+
+            if dd_summary.get("avg_bachelors_pct") and dd_summary.get("avg_graduate_pct"):
+                other_pct = round(100 - dd_summary["avg_bachelors_pct"] - dd_summary["avg_graduate_pct"], 1)
+                if other_pct < 0:
+                    other_pct = 0
+                edu_labels = ["Bachelor's Degree", "Graduate Degree", "Below Bachelor's"]
+                edu_values = [
+                    dd_summary["avg_bachelors_pct"],
+                    dd_summary["avg_graduate_pct"],
+                    other_pct,
+                ]
+                edu_colors = [BLUE, PURPLE, GRAY]
+                donut_config = build_doughnut_config(edu_labels, edu_values, edu_colors)
+                donut_json = json.dumps(donut_config)
+                body += "<div>"
+                body += chart_container(
+                    "demoEduDonut", donut_json,
+                    build_bar_fallback(edu_labels, edu_values),
+                    size="medium",
+                    title="Avg Education Level Distribution",
+                )
+                charts_js += chart_init_js("demoEduDonut", donut_json)
+                body += build_chart_legend(edu_labels, edu_values, edu_colors, show_pct=True)
+                body += "</div>"
+
+            body += "</div>"
+
+            # Data table: top 25 states by education-to-medspa gap
+            if dd_states:
+                gap_sorted = sorted(dd_states, key=lambda x: x.get("gap_score", 0), reverse=True)
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">Education-to-Medspa Gap Analysis</h3>'
+                dd_rows = []
+                for s in gap_sorted[:25]:
+                    dd_rows.append([
+                        s["state_name"][:20],
+                        f"{s['avg_bachelors']:.1f}%",
+                        f"{s['avg_graduate']:.1f}%",
+                        _fmt(s["prospect_count"]),
+                        _fmt(s["a_grade_count"]),
+                        f"{s['gap_score']:.1f}",
+                    ])
+                body += '<div class="highlight-table">'
+                body += data_table(
+                    headers=["State", "Bachelor's %", "Graduate %",
+                             "Prospects", "A-Grade", "Gap Score"],
+                    rows=dd_rows,
+                )
+                body += "</div>"
+
+            body += callout(
+                f"<strong>{dd_summary.get('underserved_educated', 0)} underserved educated states</strong> "
+                "identified with bachelor's rate >30% but fewer than 50 medspa prospects. "
+                "These represent the strongest demand-supply mismatch — educated, affluent "
+                "populations without adequate aesthetics service coverage.",
+                variant="tip",
+            )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 24: PE Competitive Heat Map
+        # ==================================================================
+        body += "\n" + section_start(24, "PE Competitive Heat Map", "pe-heatmap")
+
+        pec_summary = pe_competitive.get("summary", {})
+        pec_deals = pe_competitive.get("deals", [])
+        pec_deal_types = pe_competitive.get("deal_type_breakdown", {})
+        pec_state_counts = pe_competitive.get("state_counts", {})
+
+        if not pe_competitive:
+            body += callout(
+                "<strong>PE deal data not yet ingested.</strong> "
+                "Run <code>POST /api/v1/pe/collect</code> to enable "
+                "PE competitive heat map analysis. This shows which firms are actively "
+                "acquiring aesthetics platforms, deal multiples, and geographic concentration.",
+                variant="info",
+            )
+        else:
+            pec_cards = ""
+            pec_cards += kpi_card("PE-Backed Platforms", _fmt(pec_summary.get("pe_platforms")))
+            pec_cards += kpi_card(
+                "Avg EV/EBITDA",
+                f"{pec_summary.get('avg_ev_ebitda', 0):.1f}x",
+            )
+            pec_cards += kpi_card(
+                "Total Deal Value",
+                _fmt_currency(pec_summary.get("total_deal_value", 0)),
+            )
+            pec_cards += kpi_card("Most Active Buyer", pec_summary.get("most_active_buyer", "-"))
+            body += "\n" + kpi_strip(pec_cards)
+
+            body += """<p style="font-size:14px;color:var(--gray-600);margin:12px 0">
+            <strong>PE competitive intelligence</strong> maps active buyers in the aesthetics
+            space. Understanding deal multiples, preferred geographies, and deal types (LBO vs
+            add-on vs growth) helps position acquisitions competitively and identifies
+            white-space markets where PE capital hasn't yet concentrated.</p>"""
+
+            # Charts: bar (deals by state) + doughnut (deal type)
+            body += '<div class="provider-split-grid">'
+
+            if pec_state_counts:
+                top_states = list(pec_state_counts.items())[:15]
+                bar_labels = [s[0] for s in top_states]
+                bar_values = [float(s[1]) for s in top_states]
+                bar_config = build_horizontal_bar_config(
+                    bar_labels, bar_values,
+                    dataset_label="Deals",
+                )
+                bar_json = json.dumps(bar_config)
+                body += "<div>"
+                body += chart_container(
+                    "peHeatBar", bar_json,
+                    build_bar_fallback(bar_labels, bar_values),
+                    size="medium",
+                    title="PE Aesthetics Deals by State",
+                )
+                charts_js += chart_init_js("peHeatBar", bar_json)
+                body += "</div>"
+
+            if pec_deal_types:
+                dt_labels = list(pec_deal_types.keys())
+                dt_values = [float(v) for v in pec_deal_types.values()]
+                dt_colors = [BLUE, GREEN, ORANGE, PURPLE, TEAL, PINK][:len(dt_labels)]
+                donut_config = build_doughnut_config(dt_labels, dt_values, dt_colors)
+                donut_json = json.dumps(donut_config)
+                body += "<div>"
+                body += chart_container(
+                    "peDealTypeDonut", donut_json,
+                    build_bar_fallback(dt_labels, dt_values),
+                    size="medium",
+                    title="Deal Type Breakdown",
+                )
+                charts_js += chart_init_js("peDealTypeDonut", donut_json)
+                body += build_chart_legend(dt_labels, dt_values, dt_colors, show_pct=True)
+                body += "</div>"
+
+            body += "</div>"
+
+            # Data table: recent deals
+            if pec_deals:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">Recent Aesthetics PE Deals</h3>'
+                deal_rows = []
+                for d in pec_deals[:25]:
+                    ev_str = _fmt_currency(d["ev_usd"]) if d["ev_usd"] else "-"
+                    mult_str = f"{d['ev_ebitda']:.1f}x" if d["ev_ebitda"] else "-"
+                    deal_rows.append([
+                        d["company"],
+                        d["buyer"],
+                        d["deal_type"],
+                        ev_str,
+                        mult_str,
+                        d["date"],
+                        d["state"],
+                    ])
+                body += '<div class="highlight-table">'
+                body += data_table(
+                    headers=["Company", "Buyer", "Type", "EV",
+                             "EV/EBITDA", "Date", "State"],
+                    rows=deal_rows,
+                )
+                body += "</div>"
+
+            body += callout(
+                f"<strong>{pec_summary.get('total_deals', 0)} aesthetics deals tracked</strong> "
+                f"with an average EV/EBITDA of {pec_summary.get('avg_ev_ebitda', 0):.1f}x. "
+                "Markets with low PE activity but high medspa density present "
+                "first-mover acquisition opportunities before competitive bidding intensifies.",
+                variant="tip",
+            )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 25: Construction Momentum Signal
+        # ==================================================================
+        body += "\n" + section_start(25, "Construction Momentum Signal", "construction-momentum")
+
+        cm_summary = construction_momentum.get("summary", {})
+        cm_states = construction_momentum.get("state_data", [])
+        cm_comp = construction_momentum.get("permit_composition", {})
+
+        if not construction_momentum:
+            body += callout(
+                "<strong>HUD building permit data not yet ingested.</strong> "
+                "Run <code>POST /api/v1/realestate/hud-permits/ingest</code> to enable "
+                "construction momentum analysis. Rising building permits are a 1-2 year "
+                "leading indicator of population growth and future medspa demand.",
+                variant="info",
+            )
+        else:
+            cm_cards = ""
+            cm_cards += kpi_card("States Analyzed", _fmt(cm_summary.get("states_analyzed")))
+            cm_cards += kpi_card(
+                "Avg YoY Permit Growth",
+                f"{cm_summary.get('avg_yoy_growth', 0):+.1f}%",
+            )
+            cm_cards += kpi_card(
+                "High-Growth States",
+                _fmt(cm_summary.get("high_growth_states")),
+                delta=">10% YoY growth",
+            )
+            cm_cards += kpi_card("Top State by Permits", cm_summary.get("top_state", "-"))
+            body += "\n" + kpi_strip(cm_cards)
+
+            body += f"""<p style="font-size:14px;color:var(--gray-600);margin:12px 0">
+            <strong>Construction momentum</strong> uses HUD building permit data as a
+            <strong>1-2 year leading indicator</strong> of population growth. States with
+            surging permit activity will see new residents needing services — including medspas.
+            Cross-referenced with current medspa density to identify early-mover markets.
+            Year: <strong>{cm_summary.get('latest_year', '?')}</strong>.</p>"""
+
+            # Charts: bar (top 15 by YoY growth) + doughnut (permit type)
+            body += '<div class="provider-split-grid">'
+
+            if cm_states:
+                growth_states = [s for s in cm_states if s.get("yoy_growth") is not None][:15]
+                if growth_states:
+                    bar_labels = [s["state_name"][:20] for s in growth_states]
+                    bar_values = [s["yoy_growth"] for s in growth_states]
+                    bar_colors = ["#48bb78" if v >= 0 else "#fc8181" for v in bar_values]
+                    bar_config = build_horizontal_bar_config(
+                        bar_labels, bar_values, bar_colors,
+                        dataset_label="YoY Permit Growth %",
+                    )
+                    bar_json = json.dumps(bar_config)
+                    body += "<div>"
+                    body += chart_container(
+                        "constructionGrowthBar", bar_json,
+                        build_bar_fallback(bar_labels, bar_values),
+                        size="medium",
+                        title="Top States by YoY Permit Growth",
+                    )
+                    charts_js += chart_init_js("constructionGrowthBar", bar_json)
+                    body += "</div>"
+
+            if cm_comp:
+                comp_labels = ["Single-Family", "2-4 Units", "5+ Units"]
+                comp_values = [
+                    cm_comp.get("single_family_pct", 0),
+                    cm_comp.get("two_to_four_pct", 0),
+                    cm_comp.get("five_plus_pct", 0),
+                ]
+                comp_colors = [GREEN, ORANGE, PURPLE]
+                donut_config = build_doughnut_config(comp_labels, comp_values, comp_colors)
+                donut_json = json.dumps(donut_config)
+                body += "<div>"
+                body += chart_container(
+                    "permitTypeDonut", donut_json,
+                    build_bar_fallback(comp_labels, comp_values),
+                    size="medium",
+                    title="Permit Type Composition",
+                )
+                charts_js += chart_init_js("permitTypeDonut", donut_json)
+                body += build_chart_legend(comp_labels, comp_values, comp_colors, show_pct=True)
+                body += "</div>"
+
+            body += "</div>"
+
+            # Data table: top 25 states
+            if cm_states:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">State Permit Growth vs Medspa Density</h3>'
+                cm_rows = []
+                for s in cm_states[:25]:
+                    yoy_str = f"{s['yoy_growth']:+.1f}%" if s.get("yoy_growth") is not None else "-"
+                    yoy_color = "color:#48bb78" if (s.get("yoy_growth") or 0) >= 0 else "color:#fc8181"
+                    yoy_html = f'<span style="{yoy_color};font-weight:600">{yoy_str}</span>'
+                    # Growth signal grade
+                    yoy_val = s.get("yoy_growth") or 0
+                    if yoy_val > 15:
+                        grade = "A"
+                    elif yoy_val > 5:
+                        grade = "B"
+                    elif yoy_val > 0:
+                        grade = "C"
+                    else:
+                        grade = "D"
+                    cm_rows.append([
+                        s["state_name"][:20],
+                        _fmt(s["total_permits"]),
+                        yoy_html,
+                        _fmt(s["medspa_count"]),
+                        _fmt(s["a_grade_count"]),
+                        _grade_badge(grade),
+                    ])
+                body += '<div class="highlight-table">'
+                body += data_table(
+                    headers=["State", "Total Permits", "YoY Growth",
+                             "Medspas", "A-Grade", "Signal"],
+                    rows=cm_rows,
+                )
+                body += "</div>"
+
+            body += callout(
+                f"<strong>{cm_summary.get('high_growth_states', 0)} high-growth states</strong> "
+                "with >10% YoY permit increases. Rising construction = incoming population = "
+                "future medspa demand. Target acquisitions in these markets now, before "
+                "competition follows population growth.",
+                variant="tip",
+            )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 26: Medical CPI Pricing Power
+        # ==================================================================
+        body += "\n" + section_start(26, "Medical CPI Pricing Power", "medical-cpi")
+
+        mcpi_summary = medical_cpi.get("summary", {})
+        mcpi_annual = medical_cpi.get("annual_data", [])
+
+        if not medical_cpi:
+            body += callout(
+                "<strong>BLS CPI data not yet ingested.</strong> "
+                "Run <code>POST /api/v1/bls/dataset/ingest</code> with medical care CPI series "
+                "(CUSR0000SAM, CUSR0000SA0) to enable pricing power analysis. When medical "
+                "CPI outpaces general CPI, medspa operators have pricing power — they can "
+                "raise prices faster than general inflation.",
+                variant="info",
+            )
+        else:
+            mcpi_cards = ""
+            mcpi_cards += kpi_card(
+                "Current Medical CPI",
+                f"{mcpi_summary.get('current_medical_cpi', 0):.1f}",
+            )
+            mcpi_cards += kpi_card(
+                "YoY Medical CPI Change",
+                f"{mcpi_summary.get('yoy_medical_change', 0):+.2f}%",
+            )
+            spread = mcpi_summary.get("medical_vs_general_spread", 0) or 0
+            spread_label = "above" if spread >= 0 else "below"
+            mcpi_cards += kpi_card(
+                "Medical vs General Spread",
+                f"{spread:+.2f} pp",
+                delta=f"{spread_label} general inflation",
+            )
+            cagr = mcpi_summary.get("cagr_5yr")
+            mcpi_cards += kpi_card(
+                "5yr Medical CAGR",
+                f"{cagr:.2f}%" if cagr is not None else "-",
+            )
+            body += "\n" + kpi_strip(mcpi_cards)
+
+            body += """<p style="font-size:14px;color:var(--gray-600);margin:12px 0">
+            <strong>Medical CPI vs general CPI</strong> measures medspa pricing power.
+            When medical care inflation exceeds general inflation, operators can raise prices
+            without losing customers — a structural advantage for the aesthetics sector.
+            This is a <strong>national macro signal</strong> supporting the roll-up thesis.</p>"""
+
+            # Chart: horizontal bar (annual medical CPI YoY %)
+            if mcpi_annual:
+                yoy_data = [d for d in reversed(mcpi_annual) if d.get("medical_yoy") is not None]
+                if yoy_data:
+                    bar_labels = [str(d["year"]) for d in yoy_data]
+                    bar_values = [d["medical_yoy"] for d in yoy_data]
+                    bar_colors = [GREEN if v >= 0 else RED for v in bar_values]
+                    bar_config = build_horizontal_bar_config(
+                        bar_labels, bar_values, bar_colors,
+                        dataset_label="Medical CPI YoY %",
+                    )
+                    bar_json = json.dumps(bar_config)
+                    body += chart_container(
+                        "medCpiBar", bar_json,
+                        build_bar_fallback(bar_labels, bar_values),
+                        title="Annual Medical CPI YoY % Change",
+                    )
+                    charts_js += chart_init_js("medCpiBar", bar_json)
+
+            # Data table: annual comparison
+            if mcpi_annual:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">Medical vs General CPI Comparison</h3>'
+                cpi_rows = []
+                for d in mcpi_annual:
+                    med_yoy_str = f"{d['medical_yoy']:+.2f}%" if d.get("medical_yoy") is not None else "-"
+                    gen_yoy_str = f"{d['general_yoy']:+.2f}%" if d.get("general_yoy") is not None else "-"
+                    spread_str = f"{d['yoy_spread']:+.2f} pp" if d.get("yoy_spread") is not None else "-"
+                    spread_color = "color:#48bb78" if (d.get("yoy_spread") or 0) >= 0 else "color:#fc8181"
+                    cpi_rows.append([
+                        str(d["year"]),
+                        f"{d['medical_cpi']:.1f}",
+                        f"{d['general_cpi']:.1f}",
+                        med_yoy_str,
+                        gen_yoy_str,
+                        f'<span style="{spread_color};font-weight:600">{spread_str}</span>',
+                        f"{d['cumulative_divergence']:+.2f} pp",
+                    ])
+                body += data_table(
+                    headers=["Year", "Medical CPI", "General CPI",
+                             "Medical YoY", "General YoY", "Spread", "Cumulative"],
+                    rows=cpi_rows,
+                )
+
+            signal = "positive" if spread >= 0 else "negative"
+            pricing_msg = (
+                "Medspa operators have structural pricing power \u2014 revenue growth can outpace cost inflation."
+                if spread >= 0
+                else "Monitor for reversal; current spread suggests pricing headwinds."
+            )
+            body += callout(
+                f"<strong>Pricing power signal: {signal}.</strong> "
+                f"Medical CPI is {'outpacing' if spread >= 0 else 'trailing'} general CPI "
+                f"by {abs(spread):.2f} percentage points. {pricing_msg}",
+                variant="tip" if spread >= 0 else "info",
+            )
+
+        body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 27: Talent Pipeline Pressure
+        # ==================================================================
+        body += "\n" + section_start(27, "Talent Pipeline Pressure", "talent-pipeline")
+
+        tp_summary = talent_pipeline.get("summary", {})
+        tp_quarterly = talent_pipeline.get("quarterly_data", [])
+
+        if not talent_pipeline:
+            body += callout(
+                "<strong>BLS JOLTS data not yet ingested.</strong> "
+                "Run <code>POST /api/v1/bls/dataset/ingest</code> with healthcare JOLTS series "
+                "(JTU6200000000000JOL, JTU6200000000000HIR) to enable talent pipeline analysis. "
+                "The openings-to-hires ratio measures healthcare talent scarcity — a higher "
+                "ratio means harder hiring, making well-staffed platforms more valuable.",
+                variant="info",
+            )
+        else:
+            tp_cards = ""
+            tp_cards += kpi_card(
+                "Latest HC Openings (000s)",
+                f"{tp_summary.get('latest_openings', 0):.0f}",
+            )
+            tp_cards += kpi_card(
+                "Openings/Hires Ratio",
+                f"{tp_summary.get('openings_to_hires_ratio', 0):.2f}",
+            )
+            yoy_ch = tp_summary.get("yoy_change")
+            tp_cards += kpi_card(
+                "YoY Change",
+                f"{yoy_ch:+.1f}%" if yoy_ch is not None else "-",
+            )
+            trend = tp_summary.get("trend", "stable")
+            trend_display = {"tightening": "Tightening", "easing": "Easing", "stable": "Stable"}.get(trend, trend.title())
+            tp_cards += kpi_card("Talent Scarcity Trend", trend_display)
+            body += "\n" + kpi_strip(tp_cards)
+
+            body += """<p style="font-size:14px;color:var(--gray-600);margin:12px 0">
+            <strong>Talent pipeline pressure</strong> uses BLS JOLTS (Job Openings and Labor
+            Turnover Survey) for healthcare. A high openings-to-hires ratio signals talent
+            scarcity — well-staffed medspa platforms become <strong>competitive moats</strong>.
+            PE acquirers should target platforms with strong teams; M&A to acquire talent,
+            not just locations. This is a <strong>national macro signal</strong>.</p>"""
+
+            # Chart: horizontal bar (quarterly openings trend)
+            if tp_quarterly:
+                recent_q = list(reversed(tp_quarterly[:8]))
+                bar_labels = [q["period"] for q in recent_q]
+                bar_values = [q["openings"] for q in recent_q]
+                bar_config = build_horizontal_bar_config(
+                    bar_labels, bar_values,
+                    dataset_label="Healthcare Openings (000s)",
+                )
+                bar_json = json.dumps(bar_config)
+                body += chart_container(
+                    "talentOpeningsBar", bar_json,
+                    build_bar_fallback(bar_labels, bar_values),
+                    title="Healthcare Job Openings Trend (Quarterly)",
+                )
+                charts_js += chart_init_js("talentOpeningsBar", bar_json)
+
+            # Data table: quarterly data
+            if tp_quarterly:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">Quarterly Healthcare Labor Market Data</h3>'
+                tp_rows = []
+                for i, q in enumerate(tp_quarterly[:12]):
+                    # Compute QoQ change for ratio
+                    prev_ratio = tp_quarterly[i + 1]["ratio"] if i + 1 < len(tp_quarterly) else None
+                    ratio_change = ""
+                    if prev_ratio and prev_ratio > 0:
+                        rc = (q["ratio"] - prev_ratio) / prev_ratio * 100
+                        rc_color = "color:#fc8181" if rc > 0 else "color:#48bb78"
+                        ratio_change = f'<span style="{rc_color}">{rc:+.1f}%</span>'
+
+                    tp_rows.append([
+                        q["period"],
+                        f"{q['openings']:.0f}",
+                        f"{q['hires']:.0f}" if q["hires"] else "-",
+                        f"{q['ratio']:.2f}",
+                        ratio_change or "-",
+                    ])
+                body += data_table(
+                    headers=["Period", "Openings (000s)", "Hires (000s)",
+                             "Open/Hire Ratio", "Ratio Change"],
+                    rows=tp_rows,
+                )
+
+            talent_msg = (
+                "A tightening labor market makes staffed platforms premium assets \u2014 "
+                "acquirers should prioritize retention and team quality."
+                if trend == "tightening"
+                else "Current labor conditions are manageable, but monitor for shifts "
+                "that could impact staffing costs."
+            )
+            body += callout(
+                f"<strong>Talent scarcity trend: {trend_display.lower()}.</strong> "
+                f"Healthcare openings-to-hires ratio is {tp_summary.get('openings_to_hires_ratio', 0):.2f}. "
+                f"{talent_msg}",
+                variant="tip" if trend == "tightening" else "info",
+            )
+
+        body += "\n" + section_end()
+
         # ---- Close container ----
         body += "\n</div>"
 
@@ -4978,6 +6573,12 @@ States receiving large AGI inflows but with few A-grade medspas represent a
             "Real Estate Alpha uses Redfin ZIP-level data (preferred) or FHFA House Price Index (ZIP3 fallback).",
             "Deposit Wealth uses FDIC Summary of Deposits; deposit amounts are actual dollars.",
             "Business Formation uses IRS SOI Business Income; dollar amounts multiplied by 1,000 from source.",
+            "Opportunity Zone data from CDFI Fund; 10-year capital gains deferral applies to Qualified Opportunity Fund investments.",
+            "Demographic Demand uses Census ACS educational attainment as medspa demand proxy.",
+            "PE Competitive Heat Map filters PE portfolio/deal databases for aesthetics-related keywords.",
+            "Construction Momentum uses HUD SOCDS building permit data as 1-2 year population growth leading indicator.",
+            "Medical CPI uses BLS Consumer Price Index series CUSR0000SAM (medical) vs CUSR0000SA0 (all items).",
+            "Talent Pipeline uses BLS JOLTS healthcare series; openings-to-hires ratio measures labor scarcity.",
             "This report does not constitute investment advice. All data is from public sources.",
         ]
         body += "\n" + page_footer(
@@ -5727,6 +7328,252 @@ States receiving large AGI inflows but with few A-grade medspas represent a
         bf_col_widths = {"A": 12, "B": 8, "C": 14, "D": 14, "E": 14, "F": 14, "G": 14, "H": 8}
         for col_letter, width in bf_col_widths.items():
             ws_bf.column_dimensions[col_letter].width = width
+
+        # ---- Sheet 17: OZ Overlay ----
+        ws_oz = wb.create_sheet("OZ Overlay")
+        opportunity_zones = data.get("opportunity_zones", {})
+        oz_states = opportunity_zones.get("state_data", [])
+        oz_summary = opportunity_zones.get("summary", {})
+
+        ws_oz["A1"] = "Opportunity Zone Overlay"
+        ws_oz["A1"].font = Font(bold=True, size=13)
+        ws_oz.merge_cells("A1:E1")
+
+        ws_oz["A3"] = "Total OZ Tracts"
+        ws_oz["B3"] = oz_summary.get("total_tracts", 0)
+        ws_oz["A4"] = "States with OZs"
+        ws_oz["B4"] = oz_summary.get("states_with_oz", 0)
+        ws_oz["A5"] = "Tax-Advantaged States"
+        ws_oz["B5"] = oz_summary.get("tax_advantaged_states", 0)
+        for r in range(3, 6):
+            ws_oz[f"A{r}"].font = Font(bold=True)
+
+        oz_start = 7
+        ws_oz.cell(row=oz_start, column=1, value="State OZ Data").font = Font(bold=True, size=11)
+        oz_headers = ["State", "OZ Tracts", "Low-Income", "Medspa Prospects", "A-Grade", "OZ/Prospect Ratio"]
+        for col, header in enumerate(oz_headers, 1):
+            cell = ws_oz.cell(row=oz_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        for i, s in enumerate(oz_states, oz_start + 2):
+            ws_oz.cell(row=i, column=1, value=s.get("state"))
+            ws_oz.cell(row=i, column=2, value=s.get("oz_tracts", 0))
+            ws_oz.cell(row=i, column=3, value=s.get("low_income_tracts", 0))
+            ws_oz.cell(row=i, column=4, value=s.get("prospect_count", 0))
+            ws_oz.cell(row=i, column=5, value=s.get("a_grade_count", 0))
+            ws_oz.cell(row=i, column=6, value=s.get("oz_per_prospect", 0))
+
+        oz_col_widths = {"A": 8, "B": 12, "C": 12, "D": 16, "E": 10, "F": 18}
+        for col_letter, width in oz_col_widths.items():
+            ws_oz.column_dimensions[col_letter].width = width
+
+        # ---- Sheet 18: Demographic Demand ----
+        ws_dd = wb.create_sheet("Demographic Demand")
+        demographic_demand = data.get("demographic_demand", {})
+        dd_states = demographic_demand.get("state_data", [])
+        dd_summary = demographic_demand.get("summary", {})
+
+        ws_dd["A1"] = "Demographic Demand Model"
+        ws_dd["A1"].font = Font(bold=True, size=13)
+        ws_dd.merge_cells("A1:E1")
+
+        ws_dd["A3"] = "Period Year"
+        ws_dd["B3"] = dd_summary.get("period_year", "-")
+        ws_dd["A4"] = "Avg Bachelor's+ %"
+        ws_dd["B4"] = dd_summary.get("avg_bachelors_pct", 0)
+        ws_dd["A5"] = "Avg Graduate %"
+        ws_dd["B5"] = dd_summary.get("avg_graduate_pct", 0)
+        ws_dd["A6"] = "Underserved Educated States"
+        ws_dd["B6"] = dd_summary.get("underserved_educated", 0)
+        for r in range(3, 7):
+            ws_dd[f"A{r}"].font = Font(bold=True)
+
+        dd_start = 8
+        ws_dd.cell(row=dd_start, column=1, value="State Education vs Medspa Gap").font = Font(bold=True, size=11)
+        dd_headers = ["State", "Bachelor's %", "Graduate %", "Prospects", "A-Grade", "Gap Score"]
+        for col, header in enumerate(dd_headers, 1):
+            cell = ws_dd.cell(row=dd_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        dd_sorted = sorted(dd_states, key=lambda x: x.get("gap_score", 0), reverse=True)
+        for i, s in enumerate(dd_sorted, dd_start + 2):
+            ws_dd.cell(row=i, column=1, value=s.get("state_name", "-"))
+            ws_dd.cell(row=i, column=2, value=s.get("avg_bachelors", 0))
+            ws_dd.cell(row=i, column=3, value=s.get("avg_graduate", 0))
+            ws_dd.cell(row=i, column=4, value=s.get("prospect_count", 0))
+            ws_dd.cell(row=i, column=5, value=s.get("a_grade_count", 0))
+            ws_dd.cell(row=i, column=6, value=s.get("gap_score", 0))
+
+        dd_col_widths = {"A": 22, "B": 14, "C": 12, "D": 12, "E": 10, "F": 12}
+        for col_letter, width in dd_col_widths.items():
+            ws_dd.column_dimensions[col_letter].width = width
+
+        # ---- Sheet 19: PE Heat Map ----
+        ws_pe = wb.create_sheet("PE Heat Map")
+        pe_competitive = data.get("pe_competitive", {})
+        pec_deals = pe_competitive.get("deals", [])
+        pec_summary = pe_competitive.get("summary", {})
+
+        ws_pe["A1"] = "PE Competitive Heat Map"
+        ws_pe["A1"].font = Font(bold=True, size=13)
+        ws_pe.merge_cells("A1:E1")
+
+        ws_pe["A3"] = "PE-Backed Platforms"
+        ws_pe["B3"] = pec_summary.get("pe_platforms", 0)
+        ws_pe["A4"] = "Avg EV/EBITDA"
+        ws_pe["B4"] = pec_summary.get("avg_ev_ebitda", 0)
+        ws_pe["A5"] = "Total Deal Value"
+        ws_pe["B5"] = pec_summary.get("total_deal_value", 0)
+        ws_pe["A6"] = "Most Active Buyer"
+        ws_pe["B6"] = pec_summary.get("most_active_buyer", "-")
+        for r in range(3, 7):
+            ws_pe[f"A{r}"].font = Font(bold=True)
+
+        pe_start = 8
+        ws_pe.cell(row=pe_start, column=1, value="Aesthetics PE Deals").font = Font(bold=True, size=11)
+        pe_headers = ["Company", "Buyer", "Deal Type", "EV ($)", "EV/EBITDA", "Date", "State"]
+        for col, header in enumerate(pe_headers, 1):
+            cell = ws_pe.cell(row=pe_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        for i, d in enumerate(pec_deals, pe_start + 2):
+            ws_pe.cell(row=i, column=1, value=d.get("company", "-"))
+            ws_pe.cell(row=i, column=2, value=d.get("buyer", "-"))
+            ws_pe.cell(row=i, column=3, value=d.get("deal_type", "-"))
+            ws_pe.cell(row=i, column=4, value=d.get("ev_usd", 0))
+            ws_pe.cell(row=i, column=5, value=d.get("ev_ebitda", 0))
+            ws_pe.cell(row=i, column=6, value=d.get("date", "-"))
+            ws_pe.cell(row=i, column=7, value=d.get("state", "-"))
+
+        pe_col_widths = {"A": 30, "B": 25, "C": 12, "D": 16, "E": 12, "F": 12, "G": 8}
+        for col_letter, width in pe_col_widths.items():
+            ws_pe.column_dimensions[col_letter].width = width
+
+        # ---- Sheet 20: Construction Momentum ----
+        ws_cm = wb.create_sheet("Construction Momentum")
+        construction_momentum = data.get("construction_momentum", {})
+        cm_states = construction_momentum.get("state_data", [])
+        cm_summary = construction_momentum.get("summary", {})
+
+        ws_cm["A1"] = "Construction Momentum Signal"
+        ws_cm["A1"].font = Font(bold=True, size=13)
+        ws_cm.merge_cells("A1:E1")
+
+        ws_cm["A3"] = "Year"
+        ws_cm["B3"] = cm_summary.get("latest_year", "-")
+        ws_cm["A4"] = "States Analyzed"
+        ws_cm["B4"] = cm_summary.get("states_analyzed", 0)
+        ws_cm["A5"] = "Avg YoY Growth"
+        ws_cm["B5"] = cm_summary.get("avg_yoy_growth", 0)
+        ws_cm["A6"] = "High-Growth States (>10%)"
+        ws_cm["B6"] = cm_summary.get("high_growth_states", 0)
+        for r in range(3, 7):
+            ws_cm[f"A{r}"].font = Font(bold=True)
+
+        cm_start = 8
+        ws_cm.cell(row=cm_start, column=1, value="State Permit Data").font = Font(bold=True, size=11)
+        cm_headers = ["State", "Total Permits", "1-Unit", "5+ Units", "YoY Growth %", "Medspas", "A-Grade"]
+        for col, header in enumerate(cm_headers, 1):
+            cell = ws_cm.cell(row=cm_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        for i, s in enumerate(cm_states, cm_start + 2):
+            ws_cm.cell(row=i, column=1, value=s.get("state_name", "-"))
+            ws_cm.cell(row=i, column=2, value=s.get("total_permits", 0))
+            ws_cm.cell(row=i, column=3, value=s.get("permits_1unit", 0))
+            ws_cm.cell(row=i, column=4, value=s.get("permits_5plus", 0))
+            ws_cm.cell(row=i, column=5, value=s.get("yoy_growth"))
+            ws_cm.cell(row=i, column=6, value=s.get("medspa_count", 0))
+            ws_cm.cell(row=i, column=7, value=s.get("a_grade_count", 0))
+
+        cm_col_widths = {"A": 22, "B": 14, "C": 10, "D": 10, "E": 14, "F": 10, "G": 10}
+        for col_letter, width in cm_col_widths.items():
+            ws_cm.column_dimensions[col_letter].width = width
+
+        # ---- Sheet 21: Medical CPI ----
+        ws_cpi = wb.create_sheet("Medical CPI")
+        medical_cpi = data.get("medical_cpi", {})
+        mcpi_annual = medical_cpi.get("annual_data", [])
+        mcpi_summary = medical_cpi.get("summary", {})
+
+        ws_cpi["A1"] = "Medical CPI Pricing Power"
+        ws_cpi["A1"].font = Font(bold=True, size=13)
+        ws_cpi.merge_cells("A1:E1")
+
+        ws_cpi["A3"] = "Current Medical CPI"
+        ws_cpi["B3"] = mcpi_summary.get("current_medical_cpi", 0)
+        ws_cpi["A4"] = "YoY Medical Change %"
+        ws_cpi["B4"] = mcpi_summary.get("yoy_medical_change", 0)
+        ws_cpi["A5"] = "Medical vs General Spread"
+        ws_cpi["B5"] = mcpi_summary.get("medical_vs_general_spread", 0)
+        ws_cpi["A6"] = "5yr CAGR %"
+        ws_cpi["B6"] = mcpi_summary.get("cagr_5yr", "-")
+        for r in range(3, 7):
+            ws_cpi[f"A{r}"].font = Font(bold=True)
+
+        cpi_start = 8
+        ws_cpi.cell(row=cpi_start, column=1, value="Annual CPI Comparison").font = Font(bold=True, size=11)
+        cpi_headers = ["Year", "Medical CPI", "General CPI", "Medical YoY %", "General YoY %", "Spread (pp)", "Cumulative (pp)"]
+        for col, header in enumerate(cpi_headers, 1):
+            cell = ws_cpi.cell(row=cpi_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        for i, d in enumerate(mcpi_annual, cpi_start + 2):
+            ws_cpi.cell(row=i, column=1, value=d.get("year"))
+            ws_cpi.cell(row=i, column=2, value=d.get("medical_cpi"))
+            ws_cpi.cell(row=i, column=3, value=d.get("general_cpi"))
+            ws_cpi.cell(row=i, column=4, value=d.get("medical_yoy"))
+            ws_cpi.cell(row=i, column=5, value=d.get("general_yoy"))
+            ws_cpi.cell(row=i, column=6, value=d.get("yoy_spread"))
+            ws_cpi.cell(row=i, column=7, value=d.get("cumulative_divergence"))
+
+        cpi_col_widths = {"A": 8, "B": 14, "C": 14, "D": 14, "E": 14, "F": 12, "G": 16}
+        for col_letter, width in cpi_col_widths.items():
+            ws_cpi.column_dimensions[col_letter].width = width
+
+        # ---- Sheet 22: Talent Pipeline ----
+        ws_tp = wb.create_sheet("Talent Pipeline")
+        talent_pipeline = data.get("talent_pipeline", {})
+        tp_quarterly = talent_pipeline.get("quarterly_data", [])
+        tp_summary = talent_pipeline.get("summary", {})
+
+        ws_tp["A1"] = "Talent Pipeline Pressure"
+        ws_tp["A1"].font = Font(bold=True, size=13)
+        ws_tp.merge_cells("A1:E1")
+
+        ws_tp["A3"] = "Latest HC Openings (000s)"
+        ws_tp["B3"] = tp_summary.get("latest_openings", 0)
+        ws_tp["A4"] = "Openings/Hires Ratio"
+        ws_tp["B4"] = tp_summary.get("openings_to_hires_ratio", 0)
+        ws_tp["A5"] = "YoY Change %"
+        ws_tp["B5"] = tp_summary.get("yoy_change", "-")
+        ws_tp["A6"] = "Talent Scarcity Trend"
+        ws_tp["B6"] = tp_summary.get("trend", "-")
+        for r in range(3, 7):
+            ws_tp[f"A{r}"].font = Font(bold=True)
+
+        tp_start = 8
+        ws_tp.cell(row=tp_start, column=1, value="Quarterly Healthcare Labor Data").font = Font(bold=True, size=11)
+        tp_headers = ["Period", "Openings (000s)", "Hires (000s)", "Open/Hire Ratio"]
+        for col, header in enumerate(tp_headers, 1):
+            cell = ws_tp.cell(row=tp_start + 1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        for i, q in enumerate(tp_quarterly, tp_start + 2):
+            ws_tp.cell(row=i, column=1, value=q.get("period", "-"))
+            ws_tp.cell(row=i, column=2, value=q.get("openings", 0))
+            ws_tp.cell(row=i, column=3, value=q.get("hires", 0))
+            ws_tp.cell(row=i, column=4, value=q.get("ratio", 0))
+
+        tp_col_widths = {"A": 12, "B": 18, "C": 16, "D": 16}
+        for col_letter, width in tp_col_widths.items():
+            ws_tp.column_dimensions[col_letter].width = width
 
         # Save to bytes
         output = BytesIO()
