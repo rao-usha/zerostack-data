@@ -209,8 +209,19 @@ async def lifespan(app: FastAPI):
 
         scheduler_service.start_scheduler()
 
-        # Load active schedules
+        # Auto-create default schedules (idempotent — skips existing)
         SessionLocal = get_session_factory()
+        db = SessionLocal()
+        try:
+            created = scheduler_service.create_default_schedules(db)
+            if created:
+                logger.info(f"Created {len(created)} default schedules (paused)")
+        except Exception as e:
+            logger.warning(f"Failed to create default schedules: {e}")
+        finally:
+            db.close()
+
+        # Load active schedules
         db = SessionLocal()
         try:
             count = scheduler_service.load_all_schedules(db)

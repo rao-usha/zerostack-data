@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 # the formatter converts last_run_at into the source-specific start param.
 
 INCREMENTAL_PARAM_MAP = {
+    # Original 8 sources
     "fred": ("observation_start", lambda dt: dt.strftime("%Y-%m-%d")),
     "bls": ("start_year", lambda dt: dt.year),
     "eia": ("start", lambda dt: dt.strftime("%Y-%m-%d")),
@@ -50,6 +51,13 @@ INCREMENTAL_PARAM_MAP = {
     "bts": ("start_date", lambda dt: dt.strftime("%Y-%m-%d")),
     "census": ("year", lambda dt: dt.year),
     "bea": ("year", lambda dt: str(dt.year)),
+    # Additional 6 sources
+    "fema": ("year", lambda dt: dt.year),
+    "noaa": ("start_date", lambda dt: dt.strftime("%Y-%m-%d")),
+    "us_trade": ("year", lambda dt: str(dt.year)),
+    "realestate": ("start_date", lambda dt: dt.strftime("%Y-%m-%d")),
+    "international_econ": ("start_year", lambda dt: dt.year),
+    "uspto": ("start_date", lambda dt: dt.strftime("%Y-%m-%d")),
 }
 
 
@@ -578,70 +586,63 @@ def get_schedule_history(
 
 DEFAULT_SCHEDULES = [
     # =========================================================================
-    # TIER 1 — Daily (10:00-13:00 UTC / 5-8 AM ET)
+    # TIER 1 — DAILY (3 schedules, 10:00-11:00 UTC)
+    # Sources that publish new data every business day.
     # =========================================================================
     {
         "name": "Treasury Daily Balance",
         "source": "treasury",
-        "config": {"dataset": "daily_balance"},
+        "config": {"dataset": "daily_balance", "incremental": True},
         "frequency": ScheduleFrequency.DAILY,
         "hour": 10,
-        "description": "Daily Treasury statement",
+        "description": "Daily Treasury statement — fiscal data published each business day",
         "priority": 2,
     },
     {
-        "name": "FRED Daily Series - Interest Rates",
+        "name": "FRED Interest Rates - Daily",
         "source": "fred",
-        "config": {"category": "interest_rates"},
+        "config": {"category": "interest_rates", "incremental": True},
         "frequency": ScheduleFrequency.DAILY,
         "hour": 10,
-        "description": "Daily FRED interest rate series",
+        "description": "Daily FRED interest rates, yields, and spreads",
         "priority": 3,
     },
     {
-        "name": "Prediction Markets Snapshot",
+        "name": "Prediction Markets - Daily",
         "source": "prediction_markets",
         "config": {"sources": ["kalshi", "polymarket"]},
         "frequency": ScheduleFrequency.DAILY,
         "hour": 11,
-        "description": "Daily prediction market odds snapshot",
+        "description": "Daily prediction market odds snapshot (full refresh)",
         "priority": 4,
     },
     # =========================================================================
-    # TIER 2 — Weekly (Mon-Wed early AM)
+    # TIER 2 — WEEKLY (5 schedules, Mon-Wed 10:00-13:00 UTC)
+    # Sources with weekly publication cadence or where weekly pulls are efficient.
     # =========================================================================
     {
-        "name": "FRED All Categories - Weekly",
-        "source": "fred",
-        "config": {"category": "all"},
-        "frequency": ScheduleFrequency.WEEKLY,
-        "hour": 10,
-        "day_of_week": 0,  # Monday
-        "description": "Weekly full refresh of FRED modified series",
-        "priority": 3,
-    },
-    {
-        "name": "EIA Petroleum Weekly",
+        "name": "EIA Petroleum - Weekly",
         "source": "eia",
         "config": {
             "dataset": "petroleum_weekly",
             "subcategory": "consumption",
             "frequency": "weekly",
+            "incremental": True,
         },
         "frequency": ScheduleFrequency.WEEKLY,
         "hour": 11,
         "day_of_week": 0,  # Monday
-        "description": "Weekly petroleum status report",
+        "description": "Weekly petroleum status report (published Wednesdays)",
         "priority": 3,
     },
     {
-        "name": "CFTC COT Weekly",
+        "name": "CFTC COT - Weekly",
         "source": "cftc_cot",
         "config": {"report_type": "all"},
         "frequency": ScheduleFrequency.WEEKLY,
         "hour": 12,
         "day_of_week": 0,  # Monday
-        "description": "Weekly Commitments of Traders positions",
+        "description": "Weekly Commitments of Traders (reported Tuesdays, released Fridays)",
         "priority": 4,
     },
     {
@@ -651,7 +652,7 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.WEEKLY,
         "hour": 12,
         "day_of_week": 1,  # Tuesday
-        "description": "Weekly Tranco ranking changes",
+        "description": "Weekly Tranco domain ranking changes (full snapshot)",
         "priority": 6,
     },
     {
@@ -661,7 +662,7 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.WEEKLY,
         "hour": 10,
         "day_of_week": 2,  # Wednesday
-        "description": "Weekly GitHub repository metrics",
+        "description": "Weekly GitHub repository metrics aggregation",
         "priority": 6,
     },
     {
@@ -671,11 +672,13 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.WEEKLY,
         "hour": 11,
         "day_of_week": 2,  # Wednesday
-        "description": "Weekly weather observations refresh",
+        "description": "Weekly weather observations bulk refresh",
         "priority": 5,
     },
     # =========================================================================
-    # TIER 3 — Monthly (spread across days 1-15)
+    # TIER 3 — MONTHLY (19 schedules, days 1-15, 11:00-14:00 UTC)
+    # Sources with monthly publication cadence. Hours staggered to avoid
+    # concurrent rate-limit collisions.
     # =========================================================================
     {
         "name": "FEMA Disasters - Monthly",
@@ -684,47 +687,57 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.MONTHLY,
         "hour": 11,
         "day_of_month": 1,
-        "description": "Monthly FEMA disaster declarations update",
+        "description": "Monthly FEMA disaster declarations (full refresh)",
         "priority": 3,
+    },
+    {
+        "name": "Job Postings All Sources - Monthly",
+        "source": "job_postings:all",
+        "config": {"skip_recent_hours": 600},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 14,
+        "day_of_month": 1,
+        "description": "Monthly job postings refresh — leading economic indicator",
+        "priority": 4,
     },
     {
         "name": "BEA GDP/Income - Monthly",
         "source": "bea",
-        "config": {"dataset": "gdp", "table_name": "T10101"},
+        "config": {"dataset": "gdp", "table_name": "T10101", "incremental": True},
         "frequency": ScheduleFrequency.MONTHLY,
         "hour": 11,
         "day_of_month": 3,
-        "description": "Monthly BEA national accounts data",
+        "description": "Monthly BEA national accounts (advance/second/third estimates)",
         "priority": 2,
     },
     {
         "name": "EIA Electricity - Monthly",
         "source": "eia",
-        "config": {"dataset": "electricity", "subcategory": "retail_sales"},
+        "config": {"dataset": "electricity", "subcategory": "retail_sales", "incremental": True},
         "frequency": ScheduleFrequency.MONTHLY,
         "hour": 11,
         "day_of_month": 4,
-        "description": "Monthly EIA electricity utility rates",
+        "description": "Monthly EIA electricity utility data (~25th of prior month)",
         "priority": 4,
     },
     {
         "name": "EIA Natural Gas - Monthly",
         "source": "eia",
-        "config": {"dataset": "natural_gas", "subcategory": "consumption"},
+        "config": {"dataset": "natural_gas", "subcategory": "consumption", "incremental": True},
         "frequency": ScheduleFrequency.MONTHLY,
         "hour": 12,
         "day_of_month": 4,
-        "description": "Monthly EIA natural gas prices",
+        "description": "Monthly EIA natural gas prices/volumes (~end of prior month)",
         "priority": 4,
     },
     {
         "name": "BLS Employment (CES) - Monthly",
         "source": "bls",
-        "config": {"dataset": "ces"},
+        "config": {"dataset": "ces", "incremental": True},
         "frequency": ScheduleFrequency.MONTHLY,
         "hour": 13,
         "day_of_month": 5,
-        "description": "Monthly employment data (BLS releases ~first Friday)",
+        "description": "Monthly employment situation (BLS releases ~first Friday)",
         "priority": 2,
     },
     {
@@ -734,27 +747,37 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.MONTHLY,
         "hour": 12,
         "day_of_month": 5,
-        "description": "Monthly unified public data refresh",
+        "description": "Monthly unified public data refresh from multiple sources",
         "priority": 6,
     },
     {
         "name": "BLS CPI - Monthly",
         "source": "bls",
-        "config": {"dataset": "cpi"},
+        "config": {"dataset": "cpi", "incremental": True},
         "frequency": ScheduleFrequency.MONTHLY,
         "hour": 13,
         "day_of_month": 6,
-        "description": "Monthly consumer price index data",
+        "description": "Monthly consumer price index (~10th-15th of month)",
         "priority": 2,
     },
     {
         "name": "BLS PPI - Monthly",
         "source": "bls",
-        "config": {"dataset": "ppi"},
+        "config": {"dataset": "ppi", "incremental": True},
         "frequency": ScheduleFrequency.MONTHLY,
         "hour": 13,
         "day_of_month": 7,
-        "description": "Monthly producer price index data",
+        "description": "Monthly producer price index (~15th of month)",
+        "priority": 3,
+    },
+    {
+        "name": "BLS JOLTS - Monthly",
+        "source": "bls",
+        "config": {"dataset": "jolts", "incremental": True},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 13,
+        "day_of_month": 8,
+        "description": "Monthly job openings/labor turnover (~first week, 2-month lag)",
         "priority": 3,
     },
     {
@@ -764,7 +787,17 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.MONTHLY,
         "hour": 11,
         "day_of_month": 8,
-        "description": "Monthly FDIC bank call reports",
+        "description": "Monthly FDIC bank call report data (quarterly source, monthly check)",
+        "priority": 4,
+    },
+    {
+        "name": "BLS OES - Monthly",
+        "source": "bls",
+        "config": {"dataset": "oes", "incremental": True},
+        "frequency": ScheduleFrequency.MONTHLY,
+        "hour": 13,
+        "day_of_month": 9,
+        "description": "Occupational employment stats (annual, published May, monthly check)",
         "priority": 4,
     },
     {
@@ -774,7 +807,7 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.MONTHLY,
         "hour": 11,
         "day_of_month": 9,
-        "description": "Monthly SEC investment adviser registrations",
+        "description": "Monthly SEC investment adviser registrations (rolling filings)",
         "priority": 5,
     },
     {
@@ -784,7 +817,7 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.MONTHLY,
         "hour": 12,
         "day_of_month": 9,
-        "description": "Monthly SEC private placement filings",
+        "description": "Monthly SEC private placement filings (filed within 15 days of sale)",
         "priority": 5,
     },
     {
@@ -804,7 +837,7 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.MONTHLY,
         "hour": 11,
         "day_of_month": 11,
-        "description": "Monthly app metrics and rankings",
+        "description": "Monthly app metrics and rankings snapshot",
         "priority": 7,
     },
     {
@@ -814,7 +847,7 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.MONTHLY,
         "hour": 11,
         "day_of_month": 12,
-        "description": "Monthly FBI UCR crime statistics",
+        "description": "Monthly FBI UCR crime statistics (annual source, monthly check)",
         "priority": 5,
     },
     {
@@ -824,28 +857,8 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.MONTHLY,
         "hour": 11,
         "day_of_month": 13,
-        "description": "Monthly IRS income-by-ZIP update",
+        "description": "Monthly IRS income-by-ZIP update (annual source, 12-18 month lag)",
         "priority": 6,
-    },
-    {
-        "name": "Glassdoor Reviews - Monthly",
-        "source": "glassdoor",
-        "config": {},
-        "frequency": ScheduleFrequency.MONTHLY,
-        "hour": 11,
-        "day_of_month": 14,
-        "description": "Monthly Glassdoor company reviews/ratings",
-        "priority": 7,
-    },
-    {
-        "name": "Yelp Business Listings - Monthly",
-        "source": "yelp",
-        "config": {},
-        "frequency": ScheduleFrequency.MONTHLY,
-        "hour": 11,
-        "day_of_month": 15,
-        "description": "Monthly Yelp business listing refresh",
-        "priority": 7,
     },
     {
         "name": "FCC Broadband Coverage - Monthly",
@@ -854,36 +867,38 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.MONTHLY,
         "hour": 12,
         "day_of_month": 15,
-        "description": "Monthly FCC broadband coverage data",
+        "description": "Monthly FCC broadband coverage maps (semi-annual BDC filings)",
         "priority": 5,
     },
     # =========================================================================
-    # TIER 4 — Quarterly (Jan/Apr/Jul/Oct, staggered across first 2 weeks)
+    # TIER 4 — QUARTERLY (11 schedules, days 2-7, 08:00-12:00 UTC)
+    # Sources with quarterly/annual cadence or where quarterly refresh is
+    # sufficient for slow-moving data.
     # =========================================================================
     {
         "name": "Census ACS 5-Year - Quarterly",
         "source": "census",
-        "config": {"survey": "acs5", "geo_level": "county"},
+        "config": {"survey": "acs5", "geo_level": "county", "incremental": True},
         "frequency": ScheduleFrequency.QUARTERLY,
         "hour": 8,
         "day_of_month": 2,
-        "description": "Quarterly Census ACS 5-year estimates refresh",
+        "description": "Quarterly Census ACS 5-year estimates (annual Dec release)",
         "priority": 3,
     },
     {
         "name": "BEA Regional Data - Quarterly",
         "source": "bea",
-        "config": {"dataset": "regional", "table_name": "SAGDP2N"},
+        "config": {"dataset": "regional", "table_name": "SAGDP2N", "incremental": True},
         "frequency": ScheduleFrequency.QUARTERLY,
         "hour": 9,
         "day_of_month": 2,
-        "description": "Quarterly BEA regional economic data",
+        "description": "Quarterly BEA regional GDP by state",
         "priority": 4,
     },
     {
         "name": "SEC 10-K/10-Q Filings - Quarterly",
         "source": "sec",
-        "config": {"filing_type": "10-K,10-Q"},
+        "config": {"filing_type": "10-K,10-Q", "incremental": True},
         "frequency": ScheduleFrequency.QUARTERLY,
         "hour": 10,
         "day_of_month": 3,
@@ -893,11 +908,11 @@ DEFAULT_SCHEDULES = [
     {
         "name": "SEC 13F Holdings - Quarterly",
         "source": "sec",
-        "config": {"filing_type": "13F"},
+        "config": {"filing_type": "13F", "incremental": True},
         "frequency": ScheduleFrequency.QUARTERLY,
         "hour": 11,
         "day_of_month": 3,
-        "description": "Quarterly SEC 13F institutional holdings",
+        "description": "Quarterly SEC 13F institutional holdings (45 days after quarter-end)",
         "priority": 3,
     },
     {
@@ -907,7 +922,7 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.QUARTERLY,
         "hour": 10,
         "day_of_month": 4,
-        "description": "Quarterly USPTO patent filings refresh",
+        "description": "Quarterly USPTO patent filings and grants",
         "priority": 5,
     },
     {
@@ -917,13 +932,13 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.QUARTERLY,
         "hour": 11,
         "day_of_month": 4,
-        "description": "Quarterly US international trade data",
+        "description": "Quarterly US import/export trade flows",
         "priority": 4,
     },
     {
         "name": "BTS Transportation - Quarterly",
         "source": "bts",
-        "config": {},
+        "config": {"incremental": True},
         "frequency": ScheduleFrequency.QUARTERLY,
         "hour": 10,
         "day_of_month": 5,
@@ -937,7 +952,7 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.QUARTERLY,
         "hour": 11,
         "day_of_month": 5,
-        "description": "Quarterly international economic indicators",
+        "description": "Quarterly international economic indicators (WDI, IMF, OECD)",
         "priority": 4,
     },
     {
@@ -967,7 +982,7 @@ DEFAULT_SCHEDULES = [
         "frequency": ScheduleFrequency.QUARTERLY,
         "hour": 10,
         "day_of_month": 7,
-        "description": "Quarterly USDA crop and livestock data",
+        "description": "Quarterly USDA crop and livestock production data",
         "priority": 5,
     },
 ]

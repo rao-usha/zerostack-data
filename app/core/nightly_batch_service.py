@@ -50,80 +50,80 @@ class Tier:
     sources: List[SourceDef] = field(default_factory=list)
 
 
-# Tier 1 — Fast government APIs, no dependencies, run first
+# Tier 1 — Daily sources: fast government APIs + market data
 TIER_1 = Tier(
     level=1,
     priority=10,
-    name="Fast Government APIs",
+    name="Daily Sources",
     sources=[
         SourceDef("treasury"),
         SourceDef("fred", {"category": "interest_rates"}),
-        SourceDef("bea"),
-        SourceDef("fdic"),
-        SourceDef("fema"),
-        SourceDef("bts"),
-        SourceDef("cftc_cot"),
-        SourceDef("data_commons"),
+        SourceDef("prediction_markets", {"sources": ["kalshi", "polymarket"]}),
     ],
 )
 
-# Tier 2 — Medium APIs, rate-limited
+# Tier 2 — Weekly sources: moderate-frequency data
 TIER_2 = Tier(
     level=2,
     priority=7,
-    name="Medium Rate-Limited APIs",
+    name="Weekly Sources",
     sources=[
-        SourceDef("eia"),
-        SourceDef("bls"),
-        SourceDef("noaa"),
-        SourceDef("cms"),
-        SourceDef("fbi_crime"),
-        SourceDef("irs_soi"),
-        SourceDef("usda"),
-        SourceDef("us_trade"),
-        SourceDef("fcc_broadband"),
-        SourceDef("prediction_markets"),
-        SourceDef("realestate"),
-        SourceDef("uspto"),
-        SourceDef("dunl:currencies"),
-        SourceDef("dunl:ports"),
-        SourceDef("dunl:uom"),
-        SourceDef("dunl:uom_conversions"),
-        SourceDef("dunl:calendars", {"years": "2020,2021,2022,2023,2024,2025"}),
-        SourceDef("job_postings:all", {"skip_recent_hours": 20}),
+        SourceDef("eia", {"dataset": "petroleum_weekly", "subcategory": "consumption", "frequency": "weekly"}),
+        SourceDef("cftc_cot", {"report_type": "all"}),
+        SourceDef("web_traffic", {"list": "tranco_top1m"}),
+        SourceDef("github"),
+        SourceDef("noaa", {"dataset": "daily_summaries"}),
     ],
 )
 
-# Tier 3 — SEC/complex sources
+# Tier 3 — Monthly sources: government releases, regulatory filings
 TIER_3 = Tier(
     level=3,
     priority=5,
-    name="Complex / SEC Sources",
+    name="Monthly Sources",
     sources=[
-        SourceDef("sec"),
-        SourceDef("kaggle"),
-        SourceDef("international_econ"),
-        SourceDef("census", {"survey": "acs5", "year": 2023, "table_id": "B01001", "geo_level": "state"}),
-        SourceDef("foot_traffic"),
-        SourceDef("yelp"),
+        SourceDef("bea", {"dataset": "gdp", "table_name": "T10101"}),
+        SourceDef("bls", {"dataset": "ces"}),
+        SourceDef("eia", {"dataset": "electricity", "subcategory": "retail_sales"}),
+        SourceDef("eia", {"dataset": "natural_gas", "subcategory": "consumption"}),
+        SourceDef("fema", {"dataset": "disasters"}),
+        SourceDef("fdic", {"dataset": "financials"}),
+        SourceDef("form_adv"),
+        SourceDef("form_d"),
+        SourceDef("cms", {"dataset": "utilization"}),
+        SourceDef("fbi_crime", {"dataset": "ucr"}),
+        SourceDef("irs_soi", {"dataset": "zip_income"}),
+        SourceDef("data_commons"),
+        SourceDef("fcc_broadband"),
+        SourceDef("app_rankings"),
+        SourceDef("job_postings:all", {"skip_recent_hours": 600}),
     ],
 )
 
-# Tier 4 — Agentic/LLM pipelines (depend on base data)
+# Tier 4 — Quarterly sources: SEC, Census, trade, and slow-moving data
 TIER_4 = Tier(
     level=4,
     priority=3,
-    name="Agentic / LLM Pipelines",
+    name="Quarterly Sources",
     sources=[
-        SourceDef("site_intel_full_sync", {"mode": "full_sync"}),
-        SourceDef("people_batch", {"mode": "batch", "max_jobs": 50}),
-        SourceDef("pe_batch", {"mode": "full"}),
+        SourceDef("census", {"survey": "acs5", "geo_level": "county"}),
+        SourceDef("bea", {"dataset": "regional", "table_name": "SAGDP2N"}),
+        SourceDef("sec", {"filing_type": "10-K,10-Q"}),
+        SourceDef("sec", {"filing_type": "13F"}),
+        SourceDef("uspto"),
+        SourceDef("us_trade"),
+        SourceDef("bts"),
+        SourceDef("international_econ"),
+        SourceDef("realestate"),
+        SourceDef("opencorporates"),
+        SourceDef("usda"),
     ],
 )
 
 TIERS = [TIER_1, TIER_2, TIER_3, TIER_4]
 
-# Tier 4 sources are agentic and use separate executor types
+# Agentic sources use separate executor types (not in nightly tiers;
+# triggered on-demand via their own endpoints)
 AGENTIC_SOURCE_MAP = {
     "site_intel_full_sync": "site_intel",
     "people_batch": "people",

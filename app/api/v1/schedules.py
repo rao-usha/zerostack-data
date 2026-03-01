@@ -353,6 +353,101 @@ def create_default_schedules(db: Session = Depends(get_db)):
 
 
 # =============================================================================
+# Tier-Based Activation / Pause Endpoints
+# =============================================================================
+
+# Map tier numbers to schedule frequencies
+TIER_FREQUENCY_MAP = {
+    1: ScheduleFrequency.DAILY,
+    2: ScheduleFrequency.WEEKLY,
+    3: ScheduleFrequency.MONTHLY,
+    4: ScheduleFrequency.QUARTERLY,
+}
+
+
+@router.post("/activate-tier/{tier}")
+def activate_tier(tier: int, db: Session = Depends(get_db)):
+    """
+    Activate all schedules in a tier.
+
+    Tier mapping: 1=DAILY, 2=WEEKLY, 3=MONTHLY, 4=QUARTERLY.
+    Only activates schedules that are currently paused.
+    """
+    if tier not in TIER_FREQUENCY_MAP:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid tier {tier}. Valid tiers: 1 (daily), 2 (weekly), 3 (monthly), 4 (quarterly)",
+        )
+
+    frequency = TIER_FREQUENCY_MAP[tier]
+    schedules = (
+        db.query(IngestionSchedule)
+        .filter(
+            IngestionSchedule.frequency == frequency,
+            IngestionSchedule.is_active == 0,
+        )
+        .all()
+    )
+
+    activated = []
+    for schedule in schedules:
+        schedule.is_active = True
+        schedule.updated_at = datetime.utcnow()
+        activated.append(schedule.name)
+
+    db.commit()
+
+    # Reload schedules into APScheduler so they actually fire
+    try:
+        scheduler_service.load_all_schedules(db)
+    except Exception as e:
+        logger.warning(f"Failed to reload schedules into APScheduler: {e}")
+
+    return {
+        "message": f"Activated {len(activated)} {frequency.value} schedules (tier {tier})",
+        "activated": activated,
+    }
+
+
+@router.post("/pause-all")
+def pause_all_schedules(db: Session = Depends(get_db)):
+    """
+    Emergency pause all active schedules.
+
+    Sets is_active=False on every schedule. Use activate-tier to re-enable.
+    """
+    schedules = (
+        db.query(IngestionSchedule)
+        .filter(IngestionSchedule.is_active == 1)
+        .all()
+    )
+
+    paused = []
+    for schedule in schedules:
+        schedule.is_active = False
+        schedule.updated_at = datetime.utcnow()
+        paused.append(schedule.name)
+
+    db.commit()
+
+    # Remove all scheduled jobs from APScheduler
+    try:
+        scheduler = scheduler_service.get_scheduler()
+        for schedule in db.query(IngestionSchedule).all():
+            job_id = f"schedule_{schedule.id}"
+            existing = scheduler.get_job(job_id)
+            if existing:
+                scheduler.remove_job(job_id)
+    except Exception as e:
+        logger.warning(f"Failed to remove jobs from APScheduler: {e}")
+
+    return {
+        "message": f"Paused {len(paused)} schedules",
+        "paused": paused,
+    }
+
+
+# =============================================================================
 # Stuck Job Cleanup Endpoints
 # =============================================================================
 
