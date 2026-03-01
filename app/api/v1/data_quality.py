@@ -1100,6 +1100,18 @@ def _column_to_response(c: DataProfileColumn) -> ProfileColumnResponse:
     )
 
 
+# NOTE: /profile/all must come BEFORE /profile/{table_name} to avoid
+# FastAPI matching "all" as a table_name parameter.
+@router.post("/profile/all")
+def profile_all_tables(db: Session = Depends(get_db)):
+    """Profile all registered tables."""
+    snapshots = data_profiling_service.profile_all_tables(db)
+    return {
+        "message": f"Profiled {len(snapshots)} tables",
+        "tables_profiled": [s.table_name for s in snapshots],
+    }
+
+
 @router.post("/profile/{table_name}", response_model=ProfileSnapshotResponse)
 def profile_table(
     table_name: str,
@@ -1111,16 +1123,6 @@ def profile_table(
     if not snapshot:
         raise HTTPException(status_code=409, detail="Profiling already in progress or table not found")
     return _snapshot_to_response(snapshot)
-
-
-@router.post("/profile/all")
-def profile_all_tables(db: Session = Depends(get_db)):
-    """Profile all registered tables."""
-    snapshots = data_profiling_service.profile_all_tables(db)
-    return {
-        "message": f"Profiled {len(snapshots)} tables",
-        "tables_profiled": [s.table_name for s in snapshots],
-    }
 
 
 @router.get("/profiles/{table_name}", response_model=ProfileSnapshotResponse)

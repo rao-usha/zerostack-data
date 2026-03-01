@@ -31,7 +31,7 @@ async def schedule_pe_refresh():
         result = db.execute(
             text(
                 "SELECT id FROM pe_firms "
-                "WHERE is_active = true OR is_active IS NULL "
+                "WHERE status = 'Active' OR status IS NULL "
                 "ORDER BY updated_at ASC NULLS FIRST "
                 "LIMIT 100"
             )
@@ -101,7 +101,7 @@ async def schedule_pe_sec_sweep():
         result = db.execute(
             text(
                 "SELECT id FROM pe_firms "
-                "WHERE is_active = true OR is_active IS NULL "
+                "WHERE status = 'Active' OR status IS NULL "
                 "ORDER BY updated_at ASC NULLS FIRST "
                 "LIMIT 100"
             )

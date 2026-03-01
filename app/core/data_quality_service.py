@@ -1190,14 +1190,15 @@ def evaluate_all_rules(db: Session) -> Dict[str, Any]:
     total_errors = 0
     failed_rules_list = []
 
+    # Build evaluation plan as plain dicts so we don't depend on ORM objects
+    # surviving across rollbacks
+    eval_plan = []
     for rule in rules:
-        # Resolve target tables
         if rule.source:
             candidate_tables = table_by_source.get(rule.source, [])
         else:
             candidate_tables = all_table_names
 
-        # Filter by dataset_pattern regex
         if rule.dataset_pattern:
             try:
                 pattern = re.compile(rule.dataset_pattern)
@@ -1209,47 +1210,67 @@ def evaluate_all_rules(db: Session) -> Dict[str, Any]:
                 continue
 
         for table_name in candidate_tables:
-            try:
-                eval_result = evaluate_rule(db, rule, table_name)
-                total_evaluations += 1
+            eval_plan.append((rule.id, table_name))
 
-                # Store result
-                db_result = DataQualityResult(
-                    rule_id=rule.id,
-                    source=rule.source or "all",
-                    dataset_name=table_name,
-                    column_name=rule.column_name,
-                    passed=1 if eval_result.passed else 0,
-                    severity=eval_result.severity,
-                    message=eval_result.message,
-                    actual_value=eval_result.actual_value,
-                    expected_value=eval_result.expected_value,
-                    sample_failures=eval_result.sample_failures,
-                    rows_checked=eval_result.rows_checked,
-                    rows_passed=eval_result.rows_passed,
-                    rows_failed=eval_result.rows_failed,
-                    execution_time_ms=eval_result.execution_time_ms,
+    # Set per-rule statement timeout to prevent long-running queries
+    # from blocking the API (e.g., 58M-row m5_sales table)
+    RULE_TIMEOUT_S = 60
+
+    for rule_id, table_name in eval_plan:
+        try:
+            # Re-fetch rule each iteration to survive rollbacks
+            rule = db.query(DataQualityRule).get(rule_id)
+            if not rule:
+                continue
+
+            db.execute(
+                text(f"SET LOCAL statement_timeout = '{RULE_TIMEOUT_S * 1000}'")
+            )
+            eval_result = evaluate_rule(db, rule, table_name)
+            total_evaluations += 1
+
+            # Store result
+            db_result = DataQualityResult(
+                rule_id=rule.id,
+                source=rule.source or "all",
+                dataset_name=table_name,
+                column_name=rule.column_name,
+                passed=1 if eval_result.passed else 0,
+                severity=eval_result.severity,
+                message=eval_result.message,
+                actual_value=eval_result.actual_value,
+                expected_value=eval_result.expected_value,
+                sample_failures=eval_result.sample_failures,
+                rows_checked=eval_result.rows_checked,
+                rows_passed=eval_result.rows_passed,
+                rows_failed=eval_result.rows_failed,
+                execution_time_ms=eval_result.execution_time_ms,
+            )
+            db.add(db_result)
+
+            # Update rule statistics
+            rule.times_evaluated += 1
+            if eval_result.passed:
+                rule.times_passed += 1
+                total_passed += 1
+            else:
+                rule.times_failed += 1
+                total_failed += 1
+                failed_rules_list.append(
+                    {"id": rule.id, "name": rule.name, "table": table_name}
                 )
-                db.add(db_result)
+            rule.last_evaluated_at = datetime.utcnow()
 
-                # Update rule statistics
-                rule.times_evaluated += 1
-                if eval_result.passed:
-                    rule.times_passed += 1
-                    total_passed += 1
-                else:
-                    rule.times_failed += 1
-                    total_failed += 1
-                    failed_rules_list.append(
-                        {"id": rule.id, "name": rule.name, "table": table_name}
-                    )
-                rule.last_evaluated_at = datetime.utcnow()
+            # Periodic commit every 50 evaluations to avoid huge transactions
+            if total_evaluations % 50 == 0:
+                db.commit()
 
-            except Exception as e:
-                total_errors += 1
-                logger.error(
-                    f"Error evaluating rule {rule.id} on {table_name}: {e}"
-                )
+        except Exception as e:
+            total_errors += 1
+            logger.error(
+                f"Error evaluating rule {rule_id} on {table_name}: {e}"
+            )
+            db.rollback()
 
     # Create report record
     exec_ms = int((time.time() - start_time) * 1000)
