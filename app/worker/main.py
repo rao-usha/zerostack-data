@@ -155,12 +155,13 @@ async def _heartbeat_loop(db_factory, job_id: int):
 
 
 async def _wait_for_tier_completion(
-    db: Session, batch_id: int, wait_for_tiers: list, job: JobQueue
+    db: Session, batch_id: str, wait_for_tiers: list, job: JobQueue
 ):
     """
     Wait until all jobs from specified tiers in the same batch are complete.
 
     Polls the job_queue table every 15s. Times out after 1 hour.
+    batch_id is now a string (e.g. "batch_20260301_143022").
     """
     max_wait = 3600  # 1 hour
     poll_interval = 15
@@ -174,7 +175,7 @@ async def _wait_for_tier_completion(
         result = db.execute(
             text(f"""
                 SELECT COUNT(*) FROM job_queue
-                WHERE (payload->>'batch_id')::int = :batch_id
+                WHERE payload->>'batch_id' = :batch_id
                 AND (payload->>'tier')::int IN ({tier_list})
                 AND status NOT IN (:success, :failed)
             """),

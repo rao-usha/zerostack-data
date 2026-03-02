@@ -1111,48 +1111,81 @@ def get_worker_status(db: Session = Depends(get_db)):
 
 
 # =============================================================================
-# Nightly Batch Endpoints
-# (Must be above /{job_id} to avoid path parameter capturing "nightly")
+# Batch Collection Endpoints
+# (Must be above /{job_id} to avoid path parameter capturing "batch")
 # =============================================================================
 
 
-@router.post("/nightly/launch")
-async def launch_nightly(
+@router.post("/batch/launch")
+async def launch_batch(
     tiers: List[int] = None,
     sources: List[str] = None,
     db: Session = Depends(get_db),
 ):
     """
-    Launch a nightly batch collection.
+    Launch a batch collection.
 
-    Enqueues all data sources across 4 priority tiers:
-    - Tier 1 (priority 10): Fast gov APIs (treasury, fred, bea, fdic, fema, bts, cftc, data_commons)
-    - Tier 2 (priority 7): Medium APIs (eia, bls, noaa, cms, fbi, irs, usda, trade, fcc, etc.)
-    - Tier 3 (priority 5): Complex sources (sec, kaggle, int'l econ, census, foot_traffic, yelp)
-    - Tier 4 (priority 3): Agentic/LLM (site_intel, people, PE)
+    Enqueues all data sources across 4 priority tiers.
+    Each job is tagged with a shared batch_run_id. Status is always
+    computed live from individual job statuses — nothing can get stuck.
 
     Args:
         tiers: Optional list of tier levels to run (default: all)
         sources: Optional list of specific source keys to run
     """
-    from app.core.nightly_batch_service import launch_nightly_batch
+    from app.core.nightly_batch_service import launch_batch_collection
 
-    batch = await launch_nightly_batch(db, tiers=tiers, sources=sources)
-    return {
-        "batch_id": batch.id,
-        "total_jobs": batch.total_jobs,
-        "status": batch.status,
-        "started_at": batch.started_at.isoformat() if batch.started_at else None,
-    }
+    result = await launch_batch_collection(db, tiers=tiers, sources=sources)
+    return result
 
 
-@router.get("/nightly/{batch_id}")
-def get_nightly_status(batch_id: int, db: Session = Depends(get_db)):
+@router.get("/batch/runs/{batch_run_id}")
+def get_batch_run(batch_run_id: str, db: Session = Depends(get_db)):
     """
-    Get nightly batch progress.
+    Get batch run status.
 
-    Returns overall status, per-tier breakdown, and individual job details.
+    Status is computed live from job statuses — nothing can get stuck.
     """
+    from app.core.nightly_batch_service import get_batch_run_status
+
+    result = get_batch_run_status(db, batch_run_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Batch run not found")
+    return result
+
+
+@router.get("/batch/runs")
+def list_batch_runs_endpoint(
+    limit: int = 20,
+    status: str = None,
+    db: Session = Depends(get_db),
+):
+    """List recent batch runs with live status."""
+    from app.core.nightly_batch_service import list_batch_runs
+
+    return list_batch_runs(db, limit=limit, status=status)
+
+
+# =============================================================================
+# Deprecated Nightly Endpoints (wrappers for backwards compatibility)
+# =============================================================================
+
+
+@router.post("/nightly/launch", deprecated=True)
+async def launch_nightly(
+    tiers: List[int] = None,
+    sources: List[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Deprecated: Use POST /batch/launch instead."""
+    from app.core.nightly_batch_service import launch_batch_collection
+
+    return await launch_batch_collection(db, tiers=tiers, sources=sources)
+
+
+@router.get("/nightly/{batch_id}", deprecated=True)
+def get_nightly_status(batch_id: str, db: Session = Depends(get_db)):
+    """Deprecated: Use GET /batch/runs/{batch_run_id} instead."""
     from app.core.nightly_batch_service import get_batch_status
 
     result = get_batch_status(db, batch_id)
@@ -1161,13 +1194,13 @@ def get_nightly_status(batch_id: int, db: Session = Depends(get_db)):
     return result
 
 
-@router.get("/nightly")
+@router.get("/nightly", deprecated=True)
 def list_nightly_batches(
     limit: int = 20,
     status: str = None,
     db: Session = Depends(get_db),
 ):
-    """List recent nightly batch runs."""
+    """Deprecated: Use GET /batch/runs instead."""
     from app.core.nightly_batch_service import list_batches
 
     return list_batches(db, limit=limit, status=status)
@@ -1189,12 +1222,18 @@ def get_job(job_id: int, db: Session = Depends(get_db)) -> JobResponse:
 def list_jobs(
     source: str = None,
     status: JobStatus = None,
+    batch_run_id: str = None,
+    trigger: str = None,
     limit: int = 100,
     offset: int = 0,
     db: Session = Depends(get_db),
 ) -> List[JobResponse]:
     """
     List ingestion jobs with optional filtering.
+
+    Args:
+        batch_run_id: Filter to jobs in a specific batch run
+        trigger: Filter by trigger type ("batch", "manual", "scheduled")
     """
     query = db.query(IngestionJob)
 
@@ -1202,6 +1241,10 @@ def list_jobs(
         query = query.filter(IngestionJob.source == source)
     if status:
         query = query.filter(IngestionJob.status == status)
+    if batch_run_id:
+        query = query.filter(IngestionJob.batch_run_id == batch_run_id)
+    if trigger:
+        query = query.filter(IngestionJob.trigger == trigger)
 
     query = query.order_by(IngestionJob.created_at.desc()).offset(offset).limit(limit)
 

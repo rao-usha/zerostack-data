@@ -1,13 +1,18 @@
 """
-Nightly batch collection orchestrator.
+Batch collection orchestrator.
 
 Enqueues all data sources with tier-based priority ordering.
-Tier 1 (fast gov APIs) runs first at highest priority, Tier 4
-(agentic/LLM pipelines) runs last after base data is collected.
+Tier 1 (daily sources) runs first at highest priority, Tier 4
+(quarterly sources) runs last after base data is collected.
+
+Batch runs are tracked via IngestionJob.batch_run_id — no separate
+NightlyBatch table. Status is always computed live from job statuses,
+so nothing can get "stuck."
 
 Usage:
-    POST /api/v1/jobs/nightly/launch
-    GET  /api/v1/jobs/nightly/{batch_id}
+    POST /api/v1/jobs/batch/launch
+    GET  /api/v1/jobs/batch/runs
+    GET  /api/v1/jobs/batch/runs/{batch_run_id}
 
     # Or via scheduler (registered in main.py lifespan):
     Runs automatically at 2 AM UTC
@@ -18,10 +23,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
 
+from sqlalchemy import func, case, text
 from sqlalchemy.orm import Session
 
 from app.core.models import IngestionJob, JobStatus
-from app.core.models_queue import NightlyBatch, QueueJobStatus
 from app.core.job_queue_service import submit_job, WORKER_MODE
 
 logger = logging.getLogger(__name__)
@@ -34,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SourceDef:
-    """A data source to include in the nightly batch."""
+    """A data source to include in a batch."""
 
     key: str  # matches SOURCE_DISPATCH key in jobs.py
     default_config: Dict = field(default_factory=dict)
@@ -54,7 +59,7 @@ class Tier:
 TIER_1 = Tier(
     level=1,
     priority=10,
-    name="Daily Sources",
+    name="Daily — Rates, Treasury & Markets",
     sources=[
         SourceDef("treasury"),
         SourceDef("fred", {"category": "interest_rates"}),
@@ -66,7 +71,7 @@ TIER_1 = Tier(
 TIER_2 = Tier(
     level=2,
     priority=7,
-    name="Weekly Sources",
+    name="Weekly — Energy, Trade & Weather",
     sources=[
         SourceDef("eia", {"dataset": "petroleum_weekly", "subcategory": "consumption", "frequency": "weekly"}),
         SourceDef("cftc_cot", {"report_type": "all"}),
@@ -80,7 +85,7 @@ TIER_2 = Tier(
 TIER_3 = Tier(
     level=3,
     priority=5,
-    name="Monthly Sources",
+    name="Monthly — Employment, Healthcare & Regulatory",
     sources=[
         SourceDef("bea", {"dataset": "gdp", "table_name": "T10101"}),
         SourceDef("bls", {"dataset": "ces"}),
@@ -104,7 +109,7 @@ TIER_3 = Tier(
 TIER_4 = Tier(
     level=4,
     priority=3,
-    name="Quarterly Sources",
+    name="Quarterly — Census, SEC & Trade",
     sources=[
         SourceDef("census", {"survey": "acs5", "geo_level": "county"}),
         SourceDef("bea", {"dataset": "regional", "table_name": "SAGDP2N"}),
@@ -122,6 +127,9 @@ TIER_4 = Tier(
 
 TIERS = [TIER_1, TIER_2, TIER_3, TIER_4]
 
+# Lookup: tier level → Tier object
+TIER_BY_LEVEL = {t.level: t for t in TIERS}
+
 # Agentic sources use separate executor types (not in nightly tiers;
 # triggered on-demand via their own endpoints)
 AGENTIC_SOURCE_MAP = {
@@ -131,23 +139,54 @@ AGENTIC_SOURCE_MAP = {
 }
 
 
+def _get_source_display_name(source_key: str) -> str:
+    """Get human-readable display name for a source from the registry."""
+    try:
+        from app.core.source_registry import SOURCE_REGISTRY
+        base_key = source_key.split(":")[0]  # handle "job_postings:all" → "job_postings"
+        ctx = SOURCE_REGISTRY.get(base_key)
+        if ctx:
+            return ctx.display_name
+    except Exception:
+        pass
+    return source_key.replace("_", " ").title()
+
+
+def _get_source_description(source_key: str) -> str:
+    """Get brief description for a source from the registry."""
+    try:
+        from app.core.source_registry import SOURCE_REGISTRY
+        base_key = source_key.split(":")[0]
+        ctx = SOURCE_REGISTRY.get(base_key)
+        if ctx:
+            return ctx.description
+    except Exception:
+        pass
+    return ""
+
+
+def _generate_batch_run_id() -> str:
+    """Generate a unique batch_run_id string."""
+    return f"batch_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+
+
 # =============================================================================
 # Batch orchestrator
 # =============================================================================
 
 
-async def launch_nightly_batch(
+async def launch_batch_collection(
     db: Session,
     config: Optional[Dict] = None,
     tiers: Optional[List[int]] = None,
     sources: Optional[List[str]] = None,
-) -> NightlyBatch:
+) -> Dict:
     """
-    Launch a nightly batch collection.
+    Launch a batch collection.
 
     Creates an IngestionJob + JobQueue entry for each source in each tier.
-    All Tier 1-3 jobs run in parallel (bounded by worker slots and rate limits).
-    Tier 4 jobs get wait_for_tiers in payload so executors can defer.
+    Each job is tagged with a shared batch_run_id, trigger="batch", and tier.
+    No separate NightlyBatch record — status is computed live from jobs.
 
     Args:
         db: Database session
@@ -156,21 +195,17 @@ async def launch_nightly_batch(
         sources: Optional list of specific source keys to run
 
     Returns:
-        The NightlyBatch record
+        Dict with batch_run_id, total_jobs, and started_at
     """
     if not WORKER_MODE:
         raise RuntimeError(
-            "Nightly batch requires WORKER_MODE=1. "
+            "Batch collection requires WORKER_MODE=1. "
             "Set WORKER_MODE=1 in docker-compose.yml and start at least one worker."
         )
 
     config = config or {}
     skip_sources = set(config.get("skip_sources", []))
-
-    batch = NightlyBatch(config=config, status="running")
-    db.add(batch)
-    db.commit()
-    db.refresh(batch)
+    batch_run_id = _generate_batch_run_id()
 
     total = 0
     job_ids = []
@@ -186,32 +221,29 @@ async def launch_nightly_batch(
 
             # Determine job type — agentic sources use their own executor
             job_type = AGENTIC_SOURCE_MAP.get(source_def.key, "ingestion")
-            source_key = (
-                source_def.key
-                if source_def.key not in AGENTIC_SOURCE_MAP
-                else source_def.key
-            )
 
-            # Create the ingestion_jobs record
+            # Create the ingestion_jobs record with batch metadata
             ing_job = IngestionJob(
-                source=source_key,
+                source=source_def.key,
                 status=JobStatus.PENDING,
                 config=source_def.default_config,
+                batch_run_id=batch_run_id,
+                trigger="batch",
+                tier=tier.level,
             )
             db.add(ing_job)
             db.flush()  # get the ID
 
             # Build queue payload
             payload = {
-                "source": source_key,
+                "source": source_def.key,
                 "config": source_def.default_config,
                 "ingestion_job_id": ing_job.id,
-                "batch_id": batch.id,
+                "batch_id": batch_run_id,
                 "tier": tier.level,
             }
 
             # Agentic executors read config from top-level payload keys
-            # (e.g., PE reads payload["mode"], people reads payload["max_jobs"])
             if source_def.key in AGENTIC_SOURCE_MAP:
                 payload.update(source_def.default_config)
 
@@ -230,58 +262,67 @@ async def launch_nightly_batch(
             job_ids.append(ing_job.id)
             total += 1
 
-    batch.total_jobs = total
-    batch.job_ids = job_ids
     db.commit()
 
     logger.info(
-        f"Nightly batch {batch.id} launched: {total} jobs across "
+        f"Batch {batch_run_id} launched: {total} jobs across "
         f"{len(target_tiers)} tiers"
     )
 
-    return batch
+    return {
+        "batch_run_id": batch_run_id,
+        "total_jobs": total,
+        "job_ids": job_ids,
+        "started_at": datetime.utcnow().isoformat(),
+    }
 
 
-def get_batch_status(db: Session, batch_id: int) -> Optional[Dict]:
+def get_batch_run_status(db: Session, batch_run_id: str) -> Optional[Dict]:
     """
-    Get detailed status of a nightly batch.
+    Get detailed status of a batch run.
 
-    Returns per-tier progress, overall counts, and timing info.
+    Queries IngestionJob.batch_run_id directly — status is always live.
+    No NightlyBatch table needed. Nothing can get "stuck."
     """
-    batch = db.query(NightlyBatch).filter(NightlyBatch.id == batch_id).first()
-    if not batch:
+    jobs = (
+        db.query(IngestionJob)
+        .filter(IngestionJob.batch_run_id == batch_run_id)
+        .all()
+    )
+    if not jobs:
         return None
 
-    # Get all ingestion jobs for this batch
-    jobs = []
-    if batch.job_ids:
-        jobs = (
-            db.query(IngestionJob)
-            .filter(IngestionJob.id.in_(batch.job_ids))
-            .all()
-        )
-
     # Count by status
-    completed = sum(1 for j in jobs if j.status in (JobStatus.SUCCESS, JobStatus.FAILED))
     successful = sum(1 for j in jobs if j.status == JobStatus.SUCCESS)
     failed = sum(1 for j in jobs if j.status == JobStatus.FAILED)
     running = sum(1 for j in jobs if j.status == JobStatus.RUNNING)
     pending = sum(1 for j in jobs if j.status == JobStatus.PENDING)
+    completed = successful + failed
+    total = len(jobs)
+
+    # Derive overall status live from job statuses
+    if pending + running == 0 and total > 0:
+        if failed == 0:
+            status = "completed"
+        elif successful == 0:
+            status = "failed"
+        else:
+            status = "partial_success"
+    elif running > 0 or pending > 0:
+        status = "running"
+    else:
+        status = "completed"
 
     # Per-tier breakdown
-    from app.core.models_queue import JobQueue
-
     tier_status = {}
-    queue_jobs = (
-        db.query(JobQueue)
-        .filter(JobQueue.job_table_id.in_(batch.job_ids))
-        .all()
-    )
-    for qj in queue_jobs:
-        tier = (qj.payload or {}).get("tier", 0)
-        tier_key = f"tier_{tier}"
+    for j in jobs:
+        tier_level = j.tier or 0
+        tier_key = f"tier_{tier_level}"
         if tier_key not in tier_status:
+            tier_obj = TIER_BY_LEVEL.get(tier_level)
             tier_status[tier_key] = {
+                "name": tier_obj.name if tier_obj else f"Tier {tier_level}",
+                "sources": [s.key for s in tier_obj.sources] if tier_obj else [],
                 "total": 0,
                 "completed": 0,
                 "failed": 0,
@@ -289,86 +330,163 @@ def get_batch_status(db: Session, batch_id: int) -> Optional[Dict]:
                 "pending": 0,
             }
         tier_status[tier_key]["total"] += 1
-        status_val = qj.status.value if hasattr(qj.status, "value") else qj.status
-        if status_val == "success":
+        if j.status == JobStatus.SUCCESS:
             tier_status[tier_key]["completed"] += 1
-        elif status_val == "failed":
+        elif j.status == JobStatus.FAILED:
             tier_status[tier_key]["failed"] += 1
-        elif status_val == "running":
+        elif j.status == JobStatus.RUNNING:
             tier_status[tier_key]["running"] += 1
-        elif status_val in ("pending", "claimed"):
+        elif j.status == JobStatus.PENDING:
             tier_status[tier_key]["pending"] += 1
 
-    # Update batch record
-    batch.completed_jobs = completed
-    batch.failed_jobs = failed
-
-    if completed == batch.total_jobs and batch.total_jobs > 0:
-        if failed == 0:
-            batch.status = "completed"
-        elif successful == 0:
-            batch.status = "failed"
-        else:
-            batch.status = "partial_success"
-        batch.completed_at = datetime.utcnow()
-        db.commit()
-
+    # Timing
+    started_at = min((j.created_at for j in jobs), default=None)
+    completed_at = None
+    if status in ("completed", "failed", "partial_success"):
+        completed_at = max(
+            (j.completed_at for j in jobs if j.completed_at),
+            default=None,
+        )
     elapsed = None
-    if batch.started_at:
-        elapsed = (datetime.utcnow() - batch.started_at).total_seconds()
+    if started_at:
+        end = completed_at or datetime.utcnow()
+        elapsed = (end - started_at).total_seconds()
 
     # Job details
     job_details = []
     for j in jobs:
+        duration = None
+        if j.started_at and j.completed_at:
+            duration = round((j.completed_at - j.started_at).total_seconds(), 1)
         job_details.append({
             "job_id": j.id,
             "source": j.source,
+            "display_name": _get_source_display_name(j.source),
+            "tier": j.tier or 0,
+            "description": _get_source_description(j.source),
             "status": j.status.value if hasattr(j.status, "value") else j.status,
             "rows_inserted": j.rows_inserted,
             "error_message": j.error_message[:200] if j.error_message else None,
             "started_at": j.started_at.isoformat() if j.started_at else None,
             "completed_at": j.completed_at.isoformat() if j.completed_at else None,
+            "duration_seconds": duration,
         })
 
     return {
-        "batch_id": batch.id,
-        "status": batch.status,
-        "total_jobs": batch.total_jobs,
+        "batch_run_id": batch_run_id,
+        "status": status,
+        "total_jobs": total,
         "completed_jobs": completed,
         "successful_jobs": successful,
         "failed_jobs": failed,
         "running_jobs": running,
         "pending_jobs": pending,
         "elapsed_seconds": round(elapsed, 1) if elapsed else None,
-        "started_at": batch.started_at.isoformat() if batch.started_at else None,
-        "completed_at": batch.completed_at.isoformat() if batch.completed_at else None,
+        "started_at": started_at.isoformat() if started_at else None,
+        "completed_at": completed_at.isoformat() if completed_at else None,
         "tier_status": tier_status,
         "jobs": job_details,
-        "config": batch.config,
     }
+
+
+def list_batch_runs(
+    db: Session, limit: int = 20, status: Optional[str] = None
+) -> List[Dict]:
+    """
+    List recent batch runs by querying IngestionJob.batch_run_id.
+
+    Groups by batch_run_id with aggregate counts. Status is always
+    computed live — nothing can get "stuck."
+    """
+    # Aggregate query: GROUP BY batch_run_id
+    query = (
+        db.query(
+            IngestionJob.batch_run_id,
+            func.count().label("total_jobs"),
+            func.sum(case((IngestionJob.status == JobStatus.SUCCESS, 1), else_=0)).label("successful"),
+            func.sum(case((IngestionJob.status == JobStatus.FAILED, 1), else_=0)).label("failed"),
+            func.sum(case((IngestionJob.status == JobStatus.RUNNING, 1), else_=0)).label("running"),
+            func.sum(case((IngestionJob.status == JobStatus.PENDING, 1), else_=0)).label("pending"),
+            func.min(IngestionJob.created_at).label("started_at"),
+            func.max(IngestionJob.completed_at).label("completed_at"),
+        )
+        .filter(IngestionJob.batch_run_id.isnot(None))
+        .group_by(IngestionJob.batch_run_id)
+        .order_by(func.min(IngestionJob.created_at).desc())
+        .limit(limit)
+    )
+
+    results = []
+    for row in query.all():
+        total = row.total_jobs
+        successful = row.successful or 0
+        failed = row.failed or 0
+        running_count = row.running or 0
+        pending_count = row.pending or 0
+        completed = successful + failed
+
+        # Derive status live
+        if pending_count + running_count == 0 and total > 0:
+            if failed == 0:
+                batch_status = "completed"
+            elif successful == 0:
+                batch_status = "failed"
+            else:
+                batch_status = "partial_success"
+        elif running_count > 0 or pending_count > 0:
+            batch_status = "running"
+        else:
+            batch_status = "completed"
+
+        # Filter by status if requested
+        if status and batch_status != status:
+            continue
+
+        results.append({
+            "batch_run_id": row.batch_run_id,
+            "status": batch_status,
+            "total_jobs": total,
+            "completed_jobs": completed,
+            "successful_jobs": successful,
+            "failed_jobs": failed,
+            "running_jobs": running_count,
+            "pending_jobs": pending_count,
+            "started_at": row.started_at.isoformat() if row.started_at else None,
+            "completed_at": row.completed_at.isoformat() if row.completed_at else None,
+        })
+
+    return results
+
+
+# =============================================================================
+# Legacy wrappers (deprecated — use launch_batch_collection / get_batch_run_status)
+# =============================================================================
+
+
+async def launch_nightly_batch(
+    db: Session,
+    config: Optional[Dict] = None,
+    tiers: Optional[List[int]] = None,
+    sources: Optional[List[str]] = None,
+) -> Dict:
+    """Deprecated: wraps launch_batch_collection for backwards compatibility."""
+    return await launch_batch_collection(db, config=config, tiers=tiers, sources=sources)
+
+
+def get_batch_status(db: Session, batch_id) -> Optional[Dict]:
+    """Deprecated: wraps get_batch_run_status for backwards compatibility."""
+    # Handle both legacy int IDs and new string batch_run_ids
+    batch_run_id = str(batch_id)
+    if batch_run_id.isdigit():
+        batch_run_id = f"legacy_batch_{batch_run_id}"
+    return get_batch_run_status(db, batch_run_id)
 
 
 def list_batches(
     db: Session, limit: int = 20, status: Optional[str] = None
 ) -> List[Dict]:
-    """List recent nightly batches."""
-    query = db.query(NightlyBatch).order_by(NightlyBatch.started_at.desc())
-    if status:
-        query = query.filter(NightlyBatch.status == status)
-    batches = query.limit(limit).all()
-
-    return [
-        {
-            "batch_id": b.id,
-            "status": b.status,
-            "total_jobs": b.total_jobs,
-            "completed_jobs": b.completed_jobs,
-            "failed_jobs": b.failed_jobs,
-            "started_at": b.started_at.isoformat() if b.started_at else None,
-            "completed_at": b.completed_at.isoformat() if b.completed_at else None,
-        }
-        for b in batches
-    ]
+    """Deprecated: wraps list_batch_runs for backwards compatibility."""
+    return list_batch_runs(db, limit=limit, status=status)
 
 
 async def scheduled_nightly_batch():
@@ -383,13 +501,13 @@ async def scheduled_nightly_batch():
     db = SessionLocal()
 
     try:
-        logger.info("Scheduled nightly batch starting...")
-        batch = await launch_nightly_batch(db)
+        logger.info("Scheduled batch collection starting...")
+        result = await launch_batch_collection(db)
         logger.info(
-            f"Scheduled nightly batch {batch.id} launched: "
-            f"{batch.total_jobs} jobs"
+            f"Scheduled batch {result['batch_run_id']} launched: "
+            f"{result['total_jobs']} jobs"
         )
     except Exception as e:
-        logger.error(f"Scheduled nightly batch failed: {e}", exc_info=True)
+        logger.error(f"Scheduled batch collection failed: {e}", exc_info=True)
     finally:
         db.close()

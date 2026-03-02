@@ -209,12 +209,14 @@ async def get_job_history(
     db: Session = Depends(get_db),
 ):
     """
-    Unified paginated job history from both job_queue and ingestion_jobs tables.
+    Unified paginated job history.
 
-    Returns jobs sorted by created_at desc with computed duration_seconds
-    and summary counts by status.
+    Deduplicates ingestion-type queue jobs that have a linked ingestion_jobs
+    record — the ingestion_jobs row is the canonical record and gets enriched
+    with worker/progress info from the queue row.  Non-ingestion queue jobs
+    (site_intel, people, pe, etc.) appear as their own rows.
     """
-    # --- Build queue jobs list ---
+    # --- Load queue jobs ---
     q_query = db.query(JobQueue)
     if status:
         q_query = q_query.filter(JobQueue.status == status)
@@ -222,46 +224,61 @@ async def get_job_history(
         q_query = q_query.filter(JobQueue.job_type == job_type)
     queue_jobs = q_query.order_by(JobQueue.created_at.desc()).all()
 
-    queue_dicts = [
-        {
-            "id": j.id,
-            "table": "job_queue",
-            "job_type": _enum_val(j.job_type),
-            "status": _enum_val(j.status),
-            "worker_id": j.worker_id,
-            "progress_pct": j.progress_pct,
-            "progress_message": j.progress_message,
-            "payload": j.payload or {},
-            "rows_inserted": None,
-            "error_message": j.error_message,
-            "created_at": j.created_at.isoformat() if j.created_at else None,
-            "started_at": j.started_at.isoformat() if j.started_at else None,
-            "completed_at": j.completed_at.isoformat() if j.completed_at else None,
-            "duration_seconds": _duration(j.started_at, j.completed_at),
-            "_sort_key": j.created_at,
-        }
-        for j in queue_jobs
-    ]
+    # Build lookup: ingestion_job_id → queue job (for merging)
+    queue_by_ingest_id = {}
+    standalone_queue = []
+    for j in queue_jobs:
+        jt = _enum_val(j.job_type)
+        linked_id = j.job_table_id
+        if jt == "ingestion" and linked_id:
+            # This queue row wraps an ingestion_jobs row — merge later
+            queue_by_ingest_id[linked_id] = j
+        else:
+            # Non-ingestion queue job (site_intel, people, etc.)
+            source_name = (j.payload or {}).get("source", jt)
+            standalone_queue.append({
+                "id": j.id,
+                "table": "job_queue",
+                "job_type": source_name,
+                "status": _enum_val(j.status),
+                "worker_id": j.worker_id,
+                "progress_pct": j.progress_pct,
+                "progress_message": j.progress_message,
+                "payload": j.payload or {},
+                "rows_inserted": None,
+                "error_message": j.error_message,
+                "created_at": j.created_at.isoformat() if j.created_at else None,
+                "started_at": j.started_at.isoformat() if j.started_at else None,
+                "completed_at": j.completed_at.isoformat() if j.completed_at else None,
+                "duration_seconds": _duration(j.started_at, j.completed_at),
+                "can_retry": _enum_val(j.status) == "failed",
+                "can_restart": _enum_val(j.status) in ("failed", "success"),
+                "can_cancel": _enum_val(j.status) in ("running", "pending", "claimed"),
+                "_sort_key": j.created_at,
+            })
 
-    # --- Build ingestion jobs list ---
-    # Map ingestion statuses to the same filter values
+    # --- Load ingestion jobs ---
     i_query = db.query(IngestionJob)
     if status:
         i_query = i_query.filter(IngestionJob.status == status)
     if job_type:
-        # job_type filter: for ingestion jobs, match against source column
         i_query = i_query.filter(IngestionJob.source == job_type)
     ingest_jobs = i_query.order_by(IngestionJob.created_at.desc()).all()
 
-    ingest_dicts = [
-        {
+    ingest_dicts = []
+    for j in ingest_jobs:
+        # Merge queue info if available
+        qj = queue_by_ingest_id.get(j.id)
+        ing_status = _enum_val(j.status)
+        ingest_dicts.append({
             "id": j.id,
             "table": "ingestion_jobs",
             "job_type": j.source,
-            "status": _enum_val(j.status),
-            "worker_id": None,
-            "progress_pct": 100.0 if _enum_val(j.status) == "success" else None,
-            "progress_message": None,
+            "status": ing_status,
+            "worker_id": qj.worker_id if qj else None,
+            "progress_pct": (qj.progress_pct if qj else None)
+                or (100.0 if ing_status == "success" else None),
+            "progress_message": qj.progress_message if qj else None,
             "payload": j.config or {},
             "rows_inserted": j.rows_inserted,
             "error_message": j.error_message,
@@ -269,13 +286,16 @@ async def get_job_history(
             "started_at": j.started_at.isoformat() if j.started_at else None,
             "completed_at": j.completed_at.isoformat() if j.completed_at else None,
             "duration_seconds": _duration(j.started_at, j.completed_at),
+            "retry_count": j.retry_count or 0,
+            "max_retries": j.max_retries or 3,
+            "can_retry": ing_status == "failed" and (j.retry_count or 0) < (j.max_retries or 3),
+            "can_restart": ing_status in ("failed", "success"),
+            "can_cancel": ing_status in ("running", "pending"),
             "_sort_key": j.created_at,
-        }
-        for j in ingest_jobs
-    ]
+        })
 
     # --- Merge and sort ---
-    all_jobs = queue_dicts + ingest_dicts
+    all_jobs = standalone_queue + ingest_dicts
     from datetime import datetime as _dt
 
     _epoch = _dt(1970, 1, 1)

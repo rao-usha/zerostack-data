@@ -164,10 +164,15 @@ class JobEvent(Base):
 
 class NightlyBatch(Base):
     """
-    Tracks a nightly batch collection run.
+    DEPRECATED: Batch tracking has moved to IngestionJob.batch_run_id.
 
-    Each batch enqueues jobs for all configured sources with tier-based
-    priority and dependency ordering.
+    This table is kept for backwards compatibility and data migration.
+    New batch runs use IngestionJob.batch_run_id (string) instead of
+    creating NightlyBatch records. Status is computed live from job
+    statuses — nothing can get "stuck."
+
+    Do NOT create new NightlyBatch records. Use launch_batch_collection()
+    from nightly_batch_service.py instead.
     """
 
     __tablename__ = "nightly_batch"

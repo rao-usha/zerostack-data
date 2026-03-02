@@ -93,6 +93,11 @@ class IngestionJob(Base):
         Integer, nullable=True, index=True
     )  # Link to original job if this is a retry
 
+    # Batch metadata — groups jobs by batch run without a separate tracking table
+    batch_run_id = Column(String(50), nullable=True, index=True)  # e.g. "batch_20260301_143022"
+    trigger = Column(String(20), nullable=True)  # "batch", "manual", "scheduled"
+    tier = Column(Integer, nullable=True)  # 1-4 for batch jobs, NULL for manual
+
     def __repr__(self) -> str:
         return (
             f"<IngestionJob(id={self.id}, source={self.source}, "

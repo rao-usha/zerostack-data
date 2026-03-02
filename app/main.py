@@ -203,6 +203,60 @@ async def lifespan(app: FastAPI):
             logger.error(f"Fallback create_tables also failed: {e2}")
             raise
 
+    # --- Batch metadata columns on ingestion_jobs ---
+    try:
+        from app.core.database import get_engine
+        from sqlalchemy import text as sa_text
+
+        engine = get_engine()
+        with engine.begin() as conn:
+            # Add new columns (idempotent)
+            conn.execute(sa_text(
+                "ALTER TABLE ingestion_jobs ADD COLUMN IF NOT EXISTS "
+                "batch_run_id VARCHAR(50)"
+            ))
+            conn.execute(sa_text(
+                "ALTER TABLE ingestion_jobs ADD COLUMN IF NOT EXISTS "
+                "trigger VARCHAR(20)"
+            ))
+            conn.execute(sa_text(
+                "ALTER TABLE ingestion_jobs ADD COLUMN IF NOT EXISTS "
+                "tier INTEGER"
+            ))
+
+            # Partial index on batch_run_id (only non-null rows)
+            conn.execute(sa_text("""
+                CREATE INDEX IF NOT EXISTS ix_ingestion_jobs_batch_run_id
+                ON ingestion_jobs (batch_run_id)
+                WHERE batch_run_id IS NOT NULL
+            """))
+
+            # Backfill from legacy NightlyBatch records
+            conn.execute(sa_text("""
+                UPDATE ingestion_jobs
+                SET batch_run_id = 'legacy_batch_' || nb.id::text,
+                    trigger = 'batch'
+                FROM nightly_batch nb
+                WHERE ingestion_jobs.id = ANY(
+                    SELECT jsonb_array_elements_text(nb.job_ids::jsonb)::int
+                )
+                AND ingestion_jobs.batch_run_id IS NULL
+            """))
+
+            # Auto-resolve stale RUNNING jobs (>2 hours old)
+            conn.execute(sa_text("""
+                UPDATE ingestion_jobs
+                SET status = 'failed',
+                    error_message = 'Stale job auto-resolved on startup',
+                    completed_at = NOW()
+                WHERE status = 'running'
+                AND started_at < NOW() - INTERVAL '2 hours'
+            """))
+
+        logger.info("Batch metadata columns + backfill applied to ingestion_jobs")
+    except Exception as e:
+        logger.warning(f"Batch metadata migration skipped: {e}")
+
     # Start scheduler (optional - can be started manually via API)
     try:
         from app.core import scheduler_service

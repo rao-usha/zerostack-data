@@ -53,6 +53,11 @@ class JobResponse(BaseModel):
     parent_job_id: Optional[int] = None
     can_retry: bool = False
 
+    # Batch metadata
+    batch_run_id: Optional[str] = None
+    trigger: Optional[str] = None
+    tier: Optional[int] = None
+
     model_config = {"from_attributes": True}
 
 
