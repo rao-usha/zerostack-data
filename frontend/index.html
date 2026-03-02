@@ -878,13 +878,13 @@
                 <div id="jobs-active-list"></div>
             </div>
 
-            <!-- Section 2.5: Nightly Batch -->
+            <!-- Section 2.5: Batch Collection -->
             <div class="card jobs-section" id="nightly-batch-card">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
-                    <h2 class="card-title" style="margin:0;">🌙 Nightly Batch</h2>
+                    <h2 class="card-title" style="margin:0;">Batch Collection</h2>
                     <div style="display:flex;gap:0.5rem;">
                         <button class="btn btn-secondary" onclick="nightlyRefresh()" style="padding:0.35rem 0.75rem;font-size:0.8rem;">Refresh</button>
-                        <button class="btn" onclick="nightlyLaunch()" id="nightly-launch-btn" style="padding:0.35rem 0.75rem;font-size:0.8rem;">Launch Batch</button>
+                        <button class="btn" onclick="nightlyLaunch()" id="nightly-launch-btn" style="padding:0.35rem 0.75rem;font-size:0.8rem;">Run Collection</button>
                     </div>
                 </div>
                 <div id="nightly-status"></div>
@@ -6190,7 +6190,7 @@
         }
 
         // ==================================================================
-        // Nightly Batch Dashboard
+        // Batch Collection Dashboard
         // ==================================================================
         let _nightlyBatchId = null;
         let _nightlyPollTimer = null;
@@ -6204,10 +6204,10 @@
                 if (!resp.ok) { showToast('Launch failed: ' + resp.status, 'error'); return; }
                 const data = await resp.json();
                 _nightlyBatchId = data.batch_id;
-                showToast(`Nightly batch #${data.batch_id} launched (${data.total_jobs} jobs)`, 'success');
+                showToast(`Batch #${data.batch_id} launched (${data.total_jobs} jobs)`, 'success');
                 nightlyStartPolling();
             } catch (err) { showToast('Launch error: ' + err.message, 'error'); }
-            finally { btn.disabled = false; btn.textContent = 'Launch Batch'; }
+            finally { btn.disabled = false; btn.textContent = 'Run Collection'; }
         }
 
         function nightlyStartPolling() {
@@ -6253,37 +6253,90 @@
             const el = document.getElementById('nightly-status');
             const statusColors = { running: '#f0ad4e', completed: '#5cb85c', failed: '#d9534f', partial_success: '#f0ad4e' };
             const elapsed = data.elapsed_seconds ? `${Math.round(data.elapsed_seconds / 60)}m ${Math.round(data.elapsed_seconds % 60)}s` : '—';
+            const finished = data.successful_jobs + data.failed_jobs;
+            const pct = data.total_jobs ? Math.min(Math.round((finished / data.total_jobs) * 100), 100) : 0;
             el.innerHTML = `
                 <div style="display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.5rem;">
                     <div><span style="color:var(--text-muted);font-size:0.8rem;">Batch</span><br><strong>#${data.batch_id}</strong></div>
-                    <div><span style="color:var(--text-muted);font-size:0.8rem;">Status</span><br><span style="color:${statusColors[data.status] || 'inherit'};font-weight:600;">${data.status.toUpperCase()}</span></div>
-                    <div><span style="color:var(--text-muted);font-size:0.8rem;">Progress</span><br><strong>${data.completed_jobs + data.failed_jobs}/${data.total_jobs}</strong></div>
+                    <div><span style="color:var(--text-muted);font-size:0.8rem;">Status</span><br><span style="color:${statusColors[data.status] || 'inherit'};font-weight:600;">${data.status.replace('_', ' ').toUpperCase()}</span></div>
+                    <div><span style="color:var(--text-muted);font-size:0.8rem;">Jobs Finished</span><br><strong>${finished}/${data.total_jobs}</strong></div>
                     <div><span style="color:var(--text-muted);font-size:0.8rem;">Success</span><br><span style="color:#5cb85c;font-weight:600;">${data.successful_jobs}</span></div>
                     <div><span style="color:var(--text-muted);font-size:0.8rem;">Failed</span><br><span style="color:${data.failed_jobs > 0 ? '#d9534f' : 'inherit'};font-weight:600;">${data.failed_jobs}</span></div>
                     <div><span style="color:var(--text-muted);font-size:0.8rem;">Running</span><br><strong>${data.running_jobs}</strong></div>
                     <div><span style="color:var(--text-muted);font-size:0.8rem;">Elapsed</span><br><strong>${elapsed}</strong></div>
                 </div>
                 <div style="background:var(--bg-card);border-radius:4px;height:8px;overflow:hidden;margin-top:0.25rem;">
-                    <div style="height:100%;width:${data.total_jobs ? Math.round(((data.completed_jobs + data.failed_jobs) / data.total_jobs) * 100) : 0}%;background:linear-gradient(90deg,#5cb85c,#4cae4c);transition:width 0.3s;"></div>
+                    <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#5cb85c,#4cae4c);transition:width 0.3s;"></div>
                 </div>`;
         }
 
         function nightlyRenderTiers(data) {
             const el = document.getElementById('nightly-tiers');
             if (!data.tier_status || Object.keys(data.tier_status).length === 0) { el.innerHTML = ''; return; }
-            const tierNames = { tier_1: 'Tier 1 — Fast Gov APIs', tier_2: 'Tier 2 — Medium APIs', tier_3: 'Tier 3 — Complex/SEC', tier_4: 'Tier 4 — Agentic/LLM' };
-            let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.75rem;margin-top:0.75rem;">';
+
+            // Group jobs by tier for the detail table
+            const jobsByTier = {};
+            if (data.jobs) {
+                for (const j of data.jobs) {
+                    const tk = `tier_${j.tier || 0}`;
+                    if (!jobsByTier[tk]) jobsByTier[tk] = [];
+                    jobsByTier[tk].push(j);
+                }
+            }
+
+            let html = '<div style="display:flex;flex-direction:column;gap:0.75rem;margin-top:0.75rem;">';
             for (const [key, t] of Object.entries(data.tier_status).sort()) {
                 const done = t.completed + t.failed;
-                const pct = t.total ? Math.round((done / t.total) * 100) : 0;
+                const pct = t.total ? Math.min(Math.round((done / t.total) * 100), 100) : 0;
                 const status = done === t.total ? (t.failed === 0 ? '✅' : '⚠️') : (t.running > 0 ? '🔄' : '⏳');
+                const tierName = t.name || key;
+                const failBadge = t.failed > 0 ? ` <span style="color:#d9534f;font-size:0.8rem;">(${t.failed} failed)</span>` : '';
+                const cardId = `tier-detail-${key}`;
+
                 html += `<div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:8px;padding:0.75rem;">
-                    <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.25rem;">${status} ${tierNames[key] || key}</div>
-                    <div style="font-weight:600;margin-bottom:0.35rem;">${done}/${t.total} <span style="color:var(--text-muted);font-weight:400;font-size:0.8rem;">(${t.running} running)</span></div>
-                    <div style="background:var(--bg-body);border-radius:3px;height:6px;overflow:hidden;">
+                    <div style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;" onclick="document.getElementById('${cardId}').style.display = document.getElementById('${cardId}').style.display === 'none' ? 'block' : 'none';">
+                        <div>
+                            <span style="font-size:0.8rem;color:var(--text-muted);">${status}</span>
+                            <span style="font-weight:600;margin-left:0.25rem;">${tierName}</span>
+                            <span style="color:var(--text-muted);font-size:0.85rem;margin-left:0.75rem;">${done}/${t.total}${failBadge}</span>
+                        </div>
+                        <span style="color:var(--text-muted);font-size:0.7rem;">&#9660; detail</span>
+                    </div>
+                    <div style="background:var(--bg-body);border-radius:3px;height:6px;overflow:hidden;margin-top:0.5rem;">
                         <div style="height:100%;width:${pct}%;background:${t.failed > 0 ? '#f0ad4e' : '#5cb85c'};transition:width 0.3s;"></div>
                     </div>
-                </div>`;
+                    <div id="${cardId}" style="display:none;margin-top:0.5rem;">`;
+
+                // Render per-source job table
+                const tierJobs = jobsByTier[key] || [];
+                if (tierJobs.length > 0) {
+                    html += `<table style="width:100%;font-size:0.8rem;border-collapse:collapse;">
+                        <thead><tr style="color:var(--text-muted);text-align:left;">
+                            <th style="padding:0.3rem 0.5rem;">Source</th>
+                            <th style="padding:0.3rem 0.5rem;">Status</th>
+                            <th style="padding:0.3rem 0.5rem;">Rows</th>
+                            <th style="padding:0.3rem 0.5rem;">Time</th>
+                            <th style="padding:0.3rem 0.5rem;">Detail</th>
+                        </tr></thead><tbody>`;
+                    for (const j of tierJobs) {
+                        const sc = { success: '#5cb85c', failed: '#d9534f', running: '#f0ad4e', pending: '#888' };
+                        const dur = j.duration_seconds != null ? `${j.duration_seconds}s` : '—';
+                        const rows = j.status === 'success' ? (j.rows_inserted != null ? j.rows_inserted.toLocaleString() : '—') : '—';
+                        const detail = j.status === 'failed' && j.error_message ? `<span style="color:#d9534f;">${j.error_message.substring(0, 80)}</span>` : '';
+                        html += `<tr style="border-top:1px solid var(--border-subtle);">
+                            <td style="padding:0.3rem 0.5rem;font-weight:500;" title="${j.description || ''}">${j.display_name || j.source}</td>
+                            <td style="padding:0.3rem 0.5rem;color:${sc[j.status] || 'inherit'};font-weight:600;">${j.status}</td>
+                            <td style="padding:0.3rem 0.5rem;">${rows}</td>
+                            <td style="padding:0.3rem 0.5rem;">${dur}</td>
+                            <td style="padding:0.3rem 0.5rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${detail}</td>
+                        </tr>`;
+                    }
+                    html += '</tbody></table>';
+                } else {
+                    html += '<div style="color:var(--text-muted);font-size:0.8rem;padding:0.25rem;">No jobs in this tier</div>';
+                }
+
+                html += '</div></div>';
             }
             html += '</div>';
             el.innerHTML = html;
@@ -6292,10 +6345,10 @@
         function nightlyRenderHistory(batches) {
             const el = document.getElementById('nightly-history');
             if (!batches || batches.length === 0) {
-                el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No batch runs yet. Click "Launch Batch" to start.</div>';
+                el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No collections yet. Click "Run Collection" to start.</div>';
                 return;
             }
-            let html = '<div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.35rem;">Recent Batches</div>';
+            let html = '<div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.35rem;">Collection History</div>';
             html += '<div style="display:flex;flex-direction:column;gap:0.35rem;">';
             for (const b of batches) {
                 const colors = { completed: '#5cb85c', failed: '#d9534f', running: '#f0ad4e', partial_success: '#f0ad4e' };

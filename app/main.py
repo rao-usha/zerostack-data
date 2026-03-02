@@ -124,6 +124,7 @@ from app.api.v1 import (
     zip_scores,
     medspa_discovery,
     deal_models,
+    sources,
 )
 
 # Job Queue Streaming & Monitor
@@ -887,6 +888,8 @@ Browse the endpoint sections below to see what's available:
         {"name": "workspaces", "description": "👥 **Workspaces** - Team collaboration spaces with member management and role-based access"},
         {"name": "API Keys", "description": "🔑 **API Key Management** - Create, list, update, and revoke API keys for public API access"},
         {"name": "Public API", "description": "🌐 **Public API** - Protected endpoints for external developers with API key authentication and rate limiting"},
+        # ── Source Directory ──────────────────────────────────────────────
+        {"name": "sources", "description": "📚 **Source Directory** — Overview and status for all data sources"},
         # ── Government / Economic Data ─────────────────────────────────
         {"name": "census-batch", "description": "📊 **U.S. Census Bureau - Batch** - Bulk census data ingestion"},
         {"name": "census-geography", "description": "📊 **U.S. Census Bureau - Geography** - Geographic hierarchy and FIPS codes"},
@@ -1058,6 +1061,7 @@ app.include_router(job_stream.router, prefix="/api/v1")  # SSE streaming
 app.include_router(jobs_monitor.router, prefix="/api/v1", dependencies=_auth)  # Jobs dashboard
 
 # Protected routers
+app.include_router(sources.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(jobs.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(census_geo.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(census_batch.router, prefix="/api/v1", dependencies=_auth)
