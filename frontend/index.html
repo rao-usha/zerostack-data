@@ -3468,8 +3468,8 @@
             }
             html += `</div>`;
 
-            // ---- Alerts ----
-            const importantAlerts = (alerts || []).filter(a => a.severity === 'critical' || a.severity === 'warning');
+            // ---- Alerts (exclude stuck_job — those belong on the Jobs page) ----
+            const importantAlerts = (alerts || []).filter(a => (a.severity === 'critical' || a.severity === 'warning') && a.alert_type !== 'stuck_job');
             if (importantAlerts.length > 0) {
                 html += '<div class="ds-alerts">';
                 importantAlerts.forEach(a => {
@@ -5354,6 +5354,21 @@
                     sourceMetadataMap = {};
                     for (const s of sourcesRes.sources) {
                         sourceMetadataMap[s.key] = s;
+                    }
+                    // Aliases: frontend keys that differ from backend keys
+                    const aliases = {
+                        app_store: 'app_rankings',
+                        bts_transport: 'bts',
+                        corporate_registry: 'opencorporates',
+                        international_econ_worldbank: 'international_econ',
+                        international_econ_imf: 'international_econ',
+                        international_econ_oecd: 'international_econ',
+                        international_econ_bis: 'international_econ',
+                    };
+                    for (const [feKey, beKey] of Object.entries(aliases)) {
+                        if (sourceMetadataMap[beKey] && !sourceMetadataMap[feKey]) {
+                            sourceMetadataMap[feKey] = sourceMetadataMap[beKey];
+                        }
                     }
                 }
             } catch (e) { console.error('Phase 1 load error:', e); }
