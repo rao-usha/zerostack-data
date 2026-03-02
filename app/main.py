@@ -373,24 +373,23 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Failed to register stale job recovery: {e}")
 
-        # Nightly batch collection DISABLED — run manually via POST endpoints
-        # To re-enable: uncomment the block below
-        # try:
-        #     from app.core.nightly_batch_service import scheduled_nightly_batch
-        #     from app.core.scheduler_service import get_scheduler
-        #     from apscheduler.triggers.cron import CronTrigger
-        #
-        #     sched = get_scheduler()
-        #     sched.add_job(
-        #         scheduled_nightly_batch,
-        #         trigger=CronTrigger(hour=2, minute=0),
-        #         id="nightly_batch",
-        #         name="Nightly Collection Batch",
-        #         replace_existing=True,
-        #     )
-        #     logger.info("Nightly batch collection registered (2:00 AM UTC)")
-        # except Exception as e:
-        #     logger.warning(f"Failed to register nightly batch: {e}")
+        # Automatic batch collection — runs daily at 2:00 AM UTC
+        try:
+            from app.core.nightly_batch_service import scheduled_nightly_batch
+            from app.core.scheduler_service import get_scheduler
+            from apscheduler.triggers.cron import CronTrigger
+
+            sched = get_scheduler()
+            sched.add_job(
+                scheduled_nightly_batch,
+                trigger=CronTrigger(hour=2, minute=0),
+                id="nightly_batch",
+                name="Nightly Collection Batch",
+                replace_existing=True,
+            )
+            logger.info("Nightly batch collection registered (2:00 AM UTC)")
+        except Exception as e:
+            logger.warning(f"Failed to register nightly batch: {e}")
 
     except Exception as e:
         logger.warning(f"Failed to start scheduler: {e}")

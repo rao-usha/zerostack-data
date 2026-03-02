@@ -136,22 +136,49 @@ def claim_job(db: Session) -> Optional[JobQueue]:
     return job
 
 
+class JobCancelledError(Exception):
+    """Raised when a job is detected as cancelled mid-execution."""
+    pass
+
+
 async def _heartbeat_loop(db_factory, job_id: int):
-    """Periodically update heartbeat_at while a job is executing."""
+    """
+    Periodically update heartbeat_at while a job is executing.
+
+    Also checks if the job has been cancelled (status set to FAILED with
+    'Cancelled by user' error). If so, raises JobCancelledError to stop
+    the executor.
+    """
     SessionLocal = db_factory
     while True:
         await asyncio.sleep(HEARTBEAT_INTERVAL)
         session = SessionLocal()
         try:
+            # Check if job was cancelled
+            result = session.execute(
+                text("SELECT status, error_message FROM job_queue WHERE id = :id"),
+                {"id": job_id},
+            )
+            row = result.fetchone()
+            if row and row[0] == QueueJobStatus.FAILED.name and row[1] and "Cancelled" in row[1]:
+                logger.info(f"Job {job_id} was cancelled — stopping execution")
+                session.close()
+                raise JobCancelledError(f"Job {job_id} cancelled by user")
+
             session.execute(
                 text("UPDATE job_queue SET heartbeat_at = NOW() WHERE id = :id"),
                 {"id": job_id},
             )
             session.commit()
+        except JobCancelledError:
+            raise
         except Exception:
             session.rollback()
         finally:
-            session.close()
+            try:
+                session.close()
+            except Exception:
+                pass
 
 
 async def _wait_for_tier_completion(
@@ -252,12 +279,32 @@ async def execute_job(job: JobQueue, db: Session):
         db.commit()
         await _wait_for_tier_completion(db, batch_id, wait_for_tiers, job)
 
-    # Start heartbeat
+    # Start heartbeat (also monitors for cancellation)
     SessionLocal = get_session_factory()
     heartbeat_task = asyncio.create_task(_heartbeat_loop(SessionLocal, job.id))
+    executor_task = asyncio.create_task(executor(job, db))
 
     try:
-        await executor(job, db)
+        # Wait for either the executor to finish or the heartbeat to detect cancellation
+        done, pending = await asyncio.wait(
+            {executor_task, heartbeat_task},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+
+        # Check if heartbeat detected cancellation
+        if heartbeat_task in done:
+            heartbeat_exc = heartbeat_task.exception()
+            if isinstance(heartbeat_exc, JobCancelledError):
+                # Cancel the executor
+                executor_task.cancel()
+                try:
+                    await executor_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+                raise heartbeat_exc
+
+        # Executor finished — get its result (may raise)
+        executor_task.result()
 
         # Mark success
         job.status = QueueJobStatus.SUCCESS
@@ -280,6 +327,34 @@ async def execute_job(job: JobQueue, db: Session):
         db.commit()
 
         logger.info(f"Job {job.id} ({job.job_type}) completed successfully")
+
+    except JobCancelledError:
+        logger.info(f"Job {job.id} ({job.job_type}) cancelled by user")
+
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+        job = db.get(JobQueue, job.id)
+        if job.status != QueueJobStatus.FAILED:
+            job.status = QueueJobStatus.FAILED
+            job.error_message = "Cancelled by user"
+            job.completed_at = datetime.utcnow()
+        db.commit()
+
+        send_job_event(
+            db,
+            "job_cancelled",
+            {
+                "job_id": job.id,
+                "job_type": job.job_type
+                if isinstance(job.job_type, str)
+                else job.job_type.value,
+                "worker_id": WORKER_ID,
+            },
+        )
+        db.commit()
 
     except Exception as e:
         logger.error(f"Job {job.id} ({job.job_type}) failed: {e}", exc_info=True)
@@ -311,11 +386,14 @@ async def execute_job(job: JobQueue, db: Session):
         db.commit()
 
     finally:
-        heartbeat_task.cancel()
-        try:
-            await heartbeat_task
-        except asyncio.CancelledError:
-            pass
+        # Clean up whichever task is still running
+        for t in (heartbeat_task, executor_task):
+            if not t.done():
+                t.cancel()
+                try:
+                    await t
+                except (asyncio.CancelledError, Exception):
+                    pass
 
 
 async def _run_slot(semaphore: asyncio.Semaphore, job: JobQueue, db: Session):

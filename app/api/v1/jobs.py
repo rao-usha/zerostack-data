@@ -1351,6 +1351,15 @@ async def cancel_job(
     job.status = JobStatus.FAILED
     job.error_message = "Cancelled by user"
     job.completed_at = datetime.utcnow()
+
+    # Also mark the job_queue row so the worker sees the cancellation
+    from app.core.models_queue import JobQueue, QueueJobStatus
+    queue_row = db.query(JobQueue).filter(JobQueue.job_table_id == job_id).first()
+    if queue_row and queue_row.status in (QueueJobStatus.PENDING, QueueJobStatus.CLAIMED, QueueJobStatus.RUNNING):
+        queue_row.status = QueueJobStatus.FAILED
+        queue_row.error_message = "Cancelled by user"
+        queue_row.completed_at = datetime.utcnow()
+
     db.commit()
     db.refresh(job)
 
