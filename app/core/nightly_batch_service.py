@@ -240,6 +240,7 @@ async def launch_batch_collection(
                 "config": source_def.default_config,
                 "ingestion_job_id": ing_job.id,
                 "batch_id": batch_run_id,
+                "trigger": "batch",
                 "tier": tier.level,
             }
 

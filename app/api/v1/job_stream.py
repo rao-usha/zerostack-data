@@ -206,6 +206,9 @@ async def get_job_history(
         None, description="Filter by status (pending, running, success, failed)"
     ),
     job_type: Optional[str] = Query(None, description="Filter by job type"),
+    trigger: Optional[str] = Query(
+        None, description="Filter by trigger (batch, manual, scheduled)"
+    ),
     db: Session = Depends(get_db),
 ):
     """
@@ -222,6 +225,10 @@ async def get_job_history(
         q_query = q_query.filter(JobQueue.status == status)
     if job_type:
         q_query = q_query.filter(JobQueue.job_type == job_type)
+    if trigger:
+        q_query = q_query.filter(
+            JobQueue.payload["trigger"].astext == trigger
+        )
     queue_jobs = q_query.order_by(JobQueue.created_at.desc()).all()
 
     # Build lookup: ingestion_job_id → queue job (for merging)
@@ -254,6 +261,8 @@ async def get_job_history(
                 "can_retry": _enum_val(j.status) == "failed",
                 "can_restart": _enum_val(j.status) in ("failed", "success"),
                 "can_cancel": _enum_val(j.status) in ("running", "pending", "claimed"),
+                "batch_run_id": (j.payload or {}).get("batch_id"),
+                "trigger": (j.payload or {}).get("trigger"),
                 "_sort_key": j.created_at,
             })
 
@@ -263,6 +272,8 @@ async def get_job_history(
         i_query = i_query.filter(IngestionJob.status == status)
     if job_type:
         i_query = i_query.filter(IngestionJob.source == job_type)
+    if trigger:
+        i_query = i_query.filter(IngestionJob.trigger == trigger)
     ingest_jobs = i_query.order_by(IngestionJob.created_at.desc()).all()
 
     ingest_dicts = []
@@ -291,6 +302,8 @@ async def get_job_history(
             "can_retry": ing_status == "failed" and (j.retry_count or 0) < (j.max_retries or 3),
             "can_restart": ing_status in ("failed", "success"),
             "can_cancel": ing_status in ("running", "pending"),
+            "batch_run_id": j.batch_run_id,
+            "trigger": j.trigger,
             "_sort_key": j.created_at,
         })
 
