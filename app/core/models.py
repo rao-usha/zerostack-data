@@ -59,7 +59,12 @@ class IngestionJob(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     source = Column(String(50), nullable=False, index=True)
     status = Column(
-        Enum(JobStatus, native_enum=False, length=20),
+        Enum(
+            JobStatus,
+            native_enum=False,
+            length=20,
+            values_callable=lambda e: [m.value for m in e],
+        ),
         nullable=False,
         default=JobStatus.PENDING,
         index=True,
