@@ -1110,6 +1110,69 @@ def get_worker_status(db: Session = Depends(get_db)):
     }
 
 
+# =============================================================================
+# Nightly Batch Endpoints
+# (Must be above /{job_id} to avoid path parameter capturing "nightly")
+# =============================================================================
+
+
+@router.post("/nightly/launch")
+async def launch_nightly(
+    tiers: List[int] = None,
+    sources: List[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Launch a nightly batch collection.
+
+    Enqueues all data sources across 4 priority tiers:
+    - Tier 1 (priority 10): Fast gov APIs (treasury, fred, bea, fdic, fema, bts, cftc, data_commons)
+    - Tier 2 (priority 7): Medium APIs (eia, bls, noaa, cms, fbi, irs, usda, trade, fcc, etc.)
+    - Tier 3 (priority 5): Complex sources (sec, kaggle, int'l econ, census, foot_traffic, yelp)
+    - Tier 4 (priority 3): Agentic/LLM (site_intel, people, PE)
+
+    Args:
+        tiers: Optional list of tier levels to run (default: all)
+        sources: Optional list of specific source keys to run
+    """
+    from app.core.nightly_batch_service import launch_nightly_batch
+
+    batch = await launch_nightly_batch(db, tiers=tiers, sources=sources)
+    return {
+        "batch_id": batch.id,
+        "total_jobs": batch.total_jobs,
+        "status": batch.status,
+        "started_at": batch.started_at.isoformat() if batch.started_at else None,
+    }
+
+
+@router.get("/nightly/{batch_id}")
+def get_nightly_status(batch_id: int, db: Session = Depends(get_db)):
+    """
+    Get nightly batch progress.
+
+    Returns overall status, per-tier breakdown, and individual job details.
+    """
+    from app.core.nightly_batch_service import get_batch_status
+
+    result = get_batch_status(db, batch_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    return result
+
+
+@router.get("/nightly")
+def list_nightly_batches(
+    limit: int = 20,
+    status: str = None,
+    db: Session = Depends(get_db),
+):
+    """List recent nightly batch runs."""
+    from app.core.nightly_batch_service import list_batches
+
+    return list_batches(db, limit=limit, status=status)
+
+
 @router.get("/{job_id}", response_model=JobResponse)
 def get_job(job_id: int, db: Session = Depends(get_db)) -> JobResponse:
     """
@@ -1497,67 +1560,5 @@ def get_monitoring_dashboard(db: Session = Depends(get_db)):
     from app.core.monitoring import get_monitoring_dashboard as get_dashboard
 
     return get_dashboard(db)
-
-
-# =============================================================================
-# Nightly Batch Endpoints
-# =============================================================================
-
-
-@router.post("/nightly/launch")
-async def launch_nightly(
-    tiers: List[int] = None,
-    sources: List[str] = None,
-    db: Session = Depends(get_db),
-):
-    """
-    Launch a nightly batch collection.
-
-    Enqueues all data sources across 4 priority tiers:
-    - Tier 1 (priority 10): Fast gov APIs (treasury, fred, bea, fdic, fema, bts, cftc, data_commons)
-    - Tier 2 (priority 7): Medium APIs (eia, bls, noaa, cms, fbi, irs, usda, trade, fcc, etc.)
-    - Tier 3 (priority 5): Complex sources (sec, kaggle, int'l econ, census, foot_traffic, yelp)
-    - Tier 4 (priority 3): Agentic/LLM (site_intel, people, PE)
-
-    Args:
-        tiers: Optional list of tier levels to run (default: all)
-        sources: Optional list of specific source keys to run
-    """
-    from app.core.nightly_batch_service import launch_nightly_batch
-
-    batch = await launch_nightly_batch(db, tiers=tiers, sources=sources)
-    return {
-        "batch_id": batch.id,
-        "total_jobs": batch.total_jobs,
-        "status": batch.status,
-        "started_at": batch.started_at.isoformat() if batch.started_at else None,
-    }
-
-
-@router.get("/nightly/{batch_id}")
-def get_nightly_status(batch_id: int, db: Session = Depends(get_db)):
-    """
-    Get nightly batch progress.
-
-    Returns overall status, per-tier breakdown, and individual job details.
-    """
-    from app.core.nightly_batch_service import get_batch_status
-
-    result = get_batch_status(db, batch_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Batch not found")
-    return result
-
-
-@router.get("/nightly")
-def list_nightly_batches(
-    limit: int = 20,
-    status: str = None,
-    db: Session = Depends(get_db),
-):
-    """List recent nightly batch runs."""
-    from app.core.nightly_batch_service import list_batches
-
-    return list_batches(db, limit=limit, status=status)
 
 
