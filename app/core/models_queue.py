@@ -67,7 +67,8 @@ class JobQueue(Base):
 
     # What kind of work and optional link to domain job table
     job_type = Column(
-        Enum(QueueJobType, native_enum=False, length=30),
+        Enum(QueueJobType, native_enum=False, length=30,
+             values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         index=True,
     )
@@ -77,7 +78,8 @@ class JobQueue(Base):
 
     # Status lifecycle: pending -> claimed -> running -> success/failed
     status = Column(
-        Enum(QueueJobStatus, native_enum=False, length=20),
+        Enum(QueueJobStatus, native_enum=False, length=20,
+             values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=QueueJobStatus.PENDING,
         index=True,
@@ -133,6 +135,30 @@ class JobQueue(Base):
         return (
             f"<JobQueue id={self.id} type={self.job_type} "
             f"status={self.status} worker={self.worker_id}>"
+        )
+
+
+class JobEvent(Base):
+    """
+    Persistent log of job lifecycle events.
+
+    Every call to send_job_event() writes a row here, giving a full
+    timeline for any job (active or historical).
+    """
+
+    __tablename__ = "job_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    job_id = Column(Integer, nullable=False, index=True)
+    event_type = Column(String(50), nullable=False)       # job_started, job_progress, etc.
+    message = Column(String(500), nullable=True)           # Human-readable summary
+    data = Column(JSON, nullable=True)                     # Full event payload
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    def __repr__(self):
+        return (
+            f"<JobEvent id={self.id} job_id={self.job_id} "
+            f"type={self.event_type}>"
         )
 
 

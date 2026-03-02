@@ -123,7 +123,8 @@ class IngestionSchedule(Base):
 
     # Schedule configuration
     frequency = Column(
-        Enum(ScheduleFrequency, native_enum=False, length=20),
+        Enum(ScheduleFrequency, native_enum=False, length=20,
+             values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=ScheduleFrequency.DAILY,
     )
@@ -1946,7 +1947,8 @@ class JobDependency(Base):
 
     # When is the dependency satisfied?
     condition = Column(
-        Enum(DependencyCondition, native_enum=False, length=20),
+        Enum(DependencyCondition, native_enum=False, length=20,
+             values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=DependencyCondition.ON_SUCCESS,
     )
@@ -2154,9 +2156,11 @@ class DataQualityRule(Base):
     )  # Specific column (null = table-level)
 
     # Rule configuration
-    rule_type = Column(Enum(RuleType, native_enum=False, length=20), nullable=False)
+    rule_type = Column(Enum(RuleType, native_enum=False, length=20,
+                            values_callable=lambda e: [m.value for m in e]), nullable=False)
     severity = Column(
-        Enum(RuleSeverity, native_enum=False, length=20),
+        Enum(RuleSeverity, native_enum=False, length=20,
+             values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=RuleSeverity.ERROR,
     )
@@ -2222,7 +2226,8 @@ class DataQualityResult(Base):
 
     # Result
     passed = Column(Integer, nullable=False)  # 1=passed, 0=failed
-    severity = Column(Enum(RuleSeverity, native_enum=False, length=20), nullable=False)
+    severity = Column(Enum(RuleSeverity, native_enum=False, length=20,
+                           values_callable=lambda e: [m.value for m in e]), nullable=False)
 
     # Details
     message = Column(Text, nullable=True)  # Human-readable result
@@ -2439,14 +2444,17 @@ class DQAnomalyAlert(Base):
 
     # Classification
     alert_type = Column(
-        Enum(AnomalyAlertType, native_enum=False, length=30), nullable=False
+        Enum(AnomalyAlertType, native_enum=False, length=30,
+             values_callable=lambda e: [m.value for m in e]), nullable=False
     )
     status = Column(
-        Enum(AnomalyAlertStatus, native_enum=False, length=20),
+        Enum(AnomalyAlertStatus, native_enum=False, length=20,
+             values_callable=lambda e: [m.value for m in e]),
         nullable=False, default=AnomalyAlertStatus.OPEN,
     )
     severity = Column(
-        Enum(RuleSeverity, native_enum=False, length=20),
+        Enum(RuleSeverity, native_enum=False, length=20,
+             values_callable=lambda e: [m.value for m in e]),
         nullable=False, default=RuleSeverity.WARNING,
     )
 
@@ -2542,7 +2550,8 @@ class DQCrossSourceValidation(Base):
     config = Column(JSON, nullable=False)
 
     severity = Column(
-        Enum(RuleSeverity, native_enum=False, length=20),
+        Enum(RuleSeverity, native_enum=False, length=20,
+             values_callable=lambda e: [m.value for m in e]),
         nullable=False, default=RuleSeverity.WARNING,
     )
     is_enabled = Column(Integer, nullable=False, default=1)
@@ -2724,7 +2733,8 @@ class IngestionTemplate(Base):
 
     # Categorization
     category = Column(
-        Enum(TemplateCategory, native_enum=False, length=20),
+        Enum(TemplateCategory, native_enum=False, length=20,
+             values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=TemplateCategory.CUSTOM,
     )
@@ -2858,7 +2868,8 @@ class LineageNode(Base):
 
     # Node identification
     node_type = Column(
-        Enum(LineageNodeType, native_enum=False, length=30), nullable=False, index=True
+        Enum(LineageNodeType, native_enum=False, length=30,
+             values_callable=lambda e: [m.value for m in e]), nullable=False, index=True
     )
     node_id = Column(String(255), nullable=False)  # Unique identifier within type
     name = Column(String(255), nullable=False)  # Human-readable name
@@ -2916,7 +2927,8 @@ class LineageEdge(Base):
 
     # Relationship type
     edge_type = Column(
-        Enum(LineageEdgeType, native_enum=False, length=30), nullable=False
+        Enum(LineageEdgeType, native_enum=False, length=30,
+             values_callable=lambda e: [m.value for m in e]), nullable=False
     )
 
     # Metadata
@@ -3122,9 +3134,11 @@ class ExportJob(Base):
 
     # What to export
     table_name = Column(String(255), nullable=False, index=True)
-    format = Column(Enum(ExportFormat, native_enum=False, length=20), nullable=False)
+    format = Column(Enum(ExportFormat, native_enum=False, length=20,
+                         values_callable=lambda e: [m.value for m in e]), nullable=False)
     status = Column(
-        Enum(ExportStatus, native_enum=False, length=20),
+        Enum(ExportStatus, native_enum=False, length=20,
+             values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=ExportStatus.PENDING,
         index=True,
@@ -3199,7 +3213,8 @@ class LpCollectionRun(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     lp_id = Column(Integer, nullable=False, index=True)  # FK to lp_fund.id
     source_type = Column(
-        Enum(LpCollectionSourceType, native_enum=False, length=30),
+        Enum(LpCollectionSourceType, native_enum=False, length=30,
+             values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         index=True,
     )
@@ -3209,7 +3224,8 @@ class LpCollectionRun(Base):
 
     # Status
     status = Column(
-        Enum(LpCollectionStatus, native_enum=False, length=20),
+        Enum(LpCollectionStatus, native_enum=False, length=20,
+             values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=LpCollectionStatus.PENDING,
         index=True,
@@ -3273,12 +3289,14 @@ class LpCollectionSchedule(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     lp_id = Column(Integer, nullable=False, index=True)  # FK to lp_fund.id
     source_type = Column(
-        Enum(LpCollectionSourceType, native_enum=False, length=30), nullable=False
+        Enum(LpCollectionSourceType, native_enum=False, length=30,
+             values_callable=lambda e: [m.value for m in e]), nullable=False
     )
 
     # Schedule configuration
     frequency = Column(
-        Enum(LpCollectionFrequency, native_enum=False, length=20),
+        Enum(LpCollectionFrequency, native_enum=False, length=20,
+             values_callable=lambda e: [m.value for m in e]),
         nullable=False,
         default=LpCollectionFrequency.WEEKLY,
     )
