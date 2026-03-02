@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.event_bus import EventBus
 from app.core.models import IngestionJob
-from app.core.models_queue import JobQueue, QueueJobStatus
+from app.core.models_queue import JobEvent, JobQueue, QueueJobStatus
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +147,41 @@ async def get_queue_status(
                 "completed_at": j.completed_at.isoformat() if j.completed_at else None,
             }
             for j in jobs
+        ],
+    }
+
+
+@router.get("/{job_id}/events")
+async def get_job_events(
+    job_id: int,
+    limit: int = Query(200, ge=1, le=1000),
+    db: Session = Depends(get_db),
+):
+    """
+    Return the persisted event timeline for a job.
+
+    Events are ordered chronologically (oldest first) so the frontend
+    can render them as a top-to-bottom timeline.
+    """
+    rows = (
+        db.query(JobEvent)
+        .filter(JobEvent.job_id == job_id)
+        .order_by(JobEvent.created_at.asc())
+        .limit(limit)
+        .all()
+    )
+
+    return {
+        "job_id": job_id,
+        "event_count": len(rows),
+        "events": [
+            {
+                "event_type": r.event_type,
+                "message": r.message,
+                "data": r.data,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
         ],
     }
 
