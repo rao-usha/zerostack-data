@@ -6351,7 +6351,9 @@
                         <div><span style="color:var(--text-muted);font-size:0.8rem;">Success</span><br><span style="color:#5cb85c;font-weight:600;">${data.successful_jobs}</span></div>
                         <div><span style="color:var(--text-muted);font-size:0.8rem;">Failed</span><br><span style="color:${data.failed_jobs > 0 ? '#d9534f' : 'inherit'};font-weight:600;">${data.failed_jobs}</span></div>
                         <div><span style="color:var(--text-muted);font-size:0.8rem;">Running</span><br><strong>${data.running_jobs}</strong></div>
+                        <div><span style="color:var(--text-muted);font-size:0.8rem;">Rows</span><br><strong>${(data.total_rows_inserted || 0).toLocaleString()}</strong></div>
                         <div><span style="color:var(--text-muted);font-size:0.8rem;">Elapsed</span><br><strong>${elapsed}</strong></div>
+                        ${data.llm_cost ? `<div><span style="color:var(--text-muted);font-size:0.8rem;">LLM Cost</span><br><strong>$${data.llm_cost.total_cost_usd.toFixed(4)}</strong></div>` : ''}
                     </div>
                     <div style="background:var(--bg-body);border-radius:4px;height:8px;overflow:hidden;">
                         <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#5cb85c,#4cae4c);transition:width 0.3s;"></div>

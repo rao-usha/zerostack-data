@@ -248,9 +248,9 @@ async def launch_batch_collection(
             if source_def.key in AGENTIC_SOURCE_MAP:
                 payload.update(source_def.default_config)
 
-            # Tier 4 jobs should wait for lower tiers to complete
-            if tier.level == 4:
-                payload["wait_for_tiers"] = [1, 2, 3]
+            # Each tier waits for all lower tiers to complete first
+            if tier.level >= 2:
+                payload["wait_for_tiers"] = list(range(1, tier.level))
 
             submit_job(
                 db=db,
@@ -373,6 +373,43 @@ def get_batch_run_status(db: Session, batch_run_id: str) -> Optional[Dict]:
             "duration_seconds": duration,
         })
 
+    # Result aggregation
+    total_rows = sum(j.rows_inserted or 0 for j in jobs)
+    sources_succeeded = [j.source for j in jobs if j.status == JobStatus.SUCCESS]
+    sources_failed = [j.source for j in jobs if j.status == JobStatus.FAILED]
+    top_errors = []
+    for j in jobs:
+        if j.status == JobStatus.FAILED and j.error_message:
+            top_errors.append({
+                "source": j.source,
+                "error": j.error_message[:200],
+            })
+
+    # LLM cost aggregation
+    llm_cost_summary = None
+    try:
+        from app.core.models import LLMUsage
+        batch_job_ids = [j.id for j in jobs]
+        if batch_job_ids:
+            cost_row = (
+                db.query(
+                    func.count().label("llm_calls"),
+                    func.sum(LLMUsage.input_tokens).label("input_tokens"),
+                    func.sum(LLMUsage.output_tokens).label("output_tokens"),
+                    func.sum(LLMUsage.cost_usd).label("cost_usd"),
+                )
+                .filter(LLMUsage.job_id.in_(batch_job_ids))
+                .first()
+            )
+            if cost_row and cost_row.llm_calls:
+                llm_cost_summary = {
+                    "llm_calls": cost_row.llm_calls,
+                    "total_tokens": (cost_row.input_tokens or 0) + (cost_row.output_tokens or 0),
+                    "total_cost_usd": float(cost_row.cost_usd or 0),
+                }
+    except Exception:
+        pass
+
     return {
         "batch_run_id": batch_run_id,
         "status": status,
@@ -387,6 +424,12 @@ def get_batch_run_status(db: Session, batch_run_id: str) -> Optional[Dict]:
         "completed_at": completed_at.isoformat() if completed_at else None,
         "tier_status": tier_status,
         "jobs": job_details,
+        # Result aggregation
+        "total_rows_inserted": total_rows,
+        "sources_succeeded": sources_succeeded,
+        "sources_failed": sources_failed,
+        "top_errors": top_errors[:10],
+        "llm_cost": llm_cost_summary,
     }
 
 

@@ -279,6 +279,21 @@ async def execute_job(job: JobQueue, db: Session):
         db.commit()
         await _wait_for_tier_completion(db, batch_id, wait_for_tiers, job)
 
+    # Acquire rate limit for this source before executing
+    source_name = payload.get("source")
+    rate_limiter = None
+    if source_name:
+        try:
+            from app.core.rate_limiter import get_rate_limiter
+            rate_limiter = get_rate_limiter()
+            acquired = await rate_limiter.acquire(source_name, timeout=60.0)
+            if not acquired:
+                logger.warning(f"Job {job.id}: rate limit timeout for source '{source_name}', proceeding anyway")
+                rate_limiter = None  # Don't release what we didn't acquire
+        except Exception as e:
+            logger.warning(f"Job {job.id}: rate limiter error: {e}")
+            rate_limiter = None
+
     # Start heartbeat (also monitors for cancellation)
     SessionLocal = get_session_factory()
     heartbeat_task = asyncio.create_task(_heartbeat_loop(SessionLocal, job.id))
@@ -386,6 +401,10 @@ async def execute_job(job: JobQueue, db: Session):
         db.commit()
 
     finally:
+        # Release rate limit slot
+        if rate_limiter and source_name:
+            rate_limiter.release(source_name)
+
         # Clean up whichever task is still running
         for t in (heartbeat_task, executor_task):
             if not t.done():

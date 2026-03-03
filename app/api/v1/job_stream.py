@@ -336,6 +336,34 @@ async def get_job_history(
     for j in page:
         j.pop("_sort_key", None)
 
+    # Enrich with LLM cost data (batch query for this page)
+    try:
+        from app.core.models import LLMUsage
+        page_job_ids = [j["id"] for j in page if j.get("table") == "ingestion_jobs"]
+        if page_job_ids:
+            cost_rows = (
+                db.query(
+                    LLMUsage.job_id,
+                    func.count().label("llm_calls"),
+                    func.sum(LLMUsage.input_tokens).label("input_tokens"),
+                    func.sum(LLMUsage.output_tokens).label("output_tokens"),
+                    func.sum(LLMUsage.cost_usd).label("cost_usd"),
+                )
+                .filter(LLMUsage.job_id.in_(page_job_ids))
+                .group_by(LLMUsage.job_id)
+                .all()
+            )
+            cost_map = {r.job_id: {
+                "llm_calls": r.llm_calls,
+                "llm_tokens": (r.input_tokens or 0) + (r.output_tokens or 0),
+                "llm_cost_usd": float(r.cost_usd or 0),
+            } for r in cost_rows}
+            for j in page:
+                if j.get("table") == "ingestion_jobs":
+                    j["llm_cost"] = cost_map.get(j["id"])
+    except Exception:
+        pass  # LLM cost enrichment is optional
+
     return {
         "total": total,
         "offset": offset,
