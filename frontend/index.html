@@ -5049,10 +5049,10 @@
                     html += `<h4>Collections (${srcMeta.collection_count})</h4>`;
                     html += `<div style="color:var(--text-muted);font-size:0.8rem;">Loading...</div>`;
                     html += `</div>`;
-                    // Lazy-fetch collections from /sources/{key}
+                    // Lazy-fetch collections using backend key (srcMeta.key handles aliases)
                     (async () => {
                         try {
-                            const detail = await fetch(API + '/sources/' + src.key).then(r => r.ok ? r.json() : null);
+                            const detail = await fetch(API + '/sources/' + srcMeta.key).then(r => r.ok ? r.json() : null);
                             const el = document.getElementById('ds-about-collections-' + src.key);
                             if (detail && detail.collections && detail.collections.length && el) {
                                 let tbl = '<h4>Collections (' + detail.collections.length + ')</h4>';
