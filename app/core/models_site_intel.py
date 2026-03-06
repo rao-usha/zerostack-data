@@ -830,8 +830,13 @@ class Wetland(Base):
     geometry_geojson = Column(JSON)
     acres = Column(Numeric(12, 2))
     state = Column(String(2), index=True)
+    county = Column(String(100))
     source = Column(String(50), default="usfws")
     collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("nwi_code", "state", name="uq_wetland_nwi_state"),
+    )
 
 
 # =============================================================================
@@ -997,6 +1002,39 @@ class ZoningDistrict(Base):
     geometry_geojson = Column(JSON)
     source = Column(String(50))
     collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "jurisdiction", "state", "zone_code",
+            name="uq_zoning_district_key",
+        ),
+    )
+
+
+class LandUseParcel(Base):
+    """County-level land use aggregation from state GIS data."""
+
+    __tablename__ = "land_use_parcel"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    state = Column(String(2), nullable=False, index=True)
+    county = Column(String(100), index=True)
+    county_fips = Column(String(5), index=True)
+    land_use_code = Column(String(20))
+    land_use_label = Column(String(255))
+    land_use_category = Column(String(50))  # industrial, commercial, residential, agricultural, forest, water, wetlands, barren, other
+    acres = Column(Numeric(12, 2))
+    polygon_count = Column(Integer)
+    impervious_acres = Column(Numeric(12, 2))
+    source = Column(String(50))
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "state", "county", "land_use_code",
+            name="uq_land_use_parcel_key",
+        ),
+    )
 
 
 # =============================================================================
@@ -1719,41 +1757,11 @@ class UtilityRate(Base):
 # =============================================================================
 
 
-class SiteScoreConfig(Base):
-    """Site scoring configuration."""
-
-    __tablename__ = "site_score_config"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    config_name = Column(String(100), nullable=False)
-    use_case = Column(
-        String(50), nullable=False
-    )  # data_center, warehouse, manufacturing
-    factor_weights = Column(JSON, nullable=False)
-    description = Column(Text)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
-class SiteScore(Base):
-    """Cached site scores."""
+# NOTE: SiteScore and SiteScoreConfig tables were removed (never populated).
+# Datacenter scoring uses datacenter_site_scores table via DatacenterSiteScorer.
 
-    __tablename__ = "site_score"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    latitude = Column(Numeric(10, 7), nullable=False)
-    longitude = Column(Numeric(10, 7), nullable=False)
-    config_id = Column(Integer, ForeignKey("site_score_config.id"), index=True)
-    overall_score = Column(Numeric(5, 2))  # 0-100
-    factor_scores = Column(JSON)  # Individual factor scores
-    computed_at = Column(DateTime, default=datetime.utcnow)
-    valid_until = Column(DateTime)
-
-    __table_args__ = (
-        UniqueConstraint("latitude", "longitude", "config_id", name="uq_site_score"),
-        Index("idx_site_score_location", "latitude", "longitude"),
-    )
 
 
 # =============================================================================
@@ -1823,4 +1831,124 @@ class CollectionWatermark(Base):
             "domain", "source", "state", name="uq_watermark_domain_source_state"
         ),
         Index("idx_watermark_domain_source", "domain", "source"),
+    )
+
+
+# =============================================================================
+# DATACENTER SITE SELECTION MODELS
+# =============================================================================
+
+
+class BrownfieldSite(Base):
+    """EPA ACRES brownfield sites — remediated/assessed parcels."""
+
+    __tablename__ = "brownfield_site"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    acres_id = Column(String(50), unique=True, index=True)
+    site_name = Column(String(500))
+    address = Column(String(500))
+    city = Column(String(100))
+    state = Column(String(2), index=True)
+    county = Column(String(100))
+    zip_code = Column(String(10))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    acreage = Column(Numeric(10, 2))
+    cleanup_status = Column(String(100))  # completed, in_progress, assessed
+    contaminant_types = Column(JSON)  # list of contaminant strings
+    land_use_prior = Column(String(255))
+    land_use_current = Column(String(255))
+    assessment_date = Column(Date)
+    cleanup_completion_date = Column(Date)
+    source = Column(String(50), default="epa_acres")
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_brownfield_location", "latitude", "longitude"),
+        Index("idx_brownfield_state_county", "state", "county"),
+    )
+
+
+class BuildingPermit(Base):
+    """Census Building Permits Survey — county-level permit activity."""
+
+    __tablename__ = "building_permit"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    county_fips = Column(String(5), index=True)
+    county_name = Column(String(255))
+    state = Column(String(2), index=True)
+    period_year = Column(Integer, nullable=False)
+    period_month = Column(Integer, nullable=False)
+    total_units = Column(Integer)
+    single_family_units = Column(Integer)
+    multi_family_units = Column(Integer)
+    total_valuation_thousand = Column(BigInteger)
+    permits_per_10k_pop = Column(Numeric(8, 2))
+    yoy_growth_pct = Column(Numeric(8, 2))
+    source = Column(String(50), default="census_bps")
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "county_fips", "period_year", "period_month",
+            name="uq_building_permit_county_period",
+        ),
+    )
+
+
+class GovernmentUnit(Base):
+    """Census of Governments — jurisdiction counts per county."""
+
+    __tablename__ = "government_unit"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    county_fips = Column(String(5), index=True)
+    county_name = Column(String(255))
+    state = Column(String(2), index=True)
+    census_year = Column(Integer, nullable=False)
+    total_governments = Column(Integer)
+    county_govts = Column(Integer)
+    municipal_govts = Column(Integer)
+    township_govts = Column(Integer)
+    special_district_govts = Column(Integer)
+    school_district_govts = Column(Integer)
+    population = Column(BigInteger)
+    govts_per_10k_pop = Column(Numeric(8, 2))
+    source = Column(String(50), default="census_gov")
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "county_fips", "census_year",
+            name="uq_government_unit_county_year",
+        ),
+    )
+
+
+class EpochDatacenter(Base):
+    """Epoch AI datacenter locations with capacity data."""
+
+    __tablename__ = "epoch_datacenter"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    epoch_id = Column(String(100), unique=True, index=True)
+    company = Column(String(255), index=True)
+    facility_name = Column(String(500))
+    city = Column(String(100))
+    state = Column(String(2), index=True)
+    country = Column(String(100))
+    latitude = Column(Numeric(10, 7))
+    longitude = Column(Numeric(10, 7))
+    power_capacity_mw = Column(Numeric(10, 2))
+    building_area_sqft = Column(BigInteger)
+    year_opened = Column(Integer)
+    status = Column(String(50))  # operational, under_construction, planned
+    source = Column(String(50), default="epoch_ai")
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_epoch_dc_location", "latitude", "longitude"),
+        Index("idx_epoch_dc_state", "state"),
     )

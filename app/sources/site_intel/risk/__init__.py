@@ -17,10 +17,14 @@ from app.sources.site_intel.risk.epa_envirofacts_collector import (
     EPAEnvirofactsCollector,
 )
 from app.sources.site_intel.risk.fema_nfhl_collector import FEMANFHLFloodCollector
+from app.sources.site_intel.risk.epa_acres_collector import EPAACRESCollector
+from app.sources.site_intel.risk.nwi_wetland_collector import NWIWetlandCollector
 
 __all__ = [
     "FEMARiskCollector",
     "USGSEarthquakeCollector",
     "EPAEnvirofactsCollector",
     "FEMANFHLFloodCollector",
+    "EPAACRESCollector",
+    "NWIWetlandCollector",
 ]

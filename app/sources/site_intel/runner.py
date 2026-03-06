@@ -353,6 +353,7 @@ class SiteIntelOrchestrator:
             SiteIntelDomain.POWER: [
                 SiteIntelSource.EIA,
                 SiteIntelSource.NREL,
+                SiteIntelSource.NREL_RESOURCE,
                 SiteIntelSource.HIFLD,
                 SiteIntelSource.ISO_PJM,
                 SiteIntelSource.ISO_CAISO,
@@ -362,6 +363,7 @@ class SiteIntelOrchestrator:
                 SiteIntelSource.FCC,
                 SiteIntelSource.PEERINGDB,
                 SiteIntelSource.TELEGEOGRAPHY,
+                SiteIntelSource.EPOCH_DC,
             ],
             SiteIntelDomain.TRANSPORT: [
                 SiteIntelSource.BTS,
@@ -377,6 +379,8 @@ class SiteIntelOrchestrator:
                 SiteIntelSource.BLS_QCEW,
                 SiteIntelSource.CENSUS_LEHD,
                 SiteIntelSource.CENSUS_ACS,
+                SiteIntelSource.CENSUS_BPS,
+                SiteIntelSource.CENSUS_GOV,
             ],
             SiteIntelDomain.RISK: [
                 SiteIntelSource.FEMA,
@@ -385,12 +389,15 @@ class SiteIntelOrchestrator:
                 SiteIntelSource.NOAA_CLIMATE,
                 SiteIntelSource.EPA_ENVIROFACTS,
                 SiteIntelSource.USFWS_NWI,
+                SiteIntelSource.EPA_ACRES,
             ],
             SiteIntelDomain.INCENTIVES: [
                 SiteIntelSource.CDFI_OZ,
                 SiteIntelSource.FTZ_BOARD,
                 SiteIntelSource.GOOD_JOBS_FIRST,
                 SiteIntelSource.STATE_EDO,
+                SiteIntelSource.STATE_EDO_SITES,
+                SiteIntelSource.NATIONAL_ZONING_ATLAS,
             ],
             SiteIntelDomain.LOGISTICS: [
                 SiteIntelSource.FREIGHTOS,

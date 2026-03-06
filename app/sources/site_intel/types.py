@@ -79,6 +79,7 @@ class SiteIntelSource(str, Enum):
     FTZ_BOARD = "ftz_board"
     GOOD_JOBS_FIRST = "good_jobs_first"
     STATE_EDO = "state_edo"
+    NATIONAL_ZONING_ATLAS = "national_zoning_atlas"
 
     # Logistics
     FREIGHTOS = "freightos"
@@ -100,6 +101,14 @@ class SiteIntelSource(str, Enum):
     EPA_SDWIS = "epa_sdwis"  # EPA Safe Drinking Water Information System
     EIA_GAS = "eia_gas"  # EIA natural gas pipelines and storage
     OPENEI_URDB = "openei_urdb"  # OpenEI Utility Rate Database
+
+    # Datacenter Site Selection
+    EPA_ACRES = "epa_acres"  # EPA ACRES brownfield sites
+    CENSUS_BPS = "census_bps"  # Census Building Permits Survey
+    CENSUS_GOV = "census_gov"  # Census of Governments
+    NREL_RESOURCE = "nrel_resource"  # NREL Solar/Wind resource data
+    EPOCH_DC = "epoch_dc"  # Epoch AI datacenter locations
+    STATE_EDO_SITES = "state_edo_sites"  # State EDO certified industrial sites
 
 
 class CollectionStatus(str, Enum):

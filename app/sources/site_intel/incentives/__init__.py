@@ -14,10 +14,14 @@ from app.sources.site_intel.incentives.cdfi_collector import (
 from app.sources.site_intel.incentives.ftz_collector import FTZBoardCollector
 from app.sources.site_intel.incentives.goodjobs_collector import GoodJobsFirstCollector
 from app.sources.site_intel.incentives.state_edo_collector import StateEDOIncentiveCollector
+from app.sources.site_intel.incentives.state_edo_sites_collector import StateEDOSitesCollector
+from app.sources.site_intel.incentives.nza_zoning_collector import NZAZoningCollector
 
 __all__ = [
     "CDFIOpportunityZoneCollector",
     "FTZBoardCollector",
     "GoodJobsFirstCollector",
     "StateEDOIncentiveCollector",
+    "StateEDOSitesCollector",
+    "NZAZoningCollector",
 ]
