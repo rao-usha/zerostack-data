@@ -52,6 +52,8 @@ from app.reports.design_system import (
     chart_container, chart_init_js, page_footer,
     build_doughnut_config, build_horizontal_bar_config,
     build_bar_fallback, build_chart_legend, CHART_COLORS,
+    build_line_chart_config, build_sensitivity_grid_html,
+    build_tornado_chart_config, build_scatter_chart_config,
     BLUE, BLUE_LIGHT, BLUE_DARK, ORANGE, GREEN, RED, GRAY,
     PURPLE, TEAL, PINK,
 )
@@ -68,6 +70,13 @@ GRADE_BADGE_COLORS = {
     "C": "pe",        # amber
     "D": "sub",       # gray
     "F": "default",   # gray
+}
+
+OWNERSHIP_BADGE_COLORS = {
+    "Independent": "private",   # green
+    "Multi-Site": "pe",         # amber
+    "PE-Backed": "public",      # blue
+    "Public": "sub",            # gray
 }
 
 # Prospect scoring weights (mirrored from metadata for methodology section)
@@ -337,6 +346,232 @@ MEDSPA_EXTRA_CSS = """
 .chart-container { overflow: hidden; }
 .chart-row { overflow: hidden; align-items: start; }
 
+/* ── CEO Overview Section ── */
+.ceo-overview {
+    background: var(--white);
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    margin-bottom: 24px;
+    overflow: hidden;
+}
+.ceo-overview-header {
+    padding: 20px 24px 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.ceo-overview-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--primary);
+}
+.ceo-overview-body { padding: 16px 24px 24px 24px; }
+
+.verdict-banner {
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+.verdict-banner.buy {
+    background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+    border: 2px solid #48bb78;
+}
+.verdict-banner.watch {
+    background: linear-gradient(135deg, #fffaf0 0%, #feebc8 100%);
+    border: 2px solid #ed8936;
+}
+.verdict-banner.pass {
+    background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+    border: 2px solid #fc8181;
+}
+[data-theme="dark"] .verdict-banner.buy {
+    background: linear-gradient(135deg, #22543d 0%, #276749 100%);
+    border-color: #48bb78;
+}
+[data-theme="dark"] .verdict-banner.watch {
+    background: linear-gradient(135deg, #744210 0%, #975a16 100%);
+    border-color: #ed8936;
+}
+[data-theme="dark"] .verdict-banner.pass {
+    background: linear-gradient(135deg, #742a2a 0%, #9b2c2c 100%);
+    border-color: #fc8181;
+}
+.verdict-label {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+.verdict-banner.buy .verdict-label { color: #276749; }
+.verdict-banner.watch .verdict-label { color: #975a16; }
+.verdict-banner.pass .verdict-label { color: #9b2c2c; }
+[data-theme="dark"] .verdict-banner .verdict-label { color: var(--gray-900); }
+.verdict-details { flex: 1; min-width: 200px; }
+.verdict-rationale {
+    font-size: 14px;
+    color: var(--gray-700);
+    line-height: 1.6;
+}
+.conviction-bar-wrap {
+    min-width: 180px;
+    text-align: center;
+}
+.conviction-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 700;
+    color: var(--gray-500);
+    margin-bottom: 6px;
+}
+.conviction-bar-track {
+    height: 12px;
+    background: var(--gray-200);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.conviction-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.3s ease;
+}
+.conviction-score {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-top: 4px;
+}
+
+.ceo-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 20px 0;
+}
+@media (max-width: 768px) { .ceo-kpi-grid { grid-template-columns: 1fr; } }
+.ceo-kpi-card {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+}
+.ceo-kpi-card .ceo-kpi-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 700;
+    color: var(--gray-500);
+    margin-bottom: 8px;
+}
+.ceo-kpi-card .ceo-kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--primary);
+}
+.ceo-kpi-card .ceo-kpi-detail {
+    font-size: 12px;
+    color: var(--gray-500);
+    margin-top: 4px;
+}
+
+.risk-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+}
+.risk-card {
+    border-left: 4px solid;
+    border-radius: 0 8px 8px 0;
+    padding: 14px 16px;
+    background: var(--gray-50);
+}
+.risk-card.high { border-left-color: #e53e3e; }
+.risk-card.medium { border-left-color: #ed8936; }
+.risk-card.low { border-left-color: #48bb78; }
+.risk-card .risk-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gray-900);
+    margin-bottom: 4px;
+}
+.risk-card .risk-detail {
+    font-size: 12px;
+    color: var(--gray-500);
+    line-height: 1.5;
+}
+
+.cadence-line {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 14px 20px;
+    margin: 16px 0;
+    font-size: 14px;
+    color: var(--gray-700);
+}
+.cadence-line strong { color: var(--primary); }
+
+.freshness-bar-wrap {
+    margin: 16px 0 0 0;
+}
+.freshness-label {
+    font-size: 12px;
+    color: var(--gray-500);
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+}
+.freshness-bar-track {
+    height: 8px;
+    background: var(--gray-200);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.freshness-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: var(--primary-light);
+}
+@media print {
+    .verdict-banner { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .ceo-overview { box-shadow: none !important; border: 1px solid #e2e8f0; }
+}
+
+/* ── Collapsed Section (data unavailable) ── */
+.section-collapsed {
+    background: var(--white);
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    margin-bottom: 12px;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 0.6;
+}
+.section-collapsed .section-number {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+}
+.section-collapsed .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-500);
+    flex: 1;
+}
+.section-collapsed .section-status {
+    font-size: 12px;
+    color: var(--gray-500);
+    font-style: italic;
+}
+
 /* Sections 18-21: Provider / RE / Deposit / Business Formation */
 .provider-split-grid {
     display: grid;
@@ -458,7 +693,413 @@ class MedSpaMarketTemplate:
             **self._get_talent_pipeline_data(db),
         }
 
+        # Sections 28-32: PE Analytics (depend on deal_model + signal data)
+        deal_model = data.get("deal_model", {})
+        if deal_model.get("total_locations", 0) > 0:
+            data.update(self._get_sensitivity_data(db, deal_model))
+            data.update(self._get_jcurve_data(db, deal_model))
+            data.update(self._get_cohort_economics_data(db, deal_model))
+        data["alpha_composite"] = self._get_alpha_composite_data(data)
+
+        # CEO Overview — synthesized from already-gathered data (no extra queries)
+        data["ceo_overview"] = self._compute_ceo_overview(data)
+
         return data
+
+    # ------------------------------------------------------------------
+    # Sections 28-32: PE Analytics Data Gathering
+    # ------------------------------------------------------------------
+
+    def _get_sensitivity_data(self, db: Session, deal_model: Dict) -> Dict:
+        """Build IRR and MOIC sensitivity grids + tornado data."""
+        try:
+            from app.services.deal_engine import DealEngine
+
+            engine = DealEngine(db)
+            economics = {
+                "total_ebitda": deal_model["total_ebitda"],
+                "total_acquisition_cost": deal_model["total_acquisition_cost"],
+                "total_revenue": deal_model["total_revenue"],
+                "total_locations": deal_model["total_locations"],
+                "weighted_margin": deal_model["weighted_margin"],
+                "avg_entry_multiple": (
+                    deal_model["total_acquisition_cost"] / deal_model["total_ebitda"]
+                    if deal_model["total_ebitda"] > 0 else 3.5
+                ),
+            }
+
+            irr_grid = engine.sensitivity_analysis(
+                economics, DEAL_ASSUMPTIONS,
+                row_param="exit_multiple", row_values=[6, 7, 8, 10, 12, 14],
+                col_param="hold_years", col_values=[3, 4, 5, 6, 7],
+                metric="net_irr",
+            )
+            moic_grid = engine.sensitivity_analysis(
+                economics, DEAL_ASSUMPTIONS,
+                row_param="margin_improvement", row_values=[0.02, 0.03, 0.04, 0.05, 0.06, 0.08],
+                col_param="exit_multiple", col_values=[6, 8, 10, 12, 14],
+                metric="gross_moic",
+            )
+            tornado = engine.tornado_sensitivity(economics, DEAL_ASSUMPTIONS, metric="net_irr")
+
+            return {"sensitivity": {"irr_grid": irr_grid, "moic_grid": moic_grid, "tornado": tornado}}
+        except Exception as e:
+            logger.warning(f"Sensitivity analysis failed: {e}")
+            return {"sensitivity": {}}
+
+    def _get_jcurve_data(self, db: Session, deal_model: Dict) -> Dict:
+        """Build J-curve deployment cash flow data."""
+        try:
+            from app.services.deal_engine import DealEngine
+
+            engine = DealEngine(db)
+            economics = {
+                "total_ebitda": deal_model["total_ebitda"],
+                "total_acquisition_cost": deal_model["total_acquisition_cost"],
+                "total_revenue": deal_model["total_revenue"],
+                "total_locations": deal_model["total_locations"],
+            }
+            deployment = engine.deployment_plan(economics)
+
+            # Compute cumulative return series (each location generates EBITDA after 3-month ramp)
+            base_scenario = DEAL_ASSUMPTIONS["scenarios"]["base"]
+            organic_growth = base_scenario.get("organic_growth", 0.05)
+            avg_ebitda_per_loc = deal_model["total_ebitda"] / deal_model["total_locations"] if deal_model["total_locations"] > 0 else 0
+
+            cohorts = deployment["cohorts"]
+            invested = deployment["monthly_cash_flow"]
+            total_months = len(invested)
+
+            # Build monthly return accumulation
+            returned = []
+            cumulative_return = 0
+            for month in range(total_months):
+                month_revenue = 0
+                for cohort in cohorts:
+                    start = cohort["start_month"]
+                    locs = cohort["locations"]
+                    # Each location ramps over 3 months, full EBITDA after that
+                    months_since = month - start
+                    if months_since < 0:
+                        continue
+                    ramp = min(months_since / 3.0, 1.0)
+                    # Apply organic growth (monthly compounding)
+                    growth_factor = (1 + organic_growth / 12) ** months_since
+                    month_revenue += locs * avg_ebitda_per_loc / 12 * ramp * growth_factor
+                cumulative_return += month_revenue
+                returned.append(round(cumulative_return))
+
+            # Find crossover month
+            crossover_month = None
+            for i, (inv, ret) in enumerate(zip(invested, returned)):
+                if ret > inv and inv > 0:
+                    crossover_month = i
+                    break
+
+            months_labels = [f"M{i}" for i in range(total_months)]
+
+            return {"jcurve": {
+                "months": months_labels,
+                "invested": invested,
+                "returned": returned,
+                "crossover_month": crossover_month,
+                "cohorts": cohorts,
+                "total_capital_deployed": deployment["total_capital_deployed"],
+                "total_deployment_months": deployment["total_deployment_months"],
+            }}
+        except Exception as e:
+            logger.warning(f"J-curve data failed: {e}")
+            return {"jcurve": {}}
+
+    def _get_alpha_composite_data(self, data: Dict) -> Dict:
+        """Cross-reference state-level alpha signals (pure Python, no DB queries)."""
+        try:
+            signal_states = {}
+            signal_names = []
+
+            # Extract state-level signal sets from already-gathered data
+            extractors = [
+                ("stealth_wealth", "Stealth Wealth", lambda d: [s["state"] for s in d.get("stealth_wealth", {}).get("top_states", [])]),
+                ("migration_alpha", "Migration Alpha", lambda d: [s.get("state") for s in d.get("migration_alpha", {}).get("top_inflow", []) if s.get("state")]),
+                ("provider_density", "Provider Density", lambda d: [s["state"] for s in d.get("provider_density", {}).get("top_states", [])]),
+                ("real_estate_alpha", "RE Appreciation", lambda d: [s.get("state") for s in d.get("real_estate_alpha", {}).get("top_states", []) if s.get("state")]),
+                ("deposit_wealth", "Deposit Wealth", lambda d: [s["state"] for s in d.get("deposit_wealth", {}).get("top_states", [])]),
+                ("business_formation", "Biz Formation", lambda d: [s["state"] for s in d.get("business_formation", {}).get("top_states", [])]),
+                ("opportunity_zones", "Opportunity Zones", lambda d: [s.get("state") for s in d.get("opportunity_zones", {}).get("top_states", []) if s.get("state")]),
+                ("demographic_demand", "Demographics", lambda d: [s["state"] for s in d.get("demographic_demand", {}).get("top_states", [])]),
+            ]
+
+            for key, name, extractor in extractors:
+                if data.get(key):
+                    try:
+                        states = extractor(data)
+                        if states:
+                            signal_states[name] = set(states[:15])  # Top 15 states per signal
+                            signal_names.append(name)
+                    except Exception:
+                        pass
+
+            if not signal_names:
+                return {}
+
+            # Build composite: for each state, count how many signals it appears in
+            all_states = set()
+            for states in signal_states.values():
+                all_states |= states
+
+            # Get prospect counts per state from deal_model
+            a_grade_states = {s["state"]: s["count"] for s in data.get("deal_model", {}).get("a_grade_states", [])}
+
+            state_scores = []
+            for st in all_states:
+                hits = []
+                for name in signal_names:
+                    if st in signal_states.get(name, set()):
+                        hits.append(name)
+                state_scores.append({
+                    "state": st,
+                    "signal_count": len(hits),
+                    "signals": hits,
+                    "prospect_count": a_grade_states.get(st, 0),
+                })
+
+            state_scores.sort(key=lambda s: (-s["signal_count"], -s["prospect_count"]))
+
+            return {
+                "states": state_scores,
+                "signal_names": signal_names,
+                "max_signals": len(signal_names),
+            }
+        except Exception as e:
+            logger.warning(f"Alpha composite failed: {e}")
+            return {}
+
+    def _get_cohort_economics_data(self, db: Session, deal_model: Dict) -> Dict:
+        """Group A-grade prospects by state and price tier, compute implied economics."""
+        try:
+            from app.services.deal_engine import DealEngine
+
+            engine = DealEngine(db)
+            a_grade_states = deal_model.get("a_grade_states", [])
+            tier_economics = deal_model.get("tier_economics", [])
+
+            # By-state cohorts (top 10)
+            base_scenario = DEAL_ASSUMPTIONS["scenarios"]["base"]
+            by_state = []
+            for s in a_grade_states[:10]:
+                state_portfolio = engine.get_target_portfolio(state=s["state"])
+                state_econ = engine.compute_tier_economics(state_portfolio["tier_counts"])
+                if state_econ["total_locations"] == 0:
+                    continue
+                try:
+                    scenario = engine.run_scenario(state_econ, base_scenario)
+                    implied_irr = scenario["net_irr"]
+                except Exception:
+                    implied_irr = 0
+                by_state.append({
+                    "state": s["state"],
+                    "count": state_econ["total_locations"],
+                    "total_revenue": state_econ["total_revenue"],
+                    "margin": state_econ["weighted_margin"],
+                    "implied_irr": implied_irr,
+                })
+
+            # By-tier cohorts
+            by_tier = []
+            for te in tier_economics:
+                tier = te["tier"]
+                tier_econ = {
+                    "total_ebitda": te["total_ebitda"],
+                    "total_acquisition_cost": te["total_acq_cost"],
+                    "total_revenue": te["total_revenue"],
+                    "total_locations": te["count"],
+                }
+                try:
+                    scenario = engine.run_scenario(tier_econ, base_scenario)
+                    implied_irr = scenario["net_irr"]
+                except Exception:
+                    implied_irr = 0
+                by_tier.append({
+                    "tier": tier,
+                    "count": te["count"],
+                    "avg_revenue": te["avg_revenue"],
+                    "margin": te["ebitda_margin"],
+                    "entry_multiple": te["entry_multiple"],
+                    "implied_irr": implied_irr,
+                })
+
+            # Scatter data: score (avg across state) vs implied IRR
+            scatter_data = []
+            tier_colors = {"$": BLUE, "$$": GREEN, "$$$": ORANGE, "$$$$": PURPLE}
+            for bt in by_tier:
+                scatter_data.append({
+                    "x": round(bt["margin"] * 100, 1),
+                    "y": round(bt["implied_irr"] * 100, 1),
+                    "label": bt["tier"],
+                })
+
+            return {"cohort_economics": {
+                "by_state": by_state,
+                "by_tier": by_tier,
+                "scatter_data": scatter_data,
+            }}
+        except Exception as e:
+            logger.warning(f"Cohort economics failed: {e}")
+            return {"cohort_economics": {}}
+
+    # ------------------------------------------------------------------
+    # CEO Overview Computation
+    # ------------------------------------------------------------------
+
+    def _compute_ceo_overview(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Synthesize a CEO-level investment verdict from all gathered data."""
+        summary = data.get("summary", {})
+        deal_model = data.get("deal_model", {})
+        prospects_by_state = data.get("prospects_by_state", [])
+        pe_financials = data.get("pe_financials", [])
+
+        total_prospects = summary.get("total_prospects", 0)
+        a_grade = summary.get("a_grade", 0)
+        avg_score = summary.get("avg_score", 0)
+        states_n = summary.get("states_covered", 0)
+
+        # --- Conviction Score (0-100) ---
+        score_components = []
+        # Target volume (0-25): 789+ A-grade = full marks
+        score_components.append(min(a_grade / 789 * 25, 25) if a_grade > 0 else 0)
+        # Average quality (0-20): avg score 70+ = full marks
+        score_components.append(min(avg_score / 70 * 20, 20) if avg_score > 0 else 0)
+        # Geographic breadth (0-15): 30+ states = full marks
+        score_components.append(min(states_n / 30 * 15, 15) if states_n > 0 else 0)
+        # Deal model present (0-20)
+        score_components.append(20 if deal_model.get("total_revenue") else 0)
+        # Data layers populated (0-20)
+        data_layers = [
+            "stealth_wealth", "migration_alpha", "provider_density",
+            "real_estate_alpha", "deposit_wealth", "business_formation",
+            "opportunity_zones", "demographic_demand", "pe_competitive",
+            "construction_momentum", "medical_cpi", "talent_pipeline",
+        ]
+        populated = sum(1 for k in data_layers if data.get(k))
+        score_components.append(populated / len(data_layers) * 20)
+
+        conviction = max(0, min(100, round(sum(score_components))))
+
+        # --- Verdict ---
+        if conviction >= 65:
+            verdict = "BUY"
+        elif conviction >= 40:
+            verdict = "WATCH"
+        else:
+            verdict = "PASS"
+
+        # --- Extract deal model numbers ---
+        scenarios = deal_model.get("scenarios", {})
+        base_sc = scenarios.get("base", {})
+        cons_sc = scenarios.get("conservative", {})
+        aggr_sc = scenarios.get("aggressive", {})
+
+        base_irr = base_sc.get("net_irr", 0) * 100 if base_sc.get("net_irr") else 0
+        cons_irr = cons_sc.get("net_irr", 0) * 100 if cons_sc.get("net_irr") else 0
+        aggr_irr = aggr_sc.get("net_irr", 0) * 100 if aggr_sc.get("net_irr") else 0
+        base_moic = base_sc.get("gross_moic", 0)
+
+        portfolio_rev = deal_model.get("total_revenue", 0)
+        cap_stack = deal_model.get("capital_stack", {})
+        total_capital = cap_stack.get("total_capital_required", 0)
+        equity_check = cap_stack.get("equity", 0)
+
+        # --- Rationale ---
+        rationale_parts = []
+        if a_grade > 100:
+            rationale_parts.append(
+                f"{_fmt(a_grade)} A-grade targets across {states_n} states "
+                "provide deep acquisition pipeline"
+            )
+        elif a_grade > 0:
+            rationale_parts.append(
+                f"{_fmt(a_grade)} A-grade targets identified — pipeline exists but may need expansion"
+            )
+        if base_irr > 0:
+            rationale_parts.append(
+                f"Base case returns of {base_irr:.0f}% IRR "
+                f"with {base_moic:.1f}x MOIC support the thesis"
+            )
+        rationale = ". ".join(rationale_parts) + "." if rationale_parts else "Insufficient data for assessment."
+
+        # --- Top 3 Risks ---
+        risks = []
+        if prospects_by_state:
+            top_state = prospects_by_state[0]
+            top_pct = round(top_state["count"] / total_prospects * 100) if total_prospects > 0 else 0
+            if top_pct > 40:
+                risks.append({
+                    "title": "Geographic Concentration",
+                    "detail": f"{top_state['state']} = {top_pct}% of targets. "
+                              "Single-state regulatory or economic shock could impact portfolio.",
+                    "severity": "high",
+                })
+            elif top_pct > 25:
+                risks.append({
+                    "title": "Geographic Concentration",
+                    "detail": f"{top_state['state']} = {top_pct}% of targets. Moderate concentration.",
+                    "severity": "medium",
+                })
+
+        if populated < 6:
+            risks.append({
+                "title": "Data Gaps",
+                "detail": f"Only {populated} of {len(data_layers)} data layers populated. "
+                          "Key signals (talent, real estate, deposits) may be missing.",
+                "severity": "high" if populated < 3 else "medium",
+            })
+
+        if not data.get("talent_pipeline"):
+            risks.append({
+                "title": "Talent Pipeline Unknown",
+                "detail": "Healthcare JOLTS data not ingested — cannot assess "
+                          "labor supply risk for aesthetics practitioners.",
+                "severity": "medium",
+            })
+
+        if len(risks) < 3 and not pe_financials:
+            risks.append({
+                "title": "Limited PE Benchmarks",
+                "detail": "No PE platform financial data for comp validation. "
+                          "Deal multiples are industry estimates.",
+                "severity": "low",
+            })
+        if len(risks) < 3:
+            risks.append({
+                "title": "Fragmented Market",
+                "detail": "Med-spa roll-ups face integration complexity — "
+                          "no single platform has achieved national scale.",
+                "severity": "low",
+            })
+
+        cadence = (
+            f"Yr 1: Platform acquisition (top {min(a_grade, 50)}) | "
+            f"Yr 2: Scale to {min(a_grade, 200)} locations | "
+            "Yr 3-5: Full portfolio build + exits"
+        )
+
+        return {
+            "verdict": verdict,
+            "conviction": conviction,
+            "rationale": rationale,
+            "portfolio_revenue": portfolio_rev,
+            "a_grade": a_grade,
+            "irr_low": cons_irr,
+            "irr_high": aggr_irr,
+            "base_moic": base_moic,
+            "total_capital": total_capital,
+            "equity_check": equity_check,
+            "risks": risks[:3],
+            "cadence": cadence,
+            "data_layers_populated": populated,
+            "data_layers_total": len(data_layers),
+            "last_refresh": data.get("generated_at", "N/A"),
+        }
 
     def _get_summary_stats(self, db: Session, state: Optional[str]) -> Dict:
         """Get total addressable market overview stats."""
@@ -481,7 +1122,12 @@ class MedSpaMarketTemplate:
                     ROUND(AVG(rating), 2) as avg_rating,
                     ROUND(AVG(review_count), 0) as avg_reviews,
                     ROUND(AVG(zip_overall_score), 1) as avg_zip_score,
-                    SUM(review_count) as total_reviews
+                    SUM(review_count) as total_reviews,
+                    COUNT(*) FILTER (WHERE ownership_type = 'Independent') as independent_count,
+                    COUNT(*) FILTER (WHERE ownership_type = 'Multi-Site') as multi_site_count,
+                    COUNT(*) FILTER (WHERE ownership_type = 'PE-Backed') as pe_backed_count,
+                    COUNT(*) FILTER (WHERE ownership_type = 'Public') as public_count,
+                    COUNT(*) FILTER (WHERE ownership_type IS NOT NULL) as classified_count
                 FROM medspa_prospects
                 WHERE 1=1 {state_clause}
             """),
@@ -494,6 +1140,8 @@ class MedSpaMarketTemplate:
                 "ab_grade": 0, "states_covered": 0, "zips_covered": 0,
                 "avg_score": 0, "max_score": 0, "avg_rating": 0,
                 "avg_reviews": 0, "avg_zip_score": 0, "total_reviews": 0,
+                "independent_count": 0, "multi_site_count": 0,
+                "pe_backed_count": 0, "public_count": 0, "classified_count": 0,
             }
 
         return {
@@ -509,6 +1157,11 @@ class MedSpaMarketTemplate:
             "avg_reviews": int(row[9]) if row[9] else 0,
             "avg_zip_score": float(row[10]) if row[10] else 0,
             "total_reviews": int(row[11]) if row[11] else 0,
+            "independent_count": row[12],
+            "multi_site_count": row[13],
+            "pe_backed_count": row[14],
+            "public_count": row[15],
+            "classified_count": row[16],
         }
 
     def _get_prospects_by_state(self, db: Session, state: Optional[str]) -> List[Dict]:
@@ -609,7 +1262,8 @@ class MedSpaMarketTemplate:
                     zip_affluence_sub, yelp_rating_sub,
                     review_volume_sub, low_competition_sub,
                     price_tier_sub, competitor_count_in_zip,
-                    phone, url
+                    phone, url,
+                    ownership_type, parent_entity, location_count
                 FROM medspa_prospects
                 WHERE acquisition_grade IN ('A', 'B') {state_clause}
                 ORDER BY acquisition_score DESC
@@ -638,6 +1292,9 @@ class MedSpaMarketTemplate:
                 "competitors": int(row[16]) if row[16] else 0,
                 "phone": row[17],
                 "url": row[18],
+                "ownership_type": row[19],
+                "parent_entity": row[20],
+                "location_count": int(row[21]) if row[21] else 1,
             }
             for row in result.fetchall()
         ]
@@ -1268,25 +1925,26 @@ class MedSpaMarketTemplate:
     def _get_bls_wage_data(self, db: Session) -> Dict:
         """Get BLS OES wage trends for aesthetics-adjacent occupations."""
         # Target series IDs: annual mean wages (data type 04) for key occupations
+        # National-level (OEUN prefix), All Industries (000000)
         WAGE_SERIES = {
-            "OEUM000000000000029122904": "Dermatologists",
-            "OEUM000000000000029114104": "Registered Nurses",
-            "OEUM000000000000029117104": "Nurse Practitioners",
-            "OEUM000000000000031901104": "Massage Therapists",
-            "OEUM000000000000039501204": "Cosmetologists",
-            "OEUM000000000000031909904": "Healthcare Support",
-            "OEUM000000000000029107104": "Physician Assistants",
-            "OEUM000000000000029209904": "Health Technicians",
+            "OEUN000000000000029122904": "Dermatologists",
+            "OEUN000000000000029114104": "Registered Nurses",
+            "OEUN000000000000029117104": "Nurse Practitioners",
+            "OEUN000000000000031901104": "Massage Therapists",
+            "OEUN000000000000039501204": "Cosmetologists",
+            "OEUN000000000000031909904": "Healthcare Support",
+            "OEUN000000000000029107104": "Physician Assistants",
+            "OEUN000000000000029209904": "Health Technicians",
         }
         EMPLOYMENT_SERIES = {
-            "OEUM000000000000029122901": "Dermatologists",
-            "OEUM000000000000029114101": "Registered Nurses",
-            "OEUM000000000000029117101": "Nurse Practitioners",
-            "OEUM000000000000031901101": "Massage Therapists",
-            "OEUM000000000000039501201": "Cosmetologists",
-            "OEUM000000000000031909901": "Healthcare Support",
-            "OEUM000000000000029107101": "Physician Assistants",
-            "OEUM000000000000029209901": "Health Technicians",
+            "OEUN000000000000029122901": "Dermatologists",
+            "OEUN000000000000029114101": "Registered Nurses",
+            "OEUN000000000000029117101": "Nurse Practitioners",
+            "OEUN000000000000031901101": "Massage Therapists",
+            "OEUN000000000000039501201": "Cosmetologists",
+            "OEUN000000000000031909901": "Healthcare Support",
+            "OEUN000000000000029107101": "Physician Assistants",
+            "OEUN000000000000029209901": "Health Technicians",
         }
         try:
             # Wages
@@ -1296,7 +1954,7 @@ class MedSpaMarketTemplate:
                     SELECT series_id, year, value
                     FROM bls_oes
                     WHERE series_id = ANY(:ids)
-                      AND period = 'M13'
+                      AND period IN ('A01', 'M13')
                     ORDER BY year
                 """),
                 {"ids": wage_ids},
@@ -1315,7 +1973,7 @@ class MedSpaMarketTemplate:
                     SELECT series_id, year, value
                     FROM bls_oes
                     WHERE series_id = ANY(:ids)
-                      AND period = 'M13'
+                      AND period IN ('A01', 'M13')
                     ORDER BY year
                 """),
                 {"ids": emp_ids},
@@ -1858,6 +2516,28 @@ class MedSpaMarketTemplate:
             if state:
                 params["state"] = state.upper()
 
+            # Valid US 2-letter state codes (filter out foreign codes like "FR")
+            us_states = {
+                'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID',
+                'IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS',
+                'MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK',
+                'OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV',
+                'WI','WY','DC','PR','VI','GU','AS','MP',
+            }
+
+            # Magnitude detection: IRS SOI AGI is reported in thousands.
+            # Sample a few rows to verify the * 1000 multiplier is needed.
+            sample = db.execute(text(
+                "SELECT AVG(total_agi) FROM ("
+                "  SELECT total_agi FROM irs_soi_migration"
+                "  WHERE tax_year = :year AND total_agi > 0"
+                "  LIMIT 100"
+                ") s"
+            ), {"year": latest_year}).fetchone()
+            # If avg AGI per row > $1B, data is likely already in dollars (no multiplier needed)
+            avg_sample = float(sample[0]) if sample and sample[0] else 0
+            agi_multiplier = 1 if avg_sample > 1_000_000_000 else 1000
+
             # --- State-level net AGI flows ---
             state_flows_rows = db.execute(text(f"""
                 WITH inflows AS (
@@ -1866,6 +2546,7 @@ class MedSpaMarketTemplate:
                            SUM(num_returns) AS inflow_returns
                     FROM irs_soi_migration m
                     WHERE tax_year = :year AND flow_type = 'inflow'
+                        AND LENGTH(m.dest_state_abbr) = 2
                         {state_clause_dest}
                     GROUP BY dest_state_abbr
                 ),
@@ -1875,6 +2556,7 @@ class MedSpaMarketTemplate:
                            SUM(num_returns) AS outflow_returns
                     FROM irs_soi_migration m
                     WHERE tax_year = :year AND flow_type = 'outflow'
+                        AND LENGTH(m.dest_state_abbr) = 2
                         {state_clause_dest}
                     GROUP BY dest_state_abbr
                 ),
@@ -1906,12 +2588,13 @@ class MedSpaMarketTemplate:
                 ORDER BY net_agi DESC
             """), params).fetchall()
 
+            # Filter to valid US state codes only
             state_flows = [
                 {
                     "state": r[0],
-                    "inflow_agi_m": round(float(r[1] or 0) * 1000 / 1e6, 1),
-                    "outflow_agi_m": round(float(r[2] or 0) * 1000 / 1e6, 1),
-                    "net_agi_m": round(float(r[3] or 0) * 1000 / 1e6, 1),
+                    "inflow_agi_m": round(float(r[1] or 0) * agi_multiplier / 1e6, 1),
+                    "outflow_agi_m": round(float(r[2] or 0) * agi_multiplier / 1e6, 1),
+                    "net_agi_m": round(float(r[3] or 0) * agi_multiplier / 1e6, 1),
                     "inflow_returns": int(r[4] or 0),
                     "outflow_returns": int(r[5] or 0),
                     "total_medspas": int(r[6] or 0),
@@ -1919,9 +2602,19 @@ class MedSpaMarketTemplate:
                     "migration_alpha": round(float(r[8] or 0), 1),
                 }
                 for r in state_flows_rows
+                if r[0] in us_states
             ]
 
-            # --- Top county-level inflows ---
+            # Range validation — cap at $10T to catch overflow from unit confusion
+            total_abs = sum(abs(s["net_agi_m"]) for s in state_flows)
+            if total_abs > 10_000_000:  # > $10T = something is wrong
+                logger.warning(
+                    f"Migration alpha total absolute flow ${total_abs:,.0f}M exceeds "
+                    "sanity check — possible unit confusion. Zeroing out."
+                )
+                return {"migration_alpha": {}}
+
+            # --- Top county-level inflows (filter NULL counties and foreign codes) ---
             county_rows = db.execute(text(f"""
                 SELECT
                     m.dest_state_abbr,
@@ -1931,6 +2624,9 @@ class MedSpaMarketTemplate:
                     SUM(m.num_returns) AS inflow_returns
                 FROM irs_soi_migration m
                 WHERE m.tax_year = :year AND m.flow_type = 'inflow'
+                    AND m.dest_county_name IS NOT NULL
+                    AND LENGTH(m.dest_state_abbr) = 2
+                    AND LENGTH(m.orig_state_abbr) = 2
                     {state_clause_dest}
                 GROUP BY m.dest_state_abbr, m.dest_county_name, m.orig_state_abbr
                 ORDER BY inflow_agi DESC
@@ -1942,10 +2638,11 @@ class MedSpaMarketTemplate:
                     "dest_state": r[0],
                     "county": r[1],
                     "orig_state": r[2],
-                    "agi_m": round(float(r[3] or 0) * 1000 / 1e6, 1),
+                    "agi_m": round(float(r[3] or 0) * agi_multiplier / 1e6, 1),
                     "returns": int(r[4] or 0),
                 }
                 for r in county_rows
+                if r[0] in us_states and r[2] in us_states
             ]
 
             # --- Classify emerging markets ---
@@ -3485,6 +4182,36 @@ class MedSpaMarketTemplate:
         medical_cpi = data.get("medical_cpi", {})
         talent_pipeline = data.get("talent_pipeline", {})
 
+        # CEO Overview data
+        ceo = data.get("ceo_overview", {})
+
+        # Sections 28-32 data
+        sensitivity = data.get("sensitivity", {})
+        jcurve = data.get("jcurve", {})
+        alpha_composite = data.get("alpha_composite", {})
+        cohort_economics = data.get("cohort_economics", {})
+
+        # Section data availability map — sections 16-32 can be collapsed
+        section_has_data = {
+            16: bool(stealth_wealth),
+            17: bool(migration_alpha),
+            18: bool(provider_density) and provider_density.get("summary", {}).get("total_provider_zip_pairs", 0) > 5,
+            19: bool(real_estate_alpha),
+            20: bool(deposit_wealth),
+            21: bool(business_formation),
+            22: bool(opportunity_zones),
+            23: bool(demographic_demand),
+            24: bool(pe_competitive),
+            25: bool(construction_momentum),
+            26: bool(medical_cpi),
+            27: bool(talent_pipeline),
+            28: bool(sensitivity),
+            29: bool(jcurve),
+            30: bool(alpha_composite) and len(alpha_composite.get("states", [])) > 0,
+            31: bool(cohort_economics),
+            32: deal_model.get("total_locations", 0) > 0,
+        }
+
         charts_js = ""
         body = ""
 
@@ -3512,6 +4239,7 @@ class MedSpaMarketTemplate:
 
         # ---- Table of Contents ----
         toc_items = [
+            {"number": "\u2605", "id": "ceo-overview", "title": "CEO Overview \u2014 Investment Verdict"},
             {"number": 1, "id": "exec-summary", "title": "Executive Summary"},
             {"number": 2, "id": "market-map", "title": "Market Map"},
             {"number": 3, "id": "top-targets", "title": "Top Acquisition Targets"},
@@ -3539,8 +4267,121 @@ class MedSpaMarketTemplate:
             {"number": 25, "id": "construction-momentum", "title": "Construction Momentum Signal"},
             {"number": 26, "id": "medical-cpi", "title": "Medical CPI Pricing Power"},
             {"number": 27, "id": "talent-pipeline", "title": "Talent Pipeline Pressure"},
+            {"number": 28, "id": "sensitivity", "title": "Sensitivity Analysis"},
+            {"number": 29, "id": "jcurve", "title": "J-Curve & Deployment Cash Flow"},
+            {"number": 30, "id": "alpha-composite", "title": "Multi-Factor Alpha Scoring"},
+            {"number": 31, "id": "cohort-economics", "title": "Cohort Economics"},
+            {"number": 32, "id": "portfolio-construction", "title": "Portfolio Construction"},
         ]
-        body += "\n" + toc(toc_items)
+        # Filter TOC: exclude collapsed sections (16-27 without data)
+        visible_toc = [
+            item for item in toc_items
+            if not isinstance(item["number"], int)
+            or item["number"] < 16
+            or section_has_data.get(item["number"], True)
+        ]
+        body += "\n" + toc(visible_toc)
+
+        # ==================================================================
+        # CEO Overview — Investment Verdict (unnumbered, before Section 1)
+        # ==================================================================
+        if ceo:
+            verdict = ceo.get("verdict", "WATCH")
+            conviction = ceo.get("conviction", 0)
+            verdict_class = verdict.lower()
+
+            # Conviction bar color
+            if conviction >= 65:
+                bar_color = "#48bb78"
+            elif conviction >= 40:
+                bar_color = "#ed8936"
+            else:
+                bar_color = "#fc8181"
+
+            body += f"""
+<div class="container"><div class="ceo-overview" id="ceo-overview">
+    <div class="ceo-overview-header">
+        <div class="section-number" style="background:{bar_color}">\u2605</div>
+        <h2>CEO Overview &mdash; Investment Verdict</h2>
+    </div>
+    <div class="ceo-overview-body">
+
+    <div class="verdict-banner {verdict_class}">
+        <div class="verdict-label">{verdict}</div>
+        <div class="verdict-details">
+            <div class="verdict-rationale">{ceo.get('rationale', '')}</div>
+        </div>
+        <div class="conviction-bar-wrap">
+            <div class="conviction-label">Conviction Score</div>
+            <div class="conviction-bar-track">
+                <div class="conviction-bar-fill" style="width:{conviction}%;background:{bar_color}"></div>
+            </div>
+            <div class="conviction-score">{conviction}/100</div>
+        </div>
+    </div>
+
+    <div class="ceo-kpi-grid">
+        <div class="ceo-kpi-card">
+            <div class="ceo-kpi-label">Opportunity Size</div>
+            <div class="ceo-kpi-value">{_fmt_currency(ceo.get('portfolio_revenue', 0))} portfolio revenue</div>
+            <div class="ceo-kpi-detail">{_fmt(ceo.get('a_grade', 0))} A-grade locations</div>
+        </div>
+        <div class="ceo-kpi-card">
+            <div class="ceo-kpi-label">Expected Returns</div>
+            <div class="ceo-kpi-value">{ceo.get('irr_low', 0):.0f}&ndash;{ceo.get('irr_high', 0):.0f}% IRR range</div>
+            <div class="ceo-kpi-detail">{ceo.get('base_moic', 0):.1f}x base MOIC</div>
+        </div>
+        <div class="ceo-kpi-card">
+            <div class="ceo-kpi-label">Capital Required</div>
+            <div class="ceo-kpi-value">{_fmt_currency(ceo.get('total_capital', 0))} total</div>
+            <div class="ceo-kpi-detail">{_fmt_currency(ceo.get('equity_check', 0))} equity check</div>
+        </div>
+    </div>"""
+
+            # Risk cards
+            risks = ceo.get("risks", [])
+            if risks:
+                body += '\n    <h3 style="font-size:14px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 8px">Top Risks</h3>'
+                body += '\n    <div class="risk-cards">'
+                for risk in risks:
+                    severity = risk.get("severity", "low")
+                    body += f"""
+        <div class="risk-card {severity}">
+            <div class="risk-title">{risk.get('title', '')}</div>
+            <div class="risk-detail">{risk.get('detail', '')}</div>
+        </div>"""
+                body += "\n    </div>"
+
+            # Cadence
+            cadence = ceo.get("cadence", "")
+            if cadence:
+                body += f"""
+    <div class="cadence-line">
+        <strong>Acquisition Cadence:</strong> {cadence}
+    </div>"""
+
+            # Data freshness bar
+            pop = ceo.get("data_layers_populated", 0)
+            total_layers = ceo.get("data_layers_total", 12)
+            fresh_pct = round(pop / total_layers * 100) if total_layers > 0 else 0
+            refresh_time = ceo.get("last_refresh", "N/A")
+            if refresh_time and len(refresh_time) > 10:
+                refresh_time = refresh_time[:10]  # just the date
+
+            body += f"""
+    <div class="freshness-bar-wrap">
+        <div class="freshness-label">
+            <span>{pop} of {total_layers} data layers populated</span>
+            <span>Last refresh: {refresh_time}</span>
+        </div>
+        <div class="freshness-bar-track">
+            <div class="freshness-bar-fill" style="width:{fresh_pct}%"></div>
+        </div>
+    </div>
+
+    </div>
+</div></div>
+"""
 
         # ==================================================================
         # Section 1: Executive Summary
@@ -3587,6 +4428,75 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
     <div class="metric-detail">{gd['pct']}% of total pipeline</div>
 </div>"""
         body += "</div>"
+
+        # Ownership breakdown (only if classifier has run)
+        classified_n = summary.get("classified_count", 0)
+        indep_n = summary.get("independent_count", 0)
+        multi_n = summary.get("multi_site_count", 0)
+        pe_n = summary.get("pe_backed_count", 0)
+        pub_n = summary.get("public_count", 0)
+
+        if classified_n > 0:
+            indep_pct = round(indep_n / total_p * 100) if total_p else 0
+
+            # Ownership doughnut chart
+            own_labels = ["Independent", "Multi-Site", "PE-Backed", "Public"]
+            own_values = [float(indep_n), float(multi_n), float(pe_n), float(pub_n)]
+            own_colors = [GREEN, ORANGE, BLUE, GRAY]
+            own_donut_config = build_doughnut_config(own_labels, own_values, own_colors)
+            own_donut_json = json.dumps(own_donut_config)
+
+            body += '<div class="chart-row">'
+            body += "<div>"
+            body += chart_container(
+                "ownershipDonut", own_donut_json,
+                build_bar_fallback(own_labels, own_values),
+                size="medium",
+                title="Ownership Breakdown",
+            )
+            charts_js += chart_init_js("ownershipDonut", own_donut_json)
+            body += build_chart_legend(own_labels, own_values, own_colors, show_pct=True)
+            body += "</div>"
+
+            # Ownership KPI cards
+            body += '<div><div class="metric-grid">'
+            body += f"""<div class="metric-card">
+    <div class="metric-label">Independent</div>
+    <div class="metric-value" style="color:{GREEN}">{_fmt(indep_n)}</div>
+    <div class="metric-detail">{indep_pct}% of prospects</div>
+</div>"""
+            body += f"""<div class="metric-card">
+    <div class="metric-label">Multi-Site</div>
+    <div class="metric-value" style="color:{ORANGE}">{_fmt(multi_n)}</div>
+    <div class="metric-detail">Chain / franchise</div>
+</div>"""
+            body += f"""<div class="metric-card">
+    <div class="metric-label">PE-Backed</div>
+    <div class="metric-value" style="color:{BLUE}">{_fmt(pe_n)}</div>
+    <div class="metric-detail">Portfolio companies</div>
+</div>"""
+            body += f"""<div class="metric-card">
+    <div class="metric-label">Public</div>
+    <div class="metric-value" style="color:{GRAY}">{_fmt(pub_n)}</div>
+    <div class="metric-detail">Publicly traded</div>
+</div>"""
+            body += "</div></div>"
+            body += "</div>"  # close chart-row
+
+            body += callout(
+                f"<strong>Ownership Intelligence:</strong> {indep_pct}% of prospects "
+                f"({_fmt(indep_n)}) are independent — the primary roll-up target pool. "
+                f"{_fmt(pe_n + pub_n)} prospects are already PE-backed or public and "
+                "should be deprioritized for acquisition.",
+                variant="good" if indep_pct >= 50 else "warn",
+            )
+        else:
+            body += callout(
+                "<strong>Ownership data not yet available.</strong> Run "
+                "<code>POST /medspa-discovery/classify</code> to classify prospects "
+                "by ownership type (Independent, Multi-Site, PE-Backed, Public).",
+                variant="neutral",
+            )
 
         body += "\n" + section_end()
 
@@ -3689,6 +4599,18 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
             body += "</div>"
 
         body += "</div>"  # close chart-row
+
+        # Narrative: So What for Market Map
+        if prospects_by_state and a_grade_state:
+            top_3_states = ", ".join(s["state"] for s in prospects_by_state[:3])
+            body += callout(
+                f"<strong>So What:</strong> The prospect universe of {_fmt(summary.get('total_prospects'))} "
+                f"locations across {summary.get('states_covered', 0)} states is large enough to build a "
+                f"multi-hundred-location platform. Concentration in <strong>{top_3_states}</strong> "
+                "supports a CA-first acquisition strategy with geographic diversification in Year 2+.",
+                variant="good",
+            )
+
         body += "\n" + section_end()
 
         # ==================================================================
@@ -3696,6 +4618,9 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
         # ==================================================================
         body += "\n" + section_start(3, "Top Acquisition Targets", "top-targets")
         body += f'<p><strong>{len(top_targets)}</strong> highest-scoring A/B-grade prospects ranked by composite acquisition score.</p>'
+
+        # Check if any prospect has ownership data
+        has_ownership = any(t.get("ownership_type") for t in top_targets)
 
         if top_targets:
             table_rows = []
@@ -3709,26 +4634,57 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
                 )
                 price_display = t.get("price") or "-"
 
-                table_rows.append([
+                # Name with optional parent entity subtitle
+                name_html = f'<span class="company-name">{t["name"]}</span>'
+                otype = t.get("ownership_type")
+                parent = t.get("parent_entity")
+                if parent and otype in ("Multi-Site", "PE-Backed") and parent != t["name"]:
+                    name_html += f'<br><span style="font-size:11px;color:#718096">{parent}</span>'
+
+                # Ownership badge
+                if has_ownership:
+                    if otype:
+                        own_variant = OWNERSHIP_BADGE_COLORS.get(otype, "default")
+                        loc = t.get("location_count", 1)
+                        own_label = otype if loc <= 1 else f"{otype} ({loc})"
+                        own_html = pill_badge(own_label, own_variant)
+                    else:
+                        own_html = '<span style="color:#a0aec0">—</span>'
+
+                row = [
                     str(i),
-                    f'<span class="company-name">{t["name"]}</span>',
+                    name_html,
                     t.get("city") or "-",
                     t.get("state") or "-",
                     score_html,
                     grade_html,
+                ]
+                if has_ownership:
+                    row.append(own_html)
+                row.extend([
                     f'{t["rating"]:.1f}',
                     _fmt(t["reviews"]),
                     zip_grade_html,
                     price_display,
                 ])
 
+                table_rows.append(row)
+
+            headers = ["#", "Name", "City", "State", "Score", "Grade"]
+            if has_ownership:
+                headers.append("Type")
+            headers.extend(["Rating", "Reviews", "ZIP Grade", "Price"])
+
+            # Numeric columns shift by 1 when ownership column is present
+            if has_ownership:
+                num_cols = {0, 4, 7, 8}  # #, Score, Rating, Reviews
+            else:
+                num_cols = {0, 4, 6, 7}  # #, Score, Rating, Reviews
+
             body += data_table(
-                headers=[
-                    "#", "Name", "City", "State", "Score",
-                    "Grade", "Rating", "Reviews", "ZIP Grade", "Price",
-                ],
+                headers=headers,
                 rows=table_rows,
-                numeric_columns={0, 4, 6, 7},
+                numeric_columns=num_cols,
             )
 
             # Insight callout
@@ -3738,12 +4694,24 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
                     st = t.get("state", "??")
                     top_state_counts[st] = top_state_counts.get(st, 0) + 1
                 top_state = max(top_state_counts, key=top_state_counts.get)
+                top_state_pct = round(top_state_counts[top_state] / len(top_targets) * 100)
                 body += callout(
                     f"<strong>Insight:</strong> {top_state_counts[top_state]} of the top "
                     f"{len(top_targets)} targets are in <strong>{top_state}</strong>. "
                     f"Average score among top targets: <strong>"
                     f"{sum(t['score'] for t in top_targets) / len(top_targets):.1f}</strong>.",
                 )
+
+                # Geographic concentration warning
+                if top_state_pct > 40:
+                    body += callout(
+                        f"<strong>Concentration Risk:</strong> {top_state} represents "
+                        f"<strong>{top_state_pct}%</strong> of top targets. A CA-first platform "
+                        "strategy is viable but creates single-state regulatory risk. Consider "
+                        "diversifying into TX, FL, or NY for Year 2 bolt-on acquisitions to "
+                        "mitigate geographic concentration.",
+                        variant="warn",
+                    )
         else:
             body += callout(
                 "<strong>No A/B-grade targets found.</strong> Run the med-spa discovery "
@@ -3900,6 +4868,17 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
                     f"A-grade affluent ZIPs already have med-spa businesses. "
                     f"Focus on acquisition quality over greenfield expansion.",
                 )
+
+        # Narrative: So What for ZIP Affluence
+        if hi_zip_pen.get("total_a_zips") and summary.get("avg_zip_score", 0) > 0:
+            body += callout(
+                f"<strong>So What — Pricing Thesis Validated:</strong> Prospects cluster in ZIPs "
+                f"with an average affluence score of {summary.get('avg_zip_score', 0):.0f}/100. "
+                "This validates the premium pricing thesis — target locations sit in communities "
+                "with above-average discretionary income, supporting $300-500 per-visit ASPs "
+                "for injectables and laser treatments.",
+                variant="good",
+            )
 
         body += "\n" + section_end()
 
@@ -4256,6 +5235,17 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
                 f"de novo clinic launches or franchise expansion.",
                 variant="good",
             )
+
+            # Narrative: So What for Whitespace
+            if ws_count > 50:
+                body += callout(
+                    f"<strong>So What — Greenfield Quantified:</strong> {_fmt(ws_count)} "
+                    "whitespace ZIPs means the roll-up doesn't depend solely on existing "
+                    "operator acquisitions. A blended strategy of buy (existing med-spas) + "
+                    "build (de novo in whitespace ZIPs) could accelerate portfolio growth "
+                    "while maintaining acquisition discipline on multiples.",
+                    variant="good",
+                )
         else:
             body += callout(
                 "<strong>No whitespace data available.</strong> Run ZIP affluence scoring "
@@ -4505,7 +5495,7 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
 
                 body += chart_container(
                     "peRevenueChart", rev_bar_json,
-                    build_bar_fallback(rev_labels, rev_values),
+                    build_bar_fallback(rev_labels, rev_values, format_fn=_fmt_currency),
                     title="Revenue by Platform (Top 8)",
                     height=rev_bar_height,
                 )
@@ -4513,8 +5503,11 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
 
             body += callout(
                 "<strong>Data Confidence Note:</strong> Financial data for private PE-backed "
-                "platforms is estimated based on industry analysis, employee counts, and "
-                "comparable transactions. Treat as directional benchmarks, not audited figures.",
+                "platforms is estimated from SEC filings, employee counts, and comparable "
+                "transactions. A <strong>&ldquo;low&rdquo; confidence</strong> tag means the "
+                "figure is modeled rather than disclosed — this is normal for private companies "
+                "and does not indicate a data quality issue. Treat as directional benchmarks "
+                "for deal structuring, not audited figures.",
                 variant="warn",
             )
         else:
@@ -5021,6 +6014,34 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
         body += "\n" + section_end()
 
         # ==================================================================
+        # Sections 16-27: Collapsible — render as single line if no data
+        # ==================================================================
+        _collapsed_sections = {
+            16: ("Stealth Wealth Signal", "stealth-wealth"),
+            17: ("Migration Alpha", "migration-alpha"),
+            18: ("Medical Provider Density Signal", "provider-density"),
+            19: ("Real Estate Appreciation Alpha", "re-alpha"),
+            20: ("Deposit Wealth Concentration", "deposit-wealth"),
+            21: ("Business Formation Velocity", "biz-formation"),
+            22: ("Opportunity Zone Overlay", "oz-overlay"),
+            23: ("Demographic Demand Model", "demographic-demand"),
+            24: ("PE Competitive Heat Map", "pe-heatmap"),
+            25: ("Construction Momentum Signal", "construction-momentum"),
+            26: ("Medical CPI Pricing Power", "medical-cpi"),
+            27: ("Talent Pipeline Pressure", "talent-pipeline"),
+        }
+
+        def _collapsed_section(num: int) -> str:
+            title, sid = _collapsed_sections[num]
+            return (
+                f'<div class="container"><div class="section-collapsed" id="{sid}">'
+                f'<div class="section-number">{num}</div>'
+                f'<span class="section-title">{title}</span>'
+                f'<span class="section-status">Data not yet ingested</span>'
+                f'</div></div>'
+            )
+
+        # ==================================================================
         # Section 16: Stealth Wealth Signal
         # ==================================================================
         body += "\n" + section_start(16, "Stealth Wealth Signal", "stealth-wealth")
@@ -5039,6 +6060,18 @@ ZIP-level affluence data (IRS SOI), Yelp consumer signals, and competitive densi
                 "to reveal hidden demand in affluent ZIPs.",
                 variant="info",
             )
+        elif not sw_zips and sw_summary.get("total_stealth", 0) == 0:
+            body += callout(
+                "<strong>No stealth wealth ZIPs found matching criteria.</strong> "
+                "IRS SOI data is ingested, but no ZIPs have &gt;25% non-wage income AND "
+                "a medspa score below 70. This means existing medspa coverage already "
+                "captures the affluent non-wage-income ZIPs — a positive sign for market "
+                "efficiency. Adjust thresholds or add more ZIP-level data to expand this analysis.",
+                variant="info",
+            )
+            # Still show wealth composition if available
+            if sw_comp:
+                body += f'<p style="margin:12px 0;font-size:14px;color:var(--gray-600)">Tax year: <strong>{sw_comp.get("tax_year", "?")}</strong> | Total AGI: <strong>${sw_comp.get("total_agi_billions", 0):.1f}B</strong></p>'
         else:
             # KPI cards
             sw_cards = ""
@@ -5334,6 +6367,16 @@ States receiving large AGI inflows but with few A-grade medspas represent a
                 "surgeons, NPs, and PAs billing Medicare with medspa density to find "
                 "referral opportunity ZIPs.",
                 variant="info",
+            )
+        elif pd_summary.get("total_provider_zip_pairs", 0) <= 5:
+            body += callout(
+                f"<strong>Limited provider data available</strong> — only "
+                f"{pd_summary.get('total_provider_zip_pairs', 0)} provider-ZIP pairs found. "
+                "CMS Medicare utilization data may be partially ingested or filtered too "
+                "aggressively. Run a full CMS ingestion with "
+                "<code>POST /api/v1/cms/ingest/medicare-utilization</code> to expand coverage. "
+                "The provider density signal requires 50+ ZIP pairs for meaningful analysis.",
+                variant="warn",
             )
         else:
             # KPI cards
@@ -6473,6 +7516,364 @@ States receiving large AGI inflows but with few A-grade medspas represent a
 
         body += "\n" + section_end()
 
+        # ==================================================================
+        # Section 28: Sensitivity Analysis
+        # ==================================================================
+        if sensitivity:
+            body += "\n" + section_start(28, "Sensitivity Analysis", "sensitivity")
+
+            irr_grid_data = sensitivity.get("irr_grid", {})
+            moic_grid_data = sensitivity.get("moic_grid", {})
+            tornado_data = sensitivity.get("tornado", {})
+
+            if irr_grid_data and irr_grid_data.get("grid"):
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:12px 0 8px">IRR Sensitivity &mdash; Exit Multiple vs Hold Period</h3>'
+                body += build_sensitivity_grid_html(
+                    row_label="Exit Multiple",
+                    row_values=irr_grid_data["row_values"],
+                    col_label="Hold Years",
+                    col_values=irr_grid_data["col_values"],
+                    grid=irr_grid_data["grid"],
+                    metric_label="Net IRR",
+                    format_fn=lambda v: f"{v * 100:.1f}%",
+                    highlight=irr_grid_data.get("highlight"),
+                    color_scale="green_red",
+                )
+
+            if moic_grid_data and moic_grid_data.get("grid"):
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">MOIC Sensitivity &mdash; Margin Improvement vs Exit Multiple</h3>'
+                body += build_sensitivity_grid_html(
+                    row_label="Margin Impr.",
+                    row_values=moic_grid_data["row_values"],
+                    col_label="Exit Multiple",
+                    col_values=moic_grid_data["col_values"],
+                    grid=moic_grid_data["grid"],
+                    metric_label="Gross MOIC",
+                    format_fn=lambda v: f"{v:.2f}x",
+                    highlight=moic_grid_data.get("highlight"),
+                    color_scale="blue",
+                )
+
+            if tornado_data and tornado_data.get("variables"):
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">What Moves IRR Most? (Tornado Analysis)</h3>'
+                t_labels = [v["name"] for v in tornado_data["variables"]]
+                t_low = [round(v["low_delta"] * 100, 1) for v in tornado_data["variables"]]
+                t_high = [round(v["high_delta"] * 100, 1) for v in tornado_data["variables"]]
+                t_base = tornado_data["base_value"]
+                tornado_config = build_tornado_chart_config(
+                    t_labels, t_low, t_high, t_base, metric_label="IRR (pp)",
+                )
+                tornado_json = json.dumps(tornado_config)
+                body += chart_container(
+                    "tornadoChart", tornado_json,
+                    build_bar_fallback(t_labels, [abs(l) + abs(h) for l, h in zip(t_low, t_high)]),
+                    size="medium",
+                    title="Single-Variable IRR Sensitivity (±20%)",
+                )
+                charts_js += chart_init_js("tornadoChart", tornado_json)
+
+            body += callout(
+                "<strong>Base case highlighted.</strong> Each cell holds all other variables constant. "
+                "The tornado chart shows which single variable swings IRR the most — "
+                "focus diligence on the top drivers.",
+            )
+            body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 29: J-Curve & Deployment Cash Flow
+        # ==================================================================
+        if jcurve:
+            body += "\n" + section_start(29, "J-Curve &amp; Deployment Cash Flow", "jcurve")
+
+            jc_cohorts = jcurve.get("cohorts", [])
+            jc_crossover = jcurve.get("crossover_month")
+            jc_total_capital = jcurve.get("total_capital_deployed", 0)
+            jc_deploy_months = jcurve.get("total_deployment_months", 0)
+
+            # KPI strip
+            jc_cards = ""
+            jc_cards += kpi_card("Capital Deployed", f"${jc_total_capital / 1_000_000:.1f}M")
+            jc_cards += kpi_card("Break-Even Month", f"M{jc_crossover}" if jc_crossover else "N/A")
+            jc_cards += kpi_card("Deployment Timeline", f"{jc_deploy_months} months")
+            jc_cards += kpi_card("Cohorts", str(len(jc_cohorts)))
+            body += "\n" + kpi_strip(jc_cards)
+
+            # J-Curve line chart
+            jc_months = jcurve.get("months", [])
+            jc_invested = jcurve.get("invested", [])
+            jc_returned = jcurve.get("returned", [])
+
+            if jc_months:
+                # Show every 3rd label to avoid crowding
+                display_labels = [m if i % 3 == 0 else "" for i, m in enumerate(jc_months)]
+                jc_line_config = build_line_chart_config(
+                    display_labels,
+                    [
+                        {"label": "Capital Deployed", "data": jc_invested, "color": RED, "fill": True},
+                        {"label": "Cumulative Returns", "data": jc_returned, "color": GREEN, "fill": True},
+                    ],
+                    y_label="Dollars ($)",
+                )
+                jc_line_json = json.dumps(jc_line_config)
+                body += chart_container(
+                    "jcurveChart", jc_line_json, "",
+                    size="tall",
+                    title="J-Curve: Capital Deployed vs Cumulative Returns",
+                )
+                charts_js += chart_init_js("jcurveChart", jc_line_json)
+
+            # Deployment cohort table
+            if jc_cohorts:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">Deployment Cohort Schedule</h3>'
+                cohort_rows = []
+                for c in jc_cohorts:
+                    milestones = "; ".join(c.get("milestones", [])[:2]) or "-"
+                    cohort_rows.append([
+                        f"Phase {c['phase']}",
+                        str(c["locations"]),
+                        f"M{c['start_month']}",
+                        f"${c['acquisition_cost'] / 1_000_000:.1f}M",
+                        f"${c['cumulative_capital'] / 1_000_000:.1f}M",
+                        milestones,
+                    ])
+                body += data_table(
+                    headers=["Phase", "Locations", "Start", "Acq Cost", "Cumulative", "Milestones"],
+                    rows=cohort_rows,
+                    numeric_columns={1, 3, 4},
+                )
+
+            crossover_msg = (
+                f"Break-even at month {jc_crossover} — cumulative EBITDA generation exceeds total capital deployed."
+                if jc_crossover
+                else "Break-even not reached within the modeled period — returns build over a longer hold."
+            )
+            body += callout(
+                f"<strong>Deployment analysis.</strong> {crossover_msg} "
+                "Earlier cohorts generate compounding returns that fund later acquisitions.",
+                variant="good" if jc_crossover and jc_crossover <= 24 else "info",
+            )
+            body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 30: Multi-Factor Alpha Scoring
+        # ==================================================================
+        if alpha_composite and alpha_composite.get("states"):
+            body += "\n" + section_start(30, "Multi-Factor Alpha Scoring", "alpha-composite")
+
+            ac_states = alpha_composite.get("states", [])
+            ac_signal_names = alpha_composite.get("signal_names", [])
+            ac_max = alpha_composite.get("max_signals", 8)
+
+            states_5plus = len([s for s in ac_states if s["signal_count"] >= 5])
+            max_found = ac_states[0]["signal_count"] if ac_states else 0
+
+            # KPI strip
+            ac_cards = ""
+            ac_cards += kpi_card("States with 5+ Signals", str(states_5plus))
+            ac_cards += kpi_card("Max Signal Count", f"{max_found}/{ac_max}")
+            ac_cards += kpi_card("Signals Tracked", str(len(ac_signal_names)))
+            ac_cards += kpi_card("States Analyzed", str(len(ac_states)))
+            body += "\n" + kpi_strip(ac_cards)
+
+            # Ranked table
+            alpha_rows = []
+            for s in ac_states[:20]:
+                signal_pills = " ".join(
+                    f'<span class="signal-pill">{sig}</span>' for sig in s["signals"]
+                )
+                alpha_rows.append([
+                    f'<strong>{s["state"]}</strong>',
+                    str(s["signal_count"]),
+                    f'<div class="signal-pills">{signal_pills}</div>',
+                    str(s["prospect_count"]) if s["prospect_count"] > 0 else "-",
+                ])
+            body += data_table(
+                headers=["State", "Signals", "Which Signals", "A-Grade Prospects"],
+                rows=alpha_rows,
+                numeric_columns={1, 3},
+            )
+
+            # Signal coverage bar chart
+            signal_coverage = []
+            for name in ac_signal_names:
+                count = sum(1 for s in ac_states if name in s["signals"])
+                signal_coverage.append((name, count))
+            signal_coverage.sort(key=lambda x: -x[1])
+
+            sc_labels = [s[0] for s in signal_coverage]
+            sc_values = [s[1] for s in signal_coverage]
+            sc_config = build_horizontal_bar_config(
+                sc_labels, sc_values,
+                dataset_label="States Covered",
+            )
+            sc_json = json.dumps(sc_config)
+            body += chart_container(
+                "signalCoverageBar", sc_json,
+                build_bar_fallback(sc_labels, sc_values),
+                size="medium",
+                title="Signal Coverage — How Many States Each Signal Covers",
+            )
+            charts_js += chart_init_js("signalCoverageBar", sc_json)
+
+            body += callout(
+                f"<strong>Convergent alpha.</strong> States lighting up on 5+ independent signals "
+                f"({states_5plus} states) represent the strongest convergent alpha — multiple independent "
+                "data sources independently flag the same geographies. These are highest-conviction targets.",
+                variant="good" if states_5plus >= 3 else "info",
+            )
+            body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 31: Cohort Economics
+        # ==================================================================
+        if cohort_economics:
+            body += "\n" + section_start(31, "Cohort Economics", "cohort-economics")
+
+            ce_by_state = cohort_economics.get("by_state", [])
+            ce_by_tier = cohort_economics.get("by_tier", [])
+            ce_scatter = cohort_economics.get("scatter_data", [])
+
+            # By-state table
+            if ce_by_state:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:12px 0 8px">Unit Economics by State (Top 10)</h3>'
+                state_rows = []
+                for s in ce_by_state:
+                    state_rows.append([
+                        f'<strong>{s["state"]}</strong>',
+                        str(s["count"]),
+                        f"${s['total_revenue'] / 1_000_000:.1f}M",
+                        f"{s['margin'] * 100:.1f}%",
+                        f"{s['implied_irr'] * 100:.1f}%",
+                    ])
+                body += data_table(
+                    headers=["State", "Count", "Total Rev", "Margin", "Implied IRR"],
+                    rows=state_rows,
+                    numeric_columns={1, 2, 3, 4},
+                )
+
+            # By-tier table
+            if ce_by_tier:
+                body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:20px 0 8px">Unit Economics by Price Tier</h3>'
+                tier_rows = []
+                for t in ce_by_tier:
+                    tier_rows.append([
+                        f'<strong>{t["tier"]}</strong>',
+                        str(t["count"]),
+                        f"${t['avg_revenue']:,.0f}",
+                        f"{t['margin'] * 100:.1f}%",
+                        f"{t['entry_multiple']:.1f}x",
+                        f"{t['implied_irr'] * 100:.1f}%",
+                    ])
+                body += data_table(
+                    headers=["Tier", "Count", "Avg Revenue", "Margin", "Entry Multiple", "Implied IRR"],
+                    rows=tier_rows,
+                    numeric_columns={1, 2, 3, 4, 5},
+                )
+
+            # Scatter plot: margin vs implied IRR
+            if ce_scatter:
+                tier_color_map = {"$": BLUE, "$$": GREEN, "$$$": ORANGE, "$$$$": PURPLE}
+                scatter_datasets = []
+                for pt in ce_scatter:
+                    color = tier_color_map.get(pt["label"], GRAY)
+                    scatter_datasets.append({
+                        "label": pt["label"],
+                        "data": [{"x": pt["x"], "y": pt["y"]}],
+                        "color": color,
+                    })
+                scatter_config = build_scatter_chart_config(
+                    scatter_datasets,
+                    x_label="EBITDA Margin (%)",
+                    y_label="Implied IRR (%)",
+                )
+                scatter_json = json.dumps(scatter_config)
+                body += chart_container(
+                    "cohortScatter", scatter_json, "",
+                    size="medium",
+                    title="Margin vs Implied IRR by Price Tier",
+                )
+                charts_js += chart_init_js("cohortScatter", scatter_json)
+
+            # Sweet-spot identification
+            best_tier = max(ce_by_tier, key=lambda t: t["implied_irr"]) if ce_by_tier else None
+            best_state = max(ce_by_state, key=lambda s: s["implied_irr"]) if ce_by_state else None
+            sweet_spot = ""
+            if best_tier:
+                sweet_spot += f"The <strong>{best_tier['tier']}</strong> price tier delivers the highest implied IRR ({best_tier['implied_irr'] * 100:.1f}%). "
+            if best_state:
+                sweet_spot += f"<strong>{best_state['state']}</strong> is the top state by returns ({best_state['implied_irr'] * 100:.1f}% IRR). "
+            body += callout(
+                f"<strong>Sweet-spot cohorts.</strong> {sweet_spot}"
+                "Focus initial deployment on the highest-IRR cohorts to maximize early returns.",
+                variant="good" if best_tier and best_tier["implied_irr"] > 0.15 else "info",
+            )
+            body += "\n" + section_end()
+
+        # ==================================================================
+        # Section 32: Portfolio Construction
+        # ==================================================================
+        if deal_model.get("total_locations", 0) > 0:
+            body += "\n" + section_start(32, "Portfolio Construction", "portfolio-construction")
+
+            a_grade_states = deal_model.get("a_grade_states", [])
+            total_locs = deal_model.get("total_locations", 0)
+
+            # Compute HHI from state shares
+            hhi = 0
+            geo_rows = []
+            cumulative_pct = 0
+            for s in a_grade_states[:10]:
+                share = s["count"] / total_locs if total_locs > 0 else 0
+                hhi += (share * 100) ** 2
+                cumulative_pct += share * 100
+                geo_rows.append([
+                    f'<strong>{s["state"]}</strong>',
+                    str(s["count"]),
+                    f"{share * 100:.1f}%",
+                    f"{cumulative_pct:.1f}%",
+                ])
+            hhi = round(hhi)
+
+            # HHI interpretation
+            if hhi < 1500:
+                hhi_label = "Unconcentrated"
+                hhi_variant = "good"
+            elif hhi < 2500:
+                hhi_label = "Moderate"
+                hhi_variant = "info"
+            else:
+                hhi_label = "Concentrated"
+                hhi_variant = "warn"
+
+            # KPI strip
+            pc_cards = ""
+            pc_cards += kpi_card("HHI Index", f"{hhi:,}")
+            pc_cards += kpi_card("Concentration", hhi_label)
+            pc_cards += kpi_card("States with Targets", str(len(a_grade_states)))
+            pc_cards += kpi_card("Total A-Grade", str(total_locs))
+            body += "\n" + kpi_strip(pc_cards)
+
+            # Geographic diversification table
+            body += '<h3 style="font-size:15px;font-weight:600;color:var(--primary);margin:12px 0 8px">Geographic Diversification (Top 10 States)</h3>'
+            body += data_table(
+                headers=["State", "Targets", "Share", "Cumulative"],
+                rows=geo_rows,
+                numeric_columns={1, 2, 3},
+            )
+
+            alloc_msg = (
+                "Portfolio is well-diversified. No single state dominates, reducing geographic concentration risk."
+                if hhi < 1500
+                else "Consider capping any single state at 20% of portfolio to improve diversification."
+                if hhi < 2500
+                else "High geographic concentration — diversify across additional states before deploying full capital."
+            )
+            body += callout(
+                f"<strong>HHI = {hhi:,} ({hhi_label}).</strong> {alloc_msg}",
+                variant=hhi_variant,
+            )
+            body += "\n" + section_end()
+
         # ---- Close container ----
         body += "\n</div>"
 
@@ -6495,6 +7896,11 @@ States receiving large AGI inflows but with few A-grade medspas represent a
             "Construction Momentum uses HUD SOCDS building permit data as 1-2 year population growth leading indicator.",
             "Medical CPI uses BLS Consumer Price Index series CUSR0000SAM (medical) vs CUSR0000SA0 (all items).",
             "Talent Pipeline uses BLS JOLTS healthcare series; openings-to-hires ratio measures labor scarcity.",
+            "Sensitivity analysis uses DealEngine 2-way grid + single-variable tornado; all other inputs held constant.",
+            "J-Curve assumes 3-month EBITDA ramp per location with base-case organic growth rate.",
+            "Multi-Factor Alpha scores states by presence across 8 independent investment signals.",
+            "Cohort economics run DealEngine scenarios per state/tier group for implied IRR.",
+            "Portfolio HHI (Herfindahl-Hirschman Index): <1500 unconcentrated, 1500-2500 moderate, >2500 concentrated.",
             "This report does not constitute investment advice. All data is from public sources.",
         ]
         body += "\n" + page_footer(

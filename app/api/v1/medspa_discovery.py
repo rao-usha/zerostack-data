@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.sources.medspa_discovery.collector import MedSpaDiscoveryCollector
+from app.sources.medspa_discovery.ownership_classifier import MedSpaOwnershipClassifier
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ def get_api_budget():
 def get_prospects(
     state: Optional[str] = Query(None, description="Filter by state (e.g. CA)"),
     grade: Optional[str] = Query(None, description="Filter by acquisition grade (A-F)"),
+    ownership_type: Optional[str] = Query(None, description="Filter by ownership type (Independent, Multi-Site, PE-Backed, Public)"),
     min_score: float = Query(0.0, ge=0.0, le=100.0, description="Minimum acquisition score"),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
@@ -79,6 +81,9 @@ def get_prospects(
     if grade:
         where_clauses.append("acquisition_grade = :grade")
         params["grade"] = grade.upper()
+    if ownership_type:
+        where_clauses.append("ownership_type = :ownership_type")
+        params["ownership_type"] = ownership_type
 
     where_sql = " AND ".join(where_clauses)
 
@@ -92,7 +97,9 @@ def get_prospects(
             acquisition_score, acquisition_grade,
             zip_affluence_sub, yelp_rating_sub, review_volume_sub,
             low_competition_sub, price_tier_sub,
-            competitor_count_in_zip, batch_id, model_version, discovered_at
+            competitor_count_in_zip, batch_id, model_version, discovered_at,
+            ownership_type, parent_entity, location_count,
+            classification_confidence, adjusted_acquisition_score
         FROM medspa_prospects
         WHERE {where_sql}
         ORDER BY acquisition_score DESC
@@ -127,6 +134,7 @@ def get_prospects(
         "filters": {
             "state": state,
             "grade": grade,
+            "ownership_type": ownership_type,
             "min_score": min_score,
         },
         "prospects": prospects,
@@ -297,6 +305,35 @@ def trigger_discovery(
 
 
 # ---------------------------------------------------------------------------
+# POST /classify — run ownership classifier
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/classify",
+    summary="Classify medspa prospects by ownership type",
+    response_description="Classification summary with counts by type",
+)
+def classify_ownership(
+    force: bool = Query(False, description="Re-classify already-classified prospects"),
+    db: Session = Depends(get_db),
+):
+    """
+    Run the ownership classification pipeline on medspa prospects.
+
+    Classifies each prospect as Independent, Multi-Site, PE-Backed, or Public
+    using phone clustering, name clustering, PE cross-reference, and pattern heuristics.
+    """
+    try:
+        classifier = MedSpaOwnershipClassifier(db)
+        result = classifier.classify_all(force=force)
+        return result
+    except Exception as e:
+        logger.error(f"Classification failed: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
 # GET /prospects/{yelp_id} — single prospect detail (LAST — catch-all path)
 # ---------------------------------------------------------------------------
 
@@ -323,7 +360,9 @@ def get_prospect_detail(
             zip_affluence_sub, yelp_rating_sub, review_volume_sub,
             low_competition_sub, price_tier_sub,
             competitor_count_in_zip, search_term, batch_id,
-            model_version, discovered_at, updated_at
+            model_version, discovered_at, updated_at,
+            ownership_type, parent_entity, location_count,
+            classification_confidence, adjusted_acquisition_score
         FROM medspa_prospects
         WHERE yelp_id = :yelp_id
     """)

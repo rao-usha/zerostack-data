@@ -92,6 +92,14 @@ def generate_create_medspa_prospects_sql() -> str:
         -- Competition context
         competitor_count_in_zip INTEGER DEFAULT 0,
 
+        -- Ownership classification
+        ownership_type          VARCHAR(20),
+        parent_entity           TEXT,
+        location_count          INTEGER DEFAULT 1,
+        classification_confidence NUMERIC(4,3),
+        classified_at           TIMESTAMP,
+        adjusted_acquisition_score NUMERIC(5,2),
+
         -- Discovery metadata
         search_term     TEXT,
         batch_id        TEXT,
@@ -114,4 +122,33 @@ def generate_create_medspa_prospects_sql() -> str:
         ON medspa_prospects(acquisition_grade);
     CREATE INDEX IF NOT EXISTS idx_mp_batch_id
         ON medspa_prospects(batch_id);
+    CREATE INDEX IF NOT EXISTS idx_mp_ownership_type
+        ON medspa_prospects(ownership_type);
+    CREATE INDEX IF NOT EXISTS idx_mp_parent_entity
+        ON medspa_prospects(parent_entity);
+    """
+
+
+def generate_ownership_migration_sql() -> str:
+    """Return idempotent ALTER TABLE DDL to add ownership columns to existing table."""
+    return """
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'medspa_prospects' AND column_name = 'ownership_type'
+        ) THEN
+            ALTER TABLE medspa_prospects
+                ADD COLUMN ownership_type VARCHAR(20),
+                ADD COLUMN parent_entity TEXT,
+                ADD COLUMN location_count INTEGER DEFAULT 1,
+                ADD COLUMN classification_confidence NUMERIC(4,3),
+                ADD COLUMN classified_at TIMESTAMP,
+                ADD COLUMN adjusted_acquisition_score NUMERIC(5,2);
+            CREATE INDEX IF NOT EXISTS idx_mp_ownership_type
+                ON medspa_prospects(ownership_type);
+            CREATE INDEX IF NOT EXISTS idx_mp_parent_entity
+                ON medspa_prospects(parent_entity);
+        END IF;
+    END $$;
     """
