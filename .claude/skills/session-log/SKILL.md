@@ -1,6 +1,6 @@
 ---
 name: session-log
-description: Log a session checkpoint to the daily work log. Summarizes what was done, decisions made, and next steps. Use anytime to capture progress.
+description: Log a session checkpoint to the daily work log. Summarizes what was done, decisions made, and next steps. Use anytime to capture progress. MUST be called after every completed task.
 allowed-tools:
   - Read
   - Write
@@ -12,6 +12,10 @@ argument-hint: "[optional summary note]"
 
 Write a checkpoint entry to today's daily work log in the memory directory.
 
+## THIS IS MANDATORY
+
+You MUST call this after every completed task — not just at session end. If you changed code, ran a collection, generated a report, fixed a bug, or made any progress at all, LOG IT. Do not wait to batch entries. Log immediately after each task completes.
+
 ## Log file location
 
 ```
@@ -22,16 +26,21 @@ Use today's date for the filename.
 
 ## Behavior
 
-1. **Read the existing log file** for today (if it exists) to avoid duplicating entries.
+1. **Get the current time** for the entry timestamp:
+   ```bash
+   date +%H:%M
+   ```
 
-2. **If the file doesn't exist yet**, create it with this header:
+2. **Read the existing log file** for today (if it exists) to avoid duplicating entries.
+
+3. **If the file doesn't exist yet**, create it with this header:
    ```markdown
    # Nexdata Work Log — YYYY-MM-DD
 
    ---
    ```
 
-3. **Append a new entry** at the bottom of the file with this format:
+4. **Append a new entry** at the bottom of the file with this format:
    ```markdown
    ## HH:MM — [Brief title of what was done]
 
@@ -48,12 +57,7 @@ Use today's date for the filename.
    ---
    ```
 
-4. **If `$ARGUMENTS` is provided**, use it as context for the summary. Otherwise, summarize the conversation so far.
-
-5. **Get the current time** for the entry timestamp:
-   ```bash
-   date +%H:%M
-   ```
+5. **If `$ARGUMENTS` is provided**, use it as context for the summary. Otherwise, summarize the conversation so far.
 
 6. **Also update the log index** at `memory/logs/INDEX.md` — append today's date if not already listed.
 
@@ -64,6 +68,19 @@ Use today's date for the filename.
 - If a task is partially done, explicitly note where to resume
 - Don't repeat information already logged today — scan existing entries first
 - Focus on **what changed** and **why**, not play-by-play of commands run
+- Include data results (row counts, score ranges, etc.) when relevant — these are hard to reconstruct later
+
+## What MUST be logged (non-exhaustive)
+
+- Code changes (files created, modified, deleted)
+- Bug fixes (what was broken, what fixed it)
+- Data collection runs (what was collected, how many rows)
+- Report generation (which report, what changed)
+- Scoring/ML runs (results, score distributions)
+- Commits and pushes
+- Infrastructure changes (Docker, config, etc.)
+- Research findings and architectural decisions
+- Failed attempts and why they failed
 
 ## Example entry
 

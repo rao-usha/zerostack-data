@@ -178,19 +178,21 @@ Every ingestion creates an `ingestion_jobs` record: `pending → running → suc
 
 ---
 
-## Session Logging (MANDATORY)
+## Session Logging (MANDATORY — zero exceptions)
 
-Every session must maintain a daily work log. This is critical for continuity across sessions.
+Every session must maintain a daily work log. This is NOT optional. If you skip logging, context is lost and the user has to re-explain everything next session.
 
 **Log location:** `C:\Users\awron\.claude\projects\C--Users-awron-projects-Nexdata\memory\logs\YYYY-MM-DD.md`
 
-### Automatic behavior:
+### Automatic behavior — YOU MUST DO ALL THREE:
 
-1. **Session start:** Read today's log file (if it exists) and the last 2 days' logs. Use these to understand recent context and pick up where the previous session left off. Briefly acknowledge what you found (e.g., "Picking up from yesterday — you were working on X").
+1. **Session start (FIRST THING):** Read today's log file (if it exists) and the last 2 days' logs. Use these to understand recent context and pick up where the previous session left off. Briefly acknowledge what you found (e.g., "Picking up from yesterday — you were working on X").
 
-2. **After each significant task:** Append a timestamped entry to today's log with: what was done, decisions made, files changed, and next steps. A "significant task" = any code change, bug fix, feature addition, investigation with findings, or architectural decision.
+2. **After EVERY completed task (not just "significant" ones):** Append a timestamped entry to today's log. This means after every code change, bug fix, feature addition, investigation, collection run, report generation, commit, or architectural decision. **If you changed a file or ran a command that produced results, log it.** Do not batch multiple tasks into one entry — log each one as you finish it.
 
-3. **Before session ends (if the user says goodbye, thanks, or conversation naturally concludes):** Write a final checkpoint entry summarizing the full session and explicitly noting what to do next.
+3. **Before session ends:** Write a final checkpoint entry summarizing the full session and explicitly noting what to do next. If the user says goodbye, thanks, or the conversation naturally concludes — log it.
+
+**Self-check:** If you've done work but haven't logged in the last 2-3 messages, you missed a log entry. Go write it now.
 
 The `/session-log` skill can also be invoked manually to force a checkpoint at any time.
 
@@ -209,20 +211,40 @@ The `/session-log` skill can also be invoked manually to force a checkpoint at a
 
 ---
 
-## Workflow
+## Workflow (MANDATORY — follow every time)
 
-1. **Plan** — Record in `docs/plans/PLAN_XXX_<name>.md`, wait for explicit user approval
-2. **Execute** — Use TaskCreate/TaskUpdate for multi-step work
-3. **Test** — `docker-compose up --build -d`, curl endpoints, check logs
-4. **Commit** — Conventional Commits format: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`
+### Step 1: ALWAYS Plan First
+
+**Every task that touches more than 1 file or takes more than a single obvious change MUST start with a plan.**
+
+- Use `EnterPlanMode` to explore the codebase and design your approach
+- Write the plan to `docs/plans/PLAN_XXX_<name>.md` (find the next number)
+- Wait for explicit user approval before writing any code
+- If the user says "just do it" or the task is genuinely trivial (typo fix, single-line change), you may skip planning — but still create a task checklist
+
+### Step 2: ALWAYS Create a Task Checklist
+
+**Every task with 2+ steps MUST use `TaskCreate` to create a visible checklist BEFORE starting work.**
+
+- Break work into concrete, completable steps (e.g., "Add model columns", "Create service class", "Add API endpoint", "Write tests", "Restart and verify")
+- Mark each task `in_progress` BEFORE starting it and `completed` AFTER finishing it
+- The user should be able to see progress at any time via the task list
+- If work is interrupted, the task list shows exactly where to resume
+
+### Step 3: Execute, Test, Verify
+
+- Build: `docker-compose up --build -d`, or `docker-compose restart api` for code-only changes
+- Test: `pytest tests/ -v`, curl endpoints, check docker logs
+- Verify: Confirm the feature works end-to-end before marking complete
+
+### Step 4: Commit
+
+- Conventional Commits format: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`
+- Only commit when user explicitly asks
 
 ### Parallel Work
 
 If working alongside another Claude instance, read `PARALLEL_WORK.md` first. Only touch assigned files. Tab 1 handles main.py integration and commits.
-
-### Long-Running Tasks
-
-Use TaskCreate to break work into phases. Mark tasks `in_progress` before starting, `completed` when done. Include checkpoint info (last completed, next action, blockers, resume instructions) so work can continue if interrupted.
 
 ---
 
