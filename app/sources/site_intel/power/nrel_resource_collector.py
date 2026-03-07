@@ -6,15 +6,18 @@ centroids. Used to assess renewable energy potential for datacenter
 power sourcing.
 
 API: https://developer.nrel.gov/api/solar/solar_resource/v1
-API: https://developer.nrel.gov/api/wind-toolkit/v2/wind/wtk-srw-download
 Free API key required: https://developer.nrel.gov/signup/
 """
 
 import asyncio
+import csv
+import io
 import logging
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
+import httpx
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.models_site_intel import RenewableResource
@@ -30,69 +33,24 @@ from app.sources.site_intel.runner import register_collector
 
 logger = logging.getLogger(__name__)
 
-# County centroids for major datacenter-relevant states
-# (lat, lng, state, county_name, county_fips)
-# This is a representative subset — full list would come from Census TIGER
-COUNTY_CENTROIDS: List[Dict[str, Any]] = [
-    # Virginia — Northern Virginia DC corridor
-    {"lat": 39.04, "lng": -77.49, "state": "VA", "county": "Loudoun County", "fips": "51107"},
-    {"lat": 38.83, "lng": -77.31, "state": "VA", "county": "Fairfax County", "fips": "51059"},
-    {"lat": 38.95, "lng": -77.37, "state": "VA", "county": "Prince William County", "fips": "51153"},
-    # Texas — major DC hubs
-    {"lat": 32.77, "lng": -96.80, "state": "TX", "county": "Dallas County", "fips": "48113"},
-    {"lat": 32.97, "lng": -96.99, "state": "TX", "county": "Denton County", "fips": "48121"},
-    {"lat": 30.27, "lng": -97.74, "state": "TX", "county": "Travis County", "fips": "48453"},
-    {"lat": 29.76, "lng": -95.37, "state": "TX", "county": "Harris County", "fips": "48201"},
-    {"lat": 32.45, "lng": -97.39, "state": "TX", "county": "Tarrant County", "fips": "48439"},
-    # Arizona
-    {"lat": 33.45, "lng": -112.07, "state": "AZ", "county": "Maricopa County", "fips": "04013"},
-    {"lat": 33.42, "lng": -111.94, "state": "AZ", "county": "Pinal County", "fips": "04021"},
-    # Oregon
-    {"lat": 45.52, "lng": -122.68, "state": "OR", "county": "Multnomah County", "fips": "41051"},
-    {"lat": 45.23, "lng": -122.84, "state": "OR", "county": "Washington County", "fips": "41067"},
-    # Nevada
-    {"lat": 36.17, "lng": -115.14, "state": "NV", "county": "Clark County", "fips": "32003"},
-    {"lat": 39.53, "lng": -119.81, "state": "NV", "county": "Washoe County", "fips": "32031"},
-    # Georgia
-    {"lat": 33.75, "lng": -84.39, "state": "GA", "county": "Fulton County", "fips": "13121"},
-    {"lat": 33.79, "lng": -84.33, "state": "GA", "county": "DeKalb County", "fips": "13089"},
-    {"lat": 33.94, "lng": -84.52, "state": "GA", "county": "Cobb County", "fips": "13067"},
-    # North Carolina
-    {"lat": 35.78, "lng": -78.64, "state": "NC", "county": "Wake County", "fips": "37183"},
-    {"lat": 35.95, "lng": -78.90, "state": "NC", "county": "Durham County", "fips": "37063"},
-    # Ohio
-    {"lat": 40.10, "lng": -83.01, "state": "OH", "county": "Franklin County", "fips": "39049"},
-    {"lat": 39.99, "lng": -82.99, "state": "OH", "county": "Licking County", "fips": "39089"},
-    # Illinois
-    {"lat": 41.88, "lng": -87.63, "state": "IL", "county": "Cook County", "fips": "17031"},
-    {"lat": 41.75, "lng": -88.15, "state": "IL", "county": "DuPage County", "fips": "17043"},
-    # Iowa
-    {"lat": 41.60, "lng": -93.61, "state": "IA", "county": "Polk County", "fips": "19153"},
-    {"lat": 42.03, "lng": -93.47, "state": "IA", "county": "Story County", "fips": "19169"},
-    # Indiana
-    {"lat": 39.77, "lng": -86.16, "state": "IN", "county": "Marion County", "fips": "18097"},
-    # South Carolina
-    {"lat": 34.85, "lng": -82.39, "state": "SC", "county": "Greenville County", "fips": "45045"},
-    # Tennessee
-    {"lat": 36.16, "lng": -86.78, "state": "TN", "county": "Davidson County", "fips": "47037"},
-    # Utah
-    {"lat": 40.76, "lng": -111.89, "state": "UT", "county": "Salt Lake County", "fips": "49035"},
-    # Colorado
-    {"lat": 39.74, "lng": -104.99, "state": "CO", "county": "Denver County", "fips": "08031"},
-    {"lat": 39.65, "lng": -104.80, "state": "CO", "county": "Arapahoe County", "fips": "08005"},
-    # California
-    {"lat": 37.54, "lng": -122.05, "state": "CA", "county": "Santa Clara County", "fips": "06085"},
-    {"lat": 37.87, "lng": -122.27, "state": "CA", "county": "Alameda County", "fips": "06001"},
-    {"lat": 33.92, "lng": -118.23, "state": "CA", "county": "Los Angeles County", "fips": "06037"},
-    {"lat": 37.78, "lng": -122.42, "state": "CA", "county": "San Francisco", "fips": "06075"},
-    # New York / New Jersey
-    {"lat": 40.71, "lng": -74.01, "state": "NY", "county": "New York County", "fips": "36061"},
-    {"lat": 40.74, "lng": -74.17, "state": "NJ", "county": "Essex County", "fips": "34013"},
-    # Washington
-    {"lat": 47.61, "lng": -122.33, "state": "WA", "county": "King County", "fips": "53033"},
-    {"lat": 46.60, "lng": -120.51, "state": "WA", "county": "Yakima County", "fips": "53077"},
-    {"lat": 47.25, "lng": -119.85, "state": "WA", "county": "Grant County", "fips": "53025"},
-]
+# State abbreviation lookup
+STATE_ABBREVS = {
+    "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR",
+    "California": "CA", "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE",
+    "District of Columbia": "DC", "Florida": "FL", "Georgia": "GA", "Hawaii": "HI",
+    "Idaho": "ID", "Illinois": "IL", "Indiana": "IN", "Iowa": "IA",
+    "Kansas": "KS", "Kentucky": "KY", "Louisiana": "LA", "Maine": "ME",
+    "Maryland": "MD", "Massachusetts": "MA", "Michigan": "MI", "Minnesota": "MN",
+    "Mississippi": "MS", "Missouri": "MO", "Montana": "MT", "Nebraska": "NE",
+    "Nevada": "NV", "New Hampshire": "NH", "New Jersey": "NJ", "New Mexico": "NM",
+    "New York": "NY", "North Carolina": "NC", "North Dakota": "ND", "Ohio": "OH",
+    "Oklahoma": "OK", "Oregon": "OR", "Pennsylvania": "PA", "Rhode Island": "RI",
+    "South Carolina": "SC", "South Dakota": "SD", "Tennessee": "TN", "Texas": "TX",
+    "Utah": "UT", "Vermont": "VT", "Virginia": "VA", "Washington": "WA",
+    "West Virginia": "WV", "Wisconsin": "WI", "Wyoming": "WY",
+}
+
+CENSUS_CENTROID_URL = "https://www2.census.gov/geo/docs/reference/cenpop2020/county/CenPop2020_Mean_CO.txt"
 
 
 @register_collector(SiteIntelSource.NREL_RESOURCE)
