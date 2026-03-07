@@ -3,7 +3,7 @@ HIFLD Infrastructure Collector.
 
 Fetches infrastructure data from HIFLD ArcGIS REST API:
 - Electrical substations
-- Transmission lines (future)
+- Transmission lines
 
 HIFLD Data: https://hifld-geoplatform.opendata.arcgis.com/
 ArcGIS REST API: Query endpoint with JSON output.
@@ -17,7 +17,7 @@ from typing import Optional, Dict, Any
 
 from sqlalchemy.orm import Session
 
-from app.core.models_site_intel import Substation
+from app.core.models_site_intel import Substation, TransmissionLine
 from app.sources.site_intel.base_collector import BaseCollector
 from app.sources.site_intel.types import (
     SiteIntelDomain,
@@ -38,6 +38,7 @@ class HIFLDInfraCollector(BaseCollector):
 
     Fetches:
     - Electrical substations with voltage, owner, location
+    - Transmission lines with voltage, type, owner
     """
 
     domain = SiteIntelDomain.POWER
@@ -45,10 +46,11 @@ class HIFLDInfraCollector(BaseCollector):
 
     # HIFLD API configuration
     default_timeout = 120.0  # Large dataset, may be slow
-    rate_limit_delay = 0.2
+    rate_limit_delay = 0.1  # ArcGIS mirror, low traffic
 
-    # HIFLD ArcGIS REST endpoints
-    SUBSTATIONS_URL = "https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/Electric_Substations/FeatureServer/0/query"
+    # HIFLD ArcGIS REST endpoints (Rutgers mirror — primary HIFLD URL was decommissioned)
+    SUBSTATIONS_URL = "https://oceandata.rad.rutgers.edu/arcgis/rest/services/RenewableEnergy/HIFLD_Electric_SubstationsTransmissionLines/MapServer/0/query"
+    TRANSMISSION_URL = "https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/Electric_Power_Transmission_Lines/FeatureServer/0/query"
 
     def __init__(self, db: Session, api_key: Optional[str] = None, **kwargs):
         super().__init__(db, api_key, **kwargs)
@@ -66,7 +68,7 @@ class HIFLDInfraCollector(BaseCollector):
         """
         Execute HIFLD data collection.
 
-        Collects electrical substations.
+        Collects electrical substations and transmission lines.
         """
         total_inserted = 0
         total_processed = 0
@@ -81,6 +83,16 @@ class HIFLDInfraCollector(BaseCollector):
             if substations_result.get("error"):
                 errors.append(
                     {"source": "substations", "error": substations_result["error"]}
+                )
+
+            # Collect transmission lines
+            logger.info("Collecting HIFLD transmission line data...")
+            lines_result = await self._collect_transmission_lines(config)
+            total_inserted += lines_result.get("inserted", 0)
+            total_processed += lines_result.get("processed", 0)
+            if lines_result.get("error"):
+                errors.append(
+                    {"source": "transmission_lines", "error": lines_result["error"]}
                 )
 
             status = (
@@ -111,7 +123,7 @@ class HIFLDInfraCollector(BaseCollector):
         try:
             all_substations = []
             offset = 0
-            page_size = 2000  # ArcGIS default max is often 2000
+            page_size = 1000  # Rutgers mirror caps at 1000 per request
 
             # Build state filter if specified
             state_filter = ""
@@ -123,7 +135,7 @@ class HIFLDInfraCollector(BaseCollector):
                 params = {
                     "where": state_filter if state_filter else "1=1",
                     "outFields": "*",
-                    "returnGeometry": "true",
+                    "returnGeometry": "false",
                     "f": "json",
                     "resultOffset": offset,
                     "resultRecordCount": page_size,
@@ -145,7 +157,7 @@ class HIFLDInfraCollector(BaseCollector):
                 )
 
                 # Check if we've reached the end
-                if len(features) < page_size:
+                if len(features) < page_size and not response.get("exceededTransferLimit"):
                     break
 
                 offset += page_size
@@ -203,12 +215,9 @@ class HIFLDInfraCollector(BaseCollector):
         if not hifld_id:
             return None
 
-        # Extract coordinates
-        lat = None
-        lng = None
-        if geometry:
-            lng = geometry.get("x")
-            lat = geometry.get("y")
+        # Use LATITUDE/LONGITUDE attributes (geometry is Web Mercator, not WGS84)
+        lat = self._safe_float(attrs.get("LATITUDE"))
+        lng = self._safe_float(attrs.get("LONGITUDE"))
 
         # Parse voltage - HIFLD uses various field names
         max_voltage = self._parse_voltage(
@@ -251,6 +260,164 @@ class HIFLDInfraCollector(BaseCollector):
             "source": "hifld",
             "collected_at": datetime.utcnow(),
         }
+
+    async def _collect_transmission_lines(
+        self, config: CollectionConfig
+    ) -> Dict[str, Any]:
+        """
+        Collect transmission lines from HIFLD ArcGIS FeatureServer.
+
+        Uses pagination via resultOffset.
+        Note: Transmission lines have no STATE field — they span state boundaries.
+        State filtering is not supported; all lines are collected.
+        """
+        try:
+            all_lines = []
+            offset = 0
+            page_size = 2000
+
+            while True:
+                params = {
+                    "where": "1=1",
+                    "outFields": "OBJECTID_1,OBJECTID,ID,OWNER,VOLTAGE,VOLT_CLASS,Shape__Length,TYPE,STATUS",
+                    "returnGeometry": "false",
+                    "f": "json",
+                    "resultOffset": offset,
+                    "resultRecordCount": page_size,
+                }
+
+                response = await self.fetch_json(
+                    self.TRANSMISSION_URL,
+                    params=params,
+                    use_base_url=False,
+                )
+
+                features = response.get("features", [])
+                if not features:
+                    break
+
+                all_lines.extend(features)
+                logger.info(
+                    f"Fetched {len(features)} transmission line records "
+                    f"(total: {len(all_lines)})"
+                )
+
+                if len(features) < page_size and not response.get(
+                    "exceededTransferLimit"
+                ):
+                    break
+
+                offset += page_size
+                self.update_progress(
+                    len(all_lines),
+                    len(all_lines) + page_size,
+                    "Fetching transmission lines",
+                )
+
+            # Transform records
+            records = []
+            for feature in all_lines:
+                transformed = self._transform_transmission_line(feature)
+                if transformed:
+                    records.append(transformed)
+
+            # Insert into database
+            if records:
+                inserted, _ = self.bulk_upsert(
+                    TransmissionLine,
+                    records,
+                    unique_columns=["hifld_id"],
+                    update_columns=[
+                        "name",
+                        "state",
+                        "owner",
+                        "voltage_kv",
+                        "voltage_class",
+                        "num_circuits",
+                        "line_type",
+                        "sub_type",
+                        "length_miles",
+                        "status",
+                        "collected_at",
+                    ],
+                )
+                return {"processed": len(all_lines), "inserted": inserted}
+
+            return {"processed": 0, "inserted": 0}
+
+        except Exception as e:
+            logger.error(
+                f"Failed to collect transmission lines: {e}", exc_info=True
+            )
+            return {"processed": 0, "inserted": 0, "error": str(e)}
+
+    def _transform_transmission_line(
+        self, feature: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Transform HIFLD transmission line feature to database format."""
+        attrs = feature.get("attributes", {})
+
+        # ID field, fallback to OBJECTID_1 or OBJECTID
+        hifld_id = attrs.get("ID") or attrs.get("OBJECTID_1") or attrs.get("OBJECTID")
+        if not hifld_id:
+            return None
+
+        voltage = self._parse_voltage(attrs.get("VOLTAGE"))
+        volt_class = attrs.get("VOLT_CLASS") or ""
+
+        # Shape__Length is in meters (Web Mercator); convert to miles
+        shape_length = self._safe_float(
+            attrs.get("Shape__Length") or attrs.get("SHAPE__Len")
+        )
+        length_miles = None
+        if shape_length and shape_length > 0:
+            length_miles = round(shape_length * 0.000621371, 3)
+
+        # TYPE field contains combined info like "AC; OVERHEAD"
+        type_raw = attrs.get("TYPE") or ""
+        line_type = None
+        sub_type = None
+        if type_raw:
+            parts = [p.strip().upper() for p in type_raw.split(";")]
+            for part in parts:
+                if part in ("AC", "DC"):
+                    line_type = part
+                elif part in ("OVERHEAD", "UNDERGROUND", "SUBMARINE"):
+                    sub_type = part.lower()
+            if not line_type:
+                line_type = "AC"  # Default
+
+        # Status
+        status = attrs.get("STATUS") or "IN SERVICE"
+        if isinstance(status, str):
+            status = status.strip().lower()
+
+        owner = attrs.get("OWNER")
+
+        return {
+            "hifld_id": str(hifld_id),
+            "name": f"Line {hifld_id}",
+            "state": None,  # Lines span states; no single state attribute
+            "owner": owner,
+            "voltage_kv": voltage,
+            "voltage_class": volt_class if volt_class else None,
+            "num_circuits": None,
+            "line_type": line_type,
+            "sub_type": sub_type,
+            "length_miles": length_miles,
+            "status": status,
+            "source": "hifld",
+            "collected_at": datetime.utcnow(),
+        }
+
+    def _safe_float(self, value: Any) -> Optional[float]:
+        """Safely convert value to float."""
+        if value is None or value == "" or value == -999:
+            return None
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
 
     def _parse_voltage(self, value: Any) -> Optional[float]:
         """Parse voltage value to float kV."""

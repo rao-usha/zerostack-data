@@ -328,6 +328,66 @@ class DealEngine:
             "highlight": highlight,
         }
 
+    # ── Tornado sensitivity ─────────────────────────────────────────
+
+    def tornado_sensitivity(
+        self,
+        economics: Dict[str, Any],
+        base_assumptions: Optional[Dict] = None,
+        metric: str = "net_irr",
+        swing_pct: float = 0.20,
+    ) -> Dict[str, Any]:
+        """Swing 5 key variables ±swing_pct, return sorted deltas from base.
+
+        Returns: {"base_value": float, "variables": [{"name", "low", "high", "low_delta", "high_delta"}]}
+        """
+        a = {**DEFAULT_ASSUMPTIONS, **(base_assumptions or {})}
+        base_scenario = a["scenarios"].get("base", {
+            "exit_multiple": 10, "margin_improvement": 0.05,
+            "hold_years": 5, "organic_growth": 0.05,
+        })
+
+        base_result = self.run_scenario(economics, base_scenario, a)
+        base_val = base_result.get(metric, 0)
+
+        variables = ["exit_multiple", "margin_improvement", "organic_growth", "hold_years", "entry_multiple"]
+        results = []
+
+        for var in variables:
+            if var == "entry_multiple":
+                # Scale acquisition cost proportionally
+                orig_multiple = economics["avg_entry_multiple"] if economics.get("avg_entry_multiple") else 3.5
+                for direction, factor in [("low", 1 - swing_pct), ("high", 1 + swing_pct)]:
+                    scaled_econ = {**economics}
+                    scaled_econ["total_acquisition_cost"] = economics["total_acquisition_cost"] * factor
+                    result = self.run_scenario(scaled_econ, base_scenario, a)
+                    if direction == "low":
+                        low_val = result.get(metric, 0)
+                    else:
+                        high_val = result.get(metric, 0)
+            else:
+                base_param = base_scenario.get(var, 0)
+                for direction, factor in [("low", 1 - swing_pct), ("high", 1 + swing_pct)]:
+                    config = {**base_scenario, var: base_param * factor}
+                    result = self.run_scenario(economics, config, a)
+                    if direction == "low":
+                        low_val = result.get(metric, 0)
+                    else:
+                        high_val = result.get(metric, 0)
+
+            results.append({
+                "name": var.replace("_", " ").title(),
+                "low": round(low_val, 4),
+                "high": round(high_val, 4),
+                "low_delta": round(low_val - base_val, 4),
+                "high_delta": round(high_val - base_val, 4),
+            })
+
+        # Sort by absolute swing (largest impact first)
+        results.sort(key=lambda r: abs(r["high_delta"]) + abs(r["low_delta"]), reverse=True)
+
+        return {"base_value": round(base_val, 4), "variables": results}
+
     # ── Deployment timeline ───────────────────────────────────────────
 
     def deployment_plan(

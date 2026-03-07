@@ -58,6 +58,36 @@ INCREMENTAL_PARAM_MAP = {
     "realestate": ("start_date", lambda dt: dt.strftime("%Y-%m-%d")),
     "international_econ": ("start_year", lambda dt: dt.year),
     "uspto": ("start_date", lambda dt: dt.strftime("%Y-%m-%d")),
+    # P2: 5 additional year-based sources
+    "fdic": ("year", lambda dt: dt.year),
+    "cms": ("year", lambda dt: str(dt.year)),
+    "irs_soi": ("year", lambda dt: str(dt.year)),
+    "usda": ("year", lambda dt: str(dt.year)),
+    "cftc_cot": ("year", lambda dt: str(dt.year)),
+}
+
+
+INCREMENTAL_END_PARAM_MAP = {
+    "fred": ("observation_end", lambda dt: dt.strftime("%Y-%m-%d")),
+    "bls": ("end_year", lambda dt: dt.year),
+    "eia": ("end", lambda dt: dt.strftime("%Y-%m-%d")),
+    "sec": ("end_date", lambda dt: dt.strftime("%Y-%m-%d")),
+    "treasury": ("end_date", lambda dt: dt.strftime("%Y-%m-%d")),
+    "bts": ("end_date", lambda dt: dt.strftime("%Y-%m-%d")),
+    "census": ("year", lambda dt: dt.year),
+    "bea": ("year", lambda dt: str(dt.year)),
+    "fema": ("year", lambda dt: dt.year),
+    "noaa": ("end_date", lambda dt: dt.strftime("%Y-%m-%d")),
+    "us_trade": ("year", lambda dt: str(dt.year)),
+    "realestate": ("end_date", lambda dt: dt.strftime("%Y-%m-%d")),
+    "international_econ": ("end_year", lambda dt: dt.year),
+    "uspto": ("end_date", lambda dt: dt.strftime("%Y-%m-%d")),
+    # P2: 5 additional year-based sources
+    "fdic": ("year", lambda dt: dt.year),
+    "cms": ("year", lambda dt: str(dt.year)),
+    "irs_soi": ("year", lambda dt: str(dt.year)),
+    "usda": ("year", lambda dt: str(dt.year)),
+    "cftc_cot": ("year", lambda dt: str(dt.year)),
 }
 
 
@@ -145,6 +175,21 @@ async def run_scheduled_job(schedule_id: int):
             f"Running scheduled job: {schedule.name} (source={schedule.source})"
         )
 
+        # Skip if a job for this schedule is already running/pending
+        active = (
+            db.query(IngestionJob)
+            .filter(
+                IngestionJob.schedule_id == schedule.id,
+                IngestionJob.status.in_([JobStatus.PENDING, JobStatus.RUNNING]),
+            )
+            .first()
+        )
+        if active:
+            logger.info(
+                f"Schedule {schedule.name} skipped — job {active.id} still {active.status.value}"
+            )
+            return
+
         # Inject incremental start params if configured
         effective_config = _inject_incremental_params(
             config=schedule.config or {},
@@ -152,18 +197,20 @@ async def run_scheduled_job(schedule_id: int):
             last_run_at=schedule.last_run_at,
         )
 
-        # Create a new ingestion job
+        # Create a new ingestion job with schedule linkage
         job = IngestionJob(
             source=schedule.source,
             status=JobStatus.PENDING,
             config=effective_config,
+            schedule_id=schedule.id,
+            trigger="scheduled",
         )
         db.add(job)
         db.commit()
         db.refresh(job)
 
-        # Update schedule tracking
-        schedule.last_run_at = datetime.utcnow()
+        # Update schedule tracking — but NOT last_run_at (watermark).
+        # Watermark advances only after job SUCCESS (see jobs.py:_advance_schedule_watermark).
         schedule.last_job_id = job.id
         schedule.next_run_at = _calculate_next_run(schedule)
         db.commit()
@@ -1065,7 +1112,7 @@ async def cleanup_stuck_jobs(
 
         if not running_jobs:
             logger.info("No running jobs found during cleanup")
-            return {"cleaned_up": 0, "jobs": [], "timeout_hours": timeout_hours}
+            return {"cleaned_up": 0, "jobs": [], "retried": 0, "timeout_hours": timeout_hours}
 
         # Mark stuck jobs as failed (check per-source timeout)
         cleaned_jobs = []
@@ -1103,11 +1150,28 @@ async def cleanup_stuck_jobs(
 
         if not cleaned_jobs:
             logger.info("No stuck jobs found during cleanup")
-            return {"cleaned_up": 0, "jobs": [], "timeout_hours": timeout_hours}
+            return {"cleaned_up": 0, "jobs": [], "retried": 0, "timeout_hours": timeout_hours}
 
         db.commit()
 
         logger.info(f"Cleaned up {len(cleaned_jobs)} stuck jobs")
+
+        # Auto-retry stuck jobs that have retries remaining.
+        # This runs AFTER the batch FAILED commit so each retry can commit independently.
+        from app.core.retry_service import auto_schedule_retry
+
+        retried = 0
+        for job_info in cleaned_jobs:
+            retry_job = db.query(IngestionJob).filter(
+                IngestionJob.id == job_info["job_id"]
+            ).first()
+            if retry_job and retry_job.can_retry:
+                if auto_schedule_retry(db, retry_job):
+                    retried += 1
+                    job_info["retry_scheduled"] = True
+
+        if retried:
+            logger.info(f"Scheduled {retried} auto-retries for stuck jobs")
 
         # Send webhook notification for cleanup
         try:
@@ -1122,6 +1186,7 @@ async def cleanup_stuck_jobs(
         return {
             "cleaned_up": len(cleaned_jobs),
             "jobs": cleaned_jobs,
+            "retried": retried,
             "timeout_hours": timeout_hours,
             "cleanup_time": datetime.utcnow().isoformat(),
         }

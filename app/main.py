@@ -141,6 +141,7 @@ from app.api.v1 import (
     site_intel_logistics,
     site_intel_water_utilities,
     site_intel_sites,
+    datacenter_sites,
 )
 
 # Collection Management
@@ -1248,6 +1249,7 @@ app.include_router(
     site_intel_water_utilities.router, prefix="/api/v1", dependencies=_auth
 )
 app.include_router(site_intel_sites.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(datacenter_sites.router, prefix="/api/v1", dependencies=_auth)
 
 # Collection Management
 app.include_router(source_configs.router, prefix="/api/v1", dependencies=_auth)

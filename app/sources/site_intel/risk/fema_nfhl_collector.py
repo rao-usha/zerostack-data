@@ -64,7 +64,8 @@ ZONE_INFO = {
 }
 
 # NFHL MapServer layer for flood hazard areas
-NFHL_BASE_URL = "https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer/28/query"
+# URL changed from /gis/nfhl/ to /arcgis/ in 2025
+NFHL_BASE_URL = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query"
 
 
 @register_collector(SiteIntelSource.FEMA_NFHL)
@@ -88,7 +89,7 @@ class FEMANFHLFloodCollector(BaseCollector):
         super().__init__(db, api_key, **kwargs)
 
     def get_default_base_url(self) -> str:
-        return "https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer"
+        return "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer"
 
     def get_default_headers(self) -> Dict[str, str]:
         return {
@@ -113,22 +114,28 @@ class FEMANFHLFloodCollector(BaseCollector):
                     error_message="FEMA NFHL service unavailable. Try again later.",
                 )
 
-            for state in states:
+            async def _collect_one(state):
                 fips = STATE_FIPS.get(state)
                 if not fips:
-                    continue
+                    return {"processed": 0, "inserted": 0}
+                return await self._collect_state_flood_zones(state, fips)
 
-                try:
-                    result = await self._collect_state_flood_zones(state, fips)
-                    total_inserted += result.get("inserted", 0)
-                    total_processed += result.get("processed", 0)
-                    if result.get("error"):
-                        errors.append(
-                            {"source": f"nfhl_{state}", "error": result["error"]}
-                        )
-                except Exception as e:
-                    logger.warning(f"NFHL collection failed for {state}: {e}")
-                    errors.append({"source": f"nfhl_{state}", "error": str(e)})
+            results = await self.gather_with_limit(
+                [_collect_one(s) for s in states], max_concurrent=4
+            )
+
+            for i, result in enumerate(results):
+                state = states[i]
+                if isinstance(result, Exception):
+                    logger.warning(f"NFHL collection failed for {state}: {result}")
+                    errors.append({"source": f"nfhl_{state}", "error": str(result)})
+                    continue
+                total_inserted += result.get("inserted", 0)
+                total_processed += result.get("processed", 0)
+                if result.get("error"):
+                    errors.append(
+                        {"source": f"nfhl_{state}", "error": result["error"]}
+                    )
 
             status = CollectionStatus.SUCCESS
             if errors and total_inserted > 0:

@@ -26,7 +26,11 @@ class TestIncrementalParamMap:
     """Validate that every mapped source produces the right param name."""
 
     def test_all_sources_present(self):
-        expected = {"fred", "bls", "eia", "sec", "treasury", "bts", "census", "bea"}
+        expected = {
+            "fred", "bls", "eia", "sec", "treasury", "bts", "census", "bea",
+            "fema", "noaa", "us_trade", "realestate", "international_econ", "uspto",
+            "fdic", "cms", "irs_soi", "usda", "cftc_cot",
+        }
         assert set(INCREMENTAL_PARAM_MAP.keys()) == expected
 
     @pytest.mark.parametrize("source,param", [

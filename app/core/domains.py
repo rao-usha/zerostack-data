@@ -78,7 +78,7 @@ DOMAINS: List[Dict] = [
             "noaa_", "occupational_wage", "opportunity_zone",
             "pipeline_", "port", "power_plant", "public_water_",
             "rail_", "renewable_", "seismic_", "site_intel_",
-            "site_score", "solar_farm", "submarine_cable", "substation",
+            "solar_farm", "submarine_cable", "substation",
             "three_pl_", "trucking_", "utility_", "warehouse_",
             "water_", "wetland", "wind_farm", "zoning_",
         ],

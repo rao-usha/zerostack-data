@@ -145,12 +145,17 @@ class EIAPowerCollector(BaseCollector):
             while True:
                 params = {
                     "api_key": self.api_key,
-                    "frequency": "monthly",  # EIA v2 requires monthly for this endpoint
+                    "frequency": "monthly",
                     "data[0]": "nameplate-capacity-mw",
-                    "data[1]": "summer-capacity-mw",
-                    "data[2]": "winter-capacity-mw",
+                    "data[1]": "net-summer-capacity-mw",
+                    "data[2]": "net-winter-capacity-mw",
+                    "data[3]": "latitude",
+                    "data[4]": "longitude",
+                    "data[5]": "county",
                     "sort[0][column]": "plantid",
                     "sort[0][direction]": "asc",
+                    "start": "2025-12",  # Latest month only — avoids 4.6M rows
+                    "end": "2025-12",
                     "offset": offset,
                     "length": page_size,
                 }
@@ -195,12 +200,18 @@ class EIAPowerCollector(BaseCollector):
                 if plant_id not in plants_by_id:
                     plants_by_id[plant_id] = self._transform_plant_record(record)
                 else:
-                    # Aggregate capacity
+                    # Aggregate capacity across generators
                     existing = plants_by_id[plant_id]
-                    new_capacity = float(record.get("nameplate-capacity-mw") or 0)
-                    existing["nameplate_capacity_mw"] = (
-                        existing.get("nameplate_capacity_mw") or 0
-                    ) + new_capacity
+                    new_cap = self._safe_float(record.get("nameplate-capacity-mw"))
+                    if new_cap:
+                        existing["nameplate_capacity_mw"] = (
+                            existing.get("nameplate_capacity_mw") or 0
+                        ) + new_cap
+                    new_summer = self._safe_float(record.get("net-summer-capacity-mw"))
+                    if new_summer:
+                        existing["summer_capacity_mw"] = (
+                            existing.get("summer_capacity_mw") or 0
+                        ) + new_summer
 
             # Insert into database
             records = list(plants_by_id.values())
@@ -249,10 +260,10 @@ class EIAPowerCollector(BaseCollector):
             "nameplate_capacity_mw": self._safe_float(
                 record.get("nameplate-capacity-mw")
             ),
-            "summer_capacity_mw": self._safe_float(record.get("summer-capacity-mw")),
-            "winter_capacity_mw": self._safe_float(record.get("winter-capacity-mw")),
+            "summer_capacity_mw": self._safe_float(record.get("net-summer-capacity-mw")),
+            "winter_capacity_mw": self._safe_float(record.get("net-winter-capacity-mw")),
             "grid_region": record.get("balancing_authority_code"),
-            "balancing_authority": record.get("balancing_authority_name"),
+            "balancing_authority": record.get("balancing-authority-name"),
             "nerc_region": record.get("nerc_region"),
             "source": "eia",
             "collected_at": datetime.utcnow(),

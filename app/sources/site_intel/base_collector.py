@@ -5,10 +5,11 @@ Abstract base class for all site intelligence data collectors.
 Provides common functionality for API calls, rate limiting, and database operations.
 """
 
+import asyncio
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Type
+from typing import Optional, List, Dict, Any, Type, Coroutine
 
 import httpx
 from sqlalchemy import func
@@ -109,10 +110,61 @@ class BaseCollector(ABC):
 
     async def apply_rate_limit(self):
         """Apply rate limiting delay between requests."""
-        import asyncio
-
         if self.rate_limit_delay > 0:
             await asyncio.sleep(self.rate_limit_delay)
+
+    async def gather_with_limit(
+        self,
+        coros: List[Coroutine],
+        max_concurrent: int = 4,
+        return_exceptions: bool = True,
+    ) -> list:
+        """
+        Run coroutines with bounded concurrency via semaphore.
+
+        Each coroutine respects the collector's rate_limit_delay.
+        Effective throughput: max_concurrent / rate_limit_delay requests/sec.
+        """
+        sem = asyncio.Semaphore(max_concurrent)
+
+        async def _bounded(coro):
+            async with sem:
+                await self.apply_rate_limit()
+                return await coro
+
+        return await asyncio.gather(
+            *[_bounded(c) for c in coros],
+            return_exceptions=return_exceptions,
+        )
+
+    async def collect_states_concurrent(
+        self,
+        states: List[str],
+        collect_fn,
+        max_concurrent: int = 4,
+    ) -> List[Dict[str, Any]]:
+        """
+        Collect data for multiple states with bounded concurrency.
+
+        Args:
+            states: List of state codes
+            collect_fn: Async function(state) -> list[dict]
+            max_concurrent: Max parallel state collections
+
+        Returns:
+            Flat list of all records across all states
+        """
+        coros = [collect_fn(state) for state in states]
+        results = await self.gather_with_limit(coros, max_concurrent)
+
+        all_records = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(f"State {states[i]} failed: {result}")
+                continue
+            if result:
+                all_records.extend(result)
+        return all_records
 
     def get_default_headers(self) -> Dict[str, str]:
         """Get default headers for requests. Override for custom headers."""
@@ -168,8 +220,6 @@ class BaseCollector(ABC):
 
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 429:  # Rate limited
-                    import asyncio
-
                     wait_time = self.rate_limit_delay * (2**attempt)
                     logger.warning(f"Rate limited, waiting {wait_time}s before retry")
                     await asyncio.sleep(wait_time)
@@ -178,8 +228,6 @@ class BaseCollector(ABC):
 
             except httpx.RequestError:
                 if attempt < self.default_retries - 1:
-                    import asyncio
-
                     await asyncio.sleep(self.rate_limit_delay)
                     continue
                 raise
@@ -211,8 +259,6 @@ class BaseCollector(ABC):
         Returns:
             List of all items across pages
         """
-        import asyncio
-
         all_items = []
         page = 1
         params = params or {}
@@ -373,8 +419,6 @@ class BaseCollector(ABC):
 
     def _fire_webhook(self, result: CollectionResult):
         """Fire webhook notification for collection result (non-blocking)."""
-        import asyncio
-
         try:
             from app.core import webhook_service
             from app.core.models import WebhookEventType

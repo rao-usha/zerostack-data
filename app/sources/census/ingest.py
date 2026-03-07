@@ -292,7 +292,10 @@ async def _batch_insert_data(
     batch_size: int = 1000,
 ) -> None:
     """
-    Batch insert data into Postgres using parameterized queries.
+    Batch upsert data into Postgres using parameterized queries.
+
+    Uses ON CONFLICT (geo_id) DO UPDATE to safely handle retries and
+    re-ingestion without creating duplicates.
 
     Args:
         db: Database session
@@ -309,10 +312,17 @@ async def _batch_insert_data(
     geo_columns = ["geo_name", "geo_id", "state_fips"]
     all_columns = geo_columns + data_columns
 
-    # Build INSERT statement
+    # Columns to update on conflict (everything except the conflict key)
+    update_columns = [c for c in all_columns if c != "geo_id"]
+    set_clause = ", ".join(f"{col} = EXCLUDED.{col}" for col in update_columns)
+
+    # Build INSERT ... ON CONFLICT statement
     columns_sql = ", ".join(all_columns)
     placeholders = ", ".join([f":{col}" for col in all_columns])
-    insert_sql = f"INSERT INTO {table_name} ({columns_sql}) VALUES ({placeholders})"
+    insert_sql = (
+        f"INSERT INTO {table_name} ({columns_sql}) VALUES ({placeholders}) "
+        f"ON CONFLICT (geo_id) DO UPDATE SET {set_clause}"
+    )
 
     # Process in batches
     for i in range(0, len(data), batch_size):
@@ -335,11 +345,11 @@ async def _batch_insert_data(
 
             normalized_batch.append(normalized)
 
-        # Execute batch insert using parameterized query
+        # Execute batch upsert using parameterized query
         db.execute(text(insert_sql), normalized_batch)
         db.commit()
 
-        logger.debug(f"Inserted batch of {len(batch)} rows")
+        logger.debug(f"Upserted batch of {len(batch)} rows")
 
 
 def _normalize_value(value: Any) -> Any:

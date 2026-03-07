@@ -80,6 +80,7 @@ class SiteIntelSource(str, Enum):
     GOOD_JOBS_FIRST = "good_jobs_first"
     STATE_EDO = "state_edo"
     NATIONAL_ZONING_ATLAS = "national_zoning_atlas"
+    NJDEP_LULC = "njdep_lulc"  # NJ DEP Land Use/Land Cover
 
     # Logistics
     FREIGHTOS = "freightos"
@@ -109,6 +110,7 @@ class SiteIntelSource(str, Enum):
     NREL_RESOURCE = "nrel_resource"  # NREL Solar/Wind resource data
     EPOCH_DC = "epoch_dc"  # Epoch AI datacenter locations
     STATE_EDO_SITES = "state_edo_sites"  # State EDO certified industrial sites
+    USGS_3DEP = "usgs_3dep"  # USGS 3DEP elevation data
 
 
 class CollectionStatus(str, Enum):

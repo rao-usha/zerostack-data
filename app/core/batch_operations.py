@@ -66,6 +66,7 @@ def batch_insert(
     update_columns: Optional[List[str]] = None,
     progress_callback: Optional[Callable[[int, int], None]] = None,
     commit_per_batch: bool = True,
+    job_id: Optional[int] = None,
 ) -> BatchInsertResult:
     """
     Batch insert rows into a table with optional upsert support.
@@ -80,6 +81,7 @@ def batch_insert(
         update_columns: Columns to update on conflict (defaults to all non-conflict columns)
         progress_callback: Optional callback(current, total) for progress updates
         commit_per_batch: Whether to commit after each batch (default True)
+        job_id: Optional ingestion job ID for rows_committed progress tracking
 
     Returns:
         BatchInsertResult with statistics
@@ -130,6 +132,18 @@ def batch_insert(
 
                 if commit_per_batch:
                     db.commit()
+                    # Update rows_committed on the job record for progress visibility
+                    if job_id:
+                        try:
+                            db.execute(
+                                text(
+                                    "UPDATE ingestion_jobs SET rows_committed = :rows WHERE id = :jid"
+                                ),
+                                {"rows": result.rows_inserted, "jid": job_id},
+                            )
+                            db.commit()
+                        except Exception:
+                            logger.debug(f"Could not update rows_committed for job {job_id}")
 
                 if progress_callback:
                     progress_callback(min(i + batch_size, total_rows), total_rows)

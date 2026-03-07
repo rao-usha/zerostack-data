@@ -17,6 +17,7 @@ from app.reports.templates.portfolio_detail import PortfolioDetailTemplate
 from app.reports.templates.data_quality import DataQualityTemplate
 from app.reports.templates.data_quality_deep import DataQualityDeepTemplate
 from app.reports.templates.medspa_market import MedSpaMarketTemplate
+from app.reports.templates.datacenter_site import DatacenterSiteTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ class ReportBuilder:
             "data_quality": DataQualityTemplate(),
             "data_quality_deep": DataQualityDeepTemplate(),
             "medspa_market": MedSpaMarketTemplate(),
+            "datacenter_site": DatacenterSiteTemplate(),
         }
         self._ensure_table()
 
@@ -164,6 +166,12 @@ class ReportBuilder:
 
             file_size = len(file_content)
 
+            # Ensure clean transaction state before updating report record
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
+
             # Update record
             update_sql = text("""
                 UPDATE reports
@@ -188,6 +196,11 @@ class ReportBuilder:
 
         except Exception as e:
             logger.error(f"Error generating report {report_id}: {e}")
+
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
 
             # Update with error
             error_sql = text("""

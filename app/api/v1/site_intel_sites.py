@@ -15,8 +15,6 @@ from pydantic import BaseModel, Field
 
 from app.core.database import get_db
 from app.core.models_site_intel import (
-    SiteScoreConfig,
-    SiteScore,
     Substation,
     InternetExchange,
     DataCenterFacility,
@@ -835,19 +833,12 @@ async def generate_site_report(
 
 @router.get("/configs")
 async def list_scoring_configs(db: Session = Depends(get_db)):
-    """List available scoring configurations."""
-    configs = db.query(SiteScoreConfig).filter(SiteScoreConfig.is_active == True).all()
+    """List available scoring configurations.
 
-    return [
-        {
-            "id": c.id,
-            "name": c.config_name,
-            "use_case": c.use_case,
-            "description": c.description,
-            "factor_weights": c.factor_weights,
-        }
-        for c in configs
-    ]
+    Note: Generic site scoring configs were removed. Datacenter scoring
+    uses DatacenterSiteScorer via /api/v1/datacenter-sites endpoints.
+    """
+    return []
 
 
 @router.get("/summary")
@@ -876,7 +867,7 @@ async def get_sites_summary(db: Session = Depends(get_db)):
             {"name": "risk", "description": "Risk factors (flood, seismic, climate)"},
             {"name": "incentives", "description": "Incentives (OZ, FTZ, programs)"},
         ],
-        "cached_scores": db.query(func.count(SiteScore.id)).scalar(),
+        "cached_scores": 0,  # Generic site scoring removed; use datacenter-sites endpoints
         "available_endpoints": [
             "/site-intel/sites/collect",
             "/site-intel/sites/collect/status",

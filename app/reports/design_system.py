@@ -87,11 +87,8 @@ body {
 /* KPI Strip */
 .kpi-strip {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
-  margin: 0 0 24px 0;
-}
-.page-header + .container > .kpi-strip {
   margin: -32px 0 32px 0;
   position: relative;
   z-index: 10;
@@ -244,7 +241,8 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 8px;
+  padding: 4px 0;
+  margin-bottom: 4px;
   font-size: 13px;
   color: var(--gray-700);
 }
@@ -667,6 +665,44 @@ body {
 [data-theme="dark"] .theme-toggle .toggle-thumb { transform: translateX(22px); color: #63b3ed; }
 [data-theme="dark"] .theme-toggle .toggle-thumb::after { content: '\\263E\\FE0E'; }
 
+/* Sensitivity grids */
+.sensitivity-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  margin: 12px 0;
+}
+.sensitivity-grid th, .sensitivity-grid td {
+  padding: 8px 12px;
+  text-align: center;
+  border: 1px solid var(--gray-200);
+}
+.sensitivity-grid th {
+  background: var(--gray-100);
+  font-weight: 600;
+  color: var(--gray-700);
+  font-size: 12px;
+}
+.sensitivity-grid td { min-width: 64px; }
+.sg-highlight { outline: 2px solid var(--primary-light); outline-offset: -2px; font-weight: 700; }
+[data-theme="dark"] .sensitivity-grid th { background: var(--gray-100); }
+[data-theme="dark"] .sensitivity-grid td { border-color: var(--gray-200); }
+
+/* Signal pills (alpha scoring) */
+.signal-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.signal-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #ebf8ff;
+  color: #2b6cb0;
+  white-space: nowrap;
+}
+[data-theme="dark"] .signal-pill { background: #1e3a5f; color: #90cdf4; }
+
 /* ── Print ── */
 @media print {
   .theme-toggle { display: none !important; }
@@ -675,6 +711,7 @@ body {
     border: 1px solid #e2e8f0;
   }
   .page-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sensitivity-grid td, .sensitivity-grid th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
 /* ── Responsive ── */
@@ -1158,13 +1195,15 @@ def build_horizontal_bar_config(
                 "backgroundColor": colors[:len(values)],
                 "borderWidth": 0,
                 "borderRadius": 4,
-                "barThickness": 28,
+                "barPercentage": 0.7,
+                "categoryPercentage": 0.8,
             }],
         },
         "options": {
             "indexAxis": "y",
             "responsive": True,
             "maintainAspectRatio": False,
+            "layout": {"padding": {"top": 8, "bottom": 8}},
             "plugins": {
                 "legend": {"display": False},
             },
@@ -1183,17 +1222,28 @@ def build_horizontal_bar_config(
     }
 
 
-def build_bar_fallback(labels: List[str], values: List[float], color: str = "#2b6cb0") -> str:
-    """Build simple CSS bar fallback HTML for when Chart.js CDN fails."""
+def build_bar_fallback(
+    labels: List[str],
+    values: List[float],
+    color: str = "#2b6cb0",
+    format_fn=None,
+) -> str:
+    """Build simple CSS bar fallback HTML for when Chart.js CDN fails.
+
+    Args:
+        format_fn: Optional callable(float) -> str for custom value formatting
+                   (e.g. currency formatter). Defaults to ``{val:,.0f}``.
+    """
     max_val = max(values) if values else 1
     rows = []
     for label, val in zip(labels, values):
         pct = (val / max_val * 100) if max_val > 0 else 0
+        display_val = format_fn(val) if format_fn else f"{val:,.0f}"
         rows.append(
             f'<div class="fb-row">'
             f'<span class="fb-label">{_esc(label)}</span>'
             f'<div class="fb-bar-track"><div class="fb-bar-fill" style="width:{pct:.0f}%;background:{color}"></div></div>'
-            f'<span class="fb-value">{val:,.0f}</span>'
+            f'<span class="fb-value">{_esc(str(display_val))}</span>'
             f'</div>'
         )
     return "\n".join(rows)
@@ -1248,3 +1298,224 @@ def topval_card(title: str, labels: List[str], counts: List[float]) -> str:
         f'{"".join(rows)}'
         f'</div>'
     )
+
+
+# ---------------------------------------------------------------------------
+# Chart.js Config Builders — Extended (Sections 28-32)
+# ---------------------------------------------------------------------------
+
+def build_line_chart_config(
+    labels: List[str],
+    datasets: List[Dict[str, Any]],
+    y_label: str = "",
+) -> dict:
+    """Build Chart.js line chart config. Used for J-curve visualization.
+
+    datasets: [{"label": str, "data": list, "color": str, "fill": bool}]
+    """
+    ds_configs = []
+    for ds in datasets:
+        color = ds.get("color", BLUE)
+        ds_configs.append({
+            "label": ds["label"],
+            "data": ds["data"],
+            "borderColor": color,
+            "backgroundColor": color + "33",  # 20% alpha
+            "fill": ds.get("fill", False),
+            "tension": 0.3,
+            "pointRadius": 2,
+            "pointHoverRadius": 5,
+            "borderWidth": 2,
+        })
+
+    return {
+        "type": "line",
+        "data": {"labels": labels, "datasets": ds_configs},
+        "options": {
+            "responsive": True,
+            "maintainAspectRatio": False,
+            "interaction": {"mode": "index", "intersect": False},
+            "plugins": {
+                "legend": {"position": "top", "labels": {"boxWidth": 12, "padding": 16}},
+            },
+            "scales": {
+                "x": {"grid": {"color": "#edf2f7"}, "ticks": {"color": "#4a5568"}},
+                "y": {
+                    "grid": {"color": "#edf2f7"},
+                    "ticks": {"color": "#4a5568"},
+                    "title": {"display": bool(y_label), "text": y_label, "color": "#4a5568"},
+                },
+            },
+        },
+    }
+
+
+def build_sensitivity_grid_html(
+    row_label: str,
+    row_values: List,
+    col_label: str,
+    col_values: List,
+    grid: List[List[float]],
+    metric_label: str = "IRR",
+    format_fn=None,
+    highlight: Optional[Dict[str, int]] = None,
+    color_scale: str = "green_red",
+) -> str:
+    """Build a pure HTML sensitivity grid with inline background colors.
+
+    color_scale: 'green_red' (high=green) or 'blue' (high=dark blue)
+    """
+    if format_fn is None:
+        format_fn = lambda v: f"{v * 100:.1f}%" if isinstance(v, float) and abs(v) < 1 else f"{v:.2f}"
+
+    # Find min/max for color interpolation
+    flat = [cell for row in grid for cell in row if cell is not None]
+    if not flat:
+        return '<p style="color:var(--gray-500)">No sensitivity data available</p>'
+    lo, hi = min(flat), max(flat)
+    rng = hi - lo if hi != lo else 1
+
+    def _cell_color(val):
+        t = (val - lo) / rng  # 0..1
+        if color_scale == "blue":
+            # Light blue → dark blue
+            r = int(235 - t * 135)
+            g = int(248 - t * 118)
+            b = int(255 - t * 55)
+        else:
+            # Red → yellow → green
+            if t < 0.5:
+                r, g, b = int(229 + (255 - 229) * t * 2), int(62 + (193 - 62) * t * 2), int(62)
+            else:
+                r, g, b = int(255 - (255 - 56) * (t - 0.5) * 2), int(193 + (161 - 193) * (t - 0.5) * 2), int(62 + (105 - 62) * (t - 0.5) * 2)
+        return f"rgba({r},{g},{b},0.35)"
+
+    # Build table
+    html = f'<table class="sensitivity-grid">\n<thead><tr>'
+    html += f'<th>{_esc(metric_label)}</th>'
+    for cv in col_values:
+        cv_str = format_fn(cv) if callable(format_fn) else str(cv)
+        html += f'<th>{_esc(cv_str)}</th>'
+    html += '</tr>'
+    html += f'<tr><th></th>'
+    for _ in col_values:
+        html += f'<th style="font-size:10px;font-weight:400;color:var(--gray-500)">{_esc(col_label)}</th>'
+    html += '</tr></thead>\n<tbody>'
+
+    for ri, rv in enumerate(row_values):
+        rv_str = format_fn(rv) if callable(format_fn) else str(rv)
+        html += f'<tr><th>{_esc(rv_str)}<br><span style="font-size:10px;font-weight:400;color:var(--gray-500)">{_esc(row_label)}</span></th>'
+        for ci, cell in enumerate(grid[ri]):
+            bg = _cell_color(cell)
+            hl = ' class="sg-highlight"' if highlight and highlight.get("row") == ri and highlight.get("col") == ci else ""
+            html += f'<td style="background:{bg}"{hl}>{_esc(format_fn(cell))}</td>'
+        html += '</tr>'
+
+    html += '</tbody></table>'
+    return html
+
+
+def build_tornado_chart_config(
+    labels: List[str],
+    low_values: List[float],
+    high_values: List[float],
+    base_value: float,
+    metric_label: str = "IRR",
+) -> dict:
+    """Build Chart.js stacked horizontal bar for tornado/sensitivity chart.
+
+    low_values/high_values are deltas from base (negative for downside, positive for upside).
+    """
+    return {
+        "type": "bar",
+        "data": {
+            "labels": labels,
+            "datasets": [
+                {
+                    "label": "Downside",
+                    "data": low_values,
+                    "backgroundColor": RED + "99",
+                    "borderColor": RED,
+                    "borderWidth": 1,
+                    "borderRadius": 3,
+                },
+                {
+                    "label": "Upside",
+                    "data": high_values,
+                    "backgroundColor": GREEN + "99",
+                    "borderColor": GREEN,
+                    "borderWidth": 1,
+                    "borderRadius": 3,
+                },
+            ],
+        },
+        "options": {
+            "indexAxis": "y",
+            "responsive": True,
+            "maintainAspectRatio": False,
+            "plugins": {
+                "legend": {"position": "top", "labels": {"boxWidth": 12}},
+                "tooltip": {"callbacks": {}},
+            },
+            "scales": {
+                "x": {
+                    "stacked": True,
+                    "grid": {"color": "#edf2f7"},
+                    "ticks": {"color": "#4a5568"},
+                    "title": {"display": True, "text": f"{metric_label} Change", "color": "#4a5568"},
+                },
+                "y": {
+                    "stacked": True,
+                    "grid": {"display": False},
+                    "ticks": {"color": "#4a5568", "font": {"size": 13}},
+                },
+            },
+        },
+    }
+
+
+def build_scatter_chart_config(
+    datasets: List[Dict[str, Any]],
+    x_label: str = "",
+    y_label: str = "",
+) -> dict:
+    """Build Chart.js scatter config.
+
+    datasets: [{"label": str, "data": [{"x": float, "y": float}], "color": str}]
+    """
+    ds_configs = []
+    for ds in datasets:
+        color = ds.get("color", BLUE)
+        ds_configs.append({
+            "label": ds["label"],
+            "data": ds["data"],
+            "backgroundColor": color + "80",  # 50% alpha
+            "borderColor": color,
+            "borderWidth": 1,
+            "pointRadius": 6,
+            "pointHoverRadius": 9,
+        })
+
+    return {
+        "type": "scatter",
+        "data": {"datasets": ds_configs},
+        "options": {
+            "responsive": True,
+            "maintainAspectRatio": False,
+            "plugins": {
+                "legend": {"position": "top", "labels": {"boxWidth": 12, "padding": 16}},
+            },
+            "scales": {
+                "x": {
+                    "grid": {"color": "#edf2f7"},
+                    "ticks": {"color": "#4a5568"},
+                    "title": {"display": bool(x_label), "text": x_label, "color": "#4a5568"},
+                },
+                "y": {
+                    "grid": {"color": "#edf2f7"},
+                    "ticks": {"color": "#4a5568"},
+                    "title": {"display": bool(y_label), "text": y_label, "color": "#4a5568"},
+                },
+            },
+        },
+    }

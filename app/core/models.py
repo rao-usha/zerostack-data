@@ -6,6 +6,7 @@ These tables are source-agnostic and used by all data source adapters.
 
 from datetime import datetime
 from sqlalchemy import (
+    Boolean,
     Column,
     Integer,
     String,
@@ -92,6 +93,13 @@ class IngestionJob(Base):
     parent_job_id = Column(
         Integer, nullable=True, index=True
     )  # Link to original job if this is a retry
+
+    # Schedule linkage — direct FK to originating schedule (replaces fragile last_job_id lookup)
+    schedule_id = Column(Integer, nullable=True, index=True)  # Link to ingestion_schedules.id
+
+    # Batch progress tracking
+    rows_committed = Column(Integer, nullable=True, default=0)  # Rows committed so far (mid-batch visibility)
+    progress_checkpoint = Column(JSON, nullable=True)  # Arbitrary checkpoint data for resume
 
     # Batch metadata — groups jobs by batch run without a separate tracking table
     batch_run_id = Column(String(50), nullable=True, index=True)  # e.g. "batch_20260301_143022"
@@ -192,6 +200,62 @@ class SourceConfig(Base):
         return (
             f"<SourceConfig(source={self.source}, timeout={self.timeout_seconds}s, "
             f"retries={self.max_retries})>"
+        )
+
+
+class SourceWatermark(Base):
+    """Per-source last successful ingestion timestamp. Independent of schedules."""
+
+    __tablename__ = "source_watermarks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source = Column(String(50), unique=True, nullable=False, index=True)
+    last_success_at = Column(DateTime, nullable=True)
+    last_job_id = Column(Integer, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return (
+            f"<SourceWatermark(source={self.source}, "
+            f"last_success_at={self.last_success_at})>"
+        )
+
+
+class BatchTierConfig(Base):
+    """Override default tier settings (priority, max_concurrent, enabled)."""
+
+    __tablename__ = "batch_tier_config"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tier_level = Column(Integer, unique=True, nullable=False)
+    priority = Column(Integer, nullable=True)
+    max_concurrent = Column(Integer, nullable=True)
+    enabled = Column(Boolean, default=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return (
+            f"<BatchTierConfig(tier={self.tier_level}, priority={self.priority}, "
+            f"max_concurrent={self.max_concurrent}, enabled={self.enabled})>"
+        )
+
+
+class BatchSourceTierOverride(Base):
+    """Move a source to a different tier or disable it from batch."""
+
+    __tablename__ = "batch_source_tier_overrides"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source_key = Column(String(100), unique=True, nullable=False, index=True)
+    tier_level = Column(Integer, nullable=True)  # Move to this tier (null = remove from batch)
+    enabled = Column(Boolean, default=True)  # Disable this source from batch
+    default_config = Column(JSON, nullable=True)  # Override default_config for SourceDef
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return (
+            f"<BatchSourceTierOverride(source={self.source_key}, "
+            f"tier={self.tier_level}, enabled={self.enabled})>"
         )
 
 
@@ -1829,6 +1893,7 @@ class WebhookEventType(str, enum.Enum):
     SITE_INTEL_FAILED = "site_intel_failed"
     SITE_INTEL_SUCCESS = "site_intel_success"
     ALERT_CONSECUTIVE_FAILURES = "alert_consecutive_failures"
+    BATCH_COMPLETED = "batch_completed"
 
 
 class Webhook(Base):
@@ -2422,6 +2487,8 @@ class AnomalyAlertType(str, enum.Enum):
     TYPE_CHANGE = "type_change"
     VALUE_RANGE_SHIFT = "value_range_shift"
     QUALITY_DEGRADATION = "quality_degradation"  # Phase 4: sustained drops
+    ROW_COUNT_DROP = "row_count_drop"  # P2: data continuity — sudden row count decrease
+    DATE_GAP = "date_gap"  # P2: data continuity — missing months in time series
 
 
 class AnomalyAlertStatus(str, enum.Enum):
@@ -3470,3 +3537,35 @@ class SourceAPIKey(Base):
 
     def __repr__(self) -> str:
         return f"<SourceAPIKey(source='{self.source}', updated_at={self.updated_at})>"
+
+
+# =============================================================================
+# FRESHNESS SLA MODELS
+# =============================================================================
+
+
+class SourceFreshnessSLA(Base):
+    """
+    Configurable freshness SLA per data source.
+
+    When set, overrides the schedule-derived cadence in the freshness dashboard.
+    If no SLA is set for a source, the system falls back to the schedule cadence.
+    """
+
+    __tablename__ = "source_freshness_sla"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source = Column(String(50), unique=True, nullable=False, index=True)
+    max_age_hours = Column(Float, nullable=False)
+    alert_on_violation = Column(Integer, nullable=False, default=1)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<SourceFreshnessSLA(source='{self.source}', "
+            f"max_age_hours={self.max_age_hours})>"
+        )

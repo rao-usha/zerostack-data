@@ -31,6 +31,7 @@ def submit_job(
     payload: Dict[str, Any],
     priority: int = 0,
     job_table_id: Optional[int] = None,
+    status: Optional[QueueJobStatus] = None,
     background_tasks=None,
     background_func: Optional[Callable] = None,
     background_args: Tuple = (),
@@ -47,6 +48,8 @@ def submit_job(
         payload: JSON-serializable config dict for the executor
         priority: Higher = picked first (default 0)
         job_table_id: Optional FK to domain-specific job table
+        status: Optional initial status (default PENDING). Use BLOCKED for
+                tier 2+ batch jobs that should wait for lower tiers.
         background_tasks: FastAPI BackgroundTasks instance (legacy mode)
         background_func: Callable to run in background (legacy mode)
         background_args: Positional args for background_func (legacy mode)
@@ -59,7 +62,7 @@ def submit_job(
         job = JobQueue(
             job_type=job_type,
             job_table_id=job_table_id,
-            status=QueueJobStatus.PENDING,
+            status=status or QueueJobStatus.PENDING,
             priority=priority,
             payload=payload,
         )
@@ -136,3 +139,97 @@ def reset_stale_jobs(max_age_minutes: int = 2) -> int:
         return 0
     finally:
         db.close()
+
+
+def promote_blocked_jobs(db: Session, batch_id: str) -> int:
+    """
+    Promote BLOCKED → PENDING for the next eligible tier in a batch.
+
+    For each tier (ascending), if all lower-tier jobs are terminal
+    (SUCCESS/FAILED), promote BLOCKED jobs up to tier_max_concurrent.
+    Stops at the first tier with incomplete lower dependencies.
+
+    Also promotes the corresponding IngestionJob BLOCKED → PENDING,
+    and sends pg_notify to wake workers.
+
+    Returns:
+        Number of jobs promoted.
+    """
+    from sqlalchemy import text
+    from app.core.models import IngestionJob, JobStatus
+
+    TERMINAL = {QueueJobStatus.SUCCESS, QueueJobStatus.FAILED}
+    TERMINAL_ING = {JobStatus.SUCCESS, JobStatus.FAILED}
+
+    # Load all queue jobs in this batch
+    queue_jobs = (
+        db.query(JobQueue)
+        .filter(JobQueue.payload["batch_id"].as_string() == batch_id)
+        .all()
+    )
+    if not queue_jobs:
+        return 0
+
+    # Group by tier
+    tiers: Dict[int, list] = {}
+    for qj in queue_jobs:
+        tier_level = (qj.payload or {}).get("tier", 0)
+        tiers.setdefault(tier_level, []).append(qj)
+
+    promoted = 0
+
+    for tier_level in sorted(tiers.keys()):
+        # Check all lower tiers are terminal
+        lower_complete = True
+        for lower_level in sorted(tiers.keys()):
+            if lower_level >= tier_level:
+                break
+            for qj in tiers[lower_level]:
+                if QueueJobStatus(qj.status) not in TERMINAL:
+                    lower_complete = False
+                    break
+            if not lower_complete:
+                break
+
+        if not lower_complete:
+            break  # Stop — can't promote this or higher tiers
+
+        # Count how many non-blocked (active) jobs exist in this tier
+        tier_jobs = tiers[tier_level]
+        blocked = [qj for qj in tier_jobs if QueueJobStatus(qj.status) == QueueJobStatus.BLOCKED]
+        if not blocked:
+            continue
+
+        # Determine max_concurrent from payload
+        max_concurrent = (tier_jobs[0].payload or {}).get("tier_max_concurrent", 2)
+        active = sum(
+            1 for qj in tier_jobs
+            if QueueJobStatus(qj.status) not in TERMINAL
+            and QueueJobStatus(qj.status) != QueueJobStatus.BLOCKED
+        )
+        slots = max(0, max_concurrent - active)
+
+        for qj in blocked[:slots]:
+            qj.status = QueueJobStatus.PENDING
+            promoted += 1
+
+            # Also promote the IngestionJob
+            if qj.job_table_id:
+                ing_job = db.query(IngestionJob).filter(
+                    IngestionJob.id == qj.job_table_id
+                ).first()
+                if ing_job and ing_job.status == JobStatus.BLOCKED:
+                    ing_job.status = JobStatus.PENDING
+
+    if promoted:
+        db.commit()
+        # Wake workers via pg_notify
+        try:
+            db.execute(text("SELECT pg_notify('jobs_promoted', :batch_id)"),
+                       {"batch_id": batch_id})
+            db.commit()
+        except Exception:
+            pass  # pg_notify is best-effort
+        logger.info(f"Promoted {promoted} blocked jobs in batch {batch_id}")
+
+    return promoted

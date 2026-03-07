@@ -4,16 +4,43 @@ Job management endpoints.
 
 import importlib
 import logging
+from datetime import datetime
 from typing import List, Dict, Tuple
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.models import IngestionJob, JobStatus
-from app.core.schemas import JobCreate, JobResponse
+from app.core.models import IngestionJob, IngestionSchedule, JobStatus, BatchTierConfig
+from app.core.schemas import JobCreate, JobResponse, BackfillRequest
 from app.core.config import get_settings, MissingCensusAPIKeyError
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# API Key Pre-Flight Check
+# =============================================================================
+
+
+def _check_api_key_preflight(source: str):
+    """Return error message if required API key is missing, else None."""
+    from app.core.api_registry import API_REGISTRY, APIKeyRequirement
+    from app.core.config import get_settings
+
+    # Strip dataset suffix (e.g. "job_postings:all" → "job_postings")
+    base_source = source.split(":")[0]
+
+    api_config = API_REGISTRY.get(base_source)
+    if not api_config or api_config.api_key_requirement != APIKeyRequirement.REQUIRED:
+        return None
+
+    settings = get_settings()
+    try:
+        settings.get_api_key(base_source, required=True)
+        return None
+    except Exception:
+        return f"API key required for '{base_source}' but not configured"
+
 
 # =============================================================================
 # Universal Source Dispatch Table
@@ -590,13 +617,62 @@ async def _run_quality_gate(db, job: IngestionJob):
         except Exception as pe:
             logger.warning(f"Profiling error for job {job.id}: {pe}")
 
+        # Phase 3: Data continuity checks
+        try:
+            from app.core.data_quality_service import check_row_count_delta
+            from sqlalchemy import text as sa_text
+
+            count_result = db.execute(sa_text(f'SELECT COUNT(*) FROM "{registry.table_name}"'))
+            current_count = count_result.scalar()
+            check_row_count_delta(db, job, registry.table_name, current_count)
+        except Exception as ce:
+            logger.debug(f"Row count delta check skipped for job {job.id}: {ce}")
+
+        # Phase 3b: Date gap check for tables with known date columns
+        DATE_COLUMN_MAP = {
+            "fred_": "date",
+            "bls_": "date",
+            "treasury_": "record_date",
+            "eia_": "period",
+        }
+        try:
+            from app.core.data_quality_service import check_date_gaps
+
+            date_col = None
+            for prefix, col in DATE_COLUMN_MAP.items():
+                if registry.table_name.startswith(prefix):
+                    date_col = col
+                    break
+            if date_col:
+                check_date_gaps(db, registry.table_name, date_col, job.id)
+        except Exception as de:
+            logger.debug(f"Date gap check skipped for job {job.id}: {de}")
+
     except Exception as e:
         logger.warning(f"Quality gate error for job {job.id}: {e}")
 
 
+def _advance_schedule_watermark(db, job: IngestionJob):
+    """
+    Advance schedule watermark after successful job completion.
+
+    Only called when job.status == SUCCESS. This ensures that if a job fails,
+    last_run_at stays unchanged and the next scheduled run retries the same window.
+    """
+    if not job.schedule_id:
+        return  # Not a scheduled job — nothing to advance
+
+    schedule = db.query(IngestionSchedule).filter_by(id=job.schedule_id).first()
+    if schedule:
+        schedule.last_run_at = job.completed_at or datetime.utcnow()
+        db.commit()
+        logger.info(f"Advanced watermark for schedule {schedule.id} to {schedule.last_run_at}")
+
+
 async def _handle_job_completion(db, job: IngestionJob):
     """
-    Handle job completion: unblock dependent jobs, update chain status.
+    Handle job completion: unblock dependent jobs, update chain status,
+    and advance schedule watermark on success.
 
     Called after a job succeeds or fails (after retries exhausted).
 
@@ -605,6 +681,24 @@ async def _handle_job_completion(db, job: IngestionJob):
         job: The completed job
     """
     from app.core import dependency_service
+
+    # Advance schedule watermark on success only
+    if job.status == JobStatus.SUCCESS:
+        _advance_schedule_watermark(db, job)
+
+        # Also advance global source watermark (for future manual/batch jobs).
+        # Backfill jobs are excluded to prevent moving the watermark backward.
+        if job.trigger != "backfill" and not (job.config or {}).get("_backfill"):
+            try:
+                from app.core.watermark_service import advance_watermark
+
+                advance_watermark(
+                    db, job.source, job.completed_at or datetime.utcnow(), job.id
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to advance source watermark for {job.source}: {e}"
+                )
 
     # Check and unblock any dependent jobs
     unblocked_jobs = dependency_service.check_and_unblock_dependent_jobs(db, job.id)
@@ -621,6 +715,15 @@ async def _handle_job_completion(db, job: IngestionJob):
     if execution:
         dependency_service.update_chain_execution_status(db, execution.id)
         logger.info(f"Updated chain execution {execution.id} status")
+
+    # Check if this completes a batch → send summary webhook
+    if job.batch_run_id:
+        try:
+            from app.core.nightly_batch_service import check_and_notify_batch_completion
+
+            await check_and_notify_batch_completion(db, job.batch_run_id)
+        except Exception as e:
+            logger.error(f"Batch completion check error for {job.batch_run_id}: {e}")
 
 
 async def _handle_job_failure(
@@ -930,6 +1033,21 @@ async def run_ingestion_job(job_id: int, source: str, config: dict):
             logger.error(f"Job {job_id} not found")
             return
 
+        # API key pre-flight: fail fast if required key is missing
+        key_error = _check_api_key_preflight(source)
+        if key_error:
+            job.status = JobStatus.FAILED
+            job.error_message = key_error
+            job.completed_at = datetime.utcnow()
+            db.commit()
+            logger.warning(f"Job {job_id} failed pre-flight: {key_error}")
+            # Trigger downstream: unblock dependents, batch completion check
+            try:
+                await _handle_job_completion(db, job)
+            except Exception as e:
+                logger.error(f"Completion handler error after pre-flight for job {job_id}: {e}")
+            return
+
         job.status = JobStatus.RUNNING
         job.started_at = datetime.utcnow()
         db.commit()
@@ -983,7 +1101,10 @@ async def create_job(
 
     # Create job record
     job = IngestionJob(
-        source=job_request.source, status=JobStatus.PENDING, config=job_request.config
+        source=job_request.source,
+        status=JobStatus.PENDING,
+        config=job_request.config,
+        trigger="manual",
     )
     db.add(job)
     db.commit()
@@ -1154,6 +1275,42 @@ def get_batch_run(batch_run_id: str, db: Session = Depends(get_db)):
     return result
 
 
+@router.post("/batch/{batch_run_id}/cancel")
+def cancel_batch(batch_run_id: str, db: Session = Depends(get_db)):
+    """
+    Cancel all PENDING/RUNNING jobs in a batch.
+
+    Running jobs stop within one heartbeat interval (30s).
+    Already-completed jobs are unaffected.
+    """
+    from app.core.nightly_batch_service import cancel_batch_run
+
+    result = cancel_batch_run(db, batch_run_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Batch run not found")
+    return result
+
+
+@router.post("/batch/{batch_run_id}/rerun-failed")
+async def rerun_failed_batch_jobs(
+    batch_run_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Rerun all FAILED jobs in a batch.
+
+    Creates new queue entries for each failed job, resets IngestionJob to
+    PENDING, and returns a summary. Respects tier ordering — tier 2+ jobs
+    start as BLOCKED if lower tiers have jobs being rerun.
+    """
+    from app.core.nightly_batch_service import rerun_failed_in_batch
+
+    result = rerun_failed_in_batch(db, batch_run_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Batch run not found")
+    return result
+
+
 @router.get("/batch/runs")
 def list_batch_runs_endpoint(
     limit: int = 20,
@@ -1164,6 +1321,56 @@ def list_batch_runs_endpoint(
     from app.core.nightly_batch_service import list_batch_runs
 
     return list_batch_runs(db, limit=limit, status=status)
+
+
+# =============================================================================
+# Backfill
+# =============================================================================
+
+
+@router.post("/backfill")
+async def launch_backfill_endpoint(
+    request: BackfillRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Launch backfill jobs for one or more sources with a specific date range.
+
+    Translates universal start/end dates into source-specific query parameters.
+    Backfill jobs do NOT advance the source watermark.
+    """
+    from app.core.backfill_service import launch_backfill
+
+    # Validate sources
+    _base_sources = {k.split(":")[0] for k in SOURCE_DISPATCH}
+    valid_sources = {"census", "public_lp_strategies"} | _base_sources
+    invalid = [s for s in request.sources if s.split(":")[0] not in valid_sources]
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid sources: {invalid}. Valid: {sorted(valid_sources)}",
+        )
+
+    # Parse dates
+    try:
+        start_date = datetime.strptime(request.start_date, "%Y-%m-%d")
+        end_date = datetime.strptime(request.end_date, "%Y-%m-%d")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {e}")
+
+    if end_date < start_date:
+        raise HTTPException(
+            status_code=400, detail="end_date must be >= start_date"
+        )
+
+    result = launch_backfill(
+        db,
+        sources=request.sources,
+        start_date=start_date,
+        end_date=end_date,
+        extra_config=request.config or None,
+    )
+    return result
 
 
 # =============================================================================
@@ -1342,10 +1549,10 @@ async def cancel_job(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    if job.status not in (JobStatus.RUNNING, JobStatus.PENDING):
+    if job.status not in (JobStatus.RUNNING, JobStatus.PENDING, JobStatus.BLOCKED):
         raise HTTPException(
             status_code=400,
-            detail=f"Job is not running or pending (current: {job.status.value})",
+            detail=f"Job is not running, pending, or blocked (current: {job.status.value})",
         )
 
     job.status = JobStatus.FAILED
@@ -1355,13 +1562,19 @@ async def cancel_job(
     # Also mark the job_queue row so the worker sees the cancellation
     from app.core.models_queue import JobQueue, QueueJobStatus
     queue_row = db.query(JobQueue).filter(JobQueue.job_table_id == job_id).first()
-    if queue_row and queue_row.status in (QueueJobStatus.PENDING, QueueJobStatus.CLAIMED, QueueJobStatus.RUNNING):
+    if queue_row and queue_row.status in (QueueJobStatus.PENDING, QueueJobStatus.CLAIMED, QueueJobStatus.RUNNING, QueueJobStatus.BLOCKED):
         queue_row.status = QueueJobStatus.FAILED
         queue_row.error_message = "Cancelled by user"
         queue_row.completed_at = datetime.utcnow()
 
     db.commit()
     db.refresh(job)
+
+    # Trigger downstream: unblock dependents, batch completion check
+    try:
+        await _handle_job_completion(db, job)
+    except Exception as e:
+        logger.error(f"Completion handler error after cancel for job {job_id}: {e}")
 
     logger.info(f"Job {job_id} cancelled by user")
 
@@ -1612,5 +1825,140 @@ def get_monitoring_dashboard(db: Session = Depends(get_db)):
     from app.core.monitoring import get_monitoring_dashboard as get_dashboard
 
     return get_dashboard(db)
+
+
+# =============================================================================
+# Batch Tier Configuration Endpoints (P2 #6)
+# =============================================================================
+
+
+@router.get("/batch/tier-config")
+def get_tier_config(db: Session = Depends(get_db)):
+    """
+    Get effective tier configuration (hardcoded defaults + DB overrides).
+
+    Returns each tier with its effective settings and source list.
+    """
+    from app.core.nightly_batch_service import resolve_effective_tiers, TIERS
+    from app.core.models import BatchTierConfig, BatchSourceTierOverride
+
+    effective = resolve_effective_tiers(db)
+    overrides = {tc.tier_level: tc for tc in db.query(BatchTierConfig).all()}
+    source_overrides = {so.source_key: so for so in db.query(BatchSourceTierOverride).all()}
+
+    result = []
+    for tier in effective:
+        tier_override = overrides.get(tier.level)
+        result.append({
+            "level": tier.level,
+            "name": tier.name,
+            "priority": tier.priority,
+            "max_concurrent": tier.max_concurrent,
+            "sources": [
+                {
+                    "key": s.key,
+                    "default_config": s.default_config,
+                    "has_override": s.key in source_overrides,
+                }
+                for s in tier.sources
+            ],
+            "has_override": tier_override is not None,
+        })
+
+    return {"tiers": result, "source_overrides_count": len(source_overrides)}
+
+
+@router.put("/batch/tier-config/{tier_level}")
+def update_tier_config(
+    tier_level: int,
+    priority: int = None,
+    max_concurrent: int = None,
+    enabled: bool = True,
+    db: Session = Depends(get_db),
+):
+    """
+    Update tier-level settings (priority, max_concurrent, enabled).
+
+    Creates the override if it doesn't exist. Set enabled=false to disable an entire tier.
+    """
+    from app.core.models import BatchTierConfig
+    from app.core.nightly_batch_service import TIER_BY_LEVEL
+
+    if tier_level not in TIER_BY_LEVEL:
+        raise HTTPException(status_code=404, detail=f"Tier {tier_level} not found")
+
+    existing = db.query(BatchTierConfig).filter_by(tier_level=tier_level).first()
+    if existing:
+        if priority is not None:
+            existing.priority = priority
+        if max_concurrent is not None:
+            existing.max_concurrent = max_concurrent
+        existing.enabled = enabled
+        existing.updated_at = datetime.utcnow()
+    else:
+        existing = BatchTierConfig(
+            tier_level=tier_level,
+            priority=priority,
+            max_concurrent=max_concurrent,
+            enabled=enabled,
+        )
+        db.add(existing)
+
+    db.commit()
+    db.refresh(existing)
+
+    return {
+        "tier_level": existing.tier_level,
+        "priority": existing.priority,
+        "max_concurrent": existing.max_concurrent,
+        "enabled": existing.enabled,
+        "updated_at": existing.updated_at.isoformat() if existing.updated_at else None,
+    }
+
+
+@router.put("/batch/source-override/{source_key}")
+def update_source_override(
+    source_key: str,
+    tier_level: int = None,
+    enabled: bool = True,
+    default_config: Dict = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Move source to different tier, disable, or override config.
+
+    - Set tier_level to move source to a different tier.
+    - Set enabled=false to remove source from batch entirely.
+    - Set default_config to override/merge the source's default config.
+    """
+    from app.core.models import BatchSourceTierOverride
+
+    existing = db.query(BatchSourceTierOverride).filter_by(source_key=source_key).first()
+    if existing:
+        if tier_level is not None:
+            existing.tier_level = tier_level
+        existing.enabled = enabled
+        if default_config is not None:
+            existing.default_config = default_config
+        existing.updated_at = datetime.utcnow()
+    else:
+        existing = BatchSourceTierOverride(
+            source_key=source_key,
+            tier_level=tier_level,
+            enabled=enabled,
+            default_config=default_config,
+        )
+        db.add(existing)
+
+    db.commit()
+    db.refresh(existing)
+
+    return {
+        "source_key": existing.source_key,
+        "tier_level": existing.tier_level,
+        "enabled": existing.enabled,
+        "default_config": existing.default_config,
+        "updated_at": existing.updated_at.isoformat() if existing.updated_at else None,
+    }
 
 

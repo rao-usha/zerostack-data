@@ -214,9 +214,8 @@ def generate_create_table_sql(
     # Add geography columns if requested
     if include_geo_columns:
         columns.append("    geo_name TEXT")  # Geographic area name
-        columns.append("    geo_id TEXT")  # Geographic identifier
+        columns.append("    geo_id TEXT UNIQUE")  # Geographic identifier (unique per table)
         columns.append("    state_fips TEXT")
-        # Add more geo columns as needed based on geo_level
 
     # Add data columns from Census variables
     for var_name, var_meta in table_vars.items():

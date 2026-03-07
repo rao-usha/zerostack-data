@@ -80,6 +80,12 @@ class Settings(BaseSettings):
         description="Data.gov API key - used for FBI Crime Data and other government APIs",
     )
 
+    # NREL API Configuration (Free key, required for solar/wind resource data)
+    nrel_api_key: Optional[str] = Field(
+        default=None,
+        description="NREL API key - free, required for solar/wind resource queries",
+    )
+
     # BTS API Configuration (OPTIONAL - public data, higher limits with app token)
     bts_app_token: Optional[str] = Field(
         default=None,
@@ -739,6 +745,7 @@ class Settings(BaseSettings):
             "data_commons_api_key",
             "https://console.cloud.google.com/apis/credentials",
         ),
+        "nrel": ("nrel_api_key", "https://developer.nrel.gov/signup/"),
         "usda": ("usda_api_key", "https://api.data.gov/signup/"),
         "uspto": (
             "uspto_patentsview_api_key",

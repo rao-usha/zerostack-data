@@ -66,6 +66,7 @@ KEY_INDUSTRY_CODES = {
     "1026": "Leisure and Hospitality",
     "1027": "Other Services",
     "1029": "Unclassified",
+    "518210": "Data Processing, Hosting",
 }
 
 
@@ -82,7 +83,7 @@ class BLSQCEWCollector(BaseCollector):
     source = SiteIntelSource.BLS_QCEW
 
     default_timeout = 60.0
-    rate_limit_delay = 1.0  # Conservative — no API key
+    rate_limit_delay = 0.5  # BLS tolerates ~2 req/s
 
     def __init__(self, db: Session, api_key: Optional[str] = None, **kwargs):
         super().__init__(db, api_key, **kwargs)
@@ -116,25 +117,29 @@ class BLSQCEWCollector(BaseCollector):
 
             logger.info(f"Using QCEW data for {year} Q{quarter}")
 
-            for state in states:
+            async def _collect_one(state):
                 fips = STATE_FIPS.get(state)
                 if not fips:
-                    continue
+                    return {"processed": 0, "inserted": 0}
+                area_fips = f"{fips}000"
+                return await self._collect_state(state, area_fips, year, quarter)
 
-                area_fips = f"{fips}000"  # Statewide
-                try:
-                    result = await self._collect_state(
-                        state, area_fips, year, quarter
+            results = await self.gather_with_limit(
+                [_collect_one(s) for s in states], max_concurrent=4
+            )
+
+            for i, result in enumerate(results):
+                state = states[i]
+                if isinstance(result, Exception):
+                    logger.warning(f"Failed to collect QCEW for {state}: {result}")
+                    errors.append({"source": f"qcew_{state}", "error": str(result)})
+                    continue
+                total_inserted += result.get("inserted", 0)
+                total_processed += result.get("processed", 0)
+                if result.get("error"):
+                    errors.append(
+                        {"source": f"qcew_{state}", "error": result["error"]}
                     )
-                    total_inserted += result.get("inserted", 0)
-                    total_processed += result.get("processed", 0)
-                    if result.get("error"):
-                        errors.append(
-                            {"source": f"qcew_{state}", "error": result["error"]}
-                        )
-                except Exception as e:
-                    logger.warning(f"Failed to collect QCEW for {state}: {e}")
-                    errors.append({"source": f"qcew_{state}", "error": str(e)})
 
             status = CollectionStatus.SUCCESS
             if errors and total_inserted > 0:

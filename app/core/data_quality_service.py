@@ -1331,3 +1331,96 @@ def scheduled_rule_evaluation():
         logger.error(f"Scheduled rule evaluation failed: {e}")
     finally:
         db.close()
+
+
+# =============================================================================
+# Data Continuity Validation (P2 #3)
+# =============================================================================
+
+
+def check_row_count_delta(db: Session, job, table_name: str, current_count: int):
+    """
+    Compare current row count against last DataProfileSnapshot.
+
+    Alert if count dropped >20% from previous snapshot. Advisory only.
+    """
+    from app.core.models import DataProfileSnapshot, DQAnomalyAlert, AnomalyAlertType
+
+    prev = (
+        db.query(DataProfileSnapshot)
+        .filter(DataProfileSnapshot.table_name == table_name)
+        .order_by(DataProfileSnapshot.profiled_at.desc())
+        .first()
+    )
+    if not prev or not prev.row_count:
+        return None
+
+    delta_pct = (current_count - prev.row_count) / prev.row_count * 100
+    if delta_pct < -20:  # Dropped more than 20%
+        alert = DQAnomalyAlert(
+            table_name=table_name,
+            alert_type=AnomalyAlertType.ROW_COUNT_DROP,
+            severity="warning",
+            message=f"Row count dropped {abs(delta_pct):.1f}%: {prev.row_count} → {current_count}",
+            details={
+                "previous": prev.row_count,
+                "current": current_count,
+                "delta_pct": round(delta_pct, 1),
+            },
+            job_id=job.id,
+        )
+        db.add(alert)
+        db.commit()
+        logger.warning(
+            f"Row count drop alert for {table_name}: "
+            f"{prev.row_count} → {current_count} ({delta_pct:.1f}%)"
+        )
+        return alert
+    return None
+
+
+def check_date_gaps(db: Session, table_name: str, date_column: str, job_id: int):
+    """
+    Check for missing months in a time-series table.
+
+    Queries distinct months and identifies gaps > 1 month. Advisory only.
+    """
+    from app.core.models import DQAnomalyAlert, AnomalyAlertType
+
+    try:
+        result = db.execute(text(f"""
+            WITH months AS (
+                SELECT DISTINCT date_trunc('month', "{date_column}"::timestamp) as m
+                FROM "{table_name}"
+                WHERE "{date_column}" IS NOT NULL
+                ORDER BY m
+            ),
+            gaps AS (
+                SELECT m, lead(m) OVER (ORDER BY m) as next_m
+                FROM months
+            )
+            SELECT m, next_m FROM gaps
+            WHERE next_m - m > interval '32 days'
+            ORDER BY m DESC
+            LIMIT 5
+        """))
+
+        alerts = []
+        for row in result:
+            alert = DQAnomalyAlert(
+                table_name=table_name,
+                alert_type=AnomalyAlertType.DATE_GAP,
+                severity="info",
+                message=f"Date gap: {row.m.strftime('%Y-%m')} to {row.next_m.strftime('%Y-%m')}",
+                details={"gap_start": str(row.m), "gap_end": str(row.next_m)},
+                job_id=job_id,
+            )
+            db.add(alert)
+            alerts.append(alert)
+        if alerts:
+            db.commit()
+            logger.info(f"Found {len(alerts)} date gaps in {table_name}")
+        return alerts
+    except Exception as e:
+        logger.warning(f"Date gap check failed for {table_name}: {e}")
+        return []

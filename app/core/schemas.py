@@ -3,7 +3,7 @@ Pydantic schemas for API requests and responses.
 """
 
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator
 from app.core.models import JobStatus
 
@@ -75,3 +75,16 @@ class DatasetInfo(BaseModel):
     last_updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class BackfillRequest(BaseModel):
+    """Request schema for backfill jobs."""
+
+    sources: List[str] = Field(..., min_length=1)
+    start_date: str = Field(
+        ..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Start date (YYYY-MM-DD)"
+    )
+    end_date: str = Field(
+        ..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="End date (YYYY-MM-DD)"
+    )
+    config: Dict[str, Any] = Field(default_factory=dict)

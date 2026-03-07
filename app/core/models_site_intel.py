@@ -103,6 +103,27 @@ class Substation(Base):
     __table_args__ = (Index("idx_substation_location", "latitude", "longitude"),)
 
 
+class TransmissionLine(Base):
+    """Electrical transmission lines from HIFLD."""
+
+    __tablename__ = "transmission_line"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    hifld_id = Column(String(50), unique=True, index=True)
+    name = Column(String(500))
+    state = Column(String(2), index=True)
+    owner = Column(String(255))
+    voltage_kv = Column(Numeric(10, 2), index=True)
+    voltage_class = Column(String(50))  # e.g., "100-161", "230-345"
+    num_circuits = Column(Integer)
+    line_type = Column(String(50))  # AC, DC
+    sub_type = Column(String(50))  # overhead, underground
+    length_miles = Column(Numeric(12, 3))
+    status = Column(String(30))  # in service, under construction, proposed
+    source = Column(String(50), default="hifld")
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+
 class UtilityTerritory(Base):
     """Utility service territories from EIA."""
 
@@ -836,6 +857,28 @@ class Wetland(Base):
 
     __table_args__ = (
         UniqueConstraint("nwi_code", "state", name="uq_wetland_nwi_state"),
+    )
+
+
+class CountyElevation(Base):
+    """County-level elevation statistics from USGS 3DEP."""
+
+    __tablename__ = "county_elevation"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    state = Column(String(2), index=True)
+    county = Column(String(100))
+    fips_code = Column(String(5), index=True)
+    min_elevation_ft = Column(Numeric(10, 2))
+    max_elevation_ft = Column(Numeric(10, 2))
+    mean_elevation_ft = Column(Numeric(10, 2))
+    elevation_range_ft = Column(Numeric(10, 2))
+    sample_points = Column(Integer)  # Number of points sampled
+    source = Column(String(50), default="usgs_3dep")
+    collected_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("fips_code", name="uq_county_elevation_fips"),
     )
 
 

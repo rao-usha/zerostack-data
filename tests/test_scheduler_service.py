@@ -446,7 +446,17 @@ class TestRunScheduledJob:
         db = MagicMock()
         mock_factory.return_value = MagicMock(return_value=db)
         schedule = _make_schedule(is_active=1, config={"category": "rates"})
-        db.query.return_value.filter.return_value.first.return_value = schedule
+
+        # Model-aware query: IngestionSchedule returns schedule, IngestionJob returns None
+        def query_side_effect(model):
+            q = MagicMock()
+            if model == IngestionSchedule:
+                q.filter.return_value.first.return_value = schedule
+            elif model == IngestionJob:
+                q.filter.return_value.first.return_value = None  # no active job
+            return q
+
+        db.query.side_effect = query_side_effect
 
         def refresh_job(obj):
             if isinstance(obj, IngestionJob):
@@ -462,7 +472,11 @@ class TestRunScheduledJob:
         assert isinstance(added_job, IngestionJob)
         assert added_job.source == "fred"
         assert added_job.status == JobStatus.PENDING
-        assert schedule.last_run_at is not None
+        assert added_job.schedule_id == schedule.id
+        assert added_job.trigger == "scheduled"
+        # Watermark (last_run_at) should NOT advance at job creation —
+        # it only advances after job SUCCESS (in jobs.py:_advance_schedule_watermark)
+        assert schedule.last_run_at is None
         assert schedule.next_run_at == datetime(2025, 6, 16, 6, 0, 0)
         mock_execute.assert_called_once()
 

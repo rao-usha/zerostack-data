@@ -41,6 +41,7 @@ logger = logging.getLogger("worker")
 
 POLL_INTERVAL = float(os.getenv("WORKER_POLL_INTERVAL", "2.0"))
 MAX_CONCURRENT = int(os.getenv("WORKER_MAX_CONCURRENT", "4"))
+DRAIN_TIMEOUT = float(os.getenv("WORKER_DRAIN_TIMEOUT", "30.0"))
 HEARTBEAT_INTERVAL = 30  # seconds
 WORKER_ID = f"{socket.gethostname()}-{uuid.uuid4().hex[:8]}"
 
@@ -119,8 +120,8 @@ def claim_job(db: Session) -> Optional[JobQueue]:
             RETURNING id, job_type, payload, job_table_id
         """),
         {
-            "claimed": QueueJobStatus.CLAIMED.name,
-            "pending": QueueJobStatus.PENDING.name,
+            "claimed": QueueJobStatus.CLAIMED.value,
+            "pending": QueueJobStatus.PENDING.value,
             "worker_id": WORKER_ID,
         },
     )
@@ -160,7 +161,7 @@ async def _heartbeat_loop(db_factory, job_id: int):
                 {"id": job_id},
             )
             row = result.fetchone()
-            if row and row[0] == QueueJobStatus.FAILED.name and row[1] and "Cancelled" in row[1]:
+            if row and row[0] == QueueJobStatus.FAILED.value and row[1] and "Cancelled" in row[1]:
                 logger.info(f"Job {job_id} was cancelled — stopping execution")
                 session.close()
                 raise JobCancelledError(f"Job {job_id} cancelled by user")
@@ -179,59 +180,6 @@ async def _heartbeat_loop(db_factory, job_id: int):
                 session.close()
             except Exception:
                 pass
-
-
-async def _wait_for_tier_completion(
-    db: Session, batch_id: str, wait_for_tiers: list, job: JobQueue
-):
-    """
-    Wait until all jobs from specified tiers in the same batch are complete.
-
-    Polls the job_queue table every 15s. Times out after 1 hour.
-    batch_id is now a string (e.g. "batch_20260301_143022").
-    """
-    max_wait = 3600  # 1 hour
-    poll_interval = 15
-    waited = 0
-
-    # Validate and build tier list for SQL IN clause
-    tier_ints = [int(t) for t in wait_for_tiers]
-    tier_list = ",".join(str(t) for t in tier_ints)
-
-    while waited < max_wait and not _shutdown.is_set():
-        result = db.execute(
-            text(f"""
-                SELECT COUNT(*) FROM job_queue
-                WHERE payload->>'batch_id' = :batch_id
-                AND (payload->>'tier')::int IN ({tier_list})
-                AND status NOT IN (:success, :failed)
-            """),
-            {
-                "batch_id": batch_id,
-                "success": QueueJobStatus.SUCCESS.name,
-                "failed": QueueJobStatus.FAILED.name,
-            },
-        )
-        incomplete = result.scalar()
-
-        if incomplete == 0:
-            logger.info(
-                f"Job {job.id}: tier dependencies satisfied (waited {waited}s)"
-            )
-            return
-
-        job.progress_message = f"Waiting for {incomplete} lower-tier jobs to complete"
-        db.commit()
-
-        await asyncio.sleep(poll_interval)
-        waited += poll_interval
-
-    if _shutdown.is_set():
-        raise RuntimeError("Worker shutting down while waiting for tier dependencies")
-    raise RuntimeError(
-        f"Tier dependency wait timed out after {max_wait}s "
-        f"(batch_id={batch_id}, waiting_for_tiers={wait_for_tiers})"
-    )
 
 
 async def execute_job(job: JobQueue, db: Session):
@@ -270,16 +218,8 @@ async def execute_job(job: JobQueue, db: Session):
     )
     db.commit()
 
-    # Check tier dependencies (Tier 4 jobs wait for lower tiers)
-    payload = job.payload or {}
-    wait_for_tiers = payload.get("wait_for_tiers")
-    batch_id = payload.get("batch_id")
-    if wait_for_tiers and batch_id:
-        job.progress_message = "Waiting for lower-tier jobs to complete"
-        db.commit()
-        await _wait_for_tier_completion(db, batch_id, wait_for_tiers, job)
-
     # Acquire rate limit for this source before executing
+    payload = job.payload or {}
     source_name = payload.get("source")
     rate_limiter = None
     if source_name:
@@ -294,6 +234,22 @@ async def execute_job(job: JobQueue, db: Session):
             logger.warning(f"Job {job.id}: rate limiter error: {e}")
             rate_limiter = None
 
+    # Look up per-source timeout from SourceConfig
+    source_name = payload.get("source")
+    job_timeout_secs = None
+    if source_name:
+        try:
+            from app.core import source_config_service
+            timeout_db = get_session_factory()()
+            try:
+                job_timeout_secs = source_config_service.get_timeout_seconds(
+                    timeout_db, source_name.split(":")[0]
+                )
+            finally:
+                timeout_db.close()
+        except Exception:
+            pass
+
     # Start heartbeat (also monitors for cancellation)
     SessionLocal = get_session_factory()
     heartbeat_task = asyncio.create_task(_heartbeat_loop(SessionLocal, job.id))
@@ -304,7 +260,24 @@ async def execute_job(job: JobQueue, db: Session):
         done, pending = await asyncio.wait(
             {executor_task, heartbeat_task},
             return_when=asyncio.FIRST_COMPLETED,
+            timeout=job_timeout_secs,  # None = no timeout (default if no config)
         )
+
+        # If timed out, done is empty
+        if not done:
+            executor_task.cancel()
+            heartbeat_task.cancel()
+            try:
+                await executor_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            try:
+                await heartbeat_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            raise TimeoutError(
+                f"Job execution timed out after {job_timeout_secs}s (source={source_name})"
+            )
 
         # Check if heartbeat detected cancellation
         if heartbeat_task in done:
@@ -405,6 +378,19 @@ async def execute_job(job: JobQueue, db: Session):
         if rate_limiter and source_name:
             rate_limiter.release(source_name)
 
+        # Promote blocked jobs in the same batch (tier 2+ waiting for lower tiers)
+        batch_id = (job.payload or {}).get("batch_id")
+        if batch_id and job.status in (QueueJobStatus.SUCCESS, QueueJobStatus.FAILED):
+            try:
+                from app.core.job_queue_service import promote_blocked_jobs
+                promote_db = get_session_factory()()
+                try:
+                    promote_blocked_jobs(promote_db, batch_id)
+                finally:
+                    promote_db.close()
+            except Exception as e:
+                logger.error(f"Failed to promote blocked jobs for batch {batch_id}: {e}")
+
         # Clean up whichever task is still running
         for t in (heartbeat_task, executor_task):
             if not t.done():
@@ -471,10 +457,36 @@ async def poll_loop():
             db.close()
             await asyncio.sleep(POLL_INTERVAL)
 
-    # Graceful shutdown: wait for active tasks to finish
+    # Graceful shutdown: drain active tasks with timeout
     if active_tasks:
-        logger.info(f"Waiting for {len(active_tasks)} active task(s) to finish...")
-        await asyncio.gather(*active_tasks, return_exceptions=True)
+        logger.info(f"Draining {len(active_tasks)} task(s) (timeout={DRAIN_TIMEOUT}s)...")
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*active_tasks, return_exceptions=True),
+                timeout=DRAIN_TIMEOUT,
+            )
+            logger.info("All tasks completed within drain timeout")
+        except asyncio.TimeoutError:
+            logger.warning(f"Drain timeout exceeded — cancelling {len(active_tasks)} task(s)")
+            for task in active_tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*active_tasks, return_exceptions=True)
+
+            # Mark interrupted jobs as failed in DB
+            try:
+                cleanup_db = get_session_factory()()
+                cleanup_db.execute(text("""
+                    UPDATE job_queue
+                    SET status = 'FAILED',
+                        error_message = 'Worker drain timeout — forced shutdown',
+                        completed_at = NOW()
+                    WHERE worker_id = :wid AND status IN ('RUNNING', 'CLAIMED')
+                """), {"wid": WORKER_ID})
+                cleanup_db.commit()
+                cleanup_db.close()
+            except Exception as e:
+                logger.error(f"Drain cleanup failed: {e}")
 
     logger.info(f"Worker {WORKER_ID} shut down cleanly")
 

@@ -104,6 +104,7 @@ def format_slack_payload(
         WebhookEventType.SITE_INTEL_FAILED: ":rotating_light:",
         WebhookEventType.SITE_INTEL_SUCCESS: ":satellite:",
         WebhookEventType.ALERT_CONSECUTIVE_FAILURES: ":fire:",
+        WebhookEventType.BATCH_COMPLETED: ":package:",
     }
 
     color_map = {
@@ -117,6 +118,7 @@ def format_slack_payload(
         WebhookEventType.SITE_INTEL_FAILED: "danger",
         WebhookEventType.SITE_INTEL_SUCCESS: "good",
         WebhookEventType.ALERT_CONSECUTIVE_FAILURES: "danger",
+        WebhookEventType.BATCH_COMPLETED: "#439FE0",
     }
 
     emoji = emoji_map.get(event_type, ":bell:")
@@ -166,6 +168,7 @@ def format_discord_payload(
         WebhookEventType.SITE_INTEL_FAILED: 0xFF0000,
         WebhookEventType.SITE_INTEL_SUCCESS: 0x00FF00,
         WebhookEventType.ALERT_CONSECUTIVE_FAILURES: 0xFF4500,  # OrangeRed
+        WebhookEventType.BATCH_COMPLETED: 0x0099FF,  # Blue
     }
 
     color = color_map.get(event_type, 0x808080)
@@ -573,6 +576,36 @@ async def notify_consecutive_failures(
             "message": f"Source '{source}' has {count} consecutive failures",
         },
         source=source,
+    )
+
+
+async def notify_batch_completed(
+    batch_run_id: str,
+    status: str,
+    total_jobs: int,
+    successful_jobs: int,
+    failed_jobs: int,
+    elapsed_seconds: Optional[float] = None,
+    total_rows: int = 0,
+    top_errors: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Send notification when a batch run completes (all jobs terminal)."""
+    error_summary = "; ".join(
+        f"{e['source']}: {e['error'][:80]}" for e in (top_errors or [])[:5]
+    ) or "None"
+
+    return await trigger_webhooks(
+        event_type=WebhookEventType.BATCH_COMPLETED,
+        event_data={
+            "batch_run_id": batch_run_id,
+            "status": status,
+            "total_jobs": total_jobs,
+            "successful_jobs": successful_jobs,
+            "failed_jobs": failed_jobs,
+            "elapsed_seconds": elapsed_seconds,
+            "total_rows_inserted": total_rows,
+            "error_summary": error_summary,
+        },
     )
 
 

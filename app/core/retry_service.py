@@ -15,6 +15,29 @@ from app.core.models import IngestionJob, JobStatus
 
 logger = logging.getLogger(__name__)
 
+# Non-retryable error patterns — jobs matching these won't be auto-retried
+NON_RETRYABLE_PATTERNS = [
+    "API key required",
+    "Access forbidden",
+    "Authentication failed",
+    "Invalid request parameters",
+    "Missing required config",
+    "Unknown source:",
+    "Failed to load ingest function",
+]
+
+# If N consecutive jobs for the same source fail with the same error, stop retrying
+CONSECUTIVE_IDENTICAL_THRESHOLD = 3
+
+
+def _is_non_retryable_error(error_message: str) -> bool:
+    """Check if an error message matches a known non-retryable pattern."""
+    if not error_message:
+        return False
+    msg_lower = error_message.lower()
+    return any(p.lower() in msg_lower for p in NON_RETRYABLE_PATTERNS)
+
+
 # Exponential backoff settings
 BASE_DELAY_MINUTES = 5  # First retry after 5 minutes
 MAX_DELAY_MINUTES = 60 * 24  # Max 24 hours between retries
@@ -198,14 +221,20 @@ def create_retry_job(db: Session, original_job: IngestionJob) -> Optional[Ingest
         logger.warning(f"Job {original_job.id} cannot be retried")
         return None
 
-    # Create new job with same config
+    # Build retry config — include checkpoint from failed job so ingestors can resume
+    retry_config = dict(original_job.config or {})
+    if original_job.progress_checkpoint:
+        retry_config["_resume_from"] = original_job.progress_checkpoint
+
+    # Create new job with same config + checkpoint
     new_job = IngestionJob(
         source=original_job.source,
         status=JobStatus.PENDING,
-        config=original_job.config,
+        config=retry_config,
         retry_count=original_job.retry_count + 1,
         max_retries=original_job.max_retries,
         parent_job_id=original_job.id,
+        schedule_id=original_job.schedule_id,
     )
 
     db.add(new_job)
@@ -358,6 +387,34 @@ def auto_schedule_retry(db: Session, job: IngestionJob) -> bool:
             f"Job {job.id} has exhausted all retries ({job.retry_count}/{job.max_retries})"
         )
         return False
+
+    # Don't retry known non-retryable errors
+    if job.error_message and _is_non_retryable_error(job.error_message):
+        logger.info(f"Skipping retry for job {job.id}: non-retryable error")
+        return False
+
+    # Don't retry if N consecutive jobs for the same source failed with identical error
+    if job.error_message:
+        recent_fails = (
+            db.query(IngestionJob.error_message)
+            .filter(
+                IngestionJob.source == job.source,
+                IngestionJob.status == JobStatus.FAILED,
+                IngestionJob.error_message.isnot(None),
+            )
+            .order_by(IngestionJob.created_at.desc())
+            .limit(CONSECUTIVE_IDENTICAL_THRESHOLD)
+            .all()
+        )
+        if (
+            len(recent_fails) >= CONSECUTIVE_IDENTICAL_THRESHOLD
+            and all(r.error_message == job.error_message for r in recent_fails)
+        ):
+            logger.info(
+                f"Skipping retry for job {job.id}: {CONSECUTIVE_IDENTICAL_THRESHOLD} "
+                f"consecutive identical failures for {job.source}"
+            )
+            return False
 
     # Load per-source retry config
     retry_config = None

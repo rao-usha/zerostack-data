@@ -390,6 +390,7 @@ class SiteIntelOrchestrator:
                 SiteIntelSource.EPA_ENVIROFACTS,
                 SiteIntelSource.USFWS_NWI,
                 SiteIntelSource.EPA_ACRES,
+                SiteIntelSource.USGS_3DEP,
             ],
             SiteIntelDomain.INCENTIVES: [
                 SiteIntelSource.CDFI_OZ,
@@ -398,6 +399,7 @@ class SiteIntelOrchestrator:
                 SiteIntelSource.STATE_EDO,
                 SiteIntelSource.STATE_EDO_SITES,
                 SiteIntelSource.NATIONAL_ZONING_ATLAS,
+                SiteIntelSource.NJDEP_LULC,
             ],
             SiteIntelDomain.LOGISTICS: [
                 SiteIntelSource.FREIGHTOS,

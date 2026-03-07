@@ -28,6 +28,18 @@ async def execute(job: JobQueue, db: Session):
     config = payload.get("config", {})
     ingestion_job_id = payload.get("ingestion_job_id")
 
+    # Inject incremental params from source watermark for batch/manual jobs
+    trigger = payload.get("trigger", "")
+    if config.get("incremental") and trigger in ("batch", "manual", ""):
+        try:
+            from app.core.watermark_service import inject_incremental_from_watermark
+
+            config = inject_incremental_from_watermark(config, source, db)
+        except Exception as e:
+            raise RuntimeError(
+                f"Watermark injection failed for {source}: {e}"
+            ) from e
+
     if not ingestion_job_id:
         raise ValueError(
             f"Ingestion executor requires 'ingestion_job_id' in payload, got: {list(payload.keys())}"

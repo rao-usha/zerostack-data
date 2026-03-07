@@ -16,6 +16,7 @@ from app.sources.site_intel.incentives.goodjobs_collector import GoodJobsFirstCo
 from app.sources.site_intel.incentives.state_edo_collector import StateEDOIncentiveCollector
 from app.sources.site_intel.incentives.state_edo_sites_collector import StateEDOSitesCollector
 from app.sources.site_intel.incentives.nza_zoning_collector import NZAZoningCollector
+from app.sources.site_intel.incentives.njdep_land_use_collector import NJDEPLandUseCollector
 
 __all__ = [
     "CDFIOpportunityZoneCollector",
@@ -24,4 +25,5 @@ __all__ = [
     "StateEDOIncentiveCollector",
     "StateEDOSitesCollector",
     "NZAZoningCollector",
+    "NJDEPLandUseCollector",
 ]

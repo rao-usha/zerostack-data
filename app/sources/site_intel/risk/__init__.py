@@ -19,6 +19,7 @@ from app.sources.site_intel.risk.epa_envirofacts_collector import (
 from app.sources.site_intel.risk.fema_nfhl_collector import FEMANFHLFloodCollector
 from app.sources.site_intel.risk.epa_acres_collector import EPAACRESCollector
 from app.sources.site_intel.risk.nwi_wetland_collector import NWIWetlandCollector
+from app.sources.site_intel.risk.usgs_elevation_collector import USGS3DEPElevationCollector
 
 __all__ = [
     "FEMARiskCollector",
@@ -27,4 +28,5 @@ __all__ = [
     "FEMANFHLFloodCollector",
     "EPAACRESCollector",
     "NWIWetlandCollector",
+    "USGS3DEPElevationCollector",
 ]

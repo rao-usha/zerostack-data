@@ -27,6 +27,7 @@ from sqlalchemy import func, case, text
 from sqlalchemy.orm import Session
 
 from app.core.models import IngestionJob, JobStatus
+from app.core.models_queue import QueueJobStatus
 from app.core.job_queue_service import submit_job, WORKER_MODE
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ class Tier:
     priority: int  # higher = picked first by workers
     name: str
     sources: List[SourceDef] = field(default_factory=list)
+    max_concurrent: int = 2  # max sources running simultaneously in this tier
 
 
 # Tier 1 — Daily sources: fast government APIs + market data
@@ -61,8 +63,8 @@ TIER_1 = Tier(
     priority=10,
     name="Daily — Rates, Treasury & Markets",
     sources=[
-        SourceDef("treasury"),
-        SourceDef("fred", {"category": "interest_rates"}),
+        SourceDef("treasury", {"incremental": True}),
+        SourceDef("fred", {"category": "interest_rates", "incremental": True}),
         SourceDef("prediction_markets", {"sources": ["kalshi", "polymarket"]}),
     ],
 )
@@ -73,11 +75,11 @@ TIER_2 = Tier(
     priority=7,
     name="Weekly — Energy, Trade & Weather",
     sources=[
-        SourceDef("eia", {"dataset": "petroleum_weekly", "subcategory": "consumption", "frequency": "weekly"}),
-        SourceDef("cftc_cot", {"report_type": "all"}),
+        SourceDef("eia", {"dataset": "petroleum_weekly", "subcategory": "consumption", "frequency": "weekly", "incremental": True}),
+        SourceDef("cftc_cot", {"report_type": "all", "incremental": True}),
         SourceDef("web_traffic", {"list": "tranco_top1m"}),
         SourceDef("github"),
-        SourceDef("noaa", {"dataset": "daily_summaries"}),
+        SourceDef("noaa", {"dataset": "daily_summaries", "incremental": True}),
     ],
 )
 
@@ -86,18 +88,19 @@ TIER_3 = Tier(
     level=3,
     priority=5,
     name="Monthly — Employment, Healthcare & Regulatory",
+    max_concurrent=3,
     sources=[
-        SourceDef("bea", {"dataset": "gdp", "table_name": "T10101"}),
-        SourceDef("bls", {"dataset": "ces"}),
-        SourceDef("eia", {"dataset": "electricity", "subcategory": "retail_sales"}),
-        SourceDef("eia", {"dataset": "natural_gas", "subcategory": "consumption"}),
-        SourceDef("fema", {"dataset": "disasters"}),
-        SourceDef("fdic", {"dataset": "financials"}),
+        SourceDef("bea", {"dataset": "gdp", "table_name": "T10101", "incremental": True}),
+        SourceDef("bls", {"dataset": "ces", "incremental": True}),
+        SourceDef("eia", {"dataset": "electricity", "subcategory": "retail_sales", "incremental": True}),
+        SourceDef("eia", {"dataset": "natural_gas", "subcategory": "consumption", "incremental": True}),
+        SourceDef("fema", {"dataset": "disasters", "incremental": True}),
+        SourceDef("fdic", {"dataset": "financials", "incremental": True}),
         SourceDef("form_adv"),
         SourceDef("form_d"),
-        SourceDef("cms", {"dataset": "utilization"}),
+        SourceDef("cms", {"dataset": "utilization", "incremental": True}),
         SourceDef("fbi_crime", {"dataset": "ucr"}),
-        SourceDef("irs_soi", {"dataset": "zip_income"}),
+        SourceDef("irs_soi", {"dataset": "zip_income", "incremental": True}),
         SourceDef("data_commons"),
         SourceDef("fcc_broadband"),
         SourceDef("app_rankings"),
@@ -111,17 +114,17 @@ TIER_4 = Tier(
     priority=3,
     name="Quarterly — Census, SEC & Trade",
     sources=[
-        SourceDef("census", {"survey": "acs5", "geo_level": "county"}),
-        SourceDef("bea", {"dataset": "regional", "table_name": "SAGDP2N"}),
-        SourceDef("sec", {"filing_type": "10-K,10-Q"}),
-        SourceDef("sec", {"filing_type": "13F"}),
-        SourceDef("uspto"),
-        SourceDef("us_trade"),
-        SourceDef("bts"),
-        SourceDef("international_econ"),
-        SourceDef("realestate"),
+        SourceDef("census", {"survey": "acs5", "geo_level": "county", "incremental": True}),
+        SourceDef("bea", {"dataset": "regional", "table_name": "SAGDP2N", "incremental": True}),
+        SourceDef("sec", {"filing_type": "10-K,10-Q", "incremental": True}),
+        SourceDef("sec", {"filing_type": "13F", "incremental": True}),
+        SourceDef("uspto", {"incremental": True}),
+        SourceDef("us_trade", {"incremental": True}),
+        SourceDef("bts", {"incremental": True}),
+        SourceDef("international_econ", {"incremental": True}),
+        SourceDef("realestate", {"incremental": True}),
         SourceDef("opencorporates"),
-        SourceDef("usda"),
+        SourceDef("usda", {"incremental": True}),
     ],
 )
 
@@ -137,6 +140,65 @@ AGENTIC_SOURCE_MAP = {
     "people_batch": "people",
     "pe_batch": "pe",
 }
+
+
+def resolve_effective_tiers(db) -> list:
+    """
+    Merge hardcoded TIERS with DB overrides. Returns list of effective Tier objects.
+
+    When DB tables are empty, returns an exact copy of the hardcoded TIERS.
+    """
+    import copy
+    from app.core.models import BatchTierConfig, BatchSourceTierOverride
+
+    effective = copy.deepcopy(TIERS)
+
+    # 1. Apply tier-level overrides (priority, max_concurrent, enabled)
+    tier_configs = db.query(BatchTierConfig).all()
+    tier_config_map = {tc.tier_level: tc for tc in tier_configs}
+
+    for tier in effective:
+        override = tier_config_map.get(tier.level)
+        if override:
+            if not override.enabled:
+                tier.sources = []  # Disable entire tier
+                continue
+            if override.priority is not None:
+                tier.priority = override.priority
+            if override.max_concurrent is not None:
+                tier.max_concurrent = override.max_concurrent
+
+    # 2. Apply source-level overrides (move between tiers, disable, config override)
+    source_overrides = db.query(BatchSourceTierOverride).all()
+    override_map = {so.source_key: so for so in source_overrides}
+
+    # Remove overridden sources from their current tiers
+    moved_sources = {}
+    for tier in effective:
+        remaining = []
+        for source_def in tier.sources:
+            override = override_map.get(source_def.key)
+            if override:
+                if not override.enabled:
+                    continue  # Drop from batch
+                if override.tier_level is not None and override.tier_level != tier.level:
+                    moved_sources[source_def.key] = (source_def, override)
+                    continue  # Will be added to target tier
+                if override.default_config:
+                    source_def.default_config = {**source_def.default_config, **override.default_config}
+            remaining.append(source_def)
+        tier.sources = remaining
+
+    # Add moved sources to their target tiers
+    tier_by_level = {t.level: t for t in effective}
+    for key, (source_def, override) in moved_sources.items():
+        target = tier_by_level.get(override.tier_level)
+        if target:
+            if override.default_config:
+                source_def.default_config = {**source_def.default_config, **override.default_config}
+            target.sources.append(source_def)
+
+    return [t for t in effective if t.sources]  # Drop empty tiers
 
 
 def _get_source_display_name(source_key: str) -> str:
@@ -209,7 +271,8 @@ async def launch_batch_collection(
 
     total = 0
     job_ids = []
-    target_tiers = [t for t in TIERS if tiers is None or t.level in tiers]
+    effective_tiers = resolve_effective_tiers(db)
+    target_tiers = [t for t in effective_tiers if tiers is None or t.level in tiers]
 
     for tier in target_tiers:
         for source_def in tier.sources:
@@ -222,10 +285,16 @@ async def launch_batch_collection(
             # Determine job type — agentic sources use their own executor
             job_type = AGENTIC_SOURCE_MAP.get(source_def.key, "ingestion")
 
+            # Tier 2+ jobs start as BLOCKED; tier 1 starts as PENDING
+            lower_tiers = [t.level for t in effective_tiers if t.level < tier.level]
+            is_blocked = len(lower_tiers) > 0
+            ing_status = JobStatus.BLOCKED if is_blocked else JobStatus.PENDING
+            queue_status = QueueJobStatus.BLOCKED if is_blocked else None
+
             # Create the ingestion_jobs record with batch metadata
             ing_job = IngestionJob(
                 source=source_def.key,
-                status=JobStatus.PENDING,
+                status=ing_status,
                 config=source_def.default_config,
                 batch_run_id=batch_run_id,
                 trigger="batch",
@@ -242,15 +311,12 @@ async def launch_batch_collection(
                 "batch_id": batch_run_id,
                 "trigger": "batch",
                 "tier": tier.level,
+                "tier_max_concurrent": tier.max_concurrent,
             }
 
             # Agentic executors read config from top-level payload keys
             if source_def.key in AGENTIC_SOURCE_MAP:
                 payload.update(source_def.default_config)
-
-            # Each tier waits for all lower tiers to complete first
-            if tier.level >= 2:
-                payload["wait_for_tiers"] = list(range(1, tier.level))
 
             submit_job(
                 db=db,
@@ -258,6 +324,7 @@ async def launch_batch_collection(
                 payload=payload,
                 priority=tier.priority,
                 job_table_id=ing_job.id,
+                status=queue_status,
             )
 
             job_ids.append(ing_job.id)
@@ -298,18 +365,19 @@ def get_batch_run_status(db: Session, batch_run_id: str) -> Optional[Dict]:
     failed = sum(1 for j in jobs if j.status == JobStatus.FAILED)
     running = sum(1 for j in jobs if j.status == JobStatus.RUNNING)
     pending = sum(1 for j in jobs if j.status == JobStatus.PENDING)
+    blocked = sum(1 for j in jobs if j.status == JobStatus.BLOCKED)
     completed = successful + failed
     total = len(jobs)
 
     # Derive overall status live from job statuses
-    if pending + running == 0 and total > 0:
+    if pending + running + blocked == 0 and total > 0:
         if failed == 0:
             status = "completed"
         elif successful == 0:
             status = "failed"
         else:
             status = "partial_success"
-    elif running > 0 or pending > 0:
+    elif running > 0 or pending > 0 or blocked > 0:
         status = "running"
     else:
         status = "completed"
@@ -329,6 +397,7 @@ def get_batch_run_status(db: Session, batch_run_id: str) -> Optional[Dict]:
                 "failed": 0,
                 "running": 0,
                 "pending": 0,
+                "blocked": 0,
             }
         tier_status[tier_key]["total"] += 1
         if j.status == JobStatus.SUCCESS:
@@ -339,6 +408,8 @@ def get_batch_run_status(db: Session, batch_run_id: str) -> Optional[Dict]:
             tier_status[tier_key]["running"] += 1
         elif j.status == JobStatus.PENDING:
             tier_status[tier_key]["pending"] += 1
+        elif j.status == JobStatus.BLOCKED:
+            tier_status[tier_key]["blocked"] += 1
 
     # Timing
     started_at = min((j.created_at for j in jobs), default=None)
@@ -419,6 +490,7 @@ def get_batch_run_status(db: Session, batch_run_id: str) -> Optional[Dict]:
         "failed_jobs": failed,
         "running_jobs": running,
         "pending_jobs": pending,
+        "blocked_jobs": blocked,
         "elapsed_seconds": round(elapsed, 1) if elapsed else None,
         "started_at": started_at.isoformat() if started_at else None,
         "completed_at": completed_at.isoformat() if completed_at else None,
@@ -431,6 +503,218 @@ def get_batch_run_status(db: Session, batch_run_id: str) -> Optional[Dict]:
         "top_errors": top_errors[:10],
         "llm_cost": llm_cost_summary,
     }
+
+
+def cancel_batch_run(db: Session, batch_run_id: str) -> Optional[Dict]:
+    """
+    Cancel all PENDING/RUNNING jobs in a batch.
+
+    Sets matching jobs to FAILED with "Batch cancelled by user" error.
+    Running jobs stop within one heartbeat interval (30s) because the worker
+    heartbeat loop checks for "Cancelled" in the error message.
+    """
+    from app.core.models_queue import JobQueue, QueueJobStatus
+
+    jobs = db.query(IngestionJob).filter(
+        IngestionJob.batch_run_id == batch_run_id
+    ).all()
+    if not jobs:
+        return None
+
+    cancelled_pending = cancelled_running = cancelled_blocked = already_complete = 0
+    for job in jobs:
+        if job.status == JobStatus.PENDING:
+            job.status = JobStatus.FAILED
+            job.error_message = "Batch cancelled by user"
+            job.completed_at = datetime.utcnow()
+            cancelled_pending += 1
+        elif job.status == JobStatus.BLOCKED:
+            job.status = JobStatus.FAILED
+            job.error_message = "Batch cancelled by user"
+            job.completed_at = datetime.utcnow()
+            cancelled_blocked += 1
+        elif job.status == JobStatus.RUNNING:
+            job.status = JobStatus.FAILED
+            job.error_message = "Batch cancelled by user"
+            job.completed_at = datetime.utcnow()
+            cancelled_running += 1
+        else:
+            already_complete += 1
+
+        # Also mark job_queue row so worker heartbeat detects cancellation
+        queue_row = db.query(JobQueue).filter(
+            JobQueue.job_table_id == job.id
+        ).first()
+        if queue_row and queue_row.status in (
+            QueueJobStatus.PENDING, QueueJobStatus.CLAIMED,
+            QueueJobStatus.RUNNING, QueueJobStatus.BLOCKED,
+        ):
+            queue_row.status = QueueJobStatus.FAILED
+            queue_row.error_message = "Batch cancelled by user"
+            queue_row.completed_at = datetime.utcnow()
+
+    db.commit()
+    return {
+        "batch_run_id": batch_run_id,
+        "cancelled_pending": cancelled_pending,
+        "cancelled_blocked": cancelled_blocked,
+        "cancelled_running": cancelled_running,
+        "already_complete": already_complete,
+        "total_jobs": len(jobs),
+    }
+
+
+def rerun_failed_in_batch(db: Session, batch_run_id: str) -> Optional[Dict]:
+    """
+    Rerun all FAILED jobs in a batch.
+
+    Resets each failed IngestionJob to PENDING (or BLOCKED for tier 2+),
+    creates a new JobQueue entry, and triggers promotion for tier ordering.
+
+    Returns summary of rerun operations.
+    """
+    from app.core.models_queue import JobQueue
+
+    jobs = (
+        db.query(IngestionJob)
+        .filter(IngestionJob.batch_run_id == batch_run_id)
+        .all()
+    )
+    if not jobs:
+        return None
+
+    failed_jobs = [j for j in jobs if j.status == JobStatus.FAILED]
+    if not failed_jobs:
+        return {
+            "batch_run_id": batch_run_id,
+            "rerun_count": 0,
+            "message": "No failed jobs to rerun",
+        }
+
+    # Determine which tiers have non-terminal jobs (already running/pending)
+    active_tiers = set()
+    for j in jobs:
+        if j.status in (JobStatus.PENDING, JobStatus.RUNNING, JobStatus.BLOCKED):
+            active_tiers.add(j.tier or 0)
+
+    # Find the lowest tier among failed jobs to determine blocking
+    failed_tiers = {j.tier or 0 for j in failed_jobs}
+    min_rerun_tier = min(failed_tiers)
+
+    rerun_count = 0
+    for job in failed_jobs:
+        tier_level = job.tier or 0
+
+        # Determine effective tiers that have active/rerun jobs below this one
+        has_lower_active = any(
+            t < tier_level for t in (active_tiers | failed_tiers) if t < tier_level
+        )
+        is_blocked = has_lower_active and tier_level > min_rerun_tier
+
+        # Reset IngestionJob
+        ing_status = JobStatus.BLOCKED if is_blocked else JobStatus.PENDING
+        queue_status = QueueJobStatus.BLOCKED if is_blocked else None
+
+        job.status = ing_status
+        job.started_at = None
+        job.completed_at = None
+        job.error_message = None
+        job.rows_inserted = None
+
+        # Clean up old queue row
+        old_queue = db.query(JobQueue).filter(
+            JobQueue.job_table_id == job.id
+        ).first()
+        if old_queue:
+            db.delete(old_queue)
+
+        # Determine job type
+        job_type = AGENTIC_SOURCE_MAP.get(job.source, "ingestion")
+
+        # Look up tier config for max_concurrent
+        tier_obj = TIER_BY_LEVEL.get(tier_level)
+        max_concurrent = tier_obj.max_concurrent if tier_obj else 2
+        tier_priority = tier_obj.priority if tier_obj else 0
+
+        payload = {
+            "source": job.source,
+            "config": job.config or {},
+            "ingestion_job_id": job.id,
+            "batch_id": batch_run_id,
+            "trigger": "batch",
+            "tier": tier_level,
+            "tier_max_concurrent": max_concurrent,
+        }
+
+        if job.source in AGENTIC_SOURCE_MAP:
+            payload.update(job.config or {})
+
+        submit_job(
+            db=db,
+            job_type=job_type,
+            payload=payload,
+            priority=tier_priority,
+            job_table_id=job.id,
+            status=queue_status,
+        )
+
+        rerun_count += 1
+
+    db.commit()
+
+    # Promote any blocked jobs whose lower tiers are already complete
+    from app.core.job_queue_service import promote_blocked_jobs
+    promoted = promote_blocked_jobs(db, batch_run_id)
+
+    logger.info(
+        f"Batch {batch_run_id}: rerunning {rerun_count} failed jobs "
+        f"({promoted} immediately promoted)"
+    )
+
+    return {
+        "batch_run_id": batch_run_id,
+        "rerun_count": rerun_count,
+        "promoted": promoted,
+        "sources": [j.source for j in failed_jobs],
+    }
+
+
+async def check_and_notify_batch_completion(db: Session, batch_run_id: str):
+    """
+    If all batch jobs are terminal (not PENDING/RUNNING), send summary webhook.
+
+    Called after each job completes. Only fires when the very last job finishes.
+    """
+    pending_or_running = (
+        db.query(func.count())
+        .select_from(IngestionJob)
+        .filter(
+            IngestionJob.batch_run_id == batch_run_id,
+            IngestionJob.status.in_([
+                JobStatus.PENDING, JobStatus.RUNNING, JobStatus.BLOCKED,
+            ]),
+        )
+        .scalar()
+    )
+    if pending_or_running > 0:
+        return
+
+    status_data = get_batch_run_status(db, batch_run_id)
+    if not status_data:
+        return
+
+    from app.core.webhook_service import notify_batch_completed
+
+    await notify_batch_completed(
+        batch_run_id=batch_run_id,
+        status=status_data["status"],
+        total_jobs=status_data["total_jobs"],
+        successful_jobs=status_data["successful_jobs"],
+        failed_jobs=status_data["failed_jobs"],
+        elapsed_seconds=status_data.get("elapsed_seconds"),
+        total_rows=status_data.get("total_rows_inserted", 0),
+        top_errors=status_data.get("top_errors", []),
+    )
 
 
 def list_batch_runs(
@@ -451,6 +735,7 @@ def list_batch_runs(
             func.sum(case((IngestionJob.status == JobStatus.FAILED, 1), else_=0)).label("failed"),
             func.sum(case((IngestionJob.status == JobStatus.RUNNING, 1), else_=0)).label("running"),
             func.sum(case((IngestionJob.status == JobStatus.PENDING, 1), else_=0)).label("pending"),
+            func.sum(case((IngestionJob.status == JobStatus.BLOCKED, 1), else_=0)).label("blocked"),
             func.min(IngestionJob.created_at).label("started_at"),
             func.max(IngestionJob.completed_at).label("completed_at"),
         )
@@ -467,17 +752,18 @@ def list_batch_runs(
         failed = row.failed or 0
         running_count = row.running or 0
         pending_count = row.pending or 0
+        blocked_count = row.blocked or 0
         completed = successful + failed
 
         # Derive status live
-        if pending_count + running_count == 0 and total > 0:
+        if pending_count + running_count + blocked_count == 0 and total > 0:
             if failed == 0:
                 batch_status = "completed"
             elif successful == 0:
                 batch_status = "failed"
             else:
                 batch_status = "partial_success"
-        elif running_count > 0 or pending_count > 0:
+        elif running_count > 0 or pending_count > 0 or blocked_count > 0:
             batch_status = "running"
         else:
             batch_status = "completed"
@@ -495,6 +781,7 @@ def list_batch_runs(
             "failed_jobs": failed,
             "running_jobs": running_count,
             "pending_jobs": pending_count,
+            "blocked_jobs": blocked_count,
             "started_at": row.started_at.isoformat() if row.started_at else None,
             "completed_at": row.completed_at.isoformat() if row.completed_at else None,
         })

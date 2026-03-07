@@ -27,6 +27,7 @@ class QueueJobStatus(str, enum.Enum):
     """Status values for queued jobs."""
 
     PENDING = "pending"
+    BLOCKED = "blocked"  # Waiting for lower-tier dependencies
     CLAIMED = "claimed"  # Worker picked it up, not yet running
     RUNNING = "running"
     SUCCESS = "success"

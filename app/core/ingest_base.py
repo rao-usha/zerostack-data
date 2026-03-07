@@ -260,6 +260,7 @@ class BaseSourceIngestor(ABC):
         conflict_columns: Optional[List[str]] = None,
         update_columns: Optional[List[str]] = None,
         batch_size: int = 1000,
+        job_id: Optional[int] = None,
     ) -> BatchInsertResult:
         """
         Insert rows into table using batch operations.
@@ -271,6 +272,7 @@ class BaseSourceIngestor(ABC):
             conflict_columns: Columns for ON CONFLICT (upsert)
             update_columns: Columns to update on conflict
             batch_size: Rows per batch
+            job_id: Optional ingestion job ID for progress tracking
 
         Returns:
             BatchInsertResult with statistics
@@ -291,6 +293,7 @@ class BaseSourceIngestor(ABC):
             batch_size=batch_size,
             conflict_columns=conflict_columns,
             update_columns=update_columns,
+            job_id=job_id,
         )
 
 
