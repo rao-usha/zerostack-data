@@ -72,8 +72,15 @@ backup/
 # Docker
 docker-compose.override.yml
 
+# Cloudflare Wrangler
+.wrangler/
+
 # Generated report outputs
 report_*.html
+*_report.html
+*_report_*.html
+datacenter_report_*.html
+medspa_report.html
 report_*.xlsx
 report_*.json
 medspa_test_output.*
@@ -82,6 +89,9 @@ plan_output.txt
 *.pdf
 *.pptx
 ~$*
+
+# Downloaded data artifacts
+govt_units.zip
 
 # OS
 Thumbs.db
