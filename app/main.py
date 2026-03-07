@@ -125,6 +125,13 @@ from app.api.v1 import (
     medspa_discovery,
     deal_models,
     sources,
+    nppes,
+    usaspending,
+    fda,
+    sam_gov,
+    osha,
+    courtlistener,
+    epa_echo,
 )
 
 # Job Queue Streaming & Monitor
@@ -957,7 +964,10 @@ Browse the endpoint sections below to see what's available:
         {"name": "fbi_crime", "description": "🚔 **FBI Crime Data** - UCR crime statistics, NIBRS incident data, hate crimes, and LEOKA"},
         {"name": "irs-soi", "description": "💰 **IRS Statistics of Income (SOI)** - Income/wealth distribution by geography: ZIP code income, county income, migration flows, business income"},
         {"name": "Treasury FiscalData", "description": "💵 **U.S. Treasury FiscalData** - Federal debt, interest rates, revenue/spending, Treasury auction results"},
+        {"name": "USAspending", "description": "🏛️ **USAspending.gov** - Federal contract and grant awards by NAICS code, location, and agency"},
         {"name": "FDIC BankFind", "description": "🏦 **FDIC BankFind Suite** - Bank financials, demographics, failed banks, and branch-level deposits for 4,000+ U.S. banks"},
+        {"name": "epa_echo", "description": "🏭 **EPA ECHO** - Enforcement and Compliance History Online: facility compliance, violations, inspections, and penalties"},
+        {"name": "openFDA Devices", "description": "💊 **openFDA Device Registrations** - FDA device manufacturer registrations, product codes, 510(k) clearances, and aesthetic device filtering"},
         {"name": "FCC Broadband & Telecom", "description": "📡 **FCC National Broadband Map** - Broadband coverage, ISP availability, technology deployment, digital divide metrics"},
         {"name": "CFTC COT", "description": "📈 **CFTC Commitments of Traders** - Weekly futures positioning data: commercial vs non-commercial, managed money, swap dealers"},
         {"name": "USDA Agriculture", "description": "🌾 **USDA NASS QuickStats** - Agricultural statistics: crop production, yields, prices, livestock inventory"},
@@ -1133,6 +1143,7 @@ app.include_router(
     dependencies=_auth,
 )
 app.include_router(cms.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(nppes.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(kaggle.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(international_econ.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(fbi_crime.router, prefix="/api/v1", dependencies=_auth)
@@ -1147,8 +1158,11 @@ app.include_router(usda.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(bls.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(fcc_broadband.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(treasury.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(usaspending.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(fdic.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(fda.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(irs_soi.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(epa_echo.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(foot_traffic.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(dunl.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(prediction_markets.router, prefix="/api/v1", dependencies=_auth)
@@ -1237,6 +1251,11 @@ app.include_router(zip_scores.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(medspa_discovery.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(deal_models.router, prefix="/api/v1", dependencies=_auth)
 
+# Government & Legal Data Sources
+app.include_router(sam_gov.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(osha.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(courtlistener.router, prefix="/api/v1", dependencies=_auth)
+
 # Site Intelligence Platform
 app.include_router(site_intel_power.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(site_intel_telecom.router, prefix="/api/v1", dependencies=_auth)
@@ -1290,6 +1309,7 @@ def root():
             "realestate",
             "noaa",
             "cms",
+            "nppes",
             "kaggle",
             "international_econ",
             "fbi_crime",

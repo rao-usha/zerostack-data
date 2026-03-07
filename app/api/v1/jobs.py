@@ -82,6 +82,12 @@ SOURCE_DISPATCH: Dict[str, Tuple[str, str, List[str]]] = {
         "ingest_treasury_auctions",
         ["start_date", "end_date", "security_type"],
     ),
+    # ── USAspending ─────────────────────────────────────────────────────
+    "usaspending": (
+        "app.sources.usaspending.ingest",
+        "ingest_usaspending_awards",
+        ["naics_codes", "states", "start_date", "end_date", "award_type_codes", "min_amount", "max_pages"],
+    ),
     # ── FRED ──────────────────────────────────────────────────────────────
     "fred": (
         "app.sources.fred.ingest",
@@ -210,6 +216,12 @@ SOURCE_DISPATCH: Dict[str, Tuple[str, str, List[str]]] = {
         "app.sources.cms.ingest",
         "ingest_drug_pricing",
         ["year", "brand_name", "limit"],
+    ),
+    # ── NPPES NPI Registry ────────────────────────────────────────────────
+    "nppes": (
+        "app.sources.nppes.ingest",
+        "ingest_nppes_providers",
+        ["states", "taxonomy_codes", "taxonomy_description", "enumeration_type", "city", "postal_code", "limit"],
     ),
     # ── FBI Crime ─────────────────────────────────────────────────────────
     "fbi_crime": (
@@ -557,6 +569,40 @@ SOURCE_DISPATCH: Dict[str, Tuple[str, str, List[str]]] = {
         "app.sources.job_postings.ingest",
         "ingest_job_postings_discover",
         ["company_id"],
+    ),
+    # ── openFDA ─────────────────────────────────────────────────────────
+    "fda": (
+        "app.sources.fda.ingest",
+        "ingest_device_registrations",
+        ["states", "search_query", "limit_per_state"],
+    ),
+    # ── SAM.gov ──────────────────────────────────────────────────────────
+    "sam_gov": (
+        "app.sources.sam_gov.ingest",
+        "ingest_sam_gov_entities",
+        ["state", "naics_code", "legal_business_name", "max_pages"],
+    ),
+    # ── OSHA ─────────────────────────────────────────────────────────────
+    "osha": (
+        "app.sources.osha.ingest",
+        "ingest_osha_all",
+        ["dataset"],
+    ),
+    "osha:inspections": (
+        "app.sources.osha.ingest",
+        "ingest_osha_inspections",
+        [],
+    ),
+    "osha:violations": (
+        "app.sources.osha.ingest",
+        "ingest_osha_violations",
+        [],
+    ),
+    # ── CourtListener ────────────────────────────────────────────────────
+    "courtlistener": (
+        "app.sources.courtlistener.ingest",
+        "ingest_courtlistener_dockets",
+        ["query", "court", "filed_after", "filed_before", "max_pages"],
     ),
 }
 

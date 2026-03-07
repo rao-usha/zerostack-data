@@ -162,6 +162,48 @@ API_REGISTRY: Dict[str, APIConfig] = {
         notes="Without token: ~1000/hr. With token: ~4000/hr.",
     ),
     # -------------------------------------------------------------------------
+    # GOVERNMENT CONTRACTS
+    # -------------------------------------------------------------------------
+    "sam_gov": APIConfig(
+        source_name="sam_gov",
+        base_url="https://api.sam.gov/entity-information/v3",
+        api_key_requirement=APIKeyRequirement.REQUIRED,
+        config_key="sam_gov_api_key",
+        signup_url="https://sam.gov/content/entity-information",
+        max_concurrency=2,
+        rate_limit_interval=1.0,  # 1000 req/day, pace conservatively
+        timeout_seconds=60.0,
+        notes="Free API key required. 1,000 requests per day, max 100 records per page.",
+    ),
+    # -------------------------------------------------------------------------
+    # OSHA ENFORCEMENT
+    # -------------------------------------------------------------------------
+    "osha": APIConfig(
+        source_name="osha",
+        base_url="https://enforcedata.dol.gov",
+        api_key_requirement=APIKeyRequirement.OPTIONAL,
+        config_key="",
+        signup_url="",
+        max_concurrency=2,
+        rate_limit_interval=2.0,
+        timeout_seconds=300.0,
+        notes="Bulk CSV downloads from DOL. No API key required.",
+    ),
+    # -------------------------------------------------------------------------
+    # COURT DATA
+    # -------------------------------------------------------------------------
+    "courtlistener": APIConfig(
+        source_name="courtlistener",
+        base_url="https://www.courtlistener.com/api/rest/v4",
+        api_key_requirement=APIKeyRequirement.OPTIONAL,
+        config_key="",
+        signup_url="https://www.courtlistener.com/sign-in/",
+        max_concurrency=2,
+        rate_limit_interval=1.0,  # ~100 req/min unauthenticated
+        timeout_seconds=60.0,
+        notes="No key for basic access (~100 req/min). Auth token for higher limits.",
+    ),
+    # -------------------------------------------------------------------------
     # CRIME DATA
     # -------------------------------------------------------------------------
     "fbi_crime": APIConfig(
@@ -213,6 +255,18 @@ API_REGISTRY: Dict[str, APIConfig] = {
         max_concurrency=2,
         rate_limit_per_minute=60,
         notes="No key required. FiscalData API.",
+    ),
+    "usaspending": APIConfig(
+        source_name="usaspending",
+        base_url="https://api.usaspending.gov/api/v2/",
+        api_key_requirement=APIKeyRequirement.OPTIONAL,
+        config_key="",
+        signup_url="https://api.usaspending.gov/",
+        max_concurrency=2,
+        rate_limit_per_minute=60,
+        timeout_seconds=60.0,
+        connect_timeout_seconds=15.0,
+        notes="No key required. POST-based search API. Responses can be slow.",
     ),
     # -------------------------------------------------------------------------
     # CFTC
@@ -421,6 +475,17 @@ API_REGISTRY: Dict[str, APIConfig] = {
         max_concurrency=3,
         rate_limit_per_minute=120,
         notes="SmartRecruiters public posting API. No auth required for listing.",
+    ),
+    "fda": APIConfig(
+        source_name="fda",
+        base_url="https://api.fda.gov/",
+        api_key_requirement=APIKeyRequirement.OPTIONAL,
+        config_key="openfda_api_key",
+        signup_url="https://open.fda.gov/apis/authentication/",
+        max_concurrency=2,
+        rate_limit_per_minute=40,  # Without key: 40/min. With key: 240/min.
+        timeout_seconds=30.0,
+        notes="Without key: 40 req/min, 1K/day. With free key: 240 req/min, 120K/day.",
     ),
     "job_postings": APIConfig(
         source_name="job_postings",

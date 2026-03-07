@@ -109,6 +109,12 @@ class Settings(BaseSettings):
         description="Yelp Fusion API key - required for Yelp operations (500 calls/day free tier)",
     )
 
+    # SAM.gov API Configuration (REQUIRED for SAM.gov ingestion)
+    sam_gov_api_key: Optional[str] = Field(
+        default=None,
+        description="SAM.gov API key - required for entity registration queries (free, 1000 req/day)",
+    )
+
     # Rate Limiting and Concurrency
     max_concurrency: int = Field(
         default=4,
@@ -746,6 +752,7 @@ class Settings(BaseSettings):
             "https://console.cloud.google.com/apis/credentials",
         ),
         "nrel": ("nrel_api_key", "https://developer.nrel.gov/signup/"),
+        "sam_gov": ("sam_gov_api_key", "https://sam.gov/content/entity-information"),
         "usda": ("usda_api_key", "https://api.data.gov/signup/"),
         "uspto": (
             "uspto_patentsview_api_key",
