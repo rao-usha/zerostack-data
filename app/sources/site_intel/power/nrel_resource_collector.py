@@ -80,6 +80,45 @@ class NRELResourceCollector(BaseCollector):
             "Accept": "application/json",
         }
 
+    async def _load_centroids(self, config: CollectionConfig) -> List[Dict[str, Any]]:
+        """Load county centroids from Census Bureau, skipping already-collected counties."""
+        # Check which FIPS we already have
+        try:
+            result = self.db.execute(text("SELECT DISTINCT CONCAT(latitude::text, '_', longitude::text) FROM renewable_resource"))
+            done = {r[0] for r in result.fetchall()}
+        except Exception:
+            done = set()
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.get(CENSUS_CENTROID_URL)
+            raw = resp.text.lstrip("\ufeff")
+
+        centroids = []
+        for row in csv.DictReader(io.StringIO(raw)):
+            fips = row.get("STATEFP", "").strip() + row.get("COUNTYFP", "").strip()
+            if len(fips) != 5:
+                continue
+            try:
+                lat = float(row.get("LATITUDE", "0").strip().lstrip("+"))
+                lng = float(row.get("LONGITUDE", "0").strip().lstrip("+"))
+            except ValueError:
+                continue
+            if lat == 0 or lng == 0:
+                continue
+            st = STATE_ABBREVS.get(row.get("STNAME", "").strip(), "")
+            if not st:
+                continue
+            if config.states and st not in config.states:
+                continue
+            key = f"{lat}_{lng}"
+            if key in done:
+                continue
+            centroids.append({
+                "lat": lat, "lng": lng, "state": st,
+                "county": row.get("COUNAME", "").strip(), "fips": fips,
+            })
+        return centroids
+
     async def collect(self, config: CollectionConfig) -> CollectionResult:
         """Collect solar/wind resource data at county centroids."""
         total_inserted = 0
@@ -88,53 +127,60 @@ class NRELResourceCollector(BaseCollector):
 
         try:
             if not self.api_key:
-                # Try to get from config
                 from app.core.config import get_settings
                 self.api_key = get_settings().get_api_key("nrel") or "DEMO_KEY"
 
-            centroids = COUNTY_CENTROIDS
-            if config.states:
-                centroids = [c for c in centroids if c["state"] in config.states]
+            centroids = await self._load_centroids(config)
 
             logger.info(f"Collecting NREL resource data for {len(centroids)} county centroids...")
 
-            results = await self.gather_with_limit(
-                [self._collect_point(c) for c in centroids], max_concurrent=4
-            )
-
-            all_records = []
-            for i, result in enumerate(results):
-                centroid = centroids[i]
-                total_processed += 1
-                if isinstance(result, Exception):
-                    logger.warning(f"NREL failed for {centroid['county']}: {result}")
-                    errors.append({
-                        "source": f"nrel_{centroid['fips']}",
-                        "error": str(result),
-                    })
-                elif result.get("error"):
-                    errors.append({
-                        "source": f"nrel_{centroid['fips']}",
-                        "error": result["error"],
-                    })
-                elif result.get("record"):
-                    all_records.append(result["record"])
-
-            # Single batch upsert instead of 40+ individual calls
-            if all_records:
-                inserted, updated = self.bulk_upsert(
-                    RenewableResource,
-                    all_records,
-                    unique_columns=["latitude", "longitude"],
-                    update_columns=[
-                        "resource_type", "state", "county",
-                        "ghi_kwh_m2_day", "dni_kwh_m2_day",
-                        "wind_speed_100m_ms",
-                        "capacity_factor_pct",
-                        "source", "collected_at",
-                    ],
+            # Process in chunks of 25 to commit progress and respect rate limits
+            chunk_size = 25
+            for chunk_start in range(0, len(centroids), chunk_size):
+                chunk = centroids[chunk_start:chunk_start + chunk_size]
+                # Use 4 concurrent requests for real key, 2 for DEMO_KEY
+                max_conc = 2 if self.api_key == "DEMO_KEY" else 4
+                results = await self.gather_with_limit(
+                    [self._collect_point(c) for c in chunk], max_concurrent=max_conc
                 )
-                total_inserted = inserted + updated
+
+                chunk_records = []
+                for i, result in enumerate(results):
+                    centroid = chunk[i]
+                    total_processed += 1
+                    if isinstance(result, Exception):
+                        logger.warning(f"NREL failed for {centroid['county']}: {result}")
+                        errors.append({
+                            "source": f"nrel_{centroid['fips']}",
+                            "error": str(result),
+                        })
+                    elif result.get("error"):
+                        errors.append({
+                            "source": f"nrel_{centroid['fips']}",
+                            "error": result["error"],
+                        })
+                    elif result.get("record"):
+                        chunk_records.append(result["record"])
+
+                if chunk_records:
+                    inserted, updated = self.bulk_upsert(
+                        RenewableResource,
+                        chunk_records,
+                        unique_columns=["latitude", "longitude"],
+                        update_columns=[
+                            "resource_type", "state", "county",
+                            "ghi_kwh_m2_day", "dni_kwh_m2_day",
+                            "wind_speed_100m_ms",
+                            "capacity_factor_pct",
+                            "source", "collected_at",
+                        ],
+                    )
+                    total_inserted += inserted + updated
+
+                logger.info(
+                    f"NREL progress: {chunk_start + len(chunk)}/{len(centroids)} "
+                    f"counties, {total_inserted} inserted"
+                )
 
             status = CollectionStatus.SUCCESS
             if errors and total_inserted > 0:
