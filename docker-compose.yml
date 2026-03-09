@@ -107,7 +107,7 @@ services:
       <<: *api-keys
       WORKER_MODE: "1"
       WORKER_POLL_INTERVAL: "2.0"
-      WORKER_MAX_CONCURRENT: "4"
+      WORKER_MAX_CONCURRENT: "6"
       MAX_CONCURRENCY: 4
       LOG_LEVEL: INFO
     depends_on:
@@ -120,9 +120,9 @@ services:
       - 8.8.8.8
       - 8.8.4.4
     command: python -m app.worker.main
-    # Scale with: docker-compose up --scale worker=4
+    # 6 workers × 6 concurrent = 36 slots for parallel split jobs
     deploy:
-      replicas: 2
+      replicas: 6
 
   frontend:
     image: nginx:alpine

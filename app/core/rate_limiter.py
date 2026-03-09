@@ -654,6 +654,16 @@ DISTRIBUTED_RATE_LIMITS: Dict[str, Dict[str, float]] = {
     "api.yelp.com": {"max_tokens": 5.0, "refill_rate": 0.1},           # Yelp: 500/day
     "api.fiscaldata.treasury.gov": {"max_tokens": 10.0, "refill_rate": 1.0},
     "banks.data.fdic.gov": {"max_tokens": 10.0, "refill_rate": 1.0},
+    # Site intel API domains (for distributed parallel collection)
+    "developer.nrel.gov":          {"max_tokens": 10.0, "refill_rate": 0.28},   # 1000/hr
+    "epqs.nationalmap.gov":        {"max_tokens": 20.0, "refill_rate": 5.0},    # No published limit
+    "data.epa.gov":                {"max_tokens": 10.0, "refill_rate": 2.0},    # Shared: SDWIS + ACRES + Envirofacts
+    "hazards.fema.gov":            {"max_tokens": 5.0,  "refill_rate": 1.0},    # Flaky endpoint
+    "opendata.fcc.gov":            {"max_tokens": 10.0, "refill_rate": 1.0},
+    "fwsprimary.wim.usgs.gov":    {"max_tokens": 10.0, "refill_rate": 2.0},
+    "echodata.epa.gov":            {"max_tokens": 10.0, "refill_rate": 1.0},
+    "npiregistry.cms.hhs.gov":    {"max_tokens": 5.0,  "refill_rate": 2.0},
+    "data.cms.gov":                {"max_tokens": 10.0, "refill_rate": 1.0},
 }
 
 

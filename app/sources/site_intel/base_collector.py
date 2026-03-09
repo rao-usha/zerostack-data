@@ -7,6 +7,7 @@ Provides common functionality for API calls, rate limiting, and database operati
 
 import asyncio
 import logging
+import os
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Type, Coroutine
@@ -109,9 +110,35 @@ class BaseCollector(ABC):
             self._client = None
 
     async def apply_rate_limit(self):
-        """Apply rate limiting delay between requests."""
+        """Apply rate limiting delay between requests.
+
+        Uses local sleep + distributed Postgres-backed token bucket
+        when running in worker mode with _rate_limit_domain set.
+        This coordinates rate limits across multiple parallel workers
+        hitting the same API domain.
+        """
         if self.rate_limit_delay > 0:
             await asyncio.sleep(self.rate_limit_delay)
+
+        # Distributed coordination when running split parallel jobs
+        if (
+            os.getenv("WORKER_MODE", "0") in ("1", "true", "True")
+            and getattr(self, "_rate_limit_domain", None)
+        ):
+            try:
+                from app.core.database import get_session_factory
+                from app.core.rate_limiter import acquire_distributed_token_with_wait
+
+                SessionLocal = get_session_factory()
+                rate_db = SessionLocal()
+                try:
+                    await acquire_distributed_token_with_wait(
+                        rate_db, self._rate_limit_domain, max_wait=30.0
+                    )
+                finally:
+                    rate_db.close()
+            except Exception as e:
+                logger.debug(f"Distributed rate limit check failed: {e}")
 
     async def gather_with_limit(
         self,

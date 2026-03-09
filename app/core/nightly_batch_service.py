@@ -274,6 +274,8 @@ async def launch_batch_collection(
     effective_tiers = resolve_effective_tiers(db)
     target_tiers = [t for t in effective_tiers if tiers is None or t.level in tiers]
 
+    from app.core.job_splitter import get_split_config, create_split_jobs
+
     for tier in target_tiers:
         for source_def in tier.sources:
             # Filter by skip list or explicit source list
@@ -291,7 +293,41 @@ async def launch_batch_collection(
             ing_status = JobStatus.BLOCKED if is_blocked else JobStatus.PENDING
             queue_status = QueueJobStatus.BLOCKED if is_blocked else None
 
-            # Create the ingestion_jobs record with batch metadata
+            # Check if this source can be split into parallel jobs
+            split_config = get_split_config(source_def.key)
+            if split_config and job_type != "ingestion":
+                # Skip agentic-only check — site_intel sources use split
+                pass
+
+            if split_config:
+                # Create N parallel jobs instead of 1
+                base_payload = {
+                    "source": source_def.key,
+                    "config": source_def.default_config,
+                    "batch_id": batch_run_id,
+                    "trigger": "batch",
+                    "tier": tier.level,
+                    "tier_max_concurrent": tier.max_concurrent,
+                }
+                if source_def.key in AGENTIC_SOURCE_MAP:
+                    base_payload.update(source_def.default_config)
+
+                split_ids = create_split_jobs(
+                    db=db,
+                    source_key=source_def.key,
+                    job_type=job_type,
+                    base_payload=base_payload,
+                    priority=tier.priority,
+                    queue_status=queue_status,
+                )
+                total += len(split_ids)
+                logger.info(
+                    f"Split {source_def.key} into {len(split_ids)} parallel jobs "
+                    f"(tier {tier.level})"
+                )
+                continue
+
+            # Non-splittable source: single job as before
             ing_job = IngestionJob(
                 source=source_def.key,
                 status=ing_status,

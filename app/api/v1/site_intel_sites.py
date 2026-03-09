@@ -72,6 +72,11 @@ class CollectionRequest(BaseModel):
         default=None,
         description="US state codes to filter (e.g. ['TX', 'CA']). None = all states.",
     )
+    parallel: bool = Field(
+        default=True,
+        description="Split splittable sources into parallel jobs across state groups. "
+        "Only applies when WORKER_MODE=1.",
+    )
 
 
 # =============================================================================
@@ -245,20 +250,53 @@ async def trigger_collection(
 
     total_collectors = sum(len(v) for v in targeted.values())
 
-    from app.core.job_queue_service import submit_job
+    from app.core.job_queue_service import submit_job, WORKER_MODE
+    from app.core.job_splitter import get_split_config, create_split_jobs
 
-    result = submit_job(
-        db=db,
-        job_type="site_intel",
-        payload={
-            "domains": request.domains,
-            "sources": request.sources,
-            "states": request.states,
-        },
-        background_tasks=background_tasks,
-        background_func=_run_collection,
-        background_args=(request.domains, request.sources, request.states),
-    )
+    # When parallel=True and in worker mode, split eligible sources
+    # into N parallel jobs (one per state-group)
+    split_job_ids = []
+    unsplit_sources = []
+
+    if request.parallel and WORKER_MODE and request.sources:
+        for source_key in request.sources:
+            config = get_split_config(source_key)
+            if config:
+                ids = create_split_jobs(
+                    db=db,
+                    source_key=source_key,
+                    job_type="site_intel",
+                    base_payload={
+                        "sources": [source_key],
+                        "states": request.states,
+                    },
+                    states=request.states,
+                )
+                split_job_ids.extend(ids)
+            else:
+                unsplit_sources.append(source_key)
+        db.commit()
+    else:
+        unsplit_sources = request.sources
+
+    # Submit a single job for unsplit sources (or all sources if not parallel)
+    single_job_id = None
+    if unsplit_sources or not request.sources:
+        result = submit_job(
+            db=db,
+            job_type="site_intel",
+            payload={
+                "domains": request.domains,
+                "sources": unsplit_sources or request.sources,
+                "states": request.states,
+            },
+            background_tasks=background_tasks,
+            background_func=_run_collection,
+            background_args=(request.domains, unsplit_sources or request.sources, request.states),
+        )
+        single_job_id = result.get("job_queue_id")
+
+    all_job_ids = split_job_ids + ([single_job_id] if single_job_id else [])
 
     return {
         "status": "started",
@@ -266,8 +304,13 @@ async def trigger_collection(
         "collectors_targeted": total_collectors,
         "breakdown": targeted,
         "states_filter": request.states,
-        "job_queue_id": result.get("job_queue_id"),
-        "message": f"Collection started for {total_collectors} collectors across {len(targeted)} domains. Check /collect/status for progress.",
+        "parallel": request.parallel and bool(split_job_ids),
+        "split_jobs": len(split_job_ids),
+        "job_queue_ids": all_job_ids,
+        "job_queue_id": all_job_ids[0] if all_job_ids else None,
+        "message": f"Collection started for {total_collectors} collectors across {len(targeted)} domains"
+        + (f" ({len(split_job_ids)} parallel split jobs)" if split_job_ids else "")
+        + ". Check /collect/status for progress.",
     }
 
 
