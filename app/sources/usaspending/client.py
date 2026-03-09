@@ -47,13 +47,16 @@ AWARD_FIELDS = [
 
 
 # NAICS codes of interest for Nexdata verticals
+# USAspending API only accepts codes with lengths 2, 4, or 6
 NAICS_CODES_OF_INTEREST = {
-    "621": "Healthcare (Ambulatory Health Care Services)",
-    "622": "Hospitals",
+    "62": "Health Care and Social Assistance (includes hospitals, ambulatory)",
     "518210": "Data Processing, Hosting, and Related Services (Colocation)",
     "517311": "Wired Telecommunications Carriers",
     "54": "Professional, Scientific, and Technical Services",
-    "238": "Specialty Trade Contractors",
+    "2381": "Foundation, Structure, and Building Exterior Contractors",
+    "2382": "Building Equipment Contractors",
+    "2383": "Building Finishing Contractors",
+    "2389": "Other Specialty Trade Contractors",
 }
 
 
@@ -207,7 +210,15 @@ class USASpendingClient(BaseAPIClient):
         filters: Dict[str, Any] = {}
 
         if naics_codes:
-            filters["naics_codes"] = naics_codes
+            valid_lengths = {2, 4, 6}
+            valid_codes = [c for c in naics_codes if len(c) in valid_lengths]
+            invalid_codes = [c for c in naics_codes if len(c) not in valid_lengths]
+            if invalid_codes:
+                logger.warning(
+                    f"Dropping NAICS codes with invalid lengths (must be 2, 4, or 6): {invalid_codes}"
+                )
+            if valid_codes:
+                filters["naics_codes"] = valid_codes
 
         if states:
             filters["place_of_performance_locations"] = [

@@ -55,50 +55,51 @@ class ExportService:
         if _table_cache and (now - _table_cache_time) < _TABLE_CACHE_TTL:
             return _table_cache
 
-        inspector = inspect(self.db.get_bind())
         tables = []
 
-        # Single query for all row counts via pg_stat — avoids N COUNT(*) queries
+        # Single query: row counts from pg_class (more reliable than pg_stat)
         row_counts: Dict[str, int] = {}
         try:
             rows = self.db.execute(
                 text(
-                    "SELECT relname, n_live_tup "
-                    "FROM pg_stat_user_tables "
-                    "ORDER BY relname"
+                    "SELECT c.relname, GREATEST(c.reltuples, 0)::bigint "
+                    "FROM pg_class c "
+                    "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                    "WHERE c.relkind = 'r' AND n.nspname = 'public'"
                 )
             )
             for r in rows:
                 row_counts[r[0]] = int(r[1])
         except Exception:
-            pass  # fall back to 0 if pg_stat not available
+            pass
 
-        for table_name in inspector.get_table_names():
-            if table_name.startswith("_") or table_name in ("alembic_version",):
-                continue
-
-            try:
-                columns = [col["name"] for col in inspector.get_columns(table_name)]
-                count = row_counts.get(table_name, 0)
-                # pg_stat estimate can be 0 before ANALYZE runs; fall back to exact count
-                if count == 0:
-                    try:
-                        count = self.db.execute(
-                            text(f'SELECT COUNT(*) FROM "{table_name}"')
-                        ).scalar() or 0
-                    except Exception:
-                        pass
-                tables.append(
-                    {
-                        "table_name": table_name,
-                        "row_count": count,
-                        "columns": columns,
-                    }
+        # Single query: all columns for all public tables
+        table_columns: Dict[str, List[str]] = {}
+        try:
+            rows = self.db.execute(
+                text(
+                    "SELECT table_name, column_name "
+                    "FROM information_schema.columns "
+                    "WHERE table_schema = 'public' "
+                    "ORDER BY table_name, ordinal_position"
                 )
-            except Exception as e:
-                logger.warning(f"Could not inspect table {table_name}: {e}")
+            )
+            for r in rows:
+                table_columns.setdefault(r[0], []).append(r[1])
+        except Exception:
+            pass
 
-        tables.sort(key=lambda x: x["table_name"])
+        skip = {"alembic_version"}
+        for table_name, columns in sorted(table_columns.items()):
+            if table_name.startswith("_") or table_name in skip:
+                continue
+            tables.append(
+                {
+                    "table_name": table_name,
+                    "row_count": row_counts.get(table_name, 0),
+                    "columns": columns,
+                }
+            )
 
         _table_cache = tables
         _table_cache_time = now
