@@ -213,6 +213,17 @@ The `/session-log` skill can also be invoked manually to force a checkpoint at a
 
 ## Workflow (MANDATORY — follow every time)
 
+### Step 0: Create a Spec First
+
+**Before editing ANY source code in `app/`, you MUST have an active spec.**
+
+- Run `/spec <task_type> <feature_name>` to create a spec document + skeleton test file
+- Task types: `collector`, `api_endpoint`, `bug_fix`, `report`, `service`, `model`
+- The `/spec` skill writes to `docs/specs/.active_spec` — without this, the `check-spec-exists` hook will **BLOCK** your edits
+- Fill in test implementations BEFORE writing source code (spec-first / TDD)
+- For genuinely trivial fixes (typo, single-line change): write `BYPASS_TRIVIAL` to `docs/specs/.active_spec`
+- After task completion, run `/feedback` if the user provided any corrections
+
 ### Step 1: ALWAYS Plan First
 
 **Every task that touches more than 1 file or takes more than a single obvious change MUST start with a plan.**

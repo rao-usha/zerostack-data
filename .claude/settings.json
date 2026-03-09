@@ -20,6 +20,11 @@
             "type": "command",
             "command": "bash .claude/hooks/require-planning.sh",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-spec-exists.sh",
+            "timeout": 5
           }
         ]
       }
@@ -32,6 +37,23 @@
             "type": "command",
             "command": "bash .claude/hooks/remind-logging.sh",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/run-tests-on-edit.sh",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "SubToolCompleted",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/verify-completion.sh",
+            "timeout": 60
           }
         ]
       }
