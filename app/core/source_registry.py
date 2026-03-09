@@ -1430,6 +1430,93 @@ SOURCE_REGISTRY: Dict[str, SourceContext] = {
             ),
         ],
     ),
+    # ── PE Intelligence Features ─────────────────────────────────────────
+    "labor_arbitrage": SourceContext(
+        key="labor_arbitrage",
+        display_name="Labor Arbitrage Maps",
+        short_name="Labor Arb",
+        category="site_intel",
+        description="Compare occupational wages across geographies for PE vertical strategies using BLS OES data.",
+        update_frequency="annual",
+        api_key_required=False,
+        url="https://www.bls.gov/oes/",
+        table_prefix="occupational_wage",
+        tags=["labor", "wages", "pe", "roll-up"],
+        collections=[
+            SourceCollection(
+                name="Wage Comparison",
+                endpoint="GET /labor-arbitrage/compare",
+                description="Compare wages for an occupation across all geographies.",
+                table="occupational_wage",
+            ),
+        ],
+    ),
+    "location_diligence": SourceContext(
+        key="location_diligence",
+        display_name="Location Due Diligence",
+        short_name="Loc DD",
+        category="pe_intel",
+        description="Integrated DD package assembling market, environmental, labor, risk, and incentive data for any U.S. county.",
+        update_frequency="varies",
+        api_key_required=False,
+        url="",
+        table_prefix="diligence_",
+        tags=["due-diligence", "pe", "location", "market"],
+        collections=[
+            SourceCollection(
+                name="DD Package",
+                endpoint="GET /location-diligence/package",
+                description="Full multi-section due diligence report for a county.",
+                table="(cross-source query)",
+            ),
+        ],
+    ),
+    "rollup_intel": SourceContext(
+        key="rollup_intel",
+        display_name="Roll-Up Market Intelligence",
+        short_name="Roll-Up",
+        category="pe_intel",
+        description="Score and rank U.S. counties by roll-up attractiveness for any NAICS industry using Census CBP + IRS SOI.",
+        update_frequency="annual",
+        api_key_required=_key_required("census"),
+        url="https://api.census.gov/data/",
+        table_prefix="rollup_market_",
+        tags=["roll-up", "pe", "fragmentation", "census", "cbp"],
+        collections=[
+            SourceCollection(
+                name="Market Screening",
+                endpoint="POST /rollup-intel/screen",
+                description="Collect Census CBP data and score counties for roll-up attractiveness.",
+                table="census_cbp, rollup_market_scores",
+            ),
+            SourceCollection(
+                name="Add-On Finder",
+                endpoint="POST /rollup-intel/find-addons",
+                description="Find bolt-on acquisition markets near a portfolio company.",
+                table="rollup_market_scores",
+            ),
+        ],
+    ),
+    "vertical_discovery": SourceContext(
+        key="vertical_discovery",
+        display_name="Multi-Vertical Discovery",
+        short_name="Verticals",
+        category="pe_intel",
+        description="Config-driven prospect discovery for dental, vet, HVAC, car wash, and PT verticals via Yelp + IRS SOI.",
+        update_frequency="varies",
+        api_key_required=_key_required("yelp"),
+        url="",
+        table_prefix="dental_",
+        tags=["vertical", "pe", "acquisition", "yelp", "discovery"],
+        collections=[
+            SourceCollection(
+                name="Vertical Discovery",
+                endpoint="POST /vertical-discovery/{slug}/discover",
+                description="Discover and score acquisition prospects for any supported vertical.",
+                table="{slug}_prospects",
+            ),
+        ],
+    ),
 }
 
 

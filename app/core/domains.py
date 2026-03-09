@@ -41,6 +41,7 @@ DOMAINS: List[Dict] = [
         "prefixes": [
             "pe_", "deals", "deal_", "exit_readiness_",
             "acquisition_target_", "diligence_", "hunt_job",
+            "rollup_market_", "census_cbp",
         ],
     },
     {
@@ -133,6 +134,7 @@ DOMAINS: List[Dict] = [
         "color": PINK_LIGHT,
         "prefixes": [
             "cms_", "fda_", "medspa_", "zip_medspa_", "nppes_",
+            "dental_", "physical_therapy_",
         ],
     },
     {
@@ -145,6 +147,7 @@ DOMAINS: List[Dict] = [
             "company_web_", "company_app_", "company_ats_",
             "company_health_", "company_score", "company_enrichment",
             "competitive_", "news_", "hiring_velocity", "market_",
+            "veterinary_", "hvac_", "car_wash_",
         ],
     },
     {

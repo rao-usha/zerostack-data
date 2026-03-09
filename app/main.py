@@ -134,6 +134,14 @@ from app.api.v1 import (
     epa_echo,
 )
 
+# PE Intelligence Features
+from app.api.v1 import (
+    labor_arbitrage,
+    location_diligence,
+    rollup_intel,
+    vertical_discovery,
+)
+
 # Job Queue Streaming & Monitor
 from app.api.v1 import job_stream, jobs_monitor
 
@@ -1250,6 +1258,12 @@ app.include_router(acquisition_targets.router, prefix="/api/v1", dependencies=_a
 app.include_router(zip_scores.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(medspa_discovery.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(deal_models.router, prefix="/api/v1", dependencies=_auth)
+
+# PE Intelligence Features
+app.include_router(labor_arbitrage.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(location_diligence.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(rollup_intel.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(vertical_discovery.router, prefix="/api/v1", dependencies=_auth)
 
 # Government & Legal Data Sources
 app.include_router(sam_gov.router, prefix="/api/v1", dependencies=_auth)
