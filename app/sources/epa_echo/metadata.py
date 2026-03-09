@@ -8,6 +8,7 @@ Handles:
 - Field mapping from ECHO API to database columns
 """
 
+import json
 import logging
 from typing import Dict, List, Any, Optional
 
@@ -286,9 +287,9 @@ def parse_facility(raw: Dict[str, Any]) -> Dict[str, Any]:
         "county": (raw.get("FacCounty") or "").strip(),
         "latitude": _safe_float(raw.get("FacLat")),
         "longitude": _safe_float(raw.get("FacLong")),
-        "naics_codes": naics_codes if naics_codes else None,
-        "sic_codes": sic_codes if sic_codes else None,
-        "media_programs": media_programs if media_programs else None,
+        "naics_codes": json.dumps(naics_codes) if naics_codes else None,
+        "sic_codes": json.dumps(sic_codes) if sic_codes else None,
+        "media_programs": json.dumps(media_programs) if media_programs else None,
         "compliance_status": (
             raw.get("FacComplianceStatus") or ""
         ).strip(),

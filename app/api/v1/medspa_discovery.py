@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.sources.medspa_discovery.collector import MedSpaDiscoveryCollector
+from app.sources.medspa_discovery.enrichment import MedSpaEnrichmentPipeline
 from app.sources.medspa_discovery.ownership_classifier import MedSpaOwnershipClassifier
 
 logger = logging.getLogger(__name__)
@@ -99,7 +100,14 @@ def get_prospects(
             low_competition_sub, price_tier_sub,
             competitor_count_in_zip, batch_id, model_version, discovered_at,
             ownership_type, parent_entity, location_count,
-            classification_confidence, adjusted_acquisition_score
+            classification_confidence, adjusted_acquisition_score,
+            has_physician_oversight, nppes_provider_count,
+            nppes_provider_credentials, nppes_match_confidence,
+            medical_director_name,
+            estimated_annual_revenue, revenue_estimate_low,
+            revenue_estimate_high, revenue_confidence,
+            zip_total_filers, medspas_per_10k_filers,
+            market_saturation_index
         FROM medspa_prospects
         WHERE {where_sql}
         ORDER BY acquisition_score DESC
@@ -334,6 +342,105 @@ def classify_ownership(
 
 
 # ---------------------------------------------------------------------------
+# POST /enrich/* — enrichment endpoints
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/enrich/nppes",
+    summary="Enrich prospects with NPPES provider cross-reference",
+    response_description="NPPES match summary with tier counts",
+)
+def enrich_nppes(
+    force: bool = Query(False, description="Re-enrich already-enriched prospects"),
+    db: Session = Depends(get_db),
+):
+    """
+    Cross-reference medspa prospects against NPPES providers in matching ZIPs.
+
+    3-tier matching: (1) ZIP + fuzzy name, (2) ZIP + address tokens, (3) ZIP proximity.
+    Populates has_physician_oversight, medical_director_name, nppes_provider_credentials.
+    """
+    try:
+        pipeline = MedSpaEnrichmentPipeline(db)
+        return pipeline.enrich_nppes(force=force)
+    except Exception as e:
+        logger.error(f"NPPES enrichment failed: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/enrich/density",
+    summary="Enrich prospects with competitive density metrics",
+    response_description="Density enrichment summary with saturation distribution",
+)
+def enrich_density(
+    force: bool = Query(False, description="Re-enrich already-enriched prospects"),
+    db: Session = Depends(get_db),
+):
+    """
+    Calculate market saturation using IRS tax filer counts per ZIP.
+
+    Computes medspas_per_10k_filers and classifies as Undersaturated/Balanced/Saturated/Oversaturated.
+    """
+    try:
+        pipeline = MedSpaEnrichmentPipeline(db)
+        return pipeline.enrich_competitive_density(force=force)
+    except Exception as e:
+        logger.error(f"Density enrichment failed: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/enrich/revenue",
+    summary="Estimate annual revenue for prospects",
+    response_description="Revenue estimation summary with stats",
+)
+def enrich_revenue(
+    force: bool = Query(False, description="Re-estimate already-estimated prospects"),
+    db: Session = Depends(get_db),
+):
+    """
+    Estimate annual revenue using multiplicative model based on price tier,
+    review volume, ZIP affluence, competition, and physician oversight.
+
+    Should run after NPPES enrichment (uses has_physician_oversight).
+    """
+    try:
+        pipeline = MedSpaEnrichmentPipeline(db)
+        return pipeline.estimate_revenue(force=force)
+    except Exception as e:
+        logger.error(f"Revenue estimation failed: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/enrich/all",
+    summary="Run all Phase 1 enrichment (NPPES + density + revenue)",
+    response_description="Combined enrichment results",
+)
+def enrich_all(
+    force: bool = Query(False, description="Re-enrich already-enriched prospects"),
+    db: Session = Depends(get_db),
+):
+    """
+    Run all Phase 1 enrichment steps in order:
+    1A. NPPES medical provider cross-reference
+    1C. Competitive density (market saturation)
+    1B. Revenue estimation (depends on NPPES for physician factor)
+    """
+    try:
+        pipeline = MedSpaEnrichmentPipeline(db)
+        return pipeline.enrich_all(force=force)
+    except Exception as e:
+        logger.error(f"Full enrichment failed: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
 # GET /prospects/{yelp_id} — single prospect detail (LAST — catch-all path)
 # ---------------------------------------------------------------------------
 
@@ -362,7 +469,15 @@ def get_prospect_detail(
             competitor_count_in_zip, search_term, batch_id,
             model_version, discovered_at, updated_at,
             ownership_type, parent_entity, location_count,
-            classification_confidence, adjusted_acquisition_score
+            classification_confidence, adjusted_acquisition_score,
+            has_physician_oversight, nppes_provider_count,
+            nppes_provider_credentials, nppes_match_confidence,
+            medical_director_name, nppes_enriched_at,
+            estimated_annual_revenue, revenue_estimate_low,
+            revenue_estimate_high, revenue_confidence,
+            revenue_model_version, revenue_estimated_at,
+            zip_total_filers, medspas_per_10k_filers,
+            market_saturation_index, density_enriched_at
         FROM medspa_prospects
         WHERE yelp_id = :yelp_id
     """)

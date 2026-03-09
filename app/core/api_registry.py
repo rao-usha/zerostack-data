@@ -162,6 +162,34 @@ API_REGISTRY: Dict[str, APIConfig] = {
         notes="Without token: ~1000/hr. With token: ~4000/hr.",
     ),
     # -------------------------------------------------------------------------
+    # HEALTHCARE PROVIDERS
+    # -------------------------------------------------------------------------
+    "nppes": APIConfig(
+        source_name="nppes",
+        base_url="https://npiregistry.cms.hhs.gov/api/",
+        api_key_requirement=APIKeyRequirement.OPTIONAL,
+        config_key="",
+        signup_url="",
+        max_concurrency=2,
+        rate_limit_interval=0.5,  # 2 req/sec to be respectful
+        timeout_seconds=30.0,
+        notes="No key required. NPI Registry API v2.1. Max 200 results per page.",
+    ),
+    # -------------------------------------------------------------------------
+    # EPA ENFORCEMENT
+    # -------------------------------------------------------------------------
+    "epa_echo": APIConfig(
+        source_name="epa_echo",
+        base_url="https://echodata.epa.gov/echo/",
+        api_key_requirement=APIKeyRequirement.OPTIONAL,
+        config_key="",
+        signup_url="",
+        max_concurrency=2,
+        rate_limit_interval=1.0,  # 1 req/sec, respectful usage
+        timeout_seconds=60.0,
+        notes="No key required. Two-step API: get_facilities→QueryID→get_qid. Max 5000 rows/page.",
+    ),
+    # -------------------------------------------------------------------------
     # GOVERNMENT CONTRACTS
     # -------------------------------------------------------------------------
     "sam_gov": APIConfig(

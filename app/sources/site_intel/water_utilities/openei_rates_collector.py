@@ -25,7 +25,7 @@ from app.sources.site_intel.types import (
     CollectionResult,
     CollectionStatus,
 )
-from app.sources.site_intel.runner import register_collector
+from app.sources.site_intel.runner import register_collector  # noqa: F401 (kept for potential direct use)
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ CUSTOMER_CLASS_MAP = {
 }
 
 
-@register_collector(SiteIntelSource.OPENEI_URDB)
+# NOTE: Registration moved to power/utility_rate_collector.py (comprehensive dual-source collector)
 class OpenEIRatesCollector(BaseCollector):
     """
     Collector for OpenEI Utility Rate Database.

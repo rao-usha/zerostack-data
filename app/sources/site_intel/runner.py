@@ -358,6 +358,7 @@ class SiteIntelOrchestrator:
                 SiteIntelSource.ISO_PJM,
                 SiteIntelSource.ISO_CAISO,
                 SiteIntelSource.ISO_ERCOT,
+                SiteIntelSource.OPENEI_URDB,
             ],
             SiteIntelDomain.TELECOM: [
                 SiteIntelSource.FCC,
@@ -420,7 +421,6 @@ class SiteIntelOrchestrator:
                 SiteIntelSource.USGS_WATER,
                 SiteIntelSource.EPA_SDWIS,
                 SiteIntelSource.EIA_GAS,
-                SiteIntelSource.OPENEI_URDB,
             ],
             SiteIntelDomain.SCORING: [],
         }

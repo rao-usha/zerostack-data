@@ -65,7 +65,7 @@ def _key_required(source: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# SOURCE REGISTRY — 36 data sources
+# SOURCE REGISTRY — 43 data sources
 # ---------------------------------------------------------------------------
 
 SOURCE_REGISTRY: Dict[str, SourceContext] = {
@@ -1264,6 +1264,152 @@ SOURCE_REGISTRY: Dict[str, SourceContext] = {
             ),
         ],
     ),
+    # ── Healthcare Providers (2) ─────────────────────────────────────────
+    "nppes": SourceContext(
+        key="nppes",
+        display_name="NPPES NPI Provider Registry",
+        short_name="NPPES",
+        category="healthcare",
+        description="National Plan and Provider Enumeration System — every licensed healthcare provider in the US with NPI number, practice address, taxonomy, and credentials.",
+        update_frequency="daily",
+        api_key_required=_key_required("nppes"),
+        url="https://npiregistry.cms.hhs.gov/",
+        table_prefix="nppes_",
+        tags=["healthcare", "providers", "npi", "medspa", "physicians", "taxonomy"],
+        collections=[
+            SourceCollection(
+                name="Provider Ingestion",
+                endpoint="POST /nppes/ingest",
+                description="Ingest providers by state and/or taxonomy code. Supports medspa-relevant taxonomy filtering.",
+                table="nppes_providers",
+            ),
+        ],
+    ),
+    "fda": SourceContext(
+        key="fda",
+        display_name="openFDA Device Registrations",
+        short_name="openFDA",
+        category="healthcare",
+        description="FDA device registration and listing data — manufacturer establishments, medical device product listings, 510(k) clearances.",
+        update_frequency="monthly",
+        api_key_required=_key_required("fda"),
+        url="https://open.fda.gov/apis/device/registrationlisting/",
+        table_prefix="fda_",
+        tags=["healthcare", "fda", "medical-devices", "registrations", "510k"],
+        collections=[
+            SourceCollection(
+                name="Device Registrations",
+                endpoint="POST /fda/device-registrations/ingest",
+                description="Ingest FDA device registration and listing data by state or product code.",
+                table="fda_device_registrations",
+            ),
+        ],
+    ),
+    # ── Environmental & Regulatory (2) ────────────────────────────────────
+    "epa_echo": SourceContext(
+        key="epa_echo",
+        display_name="EPA ECHO Facilities",
+        short_name="EPA ECHO",
+        category="site_intel",
+        description="EPA Enforcement and Compliance History Online — facility compliance status, violations, inspections, and penalties across air, water, RCRA, and SDWA programs.",
+        update_frequency="weekly",
+        api_key_required=_key_required("epa_echo"),
+        url="https://echo.epa.gov/",
+        table_prefix="epa_echo_",
+        tags=["environmental", "compliance", "epa", "enforcement", "facilities", "site-intel"],
+        collections=[
+            SourceCollection(
+                name="Facility Ingestion",
+                endpoint="POST /epa-echo/ingest",
+                description="Ingest EPA ECHO facility compliance data by state, NAICS, SIC, or media program (AIR/WATER/RCRA/SDWA).",
+                table="epa_echo_facilities",
+            ),
+        ],
+    ),
+    # ── Government Contracts & Procurement (2) ────────────────────────────
+    "usaspending": SourceContext(
+        key="usaspending",
+        display_name="USAspending.gov Federal Awards",
+        short_name="USAspending",
+        category="trade_commerce",
+        description="Federal contract and grant award data from USAspending.gov — award amounts, recipients, NAICS codes, and agency breakdowns.",
+        update_frequency="daily",
+        api_key_required=_key_required("usaspending"),
+        url="https://www.usaspending.gov/",
+        table_prefix="usaspending_",
+        tags=["federal", "contracts", "grants", "awards", "procurement", "government"],
+        collections=[
+            SourceCollection(
+                name="Award Ingestion",
+                endpoint="POST /usaspending/ingest",
+                description="Ingest federal award data by NAICS codes and/or states. Defaults to datacenter, healthcare, and telecom NAICS codes.",
+                table="usaspending_awards",
+            ),
+        ],
+    ),
+    "sam_gov": SourceContext(
+        key="sam_gov",
+        display_name="SAM.gov Entity Registration",
+        short_name="SAM.gov",
+        category="financial_regulatory",
+        description="System for Award Management — federal contractor registrations, business types, NAICS codes, size standards, and contact information.",
+        update_frequency="daily",
+        api_key_required=_key_required("sam_gov"),
+        url="https://sam.gov/",
+        table_prefix="sam_gov_",
+        tags=["government", "contractors", "federal", "registration", "procurement"],
+        collections=[
+            SourceCollection(
+                name="Entity Ingestion",
+                endpoint="POST /sam-gov/ingest",
+                description="Ingest SAM.gov entity registration data by state, NAICS, or business type.",
+                table="sam_gov_entities",
+            ),
+        ],
+    ),
+    # ── Workplace Safety (1) ──────────────────────────────────────────────
+    "osha": SourceContext(
+        key="osha",
+        display_name="OSHA Inspections & Violations",
+        short_name="OSHA",
+        category="trade_commerce",
+        description="OSHA workplace safety inspection and violation data — inspection details, violation types, penalties, and abatement information.",
+        update_frequency="monthly",
+        api_key_required=_key_required("osha"),
+        url="https://enforcedata.dol.gov/views/data_catalogs.php",
+        table_prefix="osha_",
+        tags=["safety", "inspections", "violations", "workplace", "enforcement", "osha"],
+        collections=[
+            SourceCollection(
+                name="Inspections",
+                endpoint="POST /osha/ingest",
+                description="Download and ingest OSHA inspection and violation CSV data from DOL bulk downloads.",
+                table="osha_inspections, osha_violations",
+            ),
+        ],
+    ),
+    # ── Court & Legal (1) ─────────────────────────────────────────────────
+    "courtlistener": SourceContext(
+        key="courtlistener",
+        display_name="CourtListener Bankruptcy Dockets",
+        short_name="CourtListener",
+        category="financial_regulatory",
+        description="Federal bankruptcy court docket data from the Free Law Project — Chapter 7, 11, and 13 filings, case parties, and court details.",
+        update_frequency="daily",
+        api_key_required=_key_required("courtlistener"),
+        url="https://www.courtlistener.com/",
+        table_prefix="courtlistener_",
+        tags=["legal", "bankruptcy", "courts", "dockets", "filings", "chapter-11"],
+        collections=[
+            SourceCollection(
+                name="Bankruptcy Dockets",
+                endpoint="POST /courtlistener/ingest",
+                description="Ingest bankruptcy docket data by search query, court, or chapter type.",
+                table="courtlistener_dockets",
+            ),
+        ],
+    ),
+    # ── Med-Spa Discovery ─────────────────────────────────────────────────
     "medspa_discovery": SourceContext(
         key="medspa_discovery",
         display_name="Med-Spa Market Discovery",

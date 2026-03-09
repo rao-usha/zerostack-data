@@ -69,7 +69,7 @@ DOMAINS: List[Dict] = [
             "airport", "air_cargo_", "broadband_", "carrier_safety",
             "cell_tower", "climate_", "cold_storage", "commute_",
             "container_freight", "data_center_", "educational_attainment",
-            "environmental_", "ev_charging", "fault_line", "fema_",
+            "environmental_", "epa_echo_", "ev_charging", "fault_line", "fema_",
             "fbi_crime", "flood_", "freight_", "grain_elevator",
             "heavy_haul", "incentive_", "industrial_site",
             "interconnection_", "intermodal_", "internet_exchange",
@@ -99,7 +99,7 @@ DOMAINS: List[Dict] = [
         "prefixes": [
             "us_trade_", "cftc_cot_", "irs_soi_", "acs5_",
             "bts_", "dunl_", "trade_gateway_", "census_variable_",
-            "foreign_trade_zone",
+            "foreign_trade_zone", "usaspending_", "osha_",
         ],
     },
     {
@@ -108,6 +108,7 @@ DOMAINS: List[Dict] = [
         "color": INDIGO,
         "prefixes": [
             "sec_", "fdic_", "fcc_", "form_adv", "form_d",
+            "sam_gov_", "courtlistener_",
         ],
     },
     {
@@ -131,7 +132,7 @@ DOMAINS: List[Dict] = [
         "label": "Healthcare",
         "color": PINK_LIGHT,
         "prefixes": [
-            "cms_", "fda_", "medspa_", "zip_medspa_",
+            "cms_", "fda_", "medspa_", "zip_medspa_", "nppes_",
         ],
     },
     {
