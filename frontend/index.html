@@ -793,6 +793,181 @@
         }
         .tf-checkbox-group label:hover { background: var(--bg-input); color: var(--text); }
         .tf-checkbox-group input[type="checkbox"] { accent-color: var(--primary); }
+
+        /* ===== Tab Intro Sections ===== */
+        .tab-intro {
+            background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(6,182,212,0.06));
+            border: 1px solid rgba(99,102,241,0.2);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .tab-intro-icon { font-size: 1.5rem; }
+        .tab-intro-text { font-size: 0.875rem; color: var(--text-muted); line-height: 1.5; }
+        .tab-intro-text strong { color: var(--text); }
+
+        /* ===== Intelligence Tab ===== */
+        .intel-nav { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .intel-nav-btn {
+            padding: 0.5rem 1rem; background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text-muted); cursor: pointer; font-size: 0.8rem;
+            transition: all 0.15s;
+        }
+        .intel-nav-btn:hover { background: var(--border); color: var(--text); }
+        .intel-nav-btn.active { background: var(--primary); border-color: var(--primary); color: white; }
+
+        .intel-panel { display: none; }
+        .intel-panel.active { display: block; }
+
+        .intel-toolbar { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+        .intel-toolbar select, .intel-toolbar input {
+            padding: 0.5rem 0.75rem; background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: 6px; color: var(--text); font-size: 0.8rem;
+        }
+
+        .intel-table { width: 100%; border-collapse: collapse; }
+        .intel-table th {
+            text-align: left; padding: 0.625rem 0.5rem; font-size: 0.7rem;
+            color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border);
+            font-weight: 600; letter-spacing: 0.03em; cursor: pointer; user-select: none;
+        }
+        .intel-table th:hover { color: var(--text); }
+        .intel-table td {
+            padding: 0.625rem 0.5rem; border-bottom: 1px solid rgba(51,65,85,0.4);
+            font-size: 0.85rem;
+        }
+        .intel-table tbody tr:hover { background: rgba(99,102,241,0.06); }
+
+        .grade-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; border-radius: 6px; font-weight: 700; font-size: 0.8rem;
+        }
+        .grade-A { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .grade-B { background: rgba(6,182,212,0.15); color: #06b6d4; }
+        .grade-C { background: rgba(245,158,11,0.15); color: #f59e0b; }
+        .grade-D { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .grade-F { background: rgba(239,68,68,0.25); color: #ef4444; }
+
+        .score-bar {
+            display: inline-block; height: 6px; border-radius: 3px; vertical-align: middle;
+        }
+        .score-bar-bg {
+            display: inline-block; width: 60px; height: 6px; background: var(--bg-input);
+            border-radius: 3px; vertical-align: middle; margin-right: 0.5rem; position: relative;
+        }
+        .score-bar-fill {
+            position: absolute; left: 0; top: 0; height: 100%; border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        .sub-score-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.5rem; margin-top: 0.75rem;
+        }
+        .sub-score-item {
+            background: var(--bg-input); padding: 0.5rem 0.75rem; border-radius: 6px;
+        }
+        .sub-score-label {
+            font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;
+            margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.375rem;
+        }
+        .sub-score-value { font-size: 1rem; font-weight: 600; }
+
+        .metric-help {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 16px; height: 16px; border-radius: 50%; background: rgba(99,102,241,0.2);
+            color: var(--primary); font-size: 0.6rem; font-weight: 700; cursor: help;
+            position: relative;
+        }
+        .metric-tooltip {
+            display: none; position: absolute; bottom: calc(100% + 8px); left: 50%;
+            transform: translateX(-50%); width: 280px; background: var(--bg-card);
+            border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem;
+            font-size: 0.75rem; color: var(--text-muted); line-height: 1.5;
+            z-index: 999; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-weight: 400;
+            text-transform: none; letter-spacing: normal;
+        }
+        .metric-tooltip strong { color: var(--text); display: block; margin-bottom: 0.25rem; }
+        .metric-tooltip .mt-formula { color: var(--accent); font-family: monospace; font-size: 0.7rem; margin: 0.25rem 0; }
+        .metric-tooltip .mt-sources { color: var(--warning); font-size: 0.65rem; margin-top: 0.375rem; }
+        .metric-help:hover .metric-tooltip { display: block; }
+
+        .expand-row { display: none; }
+        .expand-row.open { display: table-row; }
+        .expand-cell { padding: 0.75rem 1rem; background: rgba(15,23,42,0.5); }
+
+        .chart-container { position: relative; height: 220px; margin-bottom: 1rem; }
+        .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+        @media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
+
+        .intel-empty { text-align: center; padding: 3rem; color: var(--text-muted); }
+        .intel-empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+        .intel-empty-text { font-size: 0.9rem; }
+        .intel-empty-hint { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; }
+        .intel-empty-hint code { background: var(--bg-input); padding: 0.125rem 0.375rem; border-radius: 4px; font-size: 0.75rem; }
+
+        /* ===== Visualizations Tab ===== */
+        .viz-selector {
+            display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;
+        }
+        .viz-btn {
+            padding: 0.6rem 1.25rem; background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text-muted); cursor: pointer; font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+        .viz-btn:hover { background: var(--border); color: var(--text); }
+        .viz-btn.active { background: var(--primary); border-color: var(--primary); color: white; }
+        .viz-panel { display: none; }
+        .viz-panel.viz-active { display: block; }
+        .viz-canvas {
+            width: 100%; min-height: 480px; position: relative;
+            background: rgba(15,23,42,0.3); border-radius: 8px; overflow: hidden;
+        }
+        .viz-canvas svg { width: 100%; height: 100%; }
+        .viz-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;
+        }
+        .viz-controls {
+            display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;
+        }
+        .viz-controls select {
+            padding: 0.4rem 0.65rem; background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: 6px; color: var(--text); font-size: 0.8rem;
+        }
+        .viz-controls select:focus { outline: none; border-color: var(--primary); }
+        .viz-tooltip {
+            position: absolute; pointer-events: none; z-index: 100;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+            padding: 0.75rem 1rem; font-size: 0.8rem; line-height: 1.5;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4); color: var(--text);
+            opacity: 0; transition: opacity 0.15s;
+            max-width: 280px;
+        }
+        .viz-tooltip.visible { opacity: 1; }
+        .viz-tooltip strong { color: var(--accent); }
+        .viz-tooltip .tt-row { display: flex; justify-content: space-between; gap: 1rem; }
+        .viz-tooltip .tt-label { color: var(--text-muted); }
+        .viz-tooltip .tt-value { font-weight: 600; }
+        .viz-legend {
+            display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0;
+            font-size: 0.75rem; color: var(--text-muted); flex-wrap: wrap;
+            justify-content: center;
+        }
+        .viz-legend-item { display: flex; align-items: center; gap: 0.35rem; }
+        .viz-legend-swatch {
+            width: 14px; height: 14px; border-radius: 3px;
+        }
+        .viz-legend-gradient {
+            width: 200px; height: 12px; border-radius: 3px;
+        }
+        .viz-loading {
+            display: flex; align-items: center; justify-content: center;
+            min-height: 400px; color: var(--text-muted); font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -826,7 +1001,9 @@
 
     <nav class="tabs">
         <button class="tab active" onclick="showTab('sources')">📡 Sources</button>
+        <button class="tab" onclick="showTab('intel')">🧠 Intelligence</button>
         <button class="tab" onclick="showTab('jobs')">🚀 Jobs</button>
+        <button class="tab" onclick="showTab('viz')">🗺️ Visualizations</button>
         <button class="tab" onclick="showTab('settings')">⚙️ Settings</button>
     </nav>
 
@@ -843,12 +1020,168 @@
     <main class="content">
         <!-- Sources Tab (default) -->
         <div id="tab-sources">
+            <div class="tab-intro">
+                <span class="tab-intro-icon">📡</span>
+                <div class="tab-intro-text">
+                    <strong>Data Sources & Collection Health.</strong>
+                    Monitor 28+ public data sources — see what's fresh, what's stale, and how many records each source has collected.
+                    Click any source to explore its tables, preview data, or trigger a new ingestion.
+                </div>
+            </div>
+            <div id="sources-analytics-bar" class="ds-hero" style="display:none;"></div>
             <div id="sources-loading" class="loading">Loading data sources...</div>
             <div id="sources-content" class="hidden"></div>
         </div>
 
+        <!-- Intelligence Tab -->
+        <div id="tab-intel" class="hidden">
+            <div class="tab-intro">
+                <span class="tab-intro-icon">🧠</span>
+                <div class="tab-intro-text">
+                    <strong>Scores, Rankings & Market Intelligence.</strong>
+                    Custom composite scores derived from 28+ public data sources — no guesswork.
+                    Each metric shows exactly what data feeds it, how it's calculated, and what the score means for your investment thesis.
+                </div>
+            </div>
+
+            <div class="intel-nav">
+                <button class="intel-nav-btn active" onclick="showIntelPanel('companies')">Company Health</button>
+                <button class="intel-nav-btn" onclick="showIntelPanel('exit')">Exit Readiness</button>
+                <button class="intel-nav-btn" onclick="showIntelPanel('markets')">Market Opportunities</button>
+                <button class="intel-nav-btn" onclick="showIntelPanel('sites')">Datacenter Sites</button>
+            </div>
+
+            <!-- Company Health Panel -->
+            <div id="intel-companies" class="intel-panel active">
+                <div class="chart-row">
+                    <div class="card">
+                        <div class="card-title">Score Distribution <span class="metric-help">?<span class="metric-tooltip"><strong>Score Distribution</strong>Shows how companies are graded across the A-F scale. A = top performers (80+), F = significant risk (&lt;40).<span class="mt-sources">Sources: Job postings, Tranco web rank, Glassdoor, SEC filings</span></span></span></div>
+                        <div class="chart-container"><canvas id="chart-health-dist"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Sub-Score Averages <span class="metric-help">?<span class="metric-tooltip"><strong>Sub-Score Breakdown</strong>Radar view of average scores across all signal categories. Spikes show collective strengths; dips show systemic gaps.<span class="mt-sources">Sources: BLS QCEW, Indeed/LinkedIn, Tranco, Glassdoor</span></span></span></div>
+                        <div class="chart-container"><canvas id="chart-health-radar"></canvas></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Company Health Rankings</div>
+                    <div class="intel-toolbar">
+                        <select id="health-grade-filter" onchange="loadHealthScores()">
+                            <option value="">All Grades</option>
+                            <option value="A">Grade A</option>
+                            <option value="B">Grade B</option>
+                            <option value="C">Grade C</option>
+                            <option value="D">Grade D</option>
+                            <option value="F">Grade F</option>
+                        </select>
+                        <span style="color:var(--text-muted);font-size:0.8rem;" id="health-count"></span>
+                    </div>
+                    <div id="health-table-container"><div class="loading">Loading scores...</div></div>
+                </div>
+            </div>
+
+            <!-- Exit Readiness Panel -->
+            <div id="intel-exit" class="intel-panel">
+                <div class="chart-row">
+                    <div class="card">
+                        <div class="card-title">Exit Readiness Distribution <span class="metric-help">?<span class="metric-tooltip"><strong>Exit Readiness Score</strong>Measures how prepared a PE portfolio company is for a liquidity event. Combines financial health, leadership stability, hiring signals, and hold period. 80+ = ready for exit marketing.<span class="mt-formula">Score = weighted(financial, trajectory, leadership, valuation, market, hold, hiring)</span><span class="mt-sources">Sources: SEC 10-K/10-Q, BLS, job postings, company websites</span></span></span></div>
+                        <div class="chart-container"><canvas id="chart-exit-dist"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Sub-Score Averages <span class="metric-help">?<span class="metric-tooltip"><strong>Exit Sub-Scores</strong>7 dimensions of exit readiness. Financial Health = revenue + margin trends. Leadership Stability = C-suite tenure + turnover. Hold Period = years since acquisition vs typical 5-7yr hold.<span class="mt-sources">Sources: SEC EDGAR, LinkedIn, news, job boards</span></span></span></div>
+                        <div class="chart-container"><canvas id="chart-exit-radar"></canvas></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Exit Readiness Rankings</div>
+                    <div class="intel-toolbar">
+                        <select id="exit-grade-filter" onchange="loadExitReadiness()">
+                            <option value="">All Grades</option>
+                            <option value="A">Grade A</option>
+                            <option value="B">Grade B</option>
+                            <option value="C">Grade C</option>
+                            <option value="D">Grade D</option>
+                            <option value="F">Grade F</option>
+                        </select>
+                        <span style="color:var(--text-muted);font-size:0.8rem;" id="exit-count"></span>
+                    </div>
+                    <div id="exit-table-container"><div class="loading">Loading scores...</div></div>
+                </div>
+            </div>
+
+            <!-- Market Opportunities Panel -->
+            <div id="intel-markets" class="intel-panel">
+                <div class="chart-row">
+                    <div class="card">
+                        <div class="card-title">ZIP Score Distribution <span class="metric-help">?<span class="metric-tooltip"><strong>ZIP Revenue Potential Score</strong>Composite score (0-100) predicting med-spa revenue potential in a ZIP code. Combines affluence density, discretionary wealth, market size, professional density, and wealth concentration.<span class="mt-formula">Score = weighted(affluence, wealth, market_size, professionals, concentration)</span><span class="mt-sources">Sources: IRS SOI (income by ZIP), Census ACS (demographics), NPPES (providers)</span></span></span></div>
+                        <div class="chart-container"><canvas id="chart-zip-dist"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Top States by Average Score</div>
+                        <div class="chart-container"><canvas id="chart-zip-states"></canvas></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">ZIP Code Market Rankings</div>
+                    <div class="intel-toolbar">
+                        <select id="zip-state-filter" onchange="loadZipScores()">
+                            <option value="">All States</option>
+                        </select>
+                        <select id="zip-grade-filter" onchange="loadZipScores()">
+                            <option value="">All Grades</option>
+                            <option value="A">Grade A</option>
+                            <option value="B">Grade B</option>
+                            <option value="C">Grade C</option>
+                        </select>
+                        <span style="color:var(--text-muted);font-size:0.8rem;" id="zip-count"></span>
+                    </div>
+                    <div id="zip-table-container"><div class="loading">Loading scores...</div></div>
+                </div>
+            </div>
+
+            <!-- Datacenter Sites Panel -->
+            <div id="intel-sites" class="intel-panel">
+                <div class="chart-row">
+                    <div class="card">
+                        <div class="card-title">County Grade Distribution <span class="metric-help">?<span class="metric-tooltip"><strong>Datacenter Site Score</strong>County-level composite score for datacenter development suitability. Aggregates 6 infrastructure domains: power capacity, network connectivity, regulatory environment, labor availability, natural disaster risk, and cost/incentives.<span class="mt-formula">Score = 0.30*power + 0.25*connectivity + 0.15*regulatory + 0.12*labor + 0.10*risk + 0.08*incentives</span><span class="mt-sources">Sources: EIA, HIFLD, PeeringDB, Epoch AI, BLS, FEMA, Good Jobs First, State EDOs</span></span></span></div>
+                        <div class="chart-container"><canvas id="chart-dc-dist"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Domain Score Averages <span class="metric-help">?<span class="metric-tooltip"><strong>6 Domain Scores</strong><strong>Power:</strong> Substations, generation capacity, utility rates.<br><strong>Connectivity:</strong> Internet exchanges, fiber, existing DCs.<br><strong>Regulatory:</strong> Permits, environmental compliance.<br><strong>Labor:</strong> Tech workforce, wage competitiveness.<br><strong>Risk:</strong> Flood, seismic, wildfire, hurricane.<br><strong>Incentives:</strong> Tax breaks, enterprise zones, grants.</span></span></div>
+                        <div class="chart-container"><canvas id="chart-dc-radar"></canvas></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">County Rankings</div>
+                    <div class="intel-toolbar">
+                        <select id="dc-state-filter" onchange="loadDcRankings()">
+                            <option value="">All States</option>
+                        </select>
+                        <select id="dc-grade-filter" onchange="loadDcRankings()">
+                            <option value="">All Grades</option>
+                            <option value="A">Grade A</option>
+                            <option value="B">Grade B</option>
+                            <option value="C">Grade C</option>
+                            <option value="D">Grade D</option>
+                            <option value="F">Grade F</option>
+                        </select>
+                        <span style="color:var(--text-muted);font-size:0.8rem;" id="dc-count"></span>
+                    </div>
+                    <div id="dc-table-container"><div class="loading">Loading scores...</div></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Jobs Tab -->
         <div id="tab-jobs" class="hidden">
+            <div class="tab-intro">
+                <span class="tab-intro-icon">🚀</span>
+                <div class="tab-intro-text">
+                    <strong>Collection Jobs & Pipeline Control.</strong>
+                    Launch data collection jobs, monitor active pipelines in real-time, and review job history.
+                    Use "Run Batch" to trigger a full nightly collection across all tiers.
+                </div>
+            </div>
             <!-- Section 1: Run Collection -->
             <div class="card jobs-section">
                 <h2 class="card-title">🚀 Run Collection</h2>
@@ -918,6 +1251,13 @@
 
         <!-- Settings Tab -->
         <div id="tab-settings" class="hidden">
+            <div class="tab-intro">
+                <span class="tab-intro-icon">⚙️</span>
+                <div class="tab-intro-text">
+                    <strong>API Keys & Configuration.</strong>
+                    Manage credentials for external data sources. Keys are encrypted at rest and validated before each collection run.
+                </div>
+            </div>
             <div class="card">
                 <h2 class="card-title">⚙️ API Key Management</h2>
                 <p style="color: var(--text-muted); margin-bottom: 1rem;">
@@ -935,6 +1275,119 @@
                 </div>
             </div>
         </div>
+        <!-- Visualizations Tab -->
+        <div id="tab-viz" class="hidden">
+            <div class="tab-intro">
+                <span class="tab-intro-icon">🗺️</span>
+                <div class="tab-intro-text">
+                    <strong>Interactive Data Visualizations.</strong>
+                    Explore geographic market intelligence, prospect landscapes, data coverage, and market connectivity
+                    through interactive D3 visualizations built on live API data.
+                </div>
+            </div>
+
+            <!-- Viz Selector -->
+            <div class="viz-selector">
+                <button class="viz-btn active" onclick="showViz('map')">🗺️ Market Map</button>
+                <button class="viz-btn" onclick="showViz('bubble')">🫧 Prospect Scatter</button>
+                <button class="viz-btn" onclick="showViz('sunburst')">🌀 Data Coverage</button>
+                <button class="viz-btn" onclick="showViz('force')">🕸️ Market Network</button>
+            </div>
+
+            <!-- Viz 1: Choropleth Map -->
+            <div id="viz-map" class="viz-panel">
+                <div class="card">
+                    <div class="viz-header">
+                        <h2 class="card-title">Roll-Up Market Attractiveness by State</h2>
+                        <div class="viz-controls">
+                            <select id="map-metric" onchange="updateMap()">
+                                <option value="overall_score">Overall Score</option>
+                                <option value="fragmentation_score">Fragmentation</option>
+                                <option value="market_size_score">Market Size</option>
+                                <option value="affluence_score">Affluence</option>
+                                <option value="labor_score">Labor Supply</option>
+                            </select>
+                            <select id="map-source" onchange="updateMap()">
+                                <option value="rollup">Roll-Up Scores</option>
+                                <option value="datacenter">Datacenter Scores</option>
+                                <option value="labor">Wage Levels</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="map-container" class="viz-canvas"></div>
+                    <div id="map-legend" class="viz-legend"></div>
+                    <div id="map-tooltip" class="viz-tooltip"></div>
+                </div>
+            </div>
+
+            <!-- Viz 2: Bubble Scatter -->
+            <div id="viz-bubble" class="viz-panel hidden">
+                <div class="card">
+                    <div class="viz-header">
+                        <h2 class="card-title">Prospect Landscape</h2>
+                        <div class="viz-controls">
+                            <select id="bubble-source" onchange="loadBubbleData()">
+                                <option value="medspa">Med-Spa</option>
+                                <option value="dental">Dental</option>
+                                <option value="veterinary">Veterinary</option>
+                                <option value="hvac">HVAC</option>
+                                <option value="car_wash">Car Wash</option>
+                                <option value="physical_therapy">Physical Therapy</option>
+                            </select>
+                            <select id="bubble-x" onchange="updateBubble()">
+                                <option value="rating">Yelp Rating</option>
+                                <option value="review_count">Review Count</option>
+                                <option value="zip_avg_agi">ZIP Avg AGI</option>
+                            </select>
+                            <select id="bubble-y" onchange="updateBubble()">
+                                <option value="acquisition_score">Acquisition Score</option>
+                                <option value="estimated_annual_revenue">Est. Revenue</option>
+                                <option value="competitor_count_in_zip">Competitors</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="bubble-container" class="viz-canvas"></div>
+                    <div id="bubble-tooltip" class="viz-tooltip"></div>
+                </div>
+            </div>
+
+            <!-- Viz 3: Sunburst -->
+            <div id="viz-sunburst" class="viz-panel hidden">
+                <div class="card">
+                    <div class="viz-header">
+                        <h2 class="card-title">Data Coverage Sunburst</h2>
+                        <div class="viz-controls">
+                            <span id="sunburst-breadcrumb" style="color:var(--text-muted);font-size:0.85rem;"></span>
+                        </div>
+                    </div>
+                    <div id="sunburst-container" class="viz-canvas" style="display:flex;justify-content:center;"></div>
+                </div>
+            </div>
+
+            <!-- Viz 4: Force Graph -->
+            <div id="viz-force" class="viz-panel hidden">
+                <div class="card">
+                    <div class="viz-header">
+                        <h2 class="card-title">Market Connectivity Network</h2>
+                        <div class="viz-controls">
+                            <select id="force-highlight" onchange="updateForce()">
+                                <option value="">All States</option>
+                                <option value="06">California</option>
+                                <option value="48">Texas</option>
+                                <option value="36">New York</option>
+                                <option value="12">Florida</option>
+                                <option value="17">Illinois</option>
+                            </select>
+                            <label style="color:var(--text-muted);font-size:0.85rem;margin-left:0.5rem;">
+                                <input type="checkbox" id="force-labels" onchange="updateForce()" checked> Labels
+                            </label>
+                        </div>
+                    </div>
+                    <div id="force-container" class="viz-canvas"></div>
+                    <div id="force-tooltip" class="viz-tooltip"></div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <footer class="footer">
@@ -945,6 +1398,9 @@
         <span>100+ Endpoints • 25+ Data Sources</span>
     </footer>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
     <script>
         const API = '/api/v1';
 
@@ -998,6 +1454,8 @@
             _currentTab = tab;
             if (tab === 'settings') loadApiKeys();
             if (tab === 'jobs') jobsInitialize();
+            if (tab === 'intel') intelInitialize();
+            if (tab === 'viz') vizInitialize();
         }
 
         // ===== Health Check =====
@@ -6441,6 +6899,512 @@
 
         // On initial page load, navigate to hash route if present
         handleHashRoute();
+
+        // ==================================================================
+        // Sources Tab — Analytics Bar (wired to /analytics/overview)
+        // ==================================================================
+        (async function loadSourcesAnalytics() {
+            try {
+                const r = await fetch(`${API}/analytics/overview`);
+                if (!r.ok) return;
+                const d = await r.json();
+                const bar = document.getElementById('sources-analytics-bar');
+                if (!bar) return;
+                const stats = [
+                    { label: 'Total Records', value: (d.total_portfolio_companies || 0).toLocaleString() },
+                    { label: 'Sources Active', value: Object.keys(d.companies_by_source || {}).length },
+                    { label: 'Jobs (7d)', value: d.collection_stats?.jobs_last_7d || 0 },
+                    { label: 'Success Rate', value: ((d.collection_stats?.success_rate_7d || 0) * 100).toFixed(0) + '%' },
+                    { label: 'Avg Data Age', value: (d.avg_data_age_days || 0).toFixed(1) + 'd' },
+                    { label: 'Last Collection', value: d.last_collection_at ? new Date(d.last_collection_at).toLocaleTimeString() : '--' },
+                ];
+                bar.innerHTML = stats.map(s => `
+                    <div class="ds-hero-card">
+                        <div class="ds-hero-value">${s.value}</div>
+                        <div class="ds-hero-label">${s.label}</div>
+                    </div>
+                `).join('');
+                bar.style.display = 'grid';
+                bar.style.gridTemplateColumns = `repeat(${stats.length}, 1fr)`;
+            } catch (e) { /* analytics endpoint may not be available */ }
+        })();
+
+        // ==================================================================
+        // INTELLIGENCE TAB
+        // ==================================================================
+        let _intelInitialized = false;
+        const _chartInstances = {};
+
+        function intelInitialize() {
+            if (_intelInitialized) return;
+            _intelInitialized = true;
+            loadHealthScores();
+        }
+
+        function showIntelPanel(panel) {
+            document.querySelectorAll('.intel-nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.intel-panel').forEach(p => p.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('intel-' + panel).classList.add('active');
+
+            // Lazy-load data for each panel
+            if (panel === 'companies') loadHealthScores();
+            if (panel === 'exit') loadExitReadiness();
+            if (panel === 'markets') loadZipScores();
+            if (panel === 'sites') loadDcRankings();
+        }
+
+        // ---- Helpers ----
+        function gradeHtml(grade) {
+            return `<span class="grade-badge grade-${grade || 'C'}">${grade || '?'}</span>`;
+        }
+
+        function scoreBar(score, max = 100) {
+            const pct = Math.min(100, (score / max) * 100);
+            const color = pct >= 80 ? '#22c55e' : pct >= 60 ? '#06b6d4' : pct >= 40 ? '#f59e0b' : '#ef4444';
+            return `<span class="score-bar-bg"><span class="score-bar-fill" style="width:${pct}%;background:${color};"></span></span> ${score != null ? score.toFixed(1) : '--'}`;
+        }
+
+        function emptyState(icon, text, hint) {
+            return `<div class="intel-empty">
+                <div class="intel-empty-icon">${icon}</div>
+                <div class="intel-empty-text">${text}</div>
+                ${hint ? `<div class="intel-empty-hint">${hint}</div>` : ''}
+            </div>`;
+        }
+
+        function makeChart(canvasId, config) {
+            if (_chartInstances[canvasId]) _chartInstances[canvasId].destroy();
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+            _chartInstances[canvasId] = new Chart(ctx, config);
+        }
+
+        function gradeDistChart(canvasId, rankings, label) {
+            const dist = { A: 0, B: 0, C: 0, D: 0, F: 0 };
+            rankings.forEach(r => { const g = r.grade || r.tier || 'C'; if (dist[g] !== undefined) dist[g]++; });
+            makeChart(canvasId, {
+                type: 'bar',
+                data: {
+                    labels: ['A', 'B', 'C', 'D', 'F'],
+                    datasets: [{
+                        label: label,
+                        data: [dist.A, dist.B, dist.C, dist.D, dist.F],
+                        backgroundColor: ['#22c55e', '#06b6d4', '#f59e0b', '#ef4444', '#991b1b'],
+                        borderRadius: 6,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.3)' } },
+                        x: { ticks: { color: '#94a3b8', font: { weight: 'bold', size: 14 } }, grid: { display: false } },
+                    }
+                }
+            });
+        }
+
+        function radarChart(canvasId, labels, values) {
+            makeChart(canvasId, {
+                type: 'radar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Average',
+                        data: values,
+                        backgroundColor: 'rgba(99,102,241,0.15)',
+                        borderColor: '#6366f1',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#6366f1',
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        r: {
+                            beginAtZero: true, max: 100,
+                            ticks: { color: '#94a3b8', backdropColor: 'transparent', stepSize: 25 },
+                            grid: { color: 'rgba(51,65,85,0.3)' },
+                            pointLabels: { color: '#f1f5f9', font: { size: 11 } },
+                        }
+                    }
+                }
+            });
+        }
+
+        // ---- METRIC EXPLAINERS ----
+        const METRIC_EXPLAINERS = {
+            hiring_momentum: { name: 'Hiring Momentum', desc: 'Rate of new job postings vs 6-month average. High = aggressive growth.', formula: '(recent_postings / avg_postings) * 100', sources: 'BLS QCEW, Indeed, LinkedIn' },
+            web_presence: { name: 'Web Presence', desc: 'Online visibility via Tranco web rank. Top 100K = strong, 1M+ = weak.', formula: 'log_scale(tranco_rank)', sources: 'Tranco Top 1M list' },
+            employee_sentiment: { name: 'Employee Sentiment', desc: 'Glassdoor rating + review volume. Proxy for culture health.', formula: 'glassdoor_rating * review_weight', sources: 'Glassdoor' },
+            foot_traffic: { name: 'Foot Traffic', desc: 'Physical location activity patterns. Higher = more customer engagement.', formula: 'visit_count * recency_weight', sources: 'SafeGraph, Placer.ai' },
+            financial_health: { name: 'Financial Health', desc: 'Revenue growth, margin stability, cash position from SEC filings.', formula: 'weighted(revenue_growth, margin, cash_ratio)', sources: 'SEC 10-K, 10-Q' },
+            financial_trajectory: { name: 'Financial Trajectory', desc: 'Quarter-over-quarter trend in revenue and EBITDA.', formula: 'linear_regression(quarterly_financials)', sources: 'SEC EDGAR' },
+            leadership_stability: { name: 'Leadership Stability', desc: 'C-suite tenure and turnover rate. Frequent changes = risk.', formula: '(avg_tenure / turnover_rate) * 100', sources: 'Company websites, SEC proxy, LinkedIn' },
+            valuation_momentum: { name: 'Valuation Momentum', desc: 'Recent transaction multiples and comparable deal activity.', formula: 'trend(ev_ebitda_multiples)', sources: 'SEC filings, PitchBook comps' },
+            market_position: { name: 'Market Position', desc: 'Market share and competitive positioning within sector.', formula: 'revenue_rank_in_sector', sources: 'Census CBP, BLS QCEW, SEC' },
+            hold_period: { name: 'Hold Period', desc: 'Years since PE acquisition. Typical exit window is 5-7 years.', formula: 'years_since_acquisition', sources: 'SEC Form D, press releases' },
+            hiring_signal: { name: 'Hiring Signal', desc: 'Job posting velocity as leading indicator of growth or contraction.', formula: 'postings_trend(90d)', sources: 'Indeed, LinkedIn, BLS' },
+            affluence_density: { name: 'Affluence Density', desc: 'Concentration of high-income tax filers (>$100K AGI) per ZIP.', formula: 'pct_returns_100k_plus', sources: 'IRS SOI ZIP-level income data' },
+            discretionary_wealth: { name: 'Discretionary Wealth', desc: 'Capital gains + dividends per return — proxy for disposable income.', formula: '(cap_gains + dividends) / total_returns', sources: 'IRS SOI' },
+            market_size: { name: 'Market Size', desc: 'Total tax filers in ZIP — proxy for addressable population.', formula: 'total_returns', sources: 'IRS SOI' },
+            professional_density: { name: 'Professional Density', desc: 'Healthcare providers per capita — competitive landscape signal.', formula: 'nppes_providers / population', sources: 'NPPES, Census ACS' },
+            wealth_concentration: { name: 'Wealth Concentration', desc: 'Share of filers with AGI > $200K. Higher = more premium market.', formula: 'pct_returns_200k_plus', sources: 'IRS SOI' },
+            power_score: { name: 'Power Infrastructure', desc: 'Substation density, generation capacity, utility rates.', sources: 'EIA, HIFLD substations, NREL solar/wind' },
+            connectivity_score: { name: 'Network Connectivity', desc: 'Internet exchanges, carrier hotels, existing datacenters within range.', sources: 'PeeringDB, Epoch AI, FCC broadband' },
+            regulatory_score: { name: 'Regulatory Environment', desc: 'Permitting complexity, environmental compliance burden.', sources: 'EPA ECHO, EPA Envirofacts, NZA zoning' },
+            labor_score: { name: 'Labor Market', desc: 'Tech workforce availability, wage competitiveness, education levels.', sources: 'BLS QCEW, Census ACS education' },
+            risk_score: { name: 'Natural Hazard Risk', desc: 'Flood, seismic, wildfire, and hurricane exposure (lower risk = higher score).', sources: 'FEMA NFHL, USGS seismic, NOAA storms' },
+            cost_incentive_score: { name: 'Cost & Incentives', desc: 'Tax incentives, enterprise zones, utility cost competitiveness.', sources: 'Good Jobs First, State EDOs, EIA rates' },
+        };
+
+        function metricHelp(key) {
+            const m = METRIC_EXPLAINERS[key];
+            if (!m) return '';
+            return `<span class="metric-help">?<span class="metric-tooltip">
+                <strong>${m.name}</strong>${m.desc}
+                ${m.formula ? `<span class="mt-formula">${m.formula}</span>` : ''}
+                <span class="mt-sources">Sources: ${m.sources}</span>
+            </span></span>`;
+        }
+
+        // ---- Company Health Scores ----
+        let _healthLoaded = false;
+        async function loadHealthScores() {
+            const grade = document.getElementById('health-grade-filter')?.value || '';
+            const container = document.getElementById('health-table-container');
+            try {
+                const params = new URLSearchParams({ limit: '100' });
+                if (grade) params.set('grade', grade);
+                const r = await fetch(`${API}/health-scores/rankings?${params}`);
+                if (!r.ok) throw new Error(`${r.status}`);
+                const d = await r.json();
+                const rankings = d.rankings || [];
+                document.getElementById('health-count').textContent = `${rankings.length} companies`;
+
+                if (!rankings.length) {
+                    container.innerHTML = emptyState('📊', 'No health scores computed yet.',
+                        'Run <code>POST /health-scores/compute</code> to generate scores.');
+                    return;
+                }
+
+                // Charts (only on first full load)
+                if (!_healthLoaded) {
+                    gradeDistChart('chart-health-dist', rankings, 'Companies');
+                    const subKeys = Object.keys(rankings[0].sub_scores || {});
+                    const avgValues = subKeys.map(k => {
+                        const vals = rankings.map(r => r.sub_scores?.[k]).filter(v => v != null);
+                        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+                    });
+                    radarChart('chart-health-radar', subKeys.map(k => METRIC_EXPLAINERS[k]?.name || k), avgValues);
+                    _healthLoaded = true;
+                }
+
+                let html = `<table class="intel-table">
+                    <thead><tr>
+                        <th>#</th><th>Company</th><th>Score</th><th>Grade</th><th>Confidence</th>
+                        <th>Hiring ${metricHelp('hiring_momentum')}</th>
+                        <th>Web ${metricHelp('web_presence')}</th>
+                        <th>Sentiment ${metricHelp('employee_sentiment')}</th>
+                    </tr></thead><tbody>`;
+
+                for (const r of rankings) {
+                    const s = r.sub_scores || {};
+                    html += `<tr onclick="this.nextElementSibling.classList.toggle('open');" style="cursor:pointer;">
+                        <td>${r.rank}</td>
+                        <td style="font-weight:600;">${escapeHtml(r.company_name || 'Unknown')}</td>
+                        <td>${scoreBar(r.overall_score)}</td>
+                        <td>${gradeHtml(r.grade)}</td>
+                        <td style="color:var(--text-muted);">${(r.confidence * 100).toFixed(0)}%</td>
+                        <td>${s.hiring_momentum != null ? s.hiring_momentum.toFixed(1) : '--'}</td>
+                        <td>${s.web_presence != null ? s.web_presence.toFixed(1) : '--'}</td>
+                        <td>${s.employee_sentiment != null ? s.employee_sentiment.toFixed(1) : '--'}</td>
+                    </tr>
+                    <tr class="expand-row"><td colspan="8"><div class="expand-cell">
+                        <div class="sub-score-grid">
+                            ${Object.entries(s).map(([k, v]) => `
+                                <div class="sub-score-item">
+                                    <div class="sub-score-label">${METRIC_EXPLAINERS[k]?.name || k} ${metricHelp(k)}</div>
+                                    <div class="sub-score-value">${scoreBar(v)}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div></td></tr>`;
+                }
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = emptyState('📊', 'Could not load health scores.',
+                    `API returned an error. Run <code>POST /health-scores/compute</code> first.`);
+            }
+        }
+
+        // ---- Exit Readiness ----
+        let _exitLoaded = false;
+        async function loadExitReadiness() {
+            const grade = document.getElementById('exit-grade-filter')?.value || '';
+            const container = document.getElementById('exit-table-container');
+            try {
+                const params = new URLSearchParams({ limit: '100' });
+                if (grade) params.set('grade', grade);
+                const r = await fetch(`${API}/exit-readiness/rankings?${params}`);
+                if (!r.ok) throw new Error(`${r.status}`);
+                const d = await r.json();
+                const rankings = d.rankings || [];
+                document.getElementById('exit-count').textContent = `${rankings.length} companies`;
+
+                if (!rankings.length) {
+                    container.innerHTML = emptyState('🚪', 'No exit readiness scores yet.',
+                        'Run PE deep collection + <code>POST /exit-readiness/compute</code>.');
+                    return;
+                }
+
+                if (!_exitLoaded) {
+                    gradeDistChart('chart-exit-dist', rankings, 'Companies');
+                    const subKeys = Object.keys(rankings[0].sub_scores || {});
+                    const avgValues = subKeys.map(k => {
+                        const vals = rankings.map(r => r.sub_scores?.[k]).filter(v => v != null);
+                        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+                    });
+                    radarChart('chart-exit-radar', subKeys.map(k => METRIC_EXPLAINERS[k]?.name || k), avgValues);
+                    _exitLoaded = true;
+                }
+
+                let html = `<table class="intel-table">
+                    <thead><tr>
+                        <th>#</th><th>Company</th><th>PE Owner</th><th>Score</th><th>Grade</th>
+                        <th>Hold Yrs</th>
+                        <th>Financial ${metricHelp('financial_health')}</th>
+                        <th>Leadership ${metricHelp('leadership_stability')}</th>
+                    </tr></thead><tbody>`;
+
+                for (const r of rankings) {
+                    const s = r.sub_scores || {};
+                    html += `<tr onclick="this.nextElementSibling.classList.toggle('open');" style="cursor:pointer;">
+                        <td>${r.rank}</td>
+                        <td style="font-weight:600;">${escapeHtml(r.company_name || 'Unknown')}</td>
+                        <td style="color:var(--text-muted);">${escapeHtml(r.pe_owner || '--')}</td>
+                        <td>${scoreBar(r.overall_score)}</td>
+                        <td>${gradeHtml(r.grade)}</td>
+                        <td>${r.hold_years != null ? r.hold_years.toFixed(1) : '--'}</td>
+                        <td>${s.financial_health != null ? s.financial_health.toFixed(1) : '--'}</td>
+                        <td>${s.leadership_stability != null ? s.leadership_stability.toFixed(1) : '--'}</td>
+                    </tr>
+                    <tr class="expand-row"><td colspan="8"><div class="expand-cell">
+                        <div class="sub-score-grid">
+                            ${Object.entries(s).map(([k, v]) => `
+                                <div class="sub-score-item">
+                                    <div class="sub-score-label">${METRIC_EXPLAINERS[k]?.name || k} ${metricHelp(k)}</div>
+                                    <div class="sub-score-value">${scoreBar(v)}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        ${(r.strengths?.length || r.risks?.length) ? `
+                        <div style="display:flex;gap:1rem;margin-top:0.75rem;">
+                            ${r.strengths?.length ? `<div style="flex:1;"><div style="font-size:0.7rem;color:var(--success);text-transform:uppercase;margin-bottom:0.25rem;">Strengths</div>${r.strengths.map(s => `<div style="font-size:0.8rem;">+ ${escapeHtml(s)}</div>`).join('')}</div>` : ''}
+                            ${r.risks?.length ? `<div style="flex:1;"><div style="font-size:0.7rem;color:var(--error);text-transform:uppercase;margin-bottom:0.25rem;">Risks</div>${r.risks.map(s => `<div style="font-size:0.8rem;">- ${escapeHtml(s)}</div>`).join('')}</div>` : ''}
+                        </div>` : ''}
+                    </div></td></tr>`;
+                }
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = emptyState('🚪', 'Could not load exit readiness scores.',
+                    'API returned an error. Ensure PE data is collected first.');
+            }
+        }
+
+        // ---- ZIP Score Markets ----
+        let _zipLoaded = false;
+        async function loadZipScores() {
+            const state = document.getElementById('zip-state-filter')?.value || '';
+            const grade = document.getElementById('zip-grade-filter')?.value || '';
+            const container = document.getElementById('zip-table-container');
+            try {
+                const params = new URLSearchParams({ limit: '200' });
+                if (state) params.set('state', state);
+                if (grade) params.set('grade', grade);
+                const r = await fetch(`${API}/zip-scores/rankings?${params}`);
+                if (!r.ok) throw new Error(`${r.status}`);
+                const d = await r.json();
+                const rankings = d.rankings || [];
+                document.getElementById('zip-count').textContent = `${rankings.length} ZIP codes`;
+
+                if (!rankings.length) {
+                    container.innerHTML = emptyState('🏪', 'No ZIP scores computed yet.',
+                        'Run <code>POST /zip-scores/compute</code> after IRS SOI ingestion.');
+                    return;
+                }
+
+                // Populate state filter if not done
+                const stateSelect = document.getElementById('zip-state-filter');
+                if (stateSelect && stateSelect.options.length <= 1) {
+                    const states = [...new Set(rankings.map(r => r.state_abbr))].sort();
+                    states.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; stateSelect.appendChild(o); });
+                }
+
+                if (!_zipLoaded) {
+                    gradeDistChart('chart-zip-dist', rankings, 'ZIP Codes');
+
+                    // Top states by avg score
+                    const stateScores = {};
+                    rankings.forEach(r => {
+                        if (!stateScores[r.state_abbr]) stateScores[r.state_abbr] = [];
+                        stateScores[r.state_abbr].push(r.overall_score);
+                    });
+                    const stateAvgs = Object.entries(stateScores)
+                        .map(([s, vals]) => ({ state: s, avg: vals.reduce((a, b) => a + b, 0) / vals.length }))
+                        .sort((a, b) => b.avg - a.avg)
+                        .slice(0, 15);
+                    makeChart('chart-zip-states', {
+                        type: 'bar',
+                        data: {
+                            labels: stateAvgs.map(s => s.state),
+                            datasets: [{ label: 'Avg Score', data: stateAvgs.map(s => s.avg), backgroundColor: '#6366f1', borderRadius: 4 }]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                x: { beginAtZero: true, max: 100, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.3)' } },
+                                y: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+                            }
+                        }
+                    });
+                    _zipLoaded = true;
+                }
+
+                let html = `<table class="intel-table">
+                    <thead><tr>
+                        <th>#</th><th>ZIP</th><th>State</th><th>Score</th><th>Grade</th>
+                        <th>Affluence ${metricHelp('affluence_density')}</th>
+                        <th>Wealth ${metricHelp('discretionary_wealth')}</th>
+                        <th>Market ${metricHelp('market_size')}</th>
+                    </tr></thead><tbody>`;
+
+                for (const r of rankings) {
+                    const s = r.sub_scores || {};
+                    const m = r.raw_metrics || {};
+                    html += `<tr onclick="this.nextElementSibling.classList.toggle('open');" style="cursor:pointer;">
+                        <td>${r.rank}</td>
+                        <td style="font-weight:600;">${r.zip_code}</td>
+                        <td>${r.state_abbr}</td>
+                        <td>${scoreBar(r.overall_score)}</td>
+                        <td>${gradeHtml(r.grade)}</td>
+                        <td>${s.affluence_density != null ? s.affluence_density.toFixed(1) : '--'}</td>
+                        <td>${s.discretionary_wealth != null ? s.discretionary_wealth.toFixed(1) : '--'}</td>
+                        <td>${s.market_size != null ? s.market_size.toFixed(1) : '--'}</td>
+                    </tr>
+                    <tr class="expand-row"><td colspan="8"><div class="expand-cell">
+                        <div class="sub-score-grid">
+                            ${Object.entries(s).map(([k, v]) => `
+                                <div class="sub-score-item">
+                                    <div class="sub-score-label">${METRIC_EXPLAINERS[k]?.name || k} ${metricHelp(k)}</div>
+                                    <div class="sub-score-value">${scoreBar(v)}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        ${Object.keys(m).length ? `
+                        <div style="margin-top:0.75rem;">
+                            <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.375rem;">Raw Metrics</div>
+                            <div style="display:flex;flex-wrap:wrap;gap:0.75rem;">
+                                ${Object.entries(m).map(([k, v]) => `
+                                    <div style="background:var(--bg-input);padding:0.375rem 0.625rem;border-radius:4px;font-size:0.8rem;">
+                                        <span style="color:var(--text-muted);">${k.replace(/_/g, ' ')}:</span>
+                                        <span style="font-weight:600;">${typeof v === 'number' ? (v > 1000 ? v.toLocaleString() : v.toFixed(1)) : v}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>` : ''}
+                    </div></td></tr>`;
+                }
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = emptyState('🏪', 'Could not load ZIP scores.',
+                    'Run IRS SOI ingestion first, then <code>POST /zip-scores/compute</code>.');
+            }
+        }
+
+        // ---- Datacenter Site Rankings ----
+        let _dcLoaded = false;
+        async function loadDcRankings() {
+            const state = document.getElementById('dc-state-filter')?.value || '';
+            const grade = document.getElementById('dc-grade-filter')?.value || '';
+            const container = document.getElementById('dc-table-container');
+            try {
+                const params = new URLSearchParams({ limit: '100' });
+                if (state) params.set('state', state);
+                if (grade) params.set('grade', grade);
+                const r = await fetch(`${API}/datacenter-sites/rankings?${params}`);
+                if (!r.ok) throw new Error(`${r.status}`);
+                const d = await r.json();
+                const counties = d.counties || [];
+                document.getElementById('dc-count').textContent = `${counties.length} of ${d.total} counties`;
+
+                if (!counties.length) {
+                    container.innerHTML = emptyState('🏗️', 'No datacenter site scores yet.',
+                        'Run <code>POST /datacenter-sites/score-counties</code> after site intel collection.');
+                    return;
+                }
+
+                // Populate state filter if not done
+                const stateSelect = document.getElementById('dc-state-filter');
+                if (stateSelect && stateSelect.options.length <= 1) {
+                    const states = [...new Set(counties.map(c => c.state))].sort();
+                    states.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; stateSelect.appendChild(o); });
+                }
+
+                if (!_dcLoaded) {
+                    // Grade distribution
+                    gradeDistChart('chart-dc-dist', counties, 'Counties');
+
+                    // Domain radar - averages across all counties
+                    const domainKeys = ['power_score', 'connectivity_score', 'regulatory_score', 'labor_score', 'risk_score', 'cost_incentive_score'];
+                    const domainLabels = domainKeys.map(k => METRIC_EXPLAINERS[k]?.name || k.replace(/_score$/, ''));
+                    const domainAvgs = domainKeys.map(k => {
+                        const vals = counties.map(c => c[k]).filter(v => v != null);
+                        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+                    });
+                    radarChart('chart-dc-radar', domainLabels, domainAvgs);
+                    _dcLoaded = true;
+                }
+
+                let html = `<table class="intel-table">
+                    <thead><tr>
+                        <th>Rank</th><th>County</th><th>State</th><th>Score</th><th>Grade</th>
+                        <th>Power ${metricHelp('power_score')}</th>
+                        <th>Connect ${metricHelp('connectivity_score')}</th>
+                        <th>Regulatory ${metricHelp('regulatory_score')}</th>
+                        <th>Labor ${metricHelp('labor_score')}</th>
+                        <th>Risk ${metricHelp('risk_score')}</th>
+                        <th>Incentives ${metricHelp('cost_incentive_score')}</th>
+                    </tr></thead><tbody>`;
+
+                for (const c of counties) {
+                    html += `<tr>
+                        <td>${c.national_rank || '--'}</td>
+                        <td style="font-weight:600;">${escapeHtml(c.county_name || c.county_fips)}</td>
+                        <td>${c.state}</td>
+                        <td>${scoreBar(c.overall_score)}</td>
+                        <td>${gradeHtml(c.grade)}</td>
+                        <td>${c.power_score != null ? c.power_score.toFixed(1) : '--'}</td>
+                        <td>${c.connectivity_score != null ? c.connectivity_score.toFixed(1) : '--'}</td>
+                        <td>${c.regulatory_score != null ? c.regulatory_score.toFixed(1) : '--'}</td>
+                        <td>${c.labor_score != null ? c.labor_score.toFixed(1) : '--'}</td>
+                        <td>${c.risk_score != null ? c.risk_score.toFixed(1) : '--'}</td>
+                        <td>${c.cost_incentive_score != null ? c.cost_incentive_score.toFixed(1) : '--'}</td>
+                    </tr>`;
+                }
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = emptyState('🏗️', 'Could not load datacenter rankings.',
+                    'Run site intel collection + <code>POST /datacenter-sites/score-counties</code>.');
+            }
+        }
 
     </script>
 </body>
