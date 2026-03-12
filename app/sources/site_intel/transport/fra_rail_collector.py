@@ -115,24 +115,19 @@ class FRARailCollector(BaseCollector):
         }
 
     async def collect(self, config: CollectionConfig) -> CollectionResult:
-        """Collect rail network data via ArcGIS pagination."""
-        all_records = []
-        errors = 0
+        """Collect rail network data with state-level concurrency."""
         states = config.states if config.states else list(STATE_FIPS.keys())
 
-        for i, state in enumerate(states):
+        async def _collect_one(state: str):
             fips = STATE_FIPS.get(state)
             if not fips:
-                continue
+                return []
+            return await self._collect_state_rail(state, fips, config)
 
-            self.update_progress(i, len(states), f"Collecting rail data for {state}")
-
-            try:
-                records = await self._collect_state_rail(state, fips, config)
-                all_records.extend(records)
-            except Exception as e:
-                logger.warning(f"Failed to collect rail for {state}: {e}")
-                errors += 1
+        # Use collect_states_concurrent for 4x speedup
+        all_records = await self.collect_states_concurrent(
+            states, _collect_one, max_concurrent=4
+        )
 
         # Insert records
         inserted = 0
