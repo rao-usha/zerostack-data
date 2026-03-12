@@ -56,6 +56,47 @@ def advance_watermark(
     logger.info(f"Advanced watermark for {source} to {completed_at}")
 
 
+def get_all_watermarks(db: Session, domain: str = None) -> list:
+    """
+    List all watermarks, optionally filtered by domain prefix.
+
+    Returns list of dicts with source, last_success_at, last_job_id.
+    """
+    query = db.query(SourceWatermark)
+    if domain:
+        query = query.filter(SourceWatermark.source.ilike(f"{domain}%"))
+    rows = query.order_by(SourceWatermark.source).all()
+    return [
+        {
+            "source": r.source,
+            "last_success_at": r.last_success_at.isoformat() if r.last_success_at else None,
+            "last_job_id": r.last_job_id,
+        }
+        for r in rows
+    ]
+
+
+def clear_watermark(
+    db: Session, domain: str, source: str, state: str = None
+) -> bool:
+    """
+    Clear a watermark to force full re-sync on next collection.
+
+    Uses domain/source as a combined key matching the source column.
+    """
+    key = f"{domain}:{source}" if source else domain
+    row = db.query(SourceWatermark).filter(SourceWatermark.source == key).first()
+    if not row:
+        # Try just source as-is
+        row = db.query(SourceWatermark).filter(SourceWatermark.source == source).first()
+    if not row:
+        return False
+    db.delete(row)
+    db.commit()
+    logger.info(f"Cleared watermark for {key}")
+    return True
+
+
 def inject_incremental_from_watermark(
     config: Dict[str, Any],
     source: str,

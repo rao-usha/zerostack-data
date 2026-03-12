@@ -909,6 +909,101 @@
         .intel-empty-hint { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; }
         .intel-empty-hint code { background: var(--bg-input); padding: 0.125rem 0.375rem; border-radius: 4px; font-size: 0.75rem; }
 
+        /* ===== Data Quality Tab ===== */
+        .dq-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .dq-summary-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; text-align: center; }
+        .dq-summary-card .dq-val { font-size: 2rem; font-weight: 700; }
+        .dq-summary-card .dq-lbl { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.25rem; }
+        .dq-val.critical { color: var(--error); }
+        .dq-val.high { color: #f97316; }
+        .dq-val.open { color: var(--primary); }
+        .dq-val.autofix { color: var(--success); }
+
+        .dq-chart-row { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: start; }
+        .dq-chart-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+        .dq-chart-card .card-title { margin-bottom: 0.75rem; }
+
+        .dq-toolbar { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }
+        .dq-toolbar select, .dq-toolbar input {
+            padding: 0.5rem 0.75rem; background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: 6px; color: var(--text); font-size: 0.8rem;
+        }
+        .dq-toolbar select:focus, .dq-toolbar input:focus { outline: none; border-color: var(--primary); }
+        .dq-toolbar input::placeholder { color: var(--text-muted); }
+
+        .dq-table { width: 100%; border-collapse: collapse; }
+        .dq-table th {
+            text-align: left; padding: 0.625rem 0.5rem; font-size: 0.7rem;
+            color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border);
+            font-weight: 600; letter-spacing: 0.03em;
+        }
+        .dq-table td {
+            padding: 0.625rem 0.5rem; border-bottom: 1px solid rgba(51,65,85,0.4);
+            font-size: 0.85rem; vertical-align: top;
+        }
+        .dq-table tbody tr:hover { background: rgba(99,102,241,0.06); }
+
+        .dq-badge {
+            display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px;
+            font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .dq-badge.critical { background: rgba(239,68,68,0.15); color: var(--error); }
+        .dq-badge.high { background: rgba(249,115,22,0.15); color: #f97316; }
+        .dq-badge.medium { background: rgba(245,158,11,0.15); color: var(--warning); }
+        .dq-badge.low { background: rgba(59,130,246,0.15); color: #3b82f6; }
+
+        .dq-cat-pill {
+            display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px;
+            font-size: 0.7rem; background: var(--bg-input); color: var(--text-muted);
+        }
+        .dq-cat-pill.missing_data { background: rgba(239,68,68,0.1); color: #f87171; }
+        .dq-cat-pill.stale_data { background: rgba(245,158,11,0.1); color: #fbbf24; }
+        .dq-cat-pill.low_coverage { background: rgba(249,115,22,0.1); color: #fb923c; }
+        .dq-cat-pill.schema_drift { background: rgba(168,85,247,0.1); color: #a855f7; }
+        .dq-cat-pill.cross_source_mismatch { background: rgba(236,72,153,0.1); color: #ec4899; }
+        .dq-cat-pill.enrichment_opportunity { background: rgba(34,197,94,0.1); color: #4ade80; }
+        .dq-cat-pill.anomaly { background: rgba(59,130,246,0.1); color: #60a5fa; }
+        .dq-cat-pill.orchestration { background: rgba(6,182,212,0.1); color: var(--accent); }
+        .dq-cat-pill.data_quality { background: rgba(99,102,241,0.1); color: var(--primary); }
+
+        .dq-actions { display: flex; gap: 0.375rem; }
+        .dq-btn-apply {
+            padding: 0.25rem 0.5rem; border-radius: 5px; font-size: 0.7rem; cursor: pointer;
+            background: rgba(34,197,94,0.15); color: var(--success); border: 1px solid rgba(34,197,94,0.3);
+        }
+        .dq-btn-apply:hover { background: rgba(34,197,94,0.25); }
+        .dq-btn-dismiss {
+            padding: 0.25rem 0.5rem; border-radius: 5px; font-size: 0.7rem; cursor: pointer;
+            background: var(--bg-input); color: var(--text-muted); border: 1px solid var(--border);
+        }
+        .dq-btn-dismiss:hover { background: var(--border); }
+
+        .dq-expand-row td { padding: 0; }
+        .dq-expand-content {
+            background: var(--bg); border-top: 1px solid rgba(51,65,85,0.3);
+            padding: 1rem 1.5rem; font-size: 0.8rem; animation: epSlideDown 0.2s ease-out;
+        }
+        .dq-expand-content pre {
+            background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px;
+            padding: 0.75rem; font-size: 0.75rem; overflow-x: auto; white-space: pre-wrap;
+            word-break: break-word; color: var(--text-muted); margin-top: 0.5rem; line-height: 1.5;
+        }
+        .dq-expand-content .dq-fix-label { font-weight: 600; color: var(--accent); margin-top: 0.75rem; display: block; }
+
+        .dq-load-more { display: flex; justify-content: center; margin-top: 1rem; }
+
+        .dq-run-btn {
+            padding: 0.5rem 1rem; background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.3);
+            border-radius: 8px; color: var(--accent); cursor: pointer; font-size: 0.8rem; font-weight: 600;
+        }
+        .dq-run-btn:hover { background: rgba(6,182,212,0.25); }
+        .dq-run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        @media (max-width: 900px) {
+            .dq-summary { grid-template-columns: repeat(2, 1fr); }
+            .dq-chart-row { grid-template-columns: 1fr; }
+        }
+
         /* ===== Visualizations Tab ===== */
         .viz-selector {
             display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;
@@ -968,6 +1063,71 @@
             display: flex; align-items: center; justify-content: center;
             min-height: 400px; color: var(--text-muted); font-size: 0.9rem;
         }
+
+        /* ===== Reports Manager ===== */
+        .reports-toolbar { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+        .reports-toolbar select { padding: 0.4rem 0.6rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.8rem; }
+        .reports-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1rem;
+        }
+        .report-card {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            transition: border-color 0.15s;
+        }
+        .report-card:hover { border-color: var(--primary); }
+        .report-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
+        .report-card-title { font-size: 0.95rem; font-weight: 600; color: var(--text); word-break: break-word; }
+        .report-card-meta { font-size: 0.75rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 0.25rem; }
+        .report-card-meta span { display: flex; align-items: center; gap: 0.35rem; }
+        .report-status { padding: 0.15rem 0.55rem; border-radius: 10px; font-size: 0.7rem; font-weight: 600; text-transform: capitalize; }
+        .report-status.complete { background: rgba(34,197,94,0.15); color: var(--success); }
+        .report-status.generating { background: rgba(6,182,212,0.15); color: var(--accent); }
+        .report-status.failed { background: rgba(239,68,68,0.15); color: var(--error); }
+        .report-status.pending { background: rgba(148,163,184,0.15); color: var(--text-muted); }
+        .report-template-pill { padding: 0.15rem 0.55rem; border-radius: 10px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; background: rgba(99,102,241,0.15); color: #818cf8; }
+        .report-format-pill { padding: 0.15rem 0.45rem; border-radius: 6px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; background: rgba(251,146,60,0.15); color: #fb923c; }
+        .report-card-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+        .report-card-actions .btn { padding: 0.35rem 0.75rem; font-size: 0.75rem; }
+        .btn-danger { background: rgba(239,68,68,0.15); color: var(--error); border: 1px solid rgba(239,68,68,0.3); }
+        .btn-danger:hover { background: rgba(239,68,68,0.3); }
+        .btn-view { background: rgba(34,197,94,0.15); color: var(--success); border: 1px solid rgba(34,197,94,0.3); }
+        .btn-view:hover { background: rgba(34,197,94,0.3); }
+        .reports-empty { text-align: center; padding: 3rem; color: var(--text-muted); }
+        .reports-empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+        .report-generate-form { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; }
+        .report-generate-form .jobs-launcher-field { flex: 1; min-width: 180px; }
+
+        /* Report preview modal */
+        .report-modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); z-index: 2000;
+            display: none; align-items: center; justify-content: center;
+        }
+        .report-modal-overlay.visible {
+            display: flex;
+        }
+        .report-modal {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 12px; width: 95vw; height: 90vh;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .report-modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+        }
+        .report-modal-header h3 { font-size: 1rem; font-weight: 600; }
+        .report-modal-close { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; padding: 0.25rem 0.5rem; }
+        .report-modal-close:hover { color: var(--text); }
+        .report-modal-body { flex: 1; overflow: hidden; }
+        .report-modal-body iframe { width: 100%; height: 100%; border: none; background: #fff; }
     </style>
 </head>
 <body>
@@ -1004,6 +1164,8 @@
         <button class="tab" onclick="showTab('intel')">🧠 Intelligence</button>
         <button class="tab" onclick="showTab('jobs')">🚀 Jobs</button>
         <button class="tab" onclick="showTab('viz')">🗺️ Visualizations</button>
+        <button class="tab" onclick="showTab('reports')">📄 Reports</button>
+        <button class="tab" onclick="showTab('dq')">🔍 Data Quality</button>
         <button class="tab" onclick="showTab('settings')">⚙️ Settings</button>
     </nav>
 
@@ -1235,8 +1397,12 @@
                         <option value="lp">LP</option>
                         <option value="fo">Family Office</option>
                         <option value="agentic">Agentic</option>
+                        <option value="foot_traffic">Foot Traffic</option>
                         <option value="ingestion">Ingestion</option>
                     </select>
+                    <input type="text" id="jobs-hist-search" placeholder="Search jobs..." onkeydown="if(event.key==='Enter')jobsLoadHistory()" style="padding:0.4rem 0.6rem;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.8rem;width:140px;">
+                    <input type="date" id="jobs-hist-after" onchange="jobsLoadHistory()" title="Created after" style="padding:0.35rem 0.4rem;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.75rem;">
+                    <input type="date" id="jobs-hist-before" onchange="jobsLoadHistory()" title="Created before" style="padding:0.35rem 0.4rem;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.75rem;">
                     <button class="btn btn-secondary" onclick="jobsLoadHistory()" style="padding:0.4rem 1rem;font-size:0.8rem;">Refresh</button>
                 </div>
                 <div id="jobs-summary"></div>
@@ -1245,6 +1411,63 @@
                 </div>
                 <div id="jobs-load-more" class="jobs-load-more hidden">
                     <button class="btn btn-secondary" onclick="jobsLoadMore()">Load More</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Tab -->
+        <div id="tab-reports" class="hidden">
+            <div class="tab-intro">
+                <span class="tab-intro-icon">📄</span>
+                <div class="tab-intro-text">
+                    <strong>Report Manager.</strong>
+                    Generate, preview, download, and manage HTML reports. View interactive reports inline or download for sharing.
+                </div>
+            </div>
+
+            <!-- Generate New Report -->
+            <div class="card">
+                <h2 class="card-title">Generate Report</h2>
+                <div class="report-generate-form">
+                    <div class="jobs-launcher-field">
+                        <label>Template</label>
+                        <select id="report-template-select">
+                            <option value="">Loading templates...</option>
+                        </select>
+                    </div>
+                    <div class="jobs-launcher-field">
+                        <label>Format</label>
+                        <select id="report-format-select">
+                            <option value="html">HTML</option>
+                            <option value="excel">Excel</option>
+                            <option value="pdf">PDF</option>
+                            <option value="pptx">PowerPoint</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="reportsGenerate()">Generate</button>
+                </div>
+                <div id="report-generate-result"></div>
+            </div>
+
+            <!-- Report List -->
+            <div class="card">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+                    <h2 class="card-title" style="margin:0;">Generated Reports</h2>
+                    <button class="btn btn-secondary" onclick="reportsLoad()" style="padding:0.35rem 0.75rem;font-size:0.8rem;">Refresh</button>
+                </div>
+                <div class="reports-toolbar">
+                    <select id="report-filter-template" onchange="reportsLoad()">
+                        <option value="">All Templates</option>
+                    </select>
+                    <select id="report-filter-status" onchange="reportsLoad()">
+                        <option value="">All Statuses</option>
+                        <option value="complete">Complete</option>
+                        <option value="generating">Generating</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+                <div id="reports-list">
+                    <div class="loading">Loading reports...</div>
                 </div>
             </div>
         </div>
@@ -1388,6 +1611,74 @@
                 </div>
             </div>
         </div>
+        <!-- Data Quality Tab -->
+        <div id="tab-dq" class="hidden">
+            <div class="tab-intro">
+                <span class="tab-intro-icon">🔍</span>
+                <div class="tab-intro-text">
+                    <strong>Data Quality Review.</strong>
+                    Automated recommendations for missing data, stale records, schema drift, cross-source mismatches,
+                    and enrichment opportunities across all 28+ sources.
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="dq-summary" id="dq-summary-cards">
+                <div class="dq-summary-card"><div class="dq-val open" id="dq-total-open">--</div><div class="dq-lbl">Total Open</div></div>
+                <div class="dq-summary-card"><div class="dq-val critical" id="dq-critical">--</div><div class="dq-lbl">Critical</div></div>
+                <div class="dq-summary-card"><div class="dq-val high" id="dq-high">--</div><div class="dq-lbl">High Priority</div></div>
+                <div class="dq-summary-card"><div class="dq-val autofix" id="dq-autofix">--</div><div class="dq-lbl">Auto-fixable</div></div>
+            </div>
+
+            <!-- Donut + Filter area -->
+            <div class="dq-chart-row">
+                <div class="dq-chart-card">
+                    <div class="card-title">By Category</div>
+                    <canvas id="dq-donut" width="260" height="260"></canvas>
+                </div>
+                <div class="dq-chart-card">
+                    <div class="card-title">Recommendations</div>
+                    <!-- Filter Toolbar -->
+                    <div class="dq-toolbar">
+                        <select id="dq-filter-priority" onchange="dqApplyFilters()">
+                            <option value="">All Priorities</option>
+                            <option value="critical">Critical</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                        <select id="dq-filter-category" onchange="dqApplyFilters()">
+                            <option value="">All Categories</option>
+                            <option value="missing_data">Missing Data</option>
+                            <option value="stale_data">Stale Data</option>
+                            <option value="low_coverage">Low Coverage</option>
+                            <option value="schema_drift">Schema Drift</option>
+                            <option value="cross_source_mismatch">Cross-Source Mismatch</option>
+                            <option value="enrichment_opportunity">Enrichment Opportunity</option>
+                            <option value="anomaly">Anomaly</option>
+                            <option value="orchestration">Orchestration</option>
+                            <option value="data_quality">Data Quality</option>
+                        </select>
+                        <select id="dq-filter-status" onchange="dqApplyFilters()">
+                            <option value="open">Open</option>
+                            <option value="applied">Applied</option>
+                            <option value="dismissed">Dismissed</option>
+                            <option value="">All Statuses</option>
+                        </select>
+                        <input type="text" id="dq-filter-source" placeholder="Source..." onchange="dqApplyFilters()" style="width:100px;">
+                        <input type="text" id="dq-filter-table" placeholder="Table..." onchange="dqApplyFilters()" style="width:100px;">
+                        <button class="dq-run-btn" id="dq-run-btn" onclick="dqRunAnalysis()">Run Analysis</button>
+                    </div>
+                    <!-- Table -->
+                    <div id="dq-table-container">
+                        <div class="loading">Loading recommendations...</div>
+                    </div>
+                    <div class="dq-load-more" id="dq-load-more" style="display:none;">
+                        <button class="btn btn-secondary" onclick="dqLoadMore()">Load more...</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <footer class="footer">
@@ -1444,19 +1735,55 @@
             if (cb) cb();
         }
 
-        // ===== Tab Navigation =====
+        // ===== Tab Navigation with URL routing =====
+        const TAB_ROUTES = ['sources', 'intel', 'jobs', 'viz', 'reports', 'dq', 'settings'];
         let _currentTab = 'sources';
-        function showTab(tab) {
+
+        function showTab(tab, pushState) {
+            if (!TAB_ROUTES.includes(tab)) tab = 'sources';
             document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.content > div').forEach(t => t.classList.add('hidden'));
-            event.target.classList.add('active');
+            // Highlight the correct tab button
+            const tabs = document.querySelectorAll('.tabs .tab');
+            const idx = TAB_ROUTES.indexOf(tab);
+            if (idx >= 0 && tabs[idx]) tabs[idx].classList.add('active');
             document.getElementById('tab-' + tab).classList.remove('hidden');
             _currentTab = tab;
             if (tab === 'settings') loadApiKeys();
             if (tab === 'jobs') jobsInitialize();
             if (tab === 'intel') intelInitialize();
             if (tab === 'viz') vizInitialize();
+            if (tab === 'reports') reportsInitialize();
+            if (tab === 'dq') dqInitialize();
+            // Update URL
+            if (pushState !== false) {
+                const path = tab === 'sources' ? '/' : '/' + tab;
+                history.pushState({ tab }, '', path);
+            }
         }
+
+        // Handle browser back/forward
+        window.addEventListener('popstate', function(e) {
+            const tab = (e.state && e.state.tab) ? e.state.tab : getTabFromPath();
+            showTab(tab, false);
+        });
+
+        // Read tab from URL path
+        function getTabFromPath() {
+            const path = location.pathname.replace(/^\/+|\/+$/g, '');
+            if (!path || path === 'index.html') return 'sources';
+            // Map common aliases
+            const aliases = { intelligence: 'intel', visualizations: 'viz', dataquality: 'dq', 'data-quality': 'dq' };
+            const mapped = aliases[path] || path;
+            return TAB_ROUTES.includes(mapped) ? mapped : 'sources';
+        }
+
+        // Initialize from URL on page load
+        (function() {
+            const tab = getTabFromPath();
+            _currentTab = tab;
+            showTab(tab, false);
+        })();
 
         // ===== Health Check =====
         fetch('/api/v1/deals')
@@ -6564,11 +6891,28 @@
         // Track active batch filter for "View Batch" links
         let _batchRunFilter = null;
 
+        function _jobsFilterParams() {
+            const statusFilter = document.getElementById('jobs-hist-status')?.value || '';
+            const typeFilter = document.getElementById('jobs-hist-type')?.value || '';
+            const search = document.getElementById('jobs-hist-search')?.value?.trim() || '';
+            const after = document.getElementById('jobs-hist-after')?.value || '';
+            const before = document.getElementById('jobs-hist-before')?.value || '';
+            let params = '';
+            if (statusFilter) params += `&status=${statusFilter}`;
+            if (typeFilter === 'batch') {
+                params += `&trigger=batch`;
+            } else if (typeFilter) {
+                params += `&job_type=${typeFilter}`;
+            }
+            if (search) params += `&search=${encodeURIComponent(search)}`;
+            if (after) params += `&created_after=${after}T00:00:00`;
+            if (before) params += `&created_before=${before}T23:59:59`;
+            return params;
+        }
+
         async function jobsLoadHistory() {
             _jobsHistoryOffset = 0;
             _jobsHistory = [];
-            const statusFilter = document.getElementById('jobs-hist-status')?.value || '';
-            const typeFilter = document.getElementById('jobs-hist-type')?.value || '';
 
             // If filtering by batch_run_id specifically
             if (_batchRunFilter) {
@@ -6576,13 +6920,7 @@
                 return;
             }
 
-            let url = `${API}/job-queue/history?limit=50&offset=0`;
-            if (statusFilter) url += `&status=${statusFilter}`;
-            if (typeFilter === 'batch') {
-                url += `&trigger=batch`;
-            } else if (typeFilter) {
-                url += `&job_type=${typeFilter}`;
-            }
+            let url = `${API}/job-queue/history?limit=50&offset=0` + _jobsFilterParams();
 
             try {
                 const resp = await fetch(url);
@@ -6604,15 +6942,7 @@
         }
 
         async function jobsLoadMore() {
-            const statusFilter = document.getElementById('jobs-hist-status')?.value || '';
-            const typeFilter = document.getElementById('jobs-hist-type')?.value || '';
-            let url = `${API}/job-queue/history?limit=50&offset=${_jobsHistoryOffset}`;
-            if (statusFilter) url += `&status=${statusFilter}`;
-            if (typeFilter === 'batch') {
-                url += `&trigger=batch`;
-            } else if (typeFilter) {
-                url += `&job_type=${typeFilter}`;
-            }
+            let url = `${API}/job-queue/history?limit=50&offset=${_jobsHistoryOffset}` + _jobsFilterParams();
 
             try {
                 const resp = await fetch(url);
@@ -6629,12 +6959,48 @@
         function jobsRenderHistorySummary(summary) {
             const el = document.getElementById('jobs-summary');
             if (!el) return;
-            el.innerHTML = `<div class="jobs-summary">
+            let html = `<div class="jobs-summary">
                 <span class="jobs-summary-item running">Running: ${summary.running || 0}</span>
                 <span class="jobs-summary-item pending">Pending: ${summary.pending || 0}</span>
                 <span class="jobs-summary-item success">Success: ${summary.success || 0}</span>
-                <span class="jobs-summary-item failed">Failed: ${summary.failed || 0}</span>
-            </div>`;
+                <span class="jobs-summary-item failed">Failed: ${summary.failed || 0}</span>`;
+            if (summary.worker_count > 0) {
+                html += `<span class="jobs-summary-item" style="background:rgba(99,102,241,0.15);color:var(--accent);" title="${(summary.active_workers||[]).join(', ')}">Workers: ${summary.worker_count}</span>`;
+            }
+            html += `</div>`;
+            // by_type breakdown
+            if (summary.by_type && Object.keys(summary.by_type).length > 0) {
+                html += `<div class="jobs-summary" style="margin-top:0.35rem;">`;
+                const typeColors = {ingestion:'#6366f1',site_intel:'#f59e0b',people:'#22c55e',pe:'#ec4899',lp:'#06b6d4',agentic:'#a855f7',fo:'#f97316',foot_traffic:'#14b8a6'};
+                for (const [t, c] of Object.entries(summary.by_type)) {
+                    const color = typeColors[t] || 'var(--text-muted)';
+                    html += `<span class="jobs-summary-item" style="background:${color}22;color:${color};font-size:0.72rem;">${t}: ${c}</span>`;
+                }
+                html += `</div>`;
+            }
+            el.innerHTML = html;
+        }
+
+        function _domainDetailBrief(dd) {
+            if (!dd) return '-';
+            // Pick the most meaningful metric to show inline
+            if (dd.people_found != null) return `${dd.people_found} found`;
+            if (dd.companies_found != null) return `${dd.companies_found} companies`;
+            if (dd.locations_found != null) return `${dd.locations_found} locations`;
+            if (dd.completed_lps != null && dd.total_lps != null) return `${dd.completed_lps}/${dd.total_lps} LPs`;
+            // Fallback: show first numeric value
+            for (const [k, v] of Object.entries(dd)) {
+                if (typeof v === 'number') return `${v} ${k.replace(/_/g, ' ')}`;
+            }
+            return '-';
+        }
+
+        function _domainDetailRows(dd) {
+            if (!dd) return '';
+            return Object.entries(dd)
+                .filter(([_, v]) => v != null)
+                .map(([k, v]) => `<div class="detail-row"><span class="detail-label">${k.replace(/_/g, ' ')}:</span>${typeof v === 'number' ? v.toLocaleString() : escapeHtml(String(v))}</div>`)
+                .join('');
         }
 
         function jobsRenderHistoryTable() {
@@ -6683,7 +7049,7 @@
                     <td><span class="job-type-pill ${typeCls}">${escapeHtml(job.job_type)}</span>${batchBadge}${retryInfo}</td>
                     <td><span class="job-status-badge ${statusCls}">${escapeHtml(job.status)}</span></td>
                     <td>${formatDuration(job.duration_seconds)}</td>
-                    <td>${job.rows_inserted != null ? job.rows_inserted.toLocaleString() : '-'}</td>
+                    <td>${job.rows_inserted != null ? job.rows_inserted.toLocaleString() : (job.domain_detail ? _domainDetailBrief(job.domain_detail) : '-')}</td>
                     <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${job.error_message ? 'var(--error)' : 'var(--text-muted)'};">${errorSnip}</td>
                     <td style="font-size:0.8rem;color:var(--text-muted);">${started}</td>
                     <td style="white-space:nowrap;">${actions}</td>
@@ -6699,6 +7065,7 @@
                             ${job.progress_message ? `<div class="detail-row"><span class="detail-label">Progress:</span>${escapeHtml(job.progress_message)}</div>` : ''}
                             ${job.retry_count > 0 ? `<div class="detail-row"><span class="detail-label">Retries:</span>${job.retry_count}/${job.max_retries}</div>` : ''}
                             ${job.error_message ? `<div class="detail-row"><span class="detail-label">Error:</span><span style="color:var(--error);">${escapeHtml(job.error_message)}</span></div>` : ''}
+                            ${job.domain_detail ? `<div style="margin:0.4rem 0 0.2rem;font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Domain Detail</div>${_domainDetailRows(job.domain_detail)}` : ''}
                             <div class="detail-row"><span class="detail-label">Payload:</span></div>
                             <pre>${escapeHtml(JSON.stringify(job.payload, null, 2))}</pre>
                         </div>
@@ -7406,6 +7773,1074 @@
             }
         }
 
+        // ===== Visualizations Tab =====
+        let _vizInitialized = false;
+        let _mapData = null, _mapSvg = null;
+        let _bubbleData = null, _bubbleSvg = null;
+        let _sunburstData = null;
+        let _forceData = null, _forceSim = null;
+
+        function vizInitialize() {
+            if (_vizInitialized) return;
+            _vizInitialized = true;
+            showViz('map');
+        }
+
+        function showViz(name) {
+            document.querySelectorAll('.viz-panel').forEach(p => {
+                p.classList.remove('viz-active');
+                p.classList.add('hidden');
+            });
+            document.querySelectorAll('.viz-btn').forEach(b => b.classList.remove('active'));
+            const panel = document.getElementById('viz-' + name);
+            if (panel) {
+                panel.classList.remove('hidden');
+                panel.classList.add('viz-active');
+            }
+            if (event && event.target) event.target.classList.add('active');
+
+            if (name === 'map') loadMapViz();
+            if (name === 'bubble') loadBubbleData();
+            if (name === 'sunburst') loadSunburstViz();
+            if (name === 'force') loadForceViz();
+        }
+
+        // ── Shared tooltip helper ──
+        function vizTip(tipEl, html, event) {
+            tipEl.innerHTML = html;
+            tipEl.classList.add('visible');
+            const rect = tipEl.parentElement.getBoundingClientRect();
+            tipEl.style.left = (event.clientX - rect.left + 14) + 'px';
+            tipEl.style.top  = (event.clientY - rect.top - 10) + 'px';
+        }
+        function vizTipHide(tipEl) { tipEl.classList.remove('visible'); }
+
+        // ═══════════════════════════════════════════════════════════════
+        //  VIZ 1: CHOROPLETH MAP — Med-Spa Market Attractiveness
+        // ═══════════════════════════════════════════════════════════════
+        const US_TOPO_URL = 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json';
+        const STATE_FIPS_TO_ABBR = {
+            '01':'AL','02':'AK','04':'AZ','05':'AR','06':'CA','08':'CO','09':'CT','10':'DE',
+            '11':'DC','12':'FL','13':'GA','15':'HI','16':'ID','17':'IL','18':'IN','19':'IA',
+            '20':'KS','21':'KY','22':'LA','23':'ME','24':'MD','25':'MA','26':'MI','27':'MN',
+            '28':'MS','29':'MO','30':'MT','31':'NE','32':'NV','33':'NH','34':'NJ','35':'NM',
+            '36':'NY','37':'NC','38':'ND','39':'OH','40':'OK','41':'OR','42':'PA','44':'RI',
+            '45':'SC','46':'SD','47':'TN','48':'TX','49':'UT','50':'VT','51':'VA','53':'WA',
+            '54':'WV','55':'WI','56':'WY'
+        };
+
+        async function loadMapViz() {
+            const container = document.getElementById('map-container');
+            if (!container) return;
+            if (_mapData) { updateMap(); return; }
+            container.innerHTML = '<div class="viz-loading">Loading market map...</div>';
+
+            try {
+                const [topoRes, dataRes] = await Promise.all([
+                    fetch(US_TOPO_URL),
+                    fetch(API + '/medspa-discovery/market-map?limit_per_state=3')
+                ]);
+                const topo = await topoRes.json();
+                const data = await dataRes.json();
+
+                // Build state lookup: abbr → stats
+                _mapData = {};
+                (data.states || []).forEach(s => {
+                    _mapData[s.state] = s;
+                });
+
+                container.innerHTML = '';
+                const width = container.clientWidth || 900;
+                const height = Math.max(480, width * 0.55);
+                const svg = d3.select(container).append('svg')
+                    .attr('viewBox', `0 0 ${width} ${height}`)
+                    .attr('preserveAspectRatio', 'xMidYMid meet');
+                _mapSvg = svg;
+
+                const projection = d3.geoAlbersUsa().fitSize([width, height], topojson.feature(topo, topo.objects.states));
+                const path = d3.geoPath().projection(projection);
+                const features = topojson.feature(topo, topo.objects.states).features;
+                const tip = document.getElementById('map-tooltip');
+
+                svg.append('g').selectAll('path')
+                    .data(features)
+                    .join('path')
+                    .attr('d', path)
+                    .attr('class', 'state-path')
+                    .attr('stroke', '#334155')
+                    .attr('stroke-width', 0.8)
+                    .on('mousemove', function(event, d) {
+                        const fips = String(d.id).padStart(2, '0');
+                        const abbr = STATE_FIPS_TO_ABBR[fips] || '';
+                        const st = _mapData[abbr];
+                        if (st) {
+                            vizTip(tip, `<strong>${abbr}</strong>
+                                <div class="tt-row"><span class="tt-label">Prospects</span><span class="tt-value">${st.prospect_count}</span></div>
+                                <div class="tt-row"><span class="tt-label">Avg Score</span><span class="tt-value">${st.avg_score.toFixed(1)}</span></div>
+                                <div class="tt-row"><span class="tt-label">Grade A</span><span class="tt-value">${st.a_grade_count}</span></div>
+                                <div class="tt-row"><span class="tt-label">Grade B</span><span class="tt-value">${st.b_grade_count}</span></div>`, event);
+                        } else {
+                            vizTip(tip, `<strong>${abbr || 'Unknown'}</strong><div class="tt-row"><span class="tt-label">No medspa data</span></div>`, event);
+                        }
+                    })
+                    .on('mouseleave', () => vizTipHide(tip));
+
+                updateMap();
+                _buildMapLegend();
+            } catch (e) {
+                container.innerHTML = '<div class="viz-loading">Failed to load map. Check API connection.</div>';
+                console.error('Map load error:', e);
+            }
+        }
+
+        function updateMap() {
+            if (!_mapSvg || !_mapData) return;
+            const metric = document.getElementById('map-metric').value;
+
+            // Determine value range for color scale
+            const vals = Object.values(_mapData).map(s => {
+                if (metric === 'overall_score' || metric === 'affluence_score') return s.avg_score;
+                return s.prospect_count; // fallback for metrics we don't have per-state breakdown
+            }).filter(v => v > 0);
+
+            const extent = d3.extent(vals);
+            const colorScale = d3.scaleSequential(d3.interpolateViridis).domain([extent[0] * 0.9, extent[1]]);
+
+            _mapSvg.selectAll('.state-path')
+                .attr('fill', function(d) {
+                    const fips = String(d.id).padStart(2, '0');
+                    const abbr = STATE_FIPS_TO_ABBR[fips];
+                    const st = _mapData[abbr];
+                    if (!st) return '#1e293b';
+                    const val = (metric === 'overall_score' || metric === 'affluence_score') ? st.avg_score : st.prospect_count;
+                    return colorScale(val);
+                })
+                .attr('cursor', function(d) {
+                    const fips = String(d.id).padStart(2, '0');
+                    return _mapData[STATE_FIPS_TO_ABBR[fips]] ? 'pointer' : 'default';
+                });
+        }
+
+        function _buildMapLegend() {
+            const legend = document.getElementById('map-legend');
+            if (!legend) return;
+            const canvas = document.createElement('canvas');
+            canvas.width = 200; canvas.height = 12;
+            const ctx = canvas.getContext('2d');
+            for (let i = 0; i < 200; i++) {
+                ctx.fillStyle = d3.interpolateViridis(i / 200);
+                ctx.fillRect(i, 0, 1, 12);
+            }
+            legend.innerHTML = `
+                <div class="viz-legend-item"><span style="color:var(--text-muted)">Low</span></div>
+                <img src="${canvas.toDataURL()}" style="width:200px;height:12px;border-radius:3px;">
+                <div class="viz-legend-item"><span style="color:var(--text-muted)">High</span></div>
+                <div class="viz-legend-item" style="margin-left:1rem;"><span style="color:var(--text-muted)">${Object.keys(_mapData).length} states with data</span></div>`;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        //  VIZ 2: PROSPECT SCATTER — Bubble Chart
+        // ═══════════════════════════════════════════════════════════════
+        let _bubbleRawData = [];
+
+        async function loadBubbleData() {
+            const container = document.getElementById('bubble-container');
+            if (!container) return;
+            container.innerHTML = '<div class="viz-loading">Loading prospect data...</div>';
+            _bubbleRawData = [];
+            _bubbleSvg = null;
+
+            try {
+                const src = document.getElementById('bubble-source').value;
+                // Currently only medspa has data
+                const res = await fetch(API + '/medspa-discovery/prospects?limit=500');
+                const data = await res.json();
+                _bubbleRawData = (data.prospects || []).filter(p => p.acquisition_score != null);
+
+                if (_bubbleRawData.length === 0) {
+                    container.innerHTML = '<div class="viz-loading">No prospect data available. Run medspa discovery first.</div>';
+                    return;
+                }
+
+                container.innerHTML = '';
+                _renderBubble(container);
+            } catch (e) {
+                container.innerHTML = '<div class="viz-loading">Failed to load prospects.</div>';
+                console.error('Bubble load error:', e);
+            }
+        }
+
+        function _renderBubble(container) {
+            const margin = { top: 30, right: 30, bottom: 50, left: 60 };
+            const width = (container.clientWidth || 900) - margin.left - margin.right;
+            const height = Math.max(400, 480) - margin.top - margin.bottom;
+
+            const svg = d3.select(container).append('svg')
+                .attr('viewBox', `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+                .append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+            _bubbleSvg = { svg, width, height, margin };
+
+            updateBubble();
+        }
+
+        function updateBubble() {
+            if (!_bubbleSvg || _bubbleRawData.length === 0) return;
+            const { svg, width, height } = _bubbleSvg;
+            const xField = document.getElementById('bubble-x').value;
+            const yField = document.getElementById('bubble-y').value;
+            const tip = document.getElementById('bubble-tooltip');
+
+            svg.selectAll('*').remove();
+
+            const fieldLabel = {
+                rating: 'Yelp Rating', review_count: 'Review Count', zip_avg_agi: 'ZIP Avg AGI ($)',
+                acquisition_score: 'Acquisition Score', estimated_annual_revenue: 'Est. Revenue ($)',
+                competitor_count_in_zip: 'Competitors in ZIP'
+            };
+            const getVal = (d, f) => {
+                const v = d[f];
+                return (v != null && v !== '') ? +v : null;
+            };
+
+            const filtered = _bubbleRawData.filter(d => getVal(d, xField) != null && getVal(d, yField) != null);
+            if (filtered.length === 0) {
+                svg.append('text').attr('x', width/2).attr('y', height/2)
+                    .attr('text-anchor', 'middle').attr('fill', '#94a3b8')
+                    .text('No data for selected axes.');
+                return;
+            }
+
+            const xExt = d3.extent(filtered, d => getVal(d, xField));
+            const yExt = d3.extent(filtered, d => getVal(d, yField));
+            const x = d3.scaleLinear().domain([xExt[0] * 0.95, xExt[1] * 1.05]).range([0, width]);
+            const y = d3.scaleLinear().domain([yExt[0] * 0.95, yExt[1] * 1.05]).range([height, 0]);
+
+            const gradeColor = { A: '#22c55e', B: '#6366f1', C: '#f59e0b', D: '#ef4444', F: '#64748b' };
+
+            // Axes
+            svg.append('g').attr('transform', `translate(0,${height})`)
+                .call(d3.axisBottom(x).ticks(8).tickFormat(d => xField === 'zip_avg_agi' || xField === 'estimated_annual_revenue' ? d3.format(',.0f')(d) : d))
+                .selectAll('text,line,path').attr('stroke', '#475569').attr('fill', '#94a3b8');
+            svg.append('g')
+                .call(d3.axisLeft(y).ticks(8).tickFormat(d => yField === 'estimated_annual_revenue' || yField === 'zip_avg_agi' ? d3.format(',.0f')(d) : d))
+                .selectAll('text,line,path').attr('stroke', '#475569').attr('fill', '#94a3b8');
+
+            // Axis labels
+            svg.append('text').attr('x', width/2).attr('y', height + 40)
+                .attr('text-anchor', 'middle').attr('fill', '#94a3b8').attr('font-size', '12px')
+                .text(fieldLabel[xField] || xField);
+            svg.append('text').attr('transform', 'rotate(-90)')
+                .attr('x', -height/2).attr('y', -45)
+                .attr('text-anchor', 'middle').attr('fill', '#94a3b8').attr('font-size', '12px')
+                .text(fieldLabel[yField] || yField);
+
+            // Dots
+            svg.selectAll('circle')
+                .data(filtered)
+                .join('circle')
+                .attr('cx', d => x(getVal(d, xField)))
+                .attr('cy', d => y(getVal(d, yField)))
+                .attr('r', d => Math.max(3, Math.min(12, (d.review_count || 10) / 15)))
+                .attr('fill', d => (gradeColor[d.acquisition_grade] || '#64748b') + 'aa')
+                .attr('stroke', d => gradeColor[d.acquisition_grade] || '#64748b')
+                .attr('stroke-width', 1)
+                .attr('cursor', 'pointer')
+                .on('mousemove', function(event, d) {
+                    d3.select(this).attr('r', parseFloat(d3.select(this).attr('r')) + 3);
+                    vizTip(tip, `<strong>${escapeHtml(d.name || '')}</strong>
+                        <div class="tt-row"><span class="tt-label">Score</span><span class="tt-value">${d.acquisition_score} (${d.acquisition_grade})</span></div>
+                        <div class="tt-row"><span class="tt-label">${fieldLabel[xField]}</span><span class="tt-value">${d3.format(',.1f')(getVal(d, xField))}</span></div>
+                        <div class="tt-row"><span class="tt-label">${fieldLabel[yField]}</span><span class="tt-value">${d3.format(',.1f')(getVal(d, yField))}</span></div>
+                        <div class="tt-row"><span class="tt-label">City</span><span class="tt-value">${escapeHtml(d.city || '')} ${d.state || ''}</span></div>
+                        <div class="tt-row"><span class="tt-label">Ownership</span><span class="tt-value">${d.ownership_type || 'Unknown'}</span></div>`, event);
+                })
+                .on('mouseleave', function() {
+                    d3.select(this).attr('r', d => Math.max(3, Math.min(12, (d.review_count || 10) / 15)));
+                    vizTipHide(tip);
+                });
+
+            // Legend
+            const legendG = svg.append('g').attr('transform', `translate(${width - 160}, 10)`);
+            Object.entries(gradeColor).forEach(([grade, color], i) => {
+                legendG.append('circle').attr('cx', 0).attr('cy', i * 20).attr('r', 5).attr('fill', color);
+                legendG.append('text').attr('x', 12).attr('y', i * 20 + 4)
+                    .attr('fill', '#94a3b8').attr('font-size', '11px').text('Grade ' + grade);
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        //  VIZ 3: SUNBURST — Data Coverage
+        // ═══════════════════════════════════════════════════════════════
+        async function loadSunburstViz() {
+            const container = document.getElementById('sunburst-container');
+            if (!container) return;
+            if (_sunburstData) return; // already rendered
+            container.innerHTML = '<div class="viz-loading">Loading data sources...</div>';
+
+            try {
+                const res = await fetch(API + '/sources');
+                const data = await res.json();
+                const sources = data.sources || [];
+
+                if (sources.length === 0) {
+                    container.innerHTML = '<div class="viz-loading">No source data available.</div>';
+                    return;
+                }
+
+                // Build hierarchy: root → category → source (size = total_rows or 1)
+                const catMap = {};
+                sources.forEach(s => {
+                    const cat = s.category_label || s.category || 'Other';
+                    if (!catMap[cat]) catMap[cat] = [];
+                    catMap[cat].push({
+                        name: s.short_name || s.display_name || s.key,
+                        key: s.key,
+                        value: Math.max(s.total_rows || 0, 1),
+                        rows: s.total_rows || 0,
+                        tables: s.total_tables || 0,
+                        status: s.status
+                    });
+                });
+
+                const hierarchy = {
+                    name: 'Nexdata',
+                    children: Object.entries(catMap).map(([cat, kids]) => ({
+                        name: cat,
+                        children: kids
+                    }))
+                };
+
+                _sunburstData = hierarchy;
+                container.innerHTML = '';
+                _renderSunburst(container, hierarchy);
+            } catch (e) {
+                container.innerHTML = '<div class="viz-loading">Failed to load sources.</div>';
+                console.error('Sunburst load error:', e);
+            }
+        }
+
+        function _renderSunburst(container, data) {
+            const size = Math.min(container.clientWidth || 700, 700);
+            const radius = size / 2;
+            const breadcrumb = document.getElementById('sunburst-breadcrumb');
+
+            const root = d3.hierarchy(data)
+                .sum(d => d.value || 0)
+                .sort((a, b) => b.value - a.value);
+
+            const partition = d3.partition().size([2 * Math.PI, radius]);
+            partition(root);
+
+            const arc = d3.arc()
+                .startAngle(d => d.x0)
+                .endAngle(d => d.x1)
+                .innerRadius(d => d.y0)
+                .outerRadius(d => d.y1 - 1)
+                .padAngle(0.005)
+                .padRadius(radius / 2);
+
+            const catColors = d3.scaleOrdinal()
+                .domain(data.children.map(c => c.name))
+                .range(['#6366f1', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#3b82f6']);
+
+            const statusColor = { idle: '#22c55e', running: '#06b6d4', failed: '#ef4444', never_run: '#64748b' };
+
+            const svg = d3.select(container).append('svg')
+                .attr('viewBox', `${-radius} ${-radius} ${size} ${size}`)
+                .attr('preserveAspectRatio', 'xMidYMid meet')
+                .style('max-width', size + 'px');
+
+            // Center label
+            const centerLabel = svg.append('text')
+                .attr('text-anchor', 'middle').attr('dy', '-0.2em')
+                .attr('fill', '#f1f5f9').attr('font-size', '18px').attr('font-weight', '700')
+                .text(root.descendants().length - 1);
+            const centerSub = svg.append('text')
+                .attr('text-anchor', 'middle').attr('dy', '1.2em')
+                .attr('fill', '#94a3b8').attr('font-size', '12px')
+                .text('data sources');
+
+            svg.selectAll('path')
+                .data(root.descendants().filter(d => d.depth > 0))
+                .join('path')
+                .attr('d', arc)
+                .attr('fill', d => {
+                    if (d.depth === 1) return catColors(d.data.name);
+                    // Leaf: tint by status
+                    const parentColor = catColors(d.parent.data.name);
+                    const st = d.data.status;
+                    if (st === 'failed') return '#ef444480';
+                    if (st === 'never_run') return '#64748b60';
+                    return d3.color(parentColor).brighter(0.5).toString();
+                })
+                .attr('stroke', '#0f172a')
+                .attr('stroke-width', 0.5)
+                .attr('cursor', 'pointer')
+                .on('mousemove', function(event, d) {
+                    d3.select(this).attr('opacity', 0.8);
+                    if (d.depth === 1) {
+                        const kids = d.children || [];
+                        const totalRows = kids.reduce((s, c) => s + (c.data.rows || 0), 0);
+                        breadcrumb.textContent = `${d.data.name}: ${kids.length} sources, ${d3.format(',')(totalRows)} rows`;
+                    } else {
+                        breadcrumb.textContent = `${d.parent.data.name} → ${d.data.name}: ${d3.format(',')(d.data.rows)} rows, ${d.data.tables} tables (${d.data.status})`;
+                    }
+                    centerLabel.text(d.depth === 1 ? d.children.length : d3.format(',')(d.data.rows));
+                    centerSub.text(d.depth === 1 ? 'sources' : 'rows');
+                })
+                .on('mouseleave', function() {
+                    d3.select(this).attr('opacity', 1);
+                    breadcrumb.textContent = '';
+                    centerLabel.text(root.descendants().length - 1);
+                    centerSub.text('data sources');
+                });
+
+            // Text labels for categories (depth 1) if arc is large enough
+            svg.selectAll('.cat-label')
+                .data(root.descendants().filter(d => d.depth === 1 && (d.x1 - d.x0) > 0.25))
+                .join('text')
+                .attr('class', 'cat-label')
+                .attr('transform', d => {
+                    const angle = (d.x0 + d.x1) / 2;
+                    const r = (d.y0 + d.y1) / 2;
+                    const x = Math.sin(angle) * r;
+                    const y = -Math.cos(angle) * r;
+                    const rotate = (angle * 180 / Math.PI - 90);
+                    return `translate(${x},${y}) rotate(${rotate > 90 ? rotate + 180 : rotate})`;
+                })
+                .attr('text-anchor', 'middle')
+                .attr('dy', '0.35em')
+                .attr('fill', '#f1f5f9')
+                .attr('font-size', '10px')
+                .attr('font-weight', '600')
+                .attr('pointer-events', 'none')
+                .text(d => d.data.name.length > 16 ? d.data.name.slice(0, 14) + '…' : d.data.name);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        //  VIZ 4: FORCE GRAPH — Market Connectivity Network
+        // ═══════════════════════════════════════════════════════════════
+        async function loadForceViz() {
+            const container = document.getElementById('force-container');
+            if (!container) return;
+            if (_forceData) { updateForce(); return; }
+            container.innerHTML = '<div class="viz-loading">Loading market network...</div>';
+
+            try {
+                const res = await fetch(API + '/medspa-discovery/market-map?limit_per_state=5');
+                const data = await res.json();
+                const states = data.states || [];
+
+                if (states.length === 0) {
+                    container.innerHTML = '<div class="viz-loading">No market data for network graph.</div>';
+                    return;
+                }
+
+                // Build nodes and links:
+                // Nodes = states, sized by prospect count
+                // Links = states with similar avg_score (within 5 points) share an edge
+                const nodes = states.map(s => ({
+                    id: s.state,
+                    count: s.prospect_count,
+                    avg_score: s.avg_score,
+                    a_count: s.a_grade_count,
+                    b_count: s.b_grade_count,
+                    top: (s.top_prospects || []).slice(0, 3)
+                }));
+
+                const links = [];
+                for (let i = 0; i < nodes.length; i++) {
+                    for (let j = i + 1; j < nodes.length; j++) {
+                        const diff = Math.abs(nodes[i].avg_score - nodes[j].avg_score);
+                        if (diff < 5) {
+                            links.push({
+                                source: nodes[i].id,
+                                target: nodes[j].id,
+                                strength: 1 - diff / 5
+                            });
+                        }
+                    }
+                }
+
+                _forceData = { nodes, links };
+                container.innerHTML = '';
+                _renderForce(container);
+            } catch (e) {
+                container.innerHTML = '<div class="viz-loading">Failed to load network data.</div>';
+                console.error('Force load error:', e);
+            }
+        }
+
+        function _renderForce(container) {
+            const width = container.clientWidth || 900;
+            const height = Math.max(480, width * 0.5);
+            const tip = document.getElementById('force-tooltip');
+
+            const svg = d3.select(container).append('svg')
+                .attr('viewBox', `0 0 ${width} ${height}`)
+                .attr('preserveAspectRatio', 'xMidYMid meet');
+
+            const { nodes, links } = _forceData;
+            const rScale = d3.scaleSqrt()
+                .domain(d3.extent(nodes, d => d.count))
+                .range([8, 40]);
+
+            const scoreColor = d3.scaleSequential(d3.interpolateViridis)
+                .domain(d3.extent(nodes, d => d.avg_score));
+
+            const simulation = d3.forceSimulation(nodes)
+                .force('link', d3.forceLink(links).id(d => d.id).distance(80).strength(d => d.strength * 0.3))
+                .force('charge', d3.forceManyBody().strength(-200))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide().radius(d => rScale(d.count) + 4));
+
+            _forceSim = simulation;
+
+            const link = svg.append('g')
+                .selectAll('line')
+                .data(links)
+                .join('line')
+                .attr('stroke', '#334155')
+                .attr('stroke-width', d => d.strength * 2)
+                .attr('stroke-opacity', 0.4);
+
+            const nodeG = svg.append('g')
+                .selectAll('g')
+                .data(nodes)
+                .join('g')
+                .attr('cursor', 'grab')
+                .call(d3.drag()
+                    .on('start', (event, d) => { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+                    .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+                    .on('end', (event, d) => { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+                );
+
+            nodeG.append('circle')
+                .attr('r', d => rScale(d.count))
+                .attr('fill', d => scoreColor(d.avg_score))
+                .attr('stroke', '#f1f5f9')
+                .attr('stroke-width', 1.5)
+                .attr('opacity', 0.85);
+
+            // Labels
+            const labels = nodeG.append('text')
+                .text(d => d.id)
+                .attr('text-anchor', 'middle')
+                .attr('dy', '0.35em')
+                .attr('fill', '#f1f5f9')
+                .attr('font-size', d => rScale(d.count) > 15 ? '11px' : '9px')
+                .attr('font-weight', '700')
+                .attr('pointer-events', 'none');
+
+            nodeG.on('mousemove', function(event, d) {
+                const topList = d.top.map(t => `${escapeHtml(t.name)} (${t.acquisition_score})`).join('<br>');
+                vizTip(tip, `<strong>${d.id}</strong>
+                    <div class="tt-row"><span class="tt-label">Prospects</span><span class="tt-value">${d.count}</span></div>
+                    <div class="tt-row"><span class="tt-label">Avg Score</span><span class="tt-value">${d.avg_score.toFixed(1)}</span></div>
+                    <div class="tt-row"><span class="tt-label">Grade A</span><span class="tt-value">${d.a_count}</span></div>
+                    <div class="tt-row"><span class="tt-label">Grade B</span><span class="tt-value">${d.b_count}</span></div>
+                    ${topList ? '<div style="margin-top:6px;font-size:0.7rem;color:var(--text-muted)">Top targets:</div><div style="font-size:0.7rem;">' + topList + '</div>' : ''}`, event);
+            }).on('mouseleave', () => vizTipHide(tip));
+
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+                nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
+            });
+        }
+
+        function updateForce() {
+            if (!_forceData || !_forceSim) return;
+            const highlight = document.getElementById('force-highlight').value;
+            const showLabels = document.getElementById('force-labels').checked;
+
+            d3.select('#force-container').selectAll('g g').each(function(d) {
+                const g = d3.select(this);
+                const isHighlighted = !highlight || d.id === STATE_FIPS_TO_ABBR[highlight];
+                g.select('circle').attr('opacity', isHighlighted ? 0.9 : 0.2);
+                g.select('text').attr('display', showLabels ? 'block' : 'none')
+                    .attr('opacity', isHighlighted ? 1 : 0.3);
+            });
+        }
+
+        // ===== Reports Manager =====
+        let _reportsInitialized = false;
+        let _reportsTemplates = [];
+
+        async function reportsInitialize() {
+            if (_reportsInitialized) return;
+            _reportsInitialized = true;
+            await reportsLoadTemplates();
+            await reportsLoad();
+        }
+
+        async function reportsLoadTemplates() {
+            try {
+                const r = await fetch('/api/v1/reports/templates');
+                const data = await r.json();
+                _reportsTemplates = data.templates || [];
+
+                const sel = document.getElementById('report-template-select');
+                const filterSel = document.getElementById('report-filter-template');
+                sel.innerHTML = '<option value="">Select template...</option>';
+                _reportsTemplates.forEach(t => {
+                    sel.innerHTML += `<option value="${t.name}">${t.name.replace(/_/g, ' ')}</option>`;
+                    filterSel.innerHTML += `<option value="${t.name}">${t.name.replace(/_/g, ' ')}</option>`;
+                });
+            } catch (e) {
+                console.error('Failed to load report templates:', e);
+            }
+        }
+
+        async function reportsLoad() {
+            const container = document.getElementById('reports-list');
+            container.innerHTML = '<div class="loading">Loading reports...</div>';
+
+            const template = document.getElementById('report-filter-template').value;
+            const status = document.getElementById('report-filter-status').value;
+
+            let url = '/api/v1/reports?limit=50';
+            if (template) url += '&template=' + encodeURIComponent(template);
+            if (status) url += '&status=' + encodeURIComponent(status);
+
+            try {
+                const r = await fetch(url);
+                const data = await r.json();
+                const reports = data.reports || [];
+
+                if (reports.length === 0) {
+                    container.innerHTML = `<div class="reports-empty">
+                        <div class="reports-empty-icon">📄</div>
+                        <p>No reports generated yet.</p>
+                        <p style="font-size:0.8rem;margin-top:0.5rem;">Use the form above to generate your first report.</p>
+                    </div>`;
+                    return;
+                }
+
+                let html = '<div class="reports-grid">';
+                for (const rpt of reports) {
+                    const created = rpt.created_at ? new Date(rpt.created_at).toLocaleString() : 'N/A';
+                    const size = rpt.file_size ? formatBytes(rpt.file_size) : '-';
+                    const templateLabel = (rpt.template || '').replace(/_/g, ' ');
+                    const fmt = (rpt.format || 'html').toUpperCase();
+
+                    let actions = '';
+                    if (rpt.status === 'complete') {
+                        if (rpt.format === 'html') {
+                            actions += `<button class="btn btn-view" onclick="reportsPreview(${rpt.id}, '${escapeHtml(rpt.title || templateLabel)}')">Preview</button>`;
+                        }
+                        actions += `<a class="btn btn-secondary" href="/api/v1/reports/${rpt.id}/download" target="_blank" style="text-decoration:none;">Download</a>`;
+                    }
+                    actions += `<button class="btn btn-danger" onclick="reportsDelete(${rpt.id})">Delete</button>`;
+
+                    html += `<div class="report-card">
+                        <div class="report-card-header">
+                            <div class="report-card-title">${escapeHtml(rpt.title || templateLabel)}</div>
+                            <span class="report-status ${rpt.status}">${rpt.status}</span>
+                        </div>
+                        <div class="report-card-meta">
+                            <span><span class="report-template-pill">${escapeHtml(templateLabel)}</span> <span class="report-format-pill">${fmt}</span></span>
+                            <span>Created: ${created}</span>
+                            <span>Size: ${size}</span>
+                            ${rpt.error_message ? '<span style="color:var(--error);font-size:0.7rem;">Error: ' + escapeHtml(rpt.error_message) + '</span>' : ''}
+                        </div>
+                        <div class="report-card-actions">${actions}</div>
+                    </div>`;
+                }
+                html += '</div>';
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = '<div class="reports-empty"><p>Failed to load reports.</p></div>';
+                console.error('Reports load error:', e);
+            }
+        }
+
+        async function reportsGenerate() {
+            const template = document.getElementById('report-template-select').value;
+            const format = document.getElementById('report-format-select').value;
+            const resultDiv = document.getElementById('report-generate-result');
+
+            if (!template) {
+                resultDiv.innerHTML = '<div class="jobs-run-result error">Please select a template.</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = '<div class="jobs-run-result" style="color:var(--accent);">Generating report...</div>';
+
+            try {
+                const r = await fetch('/api/v1/reports/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ template, format, params: {} })
+                });
+                const data = await r.json();
+
+                if (r.ok && data.id) {
+                    resultDiv.innerHTML = `<div class="jobs-run-result success">Report #${data.id} generated (${data.status}). ${data.file_size ? formatBytes(data.file_size) : ''}</div>`;
+                    await reportsLoad();
+                } else {
+                    const msg = data.detail ? (typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)) : 'Unknown error';
+                    resultDiv.innerHTML = `<div class="jobs-run-result error">${escapeHtml(msg)}</div>`;
+                }
+            } catch (e) {
+                resultDiv.innerHTML = `<div class="jobs-run-result error">Failed: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        function reportsPreview(reportId, title) {
+            const modal = document.getElementById('report-modal');
+            const iframe = document.getElementById('report-modal-iframe');
+            const modalTitle = document.getElementById('report-modal-title');
+            const downloadLink = document.getElementById('report-modal-download');
+
+            modalTitle.textContent = title || 'Report Preview';
+            iframe.src = '/api/v1/reports/' + reportId + '/download';
+            downloadLink.href = '/api/v1/reports/' + reportId + '/download';
+            modal.classList.add('visible');
+
+            document.addEventListener('keydown', reportsEscHandler);
+        }
+
+        function reportsClosePreview() {
+            const modal = document.getElementById('report-modal');
+            const iframe = document.getElementById('report-modal-iframe');
+            modal.classList.remove('visible');
+            iframe.src = '';
+            document.removeEventListener('keydown', reportsEscHandler);
+        }
+
+        function reportsEscHandler(e) {
+            if (e.key === 'Escape') reportsClosePreview();
+        }
+
+        async function reportsDelete(reportId) {
+            if (!confirm('Delete report #' + reportId + '? This cannot be undone.')) return;
+            try {
+                await fetch('/api/v1/reports/' + reportId, { method: 'DELETE' });
+                await reportsLoad();
+            } catch (e) {
+                console.error('Delete failed:', e);
+            }
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // ===== Data Quality Tab =====
+        let _dqInitialized = false;
+        let _dqRecs = [];
+        let _dqOffset = 0;
+        const _dqLimit = 50;
+        let _dqDonutChart = null;
+        let _dqSummary = null;
+
+        function dqInitialize() {
+            if (_dqInitialized) return;
+            _dqInitialized = true;
+            dqLoadSummary();
+            dqApplyFilters();
+        }
+
+        async function dqLoadSummary() {
+            try {
+                const res = await fetch(API + '/dq-review/summary');
+                const data = await res.json();
+                _dqSummary = data;
+
+                // recommendation_counts = {critical: N, high: N, medium: N, low: N}
+                const rc = data.recommendation_counts || {};
+                const totalOpen = Object.values(rc).reduce((a, b) => a + b, 0);
+                const critical = rc.critical || 0;
+                const high = rc.high || 0;
+
+                // Count auto-fixable from top_recommendations
+                const topRecs = data.top_recommendations || [];
+                const autoFixable = topRecs.filter(r => r.auto_fixable).length;
+
+                document.getElementById('dq-total-open').textContent = totalOpen;
+                document.getElementById('dq-critical').textContent = critical;
+                document.getElementById('dq-high').textContent = high;
+                document.getElementById('dq-autofix').textContent = autoFixable;
+
+                // Build category counts from top_recommendations
+                const byCat = {};
+                topRecs.forEach(r => {
+                    const cat = r.category || 'unknown';
+                    byCat[cat] = (byCat[cat] || 0) + 1;
+                });
+                dqRenderDonut(byCat);
+            } catch (e) {
+                console.error('DQ summary error:', e);
+            }
+        }
+
+        const DQ_CAT_COLORS = {
+            missing_data: '#f87171',
+            stale_data: '#fbbf24',
+            low_coverage: '#fb923c',
+            schema_drift: '#a855f7',
+            cross_source_mismatch: '#ec4899',
+            enrichment_opportunity: '#4ade80',
+            anomaly: '#60a5fa',
+            orchestration: '#06b6d4',
+            data_quality: '#6366f1'
+        };
+
+        function dqRenderDonut(byCategory) {
+            const canvas = document.getElementById('dq-donut');
+            if (!canvas) return;
+            const labels = Object.keys(byCategory);
+            const values = Object.values(byCategory);
+            const colors = labels.map(l => DQ_CAT_COLORS[l] || '#94a3b8');
+
+            if (_dqDonutChart) _dqDonutChart.destroy();
+
+            _dqDonutChart = new Chart(canvas, {
+                type: 'doughnut',
+                data: {
+                    labels: labels.map(l => l.replace(/_/g, ' ')),
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors,
+                        borderColor: '#1e293b',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    cutout: '55%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#94a3b8', font: { size: 11 }, padding: 12, boxWidth: 12 }
+                        }
+                    },
+                    onClick: function(e, elems) {
+                        if (elems.length > 0) {
+                            const idx = elems[0].index;
+                            const cat = labels[idx];
+                            document.getElementById('dq-filter-category').value = cat;
+                            dqApplyFilters();
+                        }
+                    }
+                }
+            });
+        }
+
+        async function dqApplyFilters() {
+            _dqOffset = 0;
+            _dqRecs = [];
+            await dqLoadRecs(false);
+        }
+
+        async function dqLoadMore() {
+            await dqLoadRecs(true);
+        }
+
+        async function dqLoadRecs(append) {
+            const priority = document.getElementById('dq-filter-priority').value;
+            const category = document.getElementById('dq-filter-category').value;
+            const status = document.getElementById('dq-filter-status').value;
+            const source = document.getElementById('dq-filter-source').value.trim();
+            const tableName = document.getElementById('dq-filter-table').value.trim();
+
+            const params = new URLSearchParams();
+            if (priority) params.set('priority', priority);
+            if (category) params.set('category', category);
+            if (status) params.set('status', status);
+            if (source) params.set('source', source);
+            if (tableName) params.set('table_name', tableName);
+            params.set('limit', _dqLimit);
+            params.set('offset', append ? _dqOffset : 0);
+
+            const container = document.getElementById('dq-table-container');
+            if (!append) container.innerHTML = '<div class="loading">Loading...</div>';
+
+            try {
+                const res = await fetch(API + '/dq-review/recommendations?' + params.toString());
+                const data = await res.json();
+                const recs = Array.isArray(data) ? data : (data.recommendations || []);
+
+                if (append) {
+                    _dqRecs = _dqRecs.concat(recs);
+                } else {
+                    _dqRecs = recs;
+                }
+                _dqOffset = _dqRecs.length;
+
+                dqRenderTable();
+
+                // Show/hide load more
+                const loadMoreEl = document.getElementById('dq-load-more');
+                if (recs.length >= _dqLimit) {
+                    loadMoreEl.style.display = 'flex';
+                } else {
+                    loadMoreEl.style.display = 'none';
+                }
+            } catch (e) {
+                container.innerHTML = '<div class="empty">Failed to load recommendations.</div>';
+                console.error('DQ recs error:', e);
+            }
+        }
+
+        function dqRenderTable() {
+            const container = document.getElementById('dq-table-container');
+            if (_dqRecs.length === 0) {
+                container.innerHTML = '<div class="empty">No recommendations found for these filters.</div>';
+                return;
+            }
+
+            let html = `<table class="dq-table">
+                <thead><tr>
+                    <th style="width:30px;"></th>
+                    <th>Priority</th>
+                    <th>Category</th>
+                    <th>Source</th>
+                    <th>Table</th>
+                    <th>Title</th>
+                    <th>Auto-fix</th>
+                    <th>Actions</th>
+                </tr></thead><tbody>`;
+
+            _dqRecs.forEach((rec, i) => {
+                const prio = (rec.priority || 'low').toLowerCase();
+                const cat = rec.category || '';
+                const autofix = rec.auto_fixable ? '<span style="color:var(--success);">&#10003;</span>' : '';
+                const status = (rec.status || 'open').toLowerCase();
+                const isOpen = status === 'open';
+
+                html += `<tr onclick="dqToggleExpand(${i})" style="cursor:pointer;">
+                    <td><span class="ds-chevron" id="dq-chev-${i}">&#9654;</span></td>
+                    <td><span class="dq-badge ${prio}">${prio}</span></td>
+                    <td><span class="dq-cat-pill ${cat}">${(cat || '').replace(/_/g, ' ')}</span></td>
+                    <td>${rec.source || '-'}</td>
+                    <td style="font-family:monospace;font-size:0.8rem;">${rec.table_name || '-'}</td>
+                    <td>${rec.title || rec.description || '-'}</td>
+                    <td style="text-align:center;">${autofix}</td>
+                    <td>
+                        <div class="dq-actions">
+                            ${isOpen ? `<button class="dq-btn-apply" onclick="event.stopPropagation();dqApply(${rec.id},${i})">Apply</button>
+                            <button class="dq-btn-dismiss" onclick="event.stopPropagation();dqDismiss(${rec.id},${i})">Dismiss</button>` :
+                            `<span class="dq-badge ${status === 'applied' ? 'low' : 'medium'}">${status}</span>`}
+                        </div>
+                    </td>
+                </tr>`;
+                html += `<tr class="dq-expand-row hidden" id="dq-expand-${i}"><td colspan="8"></td></tr>`;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function dqToggleExpand(idx) {
+            const expandRow = document.getElementById('dq-expand-' + idx);
+            const chevron = document.getElementById('dq-chev-' + idx);
+            if (!expandRow) return;
+
+            if (expandRow.classList.contains('hidden')) {
+                expandRow.classList.remove('hidden');
+                chevron.style.transform = 'rotate(90deg)';
+                const rec = _dqRecs[idx];
+                const evidence = rec.evidence ? JSON.stringify(rec.evidence, null, 2) : 'No evidence data';
+                let fixHtml = '';
+                if (rec.fix_action) {
+                    fixHtml = `<span class="dq-fix-label">Fix Action:</span> <code>${rec.fix_action}</code>`;
+                    if (rec.fix_params) {
+                        fixHtml += `<pre>${JSON.stringify(rec.fix_params, null, 2)}</pre>`;
+                    }
+                }
+                expandRow.querySelector('td').innerHTML = `<div class="dq-expand-content">
+                    <strong>Description:</strong> ${rec.description || '-'}
+                    <span class="dq-fix-label">Evidence:</span>
+                    <pre>${evidence}</pre>
+                    ${fixHtml}
+                </div>`;
+            } else {
+                expandRow.classList.add('hidden');
+                chevron.style.transform = '';
+            }
+        }
+
+        async function dqApply(id, idx) {
+            try {
+                const res = await fetch(API + '/dq-review/apply/' + id, { method: 'POST' });
+                if (res.ok) {
+                    _dqRecs[idx].status = 'applied';
+                    dqRenderTable();
+                    dqLoadSummary();
+                    showToast('Recommendation applied', 'success');
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    showToast('Apply failed: ' + (err.detail || res.statusText), 'error');
+                }
+            } catch (e) {
+                showToast('Apply failed: ' + e.message, 'error');
+            }
+        }
+
+        async function dqDismiss(id, idx) {
+            try {
+                const res = await fetch(API + '/dq-review/dismiss/' + id, { method: 'POST' });
+                if (res.ok) {
+                    _dqRecs[idx].status = 'dismissed';
+                    dqRenderTable();
+                    dqLoadSummary();
+                    showToast('Recommendation dismissed', 'info');
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    showToast('Dismiss failed: ' + (err.detail || res.statusText), 'error');
+                }
+            } catch (e) {
+                showToast('Dismiss failed: ' + e.message, 'error');
+            }
+        }
+
+        async function dqRunAnalysis() {
+            const btn = document.getElementById('dq-run-btn');
+            btn.disabled = true;
+            btn.textContent = 'Running...';
+            try {
+                const res = await fetch(API + '/dq-review/run', { method: 'POST' });
+                if (res.ok) {
+                    showToast('DQ analysis started. Refreshing...', 'success');
+                    _dqInitialized = false;
+                    setTimeout(() => {
+                        dqInitialize();
+                    }, 2000);
+                } else {
+                    showToast('Run failed: ' + res.statusText, 'error');
+                }
+            } catch (e) {
+                showToast('Run failed: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Run Analysis';
+            }
+        }
+
     </script>
+
+    <!-- Report Preview Modal (outside .content so showTab doesn't interfere) -->
+    <div id="report-modal" class="report-modal-overlay" onclick="if(event.target===this)reportsClosePreview()">
+        <div class="report-modal">
+            <div class="report-modal-header">
+                <h3 id="report-modal-title">Report Preview</h3>
+                <div style="display:flex;gap:0.5rem;align-items:center;">
+                    <a id="report-modal-download" class="btn btn-secondary" style="padding:0.35rem 0.75rem;font-size:0.75rem;text-decoration:none;" href="#" target="_blank">Download</a>
+                    <button class="report-modal-close" onclick="reportsClosePreview()">&times;</button>
+                </div>
+            </div>
+            <div class="report-modal-body">
+                <iframe id="report-modal-iframe"></iframe>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

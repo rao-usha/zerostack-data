@@ -356,7 +356,11 @@ async def get_watermark(
     """Get watermark for a specific domain/source."""
     from app.core import watermark_service
 
-    ts = watermark_service.get_watermark(db, domain, source, state=state)
+    # Try domain:source key first, then just source
+    key = f"{domain}:{source}"
+    ts = watermark_service.get_watermark(db, key)
+    if ts is None:
+        ts = watermark_service.get_watermark(db, source)
     return {
         "domain": domain,
         "source": source,
