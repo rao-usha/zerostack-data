@@ -1144,6 +1144,81 @@
         .report-modal-close:hover { color: var(--text); }
         .report-modal-body { flex: 1; overflow: hidden; }
         .report-modal-body iframe { width: 100%; height: 100%; border: none; background: #fff; }
+
+        /* ===== PE Intelligence Tab ===== */
+        .pe-controls { display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .pe-controls select { padding: 0.5rem 0.75rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.875rem; min-width: 240px; }
+        .pe-controls select:focus { outline: none; border-color: var(--primary); }
+        .pe-controls .btn { white-space: nowrap; }
+
+        .pe-portfolio-table { width: 100%; border-collapse: collapse; }
+        .pe-portfolio-table th { text-align: left; padding: 0.625rem 0.75rem; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); font-weight: 500; cursor: pointer; user-select: none; }
+        .pe-portfolio-table th:hover { color: var(--text); }
+        .pe-portfolio-table td { padding: 0.75rem; border-bottom: 1px solid rgba(51,65,85,0.5); font-size: 0.875rem; }
+        .pe-portfolio-table tbody tr { cursor: pointer; transition: background 0.12s; }
+        .pe-portfolio-table tbody tr:hover { background: rgba(99,102,241,0.08); }
+        .pe-portfolio-table tbody tr.pe-row-selected { background: rgba(99,102,241,0.15); border-left: 3px solid var(--primary); }
+        .pe-portfolio-table tbody tr.pe-row-exited td:first-child::after { content: ' (Exited)'; font-size: 0.7rem; color: var(--text-muted); font-weight: 400; }
+
+        .pe-pct-cell { font-weight: 600; font-size: 0.85rem; }
+        .pe-pct-cell.green { color: var(--success); }
+        .pe-pct-cell.yellow { color: var(--warning); }
+        .pe-pct-cell.red { color: var(--error); }
+
+        .pe-trend { font-size: 0.75rem; }
+        .pe-trend.improving { color: var(--success); }
+        .pe-trend.declining { color: var(--error); }
+        .pe-trend.stable { color: var(--text-muted); }
+
+        .pe-industry-pill { padding: 0.15rem 0.55rem; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
+        .pe-industry-pill.Healthcare { background: rgba(239,68,68,0.12); color: #f87171; }
+        .pe-industry-pill.Software { background: rgba(99,102,241,0.12); color: #818cf8; }
+        .pe-industry-pill.Industrials { background: rgba(245,158,11,0.12); color: #fbbf24; }
+        .pe-industry-pill.Technology { background: rgba(6,182,212,0.12); color: var(--accent); }
+        .pe-industry-pill.default { background: rgba(148,163,184,0.12); color: var(--text-muted); }
+        .pe-status-pill { padding: 0.15rem 0.55rem; border-radius: 10px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+        .pe-status-pill.Active { background: rgba(34,197,94,0.15); color: var(--success); }
+        .pe-status-pill.Exited { background: rgba(148,163,184,0.15); color: var(--text-muted); }
+
+        .pe-detail-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+        @media (max-width: 1100px) { .pe-detail-panels { grid-template-columns: 1fr; } }
+
+        .pe-kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; }
+        @media (max-width: 768px) { .pe-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+        .pe-kpi { background: var(--bg-input); border-radius: 8px; padding: 0.875rem; text-align: center; }
+        .pe-kpi-value { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+        .pe-kpi-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.25rem; }
+        .pe-kpi-trend { font-size: 0.7rem; margin-top: 0.15rem; }
+
+        .pe-radar-wrap { position: relative; display: flex; justify-content: center; align-items: center; min-height: 280px; }
+
+        .pe-peer-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        .pe-peer-table th { text-align: left; padding: 0.5rem 0.625rem; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        .pe-peer-table td { padding: 0.5rem 0.625rem; font-size: 0.8rem; border-bottom: 1px solid rgba(51,65,85,0.4); }
+
+        /* Exit readiness gauge */
+        .pe-gauge-wrap { display: flex; flex-direction: column; align-items: center; margin-bottom: 1.25rem; }
+        .pe-gauge-svg { width: 180px; height: 180px; }
+        .pe-gauge-score { font-size: 2.5rem; font-weight: 700; }
+        .pe-gauge-grade { font-size: 1.25rem; font-weight: 600; margin-top: 0.25rem; }
+        .pe-gauge-confidence { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+        .pe-subscore-bars { margin-bottom: 1.25rem; }
+        .pe-subscore-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+        .pe-subscore-label { width: 140px; font-size: 0.8rem; color: var(--text-muted); text-align: right; flex-shrink: 0; }
+        .pe-subscore-bar-bg { flex: 1; height: 22px; background: var(--bg-input); border-radius: 4px; overflow: hidden; position: relative; }
+        .pe-subscore-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; font-size: 0.7rem; font-weight: 600; color: white; min-width: 28px; }
+        .pe-subscore-grade { width: 28px; font-size: 0.8rem; font-weight: 700; text-align: center; flex-shrink: 0; }
+
+        .pe-recs-list { list-style: none; padding: 0; }
+        .pe-recs-list li { padding: 0.5rem 0.75rem; border-left: 3px solid var(--primary); margin-bottom: 0.5rem; background: var(--bg-input); border-radius: 0 6px 6px 0; font-size: 0.8rem; }
+        .pe-recs-list li.high-priority { border-left-color: var(--error); }
+
+        .pe-gaps-list { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-top: 0.75rem; }
+        .pe-gap-chip { background: rgba(239,68,68,0.1); color: #f87171; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.7rem; font-weight: 500; }
+
+        .pe-empty { text-align: center; padding: 3rem; color: var(--text-muted); }
+        .pe-empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
     </style>
 </head>
 <body>
@@ -1181,6 +1256,7 @@
         <button class="tab" onclick="showTab('jobs')">🚀 Jobs</button>
         <button class="tab" onclick="showTab('viz')">🗺️ Visualizations</button>
         <button class="tab" onclick="showTab('reports')">📄 Reports</button>
+        <button class="tab" onclick="showTab('pe')">💼 PE Intelligence</button>
         <button class="tab" onclick="showTab('dq')">🔍 Data Quality</button>
         <button class="tab" onclick="showTab('settings')">⚙️ Settings</button>
     </nav>
@@ -1225,6 +1301,7 @@
             <div class="intel-nav">
                 <button class="intel-nav-btn active" onclick="showIntelPanel('companies')">Company Health</button>
                 <button class="intel-nav-btn" onclick="showIntelPanel('exit')">Exit Readiness</button>
+                <button class="intel-nav-btn" onclick="showIntelPanel('leadership')">Leadership Network</button>
                 <button class="intel-nav-btn" onclick="showIntelPanel('markets')">Market Opportunities</button>
                 <button class="intel-nav-btn" onclick="showIntelPanel('sites')">Datacenter Sites</button>
             </div>
@@ -1284,6 +1361,38 @@
                         <span style="color:var(--text-muted);font-size:0.8rem;" id="exit-count"></span>
                     </div>
                     <div id="exit-table-container"><div class="loading">Loading scores...</div></div>
+                </div>
+            </div>
+
+            <!-- Leadership Network Panel -->
+            <div id="intel-leadership" class="intel-panel">
+                <div class="card">
+                    <div class="card-title">Portfolio Leadership Network <span class="metric-help">?<span class="metric-tooltip"><strong>Leadership Network Graph</strong>Interactive force-directed graph showing the leadership connections across a PE firm's portfolio. Firm partners sit on portfolio company boards, connecting the network.<span class="mt-sources">Sources: PE demo data, company leadership records</span></span></span></div>
+                    <div class="intel-toolbar">
+                        <select id="leadership-firm-select" onchange="loadLeadershipGraph()">
+                            <option value="">Select a PE Firm...</option>
+                        </select>
+                        <label style="margin-left:12px;font-size:0.8rem;color:var(--text-muted);cursor:pointer;">
+                            <input type="checkbox" id="leadership-labels" checked onchange="updateLeadershipHighlight()"> Labels
+                        </label>
+                        <span style="color:var(--text-muted);font-size:0.8rem;margin-left:12px;" id="leadership-stats"></span>
+                    </div>
+                    <div id="leadership-graph-container" style="min-height:500px;position:relative;">
+                        <div class="loading">Select a PE firm to view its leadership network.</div>
+                    </div>
+                    <div id="leadership-tooltip" class="viz-tooltip" style="display:none;position:fixed;pointer-events:none;z-index:1000;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:0.8rem;box-shadow:0 4px 12px rgba(0,0,0,0.3);max-width:280px;"></div>
+                    <div id="leadership-legend" style="display:none;margin-top:12px;padding:12px 16px;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;">
+                        <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">Legend</div>
+                        <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:0.8rem;">
+                            <span><svg width="14" height="14"><circle cx="7" cy="7" r="6" fill="#6366f1"/></svg> PE Firm</span>
+                            <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#3b82f6"/></svg> PE Partner</span>
+                            <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#22c55e"/></svg> Portfolio Company</span>
+                            <span><svg width="14" height="14"><circle cx="7" cy="7" r="4" fill="#94a3b8"/></svg> Executive</span>
+                            <span style="margin-left:12px;"><svg width="24" height="14"><line x1="0" y1="7" x2="24" y2="7" stroke="#3b82f6" stroke-width="2"/></svg> Employment</span>
+                            <span><svg width="24" height="14"><line x1="0" y1="7" x2="24" y2="7" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4,3"/></svg> Board Seat</span>
+                            <span><svg width="24" height="14"><line x1="0" y1="7" x2="24" y2="7" stroke="#64748b" stroke-width="1"/></svg> Management</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1628,6 +1737,90 @@
             </div>
         </div>
         <!-- Data Quality Tab -->
+        <!-- PE Intelligence Tab -->
+        <div id="tab-pe" class="hidden">
+            <div class="tab-intro">
+                <span class="tab-intro-icon">💼</span>
+                <div class="tab-intro-text">
+                    <strong>PE Intelligence — Portfolio Benchmarking & Exit Readiness.</strong>
+                    Compare portfolio companies against industry peers, track performance trends, and assess exit readiness with composite scoring across 6 dimensions.
+                </div>
+            </div>
+
+            <!-- Firm Selector + Seed -->
+            <div class="pe-controls">
+                <select id="pe-firm-select" onchange="peLoadPortfolio()">
+                    <option value="">Select a PE Firm...</option>
+                </select>
+                <button class="btn btn-secondary" onclick="peSeedDemo()" id="pe-seed-btn">Seed Demo Data</button>
+            </div>
+
+            <!-- Portfolio Table -->
+            <div class="card" id="pe-portfolio-card" style="display:none;">
+                <div class="card-title" id="pe-portfolio-title">Portfolio Companies</div>
+                <div style="overflow-x:auto;">
+                    <table class="pe-portfolio-table">
+                        <thead>
+                            <tr>
+                                <th onclick="peSortPortfolio('company_name')">Company</th>
+                                <th onclick="peSortPortfolio('industry')">Sector</th>
+                                <th onclick="peSortPortfolio('status')">Status</th>
+                                <th onclick="peSortPortfolio('revenue_growth')">Rev Growth</th>
+                                <th onclick="peSortPortfolio('ebitda_margin')">EBITDA %</th>
+                                <th onclick="peSortPortfolio('overall')">Overall Pctl</th>
+                                <th>Trend</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pe-portfolio-body"></tbody>
+                    </table>
+                </div>
+                <div id="pe-portfolio-empty" class="pe-empty" style="display:none;">
+                    <div class="pe-empty-icon">📊</div>
+                    <div>No portfolio data. Try seeding demo data first.</div>
+                </div>
+            </div>
+
+            <!-- Detail Panels (shown on row click) -->
+            <div class="pe-detail-panels" id="pe-detail-panels" style="display:none;">
+                <!-- Left: Benchmark Detail -->
+                <div class="card" id="pe-benchmark-card">
+                    <div class="card-title" id="pe-benchmark-title">Company Benchmarks</div>
+                    <div class="pe-kpi-grid" id="pe-kpi-grid"></div>
+                    <div class="pe-radar-wrap">
+                        <canvas id="pe-radar-chart" width="300" height="300"></canvas>
+                    </div>
+                    <div class="card-title" style="margin-top:1rem;">Peer Comparison</div>
+                    <div style="overflow-x:auto;">
+                        <table class="pe-peer-table" id="pe-peer-table">
+                            <thead>
+                                <tr>
+                                    <th>Metric</th>
+                                    <th>Company</th>
+                                    <th>Industry Median</th>
+                                    <th>Top Quartile</th>
+                                    <th>Percentile</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pe-peer-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Right: Exit Readiness -->
+                <div class="card" id="pe-exit-card">
+                    <div class="card-title" id="pe-exit-title">Exit Readiness</div>
+                    <div class="pe-gauge-wrap" id="pe-gauge-wrap"></div>
+                    <div class="pe-subscore-bars" id="pe-subscore-bars"></div>
+                    <div class="card-title" style="margin-top:1rem;">Recommendations</div>
+                    <ul class="pe-recs-list" id="pe-recs-list"></ul>
+                    <div id="pe-gaps-section" style="display:none;">
+                        <div class="card-title" style="margin-top:1rem;">Data Gaps</div>
+                        <div class="pe-gaps-list" id="pe-gaps-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="tab-dq" class="hidden">
             <div class="tab-intro">
                 <span class="tab-intro-icon">🔍</span>
@@ -1759,7 +1952,7 @@
         }
 
         // ===== Tab Navigation with URL routing =====
-        const TAB_ROUTES = ['sources', 'intel', 'jobs', 'viz', 'reports', 'dq', 'settings'];
+        const TAB_ROUTES = ['sources', 'intel', 'jobs', 'viz', 'reports', 'pe', 'dq', 'settings'];
         let _currentTab = 'sources';
 
         function showTab(tab, pushState) {
@@ -1777,6 +1970,7 @@
             if (tab === 'intel') intelInitialize();
             if (tab === 'viz') vizInitialize();
             if (tab === 'reports') reportsInitialize();
+            if (tab === 'pe') peInitialize();
             if (tab === 'dq') dqInitialize();
             // Update URL
             if (pushState !== false) {
@@ -1796,7 +1990,7 @@
             const path = location.pathname.replace(/^\/+|\/+$/g, '');
             if (!path || path === 'index.html') return 'sources';
             // Map common aliases
-            const aliases = { intelligence: 'intel', visualizations: 'viz', dataquality: 'dq', 'data-quality': 'dq' };
+            const aliases = { intelligence: 'intel', visualizations: 'viz', dataquality: 'dq', 'data-quality': 'dq', 'pe-intelligence': 'pe', 'private-equity': 'pe' };
             const mapped = aliases[path] || path;
             return TAB_ROUTES.includes(mapped) ? mapped : 'sources';
         }
@@ -7340,6 +7534,7 @@
             // Lazy-load data for each panel
             if (panel === 'companies') loadHealthScores();
             if (panel === 'exit') loadExitReadiness();
+            if (panel === 'leadership') initLeadershipPanel();
             if (panel === 'markets') loadZipScores();
             if (panel === 'sites') loadDcRankings();
         }
@@ -7604,6 +7799,222 @@
                 container.innerHTML = emptyState('🚪', 'Could not load exit readiness scores.',
                     'API returned an error. Ensure PE data is collected first.');
             }
+        }
+
+        // ---- Leadership Network Graph ----
+        let _leadershipInitialized = false;
+        let _leadershipSim = null;
+
+        async function initLeadershipPanel() {
+            if (_leadershipInitialized) return;
+            _leadershipInitialized = true;
+            // Populate firm dropdown
+            const sel = document.getElementById('leadership-firm-select');
+            try {
+                const r = await fetch(API + '/pe/firms/?limit=50');
+                if (r.ok) {
+                    const data = await r.json();
+                    const firms = data.firms || data || [];
+                    firms.forEach(f => {
+                        const opt = document.createElement('option');
+                        opt.value = f.id;
+                        opt.textContent = f.name;
+                        sel.appendChild(opt);
+                    });
+                }
+            } catch (e) {
+                // Fallback: try seed firms by querying leadership-graph with known IDs
+                console.warn('Could not load firms list:', e);
+            }
+        }
+
+        async function loadLeadershipGraph() {
+            const firmId = document.getElementById('leadership-firm-select').value;
+            const container = document.getElementById('leadership-graph-container');
+            const legend = document.getElementById('leadership-legend');
+            const stats = document.getElementById('leadership-stats');
+
+            if (!firmId) {
+                container.innerHTML = '<div class="loading">Select a PE firm to view its leadership network.</div>';
+                legend.style.display = 'none';
+                return;
+            }
+
+            container.innerHTML = '<div class="loading">Loading leadership network...</div>';
+
+            try {
+                const r = await fetch(API + '/pe/leadership-graph/' + firmId);
+                if (!r.ok) throw new Error(`${r.status}`);
+                const graph = await r.json();
+
+                if (!graph.nodes || graph.nodes.length === 0) {
+                    container.innerHTML = emptyState('🔗', 'No leadership data found.',
+                        'Run <code>POST /pe/seed-demo</code> to populate leadership data.');
+                    legend.style.display = 'none';
+                    return;
+                }
+
+                stats.textContent = `${graph.nodes.length} nodes, ${graph.links.length} links`;
+                legend.style.display = 'block';
+                container.innerHTML = '';
+                _renderLeadershipGraph(container, graph);
+            } catch (e) {
+                container.innerHTML = emptyState('🔗', 'Could not load leadership graph.',
+                    'API returned an error. Ensure PE data is seeded.');
+                legend.style.display = 'none';
+                console.error('Leadership graph error:', e);
+            }
+        }
+
+        function _renderLeadershipGraph(container, graph) {
+            const width = container.clientWidth || 900;
+            const height = Math.max(550, width * 0.55);
+            const tip = document.getElementById('leadership-tooltip');
+
+            // Kill previous simulation
+            if (_leadershipSim) { _leadershipSim.stop(); _leadershipSim = null; }
+
+            const svg = d3.select(container).append('svg')
+                .attr('viewBox', `0 0 ${width} ${height}`)
+                .attr('preserveAspectRatio', 'xMidYMid meet')
+                .style('width', '100%')
+                .style('height', height + 'px');
+
+            // Zoom
+            const g = svg.append('g');
+            svg.call(d3.zoom()
+                .scaleExtent([0.3, 4])
+                .on('zoom', (event) => g.attr('transform', event.transform))
+            );
+
+            const { nodes, links } = graph;
+
+            // Node sizing by type
+            const radiusMap = { firm: 22, pe_person: 12, company: 16, executive: 8 };
+            const colorMap = { firm: '#6366f1', pe_person: '#3b82f6', company: '#22c55e', executive: '#94a3b8' };
+
+            // Link styling by type
+            const linkColorMap = { employment: '#3b82f6', board_seat: '#f59e0b', management: '#64748b' };
+            const linkDashMap = { employment: null, board_seat: '6,4', management: '2,2' };
+            const linkWidthMap = { employment: 2, board_seat: 2, management: 1 };
+
+            const simulation = d3.forceSimulation(nodes)
+                .force('link', d3.forceLink(links).id(d => d.id).distance(d => {
+                    if (d.type === 'employment') return 100;
+                    if (d.type === 'board_seat') return 120;
+                    return 70;
+                }).strength(0.4))
+                .force('charge', d3.forceManyBody().strength(d => d.type === 'firm' ? -400 : d.type === 'company' ? -200 : -80))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide().radius(d => (radiusMap[d.type] || 8) + 6));
+
+            _leadershipSim = simulation;
+
+            // Links
+            const link = g.append('g')
+                .selectAll('line')
+                .data(links)
+                .join('line')
+                .attr('stroke', d => linkColorMap[d.type] || '#64748b')
+                .attr('stroke-width', d => linkWidthMap[d.type] || 1)
+                .attr('stroke-dasharray', d => linkDashMap[d.type])
+                .attr('stroke-opacity', 0.5);
+
+            // Node groups
+            const nodeG = g.append('g')
+                .selectAll('g')
+                .data(nodes)
+                .join('g')
+                .attr('cursor', 'grab')
+                .call(d3.drag()
+                    .on('start', (event, d) => { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+                    .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+                    .on('end', (event, d) => { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+                );
+
+            // Circles
+            nodeG.append('circle')
+                .attr('r', d => radiusMap[d.type] || 8)
+                .attr('fill', d => colorMap[d.type] || '#94a3b8')
+                .attr('stroke', '#1e293b')
+                .attr('stroke-width', d => d.type === 'firm' ? 3 : 1.5)
+                .attr('opacity', 0.9);
+
+            // Labels (for firm, pe_person, company — not executives by default)
+            const showLabels = document.getElementById('leadership-labels').checked;
+            nodeG.append('text')
+                .text(d => {
+                    if (d.type === 'firm') return d.name;
+                    if (d.type === 'company') return d.name.length > 20 ? d.name.slice(0, 18) + '...' : d.name;
+                    if (d.type === 'pe_person') return d.name.split(' ').pop(); // last name
+                    return '';
+                })
+                .attr('text-anchor', 'middle')
+                .attr('dy', d => (radiusMap[d.type] || 8) + 12)
+                .attr('fill', '#cbd5e1')
+                .attr('font-size', d => d.type === 'firm' ? '11px' : d.type === 'company' ? '9px' : '8px')
+                .attr('font-weight', d => d.type === 'firm' ? '700' : '500')
+                .attr('pointer-events', 'none')
+                .attr('display', showLabels ? 'block' : 'none');
+
+            // Hover: highlight connected nodes
+            nodeG.on('mouseover', function(event, d) {
+                // Dim all
+                nodeG.select('circle').attr('opacity', 0.15);
+                link.attr('stroke-opacity', 0.08);
+
+                // Find connected
+                const connected = new Set([d.id]);
+                links.forEach(l => {
+                    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+                    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+                    if (sid === d.id) connected.add(tid);
+                    if (tid === d.id) connected.add(sid);
+                });
+
+                nodeG.filter(n => connected.has(n.id)).select('circle').attr('opacity', 1);
+                link.filter(l => {
+                    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+                    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+                    return connected.has(sid) && connected.has(tid);
+                }).attr('stroke-opacity', 0.8);
+
+                // Tooltip
+                const typeLabels = { firm: 'PE Firm', pe_person: 'PE Partner', company: 'Portfolio Company', executive: 'Executive' };
+                let html = `<strong>${escapeHtml(d.name)}</strong>
+                    <div class="tt-row"><span class="tt-label">Type</span><span class="tt-value">${typeLabels[d.type] || d.type}</span></div>`;
+                if (d.title) html += `<div class="tt-row"><span class="tt-label">Title</span><span class="tt-value">${escapeHtml(d.title)}</span></div>`;
+                if (d.industry) html += `<div class="tt-row"><span class="tt-label">Industry</span><span class="tt-value">${escapeHtml(d.industry)}</span></div>`;
+                const connCount = connected.size - 1;
+                html += `<div class="tt-row"><span class="tt-label">Connections</span><span class="tt-value">${connCount}</span></div>`;
+
+                tip.innerHTML = html;
+                tip.style.display = 'block';
+                tip.style.left = (event.clientX + 14) + 'px';
+                tip.style.top = (event.clientY - 10) + 'px';
+            })
+            .on('mousemove', function(event) {
+                tip.style.left = (event.clientX + 14) + 'px';
+                tip.style.top = (event.clientY - 10) + 'px';
+            })
+            .on('mouseleave', function() {
+                nodeG.select('circle').attr('opacity', 0.9);
+                link.attr('stroke-opacity', 0.5);
+                tip.style.display = 'none';
+            });
+
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+                nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
+            });
+        }
+
+        function updateLeadershipHighlight() {
+            const showLabels = document.getElementById('leadership-labels').checked;
+            d3.select('#leadership-graph-container').selectAll('g g text')
+                .attr('display', showLabels ? 'block' : 'none');
         }
 
         // ---- ZIP Score Markets ----
@@ -8554,6 +8965,331 @@
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
         }
+
+        // ===== PE Intelligence Tab =====
+        let _peInitialized = false;
+        let _pePortfolioData = [];
+        let _peSelectedCompanyId = null;
+        let _peSortCol = 'overall';
+        let _peSortAsc = false;
+        let _peRadarChart = null;
+
+        function peInitialize() {
+            if (_peInitialized) return;
+            _peInitialized = true;
+            peLoadFirms();
+        }
+
+        async function peLoadFirms() {
+            const select = document.getElementById('pe-firm-select');
+            try {
+                const found = [];
+                const tryIds = [1, 2, 3, 166, 167, 168, 169, 170];
+                const promises = tryIds.map(id =>
+                    fetch(`${API}/pe/benchmarks/portfolio/${id}`)
+                        .then(r => r.ok ? r.json().then(data => ({ id, data })) : null)
+                        .catch(() => null)
+                );
+                const results = await Promise.all(promises);
+                for (const r of results) {
+                    if (r && r.data && r.data.length > 0) {
+                        found.push({ id: r.id, companies: r.data });
+                    }
+                }
+
+                select.innerHTML = '<option value="">Select a PE Firm...</option>';
+                if (found.length === 0) {
+                    select.innerHTML += '<option value="" disabled>No firms found — seed demo data first</option>';
+                } else {
+                    for (const f of found) {
+                        const industries = [...new Set(f.companies.map(c => c.industry))];
+                        const label = `Firm #${f.id} — ${f.companies.length} companies (${industries.join(', ')})`;
+                        select.innerHTML += `<option value="${f.id}">${peEsc(label)}</option>`;
+                    }
+                    select.value = found[0].id;
+                    _pePortfolioData = found[0].companies;
+                    peRenderPortfolio();
+                }
+            } catch (e) {
+                console.error('PE firms load error:', e);
+            }
+        }
+
+        async function peLoadPortfolio() {
+            const firmId = document.getElementById('pe-firm-select').value;
+            if (!firmId) {
+                document.getElementById('pe-portfolio-card').style.display = 'none';
+                document.getElementById('pe-detail-panels').style.display = 'none';
+                return;
+            }
+            try {
+                const r = await fetch(`${API}/pe/benchmarks/portfolio/${firmId}`);
+                if (!r.ok) throw new Error(r.statusText);
+                _pePortfolioData = await r.json();
+                _peSelectedCompanyId = null;
+                document.getElementById('pe-detail-panels').style.display = 'none';
+                peRenderPortfolio();
+            } catch (e) {
+                showToast('Failed to load portfolio: ' + e.message, 'error');
+            }
+        }
+
+        function peRenderPortfolio() {
+            const card = document.getElementById('pe-portfolio-card');
+            const body = document.getElementById('pe-portfolio-body');
+            const empty = document.getElementById('pe-portfolio-empty');
+            card.style.display = '';
+
+            if (!_pePortfolioData || _pePortfolioData.length === 0) {
+                body.innerHTML = '';
+                empty.style.display = '';
+                return;
+            }
+            empty.style.display = 'none';
+
+            const data = [..._pePortfolioData];
+            data.sort((a, b) => {
+                let av, bv;
+                if (_peSortCol === 'company_name') { av = a.company_name || ''; bv = b.company_name || ''; }
+                else if (_peSortCol === 'industry') { av = a.industry || ''; bv = b.industry || ''; }
+                else if (_peSortCol === 'status') { av = a.status || ''; bv = b.status || ''; }
+                else if (_peSortCol === 'revenue_growth') { av = (a.metrics && a.metrics.revenue_growth) || 0; bv = (b.metrics && b.metrics.revenue_growth) || 0; }
+                else if (_peSortCol === 'ebitda_margin') { av = (a.metrics && a.metrics.ebitda_margin) || 0; bv = (b.metrics && b.metrics.ebitda_margin) || 0; }
+                else { av = peOverallPctl(a); bv = peOverallPctl(b); }
+                if (typeof av === 'string') return _peSortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+                return _peSortAsc ? av - bv : bv - av;
+            });
+
+            body.innerHTML = data.map(c => {
+                const pctl = peOverallPctl(c);
+                const pctlClass = pctl >= 75 ? 'green' : pctl >= 25 ? 'yellow' : 'red';
+                const revG = c.metrics ? c.metrics.revenue_growth : null;
+                const ebitda = c.metrics ? c.metrics.ebitda_margin : null;
+                const trend = peTrendFromMetrics(c.metrics);
+                const trendIcon = trend === 'improving' ? '↑' : trend === 'declining' ? '↓' : '→';
+                const indClass = ['Healthcare','Software','Industrials','Technology'].includes(c.industry) ? c.industry : 'default';
+                const selected = c.company_id === _peSelectedCompanyId ? ' pe-row-selected' : '';
+                const exited = c.status === 'Exited' ? ' pe-row-exited' : '';
+                return `<tr class="${selected}${exited}" onclick="peSelectCompany(${c.company_id})">
+                    <td><strong>${peEsc(c.company_name)}</strong></td>
+                    <td><span class="pe-industry-pill ${indClass}">${peEsc(c.industry || '—')}</span></td>
+                    <td><span class="pe-status-pill ${c.status || ''}">${peEsc(c.status || '—')}</span></td>
+                    <td class="pe-pct-cell ${revG != null && revG >= 50 ? 'green' : revG != null && revG >= 25 ? 'yellow' : 'red'}">${revG != null ? revG + 'th' : '—'}</td>
+                    <td class="pe-pct-cell ${ebitda != null && ebitda >= 50 ? 'green' : ebitda != null && ebitda >= 25 ? 'yellow' : 'red'}">${ebitda != null ? ebitda + 'th' : '—'}</td>
+                    <td class="pe-pct-cell ${pctlClass}">${pctl != null ? pctl + 'th' : '—'}</td>
+                    <td><span class="pe-trend ${trend}">${trendIcon} ${trend}</span></td>
+                </tr>`;
+            }).join('');
+        }
+
+        function peOverallPctl(company) {
+            if (!company.metrics) return 0;
+            const vals = Object.values(company.metrics).filter(v => v != null);
+            if (vals.length === 0) return 0;
+            return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+        }
+
+        function peTrendFromMetrics(metrics) {
+            if (!metrics) return 'stable';
+            const vals = Object.values(metrics).filter(v => v != null);
+            if (vals.length === 0) return 'stable';
+            const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+            if (avg >= 60) return 'improving';
+            if (avg <= 35) return 'declining';
+            return 'stable';
+        }
+
+        function peSortPortfolio(col) {
+            if (_peSortCol === col) _peSortAsc = !_peSortAsc;
+            else { _peSortCol = col; _peSortAsc = col === 'company_name' || col === 'industry'; }
+            peRenderPortfolio();
+        }
+
+        async function peSelectCompany(companyId) {
+            _peSelectedCompanyId = companyId;
+            peRenderPortfolio();
+            document.getElementById('pe-detail-panels').style.display = '';
+
+            try {
+                const [benchRes, exitRes] = await Promise.all([
+                    fetch(`${API}/pe/benchmarks/${companyId}`).then(r => r.ok ? r.json() : null),
+                    fetch(`${API}/pe/exit-readiness/${companyId}`).then(r => r.ok ? r.json() : null),
+                ]);
+                if (benchRes) peRenderBenchmark(benchRes);
+                else {
+                    document.getElementById('pe-kpi-grid').innerHTML = '<div class="pe-empty">No benchmark data available</div>';
+                    document.getElementById('pe-peer-body').innerHTML = '';
+                    if (_peRadarChart) { _peRadarChart.destroy(); _peRadarChart = null; }
+                }
+                if (exitRes) peRenderExitReadiness(exitRes);
+                else document.getElementById('pe-gauge-wrap').innerHTML = '<div class="pe-empty">No exit readiness data</div>';
+            } catch (e) {
+                showToast('Failed to load company details: ' + e.message, 'error');
+            }
+
+            document.getElementById('pe-detail-panels').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function peRenderBenchmark(data) {
+            document.getElementById('pe-benchmark-title').textContent = data.company_name + ' — Benchmarks (FY' + data.fiscal_year + ')';
+
+            const kpiMetrics = ['revenue_growth', 'ebitda_margin', 'debt_to_ebitda', 'fcf_margin'];
+            const kpiLabels = { revenue_growth: 'Rev Growth', ebitda_margin: 'EBITDA Margin', debt_to_ebitda: 'Debt/EBITDA', fcf_margin: 'FCF Margin' };
+            const grid = document.getElementById('pe-kpi-grid');
+            grid.innerHTML = '';
+            for (const key of kpiMetrics) {
+                const m = data.metrics.find(x => x.metric === key);
+                if (!m) continue;
+                const valStr = m.value != null ? (key === 'debt_to_ebitda' ? m.value.toFixed(1) + 'x' : m.value.toFixed(1) + '%') : '—';
+                const trendIcon = m.trend === 'improving' ? '↑' : m.trend === 'declining' ? '↓' : '→';
+                const trendClass = m.trend || 'stable';
+                grid.innerHTML += `<div class="pe-kpi">
+                    <div class="pe-kpi-value">${valStr}</div>
+                    <div class="pe-kpi-label">${kpiLabels[key] || m.label}</div>
+                    <div class="pe-kpi-trend pe-trend ${trendClass}">${trendIcon} ${m.percentile != null ? m.percentile + 'th pctl' : ''}</div>
+                </div>`;
+            }
+
+            peRenderRadar(data);
+
+            const peerBody = document.getElementById('pe-peer-body');
+            peerBody.innerHTML = data.metrics.map(m => {
+                const pctlClass = m.percentile >= 75 ? 'green' : m.percentile >= 25 ? 'yellow' : 'red';
+                const fmt = (v) => v != null ? (m.metric === 'debt_to_ebitda' ? v.toFixed(1) + 'x' : v.toFixed(1) + '%') : '—';
+                return `<tr>
+                    <td>${peEsc(m.label)}</td>
+                    <td><strong>${fmt(m.value)}</strong></td>
+                    <td>${fmt(m.industry_median)}</td>
+                    <td>${fmt(m.top_quartile)}</td>
+                    <td class="pe-pct-cell ${pctlClass}">${m.percentile != null ? m.percentile + 'th' : '—'}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function peRenderRadar(data) {
+            const canvas = document.getElementById('pe-radar-chart');
+            if (_peRadarChart) { _peRadarChart.destroy(); _peRadarChart = null; }
+
+            const metrics = data.metrics.filter(m => m.percentile != null);
+            if (metrics.length === 0) return;
+
+            _peRadarChart = new Chart(canvas, {
+                type: 'radar',
+                data: {
+                    labels: metrics.map(m => m.label),
+                    datasets: [
+                        {
+                            label: data.company_name,
+                            data: metrics.map(m => m.percentile),
+                            backgroundColor: 'rgba(99,102,241,0.2)',
+                            borderColor: '#6366f1',
+                            borderWidth: 2,
+                            pointBackgroundColor: '#6366f1',
+                            pointRadius: 4,
+                        },
+                        {
+                            label: 'Peer Median',
+                            data: metrics.map(() => 50),
+                            backgroundColor: 'rgba(148,163,184,0.08)',
+                            borderColor: '#64748b',
+                            borderWidth: 1,
+                            borderDash: [4, 4],
+                            pointRadius: 0,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 } } },
+                    },
+                    scales: {
+                        r: {
+                            min: 0, max: 100,
+                            ticks: { stepSize: 25, color: '#64748b', backdropColor: 'transparent', font: { size: 10 } },
+                            grid: { color: 'rgba(51,65,85,0.5)' },
+                            angleLines: { color: 'rgba(51,65,85,0.5)' },
+                            pointLabels: { color: '#94a3b8', font: { size: 11 } },
+                        },
+                    },
+                },
+            });
+        }
+
+        function peRenderExitReadiness(data) {
+            document.getElementById('pe-exit-title').textContent = data.company_name + ' — Exit Readiness';
+
+            const gaugeWrap = document.getElementById('pe-gauge-wrap');
+            const score = Math.round(data.composite_score);
+            const grade = data.grade;
+            const gradeColors = { 'A+': '#22c55e', 'A': '#22c55e', 'A-': '#4ade80', 'B+': '#a3e635', 'B': '#eab308', 'B-': '#f59e0b', 'C+': '#f97316', 'C': '#f97316', 'C-': '#ef4444', 'D': '#ef4444', 'F': '#dc2626' };
+            const color = gradeColors[grade] || '#6366f1';
+            const circumference = 2 * Math.PI * 72;
+            const dashOffset = circumference * (1 - score / 100);
+
+            gaugeWrap.innerHTML = `
+                <svg class="pe-gauge-svg" viewBox="0 0 180 180">
+                    <circle cx="90" cy="90" r="72" fill="none" stroke="#1e293b" stroke-width="12"/>
+                    <circle cx="90" cy="90" r="72" fill="none" stroke="${color}" stroke-width="12"
+                        stroke-dasharray="${circumference}" stroke-dashoffset="${dashOffset}"
+                        stroke-linecap="round" transform="rotate(-90 90 90)"
+                        style="transition: stroke-dashoffset 1s ease;"/>
+                    <text x="90" y="82" text-anchor="middle" fill="${color}" style="font-size:2.5rem;font-weight:700;">${score}</text>
+                    <text x="90" y="110" text-anchor="middle" fill="${color}" style="font-size:1.25rem;font-weight:600;">${grade}</text>
+                </svg>
+                <div class="pe-gauge-confidence">Confidence: ${peEsc(data.confidence)}</div>
+            `;
+
+            const barsEl = document.getElementById('pe-subscore-bars');
+            barsEl.innerHTML = data.sub_scores.map(s => {
+                const barColor = gradeColors[s.grade] || '#6366f1';
+                const pctWidth = Math.max(s.raw_score, 5);
+                return `<div class="pe-subscore-row">
+                    <div class="pe-subscore-label">${peEsc(s.label)}</div>
+                    <div class="pe-subscore-bar-bg">
+                        <div class="pe-subscore-bar-fill" style="width:${pctWidth}%;background:${barColor};">${Math.round(s.raw_score)}</div>
+                    </div>
+                    <div class="pe-subscore-grade" style="color:${barColor};">${s.grade}</div>
+                </div>`;
+            }).join('');
+
+            const recsList = document.getElementById('pe-recs-list');
+            recsList.innerHTML = data.recommendations.map((rec, i) => {
+                const isHigh = i < 3 ? ' high-priority' : '';
+                return `<li class="${isHigh}">${peEsc(rec)}</li>`;
+            }).join('');
+
+            const gapsSection = document.getElementById('pe-gaps-section');
+            const gapsList = document.getElementById('pe-gaps-list');
+            if (data.data_gaps && data.data_gaps.length > 0) {
+                gapsSection.style.display = '';
+                gapsList.innerHTML = data.data_gaps.map(g => `<span class="pe-gap-chip">${peEsc(g)}</span>`).join('');
+            } else {
+                gapsSection.style.display = 'none';
+            }
+        }
+
+        async function peSeedDemo() {
+            const btn = document.getElementById('pe-seed-btn');
+            btn.disabled = true;
+            btn.textContent = 'Seeding...';
+            try {
+                const r = await fetch(`${API}/pe/seed-demo`, { method: 'POST' });
+                if (!r.ok) throw new Error(r.statusText);
+                const data = await r.json();
+                showToast('Seeded ' + data.total_rows + ' rows across ' + Object.keys(data.tables).length + ' tables', 'success');
+                _peInitialized = false;
+                peInitialize();
+            } catch (e) {
+                showToast('Seed failed: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Seed Demo Data';
+            }
+        }
+
+        function peEsc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
 
         // ===== Data Quality Tab =====
         let _dqInitialized = false;

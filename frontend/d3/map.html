@@ -251,6 +251,7 @@
 <body>
 
 <div class="header">
+  <a href="index.html" style="color:#94a3b8;text-decoration:none;font-size:0.85rem;position:absolute;left:1.5rem;top:50%;transform:translateY(-50%);" onmouseover="this.style.color='#f1f5f9'" onmouseout="this.style.color='#94a3b8'">&larr; Gallery</a>
   <h1><span>Location Intelligence</span> — Site Selection Scores</h1>
 </div>
 
@@ -456,7 +457,13 @@ function render() {
 
   const tooltip = document.getElementById("tooltip");
 
-  d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").then(us => {
+  d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").catch(err => {
+    svg.append("text").attr("x", width/2).attr("y", height/2).attr("text-anchor","middle")
+      .attr("fill","#94a3b8").attr("font-size","1rem")
+      .text("Failed to load map data. Check network connection.");
+    console.error("TopoJSON load error:", err);
+  }).then(us => {
+    if (!us) return;
     const states = topojson.feature(us, us.objects.states);
     const stateMap = new Map();
     states.features.forEach(f => stateMap.set(f.id, f));
