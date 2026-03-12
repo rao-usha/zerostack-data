@@ -1024,7 +1024,7 @@ async def seed_pe_demo_data(db: Session) -> Dict[str, int]:
             logger.warning("Firm not found: %s", firm_name)
             continue
         for fund in fund_list:
-            all_funds.append({**fund, "firm_id": firm_id})
+            all_funds.append({**fund, "firm_id": firm_id, "data_source": "demo_seeder"})
     counts["pe_funds"] = _upsert_rows(db, PEFund, all_funds, ["name"], has_db_constraint=False)
 
     # 3. Fund performance
@@ -1044,7 +1044,7 @@ async def seed_pe_demo_data(db: Session) -> Dict[str, int]:
     all_companies = []
     for firm_name, co_list in PORTFOLIO_COMPANIES.items():
         for co in co_list:
-            all_companies.append(co)
+            all_companies.append({**co, "data_source": "demo_seeder"})
     counts["pe_portfolio_companies"] = _upsert_rows(
         db, PEPortfolioCompany, all_companies, ["name"], has_db_constraint=False,
     )

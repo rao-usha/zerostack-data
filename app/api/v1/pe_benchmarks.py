@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import String, cast, delete, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -24,10 +24,12 @@ from app.core.pe_models import (
     PECompanyNews,
     PECompetitorMapping,
     PEDeal,
+    PEDealParticipant,
     PEFirm,
     PEFirmPeople,
     PEFund,
     PEFundInvestment,
+    PEFundPerformance,
     PEPerson,
     PEPortfolioCompany,
 )
@@ -145,6 +147,160 @@ async def seed_demo_data(db: Session = Depends(get_db)):
     except Exception as e:
         logger.exception("Demo seeder failed: %s", e)
         raise HTTPException(status_code=500, detail=f"Seeder failed: {str(e)}")
+
+
+@router.delete("/seed-demo")
+async def cleanup_demo_data(db: Session = Depends(get_db)):
+    """
+    Remove all demo seeder data in correct FK order.
+    Returns count of deleted rows per table.
+    """
+    counts: Dict[str, int] = {}
+
+    try:
+        # Identify demo entities by data_source tags
+        demo_firm_ids = [
+            r[0] for r in db.execute(
+                select(PEFirm.id).where(
+                    cast(PEFirm.data_sources, String).like("%demo_seeder%")
+                )
+            ).all()
+        ]
+        demo_fund_ids = [
+            r[0] for r in db.execute(
+                select(PEFund.id).where(PEFund.data_source == "demo_seeder")
+            ).all()
+        ]
+        demo_company_ids = [
+            r[0] for r in db.execute(
+                select(PEPortfolioCompany.id).where(
+                    PEPortfolioCompany.data_source == "demo_seeder"
+                )
+            ).all()
+        ]
+        demo_deal_ids = [
+            r[0] for r in db.execute(
+                select(PEDeal.id).where(PEDeal.company_id.in_(demo_company_ids))
+            ).all()
+        ] if demo_company_ids else []
+        demo_person_ids = [
+            r[0] for r in db.execute(
+                select(PEPerson.id).where(
+                    cast(PEPerson.data_sources, String).like("%demo_seeder%")
+                )
+            ).all()
+        ]
+
+        # Delete in FK order (children first)
+        # 1. Fund investments
+        if demo_fund_ids:
+            r = db.execute(
+                delete(PEFundInvestment).where(PEFundInvestment.fund_id.in_(demo_fund_ids))
+            )
+            counts["pe_fund_investments"] = r.rowcount
+
+        # 2. Deal participants
+        if demo_deal_ids:
+            r = db.execute(
+                delete(PEDealParticipant).where(PEDealParticipant.deal_id.in_(demo_deal_ids))
+            )
+            counts["pe_deal_participants"] = r.rowcount
+
+        # 3. Deals
+        if demo_company_ids:
+            r = db.execute(
+                delete(PEDeal).where(PEDeal.company_id.in_(demo_company_ids))
+            )
+            counts["pe_deals"] = r.rowcount
+
+        # 4. Company news
+        r = db.execute(
+            delete(PECompanyNews).where(
+                PECompanyNews.source_url.like("%example.com%")
+            )
+        )
+        counts["pe_company_news"] = r.rowcount
+
+        # 5. Competitor mappings
+        r = db.execute(
+            delete(PECompetitorMapping).where(
+                PECompetitorMapping.data_source == "demo_seeder"
+            )
+        )
+        counts["pe_competitor_mappings"] = r.rowcount
+
+        # 6. Company leadership
+        r = db.execute(
+            delete(PECompanyLeadership).where(
+                PECompanyLeadership.data_source == "demo_seeder"
+            )
+        )
+        counts["pe_company_leadership"] = r.rowcount
+
+        # 7. Firm-people links
+        if demo_person_ids:
+            r = db.execute(
+                delete(PEFirmPeople).where(PEFirmPeople.person_id.in_(demo_person_ids))
+            )
+            counts["pe_firm_people"] = r.rowcount
+
+        # 8. People
+        if demo_person_ids:
+            r = db.execute(
+                delete(PEPerson).where(PEPerson.id.in_(demo_person_ids))
+            )
+            counts["pe_people"] = r.rowcount
+
+        # 9. Company financials
+        r = db.execute(
+            delete(PECompanyFinancials).where(
+                PECompanyFinancials.data_source == "demo_seeder"
+            )
+        )
+        counts["pe_company_financials"] = r.rowcount
+
+        # 10. Fund performance
+        if demo_fund_ids:
+            r = db.execute(
+                delete(PEFundPerformance).where(
+                    PEFundPerformance.fund_id.in_(demo_fund_ids)
+                )
+            )
+            counts["pe_fund_performance"] = r.rowcount
+
+        # 11. Portfolio companies
+        if demo_company_ids:
+            r = db.execute(
+                delete(PEPortfolioCompany).where(
+                    PEPortfolioCompany.id.in_(demo_company_ids)
+                )
+            )
+            counts["pe_portfolio_companies"] = r.rowcount
+
+        # 12. Funds
+        if demo_fund_ids:
+            r = db.execute(
+                delete(PEFund).where(PEFund.id.in_(demo_fund_ids))
+            )
+            counts["pe_funds"] = r.rowcount
+
+        # 13. Firms
+        if demo_firm_ids:
+            r = db.execute(
+                delete(PEFirm).where(PEFirm.id.in_(demo_firm_ids))
+            )
+            counts["pe_firms"] = r.rowcount
+
+        db.commit()
+
+        total = sum(counts.values())
+        logger.info("Demo cleanup complete: %d total rows deleted", total)
+        return {"status": "cleaned", "tables": counts, "total_deleted": total}
+
+    except Exception as e:
+        db.rollback()
+        logger.exception("Demo cleanup failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
 
 
 @router.get("/benchmarks/{company_id}", response_model=CompanyBenchmarkResponse)

@@ -168,6 +168,9 @@ class PEFund(Base):
     # SEC/Regulatory
     sec_file_number = Column(String(50))
 
+    # Data Source
+    data_source = Column(String(100))
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -283,6 +286,9 @@ class PEPortfolioCompany(Base):
 
     # Status
     status = Column(String(50), default="Active")  # Active, Exited, Bankrupt, Merged
+
+    # Data Source
+    data_source = Column(String(100))
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
