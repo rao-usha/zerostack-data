@@ -1013,6 +1013,22 @@
         .dq-source-bar { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
         .dq-source-score { min-width: 28px; text-align: right; font-weight: 600; font-size: 0.75rem; }
 
+        /* Source Leaderboard Table */
+        .dq-leaderboard { margin-top: 1.5rem; }
+        .dq-lb-table { width: 100%; border-collapse: collapse; }
+        .dq-lb-table th { text-align: left; padding: 0.5rem 0.625rem; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); font-weight: 500; cursor: pointer; user-select: none; }
+        .dq-lb-table th:hover { color: var(--text); }
+        .dq-lb-table td { padding: 0.5rem 0.625rem; font-size: 0.8rem; border-bottom: 1px solid rgba(51,65,85,0.4); }
+        .dq-lb-table tbody tr { cursor: pointer; transition: background 0.12s; }
+        .dq-lb-table tbody tr:hover { background: rgba(99,102,241,0.08); }
+        .dq-lb-table tbody tr.dq-lb-selected { background: rgba(99,102,241,0.15); }
+        .dq-lb-score { font-weight: 600; }
+        .dq-lb-bar { display: inline-block; width: 50px; height: 6px; background: var(--bg-input); border-radius: 3px; overflow: hidden; vertical-align: middle; margin-right: 4px; }
+        .dq-lb-bar-fill { height: 100%; border-radius: 3px; }
+        .dq-lb-recs { display: inline-flex; align-items: center; gap: 0.25rem; }
+        .dq-lb-recs-count { font-weight: 600; font-size: 0.8rem; }
+        .dq-lb-date { font-size: 0.75rem; color: var(--text-muted); }
+
         .dq-result-count { font-size: 0.8rem; color: var(--text-muted); margin-left: auto; }
 
         @media (max-width: 900px) {
@@ -1216,6 +1232,37 @@
 
         .pe-gaps-list { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-top: 0.75rem; }
         .pe-gap-chip { background: rgba(239,68,68,0.1); color: #f87171; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.7rem; font-weight: 500; }
+
+        .pe-second-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+        @media (max-width: 1100px) { .pe-second-row { grid-template-columns: 1fr; } }
+
+        /* Buyer Analysis */
+        .pe-buyer-table { width: 100%; border-collapse: collapse; }
+        .pe-buyer-table th { text-align: left; padding: 0.5rem 0.625rem; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        .pe-buyer-table td { padding: 0.6rem 0.625rem; font-size: 0.8rem; border-bottom: 1px solid rgba(51,65,85,0.4); vertical-align: top; }
+        .pe-buyer-type { padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; white-space: nowrap; }
+        .pe-buyer-type.Strategic { background: rgba(34,197,94,0.12); color: #4ade80; }
+        .pe-buyer-type.Financial { background: rgba(99,102,241,0.12); color: #818cf8; }
+        .pe-buyer-type.PE { background: rgba(245,158,11,0.12); color: #fbbf24; }
+        .pe-fit-bar-bg { width: 60px; height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 4px; }
+        .pe-fit-bar-fill { height: 100%; border-radius: 4px; }
+        .pe-buyer-rationale { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+        .pe-buyer-ticker { font-family: monospace; font-size: 0.7rem; color: var(--accent); background: rgba(6,182,212,0.1); padding: 0.1rem 0.4rem; border-radius: 3px; margin-left: 0.35rem; }
+
+        /* Data Room */
+        .pe-dr-gauge { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+        .pe-dr-gauge-bar { flex: 1; height: 14px; background: var(--bg-input); border-radius: 7px; overflow: hidden; }
+        .pe-dr-gauge-fill { height: 100%; border-radius: 7px; transition: width 0.6s ease; }
+        .pe-dr-gauge-pct { font-size: 1.25rem; font-weight: 700; min-width: 50px; text-align: right; }
+        .pe-dr-sections { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+        @media (max-width: 768px) { .pe-dr-sections { grid-template-columns: repeat(2, 1fr); } }
+        .pe-dr-section { background: var(--bg-input); border-radius: 8px; padding: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+        .pe-dr-check { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
+        .pe-dr-check.ok { background: rgba(34,197,94,0.2); color: var(--success); }
+        .pe-dr-check.missing { background: rgba(239,68,68,0.15); color: var(--error); }
+        .pe-dr-label { font-size: 0.8rem; font-weight: 500; }
+        .pe-dr-count { font-size: 0.7rem; color: var(--text-muted); }
+        .pe-dr-missing-list { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-top: 0.75rem; }
 
         .pe-empty { text-align: center; padding: 3rem; color: var(--text-muted); }
         .pe-empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
@@ -1819,6 +1866,25 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Buyer Analysis + Data Room (shown on row click, second row) -->
+            <div class="pe-second-row" id="pe-second-row" style="display:none;">
+                <!-- Buyer Analysis -->
+                <div class="card" id="pe-buyers-card">
+                    <div class="card-title" id="pe-buyers-title">Potential Buyers</div>
+                    <div id="pe-buyers-content">
+                        <div class="loading">Select a company to see buyer analysis.</div>
+                    </div>
+                </div>
+
+                <!-- Data Room -->
+                <div class="card" id="pe-dataroom-card">
+                    <div class="card-title" id="pe-dataroom-title">Data Room</div>
+                    <div id="pe-dataroom-content">
+                        <div class="loading">Select a company to see data room status.</div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="tab-dq" class="hidden">
@@ -1893,6 +1959,28 @@
                         <button class="btn btn-secondary" onclick="dqLoadMore()">Load more...</button>
                     </div>
                 </div>
+            </div>
+
+            <!-- Source Quality Leaderboard -->
+            <div class="card dq-leaderboard">
+                <div class="card-title">Source Quality Leaderboard</div>
+                <div style="overflow-x:auto;">
+                    <table class="dq-lb-table">
+                        <thead>
+                            <tr>
+                                <th onclick="dqSortLeaderboard('source')">Source</th>
+                                <th onclick="dqSortLeaderboard('quality_score')">Quality</th>
+                                <th onclick="dqSortLeaderboard('completeness')">Complete</th>
+                                <th onclick="dqSortLeaderboard('freshness')">Freshness</th>
+                                <th onclick="dqSortLeaderboard('validity')">Validity</th>
+                                <th onclick="dqSortLeaderboard('recs')">Open Recs</th>
+                                <th onclick="dqSortLeaderboard('snapshot_date')">Last Scored</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dq-lb-body"></tbody>
+                    </table>
+                </div>
+                <div id="dq-lb-empty" class="empty" style="display:none;">No source quality data available. Run a DQ analysis first.</div>
             </div>
         </div>
     </main>
@@ -9028,6 +9116,7 @@
                 _pePortfolioData = await r.json();
                 _peSelectedCompanyId = null;
                 document.getElementById('pe-detail-panels').style.display = 'none';
+                document.getElementById('pe-second-row').style.display = 'none';
                 peRenderPortfolio();
             } catch (e) {
                 showToast('Failed to load portfolio: ' + e.message, 'error');
@@ -9109,11 +9198,14 @@
             _peSelectedCompanyId = companyId;
             peRenderPortfolio();
             document.getElementById('pe-detail-panels').style.display = '';
+            document.getElementById('pe-second-row').style.display = '';
 
             try {
-                const [benchRes, exitRes] = await Promise.all([
+                const [benchRes, exitRes, buyerRes, drRes] = await Promise.all([
                     fetch(`${API}/pe/benchmarks/${companyId}`).then(r => r.ok ? r.json() : null),
                     fetch(`${API}/pe/exit-readiness/${companyId}`).then(r => r.ok ? r.json() : null),
+                    fetch(`${API}/pe/buyer-analysis/${companyId}`).then(r => r.ok ? r.json() : null).catch(() => null),
+                    fetch(`${API}/pe/data-room/${companyId}`).then(r => r.ok ? r.json() : null).catch(() => null),
                 ]);
                 if (benchRes) peRenderBenchmark(benchRes);
                 else {
@@ -9123,6 +9215,10 @@
                 }
                 if (exitRes) peRenderExitReadiness(exitRes);
                 else document.getElementById('pe-gauge-wrap').innerHTML = '<div class="pe-empty">No exit readiness data</div>';
+                if (buyerRes) peRenderBuyers(buyerRes);
+                else document.getElementById('pe-buyers-content').innerHTML = '<div class="pe-empty">No buyer analysis available</div>';
+                if (drRes) peRenderDataRoom(drRes);
+                else document.getElementById('pe-dataroom-content').innerHTML = '<div class="pe-empty">No data room data available</div>';
             } catch (e) {
                 showToast('Failed to load company details: ' + e.message, 'error');
             }
@@ -9289,6 +9385,78 @@
             }
         }
 
+        function peRenderBuyers(data) {
+            document.getElementById('pe-buyers-title').textContent = data.company_name + ' — Potential Buyers (' + data.total_candidates + ')';
+            const el = document.getElementById('pe-buyers-content');
+            const all = [...(data.strategic_buyers || []), ...(data.financial_buyers || [])];
+            if (all.length === 0) {
+                el.innerHTML = '<div class="pe-empty">No buyer candidates identified yet.</div>';
+                return;
+            }
+            all.sort((a, b) => b.fit_score - a.fit_score);
+            let html = '<table class="pe-buyer-table"><thead><tr><th>Buyer</th><th>Type</th><th>Fit</th><th>Rationale</th></tr></thead><tbody>';
+            for (const b of all) {
+                const typeClass = b.buyer_type === 'Strategic' ? 'Strategic' : b.buyer_type === 'Financial' ? 'Financial' : 'PE';
+                const fitColor = b.fit_score >= 70 ? 'var(--success)' : b.fit_score >= 40 ? 'var(--warning)' : 'var(--error)';
+                const ticker = b.ticker ? `<span class="pe-buyer-ticker">${peEsc(b.ticker)}</span>` : '';
+                html += `<tr>
+                    <td><strong>${peEsc(b.name)}</strong>${ticker}</td>
+                    <td><span class="pe-buyer-type ${typeClass}">${peEsc(b.buyer_type)}</span></td>
+                    <td><div class="pe-fit-bar-bg"><div class="pe-fit-bar-fill" style="width:${b.fit_score}%;background:${fitColor};"></div></div> ${b.fit_score}</td>
+                    <td><div class="pe-buyer-rationale">${peEsc(b.rationale)}</div></td>
+                </tr>`;
+            }
+            html += '</tbody></table>';
+            el.innerHTML = html;
+        }
+
+        function peRenderDataRoom(data) {
+            document.getElementById('pe-dataroom-title').textContent = data.company_name + ' — Data Room';
+            const el = document.getElementById('pe-dataroom-content');
+            const pct = data.completeness_pct || 0;
+            const pctColor = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--error)';
+
+            const sections = [
+                { key: 'financials', label: 'Financials', count: (data.financials || []).length, unit: 'years' },
+                { key: 'leadership', label: 'Leadership', count: (data.leadership || []).length, unit: 'people' },
+                { key: 'competitors', label: 'Competitors', count: (data.competitors || []).length, unit: 'mapped' },
+                { key: 'recent_news', label: 'News', count: (data.recent_news || []).length, unit: 'articles' },
+                { key: 'benchmarks', label: 'Benchmarks', count: data.benchmarks ? 1 : 0, unit: '' },
+                { key: 'exit_readiness', label: 'Exit Score', count: data.exit_readiness ? 1 : 0, unit: '' },
+            ];
+
+            let html = `<div class="pe-dr-gauge">
+                <div class="pe-dr-gauge-bar"><div class="pe-dr-gauge-fill" style="width:${pct}%;background:${pctColor};"></div></div>
+                <div class="pe-dr-gauge-pct" style="color:${pctColor};">${pct}%</div>
+            </div>`;
+
+            html += '<div class="pe-dr-sections">';
+            for (const s of sections) {
+                const ok = s.count > 0;
+                const icon = ok ? '&#10003;' : '&#10007;';
+                const cls = ok ? 'ok' : 'missing';
+                const countStr = s.count > 0 ? `${s.count} ${s.unit}` : 'Missing';
+                html += `<div class="pe-dr-section">
+                    <div class="pe-dr-check ${cls}">${icon}</div>
+                    <div>
+                        <div class="pe-dr-label">${peEsc(s.label)}</div>
+                        <div class="pe-dr-count">${countStr}</div>
+                    </div>
+                </div>`;
+            }
+            html += '</div>';
+
+            if (data.missing_sections && data.missing_sections.length > 0) {
+                html += '<div class="pe-dr-missing-list" style="margin-top:0.75rem;">';
+                for (const m of data.missing_sections) {
+                    html += `<span class="pe-gap-chip">${peEsc(m)}</span>`;
+                }
+                html += '</div>';
+            }
+
+            el.innerHTML = html;
+        }
+
         function peEsc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
 
         // ===== Data Quality Tab =====
@@ -9374,9 +9542,12 @@
         }
 
         // Fetch paginated recs to build accurate donut category counts
+        let _dqRecsPerSource = {};
+
         async function dqLoadDonutData() {
             try {
                 const byCat = {};
+                const bySource = {};
                 let offset = 0;
                 const batchSize = 200;
                 while (true) {
@@ -9386,10 +9557,13 @@
                     arr.forEach(r => {
                         const cat = r.category || 'unknown';
                         byCat[cat] = (byCat[cat] || 0) + 1;
+                        const src = r.source || 'unknown';
+                        bySource[src] = (bySource[src] || 0) + 1;
                     });
                     if (arr.length < batchSize) break;
                     offset += batchSize;
                 }
+                _dqRecsPerSource = bySource;
                 dqRenderDonut(byCat);
             } catch (e) {
                 console.error('DQ donut data error:', e);
@@ -9483,6 +9657,87 @@
             });
             html += '</div>';
             container.innerHTML = html;
+
+            // Also populate the leaderboard table
+            dqRenderLeaderboard(scores);
+        }
+
+        let _dqLbData = [];
+        let _dqLbSortCol = 'quality_score';
+        let _dqLbSortAsc = false;
+        let _dqLbSelectedSource = null;
+
+        function dqRenderLeaderboard(scores) {
+            _dqLbData = Object.entries(scores).map(([src, s]) => ({
+                source: src,
+                quality_score: s.quality_score,
+                completeness: s.completeness,
+                freshness: s.freshness,
+                validity: s.validity,
+                consistency: s.consistency,
+                snapshot_date: s.snapshot_date,
+                recs: 0, // will be counted from loaded recs
+            }));
+
+            // Count open recs per source from donut data
+            _dqLbData.forEach(row => { row.recs = _dqRecsPerSource[row.source] || 0; });
+
+            dqSortAndRenderLb();
+        }
+
+        function dqSortLeaderboard(col) {
+            if (_dqLbSortCol === col) _dqLbSortAsc = !_dqLbSortAsc;
+            else { _dqLbSortCol = col; _dqLbSortAsc = col === 'source'; }
+            dqSortAndRenderLb();
+        }
+
+        function dqSortAndRenderLb() {
+            const body = document.getElementById('dq-lb-body');
+            const empty = document.getElementById('dq-lb-empty');
+            if (_dqLbData.length === 0) {
+                body.innerHTML = '';
+                empty.style.display = '';
+                return;
+            }
+            empty.style.display = 'none';
+
+            const data = [..._dqLbData];
+            data.sort((a, b) => {
+                let av = a[_dqLbSortCol], bv = b[_dqLbSortCol];
+                if (typeof av === 'string' && typeof bv === 'string') return _dqLbSortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+                av = av || 0; bv = bv || 0;
+                return _dqLbSortAsc ? av - bv : bv - av;
+            });
+
+            body.innerHTML = data.map(row => {
+                const q = row.quality_score != null ? row.quality_score.toFixed(0) : '—';
+                const qColor = row.quality_score >= 80 ? 'var(--success)' : row.quality_score >= 50 ? 'var(--warning)' : 'var(--error)';
+                const fmtSub = v => v != null ? v.toFixed(0) : '—';
+                const selected = _dqLbSelectedSource === row.source ? ' dq-lb-selected' : '';
+                const dateStr = row.snapshot_date ? row.snapshot_date.substring(0, 10) : '—';
+                return `<tr class="${selected}" onclick="dqFilterBySource('${row.source}')">
+                    <td><strong style="text-transform:capitalize;">${row.source}</strong></td>
+                    <td><div class="dq-lb-bar"><div class="dq-lb-bar-fill" style="width:${row.quality_score || 0}%;background:${qColor};"></div></div> <span class="dq-lb-score" style="color:${qColor};">${q}</span></td>
+                    <td>${fmtSub(row.completeness)}</td>
+                    <td>${fmtSub(row.freshness)}</td>
+                    <td>${fmtSub(row.validity)}</td>
+                    <td class="dq-lb-recs"><span class="dq-lb-recs-count">${row.recs}</span></td>
+                    <td class="dq-lb-date">${dateStr}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function dqFilterBySource(source) {
+            if (_dqLbSelectedSource === source) {
+                // Deselect — clear filter
+                _dqLbSelectedSource = null;
+                document.getElementById('dq-filter-source').value = '';
+            } else {
+                _dqLbSelectedSource = source;
+                document.getElementById('dq-filter-source').value = source;
+            }
+            dqSortAndRenderLb();
+            dqApplyFilters();
         }
 
         async function dqApplyFilters() {
