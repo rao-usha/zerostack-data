@@ -120,6 +120,8 @@ class FHFAClient:
 
                         # Parse date and apply date filters
                         record_date = row.get("date")
+                        if not record_date:
+                            continue
                         if start_date and record_date < start_date:
                             continue
                         if end_date and record_date > end_date:

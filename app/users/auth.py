@@ -4,7 +4,6 @@ User Authentication Service.
 Provides user registration, login, JWT token management, and password handling.
 """
 
-import os
 import secrets
 import logging
 from datetime import datetime, timedelta
@@ -23,7 +22,9 @@ ALGORITHM = "HS256"
 
 def _get_secret_key() -> str:
     """Get JWT secret key, failing loudly if not configured."""
-    key = os.getenv("JWT_SECRET_KEY")
+    from app.core.config import get_settings
+
+    key = get_settings().jwt_secret_key
     if not key:
         raise RuntimeError(
             "JWT_SECRET_KEY environment variable is required. "

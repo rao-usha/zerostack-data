@@ -83,7 +83,7 @@ class NPPESClient(BaseAPIClient):
                 # Check if it's a "no results" error vs a real error
                 for err in errors:
                     desc = err.get("description", "").lower()
-                    if "no result" in desc or "no match" in desc:
+                    if "no result" in desc or "no match" in desc or "no taxonomy codes" in desc:
                         logger.debug(
                             f"[nppes] No results for {resource_id}: {error_msg}"
                         )

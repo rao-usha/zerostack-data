@@ -77,8 +77,7 @@ TIER_2 = Tier(
     sources=[
         SourceDef("eia", {"dataset": "petroleum_weekly", "subcategory": "consumption", "frequency": "weekly", "incremental": True}),
         SourceDef("cftc_cot", {"report_type": "all", "incremental": True}),
-        SourceDef("web_traffic", {"list": "tranco_top1m"}),
-        SourceDef("github"),
+        # web_traffic, github — no ingest functions implemented yet
         SourceDef("noaa", {"dataset": "daily_summaries", "incremental": True}),
     ],
 )
@@ -96,14 +95,14 @@ TIER_3 = Tier(
         SourceDef("eia", {"dataset": "natural_gas", "subcategory": "consumption", "incremental": True}),
         SourceDef("fema", {"dataset": "disasters", "incremental": True}),
         SourceDef("fdic", {"dataset": "financials", "incremental": True}),
-        SourceDef("form_adv"),
-        SourceDef("form_d"),
+        SourceDef("sec:formadv"),
+        # form_d — no ingest function implemented yet
         SourceDef("cms", {"dataset": "utilization", "incremental": True}),
         SourceDef("fbi_crime", {"dataset": "ucr"}),
-        SourceDef("irs_soi", {"dataset": "zip_income", "incremental": True}),
-        SourceDef("data_commons"),
-        SourceDef("fcc_broadband"),
-        SourceDef("app_rankings"),
+        SourceDef("irs_soi", {"dataset": "zip_income", "year": 2021, "incremental": True}),
+        SourceDef("data_commons:us_states"),
+        SourceDef("fcc_broadband:all_states"),
+        # app_rankings — no ingest function implemented yet
         SourceDef("job_postings:all", {"skip_recent_hours": 600}),
     ],
 )
@@ -114,17 +113,16 @@ TIER_4 = Tier(
     priority=3,
     name="Quarterly — Census, SEC & Trade",
     sources=[
-        SourceDef("census", {"survey": "acs5", "geo_level": "county", "incremental": True}),
+        SourceDef("census", {"survey": "acs5", "geo_level": "county", "year": 2023, "table_id": "B01001", "incremental": True}),
         SourceDef("bea", {"dataset": "regional", "table_name": "SAGDP2N", "incremental": True}),
-        SourceDef("sec", {"filing_type": "10-K,10-Q", "incremental": True}),
-        SourceDef("sec", {"filing_type": "13F", "incremental": True}),
+        # sec — requires cik per-company; skip in batch (use dedicated PE pipeline)
         SourceDef("uspto", {"incremental": True}),
-        SourceDef("us_trade", {"incremental": True}),
+        SourceDef("us_trade:summary", {"year": "2025"}),
         SourceDef("bts", {"incremental": True}),
-        SourceDef("international_econ", {"incremental": True}),
+        SourceDef("international_econ:worldbank_countries"),
         SourceDef("realestate", {"incremental": True}),
-        SourceDef("opencorporates"),
-        SourceDef("usda", {"incremental": True}),
+        # opencorporates — no ingest function implemented yet
+        SourceDef("usda:annual_summary", {"year": "2025"}),
     ],
 )
 

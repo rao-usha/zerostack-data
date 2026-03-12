@@ -165,7 +165,7 @@ def create_split_jobs(
             ing_job = IngestionJob(
                 source=f"{source_key}:split_{group_idx}",
                 status=ing_status,
-                config={"states": state_group},
+                config={**base_payload.get("config", {}), "states": state_group},
                 batch_run_id=base_payload.get("batch_id"),
                 trigger="batch",
                 tier=base_payload.get("tier"),

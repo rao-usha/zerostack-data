@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     # Database (REQUIRED for API startup)
     database_url: str = Field(..., description="PostgreSQL connection URL")
 
+    # JWT Authentication
+    jwt_secret_key: Optional[str] = Field(
+        default=None,
+        description="JWT secret key for authentication tokens",
+    )
+
     # Census API Configuration (OPTIONAL for startup, REQUIRED for ingestion)
     census_survey_api_key: Optional[str] = Field(
         default=None,
@@ -107,6 +113,10 @@ class Settings(BaseSettings):
     yelp_api_key: Optional[str] = Field(
         default=None,
         description="Yelp Fusion API key - required for Yelp operations (500 calls/day free tier)",
+    )
+    yelp_client_id: Optional[str] = Field(
+        default=None,
+        description="Yelp Fusion client ID",
     )
 
     # SAM.gov API Configuration (REQUIRED for SAM.gov ingestion)

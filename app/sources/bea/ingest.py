@@ -107,13 +107,14 @@ async def ingest_nipa_data(
     Returns:
         Dictionary with ingestion results
     """
+    settings = get_settings()
+    if not api_key:
+        api_key = settings.bea_api_key
     if not api_key:
         raise ValueError(
             "BEA_API_KEY is required for BEA operations. "
             "Get a free key at: https://apps.bea.gov/api/signup/"
         )
-
-    settings = get_settings()
 
     client = BEAClient(
         api_key=api_key,
@@ -264,13 +265,14 @@ async def ingest_regional_data(
     Returns:
         Dictionary with ingestion results
     """
+    settings = get_settings()
+    if not api_key:
+        api_key = settings.bea_api_key
     if not api_key:
         raise ValueError(
             "BEA_API_KEY is required for BEA operations. "
             "Get a free key at: https://apps.bea.gov/api/signup/"
         )
-
-    settings = get_settings()
 
     client = BEAClient(
         api_key=api_key,
@@ -417,13 +419,14 @@ async def ingest_gdp_by_industry_data(
     Returns:
         Dictionary with ingestion results
     """
+    settings = get_settings()
+    if not api_key:
+        api_key = settings.bea_api_key
     if not api_key:
         raise ValueError(
             "BEA_API_KEY is required for BEA operations. "
             "Get a free key at: https://apps.bea.gov/api/signup/"
         )
-
-    settings = get_settings()
 
     client = BEAClient(
         api_key=api_key,
@@ -568,13 +571,14 @@ async def ingest_international_data(
     Returns:
         Dictionary with ingestion results
     """
+    settings = get_settings()
+    if not api_key:
+        api_key = settings.bea_api_key
     if not api_key:
         raise ValueError(
             "BEA_API_KEY is required for BEA operations. "
             "Get a free key at: https://apps.bea.gov/api/signup/"
         )
-
-    settings = get_settings()
 
     client = BEAClient(
         api_key=api_key,

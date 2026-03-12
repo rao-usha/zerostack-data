@@ -126,13 +126,14 @@ async def ingest_eia_petroleum_data(
     Returns:
         Dictionary with ingestion results
     """
+    settings = get_settings()
+    if not api_key:
+        api_key = settings.eia_api_key
     if not api_key:
         raise ValueError(
             "EIA_API_KEY is required for EIA operations. "
             "Get a free key at: https://www.eia.gov/opendata/register.php"
         )
-
-    settings = get_settings()
 
     # Initialize EIA client
     client = EIAClient(
@@ -306,13 +307,14 @@ async def ingest_eia_natural_gas_data(
 
     Similar structure to petroleum ingestion.
     """
+    settings = get_settings()
+    if not api_key:
+        api_key = settings.eia_api_key
     if not api_key:
         raise ValueError(
             "EIA_API_KEY is required for EIA operations. "
             "Get a free key at: https://www.eia.gov/opendata/register.php"
         )
-
-    settings = get_settings()
     client = EIAClient(
         api_key=api_key,
         max_concurrency=settings.max_concurrency,
@@ -459,13 +461,14 @@ async def ingest_eia_electricity_data(
     """
     Ingest EIA electricity data into Postgres.
     """
+    settings = get_settings()
+    if not api_key:
+        api_key = settings.eia_api_key
     if not api_key:
         raise ValueError(
             "EIA_API_KEY is required for EIA operations. "
             "Get a free key at: https://www.eia.gov/opendata/register.php"
         )
-
-    settings = get_settings()
     client = EIAClient(
         api_key=api_key,
         max_concurrency=settings.max_concurrency,
@@ -612,13 +615,14 @@ async def ingest_eia_retail_gas_prices(
     """
     Ingest EIA retail gas prices into Postgres.
     """
+    settings = get_settings()
+    if not api_key:
+        api_key = settings.eia_api_key
     if not api_key:
         raise ValueError(
             "EIA_API_KEY is required for EIA operations. "
             "Get a free key at: https://www.eia.gov/opendata/register.php"
         )
-
-    settings = get_settings()
     client = EIAClient(
         api_key=api_key,
         max_concurrency=settings.max_concurrency,
@@ -758,13 +762,14 @@ async def ingest_eia_steo_projections(
     """
     Ingest EIA STEO (Short-Term Energy Outlook) projections into Postgres.
     """
+    settings = get_settings()
+    if not api_key:
+        api_key = settings.eia_api_key
     if not api_key:
         raise ValueError(
             "EIA_API_KEY is required for EIA operations. "
             "Get a free key at: https://www.eia.gov/opendata/register.php"
         )
-
-    settings = get_settings()
     client = EIAClient(
         api_key=api_key,
         max_concurrency=settings.max_concurrency,

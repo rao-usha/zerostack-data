@@ -103,10 +103,21 @@ async def prepare_formadv_tables(db: Session) -> Dict[str, str]:
         raise
 
 
+_DEFAULT_FO_NAMES = [
+    "Cascade Investment", "Bezos Expeditions", "Emerson Collective",
+    "Soros Fund Management", "Bridgewater Associates", "Citadel Advisors",
+    "Point72 Asset Management", "Renaissance Technologies", "Two Sigma Investments",
+    "D.E. Shaw", "Millennium Management", "Ares Management",
+    "Apollo Global Management", "KKR", "Blackstone Group",
+    "Carlyle Group", "Bain Capital", "Warburg Pincus",
+    "TPG Capital", "Thoma Bravo",
+]
+
+
 async def ingest_family_offices(
     db: Session,
     job_id: int,
-    family_office_names: List[str],
+    family_office_names: List[str] = None,
     max_concurrency: int = 1,
     max_requests_per_second: float = 2.0,
 ) -> Dict[str, Any]:
@@ -129,6 +140,9 @@ async def ingest_family_offices(
     Returns:
         Summary of ingestion results
     """
+    if not family_office_names:
+        family_office_names = _DEFAULT_FO_NAMES
+
     client = None
 
     try:
