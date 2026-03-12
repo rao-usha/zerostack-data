@@ -1880,6 +1880,173 @@ def get_monitoring_dashboard(db: Session = Depends(get_db)):
 
 
 # =============================================================================
+# Batch Health & Unstick Endpoints
+# =============================================================================
+
+
+@router.post("/batch/{batch_run_id}/unstick")
+def unstick_batch(batch_run_id: str, db: Session = Depends(get_db)):
+    """
+    Promote stuck BLOCKED jobs in a batch.
+
+    Scans all tiers: if a tier's lower-tier dependencies are all terminal
+    (SUCCESS or FAILED), promotes its BLOCKED jobs to PENDING.
+
+    Also handles orphaned PENDING jobs that have been waiting >2 hours by
+    re-submitting them to the job queue.
+
+    Returns count of promoted jobs.
+    """
+    from app.core.job_queue_service import promote_blocked_jobs
+
+    promoted = promote_blocked_jobs(db, batch_run_id)
+
+    # Also check for orphaned pending ingestion_jobs with no queue entry
+    from sqlalchemy import text
+
+    orphaned = db.execute(
+        text("""
+            SELECT ij.id, ij.source
+            FROM ingestion_jobs ij
+            WHERE ij.batch_run_id = :batch_id
+              AND ij.status = 'pending'
+              AND ij.created_at < NOW() - INTERVAL '2 hours'
+              AND NOT EXISTS (
+                  SELECT 1 FROM job_queue jq
+                  WHERE jq.job_table_id = ij.id
+                    AND jq.status IN ('pending', 'claimed', 'running')
+              )
+        """),
+        {"batch_id": batch_run_id},
+    ).fetchall()
+
+    resubmitted = 0
+    if orphaned:
+        from app.core.job_queue_service import submit_job, WORKER_MODE
+
+        if WORKER_MODE:
+            for row in orphaned:
+                job_id, source = row[0], row[1]
+                ing_job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+                if ing_job:
+                    submit_job(
+                        db=db,
+                        job_type="ingestion",
+                        payload={
+                            "source": source,
+                            "config": ing_job.config or {},
+                            "ingestion_job_id": job_id,
+                            "batch_id": batch_run_id,
+                            "trigger": "batch",
+                        },
+                        priority=5,
+                    )
+                    resubmitted += 1
+
+    return {
+        "batch_run_id": batch_run_id,
+        "promoted": promoted,
+        "resubmitted": resubmitted,
+        "message": f"Unstick complete: {promoted} promoted, {resubmitted} resubmitted",
+    }
+
+
+@router.get("/batch/{batch_run_id}/health")
+def get_batch_health(batch_run_id: str, db: Session = Depends(get_db)):
+    """
+    Get detailed batch health status with per-tier breakdown and stuck job detection.
+
+    Returns:
+    - Overall batch status (running/stuck/complete/failed)
+    - Per-tier job counts (pending/running/blocked/success/failed)
+    - Stuck job detection (pending >1h, blocked with all lower tiers terminal)
+    - Time elapsed and estimated completion
+    """
+    from sqlalchemy import text
+
+    # Get all jobs in this batch
+    jobs = (
+        db.query(IngestionJob)
+        .filter(IngestionJob.batch_run_id == batch_run_id)
+        .all()
+    )
+    if not jobs:
+        raise HTTPException(status_code=404, detail="Batch run not found")
+
+    now = datetime.utcnow()
+    batch_started = min(j.created_at for j in jobs)
+    elapsed_minutes = (now - batch_started).total_seconds() / 60
+
+    # Per-tier breakdown
+    tier_stats = {}
+    stuck_jobs = []
+    total_by_status = {"pending": 0, "running": 0, "blocked": 0, "success": 0, "failed": 0}
+
+    for j in jobs:
+        tier = j.tier or 0
+        if tier not in tier_stats:
+            tier_stats[tier] = {"pending": 0, "running": 0, "blocked": 0, "success": 0, "failed": 0}
+        status_key = j.status.value if hasattr(j.status, 'value') else str(j.status)
+        if status_key in tier_stats[tier]:
+            tier_stats[tier][status_key] += 1
+        if status_key in total_by_status:
+            total_by_status[status_key] += 1
+
+        # Detect stuck jobs
+        age_minutes = (now - j.created_at).total_seconds() / 60
+        if j.status == JobStatus.PENDING and age_minutes > 60:
+            stuck_jobs.append({
+                "id": j.id, "source": j.source, "tier": tier,
+                "status": "pending", "age_minutes": round(age_minutes),
+                "reason": "Pending for over 1 hour",
+            })
+        elif j.status == JobStatus.RUNNING and j.started_at:
+            run_minutes = (now - j.started_at).total_seconds() / 60
+            if run_minutes > 120:
+                stuck_jobs.append({
+                    "id": j.id, "source": j.source, "tier": tier,
+                    "status": "running", "age_minutes": round(run_minutes),
+                    "reason": "Running for over 2 hours",
+                })
+
+    # Determine overall status
+    total = len(jobs)
+    terminal = total_by_status["success"] + total_by_status["failed"]
+    if terminal == total:
+        overall = "complete" if total_by_status["failed"] == 0 else "complete_with_failures"
+    elif len(stuck_jobs) > 0:
+        overall = "stuck"
+    elif total_by_status["running"] > 0:
+        overall = "running"
+    else:
+        overall = "waiting"
+
+    # Check for blocked jobs that could be promoted
+    promotable = 0
+    for tier_level in sorted(tier_stats.keys()):
+        lower_all_terminal = all(
+            tier_stats.get(lt, {}).get("pending", 0) == 0
+            and tier_stats.get(lt, {}).get("running", 0) == 0
+            and tier_stats.get(lt, {}).get("blocked", 0) == 0
+            for lt in tier_stats if lt < tier_level
+        )
+        if lower_all_terminal:
+            promotable += tier_stats[tier_level].get("blocked", 0)
+
+    return {
+        "batch_run_id": batch_run_id,
+        "overall_status": overall,
+        "total_jobs": total,
+        "elapsed_minutes": round(elapsed_minutes, 1),
+        "by_status": total_by_status,
+        "by_tier": {str(k): v for k, v in sorted(tier_stats.items())},
+        "stuck_jobs": stuck_jobs,
+        "promotable_blocked": promotable,
+        "completion_pct": round(terminal / total * 100, 1) if total else 0,
+    }
+
+
+# =============================================================================
 # Batch Tier Configuration Endpoints (P2 #6)
 # =============================================================================
 
