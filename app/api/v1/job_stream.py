@@ -5,14 +5,17 @@ GET /api/v1/jobs/stream         — SSE stream for all job events
 GET /api/v1/jobs/stream/{id}    — SSE stream for a specific job
 GET /api/v1/jobs/active         — JSON list of currently running/claimed jobs
 GET /api/v1/jobs/history        — Unified paginated history from both tables
+GET /api/v1/jobs/summary        — Lightweight counts for dashboard headers
 """
 
 import logging
+from collections import defaultdict
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func
+from sqlalchemy import String, func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -23,6 +26,73 @@ from app.core.models_queue import JobEvent, JobQueue, QueueJobStatus
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/job-queue", tags=["Job Queue"])
+
+
+# ── Domain table mapping for enrichment ─────────────────────────────────
+
+_DOMAIN_TABLE_MAP = {
+    "people": {
+        "model_path": "app.core.people_models",
+        "model_name": "PeopleCollectionJob",
+        "fields": ["people_found", "people_created", "people_updated", "company_id"],
+    },
+    "agentic": {
+        "model_path": "app.core.models",
+        "model_name": "AgenticCollectionJob",
+        "fields": ["target_investor_name", "companies_found", "new_companies", "sources_checked"],
+    },
+    "foot_traffic": {
+        "model_path": "app.core.models",
+        "model_name": "FootTrafficCollectionJob",
+        "fields": ["target_brand", "locations_found", "locations_enriched"],
+    },
+    "lp": {
+        "model_path": "app.core.models",
+        "model_name": "LpCollectionJob",
+        "fields": ["total_lps", "completed_lps", "successful_lps", "failed_lps"],
+    },
+}
+
+
+def _enrich_domain_detail(standalone_jobs: list, queue_jobs_raw: list, db: Session):
+    """
+    Batch-query domain tables and attach a `domain_detail` sub-dict
+    to standalone queue jobs that have a linked job_table_id.
+    """
+    # Group queue jobs by type for batch lookup
+    type_to_ids: dict[str, dict[int, int]] = defaultdict(dict)  # {type: {job_table_id: queue_job_idx}}
+    idx_map: dict[int, int] = {}  # queue_job.id -> index in standalone_jobs
+
+    for idx, sj in enumerate(standalone_jobs):
+        idx_map[sj["id"]] = idx
+
+    for qj in queue_jobs_raw:
+        jt = _enum_val(qj.job_type)
+        if jt in _DOMAIN_TABLE_MAP and qj.job_table_id:
+            if qj.id in idx_map:
+                type_to_ids[jt][qj.job_table_id] = idx_map[qj.id]
+
+    for jtype, id_to_idx in type_to_ids.items():
+        if not id_to_idx:
+            continue
+        cfg = _DOMAIN_TABLE_MAP[jtype]
+        try:
+            import importlib
+            mod = importlib.import_module(cfg["model_path"])
+            model_cls = getattr(mod, cfg["model_name"])
+            rows = db.query(model_cls).filter(model_cls.id.in_(list(id_to_idx.keys()))).all()
+            for row in rows:
+                sidx = id_to_idx.get(row.id)
+                if sidx is not None:
+                    detail = {}
+                    for f in cfg["fields"]:
+                        detail[f] = getattr(row, f, None)
+                    standalone_jobs[sidx]["domain_detail"] = detail
+        except Exception as e:
+            logger.debug("Domain enrichment for %s failed: %s", jtype, e)
+
+
+# ── Helpers ─────────────────────────────────────────────────────────────
 
 
 @router.get("/stream")
@@ -198,6 +268,78 @@ def _duration(started, completed):
     return None
 
 
+def _parse_datetime(s: Optional[str]) -> Optional[datetime]:
+    """Parse an ISO datetime string, returning None on failure."""
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s)
+    except (ValueError, TypeError):
+        return None
+
+
+def _get_active_workers(db: Session) -> list[str]:
+    """Return distinct worker_ids from running/claimed jobs."""
+    rows = (
+        db.query(JobQueue.worker_id)
+        .filter(
+            JobQueue.status.in_([QueueJobStatus.CLAIMED, QueueJobStatus.RUNNING]),
+            JobQueue.worker_id.isnot(None),
+        )
+        .distinct()
+        .all()
+    )
+    return [r[0] for r in rows]
+
+
+@router.get("/summary")
+async def get_job_summary(db: Session = Depends(get_db)):
+    """
+    Lightweight summary for dashboard headers.
+
+    Returns only counts — no job list, no enrichment.
+    Quick-poll friendly for real-time dashboards.
+    """
+    # by_status from job_queue
+    q_status = dict(
+        db.query(JobQueue.status, func.count(JobQueue.id))
+        .group_by(JobQueue.status)
+        .all()
+    )
+    by_status = {_enum_val(k): v for k, v in q_status.items()}
+
+    # Add ingestion_jobs counts
+    i_status = dict(
+        db.query(IngestionJob.status, func.count(IngestionJob.id))
+        .group_by(IngestionJob.status)
+        .all()
+    )
+    for k, v in i_status.items():
+        sk = _enum_val(k) if not isinstance(k, str) else k
+        by_status[sk] = by_status.get(sk, 0) + v
+
+    # by_type from job_queue
+    q_types = dict(
+        db.query(JobQueue.job_type, func.count(JobQueue.id))
+        .group_by(JobQueue.job_type)
+        .all()
+    )
+    by_type = {_enum_val(k): v for k, v in q_types.items()}
+
+    # Count ingestion jobs as "ingestion" type
+    i_total = db.query(func.count(IngestionJob.id)).scalar() or 0
+    by_type["ingestion"] = by_type.get("ingestion", 0) + i_total
+
+    workers = _get_active_workers(db)
+
+    return {
+        "by_status": by_status,
+        "by_type": by_type,
+        "active_workers": workers,
+        "worker_count": len(workers),
+    }
+
+
 @router.get("/history")
 async def get_job_history(
     limit: int = Query(50, ge=1, le=200),
@@ -209,6 +351,15 @@ async def get_job_history(
     trigger: Optional[str] = Query(
         None, description="Filter by trigger (batch, manual, scheduled)"
     ),
+    created_after: Optional[str] = Query(
+        None, description="ISO datetime — only jobs created after this time"
+    ),
+    created_before: Optional[str] = Query(
+        None, description="ISO datetime — only jobs created before this time"
+    ),
+    search: Optional[str] = Query(
+        None, description="Search job_type and progress_message"
+    ),
     db: Session = Depends(get_db),
 ):
     """
@@ -217,8 +368,13 @@ async def get_job_history(
     Deduplicates ingestion-type queue jobs that have a linked ingestion_jobs
     record — the ingestion_jobs row is the canonical record and gets enriched
     with worker/progress info from the queue row.  Non-ingestion queue jobs
-    (site_intel, people, pe, etc.) appear as their own rows.
+    (site_intel, people, pe, etc.) appear as their own rows with domain_detail
+    enrichment from their domain-specific tables.
     """
+    # Parse time range filters
+    after_dt = _parse_datetime(created_after)
+    before_dt = _parse_datetime(created_before)
+
     # --- Load queue jobs ---
     q_query = db.query(JobQueue)
     if status:
@@ -229,11 +385,22 @@ async def get_job_history(
         q_query = q_query.filter(
             JobQueue.payload["trigger"].astext == trigger
         )
+    if after_dt:
+        q_query = q_query.filter(JobQueue.created_at >= after_dt)
+    if before_dt:
+        q_query = q_query.filter(JobQueue.created_at <= before_dt)
+    if search:
+        search_like = f"%{search}%"
+        q_query = q_query.filter(
+            (func.cast(JobQueue.job_type, String).ilike(search_like))
+            | (JobQueue.progress_message.ilike(search_like))
+        )
     queue_jobs = q_query.order_by(JobQueue.created_at.desc()).all()
 
     # Build lookup: ingestion_job_id → queue job (for merging)
     queue_by_ingest_id = {}
     standalone_queue = []
+    standalone_queue_raw = []  # Keep raw ORM objects for enrichment
     for j in queue_jobs:
         jt = _enum_val(j.job_type)
         linked_id = j.job_table_id
@@ -243,10 +410,12 @@ async def get_job_history(
         else:
             # Non-ingestion queue job (site_intel, people, etc.)
             source_name = (j.payload or {}).get("source", jt)
+            standalone_queue_raw.append(j)
             standalone_queue.append({
                 "id": j.id,
                 "table": "job_queue",
                 "job_type": source_name,
+                "queue_job_type": jt,
                 "status": _enum_val(j.status),
                 "worker_id": j.worker_id,
                 "progress_pct": j.progress_pct,
@@ -254,6 +423,7 @@ async def get_job_history(
                 "payload": j.payload or {},
                 "rows_inserted": None,
                 "error_message": j.error_message,
+                "domain_detail": None,
                 "created_at": j.created_at.isoformat() if j.created_at else None,
                 "started_at": j.started_at.isoformat() if j.started_at else None,
                 "completed_at": j.completed_at.isoformat() if j.completed_at else None,
@@ -266,6 +436,12 @@ async def get_job_history(
                 "_sort_key": j.created_at,
             })
 
+    # Domain table enrichment for non-ingestion jobs
+    try:
+        _enrich_domain_detail(standalone_queue, standalone_queue_raw, db)
+    except Exception as e:
+        logger.debug("Domain enrichment failed: %s", e)
+
     # --- Load ingestion jobs ---
     i_query = db.query(IngestionJob)
     if status:
@@ -274,6 +450,16 @@ async def get_job_history(
         i_query = i_query.filter(IngestionJob.source == job_type)
     if trigger:
         i_query = i_query.filter(IngestionJob.trigger == trigger)
+    if after_dt:
+        i_query = i_query.filter(IngestionJob.created_at >= after_dt)
+    if before_dt:
+        i_query = i_query.filter(IngestionJob.created_at <= before_dt)
+    if search:
+        search_like = f"%{search}%"
+        i_query = i_query.filter(
+            (IngestionJob.source.ilike(search_like))
+            | (IngestionJob.error_message.ilike(search_like))
+        )
     ingest_jobs = i_query.order_by(IngestionJob.created_at.desc()).all()
 
     ingest_dicts = []
@@ -285,6 +471,7 @@ async def get_job_history(
             "id": j.id,
             "table": "ingestion_jobs",
             "job_type": j.source,
+            "queue_job_type": "ingestion",
             "status": ing_status,
             "worker_id": qj.worker_id if qj else None,
             "progress_pct": (qj.progress_pct if qj else None)
@@ -293,6 +480,7 @@ async def get_job_history(
             "payload": j.config or {},
             "rows_inserted": j.rows_inserted,
             "error_message": j.error_message,
+            "domain_detail": None,
             "created_at": j.created_at.isoformat() if j.created_at else None,
             "started_at": j.started_at.isoformat() if j.started_at else None,
             "completed_at": j.completed_at.isoformat() if j.completed_at else None,
@@ -309,13 +497,12 @@ async def get_job_history(
 
     # --- Merge and sort ---
     all_jobs = standalone_queue + ingest_dicts
-    from datetime import datetime as _dt
-
-    _epoch = _dt(1970, 1, 1)
+    _epoch = datetime(1970, 1, 1)
     all_jobs.sort(key=lambda x: x["_sort_key"] or _epoch, reverse=True)
 
     # Summary counts
-    summary = {"running": 0, "pending": 0, "success": 0, "failed": 0}
+    summary: dict = {"running": 0, "pending": 0, "success": 0, "failed": 0}
+    by_type: dict[str, int] = defaultdict(int)
     for j in all_jobs:
         s = j["status"]
         if s in ("running", "claimed"):
@@ -326,15 +513,24 @@ async def get_job_history(
             summary["success"] += 1
         elif s == "failed":
             summary["failed"] += 1
+        by_type[j.get("queue_job_type") or j["job_type"]] += 1
+
+    summary["by_type"] = dict(by_type)
+
+    # Active workers
+    workers = _get_active_workers(db)
+    summary["active_workers"] = workers
+    summary["worker_count"] = len(workers)
 
     total = len(all_jobs)
 
     # Apply pagination
     page = all_jobs[offset : offset + limit]
 
-    # Remove internal sort key
+    # Remove internal keys
     for j in page:
         j.pop("_sort_key", None)
+        j.pop("queue_job_type", None)
 
     # Enrich with LLM cost data (batch query for this page)
     try:

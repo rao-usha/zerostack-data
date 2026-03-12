@@ -50,6 +50,7 @@ from app.api.v1 import (
     chains,
     rate_limits,
     data_quality,
+    dq_review,
     templates,
     lineage,
     export,
@@ -97,6 +98,7 @@ from app.api.v1 import (
     pe_people,
     pe_deals,
     pe_collection,
+    pe_benchmarks,
     app_stores,
     opencorporates,
     people,
@@ -110,7 +112,7 @@ from app.api.v1 import (
     people_data_quality,
     people_dedup,
     people_jobs,
-    workflows,
+
     llm_costs,
     freshness,
     dunl,
@@ -186,38 +188,15 @@ async def lifespan(app: FastAPI):
     logger.info(f"Log level: {settings.log_level}")
     logger.info(f"Max concurrency: {settings.max_concurrency}")
 
-    # Run database migrations
+    # Ensure all tables exist (create_all is idempotent — skips existing tables)
     try:
-        from alembic.config import Config
-        from alembic import command
         from app.core.database import get_engine, create_tables
-        from sqlalchemy import inspect
-
         engine = get_engine()
-        inspector = inspect(engine)
-        has_alembic = "alembic_version" in inspector.get_table_names()
-
-        alembic_cfg = Config("alembic.ini")
-
-        if not has_alembic:
-            # Fresh database — create all tables then stamp as current
-            create_tables(engine)
-            command.stamp(alembic_cfg, "head")
-            logger.info("Fresh database: tables created and stamped at head")
-        else:
-            # Existing database — apply any pending migrations
-            command.upgrade(alembic_cfg, "head")
-            logger.info("Database migrations applied (alembic upgrade head)")
+        create_tables(engine)
+        logger.info("Database tables verified via create_all()")
     except Exception as e:
-        logger.error(f"Alembic migration failed, falling back to create_all: {e}")
-        try:
-            from app.core.database import create_tables
-
-            create_tables()
-            logger.info("Fallback: tables created via create_all()")
-        except Exception as e2:
-            logger.error(f"Fallback create_tables also failed: {e2}")
-            raise
+        logger.error(f"create_tables failed: {e}")
+        raise
 
     # --- Batch metadata columns on ingestion_jobs ---
     try:
@@ -942,6 +921,7 @@ Browse the endpoint sections below to see what's available:
         {"name": "webhooks", "description": "🔔 **Webhook Notifications** - Configure webhooks to receive notifications for job events and monitoring alerts"},
         {"name": "rate-limits", "description": "⚡ **Per-Source Rate Limits** - Configure and monitor rate limits for each data source API"},
         {"name": "data-quality", "description": "✅ **Data Quality Rules Engine** - Define and evaluate data quality rules with range, null, regex, freshness checks"},
+        {"name": "dq-review", "description": "🔍 **DQ Review & Recommendations** - Unified review workflow with auto-generated recommendations from all DQ subsystems"},
         {"name": "templates", "description": "📋 **Bulk Ingestion Templates** - Reusable templates for multi-source data ingestion with variable substitution"},
         {"name": "lineage", "description": "🔗 **Data Lineage Tracking** - Track data provenance, transformations, dataset versions, and impact analysis"},
         {"name": "export", "description": "📤 **Data Export** - Export table data to CSV, JSON, or Parquet files"},
@@ -951,7 +931,7 @@ Browse the endpoint sections below to see what's available:
         {"name": "Audit Trail", "description": "Collection audit trail - who triggered what, when, and how"},
         {"name": "Settings", "description": "Application settings - manage external source API keys"},
         {"name": "LLM Costs", "description": "💰 **LLM Cost Tracking** - Monitor token usage and costs across all LLM-powered features"},
-        {"name": "workflows", "description": "🔄 **Workflows** - Automated multi-step data processing workflows"},
+
         # ── Auth & Access ──────────────────────────────────────────────
         {"name": "auth", "description": "🔐 **Authentication** - User registration, login, JWT tokens, and password management"},
         {"name": "workspaces", "description": "👥 **Workspaces** - Team collaboration spaces with member management and role-based access"},
@@ -998,6 +978,7 @@ Browse the endpoint sections below to see what's available:
         {"name": "PE Intelligence - People", "description": "👥 **PE People** - Investment professionals, operating partners, and advisory boards"},
         {"name": "PE Intelligence - Deals", "description": "💰 **PE Deals** - M&A transactions, add-ons, exits, and deal multiples"},
         {"name": "PE Intelligence - Collection", "description": "⚙️ **PE Data Collection** - Automated PE data collection pipelines"},
+        {"name": "PE Intelligence - Benchmarks", "description": "📊 **PE Benchmarks & Exit Readiness** - Financial benchmarking, portfolio heatmaps, and exit readiness scoring"},
         # ── Site Intelligence ──────────────────────────────────────────
         {"name": "Site Intel - Power", "description": "⚡ **Power Infrastructure** - Power plants, substations, and energy capacity near sites"},
         {"name": "Site Intel - Telecom", "description": "📡 **Telecom Infrastructure** - Cell towers, fiber routes, and broadband availability"},
@@ -1179,6 +1160,7 @@ app.include_router(webhooks.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(chains.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(rate_limits.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(data_quality.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(dq_review.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(templates.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(lineage.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(export.router, prefix="/api/v1", dependencies=_auth)
@@ -1229,6 +1211,7 @@ app.include_router(pe_companies.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_people.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_deals.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_collection.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(pe_benchmarks.router, prefix="/api/v1", dependencies=_auth)
 
 # 13F Quarterly Analysis
 app.include_router(quarterly_diff.router, prefix="/api/v1", dependencies=_auth)
@@ -1291,8 +1274,6 @@ app.include_router(audit.router, prefix="/api/v1", dependencies=_auth)
 # Settings
 app.include_router(settings_router.router, prefix="/api/v1", dependencies=_auth)
 
-# Multi-Agent Orchestrator
-app.include_router(workflows.router, prefix="/api/v1", dependencies=_auth)
 
 # LLM Cost Tracking
 app.include_router(llm_costs.router, prefix="/api/v1", dependencies=_auth)
