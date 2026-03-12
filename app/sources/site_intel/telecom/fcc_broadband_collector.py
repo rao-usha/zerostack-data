@@ -84,24 +84,13 @@ class FCCBroadbandCollector(BaseCollector):
         }
 
     async def collect(self, config: CollectionConfig) -> CollectionResult:
-        """Collect FCC broadband data for configured states."""
-        all_records = []
-        errors = 0
-
+        """Collect FCC broadband data for configured states with concurrency."""
         states = config.states if config.states else STATES
 
-        for i, state in enumerate(states):
-            self.update_progress(i, len(states), f"Collecting broadband for {state}")
-
-            try:
-                records = await self._collect_state_broadband(state)
-                all_records.extend(records)
-                logger.info(
-                    f"FCC broadband {state}: {len(records)} provider-tech combos"
-                )
-            except Exception as e:
-                logger.warning(f"Failed to collect broadband for {state}: {e}")
-                errors += 1
+        # Use collect_states_concurrent for 4x speedup
+        all_records = await self.collect_states_concurrent(
+            states, self._collect_state_broadband, max_concurrent=4
+        )
 
         # Insert records
         inserted = 0
@@ -121,7 +110,7 @@ class FCCBroadbandCollector(BaseCollector):
 
         logger.info(
             f"FCC broadband collection complete: {len(all_records)} records, "
-            f"{inserted} inserted/updated, {errors} state errors"
+            f"{inserted} inserted/updated"
         )
 
         return self.create_result(
