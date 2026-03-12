@@ -130,20 +130,18 @@ class EPASDWISCollector(BaseCollector):
             )
 
     async def _collect_water_systems(self, config: CollectionConfig) -> Dict[str, Any]:
-        """Collect public water systems from EPA SDWIS with pagination."""
+        """Collect public water systems from EPA SDWIS with state-level concurrency."""
         try:
-            client = await self.get_client()
-            all_systems = []
-
             states = config.states if config.states else ["TX", "CA", "OH", "PA", "IL"]
 
-            for state_idx, state in enumerate(states):
+            async def _fetch_state(state: str):
+                """Fetch all water systems for a single state (paginated)."""
+                client = await self.get_client()
+                state_systems = []
                 offset = 0
-                state_count = 0
 
                 while True:
                     await self.apply_rate_limit()
-
                     url = (
                         f"{self.ENVIROFACTS_URL}/WATER_SYSTEM/STATE_CODE/{state}"
                         f"/rows/{offset}:{offset + self.PAGE_SIZE}/JSON"
@@ -151,36 +149,28 @@ class EPASDWISCollector(BaseCollector):
 
                     try:
                         response = await client.get(url)
-
                         if response.status_code != 200:
-                            logger.warning(
-                                f"EPA API returned {response.status_code} for {state}"
-                            )
+                            logger.warning(f"EPA API returned {response.status_code} for {state}")
                             break
-
                         data = response.json()
                         if not data:
                             break
-
-                        all_systems.extend(data)
-                        state_count += len(data)
-
+                        state_systems.extend(data)
                         if len(data) < self.PAGE_SIZE:
                             break
                         offset += self.PAGE_SIZE
-
                     except Exception as e:
-                        logger.warning(
-                            f"Failed to fetch water systems for {state} at offset {offset}: {e}"
-                        )
+                        logger.warning(f"Failed to fetch water systems for {state} at offset {offset}: {e}")
                         break
 
-                logger.info(f"Retrieved {state_count} water systems for {state}")
-                self.update_progress(
-                    processed=state_idx + 1,
-                    total=len(states),
-                    current_step=f"Fetched water systems for {state} ({state_count} records)",
-                )
+                if state_systems:
+                    logger.info(f"Retrieved {len(state_systems)} water systems for {state}")
+                return state_systems
+
+            # Use collect_states_concurrent for 4x speedup
+            all_systems = await self.collect_states_concurrent(
+                states, _fetch_state, max_concurrent=4
+            )
 
             if not all_systems:
                 return {"processed": 0, "inserted": 0}
@@ -297,21 +287,19 @@ class EPASDWISCollector(BaseCollector):
         }
 
     async def _collect_violations(self, config: CollectionConfig) -> Dict[str, Any]:
-        """Collect water system violations from EPA SDWIS with pagination."""
+        """Collect water system violations from EPA SDWIS with state-level concurrency."""
         try:
-            client = await self.get_client()
-            all_violations = []
             max_per_state = 10000
-
             states = config.states if config.states else ["TX", "CA", "OH", "PA", "IL"]
 
-            for state_idx, state in enumerate(states):
+            async def _fetch_state_violations(state: str):
+                """Fetch violations for a single state (paginated, capped)."""
+                client = await self.get_client()
+                state_violations = []
                 offset = 0
-                state_count = 0
 
-                while state_count < max_per_state:
+                while len(state_violations) < max_per_state:
                     await self.apply_rate_limit()
-
                     url = (
                         f"{self.ENVIROFACTS_URL}/VIOLATION/STATE_CODE/{state}"
                         f"/rows/{offset}:{offset + self.PAGE_SIZE}/JSON"
@@ -319,33 +307,27 @@ class EPASDWISCollector(BaseCollector):
 
                     try:
                         response = await client.get(url)
-
                         if response.status_code != 200:
                             break
-
                         data = response.json()
                         if not data:
                             break
-
-                        all_violations.extend(data)
-                        state_count += len(data)
-
+                        state_violations.extend(data)
                         if len(data) < self.PAGE_SIZE:
                             break
                         offset += self.PAGE_SIZE
-
                     except Exception as e:
-                        logger.warning(
-                            f"Failed to fetch violations for {state} at offset {offset}: {e}"
-                        )
+                        logger.warning(f"Failed to fetch violations for {state} at offset {offset}: {e}")
                         break
 
-                logger.info(f"Retrieved {state_count} violations for {state}")
-                self.update_progress(
-                    processed=state_idx + 1,
-                    total=len(states),
-                    current_step=f"Fetched violations for {state} ({state_count} records)",
-                )
+                if state_violations:
+                    logger.info(f"Retrieved {len(state_violations)} violations for {state}")
+                return state_violations
+
+            # Use collect_states_concurrent for 4x speedup
+            all_violations = await self.collect_states_concurrent(
+                states, _fetch_state_violations, max_concurrent=4
+            )
 
             if not all_violations:
                 return {"processed": 0, "inserted": 0}
