@@ -234,9 +234,25 @@ class BaseSourceIngestor(ABC):
             elif warn_on_empty:
                 logger.warning(f"Job {job_id}: Completed with 0 rows inserted")
 
-        return self.update_job_status(
+        job = self.update_job_status(
             job_id, JobStatus.SUCCESS, rows_inserted=rows_inserted
         )
+
+        # Fire-and-forget post-ingestion DQ checks (non-blocking)
+        if job and job.status == JobStatus.SUCCESS:
+            try:
+                from app.core.dq_post_ingestion_hook import schedule_post_ingestion_check
+
+                table_name = (job.config or {}).get("table_name")
+                schedule_post_ingestion_check(
+                    job_id=job_id,
+                    table_name=table_name or f"{self.SOURCE_NAME}_data",
+                    source=job.source,
+                )
+            except Exception as e:
+                logger.debug(f"Post-ingestion DQ hook skipped: {e}")
+
+        return job
 
     def fail_job(
         self,
