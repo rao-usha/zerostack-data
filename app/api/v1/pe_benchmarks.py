@@ -920,3 +920,187 @@ async def get_data_room_package(
         completeness_pct=completeness,
         missing_sections=missing,
     )
+
+
+# =============================================================================
+# Fragmentation Scoring Endpoints
+# =============================================================================
+
+
+class MarketDetail(BaseModel):
+    county_fips: Optional[str] = None
+    state_fips: Optional[str] = None
+    geo_name: Optional[str] = None
+    score: float = 0
+    grade: str = "F"
+    establishments: Optional[int] = None
+    employees: Optional[int] = None
+    hhi: Optional[float] = None
+    small_biz_pct: Optional[float] = None
+    avg_employees_per_estab: Optional[float] = None
+
+
+class FragmentationResponse(BaseModel):
+    naics_code: str
+    naics_description: Optional[str] = None
+    national_score: float = 0
+    national_grade: str = "F"
+    total_establishments: int = 0
+    total_employees: int = 0
+    county_count: int = 0
+    avg_hhi: Optional[float] = None
+    avg_small_biz_pct: Optional[float] = None
+    avg_estab_size: Optional[float] = None
+    year: int = 2021
+    top_markets: List[MarketDetail] = []
+
+
+class IndustryScanItem(BaseModel):
+    naics_code: str
+    naics_description: Optional[str] = None
+    national_score: float = 0
+    total_establishments: int = 0
+    error: Optional[str] = None
+
+
+class StateSummary(BaseModel):
+    total_establishments: int = 0
+    total_employees: int = 0
+    county_count: int = 0
+    state_score: float = 0
+    state_grade: str = "F"
+    avg_hhi: Optional[float] = None
+    avg_small_biz_pct: Optional[float] = None
+
+
+class RollUpTargetsResponse(BaseModel):
+    naics_code: str
+    naics_description: Optional[str] = None
+    state: str
+    year: int = 2021
+    targets: List[MarketDetail] = []
+    state_summary: Optional[StateSummary] = None
+
+
+@router.get(
+    "/fragmentation/scan",
+    response_model=List[IndustryScanItem],
+    summary="Scan multiple NAICS codes for fragmentation",
+)
+async def scan_fragmentation(
+    naics_codes: str = Query(
+        ...,
+        description="Comma-separated NAICS codes (e.g. '621111,541330,238220')",
+    ),
+    year: int = Query(2021, description="Data year"),
+    db: Session = Depends(get_db),
+) -> List[IndustryScanItem]:
+    """Scan multiple industries and rank by fragmentation score.
+
+    Pass NAICS codes as comma-separated string. Returns ranked list
+    from most to least fragmented.
+    """
+    from app.core.pe_fragmentation import FragmentationScorer
+
+    codes = [c.strip() for c in naics_codes.split(",") if c.strip()]
+    if not codes:
+        return []
+
+    scorer = FragmentationScorer(db)
+    results = await scorer.scan_industries(codes, year=year)
+
+    return [
+        IndustryScanItem(
+            naics_code=r["naics_code"],
+            naics_description=r.get("naics_description"),
+            national_score=r.get("national_score", 0),
+            total_establishments=r.get("total_establishments", 0),
+            error=r.get("error"),
+        )
+        for r in results
+    ]
+
+
+@router.get(
+    "/fragmentation/{naics_code}",
+    response_model=FragmentationResponse,
+    summary="Score industry fragmentation for a NAICS code",
+)
+async def get_fragmentation_score(
+    naics_code: str,
+    year: int = Query(2021, description="Data year"),
+    top_n: int = Query(20, description="Number of top markets to return"),
+    db: Session = Depends(get_db),
+) -> FragmentationResponse:
+    """Score how fragmented an industry is nationally using Census CBP data.
+
+    Higher score = more fragmented = better roll-up opportunity.
+    Returns national score plus top county-level markets ranked by fragmentation.
+    """
+    from app.core.pe_fragmentation import FragmentationScorer
+
+    scorer = FragmentationScorer(db)
+    result = await scorer.score_industry(naics_code, year=year)
+
+    # Trim top markets to requested count
+    markets = result.get("top_markets", [])[:top_n]
+
+    return FragmentationResponse(
+        naics_code=result["naics_code"],
+        naics_description=result.get("naics_description"),
+        national_score=result.get("national_score", 0),
+        national_grade=result.get("national_grade", "F"),
+        total_establishments=result.get("total_establishments", 0),
+        total_employees=result.get("total_employees", 0),
+        county_count=result.get("county_count", 0),
+        avg_hhi=result.get("avg_hhi"),
+        avg_small_biz_pct=result.get("avg_small_biz_pct"),
+        avg_estab_size=result.get("avg_estab_size"),
+        year=result.get("year", year),
+        top_markets=[MarketDetail(**m) for m in markets],
+    )
+
+
+@router.get(
+    "/roll-up-targets/{naics_code}/{state}",
+    response_model=RollUpTargetsResponse,
+    summary="Find roll-up target markets in a state",
+)
+async def get_roll_up_targets(
+    naics_code: str,
+    state: str,
+    year: int = Query(2021, description="Data year"),
+    top_n: int = Query(20, description="Number of top targets"),
+    min_establishments: int = Query(10, description="Min establishments per county"),
+    db: Session = Depends(get_db),
+) -> RollUpTargetsResponse:
+    """Find counties in a state with high fragmentation for roll-up acquisitions.
+
+    Identifies specific geographic markets where an industry is most fragmented,
+    making them ideal targets for a platform acquisition strategy.
+    """
+    from app.core.pe_fragmentation import FragmentationScorer
+
+    scorer = FragmentationScorer(db)
+
+    # Ensure data is fetched for this state
+    await scorer.collector.collect(naics_code, year=year, state=state)
+
+    result = scorer.get_roll_up_targets(
+        naics_code, state, year=year, top_n=top_n,
+        min_establishments=min_establishments,
+    )
+
+    targets = [MarketDetail(**t) for t in result.get("targets", [])]
+    summary = None
+    if result.get("state_summary"):
+        summary = StateSummary(**result["state_summary"])
+
+    return RollUpTargetsResponse(
+        naics_code=result["naics_code"],
+        naics_description=result.get("naics_description"),
+        state=result["state"],
+        year=result.get("year", year),
+        targets=targets,
+        state_summary=summary,
+    )
