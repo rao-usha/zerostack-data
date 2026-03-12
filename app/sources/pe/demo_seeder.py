@@ -14,9 +14,12 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
+from datetime import datetime
+
 from app.core.pe_models import (
     PECompanyFinancials,
     PECompanyLeadership,
+    PECompanyNews,
     PECompetitorMapping,
     PEDeal,
     PEDealParticipant,
@@ -110,6 +113,12 @@ def _select_or_insert(
         count += 1
     db.flush()
     return count
+
+
+def _get_person_firm(person_name: str) -> Optional[str]:
+    """Look up a person's firm from PERSON_FIRM_MAP."""
+    entry = PERSON_FIRM_MAP.get(person_name)
+    return entry[0] if entry else None
 
 
 def _lookup_id(db: Session, model, **filters) -> Optional[int]:
@@ -524,6 +533,412 @@ PERSON_FIRM_MAP = {
 
 
 # ---------------------------------------------------------------------------
+# Portfolio Company Executives (~2-3 C-suite per company)
+# ---------------------------------------------------------------------------
+
+COMPANY_EXECUTIVES = [
+    # Summit Ridge — Healthcare + Tech + Services
+    # MedVantage Health Systems
+    {"full_name": "Dr. Robert Chen", "first_name": "Robert", "last_name": "Chen", "current_title": "CEO", "current_company": "MedVantage Health Systems", "city": "Nashville", "state": "TN", "country": "USA", "bio": "20+ years healthcare operations; former COO at HCA Healthcare division.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Patricia Flores", "first_name": "Patricia", "last_name": "Flores", "current_title": "CFO", "current_company": "MedVantage Health Systems", "city": "Nashville", "state": "TN", "country": "USA", "bio": "Former VP Finance at Envision Healthcare; CPA, MBA Vanderbilt.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Dr. Alan Gupta", "first_name": "Alan", "last_name": "Gupta", "current_title": "CMO", "current_company": "MedVantage Health Systems", "city": "Nashville", "state": "TN", "country": "USA", "bio": "Board-certified internal medicine; led clinical quality at Tenet Healthcare.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # Apex Revenue Solutions
+    {"full_name": "Kevin McCarthy", "first_name": "Kevin", "last_name": "McCarthy", "current_title": "CEO", "current_company": "Apex Revenue Solutions", "city": "Dallas", "state": "TX", "country": "USA", "bio": "Serial entrepreneur; founded two prior RCM companies, both PE-exited.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Linda Tran", "first_name": "Linda", "last_name": "Tran", "current_title": "CFO", "current_company": "Apex Revenue Solutions", "city": "Dallas", "state": "TX", "country": "USA", "bio": "Former Director FP&A at R1 RCM; expertise in healthcare billing analytics.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # CloudShield Security
+    {"full_name": "Jason Park", "first_name": "Jason", "last_name": "Park", "current_title": "CEO & Co-Founder", "current_company": "CloudShield Security", "city": "Austin", "state": "TX", "country": "USA", "bio": "Former VP Engineering at CrowdStrike; built endpoint detection product line.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Rachel Adams", "first_name": "Rachel", "last_name": "Adams", "current_title": "CFO", "current_company": "CloudShield Security", "city": "Austin", "state": "TX", "country": "USA", "bio": "CFO track from Goldman Sachs TMT → SailPoint CFO; IPO experience.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Dmitri Volkov", "first_name": "Dmitri", "last_name": "Volkov", "current_title": "CTO", "current_company": "CloudShield Security", "city": "Austin", "state": "TX", "country": "USA", "bio": "PhD CS Stanford; former Principal Engineer at Palo Alto Networks.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # TrueNorth Behavioral
+    {"full_name": "Dr. Margaret Sullivan", "first_name": "Margaret", "last_name": "Sullivan", "current_title": "CEO", "current_company": "TrueNorth Behavioral", "city": "Phoenix", "state": "AZ", "country": "USA", "bio": "25 years behavioral health; former President of Acadia Healthcare West region.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Steven Greenfield", "first_name": "Steven", "last_name": "Greenfield", "current_title": "CFO", "current_company": "TrueNorth Behavioral", "city": "Phoenix", "state": "AZ", "country": "USA", "bio": "Healthcare CFO with multi-site experience; former CFO at Universal Health Services division.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Dr. Anita Rao", "first_name": "Anita", "last_name": "Rao", "current_title": "Chief Clinical Officer", "current_company": "TrueNorth Behavioral", "city": "Phoenix", "state": "AZ", "country": "USA", "bio": "Psychiatrist; designed evidence-based treatment protocols adopted by 50+ facilities.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # Precision Lab Diagnostics
+    {"full_name": "Frank DeLuca", "first_name": "Frank", "last_name": "DeLuca", "current_title": "CEO", "current_company": "Precision Lab Diagnostics", "city": "Philadelphia", "state": "PA", "country": "USA", "bio": "Former SVP Operations at Quest Diagnostics; scaled lab network from 40 to 120 sites.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Janet Okonkwo", "first_name": "Janet", "last_name": "Okonkwo", "current_title": "CFO", "current_company": "Precision Lab Diagnostics", "city": "Philadelphia", "state": "PA", "country": "USA", "bio": "CPA; former audit partner at Deloitte focused on healthcare and life sciences.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # Elevate Staffing Group
+    {"full_name": "Marcus Whitfield", "first_name": "Marcus", "last_name": "Whitfield", "current_title": "CEO", "current_company": "Elevate Staffing Group", "city": "Charlotte", "state": "NC", "country": "USA", "bio": "Built staffing platform from $5M to $80M revenue; former Randstad regional VP.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Diane Hoffman", "first_name": "Diane", "last_name": "Hoffman", "current_title": "CFO", "current_company": "Elevate Staffing Group", "city": "Charlotte", "state": "NC", "country": "USA", "bio": "Staffing industry finance veteran; built financial infrastructure for rapid M&A integration.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # DataBridge Analytics (exited)
+    {"full_name": "Yusuf Ibrahim", "first_name": "Yusuf", "last_name": "Ibrahim", "current_title": "CEO", "current_company": "DataBridge Analytics", "city": "Boston", "state": "MA", "country": "USA", "bio": "Data science PhD MIT; founded DataBridge in 2017 to democratize healthcare analytics.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Samantha Lee", "first_name": "Samantha", "last_name": "Lee", "current_title": "CFO", "current_company": "DataBridge Analytics", "city": "Boston", "state": "MA", "country": "USA", "bio": "Early-stage finance leader; guided DataBridge from Series A through strategic exit.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # NovaCare Urgent Clinics (exited)
+    {"full_name": "Dr. James Morton", "first_name": "James", "last_name": "Morton", "current_title": "CEO", "current_company": "NovaCare Urgent Clinics", "city": "Atlanta", "state": "GA", "country": "USA", "bio": "Emergency medicine physician; built NovaCare from 8 to 45 clinic locations.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Carolyn Briggs", "first_name": "Carolyn", "last_name": "Briggs", "current_title": "CFO", "current_company": "NovaCare Urgent Clinics", "city": "Atlanta", "state": "GA", "country": "USA", "bio": "Healthcare multi-site financial ops; managed $150M+ P&L at TeamHealth.", "is_active": True, "data_sources": ["demo_seeder"]},
+
+    # Cascade Growth — Software + Fintech
+    # FinLedger Technologies
+    {"full_name": "Nathan Cho", "first_name": "Nathan", "last_name": "Cho", "current_title": "CEO & Founder", "current_company": "FinLedger Technologies", "city": "New York", "state": "NY", "country": "USA", "bio": "Former Goldman Sachs quant; founded FinLedger to modernize trade settlement.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Elizabeth Warren-Hughes", "first_name": "Elizabeth", "last_name": "Warren-Hughes", "current_title": "CFO", "current_company": "FinLedger Technologies", "city": "New York", "state": "NY", "country": "USA", "bio": "Fintech CFO; led financial operations at Stripe and Plaid before FinLedger.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # Nimbus Data Cloud
+    {"full_name": "Arjun Mehta", "first_name": "Arjun", "last_name": "Mehta", "current_title": "CEO & Co-Founder", "current_company": "Nimbus Data Cloud", "city": "Seattle", "state": "WA", "country": "USA", "bio": "Former AWS principal engineer; built Nimbus to simplify multi-cloud data pipelines.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Claire Donovan", "first_name": "Claire", "last_name": "Donovan", "current_title": "CFO", "current_company": "Nimbus Data Cloud", "city": "Seattle", "state": "WA", "country": "USA", "bio": "SaaS finance expert; former VP Finance at Snowflake during hypergrowth phase.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # PayGrid Systems
+    {"full_name": "Monica Alvarez", "first_name": "Monica", "last_name": "Alvarez", "current_title": "CEO", "current_company": "PayGrid Systems", "city": "Miami", "state": "FL", "country": "USA", "bio": "Payments industry veteran; former SVP at FIS Global, led B2B payments division.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Derek Simmons", "first_name": "Derek", "last_name": "Simmons", "current_title": "CFO", "current_company": "PayGrid Systems", "city": "Miami", "state": "FL", "country": "USA", "bio": "CFA; former Director of Finance at Square, expertise in payment unit economics.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Raj Patel", "first_name": "Raj", "last_name": "Patel", "current_title": "CTO", "current_company": "PayGrid Systems", "city": "Miami", "state": "FL", "country": "USA", "bio": "Built real-time payment processing engine handling 50M+ transactions/month.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # VeriComply AI
+    {"full_name": "Sarah Goldstein", "first_name": "Sarah", "last_name": "Goldstein", "current_title": "CEO & Co-Founder", "current_company": "VeriComply AI", "city": "San Francisco", "state": "CA", "country": "USA", "bio": "Former compliance officer at JPMorgan; built AI-first regulatory compliance platform.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Brian Liu", "first_name": "Brian", "last_name": "Liu", "current_title": "CFO", "current_company": "VeriComply AI", "city": "San Francisco", "state": "CA", "country": "USA", "bio": "Early-stage SaaS finance; managed VeriComply through Series A and B rounds.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # InsightFlow Analytics
+    {"full_name": "Natalie Richards", "first_name": "Natalie", "last_name": "Richards", "current_title": "CEO", "current_company": "InsightFlow Analytics", "city": "Chicago", "state": "IL", "country": "USA", "bio": "Data analytics leader; former VP Product at Tableau, led enterprise analytics suite.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Gregory Tanaka", "first_name": "Gregory", "last_name": "Tanaka", "current_title": "CFO", "current_company": "InsightFlow Analytics", "city": "Chicago", "state": "IL", "country": "USA", "bio": "MBA Wharton; scaled finance operations at three analytics startups through exit.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # ShieldPay Fraud Detection
+    {"full_name": "Alex Petrov", "first_name": "Alex", "last_name": "Petrov", "current_title": "CEO & Founder", "current_company": "ShieldPay Fraud Detection", "city": "New York", "state": "NY", "country": "USA", "bio": "Former ML lead at Stripe Radar; founded ShieldPay to fight real-time payment fraud.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Wendy Chung", "first_name": "Wendy", "last_name": "Chung", "current_title": "CFO", "current_company": "ShieldPay Fraud Detection", "city": "New York", "state": "NY", "country": "USA", "bio": "Fintech finance; built financial controls and reporting at Affirm pre-IPO.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # CloudMetrics Pro (exited)
+    {"full_name": "Tyler Brennan", "first_name": "Tyler", "last_name": "Brennan", "current_title": "CEO & Founder", "current_company": "CloudMetrics Pro", "city": "Portland", "state": "OR", "country": "USA", "bio": "DevOps pioneer; founded CloudMetrics to solve cloud cost visibility challenges.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Amy Nakagawa", "first_name": "Amy", "last_name": "Nakagawa", "current_title": "CFO", "current_company": "CloudMetrics Pro", "city": "Portland", "state": "OR", "country": "USA", "bio": "SaaS metrics expert; guided CloudMetrics through Datadog acquisition process.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # TrueVault Data (written off)
+    {"full_name": "Oliver Reese", "first_name": "Oliver", "last_name": "Reese", "current_title": "CEO & Founder", "current_company": "TrueVault Data", "city": "Denver", "state": "CO", "country": "USA", "bio": "Privacy tech entrepreneur; pivoted TrueVault through multiple market strategies.", "is_active": False, "data_sources": ["demo_seeder"]},
+    {"full_name": "Hannah Spiegel", "first_name": "Hannah", "last_name": "Spiegel", "current_title": "CFO", "current_company": "TrueVault Data", "city": "Denver", "state": "CO", "country": "USA", "bio": "Managed wind-down financials and creditor negotiations for TrueVault.", "is_active": False, "data_sources": ["demo_seeder"]},
+
+    # Ironforge Industrial — Manufacturing + A&D
+    # Titan Precision Manufacturing
+    {"full_name": "Gary Stevenson", "first_name": "Gary", "last_name": "Stevenson", "current_title": "CEO", "current_company": "Titan Precision Manufacturing", "city": "Cincinnati", "state": "OH", "country": "USA", "bio": "30-year manufacturing veteran; former President at Precision Castparts aerospace division.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Donna Kessler", "first_name": "Donna", "last_name": "Kessler", "current_title": "CFO", "current_company": "Titan Precision Manufacturing", "city": "Cincinnati", "state": "OH", "country": "USA", "bio": "CPA; former Controller at Parker Hannifin, expert in manufacturing cost accounting.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "James Nakamura", "first_name": "James", "last_name": "Nakamura", "current_title": "COO", "current_company": "Titan Precision Manufacturing", "city": "Cincinnati", "state": "OH", "country": "USA", "bio": "Lean manufacturing expert; led operational transformation at Spirit AeroSystems.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # AeroSpec Coatings
+    {"full_name": "Thomas Grant", "first_name": "Thomas", "last_name": "Grant", "current_title": "CEO", "current_company": "AeroSpec Coatings", "city": "Wichita", "state": "KS", "country": "USA", "bio": "Materials scientist turned exec; holds 12 patents in thermal barrier coatings.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Karen Wojcik", "first_name": "Karen", "last_name": "Wojcik", "current_title": "CFO", "current_company": "AeroSpec Coatings", "city": "Wichita", "state": "KS", "country": "USA", "bio": "Former VP Finance at Sherwin-Williams industrial division; aerospace P&L experience.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # Continental Packaging Solutions
+    {"full_name": "Raymond Cross", "first_name": "Raymond", "last_name": "Cross", "current_title": "CEO", "current_company": "Continental Packaging Solutions", "city": "Milwaukee", "state": "WI", "country": "USA", "bio": "Packaging industry leader; grew Continental from regional to national footprint via 5 add-ons.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Sandra Nilsson", "first_name": "Sandra", "last_name": "Nilsson", "current_title": "CFO", "current_company": "Continental Packaging Solutions", "city": "Milwaukee", "state": "WI", "country": "USA", "bio": "M&A integration specialist; managed financial integration of 5 bolt-on acquisitions.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Victor Huang", "first_name": "Victor", "last_name": "Huang", "current_title": "COO", "current_company": "Continental Packaging Solutions", "city": "Milwaukee", "state": "WI", "country": "USA", "bio": "Supply chain expert; optimized Continental's 12-plant network for 15% cost reduction.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # Midwest Valve & Controls
+    {"full_name": "Robert Magnusson", "first_name": "Robert", "last_name": "Magnusson", "current_title": "CEO", "current_company": "Midwest Valve & Controls", "city": "Houston", "state": "TX", "country": "USA", "bio": "Flow control industry veteran; former EVP at Emerson's valve division.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Christine Blake", "first_name": "Christine", "last_name": "Blake", "current_title": "CFO", "current_company": "Midwest Valve & Controls", "city": "Houston", "state": "TX", "country": "USA", "bio": "Energy sector CFO; managed through oil price cycles at Cameron International.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # SteelCore Fabrication
+    {"full_name": "Anthony Russo", "first_name": "Anthony", "last_name": "Russo", "current_title": "CEO", "current_company": "SteelCore Fabrication", "city": "Pittsburgh", "state": "PA", "country": "USA", "bio": "Third-generation steelworker turned exec; modernized SteelCore with automated welding.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Michelle Chen-Park", "first_name": "Michelle", "last_name": "Chen-Park", "current_title": "CFO", "current_company": "SteelCore Fabrication", "city": "Pittsburgh", "state": "PA", "country": "USA", "bio": "Industrial finance; built project-based costing system that improved margins 3pts.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # DefenseTech Systems
+    {"full_name": "Col. (Ret.) Mark Henderson", "first_name": "Mark", "last_name": "Henderson", "current_title": "CEO", "current_company": "DefenseTech Systems", "city": "Huntsville", "state": "AL", "country": "USA", "bio": "Retired Army Colonel; 20 years in DoD acquisition, former PM for EW programs.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Laura Castellano", "first_name": "Laura", "last_name": "Castellano", "current_title": "CFO", "current_company": "DefenseTech Systems", "city": "Huntsville", "state": "AL", "country": "USA", "bio": "Defense CFO; FAR/DFAR compliance expert, former Controller at L3Harris division.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Dr. Wei Zhang", "first_name": "Wei", "last_name": "Zhang", "current_title": "CTO", "current_company": "DefenseTech Systems", "city": "Huntsville", "state": "AL", "country": "USA", "bio": "PhD EE Georgia Tech; holds Top Secret clearance, led DARPA-funded EW programs.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # Great Lakes Plastics (exited)
+    {"full_name": "Paul Henriksen", "first_name": "Paul", "last_name": "Henriksen", "current_title": "CEO", "current_company": "Great Lakes Plastics", "city": "Grand Rapids", "state": "MI", "country": "USA", "bio": "Plastics manufacturing exec; led Great Lakes through Berry Global acquisition.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Tamara Novak", "first_name": "Tamara", "last_name": "Novak", "current_title": "CFO", "current_company": "Great Lakes Plastics", "city": "Grand Rapids", "state": "MI", "country": "USA", "bio": "Manufacturing finance; managed sell-side due diligence and transition.", "is_active": True, "data_sources": ["demo_seeder"]},
+    # Northwest Automation Group (exited)
+    {"full_name": "Eric Johansson", "first_name": "Eric", "last_name": "Johansson", "current_title": "CEO", "current_company": "Northwest Automation Group", "city": "Minneapolis", "state": "MN", "country": "USA", "bio": "Automation engineer turned CEO; grew Northwest from 40 to 170 employees.", "is_active": True, "data_sources": ["demo_seeder"]},
+    {"full_name": "Rebecca Foley", "first_name": "Rebecca", "last_name": "Foley", "current_title": "CFO", "current_company": "Northwest Automation Group", "city": "Minneapolis", "state": "MN", "country": "USA", "bio": "Industrial services finance; structured Rockwell Automation sale for 12.1x EBITDA.", "is_active": True, "data_sources": ["demo_seeder"]},
+]
+
+
+# Map company → executive leadership records
+# Tuple: (person_name, title, role_category, is_ceo, is_cfo, is_board, appointed_by_pe, pe_affiliation)
+COMPANY_LEADERSHIP_MAP = {
+    "MedVantage Health Systems": [
+        ("Dr. Robert Chen", "Chief Executive Officer", "C-Suite", True, False, False, True, "Summit Ridge Partners"),
+        ("Patricia Flores", "Chief Financial Officer", "C-Suite", False, True, False, True, "Summit Ridge Partners"),
+        ("Dr. Alan Gupta", "Chief Medical Officer", "C-Suite", False, False, False, False, None),
+    ],
+    "Apex Revenue Solutions": [
+        ("Kevin McCarthy", "Chief Executive Officer", "C-Suite", True, False, False, False, None),
+        ("Linda Tran", "Chief Financial Officer", "C-Suite", False, True, False, True, "Summit Ridge Partners"),
+    ],
+    "CloudShield Security": [
+        ("Jason Park", "Chief Executive Officer & Co-Founder", "C-Suite", True, False, False, False, None),
+        ("Rachel Adams", "Chief Financial Officer", "C-Suite", False, True, False, True, "Summit Ridge Partners"),
+        ("Dmitri Volkov", "Chief Technology Officer", "C-Suite", False, False, False, False, None),
+    ],
+    "TrueNorth Behavioral": [
+        ("Dr. Margaret Sullivan", "Chief Executive Officer", "C-Suite", True, False, False, True, "Summit Ridge Partners"),
+        ("Steven Greenfield", "Chief Financial Officer", "C-Suite", False, True, False, True, "Summit Ridge Partners"),
+        ("Dr. Anita Rao", "Chief Clinical Officer", "C-Suite", False, False, False, False, None),
+    ],
+    "Precision Lab Diagnostics": [
+        ("Frank DeLuca", "Chief Executive Officer", "C-Suite", True, False, False, True, "Summit Ridge Partners"),
+        ("Janet Okonkwo", "Chief Financial Officer", "C-Suite", False, True, False, False, None),
+    ],
+    "Elevate Staffing Group": [
+        ("Marcus Whitfield", "Chief Executive Officer", "C-Suite", True, False, False, False, None),
+        ("Diane Hoffman", "Chief Financial Officer", "C-Suite", False, True, False, True, "Summit Ridge Partners"),
+    ],
+    "DataBridge Analytics": [
+        ("Yusuf Ibrahim", "Chief Executive Officer & Founder", "C-Suite", True, False, False, False, None),
+        ("Samantha Lee", "Chief Financial Officer", "C-Suite", False, True, False, False, None),
+    ],
+    "NovaCare Urgent Clinics": [
+        ("Dr. James Morton", "Chief Executive Officer", "C-Suite", True, False, False, False, None),
+        ("Carolyn Briggs", "Chief Financial Officer", "C-Suite", False, True, False, True, "Summit Ridge Partners"),
+    ],
+    "FinLedger Technologies": [
+        ("Nathan Cho", "Chief Executive Officer & Founder", "C-Suite", True, False, False, False, None),
+        ("Elizabeth Warren-Hughes", "Chief Financial Officer", "C-Suite", False, True, False, False, None),
+    ],
+    "Nimbus Data Cloud": [
+        ("Arjun Mehta", "Chief Executive Officer & Co-Founder", "C-Suite", True, False, False, False, None),
+        ("Claire Donovan", "Chief Financial Officer", "C-Suite", False, True, False, False, None),
+    ],
+    "PayGrid Systems": [
+        ("Monica Alvarez", "Chief Executive Officer", "C-Suite", True, False, False, False, None),
+        ("Derek Simmons", "Chief Financial Officer", "C-Suite", False, True, False, False, None),
+        ("Raj Patel", "Chief Technology Officer", "C-Suite", False, False, False, False, None),
+    ],
+    "VeriComply AI": [
+        ("Sarah Goldstein", "Chief Executive Officer & Co-Founder", "C-Suite", True, False, False, False, None),
+        ("Brian Liu", "Chief Financial Officer", "C-Suite", False, True, False, False, None),
+    ],
+    "InsightFlow Analytics": [
+        ("Natalie Richards", "Chief Executive Officer", "C-Suite", True, False, False, False, None),
+        ("Gregory Tanaka", "Chief Financial Officer", "C-Suite", False, True, False, False, None),
+    ],
+    "ShieldPay Fraud Detection": [
+        ("Alex Petrov", "Chief Executive Officer & Founder", "C-Suite", True, False, False, False, None),
+        ("Wendy Chung", "Chief Financial Officer", "C-Suite", False, True, False, False, None),
+    ],
+    "CloudMetrics Pro": [
+        ("Tyler Brennan", "Chief Executive Officer & Founder", "C-Suite", True, False, False, False, None),
+        ("Amy Nakagawa", "Chief Financial Officer", "C-Suite", False, True, False, False, None),
+    ],
+    "TrueVault Data": [
+        ("Oliver Reese", "Chief Executive Officer & Founder", "C-Suite", True, False, False, False, None),
+        ("Hannah Spiegel", "Chief Financial Officer", "C-Suite", False, True, False, False, None),
+    ],
+    "Titan Precision Manufacturing": [
+        ("Gary Stevenson", "Chief Executive Officer", "C-Suite", True, False, False, True, "Ironforge Industrial Capital"),
+        ("Donna Kessler", "Chief Financial Officer", "C-Suite", False, True, False, False, None),
+        ("James Nakamura", "Chief Operating Officer", "C-Suite", False, False, False, True, "Ironforge Industrial Capital"),
+    ],
+    "AeroSpec Coatings": [
+        ("Thomas Grant", "Chief Executive Officer", "C-Suite", True, False, False, False, None),
+        ("Karen Wojcik", "Chief Financial Officer", "C-Suite", False, True, False, True, "Ironforge Industrial Capital"),
+    ],
+    "Continental Packaging Solutions": [
+        ("Raymond Cross", "Chief Executive Officer", "C-Suite", True, False, False, True, "Ironforge Industrial Capital"),
+        ("Sandra Nilsson", "Chief Financial Officer", "C-Suite", False, True, False, True, "Ironforge Industrial Capital"),
+        ("Victor Huang", "Chief Operating Officer", "C-Suite", False, False, False, False, None),
+    ],
+    "Midwest Valve & Controls": [
+        ("Robert Magnusson", "Chief Executive Officer", "C-Suite", True, False, False, False, None),
+        ("Christine Blake", "Chief Financial Officer", "C-Suite", False, True, False, False, None),
+    ],
+    "SteelCore Fabrication": [
+        ("Anthony Russo", "Chief Executive Officer", "C-Suite", True, False, False, False, None),
+        ("Michelle Chen-Park", "Chief Financial Officer", "C-Suite", False, True, False, True, "Ironforge Industrial Capital"),
+    ],
+    "DefenseTech Systems": [
+        ("Col. (Ret.) Mark Henderson", "Chief Executive Officer", "C-Suite", True, False, False, True, "Ironforge Industrial Capital"),
+        ("Laura Castellano", "Chief Financial Officer", "C-Suite", False, True, False, False, None),
+        ("Dr. Wei Zhang", "Chief Technology Officer", "C-Suite", False, False, False, False, None),
+    ],
+    "Great Lakes Plastics": [
+        ("Paul Henriksen", "Chief Executive Officer", "C-Suite", True, False, False, False, None),
+        ("Tamara Novak", "Chief Financial Officer", "C-Suite", False, True, False, False, None),
+    ],
+    "Northwest Automation Group": [
+        ("Eric Johansson", "Chief Executive Officer", "C-Suite", True, False, False, False, None),
+        ("Rebecca Foley", "Chief Financial Officer", "C-Suite", False, True, False, False, None),
+    ],
+}
+
+
+# Board seats: PE partners sitting on portfolio company boards
+# Tuple: (person_name, company_name, title, is_board_chair)
+BOARD_SEATS = [
+    # Summit Ridge partners on their portfolio boards
+    ("James Harrington", "MedVantage Health Systems", "Board Chair", True),
+    ("Sarah Chen", "MedVantage Health Systems", "Board Member", False),
+    ("Sarah Chen", "TrueNorth Behavioral", "Board Chair", True),
+    ("Sarah Chen", "NovaCare Urgent Clinics", "Board Member", False),
+    ("Michael Torres", "CloudShield Security", "Board Chair", True),
+    ("Michael Torres", "DataBridge Analytics", "Board Member", False),
+    ("James Harrington", "Apex Revenue Solutions", "Board Member", False),
+    ("Amanda Brooks", "Precision Lab Diagnostics", "Board Member", False),
+    ("Robert Kim", "TrueNorth Behavioral", "Board Member", False),
+    ("Robert Kim", "Elevate Staffing Group", "Board Chair", True),
+    ("David Patel", "Elevate Staffing Group", "Board Member", False),
+    # Cascade Growth partners on boards
+    ("Elena Vasquez", "FinLedger Technologies", "Board Member", False),
+    ("Elena Vasquez", "PayGrid Systems", "Board Chair", True),
+    ("Ryan Mitchell", "Nimbus Data Cloud", "Board Member", False),
+    ("Ryan Mitchell", "VeriComply AI", "Board Member", False),
+    ("Lisa Nakamura", "InsightFlow Analytics", "Board Chair", True),
+    ("Lisa Nakamura", "ShieldPay Fraud Detection", "Board Member", False),
+    ("Marcus Thompson", "PayGrid Systems", "Board Member", False),
+    ("Andrew Foster", "CloudMetrics Pro", "Board Member", False),
+    # Ironforge partners on boards
+    ("William Blackwell", "Titan Precision Manufacturing", "Board Chair", True),
+    ("William Blackwell", "Continental Packaging Solutions", "Board Chair", True),
+    ("Katherine Dawson", "AeroSpec Coatings", "Board Chair", True),
+    ("Katherine Dawson", "Midwest Valve & Controls", "Board Member", False),
+    ("Thomas O'Brien", "DefenseTech Systems", "Board Chair", True),
+    ("Thomas O'Brien", "Titan Precision Manufacturing", "Board Member", False),
+    ("Maria Rodriguez", "SteelCore Fabrication", "Board Member", False),
+    ("Maria Rodriguez", "Continental Packaging Solutions", "Board Member", False),
+    ("Richard Hoffman", "Great Lakes Plastics", "Board Chair", True),
+    ("Richard Hoffman", "Northwest Automation Group", "Board Member", False),
+    ("Daniel Kowalski", "Midwest Valve & Controls", "Board Member", False),
+]
+
+
+# ---------------------------------------------------------------------------
+# Competitor Mappings (2-3 per portfolio company)
+# ---------------------------------------------------------------------------
+
+# Dict: company_name → list of (competitor_name, type, relative_size, market_position, is_public, ticker, is_pe_backed, pe_owner, notes)
+COMPETITOR_MAPPINGS = {
+    # Summit Ridge — Healthcare
+    "MedVantage Health Systems": [
+        ("Amedisys", "Direct", "Larger", "Leader", True, "AMED", False, None, "National home health and hospice services"),
+        ("Addus HomeCare", "Direct", "Similar", "Challenger", True, "ADUS", False, None, "Personal care and home health"),
+        ("BrightSpring Health", "Direct", "Larger", "Leader", False, None, True, "KKR", "Diversified health services platform"),
+    ],
+    "TrueNorth Behavioral": [
+        ("Acadia Healthcare", "Direct", "Larger", "Leader", True, "ACHC", False, None, "Behavioral health facilities operator"),
+        ("Universal Health Services", "Direct", "Larger", "Leader", True, "UHS", False, None, "Acute and behavioral health"),
+        ("Refresh Mental Health", "Direct", "Similar", "Challenger", False, None, True, "Lee Equity Partners", "Outpatient behavioral health"),
+    ],
+    "NovaCare Urgent Clinics": [
+        ("CityMD", "Direct", "Larger", "Leader", False, None, True, "Warburg Pincus", "Walk-in urgent care clinics"),
+        ("GoHealth Urgent Care", "Direct", "Similar", "Challenger", False, None, True, "TPG", "Joint-venture urgent care"),
+    ],
+    "Precision Lab Diagnostics": [
+        ("Quest Diagnostics", "Direct", "Larger", "Leader", True, "DGX", False, None, "National clinical laboratory"),
+        ("Sonic Healthcare", "Direct", "Larger", "Leader", True, "SHL.AX", False, None, "Global pathology and diagnostics"),
+        ("BioReference Labs", "Direct", "Similar", "Challenger", False, None, True, "OPKO Health", "Regional specialty lab"),
+    ],
+    # Summit Ridge — Software/Services
+    "CloudShield Security": [
+        ("CrowdStrike", "Direct", "Larger", "Leader", True, "CRWD", False, None, "Cloud-native endpoint security"),
+        ("SentinelOne", "Direct", "Larger", "Challenger", True, "S", False, None, "AI-powered security platform"),
+        ("Arctic Wolf", "Indirect", "Similar", "Challenger", False, None, True, "Viking Global", "Security operations as a service"),
+    ],
+    "Apex Revenue Solutions": [
+        ("R1 RCM", "Direct", "Larger", "Leader", True, "RCM", False, None, "Revenue cycle management"),
+        ("Waystar", "Direct", "Similar", "Challenger", False, None, True, "EQT/CPPIB", "Healthcare payment solutions"),
+    ],
+    "DataBridge Analytics": [
+        ("Health Catalyst", "Direct", "Similar", "Challenger", True, "HCAT", False, None, "Healthcare data platform"),
+        ("Innovaccer", "Indirect", "Similar", "Niche", False, None, True, "Tiger Global", "Healthcare data unification"),
+    ],
+    "Elevate Staffing Group": [
+        ("AMN Healthcare", "Direct", "Larger", "Leader", True, "AMN", False, None, "Healthcare staffing and workforce"),
+        ("Cross Country Healthcare", "Direct", "Similar", "Challenger", True, "CCRN", False, None, "Healthcare staffing"),
+    ],
+    # Cascade Growth — Fintech/SaaS
+    "FinLedger Technologies": [
+        ("nCino", "Direct", "Larger", "Leader", True, "NCNO", False, None, "Cloud banking platform"),
+        ("Blend Labs", "Direct", "Similar", "Challenger", True, "BLND", False, None, "Digital lending platform"),
+    ],
+    "PayGrid Systems": [
+        ("Marqeta", "Direct", "Similar", "Challenger", True, "MQ", False, None, "Card issuing and payment infrastructure"),
+        ("Adyen", "Direct", "Larger", "Leader", True, "ADYEN.AS", False, None, "Payment platform"),
+        ("Stripe", "Direct", "Larger", "Leader", False, None, True, "Sequoia/a16z", "Payment infrastructure"),
+    ],
+    "Nimbus Data Cloud": [
+        ("Snowflake", "Direct", "Larger", "Leader", True, "SNOW", False, None, "Cloud data warehouse"),
+        ("Databricks", "Direct", "Larger", "Leader", False, None, True, "a16z", "Unified data analytics platform"),
+    ],
+    "InsightFlow Analytics": [
+        ("Domo", "Direct", "Similar", "Challenger", True, "DOMO", False, None, "Cloud BI platform"),
+        ("Sisense", "Direct", "Similar", "Challenger", False, None, True, "Insight Partners", "Embedded analytics"),
+    ],
+    "ShieldPay Fraud Detection": [
+        ("Featurespace", "Direct", "Similar", "Challenger", False, None, True, "Merian Chrysalis", "Adaptive fraud detection"),
+        ("Feedzai", "Direct", "Similar", "Challenger", False, None, True, "KKR", "AI fraud prevention"),
+        ("NICE Actimize", "Direct", "Larger", "Leader", False, None, False, None, "Financial crime detection (div of NICE)"),
+    ],
+    "VeriComply AI": [
+        ("ComplyAdvantage", "Direct", "Similar", "Challenger", False, None, True, "Goldman Sachs", "AI-powered compliance"),
+        ("Alloy", "Direct", "Similar", "Challenger", False, None, True, "Lightspeed", "Identity risk decisioning"),
+    ],
+    "CloudMetrics Pro": [
+        ("Datadog", "Direct", "Larger", "Leader", True, "DDOG", False, None, "Cloud monitoring and analytics"),
+        ("New Relic", "Direct", "Larger", "Challenger", True, "NEWR", False, None, "Observability platform"),
+    ],
+    "TrueVault Data": [
+        ("OneTrust", "Direct", "Larger", "Leader", False, None, True, "Insight Partners", "Privacy management platform"),
+        ("BigID", "Direct", "Similar", "Challenger", False, None, True, "Bessemer", "Data intelligence and privacy"),
+    ],
+    # Ironforge — Industrial
+    "Titan Precision Manufacturing": [
+        ("Precision Castparts", "Direct", "Larger", "Leader", False, None, False, None, "Berkshire Hathaway subsidiary — precision components"),
+        ("Triumph Group", "Direct", "Similar", "Challenger", True, "TGI", False, None, "Aerospace structures and systems"),
+        ("TransDigm Group", "Direct", "Larger", "Leader", True, "TDG", False, None, "Proprietary aerospace components"),
+    ],
+    "AeroSpec Coatings": [
+        ("PPG Industries", "Direct", "Larger", "Leader", True, "PPG", False, None, "Aerospace coatings division"),
+        ("AkzoNobel", "Direct", "Larger", "Leader", True, "AKZA.AS", False, None, "Performance coatings"),
+    ],
+    "Continental Packaging Solutions": [
+        ("Sealed Air", "Direct", "Larger", "Leader", True, "SEE", False, None, "Packaging solutions"),
+        ("Sonoco Products", "Direct", "Larger", "Challenger", True, "SON", False, None, "Industrial packaging"),
+        ("ProMach", "Direct", "Similar", "Challenger", False, None, True, "ProMach Holdings", "Packaging machinery"),
+    ],
+    "Midwest Valve & Controls": [
+        ("Emerson Electric", "Direct", "Larger", "Leader", True, "EMR", False, None, "Flow control division (Fisher, Bettis)"),
+        ("Flowserve", "Direct", "Larger", "Challenger", True, "FLS", False, None, "Industrial valve manufacturer"),
+    ],
+    "SteelCore Fabrication": [
+        ("Nucor Corporation", "Direct", "Larger", "Leader", True, "NUE", False, None, "Steel fabrication & products"),
+        ("Commercial Metals", "Direct", "Larger", "Challenger", True, "CMC", False, None, "Steel fabrication & recycling"),
+    ],
+    "DefenseTech Systems": [
+        ("L3Harris Technologies", "Direct", "Larger", "Leader", True, "LHX", False, None, "Defense technology and comms"),
+        ("Mercury Systems", "Direct", "Similar", "Challenger", True, "MRCY", False, None, "Defense electronics processing"),
+        ("CACI International", "Direct", "Similar", "Challenger", True, "CACI", False, None, "Defense technology & services"),
+    ],
+    "Great Lakes Plastics": [
+        ("Berry Global", "Direct", "Larger", "Leader", True, "BERY", False, None, "Plastic packaging solutions"),
+        ("AptarGroup", "Direct", "Larger", "Challenger", True, "ATR", False, None, "Dispensing solutions"),
+    ],
+    "Northwest Automation Group": [
+        ("Rockwell Automation", "Direct", "Larger", "Leader", True, "ROK", False, None, "Industrial automation"),
+        ("Emerson Electric", "Direct", "Larger", "Leader", True, "EMR", False, None, "Automation solutions division"),
+    ],
+}
+
+
+# ---------------------------------------------------------------------------
+# Company News (2-3 items per company, mix of sentiment)
+# ---------------------------------------------------------------------------
+
+# Dict: company_name → list of (title, source, url_slug, summary, news_type, sentiment, score, published_date)
+COMPANY_NEWS = {
+    "MedVantage Health Systems": [
+        ("MedVantage Expands to 12 New Markets Across Southeast", "Modern Healthcare", "medvantage-expansion-southeast", "MedVantage Health Systems announced expansion into 12 new metropolitan markets across the Southeast, bringing its total footprint to 85 markets. The expansion is backed by a $45M growth capital investment from Summit Ridge Partners.", "Expansion", "Positive", 0.82, datetime(2025, 8, 15)),
+        ("Home Health Industry Faces Medicare Reimbursement Headwinds", "Healthcare Dive", "home-health-medicare-headwinds", "CMS proposed a 1.7% cut to home health reimbursement rates for 2026, affecting providers including MedVantage, Amedisys, and Addus HomeCare. Industry groups are lobbying for reversal.", "Regulatory", "Negative", -0.45, datetime(2025, 7, 20)),
+        ("MedVantage CEO Named to Modern Healthcare's Top 25 Innovators", "Modern Healthcare", "medvantage-ceo-top25-innovators", "Dr. Sarah Mitchell, CEO of MedVantage Health Systems, was recognized for pioneering hybrid telehealth-home health delivery models.", "Management", "Positive", 0.65, datetime(2025, 9, 1)),
+    ],
+    "TrueNorth Behavioral": [
+        ("TrueNorth Behavioral Opens 5 New Outpatient Centers", "Behavioral Health Business", "truenorth-new-outpatient-centers", "TrueNorth Behavioral expanded its outpatient network with 5 new centers across Texas and Florida, targeting underserved communities.", "Expansion", "Positive", 0.75, datetime(2025, 6, 10)),
+        ("Behavioral Health Demand Surges Post-Pandemic, Creating M&A Opportunities", "PE Hub", "behavioral-health-ma-surge", "Private equity firms are increasingly targeting behavioral health platforms, with TrueNorth Behavioral among the most active acquirers.", "Deal", "Positive", 0.60, datetime(2025, 5, 22)),
+    ],
+    "CloudShield Security": [
+        ("CloudShield Security Achieves FedRAMP High Authorization", "CyberScoop", "cloudshield-fedramp-high", "CloudShield Security received FedRAMP High authorization, opening the door to federal contracts worth an estimated $200M TAM.", "Product", "Positive", 0.88, datetime(2025, 9, 5)),
+        ("Cybersecurity Funding Cools as Valuations Reset", "TechCrunch", "cybersec-funding-cools-2025", "Cybersecurity startups face valuation compression as investors demand profitability over growth. Affects late-stage companies including CloudShield and Arctic Wolf.", "Market", "Negative", -0.30, datetime(2025, 7, 15)),
+    ],
+    "Precision Lab Diagnostics": [
+        ("Precision Lab Diagnostics Launches At-Home Testing Platform", "MedTech Dive", "precision-lab-home-testing", "Precision Lab introduced a direct-to-consumer at-home testing platform for common lab panels, targeting the $5B home diagnostics market.", "Product", "Positive", 0.72, datetime(2025, 8, 20)),
+        ("Lab Industry Consolidation Accelerates with 12 Deals in Q2", "Dark Daily", "lab-consolidation-q2-2025", "The clinical laboratory industry saw 12 M&A transactions in Q2 2025, with Precision Lab and BioReference among rumored targets.", "Deal", "Neutral", 0.10, datetime(2025, 7, 8)),
+    ],
+    "FinLedger Technologies": [
+        ("FinLedger Partners with Top 20 Regional Bank for Digital Transformation", "American Banker", "finledger-regional-bank-partnership", "FinLedger Technologies signed a 5-year partnership with a Top 20 regional bank to digitize commercial lending, representing $8M ARR.", "Deal", "Positive", 0.78, datetime(2025, 9, 12)),
+        ("Community Banks Accelerate Tech Adoption to Compete with Neobanks", "Banking Dive", "community-banks-tech-adoption", "Survey shows 78% of community banks plan to increase technology spending, benefiting vendors like FinLedger and nCino.", "Market", "Positive", 0.55, datetime(2025, 6, 28)),
+    ],
+    "PayGrid Systems": [
+        ("PayGrid Systems Processes $10B in Annual Volume", "PYMNTS", "paygrid-10b-annual-volume", "PayGrid Systems crossed the $10B annual payment processing milestone, up 45% YoY, driven by B2B embedded payments growth.", "Earnings", "Positive", 0.85, datetime(2025, 8, 1)),
+        ("Payment Fraud Losses Hit $32B Globally, Pressuring Processors", "Payments Journal", "payment-fraud-losses-32b", "Rising fraud rates are forcing payment processors including PayGrid and Marqeta to invest heavily in fraud prevention technology.", "Market", "Negative", -0.25, datetime(2025, 7, 5)),
+        ("PayGrid Named to Forbes Fintech 50", "Forbes", "paygrid-forbes-fintech-50", "PayGrid Systems earned a spot on the 2025 Forbes Fintech 50 list for its B2B payment infrastructure innovation.", "Management", "Positive", 0.70, datetime(2025, 6, 15)),
+    ],
+    "Titan Precision Manufacturing": [
+        ("Titan Precision Wins $120M Multi-Year Defense Contract", "Defense News", "titan-defense-contract-120m", "Titan Precision Manufacturing secured a $120M contract to supply precision-machined components for next-generation fighter aircraft.", "Deal", "Positive", 0.90, datetime(2025, 9, 8)),
+        ("Titan Precision Exploring Bolt-On Acquisition of Southwest Machine Works", "PE Hub", "titan-southwest-bolt-on", "Ironforge Industrial Capital-backed Titan Precision is in advanced talks to acquire Southwest Machine Works for approximately $45M.", "Deal", "Positive", 0.65, datetime(2025, 8, 28)),
+        ("Aerospace Supply Chain Faces Skilled Labor Shortage", "Aviation Week", "aerospace-labor-shortage-2025", "Aerospace manufacturers including Titan Precision and Triumph Group report 15-20% unfilled machinist positions.", "Market", "Negative", -0.35, datetime(2025, 7, 12)),
+    ],
+    "Continental Packaging Solutions": [
+        ("Continental Packaging Launches Sustainable Product Line", "Packaging World", "continental-sustainable-packaging", "Continental Packaging Solutions introduced a fully recyclable packaging line that reduces material costs by 18% while meeting ESG targets.", "Product", "Positive", 0.73, datetime(2025, 8, 5)),
+        ("Raw Material Costs Stabilize After Two-Year Surge", "Packaging Digest", "raw-material-costs-stabilize", "Resin and corrugated board prices have stabilized, improving margins for converters like Continental Packaging and Sonoco.", "Market", "Positive", 0.40, datetime(2025, 6, 20)),
+    ],
+    "DefenseTech Systems": [
+        ("DefenseTech Systems Selected for JADC2 Pilot Program", "C4ISRNet", "defensetech-jadc2-pilot", "DefenseTech Systems was selected as a technology partner for the DoD's JADC2 initiative, focused on secure tactical communications.", "Deal", "Positive", 0.88, datetime(2025, 9, 15)),
+        ("Defense Budget Request Includes 7% Increase for Technology Modernization", "Defense One", "defense-budget-tech-increase", "The FY2026 defense budget proposal includes a 7% increase in technology modernization funding, benefiting contractors like DefenseTech.", "Regulatory", "Positive", 0.60, datetime(2025, 5, 30)),
+    ],
+}
+
+
+# ---------------------------------------------------------------------------
 # Deals
 # ---------------------------------------------------------------------------
 
@@ -675,7 +1090,134 @@ async def seed_pe_demo_data(db: Session) -> Dict[str, int]:
     db.flush()
     counts["pe_firm_people"] = fp_count
 
-    # 8. Deals
+    # 8. Company executives (PEPerson records)
+    logger.info("Seeding %d company executives", len(COMPANY_EXECUTIVES))
+    counts["pe_people_executives"] = _upsert_rows(
+        db, PEPerson, COMPANY_EXECUTIVES, ["full_name"], has_db_constraint=False,
+    )
+
+    # 9. Company leadership records (executive → company)
+    leadership_count = 0
+    for co_name, leaders in COMPANY_LEADERSHIP_MAP.items():
+        co_id = _lookup_id(db, PEPortfolioCompany, name=co_name)
+        if not co_id:
+            logger.warning("Company not found for leadership: %s", co_name)
+            continue
+        for (person_name, title, role_cat, is_ceo, is_cfo, is_board, appointed_pe, pe_affil) in leaders:
+            person_id = _lookup_id(db, PEPerson, full_name=person_name)
+            if not person_id:
+                logger.warning("Person not found: %s", person_name)
+                continue
+            existing = db.execute(
+                select(PECompanyLeadership.id).where(
+                    PECompanyLeadership.company_id == co_id,
+                    PECompanyLeadership.person_id == person_id,
+                    PECompanyLeadership.title == title,
+                )
+            ).scalar_one_or_none()
+            if existing:
+                leadership_count += 1
+                continue
+            db.add(PECompanyLeadership(
+                company_id=co_id, person_id=person_id, title=title,
+                role_category=role_cat, is_ceo=is_ceo, is_cfo=is_cfo,
+                is_board_member=is_board, is_current=True,
+                appointed_by_pe=appointed_pe,
+                pe_firm_affiliation=pe_affil,
+                start_date=date(2020, 1, 1),
+                data_source="demo_seeder",
+            ))
+            leadership_count += 1
+    db.flush()
+    counts["pe_company_leadership"] = leadership_count
+
+    # 10. Board seats (PE partners → portfolio company boards)
+    board_count = 0
+    for (person_name, co_name, title, is_chair) in BOARD_SEATS:
+        person_id = _lookup_id(db, PEPerson, full_name=person_name)
+        co_id = _lookup_id(db, PEPortfolioCompany, name=co_name)
+        if not (person_id and co_id):
+            logger.warning("Board seat lookup failed: %s → %s", person_name, co_name)
+            continue
+        existing = db.execute(
+            select(PECompanyLeadership.id).where(
+                PECompanyLeadership.company_id == co_id,
+                PECompanyLeadership.person_id == person_id,
+                PECompanyLeadership.is_board_member == True,
+            )
+        ).scalar_one_or_none()
+        if existing:
+            board_count += 1
+            continue
+        db.add(PECompanyLeadership(
+            company_id=co_id, person_id=person_id, title=title,
+            role_category="Board", is_board_member=True, is_board_chair=is_chair,
+            is_current=True, appointed_by_pe=True,
+            pe_firm_affiliation=_get_person_firm(person_name),
+            start_date=date(2019, 1, 1),
+            data_source="demo_seeder",
+        ))
+        board_count += 1
+    db.flush()
+    counts["pe_company_leadership_board"] = board_count
+
+    # 11. Competitor mappings
+    comp_count = 0
+    for co_name, competitors in COMPETITOR_MAPPINGS.items():
+        co_id = _lookup_id(db, PEPortfolioCompany, name=co_name)
+        if not co_id:
+            logger.warning("Company not found for competitor mapping: %s", co_name)
+            continue
+        for (comp_name, comp_type, rel_size, mkt_pos, is_pub, ticker, is_pe, pe_owner, notes) in competitors:
+            existing = db.execute(
+                select(PECompetitorMapping.id).where(
+                    PECompetitorMapping.company_id == co_id,
+                    PECompetitorMapping.competitor_name == comp_name,
+                )
+            ).scalar_one_or_none()
+            if existing:
+                comp_count += 1
+                continue
+            db.add(PECompetitorMapping(
+                company_id=co_id, competitor_name=comp_name,
+                competitor_type=comp_type, relative_size=rel_size,
+                market_position=mkt_pos, is_public=is_pub, ticker=ticker,
+                is_pe_backed=is_pe, pe_owner=pe_owner, notes=notes,
+                data_source="demo_seeder", last_verified=date(2025, 9, 1),
+            ))
+            comp_count += 1
+    db.flush()
+    counts["pe_competitor_mappings"] = comp_count
+
+    # 12. Company news
+    news_count = 0
+    for co_name, articles in COMPANY_NEWS.items():
+        co_id = _lookup_id(db, PEPortfolioCompany, name=co_name)
+        if not co_id:
+            logger.warning("Company not found for news: %s", co_name)
+            continue
+        for (title, source_name, url_slug, summary, news_type, sentiment, score, pub_date) in articles:
+            source_url = f"https://example.com/news/{url_slug}"
+            existing = db.execute(
+                select(PECompanyNews.id).where(
+                    PECompanyNews.source_url == source_url,
+                )
+            ).scalar_one_or_none()
+            if existing:
+                news_count += 1
+                continue
+            db.add(PECompanyNews(
+                company_id=co_id, title=title, source_name=source_name,
+                source_url=source_url, summary=summary, news_type=news_type,
+                sentiment=sentiment, sentiment_score=Decimal(str(score)),
+                relevance_score=Decimal("0.85"), is_primary=True,
+                published_date=pub_date,
+            ))
+            news_count += 1
+    db.flush()
+    counts["pe_company_news"] = news_count
+
+    # 13. Deals
     all_deals = []
     for deal in DEALS:
         co_name = deal.pop("company_name")
@@ -688,7 +1230,7 @@ async def seed_pe_demo_data(db: Session) -> Dict[str, int]:
         deal["company_name"] = co_name  # restore for idempotency
     counts["pe_deals"] = _upsert_rows(db, PEDeal, all_deals, ["deal_name"], has_db_constraint=False)
 
-    # 9. Investments (fund → company) — no unique constraint, select-or-insert
+    # 12. Investments (fund → company) — no unique constraint, select-or-insert
     inv_count = 0
     for fund_name, inv_list in INVESTMENTS.items():
         fund_id = _lookup_id(db, PEFund, name=fund_name)

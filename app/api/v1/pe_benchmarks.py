@@ -4,17 +4,33 @@ PE Benchmarking & Exit Readiness API endpoints.
 Endpoints for:
 - Financial benchmarking (single company + portfolio heatmap)
 - Exit readiness scoring
+- Leadership network graph
 - Demo data seeding
 """
 
 import logging
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.pe_models import (
+    PECompanyFinancials,
+    PECompanyLeadership,
+    PECompanyNews,
+    PECompetitorMapping,
+    PEDeal,
+    PEFirm,
+    PEFirmPeople,
+    PEFund,
+    PEFundInvestment,
+    PEPerson,
+    PEPortfolioCompany,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +99,27 @@ class SeedDemoResponse(BaseModel):
     status: str
     tables: Dict[str, int] = {}
     total_rows: int = 0
+
+
+class GraphNodeResponse(BaseModel):
+    id: str
+    name: str
+    type: str  # firm, pe_person, company, executive
+    title: Optional[str] = None
+    industry: Optional[str] = None
+
+
+class GraphLinkResponse(BaseModel):
+    source: str
+    target: str
+    type: str  # employment, board_seat, management
+
+
+class LeadershipGraphResponse(BaseModel):
+    firm_id: int
+    firm_name: str
+    nodes: List[GraphNodeResponse] = []
+    links: List[GraphLinkResponse] = []
 
 
 # =============================================================================
@@ -216,4 +253,514 @@ async def get_exit_readiness(
         recommendations=result.recommendations,
         confidence=result.confidence,
         data_gaps=result.data_gaps,
+    )
+
+
+@router.get("/leadership-graph/{firm_id}", response_model=LeadershipGraphResponse)
+async def get_leadership_graph(
+    firm_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Leadership network graph for a PE firm's portfolio.
+
+    Returns a force-directed graph with 4 node types (firm, pe_person, company, executive)
+    and 3 link types (employment, board_seat, management).
+    """
+    # Look up firm
+    firm = db.execute(
+        select(PEFirm).where(PEFirm.id == firm_id)
+    ).scalar_one_or_none()
+    if not firm:
+        raise HTTPException(status_code=404, detail=f"Firm {firm_id} not found")
+
+    nodes = []
+    links = []
+    seen_nodes = set()
+
+    # Node: the firm itself
+    firm_node_id = f"firm_{firm.id}"
+    nodes.append(GraphNodeResponse(id=firm_node_id, name=firm.name, type="firm"))
+    seen_nodes.add(firm_node_id)
+
+    # PE team members at this firm
+    firm_people = db.execute(
+        select(PEFirmPeople, PEPerson)
+        .join(PEPerson, PEPerson.id == PEFirmPeople.person_id)
+        .where(PEFirmPeople.firm_id == firm_id, PEFirmPeople.is_current == True)
+    ).all()
+
+    pe_person_ids = set()
+    for fp, person in firm_people:
+        node_id = f"person_{person.id}"
+        if node_id not in seen_nodes:
+            nodes.append(GraphNodeResponse(
+                id=node_id, name=person.full_name, type="pe_person", title=fp.title,
+            ))
+            seen_nodes.add(node_id)
+        pe_person_ids.add(person.id)
+        links.append(GraphLinkResponse(source=firm_node_id, target=node_id, type="employment"))
+
+    # Find portfolio companies via funds → investments
+    funds = db.execute(
+        select(PEFund.id).where(PEFund.firm_id == firm_id)
+    ).scalars().all()
+
+    company_ids = set()
+    if funds:
+        investments = db.execute(
+            select(PEFundInvestment.company_id)
+            .where(PEFundInvestment.fund_id.in_(funds))
+            .distinct()
+        ).scalars().all()
+        company_ids = set(investments)
+
+    # Add company nodes
+    for co_id in company_ids:
+        company = db.execute(
+            select(PEPortfolioCompany).where(PEPortfolioCompany.id == co_id)
+        ).scalar_one_or_none()
+        if not company:
+            continue
+        co_node_id = f"company_{company.id}"
+        if co_node_id not in seen_nodes:
+            nodes.append(GraphNodeResponse(
+                id=co_node_id, name=company.name, type="company", industry=company.industry,
+            ))
+            seen_nodes.add(co_node_id)
+
+        # Leadership records for this company
+        leaders = db.execute(
+            select(PECompanyLeadership, PEPerson)
+            .join(PEPerson, PEPerson.id == PECompanyLeadership.person_id)
+            .where(
+                PECompanyLeadership.company_id == co_id,
+                PECompanyLeadership.is_current == True,
+            )
+        ).all()
+
+        for leadership, person in leaders:
+            person_node_id = f"person_{person.id}" if person.id in pe_person_ids else f"exec_{person.id}"
+
+            if person_node_id not in seen_nodes:
+                node_type = "pe_person" if person.id in pe_person_ids else "executive"
+                nodes.append(GraphNodeResponse(
+                    id=person_node_id, name=person.full_name, type=node_type,
+                    title=leadership.title,
+                ))
+                seen_nodes.add(person_node_id)
+
+            # Link type depends on whether this is a board seat or management role
+            if leadership.is_board_member:
+                links.append(GraphLinkResponse(
+                    source=person_node_id, target=co_node_id, type="board_seat",
+                ))
+            else:
+                links.append(GraphLinkResponse(
+                    source=co_node_id, target=person_node_id, type="management",
+                ))
+
+    return LeadershipGraphResponse(
+        firm_id=firm.id,
+        firm_name=firm.name,
+        nodes=nodes,
+        links=links,
+    )
+
+
+# =============================================================================
+# Potential Buyers
+# =============================================================================
+
+
+class BuyerCandidate(BaseModel):
+    name: str
+    buyer_type: str  # Strategic, Financial, PE Platform
+    fit_score: int = Field(ge=0, le=100)
+    rationale: str
+    is_public: bool = False
+    ticker: Optional[str] = None
+    estimated_capacity_usd: Optional[float] = None
+
+
+class PotentialBuyersResponse(BaseModel):
+    company_id: int
+    company_name: str
+    industry: Optional[str] = None
+    strategic_buyers: List[BuyerCandidate] = []
+    financial_buyers: List[BuyerCandidate] = []
+    total_candidates: int = 0
+
+
+@router.get("/buyer-analysis/{company_id}", response_model=PotentialBuyersResponse)
+async def get_potential_buyers(
+    company_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Identify potential buyers for a portfolio company.
+
+    Generates strategic and financial buyer candidates based on:
+    - Competitor mappings (larger competitors = strategic acquirers)
+    - Industry vertical and deal history
+    - PE firms active in the sector
+    """
+    company = db.execute(
+        select(PEPortfolioCompany).where(PEPortfolioCompany.id == company_id)
+    ).scalar_one_or_none()
+    if not company:
+        raise HTTPException(status_code=404, detail=f"Company {company_id} not found")
+
+    strategic = []
+    financial = []
+
+    # 1. Competitors as strategic buyers (larger ones are acquirers)
+    competitors = db.execute(
+        select(PECompetitorMapping).where(PECompetitorMapping.company_id == company_id)
+    ).scalars().all()
+
+    for comp in competitors:
+        if comp.relative_size in ("Larger", "Similar") and comp.market_position in ("Leader", "Challenger"):
+            fit = 85 if comp.relative_size == "Larger" and comp.market_position == "Leader" else 70
+            rationale_parts = [f"{comp.competitor_type} competitor"]
+            if comp.relative_size == "Larger":
+                rationale_parts.append("larger platform seeking tuck-in")
+            if comp.is_public:
+                rationale_parts.append(f"public ({comp.ticker}), acquisition currency available")
+            strategic.append(BuyerCandidate(
+                name=comp.competitor_name,
+                buyer_type="Strategic",
+                fit_score=fit,
+                rationale="; ".join(rationale_parts),
+                is_public=comp.is_public or False,
+                ticker=comp.ticker,
+            ))
+
+    # 2. PE-backed competitors as "PE Platform" buyers
+    for comp in competitors:
+        if comp.is_pe_backed and comp.pe_owner:
+            strategic.append(BuyerCandidate(
+                name=f"{comp.competitor_name} (backed by {comp.pe_owner})",
+                buyer_type="PE Platform",
+                fit_score=65,
+                rationale=f"PE-backed competitor seeking add-on in {company.industry or 'sector'}",
+                is_public=False,
+            ))
+
+    # 3. Historical buyers in same industry (from past deals)
+    industry_deals = db.execute(
+        select(PEDeal).join(
+            PEPortfolioCompany, PEPortfolioCompany.id == PEDeal.company_id
+        ).where(
+            PEPortfolioCompany.industry == company.industry,
+            PEDeal.deal_type == "Exit",
+            PEDeal.buyer_name.isnot(None),
+        )
+    ).scalars().all()
+
+    seen_buyers = {s.name for s in strategic}
+    for deal in industry_deals:
+        if deal.buyer_name and deal.buyer_name not in seen_buyers:
+            strategic.append(BuyerCandidate(
+                name=deal.buyer_name,
+                buyer_type="Strategic",
+                fit_score=75,
+                rationale=f"Prior acquirer in {company.industry} — bought {deal.deal_name.split(' Sale')[0] if ' Sale' in deal.deal_name else 'similar company'}",
+            ))
+            seen_buyers.add(deal.buyer_name)
+
+    # 4. Financial buyers — PE firms active in same industry
+    # Find current owner firm to exclude
+    owner_firm_id = db.execute(
+        select(PEFund.firm_id)
+        .join(PEFundInvestment, PEFundInvestment.fund_id == PEFund.id)
+        .where(PEFundInvestment.company_id == company_id)
+        .limit(1)
+    ).scalar_one_or_none()
+
+    industry_firms = db.execute(
+        select(PEFirm).where(
+            PEFirm.id != owner_firm_id if owner_firm_id else True
+        )
+    ).scalars().all()
+
+    for firm in industry_firms:
+        # Check if firm has portfolio companies in same industry
+        same_industry = db.execute(
+            select(PEPortfolioCompany).join(
+                PEFundInvestment, PEFundInvestment.company_id == PEPortfolioCompany.id
+            ).join(
+                PEFund, PEFund.id == PEFundInvestment.fund_id
+            ).where(
+                PEFund.firm_id == firm.id,
+                PEPortfolioCompany.industry == company.industry,
+            )
+        ).scalars().first()
+
+        if same_industry:
+            financial.append(BuyerCandidate(
+                name=firm.name,
+                buyer_type="Financial",
+                fit_score=70,
+                rationale=f"Active PE investor in {company.industry} with existing platform ({same_industry.name})",
+            ))
+
+    # Sort by fit score
+    strategic.sort(key=lambda x: x.fit_score, reverse=True)
+    financial.sort(key=lambda x: x.fit_score, reverse=True)
+
+    return PotentialBuyersResponse(
+        company_id=company.id,
+        company_name=company.name,
+        industry=company.industry,
+        strategic_buyers=strategic,
+        financial_buyers=financial,
+        total_candidates=len(strategic) + len(financial),
+    )
+
+
+# =============================================================================
+# Data Room Package
+# =============================================================================
+
+
+class DataRoomFinancials(BaseModel):
+    fiscal_year: int
+    revenue_usd: Optional[float] = None
+    ebitda_usd: Optional[float] = None
+    ebitda_margin_pct: Optional[float] = None
+    gross_margin_pct: Optional[float] = None
+    revenue_growth_pct: Optional[float] = None
+    employees: Optional[int] = None
+
+
+class DataRoomLeader(BaseModel):
+    name: str
+    title: str
+    role_category: Optional[str] = None
+    is_ceo: bool = False
+    is_cfo: bool = False
+    is_board_member: bool = False
+    appointed_by_pe: Optional[bool] = None
+    tenure_years: Optional[float] = None
+
+
+class DataRoomCompetitor(BaseModel):
+    name: str
+    competitor_type: Optional[str] = None
+    relative_size: Optional[str] = None
+    market_position: Optional[str] = None
+    is_public: bool = False
+    ticker: Optional[str] = None
+
+
+class DataRoomNewsItem(BaseModel):
+    title: str
+    source: Optional[str] = None
+    published_date: Optional[str] = None
+    sentiment: Optional[str] = None
+    news_type: Optional[str] = None
+    summary: Optional[str] = None
+
+
+class DataRoomPackageResponse(BaseModel):
+    company_id: int
+    company_name: str
+    industry: Optional[str] = None
+    status: Optional[str] = None
+    headquarters: Optional[str] = None
+    founded_year: Optional[int] = None
+    employee_count: Optional[int] = None
+    website: Optional[str] = None
+    financials: List[DataRoomFinancials] = []
+    leadership: List[DataRoomLeader] = []
+    competitors: List[DataRoomCompetitor] = []
+    recent_news: List[DataRoomNewsItem] = []
+    benchmarks: Optional[Dict[str, Any]] = None
+    exit_readiness: Optional[Dict[str, Any]] = None
+    completeness_pct: int = 0
+    missing_sections: List[str] = []
+
+
+@router.get("/data-room/{company_id}", response_model=DataRoomPackageResponse)
+async def get_data_room_package(
+    company_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Assemble a complete data room package for a portfolio company.
+
+    Combines financials, leadership, competitors, news, benchmarks,
+    and exit readiness into a single response for buyer due diligence.
+    """
+    from app.core.pe_benchmarking import benchmark_company
+    from app.core.pe_exit_scoring import score_exit_readiness
+
+    company = db.execute(
+        select(PEPortfolioCompany).where(PEPortfolioCompany.id == company_id)
+    ).scalar_one_or_none()
+    if not company:
+        raise HTTPException(status_code=404, detail=f"Company {company_id} not found")
+
+    sections_present = 0
+    total_sections = 6
+    missing = []
+
+    # 1. Financials (last 5 years)
+    financials_raw = db.execute(
+        select(PECompanyFinancials)
+        .where(PECompanyFinancials.company_id == company_id)
+        .order_by(PECompanyFinancials.fiscal_year.desc())
+        .limit(5)
+    ).scalars().all()
+
+    financials = []
+    for f in financials_raw:
+        financials.append(DataRoomFinancials(
+            fiscal_year=f.fiscal_year,
+            revenue_usd=float(f.revenue_usd) if f.revenue_usd else None,
+            ebitda_usd=float(f.ebitda_usd) if f.ebitda_usd else None,
+            ebitda_margin_pct=float(f.ebitda_margin_pct) if f.ebitda_margin_pct else None,
+            gross_margin_pct=float(f.gross_margin_pct) if f.gross_margin_pct else None,
+            revenue_growth_pct=float(f.revenue_growth_pct) if f.revenue_growth_pct else None,
+            employees=None,
+        ))
+    if financials:
+        sections_present += 1
+    else:
+        missing.append("financials")
+
+    # 2. Leadership
+    leaders_raw = db.execute(
+        select(PECompanyLeadership, PEPerson)
+        .join(PEPerson, PEPerson.id == PECompanyLeadership.person_id)
+        .where(
+            PECompanyLeadership.company_id == company_id,
+            PECompanyLeadership.is_current == True,
+        )
+    ).all()
+
+    leadership = []
+    for l_rec, person in leaders_raw:
+        tenure = None
+        if l_rec.start_date:
+            tenure = round((date.today() - l_rec.start_date).days / 365.25, 1)
+        leadership.append(DataRoomLeader(
+            name=person.full_name,
+            title=l_rec.title,
+            role_category=l_rec.role_category,
+            is_ceo=l_rec.is_ceo or False,
+            is_cfo=l_rec.is_cfo or False,
+            is_board_member=l_rec.is_board_member or False,
+            appointed_by_pe=l_rec.appointed_by_pe,
+            tenure_years=tenure,
+        ))
+    if leadership:
+        sections_present += 1
+    else:
+        missing.append("leadership")
+
+    # 3. Competitors
+    competitors_raw = db.execute(
+        select(PECompetitorMapping).where(PECompetitorMapping.company_id == company_id)
+    ).scalars().all()
+
+    competitors = [
+        DataRoomCompetitor(
+            name=c.competitor_name,
+            competitor_type=c.competitor_type,
+            relative_size=c.relative_size,
+            market_position=c.market_position,
+            is_public=c.is_public or False,
+            ticker=c.ticker,
+        )
+        for c in competitors_raw
+    ]
+    if competitors:
+        sections_present += 1
+    else:
+        missing.append("competitive_landscape")
+
+    # 4. Recent news
+    news_raw = db.execute(
+        select(PECompanyNews)
+        .where(PECompanyNews.company_id == company_id)
+        .order_by(PECompanyNews.published_date.desc())
+        .limit(10)
+    ).scalars().all()
+
+    recent_news = [
+        DataRoomNewsItem(
+            title=n.title,
+            source=n.source_name,
+            published_date=n.published_date.strftime("%Y-%m-%d") if n.published_date else None,
+            sentiment=n.sentiment,
+            news_type=n.news_type,
+            summary=n.summary,
+        )
+        for n in news_raw
+    ]
+    if recent_news:
+        sections_present += 1
+    else:
+        missing.append("news_coverage")
+
+    # 5. Benchmarks
+    benchmarks_data = None
+    try:
+        bench = benchmark_company(db, company_id)
+        if bench:
+            benchmarks_data = {
+                "overall_percentile": bench.overall_percentile,
+                "metrics": {
+                    m.metric: {"value": m.value, "percentile": m.percentile, "trend": m.trend}
+                    for m in bench.metrics
+                },
+            }
+            sections_present += 1
+        else:
+            missing.append("benchmarks")
+    except Exception:
+        missing.append("benchmarks")
+
+    # 6. Exit readiness
+    exit_data = None
+    try:
+        er = score_exit_readiness(db, company_id)
+        if er:
+            exit_data = {
+                "composite_score": er.composite_score,
+                "grade": er.grade,
+                "confidence": er.confidence,
+                "sub_scores": {
+                    s.dimension: {"score": s.raw_score, "grade": s.grade}
+                    for s in er.sub_scores
+                },
+                "top_recommendations": er.recommendations[:3],
+            }
+            sections_present += 1
+        else:
+            missing.append("exit_readiness")
+    except Exception:
+        missing.append("exit_readiness")
+
+    completeness = int((sections_present / total_sections) * 100)
+
+    return DataRoomPackageResponse(
+        company_id=company.id,
+        company_name=company.name,
+        industry=company.industry,
+        status=company.status,
+        headquarters=f"{company.headquarters_city}, {company.headquarters_state}" if company.headquarters_city else None,
+        founded_year=company.founded_year,
+        employee_count=company.employee_count,
+        website=company.website,
+        financials=financials,
+        leadership=leadership,
+        competitors=competitors,
+        recent_news=recent_news,
+        benchmarks=benchmarks_data,
+        exit_readiness=exit_data,
+        completeness_pct=completeness,
+        missing_sections=missing,
     )
