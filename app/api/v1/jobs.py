@@ -1255,30 +1255,47 @@ def get_worker_status(db: Session = Depends(get_db)):
             "active_jobs": row[4] or [],
         })
 
-    # Queue summary
+    # Queue summary + worker activity stats
     summary = db.execute(
         sa_text("""
             SELECT
                 COUNT(*) FILTER (WHERE status = 'PENDING') as pending,
+                COUNT(*) FILTER (WHERE status = 'BLOCKED') as blocked,
                 COUNT(*) FILTER (WHERE status = 'CLAIMED') as claimed,
                 COUNT(*) FILTER (WHERE status = 'RUNNING') as running,
                 COUNT(*) FILTER (WHERE status = 'SUCCESS'
-                    AND completed_at >= NOW() - INTERVAL '1 hour') as recent_success,
+                    AND completed_at >= NOW() - INTERVAL '1 hour') as completed_1h,
                 COUNT(*) FILTER (WHERE status = 'FAILED'
-                    AND completed_at >= NOW() - INTERVAL '1 hour') as recent_failed
+                    AND completed_at >= NOW() - INTERVAL '1 hour') as failed_1h,
+                MAX(claimed_at) as last_claimed_at,
+                MAX(completed_at) FILTER (WHERE status IN ('SUCCESS', 'FAILED')) as last_completed_at
             FROM job_queue
         """)
     ).fetchone()
 
+    has_recent_heartbeat = len(workers) > 0
+    last_claimed = summary[6]
+    last_completed = summary[7]
+
+    # Worker availability: recent heartbeat OR claimed a job in last 10 min
+    worker_alive = has_recent_heartbeat
+    if not worker_alive and last_claimed:
+        worker_alive = (datetime.utcnow() - last_claimed).total_seconds() < 600
+
     return {
         "workers": workers,
         "total_active_workers": len(workers),
+        "worker_available": worker_alive,
+        "last_job_claimed_at": last_claimed.isoformat() if last_claimed else None,
+        "last_job_completed_at": last_completed.isoformat() if last_completed else None,
         "queue": {
             "pending": summary[0],
-            "claimed": summary[1],
-            "running": summary[2],
-            "recent_success_1h": summary[3],
-            "recent_failed_1h": summary[4],
+            "blocked": summary[1],
+            "claimed": summary[2],
+            "running": summary[3],
+            "completed_1h": summary[4],
+            "failed_1h": summary[5],
+            "depth": summary[0] + summary[1],
         },
     }
 

@@ -1350,7 +1350,7 @@ def health_check():
     from app.core.database import get_engine
     from sqlalchemy import text
 
-    health_status = {"status": "healthy", "service": "running", "database": "unknown"}
+    health_status = {"status": "healthy", "service": "running", "database": "unknown", "worker": "unknown"}
 
     # Check database connectivity
     try:
@@ -1358,6 +1358,31 @@ def health_check():
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         health_status["database"] = "connected"
+
+        # Check worker availability — any heartbeat in last 5 min?
+        try:
+            row = conn.execute(text(
+                "SELECT COUNT(*) FROM job_queue "
+                "WHERE worker_id IS NOT NULL "
+                "AND heartbeat_at >= NOW() - INTERVAL '5 minutes' "
+                "AND status IN ('RUNNING', 'CLAIMED')"
+            )).scalar()
+            if row and row > 0:
+                health_status["worker"] = "active"
+            else:
+                # Check if any jobs were completed recently (worker may be idle)
+                recent = conn.execute(text(
+                    "SELECT COUNT(*) FROM job_queue "
+                    "WHERE status IN ('SUCCESS', 'FAILED') "
+                    "AND completed_at >= NOW() - INTERVAL '10 minutes'"
+                )).scalar()
+                if recent and recent > 0:
+                    health_status["worker"] = "idle"
+                else:
+                    health_status["worker"] = "unavailable"
+                    health_status["status"] = "degraded"
+        except Exception:
+            health_status["worker"] = "unknown"
     except Exception as e:
         health_status["status"] = "degraded"
         health_status["database"] = f"error: {str(e)}"
