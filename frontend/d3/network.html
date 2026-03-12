@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Investment Network — Co-Investment &amp; Executive Relationships</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f172a;--card:#1e293b;--border:#334155;--text:#f1f5f9;
+    --muted:#94a3b8;--primary:#6366f1;--accent:#06b6d4;--orange:#f59e0b;
+    --ownership:#6366f1;--coinvest:#06b6d4;--executive:#f59e0b;
+  }
+  html,body{height:100%;overflow:hidden;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text)}
+  body{display:flex;flex-direction:column}
+
+  /* ── Header ── */
+  .header{padding:16px 24px;display:flex;align-items:center;gap:24px;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0}
+  .header-title h1{font-size:20px;font-weight:700;letter-spacing:-0.3px}
+  .header-title p{font-size:12px;color:var(--muted);margin-top:2px}
+  .search-box{position:relative;margin-left:auto}
+  .search-box input{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px 8px 34px;color:var(--text);font-size:13px;width:240px;outline:none;transition:border-color .2s}
+  .search-box input:focus{border-color:var(--primary)}
+  .search-box input::placeholder{color:var(--muted)}
+  .search-box svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted)}
+  .search-results{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-top:4px;max-height:200px;overflow-y:auto;z-index:100;display:none}
+  .search-results.show{display:block}
+  .search-result-item{padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);transition:background .15s}
+  .search-result-item:last-child{border-bottom:none}
+  .search-result-item:hover{background:var(--bg)}
+  .search-result-item .type-badge{font-size:10px;padding:2px 6px;border-radius:4px;margin-left:8px;font-weight:600}
+  .search-result-item .type-badge.pe{background:rgba(99,102,241,.2);color:var(--primary)}
+  .search-result-item .type-badge.company{background:rgba(6,182,212,.2);color:var(--accent)}
+  .search-result-item .type-badge.person{background:rgba(245,158,11,.2);color:var(--orange)}
+
+  /* ── Stats Bar ── */
+  .stats-bar{display:flex;gap:24px;padding:10px 24px;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0}
+  .stat{display:flex;align-items:baseline;gap:6px}
+  .stat-value{font-size:18px;font-weight:700;color:var(--primary)}
+  .stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+
+  /* ── SVG container ── */
+  .graph-container{flex:1;position:relative;overflow:hidden}
+  svg{width:100%;height:100%;display:block}
+
+  /* ── Legend ── */
+  .legend{position:absolute;bottom:20px;left:20px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 20px;font-size:12px;z-index:10;min-width:200px}
+  .legend h3{font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text)}
+  .legend-section{margin-bottom:10px}
+  .legend-section:last-child{margin-bottom:0}
+  .legend-section-title{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+  .legend-item{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  .legend-circle{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+  .legend-line{width:24px;height:0;flex-shrink:0}
+
+  /* ── Tooltip ── */
+  .tooltip{position:absolute;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;pointer-events:none;opacity:0;transition:opacity .15s;z-index:20;max-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+  .tooltip h4{font-size:14px;font-weight:600;margin-bottom:6px}
+  .tooltip .type{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+  .tooltip .detail{font-size:12px;color:var(--muted);line-height:1.5}
+  .tooltip .detail strong{color:var(--text)}
+
+  /* ── Controls ── */
+  .controls{position:absolute;top:20px;right:20px;display:flex;flex-direction:column;gap:6px;z-index:10}
+  .ctrl-btn{background:var(--card);border:1px solid var(--border);border-radius:8px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);transition:all .15s;font-size:16px}
+  .ctrl-btn:hover{border-color:var(--primary);color:var(--text)}
+
+  /* ── Node label ── */
+  .node-label{font-size:10px;fill:var(--muted);pointer-events:none;text-anchor:middle;dominant-baseline:central}
+  .node-label.highlighted{fill:var(--text);font-weight:600}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-title">
+    <h1>Investment Network</h1>
+    <p>Co-Investment &amp; Executive Relationships</p>
+  </div>
+  <div class="search-box">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="search-input" placeholder="Search entities..." autocomplete="off">
+    <div class="search-results" id="search-results"></div>
+  </div>
+</div>
+
+<!-- Stats Bar -->
+<div class="stats-bar">
+  <div class="stat"><span class="stat-value" id="stat-entities">0</span><span class="stat-label">Total Entities</span></div>
+  <div class="stat"><span class="stat-value" id="stat-connections">0</span><span class="stat-label">Connections</span></div>
+  <div class="stat"><span class="stat-value" id="stat-clusters">0</span><span class="stat-label">Clusters</span></div>
+  <div class="stat"><span class="stat-value" id="stat-avg">0</span><span class="stat-label">Avg Connections/Node</span></div>
+</div>
+
+<!-- Graph -->
+<div class="graph-container" id="graph-container">
+  <svg id="network-svg"></svg>
+
+  <!-- Legend -->
+  <div class="legend">
+    <h3>Legend</h3>
+    <div class="legend-section">
+      <div class="legend-section-title">Node Types</div>
+      <div class="legend-item"><div class="legend-circle" style="background:var(--primary)"></div>PE Firm</div>
+      <div class="legend-item"><div class="legend-circle" style="background:var(--accent)"></div>Portfolio Company</div>
+      <div class="legend-item"><div class="legend-circle" style="background:var(--orange)"></div>Executive / Person</div>
+    </div>
+    <div class="legend-section">
+      <div class="legend-section-title">Link Types</div>
+      <div class="legend-item"><div class="legend-line" style="border-top:3px solid var(--ownership)"></div>Ownership</div>
+      <div class="legend-item"><div class="legend-line" style="border-top:2px dashed var(--coinvest)"></div>Co-Investment</div>
+      <div class="legend-item"><div class="legend-line" style="border-top:1.5px dotted var(--executive)"></div>Shared Executive</div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="ctrl-btn" id="zoom-in" title="Zoom In">+</div>
+    <div class="ctrl-btn" id="zoom-out" title="Zoom Out">&minus;</div>
+    <div class="ctrl-btn" id="zoom-reset" title="Reset View">&#8634;</div>
+  </div>
+
+  <!-- Tooltip -->
+  <div class="tooltip" id="tooltip"></div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────
+const nodes = [
+  // PE Firms (14)
+  { id: "blackstone",       label: "Blackstone",        type: "pe",      aum: "$991B", founded: 1985, hq: "New York", sector: "Diversified" },
+  { id: "kkr",              label: "KKR",               type: "pe",      aum: "$553B", founded: 1976, hq: "New York", sector: "Diversified" },
+  { id: "apollo",           label: "Apollo Global",     type: "pe",      aum: "$651B", founded: 1990, hq: "New York", sector: "Diversified" },
+  { id: "carlyle",          label: "Carlyle Group",     type: "pe",      aum: "$426B", founded: 1987, hq: "Washington DC", sector: "Diversified" },
+  { id: "tpg",              label: "TPG Capital",       type: "pe",      aum: "$222B", founded: 1992, hq: "Fort Worth", sector: "Diversified" },
+  { id: "warburg",          label: "Warburg Pincus",    type: "pe",      aum: "$83B",  founded: 1966, hq: "New York", sector: "Growth Equity" },
+  { id: "bain",             label: "Bain Capital",      type: "pe",      aum: "$180B", founded: 1984, hq: "Boston", sector: "Diversified" },
+  { id: "thoma_bravo",      label: "Thoma Bravo",       type: "pe",      aum: "$138B", founded: 2008, hq: "Chicago", sector: "Software" },
+  { id: "vista",            label: "Vista Equity",      type: "pe",      aum: "$100B", founded: 2000, hq: "Austin", sector: "Enterprise Software" },
+  { id: "advent",           label: "Advent Intl",       type: "pe",      aum: "$91B",  founded: 1984, hq: "Boston", sector: "Diversified" },
+  { id: "silver_lake",      label: "Silver Lake",       type: "pe",      aum: "$102B", founded: 1999, hq: "Menlo Park", sector: "Technology" },
+  { id: "hellman",          label: "Hellman & Friedman", type: "pe",     aum: "$75B",  founded: 1984, hq: "San Francisco", sector: "Software/Services" },
+  { id: "insight",          label: "Insight Partners",  type: "pe",      aum: "$80B",  founded: 1995, hq: "New York", sector: "Software" },
+  { id: "platinum",         label: "Platinum Equity",   type: "pe",      aum: "$48B",  founded: 1995, hq: "Los Angeles", sector: "Industrial" },
+
+  // Portfolio Companies (10)
+  { id: "refinitiv",        label: "Refinitiv",         type: "company", revenue: "$6.8B",  employees: 19000, sector: "Financial Data" },
+  { id: "epicor",           label: "Epicor Software",   type: "company", revenue: "$1.0B",  employees: 5100,  sector: "ERP Software" },
+  { id: "finastra",         label: "Finastra",          type: "company", revenue: "$1.9B",  employees: 8500,  sector: "FinTech" },
+  { id: "mcafee",           label: "McAfee",            type: "company", revenue: "$2.9B",  employees: 8000,  sector: "Cybersecurity" },
+  { id: "medline",          label: "Medline Industries",type: "company", revenue: "$20.2B", employees: 34000, sector: "Healthcare Supply" },
+  { id: "cloudera",         label: "Cloudera",          type: "company", revenue: "$900M",  employees: 3200,  sector: "Data Analytics" },
+  { id: "sailpoint",        label: "SailPoint",         type: "company", revenue: "$470M",  employees: 2400,  sector: "Identity Security" },
+  { id: "datto",            label: "Datto",             type: "company", revenue: "$620M",  employees: 2000,  sector: "MSP Software" },
+  { id: "stamps_com",       label: "Stamps.com",        type: "company", revenue: "$780M",  employees: 3600,  sector: "Shipping Tech" },
+  { id: "mindbody",         label: "Mindbody",          type: "company", revenue: "$340M",  employees: 1800,  sector: "Wellness SaaS" },
+
+  // People (8)
+  { id: "schwarzman",       label: "Steve Schwarzman",  type: "person",  role: "Chairman & CEO", firm: "Blackstone", since: 1985 },
+  { id: "kravis",           label: "Henry Kravis",      type: "person",  role: "Co-Chairman",    firm: "KKR",       since: 1976 },
+  { id: "roberts",          label: "George Roberts",    type: "person",  role: "Co-Chairman",    firm: "KKR",       since: 1976 },
+  { id: "harris",           label: "Marc Harris",       type: "person",  role: "Operating Partner", firm: "Apollo / Carlyle (former)", since: 2010 },
+  { id: "smith",            label: "Robert F. Smith",   type: "person",  role: "Founder & CEO",  firm: "Vista Equity", since: 2000 },
+  { id: "bravo",            label: "Orlando Bravo",     type: "person",  role: "Managing Partner",firm: "Thoma Bravo", since: 2008 },
+  { id: "conway",           label: "Bill Conway",       type: "person",  role: "Co-Founder",     firm: "Carlyle Group", since: 1987 },
+  { id: "egon",             label: "Egon Durban",       type: "person",  role: "Co-CEO",         firm: "Silver Lake", since: 1999 }
+];
+
+const links = [
+  // Ownership links (PE → Portfolio Company)
+  { source: "blackstone",  target: "refinitiv",   type: "ownership", value: "55% stake, $20B deal (2018)" },
+  { source: "blackstone",  target: "medline",     type: "ownership", value: "Co-led $34B buyout (2021)" },
+  { source: "carlyle",     target: "medline",     type: "ownership", value: "Co-led $34B buyout (2021)" },
+  { source: "hellman",     target: "medline",     type: "ownership", value: "Co-led $34B buyout (2021)" },
+  { source: "kkr",         target: "epicor",      type: "ownership", value: "$4.7B acquisition (2020)" },
+  { source: "vista",       target: "finastra",    type: "ownership", value: "Merged Misys + D+H (2017)" },
+  { source: "tpg",         target: "mcafee",      type: "ownership", value: "$14B take-private (2022)" },
+  { source: "advent",      target: "mcafee",      type: "ownership", value: "Co-investor in $14B deal" },
+  { source: "thoma_bravo", target: "sailpoint",   type: "ownership", value: "$6.9B take-private (2022)" },
+  { source: "vista",       target: "datto",       type: "ownership", value: "$6.2B acquisition (2022)" },
+  { source: "thoma_bravo", target: "stamps_com",  type: "ownership", value: "$6.6B acquisition (2021)" },
+  { source: "vista",       target: "mindbody",    type: "ownership", value: "$1.9B take-private (2019)" },
+  { source: "kkr",         target: "cloudera",    type: "ownership", value: "Co-led $5.3B buyout (2021)" },
+  { source: "apollo",      target: "finastra",    type: "ownership", value: "Acquired from Vista (2024)" },
+  { source: "insight",     target: "sailpoint",   type: "ownership", value: "Pre-IPO investor, board seat" },
+
+  // Co-investment links (PE ↔ PE)
+  { source: "blackstone",  target: "carlyle",     type: "coinvest",  value: "Medline Industries ($34B, 2021)" },
+  { source: "blackstone",  target: "hellman",     type: "coinvest",  value: "Medline Industries ($34B, 2021)" },
+  { source: "carlyle",     target: "hellman",     type: "coinvest",  value: "Medline Industries ($34B, 2021)" },
+  { source: "tpg",         target: "advent",      type: "coinvest",  value: "McAfee ($14B, 2022)" },
+  { source: "kkr",         target: "silver_lake", type: "coinvest",  value: "Multiple tech co-invests" },
+  { source: "bain",        target: "carlyle",     type: "coinvest",  value: "Dunkin' Brands ($2.4B, 2006)" },
+  { source: "thoma_bravo", target: "insight",     type: "coinvest",  value: "SailPoint secondary" },
+  { source: "vista",       target: "thoma_bravo", type: "coinvest",  value: "Enterprise SaaS deal flow" },
+  { source: "apollo",      target: "kkr",         type: "coinvest",  value: "Energy sector co-invests" },
+
+  // Shared executive / person links
+  { source: "schwarzman",  target: "blackstone",  type: "executive", value: "Founder & CEO since 1985" },
+  { source: "kravis",      target: "kkr",         type: "executive", value: "Co-Founder since 1976" },
+  { source: "roberts",     target: "kkr",         type: "executive", value: "Co-Founder since 1976" },
+  { source: "harris",      target: "apollo",      type: "executive", value: "Operating Partner (2010-2018)" },
+  { source: "harris",      target: "carlyle",     type: "executive", value: "Senior Advisor (2019-present)" },
+  { source: "smith",       target: "vista",       type: "executive", value: "Founder & CEO since 2000" },
+  { source: "bravo",       target: "thoma_bravo",  type: "executive", value: "Managing Partner since 2008" },
+  { source: "conway",      target: "carlyle",     type: "executive", value: "Co-Founder since 1987" },
+  { source: "egon",        target: "silver_lake",  type: "executive", value: "Co-CEO since 1999" },
+  { source: "kravis",      target: "roberts",     type: "executive", value: "Co-founders, cousins" }
+];
+
+// ─────────────────────────────────────────────
+// STATS
+// ─────────────────────────────────────────────
+function computeStats() {
+  document.getElementById("stat-entities").textContent = nodes.length;
+  document.getElementById("stat-connections").textContent = links.length;
+
+  // clusters via BFS
+  const adj = {};
+  nodes.forEach(n => adj[n.id] = []);
+  links.forEach(l => {
+    const s = typeof l.source === "object" ? l.source.id : l.source;
+    const t = typeof l.target === "object" ? l.target.id : l.target;
+    adj[s].push(t);
+    adj[t].push(s);
+  });
+  const visited = new Set();
+  let clusters = 0;
+  nodes.forEach(n => {
+    if (!visited.has(n.id)) {
+      clusters++;
+      const stack = [n.id];
+      while (stack.length) {
+        const cur = stack.pop();
+        if (visited.has(cur)) continue;
+        visited.add(cur);
+        adj[cur].forEach(nb => { if (!visited.has(nb)) stack.push(nb); });
+      }
+    }
+  });
+  document.getElementById("stat-clusters").textContent = clusters;
+
+  const degreeSum = links.length * 2;
+  document.getElementById("stat-avg").textContent = (degreeSum / nodes.length).toFixed(1);
+}
+computeStats();
+
+// ─────────────────────────────────────────────
+// GRAPH
+// ─────────────────────────────────────────────
+const container = document.getElementById("graph-container");
+const svg = d3.select("#network-svg");
+const width = container.clientWidth;
+const height = container.clientHeight;
+
+// Zoom
+const zoomBehavior = d3.zoom()
+  .scaleExtent([0.15, 5])
+  .on("zoom", ({ transform }) => g.attr("transform", transform));
+
+svg.call(zoomBehavior);
+
+const g = svg.append("g");
+
+// Arrow markers
+const defs = svg.append("defs");
+["ownership", "coinvest", "executive"].forEach(type => {
+  const color = type === "ownership" ? "#6366f1" : type === "coinvest" ? "#06b6d4" : "#f59e0b";
+  defs.append("marker")
+    .attr("id", `arrow-${type}`)
+    .attr("viewBox", "0 -5 10 10")
+    .attr("refX", 20)
+    .attr("refY", 0)
+    .attr("markerWidth", 6)
+    .attr("markerHeight", 6)
+    .attr("orient", "auto")
+    .append("path")
+    .attr("d", "M0,-5L10,0L0,5")
+    .attr("fill", color)
+    .attr("opacity", 0.6);
+});
+
+// Force simulation
+const simulation = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(links).id(d => d.id).distance(d => {
+    if (d.type === "ownership")  return 120;
+    if (d.type === "coinvest")   return 180;
+    return 100;
+  }).strength(d => {
+    if (d.type === "ownership")  return 0.7;
+    if (d.type === "coinvest")   return 0.3;
+    return 0.5;
+  }))
+  .force("charge", d3.forceManyBody().strength(-300).distanceMax(500))
+  .force("center", d3.forceCenter(width / 2, height / 2))
+  .force("collision", d3.forceCollide().radius(d => nodeRadius(d) + 12))
+  .force("x", d3.forceX(width / 2).strength(0.03))
+  .force("y", d3.forceY(height / 2).strength(0.03));
+
+function nodeRadius(d) {
+  if (d.type === "pe")      return 24;
+  if (d.type === "company") return 16;
+  return 10;
+}
+
+function nodeColor(d) {
+  if (d.type === "pe")      return "#6366f1";
+  if (d.type === "company") return "#06b6d4";
+  return "#f59e0b";
+}
+
+function linkColor(d) {
+  if (d.type === "ownership")  return "#6366f1";
+  if (d.type === "coinvest")   return "#06b6d4";
+  return "#f59e0b";
+}
+
+function linkStroke(d) {
+  if (d.type === "ownership")  return "3px";
+  if (d.type === "coinvest")   return "2px";
+  return "1.5px";
+}
+
+function linkDash(d) {
+  if (d.type === "coinvest")   return "8 4";
+  if (d.type === "executive")  return "3 3";
+  return "none";
+}
+
+// Draw links
+const linkGroup = g.append("g").attr("class", "links");
+const link = linkGroup.selectAll("line")
+  .data(links)
+  .join("line")
+  .attr("stroke", d => linkColor(d))
+  .attr("stroke-width", d => linkStroke(d))
+  .attr("stroke-dasharray", d => linkDash(d))
+  .attr("stroke-opacity", 0.5)
+  .attr("marker-end", d => d.type === "ownership" ? `url(#arrow-${d.type})` : null);
+
+// Draw nodes
+const nodeGroup = g.append("g").attr("class", "nodes");
+const node = nodeGroup.selectAll("g")
+  .data(nodes)
+  .join("g")
+  .attr("class", "node")
+  .call(d3.drag()
+    .on("start", dragStarted)
+    .on("drag", dragged)
+    .on("end", dragEnded));
+
+// Glow filter
+defs.append("filter")
+  .attr("id", "glow")
+  .append("feGaussianBlur")
+  .attr("stdDeviation", 3.5)
+  .attr("result", "coloredBlur");
+
+const feMerge = defs.select("#glow").append("feMerge");
+feMerge.append("feMergeNode").attr("in", "coloredBlur");
+feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
+// Node circles
+node.append("circle")
+  .attr("r", d => nodeRadius(d))
+  .attr("fill", d => nodeColor(d))
+  .attr("stroke", d => d3.color(nodeColor(d)).brighter(0.5))
+  .attr("stroke-width", 2)
+  .attr("opacity", 0.9)
+  .style("cursor", "pointer");
+
+// Node inner icon hint (small letter)
+node.append("text")
+  .attr("text-anchor", "middle")
+  .attr("dominant-baseline", "central")
+  .attr("font-size", d => d.type === "pe" ? 11 : d.type === "company" ? 8 : 7)
+  .attr("font-weight", 700)
+  .attr("fill", "#0f172a")
+  .attr("pointer-events", "none")
+  .text(d => {
+    if (d.type === "pe") return d.label.substring(0, 2).toUpperCase();
+    if (d.type === "company") return d.label.substring(0, 1).toUpperCase();
+    return "";
+  });
+
+// Node labels
+const label = nodeGroup.selectAll("text.node-label")
+  .data(nodes)
+  .join("text")
+  .attr("class", "node-label")
+  .attr("dy", d => nodeRadius(d) + 14)
+  .text(d => d.label);
+
+// ─────────────────────────────────────────────
+// TOOLTIP
+// ─────────────────────────────────────────────
+const tooltip = document.getElementById("tooltip");
+
+function showTooltip(event, d) {
+  let html = `<h4>${d.label}</h4>`;
+  const typeLabel = d.type === "pe" ? "PE Firm" : d.type === "company" ? "Portfolio Company" : "Executive";
+  html += `<div class="type">${typeLabel}</div><div class="detail">`;
+
+  if (d.type === "pe") {
+    html += `<strong>AUM:</strong> ${d.aum}<br>`;
+    html += `<strong>Founded:</strong> ${d.founded}<br>`;
+    html += `<strong>HQ:</strong> ${d.hq}<br>`;
+    html += `<strong>Focus:</strong> ${d.sector}`;
+  } else if (d.type === "company") {
+    html += `<strong>Revenue:</strong> ${d.revenue}<br>`;
+    html += `<strong>Employees:</strong> ${d.employees.toLocaleString()}<br>`;
+    html += `<strong>Sector:</strong> ${d.sector}`;
+  } else {
+    html += `<strong>Role:</strong> ${d.role}<br>`;
+    html += `<strong>Firm:</strong> ${d.firm}<br>`;
+    html += `<strong>Since:</strong> ${d.since}`;
+  }
+
+  // Connection count
+  const connCount = links.filter(l => {
+    const s = typeof l.source === "object" ? l.source.id : l.source;
+    const t = typeof l.target === "object" ? l.target.id : l.target;
+    return s === d.id || t === d.id;
+  }).length;
+  html += `<br><strong>Connections:</strong> ${connCount}`;
+  html += `</div>`;
+
+  tooltip.innerHTML = html;
+  tooltip.style.opacity = 1;
+
+  const rect = container.getBoundingClientRect();
+  let x = event.clientX - rect.left + 16;
+  let y = event.clientY - rect.top - 10;
+
+  // Keep tooltip in bounds
+  const tw = tooltip.offsetWidth;
+  const th = tooltip.offsetHeight;
+  if (x + tw > rect.width - 10) x = x - tw - 32;
+  if (y + th > rect.height - 10) y = rect.height - th - 10;
+  if (y < 10) y = 10;
+
+  tooltip.style.left = x + "px";
+  tooltip.style.top = y + "px";
+}
+
+function hideTooltip() {
+  tooltip.style.opacity = 0;
+}
+
+// ─────────────────────────────────────────────
+// INTERACTIONS
+// ─────────────────────────────────────────────
+
+// Build adjacency for hover highlighting
+function getConnected(nodeId) {
+  const connected = new Set([nodeId]);
+  links.forEach(l => {
+    const s = typeof l.source === "object" ? l.source.id : l.source;
+    const t = typeof l.target === "object" ? l.target.id : l.target;
+    if (s === nodeId) connected.add(t);
+    if (t === nodeId) connected.add(s);
+  });
+  return connected;
+}
+
+node.on("mouseover", function(event, d) {
+  const connected = getConnected(d.id);
+
+  // Dim unconnected nodes
+  node.selectAll("circle")
+    .transition().duration(150)
+    .attr("opacity", n => connected.has(n.id) ? 1 : 0.15);
+
+  // Dim unconnected labels
+  label.transition().duration(150)
+    .attr("opacity", n => connected.has(n.id) ? 1 : 0.1)
+    .attr("class", n => connected.has(n.id) ? "node-label highlighted" : "node-label");
+
+  // Dim unconnected links
+  link.transition().duration(150)
+    .attr("stroke-opacity", l => {
+      const s = typeof l.source === "object" ? l.source.id : l.source;
+      const t = typeof l.target === "object" ? l.target.id : l.target;
+      return (s === d.id || t === d.id) ? 0.85 : 0.05;
+    });
+
+  // Glow on hovered node
+  d3.select(this).select("circle").attr("filter", "url(#glow)");
+
+  showTooltip(event, d);
+});
+
+node.on("mousemove", function(event, d) {
+  showTooltip(event, d);
+});
+
+node.on("mouseout", function() {
+  node.selectAll("circle")
+    .transition().duration(300)
+    .attr("opacity", 0.9)
+    .attr("filter", null);
+
+  label.transition().duration(300)
+    .attr("opacity", 1)
+    .attr("class", "node-label");
+
+  link.transition().duration(300)
+    .attr("stroke-opacity", 0.5);
+
+  hideTooltip();
+});
+
+// Click: pulse + highlight
+let selectedNode = null;
+
+node.on("click", function(event, d) {
+  event.stopPropagation();
+
+  if (selectedNode === d.id) {
+    // Deselect
+    selectedNode = null;
+    resetHighlight();
+    return;
+  }
+
+  selectedNode = d.id;
+  const connected = getConnected(d.id);
+
+  // Animate: pulse the clicked node
+  d3.select(this).select("circle")
+    .transition().duration(200)
+    .attr("r", nodeRadius(d) * 1.5)
+    .attr("filter", "url(#glow)")
+    .transition().duration(300)
+    .attr("r", nodeRadius(d) * 1.2);
+
+  // Highlight connected nodes with staggered animation
+  node.selectAll("circle")
+    .transition().duration(300)
+    .attr("opacity", n => connected.has(n.id) ? 1 : 0.1)
+    .attr("r", n => {
+      if (n.id === d.id) return nodeRadius(n) * 1.2;
+      return connected.has(n.id) ? nodeRadius(n) * 1.1 : nodeRadius(n) * 0.8;
+    });
+
+  label.transition().duration(300)
+    .attr("opacity", n => connected.has(n.id) ? 1 : 0.05)
+    .attr("class", n => connected.has(n.id) ? "node-label highlighted" : "node-label");
+
+  link.transition().duration(300)
+    .attr("stroke-opacity", l => {
+      const s = typeof l.source === "object" ? l.source.id : l.source;
+      const t = typeof l.target === "object" ? l.target.id : l.target;
+      return (s === d.id || t === d.id) ? 0.9 : 0.03;
+    })
+    .attr("stroke-width", l => {
+      const s = typeof l.source === "object" ? l.source.id : l.source;
+      const t = typeof l.target === "object" ? l.target.id : l.target;
+      if (s === d.id || t === d.id) {
+        return l.type === "ownership" ? "4px" : l.type === "coinvest" ? "3px" : "2px";
+      }
+      return linkStroke(l);
+    });
+});
+
+// Click background to deselect
+svg.on("click", function() {
+  if (selectedNode) {
+    selectedNode = null;
+    resetHighlight();
+  }
+});
+
+function resetHighlight() {
+  node.selectAll("circle")
+    .transition().duration(400)
+    .attr("opacity", 0.9)
+    .attr("r", d => nodeRadius(d))
+    .attr("filter", null);
+
+  label.transition().duration(400)
+    .attr("opacity", 1)
+    .attr("class", "node-label");
+
+  link.transition().duration(400)
+    .attr("stroke-opacity", 0.5)
+    .attr("stroke-width", d => linkStroke(d));
+}
+
+// ─────────────────────────────────────────────
+// DRAG
+// ─────────────────────────────────────────────
+function dragStarted(event, d) {
+  if (!event.active) simulation.alphaTarget(0.3).restart();
+  d.fx = d.x;
+  d.fy = d.y;
+}
+
+function dragged(event, d) {
+  d.fx = event.x;
+  d.fy = event.y;
+}
+
+function dragEnded(event, d) {
+  if (!event.active) simulation.alphaTarget(0);
+  d.fx = null;
+  d.fy = null;
+}
+
+// ─────────────────────────────────────────────
+// SIMULATION TICK
+// ─────────────────────────────────────────────
+simulation.on("tick", () => {
+  link
+    .attr("x1", d => d.source.x)
+    .attr("y1", d => d.source.y)
+    .attr("x2", d => d.target.x)
+    .attr("y2", d => d.target.y);
+
+  node.attr("transform", d => `translate(${d.x},${d.y})`);
+
+  label
+    .attr("x", d => d.x)
+    .attr("y", d => d.y);
+});
+
+// ─────────────────────────────────────────────
+// ZOOM CONTROLS
+// ─────────────────────────────────────────────
+document.getElementById("zoom-in").addEventListener("click", () => {
+  svg.transition().duration(300).call(zoomBehavior.scaleBy, 1.4);
+});
+document.getElementById("zoom-out").addEventListener("click", () => {
+  svg.transition().duration(300).call(zoomBehavior.scaleBy, 0.7);
+});
+document.getElementById("zoom-reset").addEventListener("click", () => {
+  svg.transition().duration(500).call(zoomBehavior.transform, d3.zoomIdentity.translate(0, 0).scale(1));
+});
+
+// ─────────────────────────────────────────────
+// SEARCH
+// ─────────────────────────────────────────────
+const searchInput = document.getElementById("search-input");
+const searchResults = document.getElementById("search-results");
+
+searchInput.addEventListener("input", function() {
+  const query = this.value.toLowerCase().trim();
+  if (!query) {
+    searchResults.classList.remove("show");
+    resetHighlight();
+    selectedNode = null;
+    return;
+  }
+
+  const matches = nodes.filter(n => n.label.toLowerCase().includes(query));
+  if (matches.length === 0) {
+    searchResults.innerHTML = '<div class="search-result-item" style="color:var(--muted)">No results found</div>';
+    searchResults.classList.add("show");
+    return;
+  }
+
+  searchResults.innerHTML = matches.slice(0, 8).map(n => {
+    const typeClass = n.type === "pe" ? "pe" : n.type === "company" ? "company" : "person";
+    const typeText = n.type === "pe" ? "PE Firm" : n.type === "company" ? "Company" : "Person";
+    return `<div class="search-result-item" data-id="${n.id}">${n.label}<span class="type-badge ${typeClass}">${typeText}</span></div>`;
+  }).join("");
+  searchResults.classList.add("show");
+});
+
+searchResults.addEventListener("click", function(e) {
+  const item = e.target.closest(".search-result-item");
+  if (!item || !item.dataset.id) return;
+
+  const targetId = item.dataset.id;
+  const targetNode = nodes.find(n => n.id === targetId);
+  if (!targetNode) return;
+
+  searchResults.classList.remove("show");
+  searchInput.value = targetNode.label;
+
+  // Zoom to the node
+  const scale = 1.5;
+  const transform = d3.zoomIdentity
+    .translate(width / 2 - targetNode.x * scale, height / 2 - targetNode.y * scale)
+    .scale(scale);
+  svg.transition().duration(750).call(zoomBehavior.transform, transform);
+
+  // Highlight
+  selectedNode = targetId;
+  const connected = getConnected(targetId);
+
+  node.selectAll("circle")
+    .transition().duration(400)
+    .attr("opacity", n => connected.has(n.id) ? 1 : 0.1)
+    .attr("r", n => {
+      if (n.id === targetId) return nodeRadius(n) * 1.3;
+      return connected.has(n.id) ? nodeRadius(n) * 1.1 : nodeRadius(n) * 0.8;
+    })
+    .attr("filter", n => n.id === targetId ? "url(#glow)" : null);
+
+  label.transition().duration(400)
+    .attr("opacity", n => connected.has(n.id) ? 1 : 0.05)
+    .attr("class", n => connected.has(n.id) ? "node-label highlighted" : "node-label");
+
+  link.transition().duration(400)
+    .attr("stroke-opacity", l => {
+      const s = typeof l.source === "object" ? l.source.id : l.source;
+      const t = typeof l.target === "object" ? l.target.id : l.target;
+      return (s === targetId || t === targetId) ? 0.9 : 0.03;
+    });
+});
+
+// Close search results when clicking outside
+document.addEventListener("click", function(e) {
+  if (!e.target.closest(".search-box")) {
+    searchResults.classList.remove("show");
+  }
+});
+
+// Escape to clear search
+searchInput.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") {
+    this.value = "";
+    searchResults.classList.remove("show");
+    selectedNode = null;
+    resetHighlight();
+    svg.transition().duration(500).call(zoomBehavior.transform, d3.zoomIdentity);
+  }
+});
+
+// ─────────────────────────────────────────────
+// RESPONSIVE RESIZE
+// ─────────────────────────────────────────────
+window.addEventListener("resize", () => {
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  simulation.force("center", d3.forceCenter(w / 2, h / 2));
+  simulation.force("x", d3.forceX(w / 2).strength(0.03));
+  simulation.force("y", d3.forceY(h / 2).strength(0.03));
+  simulation.alpha(0.3).restart();
+});
+</script>
+</body>
+</html>

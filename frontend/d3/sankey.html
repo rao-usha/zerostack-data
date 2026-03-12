@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deal Flow Pipeline — Nexdata PE Intelligence</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f172a;--card:#1e293b;--border:#334155;--text:#f1f5f9;
+    --muted:#94a3b8;--primary:#6366f1;--accent:#06b6d4;
+    --red:#ef4444;--red-muted:#7f1d1d;
+  }
+  body{
+    background:var(--bg);color:var(--text);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;
+    padding:24px 32px 40px;
+  }
+  header{text-align:center;margin-bottom:8px;width:100%;max-width:1400px}
+  header h1{font-size:28px;font-weight:700;letter-spacing:-0.5px;color:var(--text)}
+  header p{font-size:14px;color:var(--muted);margin-top:4px}
+
+  .filters{
+    display:flex;gap:8px;justify-content:center;flex-wrap:wrap;
+    margin:16px 0 12px;width:100%;max-width:1400px;
+  }
+  .filters button{
+    background:var(--card);color:var(--muted);border:1px solid var(--border);
+    padding:7px 18px;border-radius:8px;font-size:13px;font-weight:500;
+    cursor:pointer;transition:all .2s ease;
+  }
+  .filters button:hover{border-color:var(--primary);color:var(--text)}
+  .filters button.active{
+    background:var(--primary);color:#fff;border-color:var(--primary);
+  }
+
+  #chart-container{
+    width:100%;max-width:1400px;
+    background:var(--card);border:1px solid var(--border);border-radius:16px;
+    padding:28px 24px 20px;position:relative;
+  }
+  #chart-container svg{width:100%;display:block}
+
+  .stats-bar{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:16px;
+    width:100%;max-width:1400px;margin-top:16px;
+  }
+  .stat-card{
+    background:var(--card);border:1px solid var(--border);border-radius:12px;
+    padding:16px 20px;text-align:center;
+  }
+  .stat-card .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
+  .stat-card .value{font-size:26px;font-weight:700;color:var(--text)}
+  .stat-card .sub{font-size:12px;color:var(--muted);margin-top:2px}
+
+  .tooltip{
+    position:fixed;pointer-events:none;
+    background:#0f172aee;border:1px solid var(--border);border-radius:10px;
+    padding:12px 16px;font-size:13px;color:var(--text);
+    box-shadow:0 8px 32px rgba(0,0,0,.45);
+    z-index:1000;opacity:0;transition:opacity .15s ease;
+    max-width:260px;
+  }
+  .tooltip.visible{opacity:1}
+  .tooltip .tt-title{font-weight:600;font-size:14px;margin-bottom:6px}
+  .tooltip .tt-row{display:flex;justify-content:space-between;gap:16px;margin:3px 0}
+  .tooltip .tt-label{color:var(--muted)}
+  .tooltip .tt-val{font-weight:600}
+  .tooltip .tt-bar{height:4px;border-radius:2px;background:var(--border);margin-top:6px;overflow:hidden}
+  .tooltip .tt-bar-fill{height:100%;border-radius:2px;transition:width .3s ease}
+
+  @media(max-width:640px){
+    body{padding:16px}
+    .stats-bar{grid-template-columns:repeat(2,1fr)}
+    header h1{font-size:22px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Deal Flow Pipeline</h1>
+  <p>Last 12 Months &mdash; All Sectors</p>
+</header>
+
+<div class="filters" id="filters"></div>
+
+<div id="chart-container">
+  <svg id="sankey-svg"></svg>
+</div>
+
+<div class="stats-bar" id="stats-bar"></div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ─── Theme Colors ───────────────────────────────────────────────────
+const C = {
+  bg:'#0f172a', card:'#1e293b', border:'#334155', text:'#f1f5f9',
+  muted:'#94a3b8', primary:'#6366f1', accent:'#06b6d4',
+  red:'#ef4444', redMuted:'#7f1d1d'
+};
+
+// ─── Sector Data ────────────────────────────────────────────────────
+const SECTOR_DATA = {
+  All: {
+    sourced:250, screen:180, meeting:95, loi:42, dd:28, ic:18, closed:12,
+    avgDays:127, activeInPipeline:88
+  },
+  Industrials: {
+    sourced:72, screen:54, meeting:30, loi:14, dd:10, ic:7, closed:5,
+    avgDays:134, activeInPipeline:26
+  },
+  Healthcare: {
+    sourced:58, screen:42, meeting:22, loi:10, dd:7, ic:4, closed:3,
+    avgDays:142, activeInPipeline:19
+  },
+  Tech: {
+    sourced:65, screen:48, meeting:24, loi:11, dd:7, ic:5, closed:3,
+    avgDays:108, activeInPipeline:24
+  },
+  Services: {
+    sourced:55, screen:36, meeting:19, loi:7, dd:4, ic:2, closed:1,
+    avgDays:118, activeInPipeline:19
+  }
+};
+
+const STAGES = [
+  {key:'sourced',  label:'Sourced'},
+  {key:'screen',   label:'Initial Screen'},
+  {key:'meeting',  label:'Mgmt Meeting'},
+  {key:'loi',      label:'LOI Submitted'},
+  {key:'dd',       label:'Due Diligence'},
+  {key:'ic',       label:'IC Approval'},
+  {key:'closed',   label:'Closed'}
+];
+
+// Pipeline gradient from primary → accent
+function pipelineColor(i, total) {
+  return d3.interpolateRgb(C.primary, C.accent)(i / (total - 1));
+}
+
+// ─── Build Sankey Data ──────────────────────────────────────────────
+function buildData(sector) {
+  const s = SECTOR_DATA[sector];
+  const vals = STAGES.map(st => s[st.key]);
+
+  // Nodes: pipeline stages + drop-off nodes
+  const nodes = [];
+  const links = [];
+
+  STAGES.forEach((st, i) => {
+    nodes.push({ id: st.key, label: st.label, value: vals[i], type: 'pipeline', stageIdx: i });
+  });
+
+  for (let i = 0; i < STAGES.length - 1; i++) {
+    const from = vals[i];
+    const to = vals[i + 1];
+    const dropped = from - to;
+    const dropId = `drop_${i}`;
+    nodes.push({ id: dropId, label: 'Passed / Declined', value: dropped, type: 'drop', stageIdx: i });
+
+    // Forward link
+    links.push({ source: STAGES[i].key, target: STAGES[i + 1].key, value: to });
+    // Drop link
+    if (dropped > 0) {
+      links.push({ source: STAGES[i].key, target: dropId, value: dropped });
+    }
+  }
+
+  return { nodes, links };
+}
+
+// ─── Render ─────────────────────────────────────────────────────────
+let activeSector = 'All';
+
+function render(sector) {
+  activeSector = sector;
+  const data = buildData(sector);
+  const container = document.getElementById('chart-container');
+  const tooltip = document.getElementById('tooltip');
+  const rect = container.getBoundingClientRect();
+
+  const margin = { top: 16, right: 24, bottom: 16, left: 24 };
+  const width = rect.width - margin.left - margin.right - 48; // account for padding
+  const height = 420;
+
+  // Clear
+  d3.select('#sankey-svg').selectAll('*').remove();
+
+  const svg = d3.select('#sankey-svg')
+    .attr('viewBox', `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet');
+
+  const g = svg.append('g')
+    .attr('transform', `translate(${margin.left},${margin.top})`);
+
+  // ── Sankey layout ──
+  const nodeMap = new Map(data.nodes.map((n, i) => [n.id, i]));
+
+  const sankeyGen = d3.sankey()
+    .nodeId(d => d.id)
+    .nodeWidth(22)
+    .nodePadding(18)
+    .nodeAlign(d3.sankeyLeft)
+    .extent([[0, 0], [width, height]]);
+
+  const graph = sankeyGen({
+    nodes: data.nodes.map(d => ({ ...d })),
+    links: data.links.map(d => ({ ...d }))
+  });
+
+  // ── Defs: gradients for links ──
+  const defs = svg.append('defs');
+
+  graph.links.forEach((link, i) => {
+    const gradId = `linkGrad-${i}`;
+    const lg = defs.append('linearGradient')
+      .attr('id', gradId)
+      .attr('gradientUnits', 'userSpaceOnUse')
+      .attr('x1', link.source.x1)
+      .attr('x2', link.target.x0);
+    lg.append('stop').attr('offset', '0%')
+      .attr('stop-color', nodeColor(link.source));
+    lg.append('stop').attr('offset', '100%')
+      .attr('stop-color', nodeColor(link.target));
+  });
+
+  // ── Links ──
+  const linkGroup = g.append('g').attr('class', 'links')
+    .attr('fill', 'none')
+    .attr('stroke-opacity', 0.35);
+
+  const linkPaths = linkGroup.selectAll('path')
+    .data(graph.links)
+    .join('path')
+      .attr('d', d3.sankeyLinkHorizontal())
+      .attr('stroke', (d, i) => `url(#linkGrad-${i})`)
+      .attr('stroke-width', d => Math.max(2, d.width))
+      .style('cursor', 'pointer');
+
+  linkPaths
+    .on('mouseenter', function(event, d) {
+      d3.select(this).transition().duration(150).attr('stroke-opacity', 0.65);
+      showLinkTooltip(event, d);
+    })
+    .on('mousemove', (event) => moveTooltip(event))
+    .on('mouseleave', function() {
+      d3.select(this).transition().duration(150).attr('stroke-opacity', 0.35);
+      hideTooltip();
+    });
+
+  // ── Nodes ──
+  const nodeGroup = g.append('g').attr('class', 'nodes');
+
+  const nodeRects = nodeGroup.selectAll('g')
+    .data(graph.nodes)
+    .join('g')
+      .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+  nodeRects.append('rect')
+    .attr('width', d => d.x1 - d.x0)
+    .attr('height', d => Math.max(4, d.y1 - d.y0))
+    .attr('rx', 4)
+    .attr('ry', 4)
+    .attr('fill', d => nodeColor(d))
+    .attr('stroke', d => d3.color(nodeColor(d)).brighter(0.3))
+    .attr('stroke-width', 1)
+    .style('cursor', 'pointer')
+    .on('mouseenter', function(event, d) {
+      d3.select(this).transition().duration(150)
+        .attr('stroke-width', 2)
+        .attr('stroke', '#fff');
+      showNodeTooltip(event, d);
+    })
+    .on('mousemove', (event) => moveTooltip(event))
+    .on('mouseleave', function() {
+      const d = d3.select(this.parentNode).datum();
+      d3.select(this).transition().duration(150)
+        .attr('stroke-width', 1)
+        .attr('stroke', d3.color(nodeColor(d)).brighter(0.3));
+      hideTooltip();
+    });
+
+  // ── Node labels ──
+  nodeRects.each(function(d) {
+    const nodeHeight = d.y1 - d.y0;
+    const nodeWidth = d.x1 - d.x0;
+    const isPipeline = d.type === 'pipeline';
+
+    if (isPipeline) {
+      // Label to the right for left-side nodes, left for right-side
+      const isRight = d.x0 > width * 0.6;
+      const labelX = isRight ? -8 : nodeWidth + 8;
+      const anchor = isRight ? 'end' : 'start';
+
+      const labelG = d3.select(this).append('g')
+        .attr('transform', `translate(${labelX}, ${nodeHeight / 2})`);
+
+      labelG.append('text')
+        .attr('dy', '-0.4em')
+        .attr('text-anchor', anchor)
+        .attr('fill', C.text)
+        .attr('font-size', '13px')
+        .attr('font-weight', '600')
+        .text(d.label);
+
+      labelG.append('text')
+        .attr('dy', '1em')
+        .attr('text-anchor', anchor)
+        .attr('fill', C.muted)
+        .attr('font-size', '12px')
+        .text(`${d.value} deals`);
+    } else {
+      // Drop-off: small label below or to the side
+      const labelG = d3.select(this).append('g')
+        .attr('transform', `translate(${nodeWidth / 2}, ${nodeHeight + 14})`);
+
+      labelG.append('text')
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#ef444499')
+        .attr('font-size', '11px')
+        .attr('font-weight', '500')
+        .text(`-${d.value}`);
+    }
+  });
+
+  // ── Animate links in ──
+  linkPaths
+    .attr('stroke-dasharray', function() { return this.getTotalLength() + ' ' + this.getTotalLength(); })
+    .attr('stroke-dashoffset', function() { return this.getTotalLength(); })
+    .transition().duration(900).ease(d3.easeCubicOut)
+    .attr('stroke-dashoffset', 0);
+
+  // ── Animate nodes in ──
+  nodeRects
+    .attr('opacity', 0)
+    .transition().duration(500).delay((d, i) => i * 40)
+    .attr('opacity', 1);
+
+  // ── Update stats bar ──
+  renderStats(sector);
+
+  // ── Update subtitle ──
+  document.querySelector('header p').textContent =
+    `Last 12 Months \u2014 ${sector === 'All' ? 'All Sectors' : sector}`;
+
+  // ── Tooltip helpers ──
+  function showNodeTooltip(event, d) {
+    const s = SECTOR_DATA[sector];
+    let html = '';
+    if (d.type === 'pipeline') {
+      const convFrom = d.stageIdx > 0 ? STAGES[d.stageIdx - 1] : null;
+      const prevVal = convFrom ? s[convFrom.key] : null;
+      const convRate = prevVal ? ((d.value / prevVal) * 100).toFixed(1) : null;
+      const overallRate = ((d.value / s.sourced) * 100).toFixed(1);
+
+      html = `<div class="tt-title">${d.label}</div>`;
+      html += `<div class="tt-row"><span class="tt-label">Deals</span><span class="tt-val">${d.value}</span></div>`;
+      if (convRate !== null) {
+        html += `<div class="tt-row"><span class="tt-label">Stage Conv.</span><span class="tt-val">${convRate}%</span></div>`;
+      }
+      html += `<div class="tt-row"><span class="tt-label">Overall</span><span class="tt-val">${overallRate}%</span></div>`;
+      html += `<div class="tt-bar"><div class="tt-bar-fill" style="width:${overallRate}%;background:${nodeColor(d)}"></div></div>`;
+    } else {
+      html = `<div class="tt-title">Passed / Declined</div>`;
+      html += `<div class="tt-row"><span class="tt-label">Deals dropped</span><span class="tt-val">${d.value}</span></div>`;
+      const stageFrom = STAGES[d.stageIdx];
+      const fromVal = s[stageFrom.key];
+      const dropRate = ((d.value / fromVal) * 100).toFixed(1);
+      html += `<div class="tt-row"><span class="tt-label">Drop rate</span><span class="tt-val" style="color:${C.red}">${dropRate}%</span></div>`;
+    }
+    tooltip.innerHTML = html;
+    tooltip.classList.add('visible');
+    moveTooltip(event);
+  }
+
+  function showLinkTooltip(event, d) {
+    const fromLabel = d.source.label;
+    const toLabel = d.target.label;
+    const rate = ((d.value / d.source.value) * 100).toFixed(1);
+    let html = `<div class="tt-title">${fromLabel} &rarr; ${toLabel}</div>`;
+    html += `<div class="tt-row"><span class="tt-label">Deals</span><span class="tt-val">${d.value}</span></div>`;
+    html += `<div class="tt-row"><span class="tt-label">Conversion</span><span class="tt-val">${rate}%</span></div>`;
+    html += `<div class="tt-bar"><div class="tt-bar-fill" style="width:${rate}%;background:${d.target.type === 'drop' ? C.red : C.accent}"></div></div>`;
+    tooltip.innerHTML = html;
+    tooltip.classList.add('visible');
+    moveTooltip(event);
+  }
+
+  function moveTooltip(event) {
+    const pad = 14;
+    let x = event.clientX + pad;
+    let y = event.clientY + pad;
+    const tw = tooltip.offsetWidth;
+    const th = tooltip.offsetHeight;
+    if (x + tw > window.innerWidth - 12) x = event.clientX - tw - pad;
+    if (y + th > window.innerHeight - 12) y = event.clientY - th - pad;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
+  }
+
+  function hideTooltip() {
+    tooltip.classList.remove('visible');
+  }
+}
+
+function nodeColor(d) {
+  if (d.type === 'drop') return '#ef444488';
+  return pipelineColor(d.stageIdx, STAGES.length);
+}
+
+// ─── Stats Bar ──────────────────────────────────────────────────────
+function renderStats(sector) {
+  const s = SECTOR_DATA[sector];
+  const winRate = ((s.closed / s.sourced) * 100).toFixed(1);
+  const bar = document.getElementById('stats-bar');
+  bar.innerHTML = `
+    <div class="stat-card">
+      <div class="label">Total Sourced</div>
+      <div class="value">${s.sourced}</div>
+      <div class="sub">${sector === 'All' ? 'across all sectors' : sector + ' sector'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Win Rate</div>
+      <div class="value" style="color:${C.accent}">${winRate}%</div>
+      <div class="sub">${s.closed} deals closed</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Avg Days to Close</div>
+      <div class="value">${s.avgDays}</div>
+      <div class="sub">from sourcing to close</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Active in Pipeline</div>
+      <div class="value" style="color:${C.primary}">${s.activeInPipeline}</div>
+      <div class="sub">deals in progress</div>
+    </div>
+  `;
+}
+
+// ─── Filter Buttons ─────────────────────────────────────────────────
+function renderFilters() {
+  const container = document.getElementById('filters');
+  const sectors = Object.keys(SECTOR_DATA);
+  sectors.forEach(sec => {
+    const btn = document.createElement('button');
+    btn.textContent = sec;
+    btn.className = sec === activeSector ? 'active' : '';
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filters button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      render(sec);
+    });
+    container.appendChild(btn);
+  });
+}
+
+// ─── Responsive resize ─────────────────────────────────────────────
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => render(activeSector), 200);
+});
+
+// ─── Init ───────────────────────────────────────────────────────────
+renderFilters();
+render('All');
+</script>
+</body>
+</html>

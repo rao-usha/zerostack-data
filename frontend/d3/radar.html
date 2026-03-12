@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deal Scoring — Multi-Axis Assessment</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f172a;
+    color: #f1f5f9;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .header {
+    padding: 24px 32px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #f1f5f9;
+  }
+  .header h1 span {
+    color: #6366f1;
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .controls label {
+    font-size: 13px;
+    color: #94a3b8;
+  }
+  .controls select {
+    background: #1e293b;
+    color: #f1f5f9;
+    border: 1px solid #334155;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .controls select:focus {
+    outline: none;
+    border-color: #6366f1;
+  }
+
+  .main-container {
+    display: flex;
+    padding: 24px 32px;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .chart-panel {
+    flex: 1;
+    min-width: 520px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 24px;
+  }
+
+  .details-panel {
+    width: 340px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .card h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 16px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-bottom: 4px;
+  }
+  .legend-item:hover {
+    background: rgba(99, 102, 241, 0.1);
+  }
+  .legend-item.disabled {
+    opacity: 0.35;
+  }
+  .legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .legend-name {
+    font-size: 14px;
+    font-weight: 500;
+    flex: 1;
+  }
+  .legend-score {
+    font-size: 13px;
+    color: #94a3b8;
+    font-weight: 600;
+  }
+
+  .score-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #334155;
+  }
+  .score-row:last-child {
+    border-bottom: none;
+  }
+  .score-label {
+    font-size: 13px;
+    color: #94a3b8;
+  }
+  .score-value {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .score-bar-bg {
+    width: 80px;
+    height: 6px;
+    background: #334155;
+    border-radius: 3px;
+    margin-left: 12px;
+    overflow: hidden;
+  }
+  .score-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+  }
+  .score-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .overall-score {
+    text-align: center;
+    padding: 16px;
+    border-bottom: 1px solid #334155;
+    margin-bottom: 12px;
+  }
+  .overall-score .value {
+    font-size: 42px;
+    font-weight: 700;
+  }
+  .overall-score .label {
+    font-size: 12px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+
+  .comparison-badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-top: 8px;
+  }
+  .comparison-badge.above {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+  }
+  .comparison-badge.below {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+  }
+
+  .tooltip-radar {
+    position: absolute;
+    pointer-events: none;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #f1f5f9;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .tooltip-radar .tt-label {
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #94a3b8;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .tooltip-radar .tt-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+  }
+  .tooltip-radar .tt-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>Deal Scoring</span> — Multi-Axis Assessment</h1>
+  <div class="controls">
+    <label for="mode-select">Compare against:</label>
+    <select id="mode-select">
+      <option value="peer">vs Peer Median</option>
+      <option value="portfolio">vs Portfolio Average</option>
+    </select>
+  </div>
+</div>
+
+<div class="main-container">
+  <div class="chart-panel">
+    <svg id="radar-svg"></svg>
+  </div>
+  <div class="details-panel">
+    <div class="card">
+      <h3>Companies</h3>
+      <div id="legend"></div>
+    </div>
+    <div class="card" id="details-card">
+      <h3>Score Breakdown</h3>
+      <div id="details-content">
+        <p style="color:#94a3b8; font-size:13px;">Click a company in the legend to view details.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tooltip-radar" id="tooltip"></div>
+
+<script>
+const axes = [
+  "Financial Health", "Growth Trajectory", "Market Position", "Management Quality",
+  "Data Coverage", "Location Score", "Labor Arbitrage", "Risk Score"
+];
+
+const companies = [
+  {
+    name: "Acme Industrial",
+    scores: [85, 72, 68, 91, 78, 65, 82, 70],
+    color: "#6366f1",
+    visible: true
+  },
+  {
+    name: "Precision Manufacturing",
+    scores: [62, 88, 75, 55, 90, 80, 45, 85],
+    color: "#06b6d4",
+    visible: true
+  },
+  {
+    name: "National Logistics",
+    scores: [78, 65, 82, 70, 55, 92, 88, 60],
+    color: "#f97316",
+    visible: true
+  }
+];
+
+const benchmarks = {
+  peer:      [72, 70, 74, 68, 65, 72, 66, 72],
+  portfolio: [75, 75, 75, 72, 74, 79, 72, 72]
+};
+
+let selectedCompany = 0;
+let highlightedAxis = null;
+let highlightedCompany = null;
+let comparisonMode = "peer";
+
+const margin = { top: 60, right: 60, bottom: 60, left: 60 };
+
+function render() {
+  const container = document.querySelector('.chart-panel');
+  const containerW = container.clientWidth - 48;
+  const containerH = Math.min(containerW, 600);
+  const width = containerW;
+  const height = containerH;
+  const radius = Math.min(width, height) / 2 - 60;
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const numAxes = axes.length;
+  const angleSlice = (2 * Math.PI) / numAxes;
+
+  const svg = d3.select("#radar-svg")
+    .attr("width", width)
+    .attr("height", height);
+
+  svg.selectAll("*").remove();
+
+  const g = svg.append("g")
+    .attr("transform", `translate(${centerX},${centerY})`);
+
+  const rScale = d3.scaleLinear().domain([0, 100]).range([0, radius]);
+
+  // Grid circles
+  const levels = [20, 40, 60, 80, 100];
+  levels.forEach(level => {
+    const points = [];
+    for (let i = 0; i < numAxes; i++) {
+      const angle = angleSlice * i - Math.PI / 2;
+      points.push([rScale(level) * Math.cos(angle), rScale(level) * Math.sin(angle)]);
+    }
+    g.append("polygon")
+      .attr("points", points.map(p => p.join(",")).join(" "))
+      .attr("fill", "none")
+      .attr("stroke", "#334155")
+      .attr("stroke-width", level === 100 ? 1 : 0.5)
+      .attr("stroke-dasharray", level === 100 ? "none" : "2,3");
+
+    // Level labels
+    const labelAngle = -Math.PI / 2;
+    g.append("text")
+      .attr("x", rScale(level) * Math.cos(labelAngle) + 4)
+      .attr("y", rScale(level) * Math.sin(labelAngle) - 4)
+      .attr("fill", "#475569")
+      .attr("font-size", 10)
+      .text(level);
+  });
+
+  // Axis lines
+  for (let i = 0; i < numAxes; i++) {
+    const angle = angleSlice * i - Math.PI / 2;
+    const isHighlighted = highlightedAxis === i;
+    g.append("line")
+      .attr("x1", 0).attr("y1", 0)
+      .attr("x2", rScale(100) * Math.cos(angle))
+      .attr("y2", rScale(100) * Math.sin(angle))
+      .attr("stroke", isHighlighted ? "#f1f5f9" : "#334155")
+      .attr("stroke-width", isHighlighted ? 1.5 : 0.5);
+  }
+
+  // Axis labels (interactive)
+  for (let i = 0; i < numAxes; i++) {
+    const angle = angleSlice * i - Math.PI / 2;
+    const lx = (radius + 30) * Math.cos(angle);
+    const ly = (radius + 30) * Math.sin(angle);
+    const isHighlighted = highlightedAxis === i;
+
+    let anchor = "middle";
+    if (Math.abs(Math.cos(angle)) > 0.3) {
+      anchor = Math.cos(angle) > 0 ? "start" : "end";
+    }
+
+    g.append("text")
+      .attr("x", lx)
+      .attr("y", ly)
+      .attr("text-anchor", anchor)
+      .attr("dominant-baseline", "central")
+      .attr("fill", isHighlighted ? "#f1f5f9" : "#94a3b8")
+      .attr("font-size", isHighlighted ? 13 : 12)
+      .attr("font-weight", isHighlighted ? 600 : 400)
+      .attr("cursor", "pointer")
+      .text(axes[i])
+      .on("mouseenter", function() {
+        highlightedAxis = i;
+        showAxisTooltip(i, d3.event || window.event);
+        render();
+      })
+      .on("mouseleave", function() {
+        highlightedAxis = null;
+        hideTooltip();
+        render();
+      });
+  }
+
+  // Highlighted axis dimension line
+  if (highlightedAxis !== null) {
+    const angle = angleSlice * highlightedAxis - Math.PI / 2;
+    companies.forEach(c => {
+      if (!c.visible) return;
+      const val = c.scores[highlightedAxis];
+      const cx = rScale(val) * Math.cos(angle);
+      const cy = rScale(val) * Math.sin(angle);
+      g.append("circle")
+        .attr("cx", cx).attr("cy", cy)
+        .attr("r", 6)
+        .attr("fill", c.color)
+        .attr("stroke", "#f1f5f9")
+        .attr("stroke-width", 2);
+    });
+  }
+
+  // Company polygons
+  const lineGen = d3.lineRadial()
+    .radius(d => rScale(d))
+    .angle((d, i) => angleSlice * i)
+    .curve(d3.curveLinearClosed);
+
+  companies.forEach((company, ci) => {
+    if (!company.visible) return;
+
+    const isHovered = highlightedCompany === ci;
+    const fillOpacity = isHovered ? 0.3 : (highlightedCompany !== null && !isHovered ? 0.05 : 0.15);
+    const strokeOpacity = isHovered ? 1 : (highlightedCompany !== null && !isHovered ? 0.2 : 0.8);
+    const strokeWidth = isHovered ? 2.5 : 1.5;
+
+    const pathGroup = g.append("g");
+
+    pathGroup.append("path")
+      .datum(company.scores)
+      .attr("d", lineGen)
+      .attr("fill", company.color)
+      .attr("fill-opacity", fillOpacity)
+      .attr("stroke", company.color)
+      .attr("stroke-opacity", strokeOpacity)
+      .attr("stroke-width", strokeWidth)
+      .attr("cursor", "pointer")
+      .on("mouseenter", function(event) {
+        highlightedCompany = ci;
+        render();
+      })
+      .on("mouseleave", function() {
+        highlightedCompany = null;
+        render();
+      });
+
+    // Vertex dots
+    company.scores.forEach((score, i) => {
+      const angle = angleSlice * i - Math.PI / 2;
+      const dotOpacity = isHovered ? 1 : (highlightedCompany !== null && !isHovered ? 0.2 : 0.7);
+      pathGroup.append("circle")
+        .attr("cx", rScale(score) * Math.cos(angle))
+        .attr("cy", rScale(score) * Math.sin(angle))
+        .attr("r", isHovered ? 5 : 3.5)
+        .attr("fill", company.color)
+        .attr("opacity", dotOpacity)
+        .attr("stroke", "#0f172a")
+        .attr("stroke-width", 1)
+        .attr("pointer-events", "none");
+    });
+  });
+
+  // Benchmark reference (dashed)
+  const benchData = benchmarks[comparisonMode];
+  const benchPath = g.append("path")
+    .datum(benchData)
+    .attr("d", lineGen)
+    .attr("fill", "none")
+    .attr("stroke", "#475569")
+    .attr("stroke-width", 1)
+    .attr("stroke-dasharray", "4,4")
+    .attr("opacity", 0.6);
+
+  // Legend
+  renderLegend();
+  renderDetails();
+}
+
+function renderLegend() {
+  const legendDiv = document.getElementById("legend");
+  legendDiv.innerHTML = "";
+
+  companies.forEach((c, i) => {
+    const item = document.createElement("div");
+    item.className = `legend-item ${c.visible ? "" : "disabled"}`;
+    const avg = Math.round(c.scores.reduce((a, b) => a + b, 0) / c.scores.length);
+    item.innerHTML = `
+      <div class="legend-swatch" style="background:${c.color}"></div>
+      <span class="legend-name">${c.name}</span>
+      <span class="legend-score">${avg}</span>
+    `;
+    item.addEventListener("click", () => {
+      // Toggle visibility on right-click behavior: if all visible, clicking hides one;
+      // simple toggle
+      c.visible = !c.visible;
+      // Ensure at least one is visible
+      if (!companies.some(co => co.visible)) c.visible = true;
+      selectedCompany = i;
+      render();
+    });
+    item.addEventListener("mouseenter", () => {
+      selectedCompany = i;
+      highlightedCompany = i;
+      render();
+    });
+    item.addEventListener("mouseleave", () => {
+      highlightedCompany = null;
+      render();
+    });
+    legendDiv.appendChild(item);
+  });
+}
+
+function renderDetails() {
+  const content = document.getElementById("details-content");
+  const c = companies[selectedCompany];
+  const bench = benchmarks[comparisonMode];
+  const avg = Math.round(c.scores.reduce((a, b) => a + b, 0) / c.scores.length);
+  const benchAvg = Math.round(bench.reduce((a, b) => a + b, 0) / bench.length);
+  const diff = avg - benchAvg;
+
+  let html = `
+    <div class="overall-score">
+      <div class="value" style="color:${c.color}">${avg}</div>
+      <div class="label">Overall Score</div>
+      <div class="comparison-badge ${diff >= 0 ? 'above' : 'below'}">
+        ${diff >= 0 ? '+' : ''}${diff} vs ${comparisonMode === 'peer' ? 'Peer Median' : 'Portfolio Avg'}
+      </div>
+    </div>
+  `;
+
+  axes.forEach((axis, i) => {
+    const val = c.scores[i];
+    const bVal = bench[i];
+    const axisDiff = val - bVal;
+    const barColor = val >= 75 ? "#22c55e" : val >= 50 ? "#eab308" : "#ef4444";
+
+    html += `
+      <div class="score-row" style="${highlightedAxis === i ? 'background:rgba(99,102,241,0.08);border-radius:6px;padding:10px 8px;' : ''}">
+        <span class="score-label">${axis}</span>
+        <div class="score-cell">
+          <span class="score-value" style="color:${c.color};min-width:28px;text-align:right">${val}</span>
+          <div class="score-bar-bg">
+            <div class="score-bar-fill" style="width:${val}%;background:${barColor}"></div>
+          </div>
+          <span style="font-size:11px;min-width:32px;text-align:right;color:${axisDiff >= 0 ? '#22c55e' : '#ef4444'}">${axisDiff >= 0 ? '+' : ''}${axisDiff}</span>
+        </div>
+      </div>
+    `;
+  });
+
+  content.innerHTML = html;
+}
+
+function showAxisTooltip(axisIndex, event) {
+  const tooltip = document.getElementById("tooltip");
+  let html = `<div class="tt-label">${axes[axisIndex]}</div>`;
+  companies.forEach(c => {
+    if (!c.visible) return;
+    html += `<div class="tt-row">
+      <div class="tt-dot" style="background:${c.color}"></div>
+      <span>${c.name}:</span>
+      <strong>${c.scores[axisIndex]}</strong>
+    </div>`;
+  });
+  tooltip.innerHTML = html;
+  tooltip.style.opacity = 1;
+
+  const updatePos = (e) => {
+    tooltip.style.left = (e.pageX || e.clientX) + 16 + "px";
+    tooltip.style.top = (e.pageY || e.clientY) - 10 + "px";
+  };
+  if (event) updatePos(event);
+  document.addEventListener("mousemove", updatePos, { once: false });
+  tooltip._moveHandler = updatePos;
+}
+
+function hideTooltip() {
+  const tooltip = document.getElementById("tooltip");
+  tooltip.style.opacity = 0;
+  if (tooltip._moveHandler) {
+    document.removeEventListener("mousemove", tooltip._moveHandler);
+  }
+}
+
+document.getElementById("mode-select").addEventListener("change", function() {
+  comparisonMode = this.value;
+  render();
+});
+
+// Handle resize
+window.addEventListener("resize", render);
+
+// Initial render
+render();
+</script>
+</body>
+</html>

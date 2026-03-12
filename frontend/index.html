@@ -919,7 +919,7 @@
         .dq-val.open { color: var(--primary); }
         .dq-val.autofix { color: var(--success); }
 
-        .dq-chart-row { display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: start; }
+        .dq-chart-row { display: grid; grid-template-columns: 280px 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: start; }
         .dq-chart-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
         .dq-chart-card .card-title { margin-bottom: 0.75rem; }
 
@@ -998,6 +998,22 @@
         }
         .dq-run-btn:hover { background: rgba(6,182,212,0.25); }
         .dq-run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .dq-tab-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 18px; height: 18px; padding: 0 5px;
+            background: var(--error); color: white; border-radius: 999px;
+            font-size: 0.65rem; font-weight: 700; margin-left: 0.375rem; vertical-align: middle;
+        }
+
+        .dq-source-list { max-height: 280px; overflow-y: auto; }
+        .dq-source-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; font-size: 0.8rem; }
+        .dq-source-name { min-width: 100px; color: var(--text-muted); text-transform: capitalize; }
+        .dq-source-bar-bg { flex: 1; height: 6px; background: var(--bg-input); border-radius: 3px; overflow: hidden; }
+        .dq-source-bar { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+        .dq-source-score { min-width: 28px; text-align: right; font-weight: 600; font-size: 0.75rem; }
+
+        .dq-result-count { font-size: 0.8rem; color: var(--text-muted); margin-left: auto; }
 
         @media (max-width: 900px) {
             .dq-summary { grid-template-columns: repeat(2, 1fr); }
@@ -1632,9 +1648,15 @@
 
             <!-- Donut + Filter area -->
             <div class="dq-chart-row">
-                <div class="dq-chart-card">
-                    <div class="card-title">By Category</div>
-                    <canvas id="dq-donut" width="260" height="260"></canvas>
+                <div>
+                    <div class="dq-chart-card" style="margin-bottom:1rem;">
+                        <div class="card-title">By Category</div>
+                        <canvas id="dq-donut" width="260" height="260"></canvas>
+                    </div>
+                    <div class="dq-chart-card">
+                        <div class="card-title">Source Quality Scores</div>
+                        <div id="dq-source-scores"><div class="loading">Loading...</div></div>
+                    </div>
                 </div>
                 <div class="dq-chart-card">
                     <div class="card-title">Recommendations</div>
@@ -1668,6 +1690,7 @@
                         <input type="text" id="dq-filter-source" placeholder="Source..." onchange="dqApplyFilters()" style="width:100px;">
                         <input type="text" id="dq-filter-table" placeholder="Table..." onchange="dqApplyFilters()" style="width:100px;">
                         <button class="dq-run-btn" id="dq-run-btn" onclick="dqRunAnalysis()">Run Analysis</button>
+                        <span class="dq-result-count" id="dq-result-count"></span>
                     </div>
                     <!-- Table -->
                     <div id="dq-table-container">
@@ -8539,12 +8562,34 @@
         const _dqLimit = 50;
         let _dqDonutChart = null;
         let _dqSummary = null;
+        let _dqSortCol = null;
+        let _dqSortAsc = true;
+        let _dqFilterTimer = null;
+        let _dqCatLabels = []; // stored for donut click-to-filter
 
         function dqInitialize() {
             if (_dqInitialized) return;
             _dqInitialized = true;
+            dqBindInputs();
             dqLoadSummary();
+            dqLoadDonutData();
             dqApplyFilters();
+        }
+
+        // Debounced text inputs + Enter key
+        function dqBindInputs() {
+            ['dq-filter-source', 'dq-filter-table'].forEach(id => {
+                const el = document.getElementById(id);
+                if (!el || el._dqBound) return;
+                el._dqBound = true;
+                el.addEventListener('input', () => {
+                    clearTimeout(_dqFilterTimer);
+                    _dqFilterTimer = setTimeout(() => dqApplyFilters(), 400);
+                });
+                el.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') { clearTimeout(_dqFilterTimer); dqApplyFilters(); }
+                });
+            });
         }
 
         async function dqLoadSummary() {
@@ -8553,7 +8598,6 @@
                 const data = await res.json();
                 _dqSummary = data;
 
-                // recommendation_counts = {critical: N, high: N, medium: N, low: N}
                 const rc = data.recommendation_counts || {};
                 const totalOpen = Object.values(rc).reduce((a, b) => a + b, 0);
                 const critical = rc.critical || 0;
@@ -8563,20 +8607,56 @@
                 const topRecs = data.top_recommendations || [];
                 const autoFixable = topRecs.filter(r => r.auto_fixable).length;
 
-                document.getElementById('dq-total-open').textContent = totalOpen;
-                document.getElementById('dq-critical').textContent = critical;
-                document.getElementById('dq-high').textContent = high;
-                document.getElementById('dq-autofix').textContent = autoFixable;
+                document.getElementById('dq-total-open').textContent = totalOpen.toLocaleString();
+                document.getElementById('dq-critical').textContent = critical.toLocaleString();
+                document.getElementById('dq-high').textContent = high.toLocaleString();
+                document.getElementById('dq-autofix').textContent = autoFixable.toLocaleString();
 
-                // Build category counts from top_recommendations
-                const byCat = {};
-                topRecs.forEach(r => {
-                    const cat = r.category || 'unknown';
-                    byCat[cat] = (byCat[cat] || 0) + 1;
-                });
-                dqRenderDonut(byCat);
+                // Update tab badge
+                dqUpdateBadge(totalOpen);
+
+                // Render source quality bars
+                dqRenderSourceScores(data.source_scores || {});
             } catch (e) {
                 console.error('DQ summary error:', e);
+            }
+        }
+
+        function dqUpdateBadge(count) {
+            const tabs = document.querySelectorAll('.tabs .tab');
+            const idx = TAB_ROUTES.indexOf('dq');
+            if (idx >= 0 && tabs[idx]) {
+                const existing = tabs[idx].querySelector('.dq-tab-badge');
+                if (existing) existing.remove();
+                if (count > 0) {
+                    const badge = document.createElement('span');
+                    badge.className = 'dq-tab-badge';
+                    badge.textContent = count > 999 ? '999+' : count;
+                    tabs[idx].appendChild(badge);
+                }
+            }
+        }
+
+        // Fetch paginated recs to build accurate donut category counts
+        async function dqLoadDonutData() {
+            try {
+                const byCat = {};
+                let offset = 0;
+                const batchSize = 200;
+                while (true) {
+                    const res = await fetch(API + '/dq-review/recommendations?status=open&limit=' + batchSize + '&offset=' + offset);
+                    const recs = await res.json();
+                    const arr = Array.isArray(recs) ? recs : [];
+                    arr.forEach(r => {
+                        const cat = r.category || 'unknown';
+                        byCat[cat] = (byCat[cat] || 0) + 1;
+                    });
+                    if (arr.length < batchSize) break;
+                    offset += batchSize;
+                }
+                dqRenderDonut(byCat);
+            } catch (e) {
+                console.error('DQ donut data error:', e);
             }
         }
 
@@ -8595,8 +8675,9 @@
         function dqRenderDonut(byCategory) {
             const canvas = document.getElementById('dq-donut');
             if (!canvas) return;
-            const labels = Object.keys(byCategory);
-            const values = Object.values(byCategory);
+            const labels = Object.keys(byCategory).sort((a, b) => byCategory[b] - byCategory[a]);
+            _dqCatLabels = labels;
+            const values = labels.map(l => byCategory[l]);
             const colors = labels.map(l => DQ_CAT_COLORS[l] || '#94a3b8');
 
             if (_dqDonutChart) _dqDonutChart.destroy();
@@ -8609,7 +8690,9 @@
                         data: values,
                         backgroundColor: colors,
                         borderColor: '#1e293b',
-                        borderWidth: 2
+                        borderWidth: 2,
+                        hoverBorderColor: '#f1f5f9',
+                        hoverBorderWidth: 3
                     }]
                 },
                 options: {
@@ -8620,13 +8703,24 @@
                         legend: {
                             position: 'bottom',
                             labels: { color: '#94a3b8', font: { size: 11 }, padding: 12, boxWidth: 12 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                    const pct = total ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
+                                    return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`;
+                                }
+                            }
                         }
                     },
                     onClick: function(e, elems) {
                         if (elems.length > 0) {
                             const idx = elems[0].index;
-                            const cat = labels[idx];
-                            document.getElementById('dq-filter-category').value = cat;
+                            const cat = _dqCatLabels[idx];
+                            const filterEl = document.getElementById('dq-filter-category');
+                            // Toggle: click same category again to clear
+                            filterEl.value = filterEl.value === cat ? '' : cat;
                             dqApplyFilters();
                         }
                     }
@@ -8634,9 +8728,32 @@
             });
         }
 
+        function dqRenderSourceScores(scores) {
+            const container = document.getElementById('dq-source-scores');
+            if (!container) return;
+            const entries = Object.entries(scores).sort((a, b) => (a[1].quality_score || 0) - (b[1].quality_score || 0));
+            if (entries.length === 0) { container.innerHTML = '<div class="empty">No source scores available.</div>'; return; }
+
+            let html = '<div class="dq-source-list">';
+            entries.forEach(([src, s]) => {
+                const score = s.quality_score != null ? s.quality_score.toFixed(0) : '?';
+                const pct = s.quality_score != null ? Math.min(s.quality_score, 100) : 0;
+                const color = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--error)';
+                html += `<div class="dq-source-row">
+                    <span class="dq-source-name">${src}</span>
+                    <div class="dq-source-bar-bg"><div class="dq-source-bar" style="width:${pct}%;background:${color};"></div></div>
+                    <span class="dq-source-score" style="color:${color};">${score}</span>
+                </div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
         async function dqApplyFilters() {
             _dqOffset = 0;
             _dqRecs = [];
+            _dqSortCol = null;
+            _dqSortAsc = true;
             await dqLoadRecs(false);
         }
 
@@ -8661,7 +8778,7 @@
             params.set('offset', append ? _dqOffset : 0);
 
             const container = document.getElementById('dq-table-container');
-            if (!append) container.innerHTML = '<div class="loading">Loading...</div>';
+            if (!append) container.innerHTML = '<div class="loading">Loading recommendations...</div>';
 
             try {
                 const res = await fetch(API + '/dq-review/recommendations?' + params.toString());
@@ -8677,34 +8794,68 @@
 
                 dqRenderTable();
 
-                // Show/hide load more
                 const loadMoreEl = document.getElementById('dq-load-more');
-                if (recs.length >= _dqLimit) {
-                    loadMoreEl.style.display = 'flex';
-                } else {
-                    loadMoreEl.style.display = 'none';
-                }
+                loadMoreEl.style.display = recs.length >= _dqLimit ? 'flex' : 'none';
+
+                // Show result count
+                const countEl = document.getElementById('dq-result-count');
+                if (countEl) countEl.textContent = `Showing ${_dqRecs.length} recommendations`;
             } catch (e) {
                 container.innerHTML = '<div class="empty">Failed to load recommendations.</div>';
                 console.error('DQ recs error:', e);
             }
         }
 
+        const DQ_PRIO_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
+
+        function dqSort(col) {
+            if (_dqSortCol === col) { _dqSortAsc = !_dqSortAsc; }
+            else { _dqSortCol = col; _dqSortAsc = true; }
+
+            _dqRecs.sort((a, b) => {
+                let va, vb;
+                switch (col) {
+                    case 'priority':
+                        va = DQ_PRIO_ORDER[(a.priority || 'low').toLowerCase()] ?? 9;
+                        vb = DQ_PRIO_ORDER[(b.priority || 'low').toLowerCase()] ?? 9;
+                        break;
+                    case 'category': va = a.category || ''; vb = b.category || ''; break;
+                    case 'source': va = a.source || ''; vb = b.source || ''; break;
+                    case 'table': va = a.table_name || ''; vb = b.table_name || ''; break;
+                    case 'title': va = a.title || a.description || ''; vb = b.title || b.description || ''; break;
+                    default: return 0;
+                }
+                if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+                const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+                return _dqSortAsc ? cmp : -cmp;
+            });
+            dqRenderTable();
+        }
+
+        function dqSortArrow(col) {
+            if (_dqSortCol !== col) return '';
+            return _dqSortAsc ? ' &#9650;' : ' &#9660;';
+        }
+
         function dqRenderTable() {
             const container = document.getElementById('dq-table-container');
             if (_dqRecs.length === 0) {
-                container.innerHTML = '<div class="empty">No recommendations found for these filters.</div>';
+                container.innerHTML = `<div class="intel-empty">
+                    <div class="intel-empty-icon">&#128269;</div>
+                    <div class="intel-empty-text">No recommendations match these filters.</div>
+                    <div class="intel-empty-hint">Try broadening your filters or click <code>Run Analysis</code> to generate fresh recommendations.</div>
+                </div>`;
                 return;
             }
 
             let html = `<table class="dq-table">
                 <thead><tr>
                     <th style="width:30px;"></th>
-                    <th>Priority</th>
-                    <th>Category</th>
-                    <th>Source</th>
-                    <th>Table</th>
-                    <th>Title</th>
+                    <th onclick="dqSort('priority')" style="cursor:pointer;">Priority${dqSortArrow('priority')}</th>
+                    <th onclick="dqSort('category')" style="cursor:pointer;">Category${dqSortArrow('category')}</th>
+                    <th onclick="dqSort('source')" style="cursor:pointer;">Source${dqSortArrow('source')}</th>
+                    <th onclick="dqSort('table')" style="cursor:pointer;">Table${dqSortArrow('table')}</th>
+                    <th onclick="dqSort('title')" style="cursor:pointer;">Title${dqSortArrow('title')}</th>
                     <th>Auto-fix</th>
                     <th>Actions</th>
                 </tr></thead><tbody>`;
@@ -8712,11 +8863,11 @@
             _dqRecs.forEach((rec, i) => {
                 const prio = (rec.priority || 'low').toLowerCase();
                 const cat = rec.category || '';
-                const autofix = rec.auto_fixable ? '<span style="color:var(--success);">&#10003;</span>' : '';
+                const autofix = rec.auto_fixable ? '<span style="color:var(--success);">&#10003;</span>' : '<span style="color:var(--text-muted);">&#8212;</span>';
                 const status = (rec.status || 'open').toLowerCase();
                 const isOpen = status === 'open';
 
-                html += `<tr onclick="dqToggleExpand(${i})" style="cursor:pointer;">
+                html += `<tr onclick="dqToggleExpand(${i})" style="cursor:pointer;" id="dq-row-${i}">
                     <td><span class="ds-chevron" id="dq-chev-${i}">&#9654;</span></td>
                     <td><span class="dq-badge ${prio}">${prio}</span></td>
                     <td><span class="dq-cat-pill ${cat}">${(cat || '').replace(/_/g, ' ')}</span></td>
@@ -8748,7 +8899,8 @@
                 expandRow.classList.remove('hidden');
                 chevron.style.transform = 'rotate(90deg)';
                 const rec = _dqRecs[idx];
-                const evidence = rec.evidence ? JSON.stringify(rec.evidence, null, 2) : 'No evidence data';
+                const evidence = rec.evidence && Object.keys(rec.evidence).length > 0
+                    ? JSON.stringify(rec.evidence, null, 2) : 'No evidence data';
                 let fixHtml = '';
                 if (rec.fix_action) {
                     fixHtml = `<span class="dq-fix-label">Fix Action:</span> <code>${rec.fix_action}</code>`;
@@ -8756,8 +8908,13 @@
                         fixHtml += `<pre>${JSON.stringify(rec.fix_params, null, 2)}</pre>`;
                     }
                 }
+                let suggestHtml = '';
+                if (rec.suggested_action) {
+                    suggestHtml = `<span class="dq-fix-label">Suggested Action:</span> ${rec.suggested_action}`;
+                }
                 expandRow.querySelector('td').innerHTML = `<div class="dq-expand-content">
                     <strong>Description:</strong> ${rec.description || '-'}
+                    ${suggestHtml}
                     <span class="dq-fix-label">Evidence:</span>
                     <pre>${evidence}</pre>
                     ${fixHtml}
@@ -8769,12 +8926,21 @@
         }
 
         async function dqApply(id, idx) {
+            const btn = event.target;
+            btn.disabled = true; btn.textContent = '...';
             try {
                 const res = await fetch(API + '/dq-review/apply/' + id, { method: 'POST' });
                 if (res.ok) {
-                    _dqRecs[idx].status = 'applied';
+                    // If filtering by open, remove from list; otherwise mark as applied
+                    const filterStatus = document.getElementById('dq-filter-status').value;
+                    if (filterStatus === 'open') {
+                        _dqRecs.splice(idx, 1);
+                    } else {
+                        _dqRecs[idx].status = 'applied';
+                    }
                     dqRenderTable();
                     dqLoadSummary();
+                    dqLoadDonutData();
                     showToast('Recommendation applied', 'success');
                 } else {
                     const err = await res.json().catch(() => ({}));
@@ -8786,12 +8952,20 @@
         }
 
         async function dqDismiss(id, idx) {
+            const btn = event.target;
+            btn.disabled = true; btn.textContent = '...';
             try {
                 const res = await fetch(API + '/dq-review/dismiss/' + id, { method: 'POST' });
                 if (res.ok) {
-                    _dqRecs[idx].status = 'dismissed';
+                    const filterStatus = document.getElementById('dq-filter-status').value;
+                    if (filterStatus === 'open') {
+                        _dqRecs.splice(idx, 1);
+                    } else {
+                        _dqRecs[idx].status = 'dismissed';
+                    }
                     dqRenderTable();
                     dqLoadSummary();
+                    dqLoadDonutData();
                     showToast('Recommendation dismissed', 'info');
                 } else {
                     const err = await res.json().catch(() => ({}));
@@ -8809,11 +8983,9 @@
             try {
                 const res = await fetch(API + '/dq-review/run', { method: 'POST' });
                 if (res.ok) {
-                    showToast('DQ analysis started. Refreshing...', 'success');
+                    showToast('DQ analysis complete. Refreshing...', 'success');
                     _dqInitialized = false;
-                    setTimeout(() => {
-                        dqInitialize();
-                    }, 2000);
+                    dqInitialize();
                 } else {
                     showToast('Run failed: ' + res.statusText, 'error');
                 }

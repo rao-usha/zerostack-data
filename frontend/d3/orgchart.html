@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organization Chart — Acme Industrial Corp</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --border: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --primary: #6366f1;
+            --accent: #06b6d4;
+            --dept-operations: #3b82f6;
+            --dept-finance: #22c55e;
+            --dept-technology: #06b6d4;
+            --dept-marketing: #f97316;
+            --dept-hr: #a855f7;
+            --dept-executive: #6366f1;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            z-index: 10;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        .back-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--text); }
+        .title-group h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .title-group .subtitle {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin-top: 2px;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .search-container {
+            position: relative;
+        }
+        .search-input {
+            padding: 0.5rem 0.75rem 0.5rem 2rem;
+            background: #334155;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.875rem;
+            width: 220px;
+            outline: none;
+            transition: border-color 0.2s, width 0.3s;
+        }
+        .search-input:focus {
+            border-color: var(--primary);
+            width: 280px;
+        }
+        .search-icon {
+            position: absolute;
+            left: 0.6rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            pointer-events: none;
+        }
+        .search-results {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            max-height: 240px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+        }
+        .search-results.visible { display: block; }
+        .search-result-item {
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            font-size: 0.8rem;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.15s;
+        }
+        .search-result-item:last-child { border-bottom: none; }
+        .search-result-item:hover { background: #334155; }
+        .search-result-item .sr-name { font-weight: 600; }
+        .search-result-item .sr-title { color: var(--text-muted); font-size: 0.75rem; }
+        .controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .btn {
+            padding: 0.4rem 0.75rem;
+            background: #334155;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:hover { background: #475569; color: var(--text); }
+        .stats-bar {
+            display: flex;
+            gap: 1.5rem;
+            padding: 0.6rem 2rem;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            z-index: 10;
+        }
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+        }
+        .stat-label { color: var(--text-muted); }
+        .stat-value {
+            font-weight: 700;
+            font-size: 1rem;
+        }
+        .stat-value.primary { color: var(--primary); }
+        .stat-value.accent { color: var(--accent); }
+        .stat-value.green { color: #22c55e; }
+        .stat-value.orange { color: #f97316; }
+        .legend {
+            display: flex;
+            gap: 1rem;
+            margin-left: auto;
+            align-items: center;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+        }
+        #chart-container {
+            width: 100%;
+            height: calc(100vh - 110px);
+            cursor: grab;
+        }
+        #chart-container:active { cursor: grabbing; }
+        #chart-container svg { width: 100%; height: 100%; }
+
+        /* Node styles */
+        .node-card {
+            cursor: pointer;
+            transition: filter 0.2s;
+        }
+        .node-card.dimmed { opacity: 0.15; }
+        .node-card.highlighted { opacity: 1; }
+        .node-card-bg {
+            rx: 10;
+            ry: 10;
+            stroke-width: 2;
+            transition: stroke-width 0.2s, filter 0.2s;
+        }
+        .node-card:hover .node-card-bg {
+            stroke-width: 3;
+            filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.4));
+        }
+        .node-card.search-match .node-card-bg {
+            stroke-width: 3;
+            filter: drop-shadow(0 0 16px rgba(6, 182, 212, 0.6));
+        }
+        .node-name {
+            font-size: 13px;
+            font-weight: 700;
+            fill: var(--text);
+        }
+        .node-title {
+            font-size: 10.5px;
+            fill: var(--text-muted);
+        }
+        .node-dept {
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .tenure-badge {
+            rx: 4;
+            ry: 4;
+        }
+        .tenure-text {
+            font-size: 8.5px;
+            font-weight: 600;
+            fill: var(--text);
+        }
+        .expand-indicator {
+            font-size: 14px;
+            fill: var(--text-muted);
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .link {
+            fill: none;
+            stroke-width: 2;
+            opacity: 0.4;
+            transition: opacity 0.2s, stroke-width 0.2s;
+        }
+        .link.highlighted {
+            opacity: 1;
+            stroke-width: 3;
+        }
+        .link.dimmed { opacity: 0.08; }
+
+        .tooltip {
+            position: fixed;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            font-size: 0.8rem;
+            color: var(--text);
+            pointer-events: none;
+            z-index: 200;
+            opacity: 0;
+            transition: opacity 0.15s;
+            max-width: 250px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .tooltip.visible { opacity: 1; }
+        .tooltip .tt-name { font-weight: 700; font-size: 0.9rem; margin-bottom: 4px; }
+        .tooltip .tt-row { display: flex; justify-content: space-between; gap: 1rem; margin-top: 2px; }
+        .tooltip .tt-label { color: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <a href="index.html" class="back-link">
+                <span>&larr;</span> Gallery
+            </a>
+            <div class="title-group">
+                <h1>Organization Chart &mdash; Acme Industrial Corp</h1>
+                <div class="subtitle">Interactive leadership hierarchy visualization</div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="search-container">
+                <span class="search-icon">&#128269;</span>
+                <input type="text" class="search-input" id="search" placeholder="Search by name or title...">
+                <div class="search-results" id="search-results"></div>
+            </div>
+            <div class="controls">
+                <button class="btn" id="btn-expand-all">Expand All</button>
+                <button class="btn" id="btn-collapse-all">Collapse</button>
+                <button class="btn" id="btn-reset-zoom">Reset Zoom</button>
+            </div>
+        </div>
+    </div>
+    <div class="stats-bar">
+        <div class="stat-item">
+            <span class="stat-label">Total Headcount</span>
+            <span class="stat-value primary" id="stat-headcount">25</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Departments</span>
+            <span class="stat-value accent" id="stat-depts">6</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Avg Span of Control</span>
+            <span class="stat-value green" id="stat-span">3.1</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Management Layers</span>
+            <span class="stat-value orange" id="stat-layers">4</span>
+        </div>
+        <div class="legend">
+            <div class="legend-item"><div class="legend-dot" style="background: var(--dept-executive)"></div> Executive</div>
+            <div class="legend-item"><div class="legend-dot" style="background: var(--dept-operations)"></div> Operations</div>
+            <div class="legend-item"><div class="legend-dot" style="background: var(--dept-finance)"></div> Finance</div>
+            <div class="legend-item"><div class="legend-dot" style="background: var(--dept-technology)"></div> Technology</div>
+            <div class="legend-item"><div class="legend-dot" style="background: var(--dept-marketing)"></div> Marketing</div>
+            <div class="legend-item"><div class="legend-dot" style="background: var(--dept-hr)"></div> HR</div>
+        </div>
+    </div>
+    <div id="chart-container"></div>
+    <div class="tooltip" id="tooltip"></div>
+
+<script>
+// === Demo Data: Acme Industrial Corp org chart ===
+const orgData = {
+    name: "Robert Chen", title: "Chief Executive Officer", dept: "Executive", tenure: 12,
+    children: [
+        {
+            name: "Patricia Huang", title: "Chief Financial Officer", dept: "Finance", tenure: 8,
+            children: [
+                {
+                    name: "David Park", title: "VP of Finance", dept: "Finance", tenure: 6,
+                    children: [
+                        { name: "Sarah Kim", title: "Director of FP&A", dept: "Finance", tenure: 4 },
+                        { name: "James Liu", title: "Controller", dept: "Finance", tenure: 5 }
+                    ]
+                },
+                { name: "Emily Torres", title: "VP of Treasury", dept: "Finance", tenure: 3 },
+                {
+                    name: "Michael Grant", title: "Director of IR", dept: "Finance", tenure: 2,
+                    children: [
+                        { name: "Nicole Adams", title: "IR Manager", dept: "Finance", tenure: 1 }
+                    ]
+                }
+            ]
+        },
+        {
+            name: "Marcus Johnson", title: "Chief Operating Officer", dept: "Operations", tenure: 10,
+            children: [
+                {
+                    name: "Angela Rivera", title: "VP of Manufacturing", dept: "Operations", tenure: 7,
+                    children: [
+                        { name: "Tom Bradley", title: "Plant Manager — East", dept: "Operations", tenure: 5 },
+                        { name: "Lisa Chang", title: "Plant Manager — West", dept: "Operations", tenure: 4 }
+                    ]
+                },
+                {
+                    name: "Derek Williams", title: "VP of Supply Chain", dept: "Operations", tenure: 5,
+                    children: [
+                        { name: "Karen Mitchell", title: "Director of Logistics", dept: "Operations", tenure: 3 }
+                    ]
+                },
+                { name: "Susan Patel", title: "VP of Quality", dept: "Operations", tenure: 6 }
+            ]
+        },
+        {
+            name: "Jennifer Wu", title: "Chief Technology Officer", dept: "Technology", tenure: 5,
+            children: [
+                {
+                    name: "Ryan Foster", title: "VP of Engineering", dept: "Technology", tenure: 4,
+                    children: [
+                        { name: "Alex Novak", title: "Director of Software", dept: "Technology", tenure: 3 },
+                        { name: "Priya Sharma", title: "Director of Infrastructure", dept: "Technology", tenure: 2 }
+                    ]
+                },
+                { name: "Brandon Cole", title: "VP of Data & Analytics", dept: "Technology", tenure: 3 }
+            ]
+        },
+        {
+            name: "Stephanie Brooks", title: "Chief Marketing Officer", dept: "Marketing", tenure: 4,
+            children: [
+                { name: "Kevin Ortiz", title: "VP of Brand", dept: "Marketing", tenure: 3 },
+                {
+                    name: "Rachel Green", title: "VP of Digital", dept: "Marketing", tenure: 2,
+                    children: [
+                        { name: "Jason Lee", title: "Director of Content", dept: "Marketing", tenure: 1 }
+                    ]
+                }
+            ]
+        },
+        {
+            name: "Diana Okafor", title: "Chief Human Resources Officer", dept: "HR", tenure: 6,
+            children: [
+                { name: "Carlos Mendez", title: "VP of Talent Acquisition", dept: "HR", tenure: 4 },
+                { name: "Amanda Foster", title: "VP of People Operations", dept: "HR", tenure: 3 }
+            ]
+        }
+    ]
+};
+
+// === Color mappings ===
+const deptColors = {
+    Executive: "#6366f1",
+    Operations: "#3b82f6",
+    Finance: "#22c55e",
+    Technology: "#06b6d4",
+    Marketing: "#f97316",
+    HR: "#a855f7"
+};
+
+// === Dimensions ===
+const nodeW = 200, nodeH = 72;
+const margin = { top: 60, right: 80, bottom: 60, left: 80 };
+
+// === Setup SVG ===
+const container = d3.select("#chart-container");
+const width = container.node().clientWidth;
+const height = container.node().clientHeight;
+
+const svg = container.append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+const defs = svg.append("defs");
+
+// Create gradient for each department
+Object.entries(deptColors).forEach(([dept, color]) => {
+    const grad = defs.append("linearGradient")
+        .attr("id", `link-grad-${dept.toLowerCase()}`)
+        .attr("gradientUnits", "userSpaceOnUse");
+    grad.append("stop").attr("offset", "0%").attr("stop-color", color).attr("stop-opacity", 0.6);
+    grad.append("stop").attr("offset", "100%").attr("stop-color", color).attr("stop-opacity", 0.2);
+});
+
+const g = svg.append("g");
+
+// === Zoom ===
+const zoom = d3.zoom()
+    .scaleExtent([0.2, 3])
+    .on("zoom", (event) => g.attr("transform", event.transform));
+
+svg.call(zoom);
+
+// === Hierarchy ===
+let root = d3.hierarchy(orgData);
+
+// Store original children for expand/collapse
+root.descendants().forEach(d => {
+    d._children = d.children;
+    d.data._id = d.data.name.replace(/\s/g, '_');
+});
+
+// Compute stats
+function computeStats() {
+    const visible = root.descendants();
+    const all = [];
+    function gather(node) {
+        all.push(node);
+        if (node._children) node._children.forEach(gather);
+        else if (node.children) node.children.forEach(gather);
+    }
+    gather(root);
+
+    const totalCount = all.length;
+    const depts = new Set(all.map(d => d.data.dept));
+    // Span of control: avg number of direct reports for managers
+    const managers = all.filter(d => (d._children && d._children.length > 0) || (d.children && d.children.length > 0));
+    const avgSpan = managers.length > 0
+        ? (managers.reduce((s, d) => s + (d._children || d.children || []).length, 0) / managers.length).toFixed(1)
+        : 0;
+    // Max depth
+    let maxDepth = 0;
+    function depth(node, level) {
+        maxDepth = Math.max(maxDepth, level);
+        (node._children || node.children || []).forEach(c => depth(c, level + 1));
+    }
+    depth(root, 1);
+
+    document.getElementById("stat-headcount").textContent = totalCount;
+    document.getElementById("stat-depts").textContent = depts.size;
+    document.getElementById("stat-span").textContent = avgSpan;
+    document.getElementById("stat-layers").textContent = maxDepth;
+}
+
+// === Tree layout and render ===
+const treeLayout = d3.tree().nodeSize([nodeW + 30, nodeH + 60]);
+
+const linkGroup = g.append("g").attr("class", "links");
+const nodeGroup = g.append("g").attr("class", "nodes");
+
+const tooltip = document.getElementById("tooltip");
+
+function update(source) {
+    treeLayout(root);
+
+    const nodes = root.descendants();
+    const links = root.links();
+    const duration = 500;
+
+    // === Links ===
+    const linkSel = linkGroup.selectAll(".link")
+        .data(links, d => d.target.data.name);
+
+    const linkEnter = linkSel.enter()
+        .append("path")
+        .attr("class", "link")
+        .attr("d", () => {
+            const o = { x: source.x0 || source.x, y: source.y0 || source.y };
+            return linkPath({ source: o, target: o });
+        })
+        .attr("stroke", d => {
+            const dept = d.target.data.dept.toLowerCase();
+            return `url(#link-grad-${dept})`;
+        });
+
+    linkSel.merge(linkEnter)
+        .transition().duration(duration)
+        .attr("d", d => linkPath(d))
+        .attr("stroke", d => {
+            const dept = d.target.data.dept.toLowerCase();
+            return `url(#link-grad-${dept})`;
+        });
+
+    linkSel.exit()
+        .transition().duration(duration)
+        .attr("d", () => {
+            const o = { x: source.x, y: source.y };
+            return linkPath({ source: o, target: o });
+        })
+        .remove();
+
+    // === Nodes ===
+    const nodeSel = nodeGroup.selectAll(".node-card")
+        .data(nodes, d => d.data.name);
+
+    const nodeEnter = nodeSel.enter()
+        .append("g")
+        .attr("class", "node-card")
+        .attr("transform", () => `translate(${(source.x0 || source.x) - nodeW/2},${source.y0 || source.y})`)
+        .on("click", (event, d) => {
+            event.stopPropagation();
+            toggle(d);
+            update(d);
+        })
+        .on("mouseenter", (event, d) => {
+            highlightChain(d);
+            showTooltip(event, d);
+        })
+        .on("mousemove", (event) => {
+            tooltip.style.left = (event.clientX + 16) + "px";
+            tooltip.style.top = (event.clientY - 10) + "px";
+        })
+        .on("mouseleave", () => {
+            clearHighlight();
+            tooltip.classList.remove("visible");
+        });
+
+    // Background rect
+    nodeEnter.append("rect")
+        .attr("class", "node-card-bg")
+        .attr("width", nodeW)
+        .attr("height", nodeH)
+        .attr("fill", "#1e293b")
+        .attr("stroke", d => deptColors[d.data.dept] || "#334155");
+
+    // Department color bar (left side)
+    nodeEnter.append("rect")
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("width", 4)
+        .attr("height", nodeH)
+        .attr("rx", 2)
+        .attr("fill", d => deptColors[d.data.dept] || "#334155");
+
+    // Name
+    nodeEnter.append("text")
+        .attr("class", "node-name")
+        .attr("x", 14)
+        .attr("y", 22)
+        .text(d => d.data.name);
+
+    // Title
+    nodeEnter.append("text")
+        .attr("class", "node-title")
+        .attr("x", 14)
+        .attr("y", 38)
+        .text(d => {
+            const t = d.data.title;
+            return t.length > 28 ? t.substring(0, 26) + "..." : t;
+        });
+
+    // Department badge
+    nodeEnter.append("text")
+        .attr("class", "node-dept")
+        .attr("x", 14)
+        .attr("y", 54)
+        .attr("fill", d => deptColors[d.data.dept] || "#94a3b8")
+        .text(d => d.data.dept);
+
+    // Tenure badge
+    nodeEnter.append("rect")
+        .attr("class", "tenure-badge")
+        .attr("x", nodeW - 40)
+        .attr("y", 8)
+        .attr("width", 30)
+        .attr("height", 18)
+        .attr("fill", d => deptColors[d.data.dept] + "33");
+
+    nodeEnter.append("text")
+        .attr("class", "tenure-text")
+        .attr("x", nodeW - 25)
+        .attr("y", 20)
+        .attr("text-anchor", "middle")
+        .text(d => d.data.tenure + "y");
+
+    // Expand/collapse indicator
+    nodeEnter.append("text")
+        .attr("class", "expand-indicator")
+        .attr("x", nodeW / 2)
+        .attr("y", nodeH + 16)
+        .attr("text-anchor", "middle")
+        .text(d => {
+            if (!d._children || d._children.length === 0) return "";
+            return d.children ? "−" : "+";
+        });
+
+    // Update positions
+    const nodeUpdate = nodeSel.merge(nodeEnter);
+    nodeUpdate.transition().duration(duration)
+        .attr("transform", d => `translate(${d.x - nodeW/2},${d.y})`);
+
+    // Update expand indicators on merge
+    nodeUpdate.select(".expand-indicator")
+        .text(d => {
+            if (!d._children || d._children.length === 0) return "";
+            return d.children ? "−" : "+";
+        });
+
+    // Exit
+    nodeSel.exit()
+        .transition().duration(duration)
+        .attr("transform", `translate(${source.x - nodeW/2},${source.y})`)
+        .style("opacity", 0)
+        .remove();
+
+    // Save positions for transition
+    nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
+
+    computeStats();
+
+    // Update link gradients y-coordinates
+    links.forEach(d => {
+        const dept = d.target.data.dept.toLowerCase();
+        const gradId = `link-grad-${dept}`;
+        const grad = defs.select(`#${gradId}`);
+        if (!grad.empty()) {
+            grad.attr("y1", d.source.y).attr("y2", d.target.y);
+        }
+    });
+}
+
+function linkPath(d) {
+    const sy = d.source.y + nodeH;
+    const ty = d.target.y;
+    const midY = (sy + ty) / 2;
+    return `M${d.source.x},${sy}C${d.source.x},${midY} ${d.target.x},${midY} ${d.target.x},${ty}`;
+}
+
+function toggle(d) {
+    if (d.children) {
+        d.children = null;
+    } else if (d._children) {
+        d.children = d._children;
+    }
+}
+
+function expandAll(node) {
+    if (node._children) {
+        node.children = node._children;
+    }
+    if (node.children) {
+        node.children.forEach(expandAll);
+    }
+}
+
+function collapseAll(node) {
+    if (node._children && node._children.length > 0) {
+        node.children = null;
+    }
+    if (node._children) {
+        node._children.forEach(n => {
+            if (n.children) {
+                n.children.forEach(collapseAll);
+                n.children = null;
+            }
+        });
+    }
+}
+
+// === Highlight reporting chain ===
+function highlightChain(d) {
+    const chain = new Set();
+    let current = d;
+    while (current) {
+        chain.add(current.data.name);
+        current = current.parent;
+    }
+
+    nodeGroup.selectAll(".node-card")
+        .classed("dimmed", n => !chain.has(n.data.name))
+        .classed("highlighted", n => chain.has(n.data.name));
+
+    linkGroup.selectAll(".link")
+        .classed("dimmed", l => !chain.has(l.source.data.name) || !chain.has(l.target.data.name))
+        .classed("highlighted", l => chain.has(l.source.data.name) && chain.has(l.target.data.name));
+}
+
+function clearHighlight() {
+    nodeGroup.selectAll(".node-card").classed("dimmed", false).classed("highlighted", false);
+    linkGroup.selectAll(".link").classed("dimmed", false).classed("highlighted", false);
+}
+
+// === Tooltip ===
+function showTooltip(event, d) {
+    const directReports = (d._children || d.children || []).length;
+    function countAll(node) {
+        let count = 0;
+        (node._children || node.children || []).forEach(c => { count += 1 + countAll(c); });
+        return count;
+    }
+    const totalReports = countAll(d);
+    const ttHtml = `
+        <div class="tt-name">${d.data.name}</div>
+        <div style="color:${deptColors[d.data.dept]};font-size:0.75rem;margin-bottom:6px;">${d.data.title}</div>
+        <div class="tt-row"><span class="tt-label">Department</span><span>${d.data.dept}</span></div>
+        <div class="tt-row"><span class="tt-label">Tenure</span><span>${d.data.tenure} years</span></div>
+        <div class="tt-row"><span class="tt-label">Direct Reports</span><span>${directReports}</span></div>
+        <div class="tt-row"><span class="tt-label">Total Org Size</span><span>${totalReports}</span></div>
+    `;
+    tooltip.innerHTML = ttHtml;
+    tooltip.style.left = (event.clientX + 16) + "px";
+    tooltip.style.top = (event.clientY - 10) + "px";
+    tooltip.classList.add("visible");
+}
+
+// === Search ===
+const searchInput = document.getElementById("search");
+const searchResultsEl = document.getElementById("search-results");
+
+function getAllPeople() {
+    const people = [];
+    function gather(node) {
+        people.push(node);
+        if (node._children) node._children.forEach(c => gather(c));
+        else if (node.children) node.children.forEach(c => gather(c));
+    }
+    gather(root);
+    return people;
+}
+
+searchInput.addEventListener("input", () => {
+    const q = searchInput.value.toLowerCase().trim();
+    if (q.length < 2) {
+        searchResultsEl.classList.remove("visible");
+        nodeGroup.selectAll(".node-card").classed("search-match", false);
+        return;
+    }
+    const people = getAllPeople();
+    const matches = people.filter(d =>
+        d.data.name.toLowerCase().includes(q) || d.data.title.toLowerCase().includes(q)
+    );
+
+    if (matches.length === 0) {
+        searchResultsEl.innerHTML = '<div class="search-result-item"><span class="sr-title">No results</span></div>';
+    } else {
+        searchResultsEl.innerHTML = matches.slice(0, 8).map(d =>
+            `<div class="search-result-item" data-name="${d.data.name}">
+                <div class="sr-name">${d.data.name}</div>
+                <div class="sr-title">${d.data.title} &mdash; ${d.data.dept}</div>
+            </div>`
+        ).join("");
+    }
+    searchResultsEl.classList.add("visible");
+
+    // Highlight in tree
+    const matchNames = new Set(matches.map(d => d.data.name));
+    nodeGroup.selectAll(".node-card")
+        .classed("search-match", d => matchNames.has(d.data.name));
+});
+
+searchResultsEl.addEventListener("click", (event) => {
+    const item = event.target.closest(".search-result-item");
+    if (!item) return;
+    const name = item.dataset.name;
+
+    // Expand path to this node
+    function findAndExpand(node, target) {
+        if (node.data.name === target) return true;
+        const kids = node._children || node.children || [];
+        for (const child of kids) {
+            if (findAndExpand(child, target)) {
+                node.children = node._children;
+                return true;
+            }
+        }
+        return false;
+    }
+    findAndExpand(root, name);
+    update(root);
+
+    // Zoom to node after transition
+    setTimeout(() => {
+        const targetNode = root.descendants().find(d => d.data.name === name);
+        if (targetNode) {
+            const tx = width / 2 - targetNode.x;
+            const ty = height / 2 - targetNode.y - nodeH / 2;
+            svg.transition().duration(750).call(
+                zoom.transform,
+                d3.zoomIdentity.translate(tx, ty).scale(1)
+            );
+            // Flash highlight
+            nodeGroup.selectAll(".node-card")
+                .classed("search-match", d => d.data.name === name);
+        }
+    }, 600);
+
+    searchResultsEl.classList.remove("visible");
+    searchInput.value = name;
+});
+
+document.addEventListener("click", (e) => {
+    if (!e.target.closest(".search-container")) {
+        searchResultsEl.classList.remove("visible");
+    }
+});
+
+// === Buttons ===
+document.getElementById("btn-expand-all").addEventListener("click", () => {
+    expandAll(root);
+    update(root);
+    fitToView();
+});
+
+document.getElementById("btn-collapse-all").addEventListener("click", () => {
+    root.descendants().forEach(d => {
+        if (d.depth > 0 && d._children) {
+            d.children = null;
+        }
+    });
+    // Keep first level open
+    if (root._children) root.children = root._children;
+    update(root);
+    fitToView();
+});
+
+document.getElementById("btn-reset-zoom").addEventListener("click", fitToView);
+
+function fitToView() {
+    setTimeout(() => {
+        const bounds = g.node().getBBox();
+        if (bounds.width === 0 || bounds.height === 0) return;
+        const padding = 60;
+        const fullW = bounds.width + padding * 2;
+        const fullH = bounds.height + padding * 2;
+        const scale = Math.min(width / fullW, height / fullH, 1.2);
+        const tx = width / 2 - (bounds.x + bounds.width / 2) * scale;
+        const ty = padding * scale + (-bounds.y) * scale;
+        svg.transition().duration(750).call(
+            zoom.transform,
+            d3.zoomIdentity.translate(tx, ty).scale(scale)
+        );
+    }, 100);
+}
+
+// === Initial render ===
+root.x0 = 0;
+root.y0 = 0;
+update(root);
+fitToView();
+</script>
+</body>
+</html>

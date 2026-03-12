@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Location Intelligence — Site Selection Scores</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f172a;
+    color: #f1f5f9;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .header {
+    padding: 24px 32px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .header h1 {
+    font-size: 24px;
+    font-weight: 700;
+  }
+  .header h1 span {
+    color: #6366f1;
+  }
+
+  .stats-bar {
+    display: flex;
+    gap: 32px;
+    padding: 16px 32px;
+    margin-top: 8px;
+  }
+  .stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #6366f1;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .main-container {
+    display: flex;
+    padding: 16px 32px 32px;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .map-panel {
+    flex: 1;
+    min-width: 600px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sidebar {
+    width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .card h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 14px;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    cursor: pointer;
+  }
+  .toggle-row:hover {
+    opacity: 0.85;
+  }
+  .toggle-switch {
+    width: 36px;
+    height: 20px;
+    background: #334155;
+    border-radius: 10px;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle-switch.active {
+    background: #6366f1;
+  }
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s;
+  }
+  .toggle-switch.active::after {
+    transform: translateX(16px);
+  }
+  .toggle-label {
+    font-size: 13px;
+    color: #f1f5f9;
+  }
+
+  .legend-bar {
+    margin-top: 12px;
+  }
+  .legend-gradient {
+    width: 100%;
+    height: 12px;
+    border-radius: 6px;
+  }
+  .legend-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    font-size: 11px;
+    color: #94a3b8;
+  }
+
+  .state-info {
+    display: none;
+  }
+  .state-info.visible {
+    display: block;
+  }
+  .state-info .state-name {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .state-info .state-score-big {
+    font-size: 36px;
+    font-weight: 700;
+    color: #6366f1;
+  }
+  .state-info .state-score-label {
+    font-size: 11px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #334155;
+    font-size: 13px;
+  }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-label { color: #94a3b8; }
+  .metric-value { font-weight: 600; }
+
+  .companies-list {
+    margin-top: 12px;
+  }
+  .company-item {
+    padding: 8px 0;
+    border-bottom: 1px solid #334155;
+    font-size: 13px;
+  }
+  .company-item:last-child { border-bottom: none; }
+  .company-item .co-name { font-weight: 600; }
+  .company-item .co-type { color: #94a3b8; font-size: 12px; }
+
+  .tooltip-map {
+    position: absolute;
+    pointer-events: none;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #f1f5f9;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.15s;
+    max-width: 240px;
+  }
+  .tooltip-map .tt-name {
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  .tooltip-map .tt-score {
+    font-size: 22px;
+    font-weight: 700;
+    color: #6366f1;
+  }
+  .tooltip-map .tt-metric {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    font-size: 12px;
+  }
+  .tooltip-map .tt-metric-label { color: #94a3b8; }
+
+  .reset-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: #6366f1;
+    color: #f1f5f9;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    display: none;
+    z-index: 10;
+  }
+  .reset-btn:hover { background: #4f46e5; }
+  .reset-btn.visible { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>Location Intelligence</span> — Site Selection Scores</h1>
+</div>
+
+<div class="stats-bar">
+  <div class="stat-item">
+    <div class="stat-value">50</div>
+    <div class="stat-label">States Analyzed</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value" id="avg-score-stat">--</div>
+    <div class="stat-label">Avg Score</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value">15</div>
+    <div class="stat-label">Portfolio Locations</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-value">8</div>
+    <div class="stat-label">Target Markets</div>
+  </div>
+</div>
+
+<div class="main-container">
+  <div class="map-panel">
+    <svg id="map-svg"></svg>
+    <button class="reset-btn" id="reset-btn">Reset Zoom</button>
+    <div class="tooltip-map" id="tooltip"></div>
+  </div>
+  <div class="sidebar">
+    <div class="card">
+      <h3>Layers</h3>
+      <div class="toggle-row" data-layer="scores">
+        <div class="toggle-switch active" id="toggle-scores"></div>
+        <span class="toggle-label">Location Scores</span>
+      </div>
+      <div class="toggle-row" data-layer="companies">
+        <div class="toggle-switch active" id="toggle-companies"></div>
+        <span class="toggle-label">Portfolio Companies</span>
+      </div>
+      <div class="toggle-row" data-layer="targets">
+        <div class="toggle-switch active" id="toggle-targets"></div>
+        <span class="toggle-label">Target Markets</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Score Legend</h3>
+      <div class="legend-bar">
+        <div class="legend-gradient" id="legend-gradient"></div>
+        <div class="legend-labels">
+          <span>0 — Low</span>
+          <span>50</span>
+          <span>100 — High</span>
+        </div>
+      </div>
+    </div>
+    <div class="card state-info" id="state-info">
+      <h3>State Details</h3>
+      <div id="state-details"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// State scores (FIPS -> score) — industrial states score higher
+const stateScores = {
+  "01": 70, // Alabama
+  "02": 38, // Alaska
+  "04": 58, // Arizona
+  "05": 71, // Arkansas
+  "06": 45, // California
+  "08": 56, // Colorado
+  "09": 52, // Connecticut
+  "10": 63, // Delaware
+  "12": 62, // Florida
+  "13": 83, // Georgia
+  "15": 35, // Hawaii
+  "16": 64, // Idaho
+  "17": 72, // Illinois
+  "18": 85, // Indiana
+  "19": 76, // Iowa
+  "20": 74, // Kansas
+  "21": 78, // Kentucky
+  "22": 73, // Louisiana
+  "23": 48, // Maine
+  "24": 60, // Maryland
+  "25": 50, // Massachusetts
+  "26": 80, // Michigan
+  "27": 68, // Minnesota
+  "28": 72, // Mississippi
+  "29": 77, // Missouri
+  "30": 55, // Montana
+  "31": 69, // Nebraska
+  "32": 47, // Nevada
+  "33": 49, // New Hampshire
+  "34": 54, // New Jersey
+  "35": 53, // New Mexico
+  "36": 42, // New York
+  "37": 79, // North Carolina
+  "38": 66, // North Dakota
+  "39": 88, // Ohio
+  "40": 75, // Oklahoma
+  "41": 57, // Oregon
+  "42": 75, // Pennsylvania
+  "44": 46, // Rhode Island
+  "45": 77, // South Carolina
+  "46": 65, // South Dakota
+  "47": 81, // Tennessee
+  "48": 92, // Texas
+  "49": 61, // Utah
+  "50": 44, // Vermont
+  "51": 67, // Virginia
+  "53": 52, // Washington
+  "54": 70, // West Virginia
+  "55": 78, // Wisconsin
+  "56": 59  // Wyoming
+};
+
+const stateMetrics = {
+  "48": { utility: "$0.068/kWh", labor: "$18.50/hr", incentive: "High" },
+  "39": { utility: "$0.072/kWh", labor: "$19.20/hr", incentive: "High" },
+  "18": { utility: "$0.075/kWh", labor: "$17.80/hr", incentive: "High" },
+  "13": { utility: "$0.079/kWh", labor: "$18.10/hr", incentive: "High" },
+  "47": { utility: "$0.082/kWh", labor: "$17.40/hr", incentive: "High" },
+  "37": { utility: "$0.078/kWh", labor: "$17.90/hr", incentive: "Medium" },
+  "45": { utility: "$0.081/kWh", labor: "$16.80/hr", incentive: "High" },
+  "42": { utility: "$0.085/kWh", labor: "$20.50/hr", incentive: "Medium" },
+  "26": { utility: "$0.089/kWh", labor: "$21.30/hr", incentive: "Medium" },
+  "55": { utility: "$0.083/kWh", labor: "$19.70/hr", incentive: "Medium" },
+  "17": { utility: "$0.088/kWh", labor: "$22.10/hr", incentive: "Medium" },
+  "06": { utility: "$0.142/kWh", labor: "$26.40/hr", incentive: "Low" },
+  "36": { utility: "$0.138/kWh", labor: "$25.80/hr", incentive: "Low" },
+};
+
+// Default metrics for states without specific data
+function getMetrics(fips) {
+  if (stateMetrics[fips]) return stateMetrics[fips];
+  const score = stateScores[fips] || 50;
+  const utilBase = 0.06 + (100 - score) * 0.001;
+  const laborBase = 15 + (100 - score) * 0.15;
+  const incentive = score >= 75 ? "High" : score >= 55 ? "Medium" : "Low";
+  return {
+    utility: `$${utilBase.toFixed(3)}/kWh`,
+    labor: `$${laborBase.toFixed(2)}/hr`,
+    incentive
+  };
+}
+
+// Portfolio companies with lat/lng
+const portfolioCompanies = [
+  { name: "Acme Industrial", type: "Manufacturing", lat: 32.78, lng: -96.80, state: "TX" },
+  { name: "Precision Mfg", type: "Precision Parts", lat: 41.50, lng: -81.69, state: "OH" },
+  { name: "National Logistics", type: "3PL", lat: 39.77, lng: -86.16, state: "IN" },
+  { name: "Southern Steel", type: "Steel Fabrication", lat: 33.75, lng: -84.39, state: "GA" },
+  { name: "Delta Packaging", type: "Packaging", lat: 35.15, lng: -90.05, state: "TN" },
+  { name: "Carolina Textiles", type: "Textiles", lat: 35.23, lng: -80.84, state: "NC" },
+  { name: "Midwest Coatings", type: "Industrial Coatings", lat: 41.88, lng: -87.63, state: "IL" },
+  { name: "Keystone Machining", type: "CNC Machining", lat: 40.44, lng: -79.99, state: "PA" },
+  { name: "Lone Star Plastics", type: "Plastics", lat: 29.76, lng: -95.37, state: "TX" },
+  { name: "Great Lakes Metals", type: "Metal Stamping", lat: 42.33, lng: -83.05, state: "MI" },
+  { name: "Badger Assembly", type: "Assembly", lat: 43.04, lng: -87.91, state: "WI" },
+  { name: "Heartland Dist.", type: "Distribution", lat: 39.10, lng: -94.58, state: "MO" },
+  { name: "Palmetto Chemicals", type: "Chemicals", lat: 32.78, lng: -79.93, state: "SC" },
+  { name: "Bluegrass Components", type: "Components", lat: 38.25, lng: -85.76, state: "KY" },
+  { name: "Hawkeye Automation", type: "Automation", lat: 41.60, lng: -93.61, state: "IA" }
+];
+
+// Target markets (states)
+const targetMarkets = ["48", "39", "18", "13", "47", "37", "45", "26"];
+
+// Color scale
+const colorScale = d3.scaleSequential()
+  .domain([30, 95])
+  .interpolator(d3.interpolateRgbBasis(["#1e3a5f", "#1a5276", "#148f77", "#27ae60", "#2ecc71"]));
+
+// Compute avg score
+const scoreValues = Object.values(stateScores);
+const avgScore = Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length);
+document.getElementById("avg-score-stat").textContent = avgScore;
+
+// State
+let layers = { scores: true, companies: true, targets: true };
+let zoomedState = null;
+
+// Map dimensions
+const mapPanel = document.querySelector('.map-panel');
+
+function render() {
+  const width = mapPanel.clientWidth - 32;
+  const height = Math.max(500, width * 0.62);
+
+  const svg = d3.select("#map-svg")
+    .attr("width", width)
+    .attr("height", height);
+
+  svg.selectAll("*").remove();
+
+  const g = svg.append("g");
+
+  const projection = d3.geoAlbersUsa()
+    .fitSize([width - 20, height - 20], { type: "Sphere" });
+
+  const path = d3.geoPath().projection(projection);
+
+  const tooltip = document.getElementById("tooltip");
+
+  d3.json("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").then(us => {
+    const states = topojson.feature(us, us.objects.states);
+    const stateMap = new Map();
+    states.features.forEach(f => stateMap.set(f.id, f));
+
+    // State name lookup
+    const stateNames = {
+      "01":"Alabama","02":"Alaska","04":"Arizona","05":"Arkansas","06":"California",
+      "08":"Colorado","09":"Connecticut","10":"Delaware","12":"Florida","13":"Georgia",
+      "15":"Hawaii","16":"Idaho","17":"Illinois","18":"Indiana","19":"Iowa",
+      "20":"Kansas","21":"Kentucky","22":"Louisiana","23":"Maine","24":"Maryland",
+      "25":"Massachusetts","26":"Michigan","27":"Minnesota","28":"Mississippi","29":"Missouri",
+      "30":"Montana","31":"Nebraska","32":"Nevada","33":"New Hampshire","34":"New Jersey",
+      "35":"New Mexico","36":"New York","37":"North Carolina","38":"North Dakota","39":"Ohio",
+      "40":"Oklahoma","41":"Oregon","42":"Pennsylvania","44":"Rhode Island","45":"South Carolina",
+      "46":"South Dakota","47":"Tennessee","48":"Texas","49":"Utah","50":"Vermont",
+      "51":"Virginia","53":"Washington","54":"West Virginia","55":"Wisconsin","56":"Wyoming"
+    };
+
+    // Zoom behavior
+    const zoom = d3.zoom()
+      .scaleExtent([1, 8])
+      .on("zoom", (event) => {
+        g.attr("transform", event.transform);
+      });
+
+    svg.call(zoom);
+
+    function resetZoom() {
+      svg.transition().duration(600).call(zoom.transform, d3.zoomIdentity);
+      zoomedState = null;
+      document.getElementById("reset-btn").classList.remove("visible");
+      document.getElementById("state-info").classList.remove("visible");
+    }
+
+    function zoomToState(feature) {
+      const [[x0, y0], [x1, y1]] = path.bounds(feature);
+      const dx = x1 - x0;
+      const dy = y1 - y0;
+      const x = (x0 + x1) / 2;
+      const y = (y0 + y1) / 2;
+      const scale = Math.max(1, Math.min(8, 0.8 / Math.max(dx / width, dy / height)));
+      const translate = [width / 2 - scale * x, height / 2 - scale * y];
+
+      svg.transition().duration(600).call(
+        zoom.transform,
+        d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
+      );
+    }
+
+    // Click background to reset
+    svg.on("click", (event) => {
+      if (event.target === svg.node()) resetZoom();
+    });
+
+    document.getElementById("reset-btn").addEventListener("click", resetZoom);
+
+    // Draw states
+    const stateGroups = g.selectAll("path.state")
+      .data(states.features)
+      .join("path")
+      .attr("class", "state")
+      .attr("d", path)
+      .attr("fill", d => {
+        if (!layers.scores) return "#1e293b";
+        const score = stateScores[d.id];
+        return score ? colorScale(score) : "#1e293b";
+      })
+      .attr("stroke", d => {
+        if (layers.targets && targetMarkets.includes(d.id)) return "#f97316";
+        return "#334155";
+      })
+      .attr("stroke-width", d => {
+        if (layers.targets && targetMarkets.includes(d.id)) return 2;
+        return 0.5;
+      })
+      .attr("cursor", "pointer")
+      .on("mouseenter", function(event, d) {
+        d3.select(this).attr("stroke", "#f1f5f9").attr("stroke-width", 2);
+        const fips = d.id;
+        const name = stateNames[fips] || "Unknown";
+        const score = stateScores[fips] || "N/A";
+        const metrics = getMetrics(fips);
+        tooltip.innerHTML = `
+          <div class="tt-name">${name}</div>
+          <div class="tt-score">${score}</div>
+          <div class="tt-metric"><span class="tt-metric-label">Avg Utility Rate</span><span>${metrics.utility}</span></div>
+          <div class="tt-metric"><span class="tt-metric-label">Avg Labor Cost</span><span>${metrics.labor}</span></div>
+          <div class="tt-metric"><span class="tt-metric-label">Incentive Level</span><span>${metrics.incentive}</span></div>
+        `;
+        tooltip.style.opacity = 1;
+      })
+      .on("mousemove", function(event) {
+        const rect = mapPanel.getBoundingClientRect();
+        tooltip.style.left = (event.clientX - rect.left + 16) + "px";
+        tooltip.style.top = (event.clientY - rect.top - 10) + "px";
+      })
+      .on("mouseleave", function(event, d) {
+        const fips = d.id;
+        d3.select(this)
+          .attr("stroke", layers.targets && targetMarkets.includes(fips) ? "#f97316" : "#334155")
+          .attr("stroke-width", layers.targets && targetMarkets.includes(fips) ? 2 : 0.5);
+        tooltip.style.opacity = 0;
+      })
+      .on("click", function(event, d) {
+        event.stopPropagation();
+        const fips = d.id;
+        const name = stateNames[fips] || "Unknown";
+        const score = stateScores[fips] || 0;
+        const metrics = getMetrics(fips);
+        zoomedState = fips;
+        zoomToState(d);
+        document.getElementById("reset-btn").classList.add("visible");
+
+        // Show state info
+        const infoPanel = document.getElementById("state-info");
+        infoPanel.classList.add("visible");
+
+        const stateAbbrevs = {
+          "01":"AL","02":"AK","04":"AZ","05":"AR","06":"CA","08":"CO","09":"CT","10":"DE",
+          "12":"FL","13":"GA","15":"HI","16":"ID","17":"IL","18":"IN","19":"IA","20":"KS",
+          "21":"KY","22":"LA","23":"ME","24":"MD","25":"MA","26":"MI","27":"MN","28":"MS",
+          "29":"MO","30":"MT","31":"NE","32":"NV","33":"NH","34":"NJ","35":"NM","36":"NY",
+          "37":"NC","38":"ND","39":"OH","40":"OK","41":"OR","42":"PA","44":"RI","45":"SC",
+          "46":"SD","47":"TN","48":"TX","49":"UT","50":"VT","51":"VA","53":"WA","54":"WV",
+          "55":"WI","56":"WY"
+        };
+
+        const abbrev = stateAbbrevs[fips];
+        const stateCompanies = portfolioCompanies.filter(c => c.state === abbrev);
+
+        let html = `
+          <div style="text-align:center;margin-bottom:12px;">
+            <div class="state-name">${name}</div>
+            <div class="state-score-big">${score}</div>
+            <div class="state-score-label">Location Score</div>
+          </div>
+          <div class="metric-row"><span class="metric-label">Utility Rate</span><span class="metric-value">${metrics.utility}</span></div>
+          <div class="metric-row"><span class="metric-label">Labor Cost</span><span class="metric-value">${metrics.labor}</span></div>
+          <div class="metric-row"><span class="metric-label">Incentive Level</span><span class="metric-value">${metrics.incentive}</span></div>
+          <div class="metric-row"><span class="metric-label">Target Market</span><span class="metric-value">${targetMarkets.includes(fips) ? 'Yes' : 'No'}</span></div>
+        `;
+
+        if (stateCompanies.length > 0) {
+          html += `<div class="companies-list"><h3 style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin:12px 0 8px;">Portfolio Companies (${stateCompanies.length})</h3>`;
+          stateCompanies.forEach(c => {
+            html += `<div class="company-item"><div class="co-name">${c.name}</div><div class="co-type">${c.type}</div></div>`;
+          });
+          html += `</div>`;
+        } else {
+          html += `<div style="margin-top:12px;font-size:12px;color:#94a3b8;">No portfolio companies in this state.</div>`;
+        }
+
+        document.getElementById("state-details").innerHTML = html;
+      });
+
+    // Portfolio company markers
+    if (layers.companies) {
+      const companyGroup = g.append("g").attr("class", "companies-layer");
+
+      portfolioCompanies.forEach(c => {
+        const coords = projection([c.lng, c.lat]);
+        if (!coords) return;
+
+        // Outer ring
+        companyGroup.append("circle")
+          .attr("cx", coords[0])
+          .attr("cy", coords[1])
+          .attr("r", 8)
+          .attr("fill", "none")
+          .attr("stroke", "#6366f1")
+          .attr("stroke-width", 1.5)
+          .attr("opacity", 0.6);
+
+        // Inner dot
+        companyGroup.append("circle")
+          .attr("cx", coords[0])
+          .attr("cy", coords[1])
+          .attr("r", 4)
+          .attr("fill", "#6366f1")
+          .attr("stroke", "#0f172a")
+          .attr("stroke-width", 1)
+          .attr("cursor", "pointer")
+          .on("mouseenter", function(event) {
+            d3.select(this).attr("r", 6).attr("fill", "#818cf8");
+            const rect = mapPanel.getBoundingClientRect();
+            tooltip.innerHTML = `
+              <div class="tt-name">${c.name}</div>
+              <div style="font-size:12px;color:#94a3b8;margin-bottom:4px;">${c.type}</div>
+              <div class="tt-metric"><span class="tt-metric-label">State</span><span>${c.state}</span></div>
+              <div class="tt-metric"><span class="tt-metric-label">Lat/Lng</span><span>${c.lat.toFixed(2)}, ${c.lng.toFixed(2)}</span></div>
+            `;
+            tooltip.style.opacity = 1;
+            tooltip.style.left = (event.clientX - rect.left + 16) + "px";
+            tooltip.style.top = (event.clientY - rect.top - 10) + "px";
+          })
+          .on("mouseleave", function() {
+            d3.select(this).attr("r", 4).attr("fill", "#6366f1");
+            tooltip.style.opacity = 0;
+          });
+      });
+    }
+
+    // Target market pulsing borders already handled via state stroke above
+    // Add small "target" diamond markers in target states
+    if (layers.targets) {
+      const targetGroup = g.append("g").attr("class", "targets-layer");
+
+      targetMarkets.forEach(fips => {
+        const feature = stateMap.get(fips);
+        if (!feature) return;
+        const centroid = path.centroid(feature);
+        if (!centroid || isNaN(centroid[0])) return;
+
+        targetGroup.append("path")
+          .attr("d", d3.symbol().type(d3.symbolDiamond).size(60))
+          .attr("transform", `translate(${centroid[0]},${centroid[1]})`)
+          .attr("fill", "#f97316")
+          .attr("opacity", 0.8)
+          .attr("stroke", "#0f172a")
+          .attr("stroke-width", 0.5);
+      });
+    }
+  });
+}
+
+// Legend gradient
+const canvas = document.createElement("canvas");
+canvas.width = 240;
+canvas.height = 1;
+const ctx = canvas.getContext("2d");
+for (let i = 0; i < 240; i++) {
+  const val = 30 + (i / 240) * 65;
+  ctx.fillStyle = colorScale(val);
+  ctx.fillRect(i, 0, 1, 1);
+}
+const gradEl = document.getElementById("legend-gradient");
+gradEl.style.background = `url(${canvas.toDataURL()})`;
+gradEl.style.backgroundSize = "100% 100%";
+
+// Toggle handlers
+document.querySelectorAll(".toggle-row").forEach(row => {
+  row.addEventListener("click", () => {
+    const layer = row.dataset.layer;
+    layers[layer] = !layers[layer];
+    const sw = row.querySelector(".toggle-switch");
+    sw.classList.toggle("active", layers[layer]);
+    render();
+  });
+});
+
+window.addEventListener("resize", render);
+render();
+</script>
+</body>
+</html>
