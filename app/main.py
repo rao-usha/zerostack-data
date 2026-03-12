@@ -368,6 +368,23 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Failed to register stale job recovery: {e}")
 
+        # Register auto-cancel for jobs stuck pending with no worker (every 30 min)
+        try:
+            from app.core.job_queue_service import cancel_stale_pending_jobs
+            from app.core.scheduler_service import get_scheduler
+
+            sched = get_scheduler()
+            sched.add_job(
+                cancel_stale_pending_jobs,
+                "interval",
+                minutes=30,
+                id="cancel_stale_pending_jobs",
+                replace_existing=True,
+            )
+            logger.info("Stale pending job auto-cancel registered (every 30 min, >4h threshold)")
+        except Exception as e:
+            logger.warning(f"Failed to register stale pending job cancel: {e}")
+
         # Automatic batch collection — runs daily at 2:00 AM UTC
         try:
             from app.core.nightly_batch_service import scheduled_nightly_batch

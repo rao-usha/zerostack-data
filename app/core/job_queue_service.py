@@ -141,6 +141,67 @@ def reset_stale_jobs(max_age_minutes: int = 2) -> int:
         db.close()
 
 
+def cancel_stale_pending_jobs(max_age_hours: int = 4) -> int:
+    """
+    Cancel pending/blocked jobs that have been waiting too long with no worker.
+
+    Jobs older than max_age_hours that are still PENDING or BLOCKED and have
+    never been claimed are cancelled with reason "no_worker_available".
+    This prevents batches from being stuck indefinitely when no worker is running.
+
+    Called every 30 minutes by the scheduler.
+
+    Returns:
+        Number of jobs cancelled
+    """
+    from app.core.database import get_session_factory
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+
+    try:
+        cutoff = datetime.utcnow() - timedelta(hours=max_age_hours)
+
+        # Only cancel jobs that have never been claimed (worker_id IS NULL)
+        # and are old enough
+        stale = (
+            db.query(JobQueue)
+            .filter(
+                JobQueue.status.in_([
+                    QueueJobStatus.PENDING,
+                    QueueJobStatus.BLOCKED,
+                ]),
+                JobQueue.worker_id.is_(None),
+                JobQueue.created_at < cutoff,
+            )
+            .all()
+        )
+
+        count = 0
+        for job in stale:
+            logger.warning(
+                f"Auto-cancelling stale job {job.id} (type={job.job_type}, "
+                f"status={job.status}, created={job.created_at}, "
+                f"age_hours={(datetime.utcnow() - job.created_at).total_seconds() / 3600:.1f})"
+            )
+            job.status = QueueJobStatus.FAILED
+            job.error_message = "no_worker_available: job pending too long with no worker"
+            job.completed_at = datetime.utcnow()
+            count += 1
+
+        if count:
+            db.commit()
+            logger.info(f"Auto-cancelled {count} stale pending/blocked job(s)")
+
+        return count
+    except Exception as e:
+        logger.error(f"Error cancelling stale pending jobs: {e}")
+        db.rollback()
+        return 0
+    finally:
+        db.close()
+
+
 def promote_blocked_jobs(db: Session, batch_id: str) -> int:
     """
     Promote BLOCKED → PENDING for the next eligible tier in a batch.
