@@ -1519,3 +1519,30 @@ def build_scatter_chart_config(
             },
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Leaflet.js Map Helpers
+# ---------------------------------------------------------------------------
+
+LEAFLET_CSS_CDN = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+LEAFLET_JS_CDN = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+MARKER_CLUSTER_CSS_CDN = "https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
+MARKER_CLUSTER_DEFAULT_CSS_CDN = "https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"
+MARKER_CLUSTER_JS_CDN = "https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"
+
+
+def leaflet_head() -> str:
+    """Return <link> and <script> tags for Leaflet 1.9.4 + MarkerCluster plugin."""
+    return (
+        f'<link rel="stylesheet" href="{LEAFLET_CSS_CDN}" />\n'
+        f'<link rel="stylesheet" href="{MARKER_CLUSTER_CSS_CDN}" />\n'
+        f'<link rel="stylesheet" href="{MARKER_CLUSTER_DEFAULT_CSS_CDN}" />\n'
+        f'<script src="{LEAFLET_JS_CDN}"></script>\n'
+        f'<script src="{MARKER_CLUSTER_JS_CDN}"></script>'
+    )
+
+
+def map_container(map_id: str = "map", height: str = "600px") -> str:
+    """Return a styled <div> for a Leaflet map."""
+    return f'<div id="{_esc(map_id)}" style="width:100%;height:{_esc(height)};border-radius:10px;"></div>'

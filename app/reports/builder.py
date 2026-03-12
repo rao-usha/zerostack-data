@@ -18,6 +18,7 @@ from app.reports.templates.data_quality import DataQualityTemplate
 from app.reports.templates.data_quality_deep import DataQualityDeepTemplate
 from app.reports.templates.medspa_market import MedSpaMarketTemplate
 from app.reports.templates.datacenter_site import DatacenterSiteTemplate
+from app.reports.templates.medspa_opportunity_map import MedSpaOpportunityMapTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ class ReportBuilder:
             "data_quality_deep": DataQualityDeepTemplate(),
             "medspa_market": MedSpaMarketTemplate(),
             "datacenter_site": DatacenterSiteTemplate(),
+            "medspa_opportunity_map": MedSpaOpportunityMapTemplate(),
         }
         self._ensure_table()
 
