@@ -22,6 +22,7 @@ from app.core.models import (
     RuleSeverity,
     IngestionJob,
 )
+from app.core.safe_sql import qi, safe_operator, safe_int
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +73,9 @@ def evaluate_range_rule(
     # Build query to check range violations
     conditions = []
     if min_val is not None:
-        conditions.append(f'"{column_name}" < :min_val')
+        conditions.append(f'{qi(column_name)} < :min_val')
     if max_val is not None:
-        conditions.append(f'"{column_name}" > :max_val')
+        conditions.append(f'{qi(column_name)} > :max_val')
 
     if not conditions:
         return RuleEvaluationResult(
@@ -90,8 +91,8 @@ def evaluate_range_rule(
     query = text(f"""
         SELECT COUNT(*) as total,
                SUM(CASE WHEN {where_clause} THEN 1 ELSE 0 END) as violations
-        FROM "{table_name}"
-        WHERE "{column_name}" IS NOT NULL
+        FROM {qi(table_name)}
+        WHERE {qi(column_name)} IS NOT NULL
     """)
 
     try:
@@ -112,7 +113,7 @@ def evaluate_range_rule(
         sample_failures = None
         if violations > 0:
             sample_query = text(f"""
-                SELECT "{column_name}" FROM "{table_name}"
+                SELECT {qi(column_name)} FROM {qi(table_name)}
                 WHERE {where_clause}
                 LIMIT 5
             """)
@@ -158,8 +159,8 @@ def evaluate_not_null_rule(
 
     query = text(f"""
         SELECT COUNT(*) as total,
-               SUM(CASE WHEN "{column_name}" IS NULL THEN 1 ELSE 0 END) as nulls
-        FROM "{table_name}"
+               SUM(CASE WHEN {qi(column_name)} IS NULL THEN 1 ELSE 0 END) as nulls
+        FROM {qi(table_name)}
     """)
 
     try:
@@ -207,9 +208,9 @@ def evaluate_unique_rule(
 
     query = text(f"""
         SELECT COUNT(*) as total,
-               COUNT(DISTINCT "{column_name}") as unique_count
-        FROM "{table_name}"
-        WHERE "{column_name}" IS NOT NULL
+               COUNT(DISTINCT {qi(column_name)}) as unique_count
+        FROM {qi(table_name)}
+        WHERE {qi(column_name)} IS NOT NULL
     """)
 
     try:
@@ -224,10 +225,10 @@ def evaluate_unique_rule(
         sample_failures = None
         if duplicates > 0:
             dup_query = text(f"""
-                SELECT "{column_name}", COUNT(*) as cnt
-                FROM "{table_name}"
-                WHERE "{column_name}" IS NOT NULL
-                GROUP BY "{column_name}"
+                SELECT {qi(column_name)}, COUNT(*) as cnt
+                FROM {qi(table_name)}
+                WHERE {qi(column_name)} IS NOT NULL
+                GROUP BY {qi(column_name)}
                 HAVING COUNT(*) > 1
                 LIMIT 5
             """)
@@ -278,7 +279,7 @@ def evaluate_row_count_rule(
     min_rows = params.get("min")
     max_rows = params.get("max")
 
-    query = text(f'SELECT COUNT(*) FROM "{table_name}"')
+    query = text(f'SELECT COUNT(*) FROM {qi(table_name)}')
 
     try:
         result = db.execute(query).fetchone()
@@ -350,9 +351,9 @@ def evaluate_enum_rule(
     placeholders = ", ".join([f":val_{i}" for i in range(len(allowed))])
     query = text(f"""
         SELECT COUNT(*) as total,
-               SUM(CASE WHEN "{column_name}" NOT IN ({placeholders}) THEN 1 ELSE 0 END) as violations
-        FROM "{table_name}"
-        WHERE "{column_name}" IS NOT NULL
+               SUM(CASE WHEN {qi(column_name)} NOT IN ({placeholders}) THEN 1 ELSE 0 END) as violations
+        FROM {qi(table_name)}
+        WHERE {qi(column_name)} IS NOT NULL
     """)
 
     try:
@@ -367,9 +368,9 @@ def evaluate_enum_rule(
         sample_failures = None
         if violations > 0:
             sample_query = text(f"""
-                SELECT DISTINCT "{column_name}" FROM "{table_name}"
-                WHERE "{column_name}" IS NOT NULL
-                  AND "{column_name}" NOT IN ({placeholders})
+                SELECT DISTINCT {qi(column_name)} FROM {qi(table_name)}
+                WHERE {qi(column_name)} IS NOT NULL
+                  AND {qi(column_name)} NOT IN ({placeholders})
                 LIMIT 5
             """)
             samples = db.execute(sample_query, bind_params).fetchall()
@@ -435,8 +436,8 @@ def evaluate_freshness_rule(
     cutoff_time = datetime.utcnow() - timedelta(hours=max_age_hours)
 
     query = text(f"""
-        SELECT MAX("{column_name}") as latest
-        FROM "{table_name}"
+        SELECT MAX({qi(column_name)}) as latest
+        FROM {qi(table_name)}
     """)
 
     try:
@@ -512,8 +513,8 @@ def evaluate_regex_rule(
 
     # Fetch values and check with Python regex (more portable than DB-specific regex)
     query = text(f"""
-        SELECT "{column_name}" FROM "{table_name}"
-        WHERE "{column_name}" IS NOT NULL
+        SELECT {qi(column_name)} FROM {qi(table_name)}
+        WHERE {qi(column_name)} IS NOT NULL
     """)
 
     try:
@@ -618,12 +619,12 @@ def evaluate_custom_sql_rule(
         )
 
     # Substitute {table} placeholder
-    sql = condition.replace("{table}", f'"{table_name}"')
+    sql = condition.replace("{table}", qi(table_name))
 
     try:
         # Set statement timeout and read-only transaction
         db.execute(
-            text(f"SET LOCAL statement_timeout = '{timeout_seconds * 1000}'")
+            text(f"SET LOCAL statement_timeout = '{safe_int(timeout_seconds, 'timeout_seconds') * 1000}'")
         )
         result = db.execute(text(sql)).fetchone()
 
@@ -683,14 +684,13 @@ def evaluate_comparison_rule(
     operator = params.get("operator")
     compare_column = params.get("compare_column")
 
-    valid_operators = {"<", ">", "<=", ">=", "=", "!="}
-    if not operator or operator not in valid_operators:
+    if not operator or operator not in ALLOWED_OPERATORS:
         return RuleEvaluationResult(
             rule_id=rule.id,
             rule_name=rule.name,
             passed=False,
             severity=rule.severity,
-            message=f"Invalid or missing operator. Must be one of: {valid_operators}",
+            message=f"Invalid or missing operator. Must be one of: {ALLOWED_OPERATORS}",
             execution_time_ms=int((time.time() - start_time) * 1000),
         )
 
@@ -707,9 +707,9 @@ def evaluate_comparison_rule(
     # Count rows where the comparison is NOT true (both columns non-null)
     query = text(f"""
         SELECT COUNT(*) as total,
-               SUM(CASE WHEN NOT ("{column_name}" {operator} "{compare_column}") THEN 1 ELSE 0 END) as violations
-        FROM "{table_name}"
-        WHERE "{column_name}" IS NOT NULL AND "{compare_column}" IS NOT NULL
+               SUM(CASE WHEN NOT ({qi(column_name)} {safe_operator(operator)} {qi(compare_column)}) THEN 1 ELSE 0 END) as violations
+        FROM {qi(table_name)}
+        WHERE {qi(column_name)} IS NOT NULL AND {qi(compare_column)} IS NOT NULL
     """)
 
     try:
@@ -723,10 +723,10 @@ def evaluate_comparison_rule(
         sample_failures = None
         if violations > 0:
             sample_query = text(f"""
-                SELECT "{column_name}", "{compare_column}"
-                FROM "{table_name}"
-                WHERE "{column_name}" IS NOT NULL AND "{compare_column}" IS NOT NULL
-                  AND NOT ("{column_name}" {operator} "{compare_column}")
+                SELECT {qi(column_name)}, {qi(compare_column)}
+                FROM {qi(table_name)}
+                WHERE {qi(column_name)} IS NOT NULL AND {qi(compare_column)} IS NOT NULL
+                  AND NOT ({qi(column_name)} {safe_operator(operator)} {qi(compare_column)})
                 LIMIT 5
             """)
             samples = db.execute(sample_query).fetchall()
@@ -1224,7 +1224,7 @@ def evaluate_all_rules(db: Session) -> Dict[str, Any]:
                 continue
 
             db.execute(
-                text(f"SET LOCAL statement_timeout = '{RULE_TIMEOUT_S * 1000}'")
+                text(f"SET LOCAL statement_timeout = '{safe_int(RULE_TIMEOUT_S, 'RULE_TIMEOUT_S') * 1000}'")
             )
             eval_result = evaluate_rule(db, rule, table_name)
             total_evaluations += 1
@@ -1390,9 +1390,9 @@ def check_date_gaps(db: Session, table_name: str, date_column: str, job_id: int)
     try:
         result = db.execute(text(f"""
             WITH months AS (
-                SELECT DISTINCT date_trunc('month', "{date_column}"::timestamp) as m
-                FROM "{table_name}"
-                WHERE "{date_column}" IS NOT NULL
+                SELECT DISTINCT date_trunc('month', {qi(date_column)}::timestamp) as m
+                FROM {qi(table_name)}
+                WHERE {qi(date_column)} IS NOT NULL
                 ORDER BY m
             ),
             gaps AS (

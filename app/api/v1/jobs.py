@@ -13,6 +13,7 @@ from app.core.database import get_db
 from app.core.models import IngestionJob, IngestionSchedule, JobStatus, BatchTierConfig
 from app.core.schemas import JobCreate, JobResponse, BackfillRequest
 from app.core.config import get_settings, MissingCensusAPIKeyError
+from app.core.safe_sql import qi
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +98,8 @@ SOURCE_DISPATCH: Dict[str, Tuple[str, str, List[str]]] = {
     # ── Prediction Markets ────────────────────────────────────────────────
     "prediction_markets": (
         "app.sources.prediction_markets.ingest",
-        "create_job",
-        ["job_type", "target_platforms", "target_categories"],
+        "monitor_all_platforms",
+        ["kalshi_categories", "limit_per_platform"],
     ),
     # ── EIA ───────────────────────────────────────────────────────────────
     "eia": (
@@ -668,7 +669,7 @@ async def _run_quality_gate(db, job: IngestionJob):
             from app.core.data_quality_service import check_row_count_delta
             from sqlalchemy import text as sa_text
 
-            count_result = db.execute(sa_text(f'SELECT COUNT(*) FROM "{registry.table_name}"'))
+            count_result = db.execute(sa_text(f'SELECT COUNT(*) FROM {qi(registry.table_name)}'))
             current_count = count_result.scalar()
             check_row_count_delta(db, job, registry.table_name, current_count)
         except Exception as ce:
@@ -826,12 +827,15 @@ async def _run_dispatched_job(db, job, job_id, source, config, monitoring):
     """Run a job via the SOURCE_DISPATCH registry."""
     from datetime import datetime
 
-    # Resolve dispatch key: try "source:dataset" first, then "source"
+    # Strip split suffix (e.g. "cms:split_0" → "cms") for dispatch lookup
+    base_source = source.split(":split_")[0] if ":split_" in source else source
+
+    # Resolve dispatch key: try "source:dataset" first, then base source
     dataset = config.get("dataset") if config else None
     dispatch_key = (
-        f"{source}:{dataset}"
-        if dataset and f"{source}:{dataset}" in SOURCE_DISPATCH
-        else source
+        f"{base_source}:{dataset}"
+        if dataset and f"{base_source}:{dataset}" in SOURCE_DISPATCH
+        else base_source
     )
     module_path, func_name, config_keys = SOURCE_DISPATCH[dispatch_key]
 
@@ -855,7 +859,13 @@ async def _run_dispatched_job(db, job, job_id, source, config, monitoring):
             kwargs[key] = val
 
     try:
-        result = await func(db=db, job_id=job_id, **kwargs)
+        # Pass job_id only if the function accepts it
+        import inspect
+        sig = inspect.signature(func)
+        if "job_id" in sig.parameters:
+            result = await func(db=db, job_id=job_id, **kwargs)
+        else:
+            result = await func(db=db, **kwargs)
 
         # Update job with success
         job.status = JobStatus.SUCCESS
@@ -911,14 +921,10 @@ async def _run_census_job(db, job, job_id, config, monitoring):
     geo_level = config.get("geo_level", "state")
     geo_filter = config.get("geo_filter")
 
-    if not year or not table_id:
-        await _handle_job_failure(
-            db,
-            job,
-            "Missing required config: 'year' and 'table_id' are required",
-            "ValidationError",
-        )
-        return
+    if not year:
+        year = 2023  # Latest full ACS5 release
+    if not table_id:
+        table_id = "B01001"  # Total population by sex/age — most commonly used
 
     try:
         include_geojson = config.get("include_geojson", False)
@@ -1107,7 +1113,7 @@ async def run_ingestion_job(job_id: int, source: str, config: dict):
 
         elif source in SOURCE_DISPATCH or any(
             k.startswith(f"{source}:") for k in SOURCE_DISPATCH
-        ):
+        ) or (":split_" in source and source.split(":split_")[0] in SOURCE_DISPATCH):
             await _run_dispatched_job(db, job, job_id, source, config, monitoring)
 
         else:

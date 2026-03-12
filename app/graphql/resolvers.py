@@ -8,6 +8,8 @@ from typing import Optional, List
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.safe_sql import safe_int
+
 from app.graphql.types import (
     LPFundType,
     FamilyOfficeType,
@@ -545,6 +547,7 @@ def resolve_top_movers(
 
     # Can't use interval with parameter directly in some PostgreSQL versions
     # Use a workaround
+    safe_days = safe_int(days, "days")
     query = text(f"""
         SELECT pc.investor_id, pc.investor_type, pc.company_name,
                pc.collected_date,
@@ -557,7 +560,7 @@ def resolve_top_movers(
                    ELSE (SELECT name FROM family_offices WHERE id = pc.investor_id)
                END as investor_name
         FROM portfolio_companies pc
-        WHERE pc.collected_date >= NOW() - INTERVAL '{days} days'
+        WHERE pc.collected_date >= NOW() - INTERVAL '{safe_days} days'
         ORDER BY pc.collected_date DESC
         LIMIT :limit
     """)

@@ -18,6 +18,7 @@ from app.sources.vertical_discovery.configs import (
     SATURATION_THRESHOLDS,
     VerticalConfig,
 )
+from app.core.safe_sql import qi
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ class VerticalEnrichmentPipeline:
         # Load prospects
         where = "1=1" if force else "nppes_enriched_at IS NULL"
         prospects = self._safe_query(
-            f"SELECT yelp_id, name, address, zip_code, state FROM {t} WHERE {where}", {}
+            f"SELECT yelp_id, name, address, zip_code, state FROM {qi(t)} WHERE {where}", {}
         )
         if not prospects:
             return {"enriched": 0, "note": "No prospects to enrich"}
@@ -138,7 +139,7 @@ class VerticalEnrichmentPipeline:
         try:
             self.db.execute(
                 text(f"""
-                    UPDATE {t} SET
+                    UPDATE {qi(t)} SET
                         has_physician_oversight = true,
                         nppes_provider_count = :cnt,
                         nppes_match_confidence = :conf,
@@ -162,7 +163,7 @@ class VerticalEnrichmentPipeline:
         try:
             self.db.execute(
                 text(f"""
-                    UPDATE {t} SET
+                    UPDATE {qi(t)} SET
                         nppes_provider_count = :cnt,
                         nppes_match_confidence = 0.30,
                         nppes_enriched_at = NOW()
@@ -184,14 +185,14 @@ class VerticalEnrichmentPipeline:
         where = "1=1" if force else "density_enriched_at IS NULL"
 
         prospects = self._safe_query(
-            f"SELECT yelp_id, zip_code FROM {t} WHERE {where}", {}
+            f"SELECT yelp_id, zip_code FROM {qi(t)} WHERE {where}", {}
         )
         if not prospects:
             return {"enriched": 0}
 
         # Get competitor counts per ZIP
         zip_counts = self._safe_query(
-            f"SELECT zip_code, COUNT(*) AS cnt FROM {t} GROUP BY zip_code", {}
+            f"SELECT zip_code, COUNT(*) AS cnt FROM {qi(t)} GROUP BY zip_code", {}
         )
         count_map = {r["zip_code"]: r["cnt"] for r in zip_counts}
 
@@ -227,7 +228,7 @@ class VerticalEnrichmentPipeline:
             try:
                 self.db.execute(
                     text(f"""
-                        UPDATE {t} SET
+                        UPDATE {qi(t)} SET
                             zip_total_filers = :filers,
                             businesses_per_10k_filers = :per10k,
                             market_saturation_index = :cat,
@@ -266,7 +267,7 @@ class VerticalEnrichmentPipeline:
             f"""SELECT yelp_id, price, review_count, rating,
                        zip_avg_agi, competitor_count_in_zip,
                        has_physician_oversight
-                FROM {t} WHERE {where}""",
+                FROM {qi(t)} WHERE {where}""",
             {},
         )
         if not prospects:
@@ -322,7 +323,7 @@ class VerticalEnrichmentPipeline:
             try:
                 self.db.execute(
                     text(f"""
-                        UPDATE {t} SET
+                        UPDATE {qi(t)} SET
                             estimated_annual_revenue = :rev,
                             revenue_estimate_low = :low,
                             revenue_estimate_high = :high,

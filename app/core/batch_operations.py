@@ -14,6 +14,8 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
+from app.core.safe_sql import qi
+
 logger = logging.getLogger(__name__)
 
 
@@ -228,7 +230,7 @@ def batch_insert_with_returning(
         conflict_columns=conflict_columns,
         update_columns=update_columns,
     )
-    returning_clause = f" RETURNING {', '.join(returning_columns)}"
+    returning_clause = f" RETURNING {', '.join(qi(c) for c in returning_columns)}"
     sql = base_sql + returning_clause
 
     total_rows = len(rows)
@@ -275,18 +277,18 @@ def _build_insert_sql(
     Returns:
         SQL string with :param placeholders
     """
-    # Column list
-    cols = ", ".join(columns)
+    # Column list (validated and quoted)
+    cols = ", ".join(qi(c) for c in columns)
 
     # Value placeholders (:column_name)
     values = ", ".join(f":{col}" for col in columns)
 
     # Basic INSERT
-    sql = f"INSERT INTO {table_name} ({cols}) VALUES ({values})"
+    sql = f"INSERT INTO {qi(table_name)} ({cols}) VALUES ({values})"
 
     # Add ON CONFLICT if specified
     if conflict_columns:
-        conflict_cols = ", ".join(conflict_columns)
+        conflict_cols = ", ".join(qi(c) for c in conflict_columns)
 
         # Determine update columns (all non-conflict columns by default)
         if update_columns is None:
@@ -294,7 +296,7 @@ def _build_insert_sql(
 
         if update_columns:
             # Build SET clause with EXCLUDED
-            set_clause = ", ".join(f"{col} = EXCLUDED.{col}" for col in update_columns)
+            set_clause = ", ".join(f"{qi(col)} = EXCLUDED.{qi(col)}" for col in update_columns)
             sql += f" ON CONFLICT ({conflict_cols}) DO UPDATE SET {set_clause}"
         else:
             # No columns to update, just ignore conflicts

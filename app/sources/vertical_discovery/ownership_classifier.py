@@ -23,6 +23,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.sources.vertical_discovery.configs import VerticalConfig
+from app.core.safe_sql import qi
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ class VerticalOwnershipClassifier:
 
         where = "1=1" if force else "classified_at IS NULL"
         prospects = self._safe_query(
-            f"SELECT yelp_id, name, phone, acquisition_score FROM {t} WHERE {where}",
+            f"SELECT yelp_id, name, phone, acquisition_score FROM {qi(t)} WHERE {where}",
             {},
         )
         if not prospects:
@@ -226,7 +227,7 @@ class VerticalOwnershipClassifier:
             try:
                 self.db.execute(
                     text(f"""
-                        UPDATE {t} SET
+                        UPDATE {qi(t)} SET
                             ownership_type = :otype,
                             parent_entity = :parent,
                             location_count = :lcount,

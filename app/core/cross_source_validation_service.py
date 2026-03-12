@@ -18,6 +18,7 @@ from app.core.models import (
     DQCrossSourceResult,
     RuleSeverity,
 )
+from app.core.safe_sql import qi
 
 logger = logging.getLogger(__name__)
 
@@ -66,20 +67,20 @@ def run_fips_validation(db: Session, config: Dict[str, Any]) -> Dict[str, Any]:
 
     # Count distinct values on each side
     left_count = db.execute(
-        text(f'SELECT COUNT(DISTINCT "{left_col}") FROM "{left_table}" WHERE "{left_col}" IS NOT NULL')
+        text(f'SELECT COUNT(DISTINCT {qi(left_col)}) FROM {qi(left_table)} WHERE {qi(left_col)} IS NOT NULL')
     ).scalar() or 0
 
     right_count = db.execute(
-        text(f'SELECT COUNT(DISTINCT "{right_col}") FROM "{right_table}" WHERE "{right_col}" IS NOT NULL')
+        text(f'SELECT COUNT(DISTINCT {qi(right_col)}) FROM {qi(right_table)} WHERE {qi(right_col)} IS NOT NULL')
     ).scalar() or 0
 
     # Count matches
     matched = db.execute(
         text(f"""
-            SELECT COUNT(DISTINCT l."{left_col}")
-            FROM "{left_table}" l
-            INNER JOIN "{right_table}" r ON l."{left_col}" = r."{right_col}"
-            WHERE l."{left_col}" IS NOT NULL
+            SELECT COUNT(DISTINCT l.{qi(left_col)})
+            FROM {qi(left_table)} l
+            INNER JOIN {qi(right_table)} r ON l.{qi(left_col)} = r.{qi(right_col)}
+            WHERE l.{qi(left_col)} IS NOT NULL
         """)
     ).scalar() or 0
 
@@ -91,10 +92,10 @@ def run_fips_validation(db: Session, config: Dict[str, Any]) -> Dict[str, Any]:
     # Sample orphans from left side
     sample_orphans_rows = db.execute(
         text(f"""
-            SELECT DISTINCT l."{left_col}"
-            FROM "{left_table}" l
-            LEFT JOIN "{right_table}" r ON l."{left_col}" = r."{right_col}"
-            WHERE r."{right_col}" IS NULL AND l."{left_col}" IS NOT NULL
+            SELECT DISTINCT l.{qi(left_col)}
+            FROM {qi(left_table)} l
+            LEFT JOIN {qi(right_table)} r ON l.{qi(left_col)} = r.{qi(right_col)}
+            WHERE r.{qi(right_col)} IS NULL AND l.{qi(left_col)} IS NOT NULL
             LIMIT 10
         """)
     ).fetchall()
@@ -141,19 +142,19 @@ def run_identifier_validation(db: Session, config: Dict[str, Any]) -> Dict[str, 
         }
 
     left_count = db.execute(
-        text(f'SELECT COUNT(DISTINCT "{left_col}") FROM "{left_table}" WHERE "{left_col}" IS NOT NULL')
+        text(f'SELECT COUNT(DISTINCT {qi(left_col)}) FROM {qi(left_table)} WHERE {qi(left_col)} IS NOT NULL')
     ).scalar() or 0
 
     right_count = db.execute(
-        text(f'SELECT COUNT(DISTINCT "{right_col}") FROM "{right_table}" WHERE "{right_col}" IS NOT NULL')
+        text(f'SELECT COUNT(DISTINCT {qi(right_col)}) FROM {qi(right_table)} WHERE {qi(right_col)} IS NOT NULL')
     ).scalar() or 0
 
     matched = db.execute(
         text(f"""
-            SELECT COUNT(DISTINCT l."{left_col}")
-            FROM "{left_table}" l
-            INNER JOIN "{right_table}" r ON l."{left_col}"::text = r."{right_col}"::text
-            WHERE l."{left_col}" IS NOT NULL
+            SELECT COUNT(DISTINCT l.{qi(left_col)})
+            FROM {qi(left_table)} l
+            INNER JOIN {qi(right_table)} r ON l.{qi(left_col)}::text = r.{qi(right_col)}::text
+            WHERE l.{qi(left_col)} IS NOT NULL
         """)
     ).scalar() or 0
 
@@ -164,10 +165,10 @@ def run_identifier_validation(db: Session, config: Dict[str, Any]) -> Dict[str, 
 
     sample_orphans_rows = db.execute(
         text(f"""
-            SELECT DISTINCT l."{left_col}"::text
-            FROM "{left_table}" l
-            LEFT JOIN "{right_table}" r ON l."{left_col}"::text = r."{right_col}"::text
-            WHERE r."{right_col}" IS NULL AND l."{left_col}" IS NOT NULL
+            SELECT DISTINCT l.{qi(left_col)}::text
+            FROM {qi(left_table)} l
+            LEFT JOIN {qi(right_table)} r ON l.{qi(left_col)}::text = r.{qi(right_col)}::text
+            WHERE r.{qi(right_col)} IS NULL AND l.{qi(left_col)} IS NOT NULL
             LIMIT 10
         """)
     ).fetchall()
@@ -215,19 +216,19 @@ def run_geo_coherence_validation(db: Session, config: Dict[str, Any]) -> Dict[st
 
     # Compare state/FIPS values
     left_count = db.execute(
-        text(f'SELECT COUNT(DISTINCT "{left_col}") FROM "{left_table}" WHERE "{left_col}" IS NOT NULL')
+        text(f'SELECT COUNT(DISTINCT {qi(left_col)}) FROM {qi(left_table)} WHERE {qi(left_col)} IS NOT NULL')
     ).scalar() or 0
 
     right_count = db.execute(
-        text(f'SELECT COUNT(DISTINCT "{right_col}") FROM "{right_table}" WHERE "{right_col}" IS NOT NULL')
+        text(f'SELECT COUNT(DISTINCT {qi(right_col)}) FROM {qi(right_table)} WHERE {qi(right_col)} IS NOT NULL')
     ).scalar() or 0
 
     matched = db.execute(
         text(f"""
-            SELECT COUNT(DISTINCT l."{left_col}")
-            FROM "{left_table}" l
-            INNER JOIN "{right_table}" r ON l."{left_col}"::text = r."{right_col}"::text
-            WHERE l."{left_col}" IS NOT NULL
+            SELECT COUNT(DISTINCT l.{qi(left_col)})
+            FROM {qi(left_table)} l
+            INNER JOIN {qi(right_table)} r ON l.{qi(left_col)}::text = r.{qi(right_col)}::text
+            WHERE l.{qi(left_col)} IS NOT NULL
         """)
     ).scalar() or 0
 
@@ -274,11 +275,11 @@ def run_temporal_validation(db: Session, config: Dict[str, Any]) -> Dict[str, An
 
     # Get date ranges for both
     left_range = db.execute(
-        text(f'SELECT MIN("{left_col}"), MAX("{left_col}"), COUNT(*) FROM "{left_table}" WHERE "{left_col}" IS NOT NULL')
+        text(f'SELECT MIN({qi(left_col)}), MAX({qi(left_col)}), COUNT(*) FROM {qi(left_table)} WHERE {qi(left_col)} IS NOT NULL')
     ).fetchone()
 
     right_range = db.execute(
-        text(f'SELECT MIN("{right_col}"), MAX("{right_col}"), COUNT(*) FROM "{right_table}" WHERE "{right_col}" IS NOT NULL')
+        text(f'SELECT MIN({qi(right_col)}), MAX({qi(right_col)}), COUNT(*) FROM {qi(right_table)} WHERE {qi(right_col)} IS NOT NULL')
     ).fetchone()
 
     left_count = int(left_range[2]) if left_range else 0

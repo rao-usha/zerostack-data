@@ -15,6 +15,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.safe_sql import safe_int
+
 logger = logging.getLogger(__name__)
 
 
@@ -787,14 +789,14 @@ class NewsMonitor:
     ) -> Dict[str, Any]:
         """Get news matched to watch list, sorted by relevance."""
         params = {
-            "days": days,
             "min_relevance": min_relevance,
             "limit": limit,
             "offset": offset,
         }
 
+        safe_days = safe_int(days, "days")
         where_clauses = [
-            "created_at > NOW() - INTERVAL ':days days'",
+            f"created_at > NOW() - INTERVAL '{safe_days} days'",
             "relevance_score >= :min_relevance",
         ]
 

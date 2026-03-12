@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.core.models import IngestionJob
+from app.core.safe_sql import qi
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +139,7 @@ class DataQualityValidator:
         """Check if row count meets minimum expectation."""
         if actual_rows is None:
             result = self.db.execute(
-                text(f"SELECT COUNT(*) FROM {table_name}")
+                text(f"SELECT COUNT(*) FROM {qi(table_name)}")
             ).scalar()
             actual_rows = result or 0
 
@@ -159,7 +160,7 @@ class DataQualityValidator:
         for column in required_columns:
             try:
                 result = self.db.execute(
-                    text(f"SELECT COUNT(*) FROM {table_name} WHERE {column} IS NULL")
+                    text(f"SELECT COUNT(*) FROM {qi(table_name)} WHERE {qi(column)} IS NULL")
                 ).scalar()
                 null_count = result or 0
 
@@ -190,11 +191,12 @@ class DataQualityValidator:
         columns_str = ", ".join(unique_columns)
 
         try:
+            quoted_cols = ", ".join(qi(c) for c in unique_columns)
             query = f"""
                 SELECT COUNT(*) as dup_count FROM (
-                    SELECT {columns_str}, COUNT(*) as cnt
-                    FROM {table_name}
-                    GROUP BY {columns_str}
+                    SELECT {quoted_cols}, COUNT(*) as cnt
+                    FROM {qi(table_name)}
+                    GROUP BY {quoted_cols}
                     HAVING COUNT(*) > 1
                 ) dups
             """
@@ -232,14 +234,15 @@ class DataQualityValidator:
         """Check if numeric values fall within expected ranges."""
         for column, (min_val, max_val) in numeric_ranges.items():
             try:
+                qcol = qi(column)
                 query = f"""
                     SELECT
                         COUNT(*) as total,
-                        SUM(CASE WHEN {column} < {min_val} OR {column} > {max_val} THEN 1 ELSE 0 END) as out_of_range,
-                        MIN({column}) as min_val,
-                        MAX({column}) as max_val
-                    FROM {table_name}
-                    WHERE {column} IS NOT NULL
+                        SUM(CASE WHEN {qcol} < {min_val} OR {qcol} > {max_val} THEN 1 ELSE 0 END) as out_of_range,
+                        MIN({qcol}) as min_val,
+                        MAX({qcol}) as max_val
+                    FROM {qi(table_name)}
+                    WHERE {qcol} IS NOT NULL
                 """
                 result = self.db.execute(text(query)).fetchone()
 

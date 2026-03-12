@@ -33,6 +33,7 @@ from app.reports.design_system import (
     BLUE_LIGHT,
     GREEN,
 )
+from app.core.safe_sql import qi
 
 logger = logging.getLogger(__name__)
 
@@ -698,7 +699,7 @@ class DatacenterSiteTemplate:
         for src in sources:
             try:
                 result = db.execute(
-                    text(f"SELECT COUNT(*), MAX(collected_at) FROM {src['table']}")
+                    text(f"SELECT COUNT(*), MAX(collected_at) FROM {qi(src['table'])}")
                 )
                 row = result.fetchone()
                 src["row_count"] = row[0] if row else 0
