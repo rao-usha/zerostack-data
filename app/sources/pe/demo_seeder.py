@@ -1000,6 +1000,56 @@ INVESTMENTS = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Independent Target Companies (acquisition targets for screener)
+# ---------------------------------------------------------------------------
+
+INDEPENDENT_TARGETS = [
+    # Healthcare — physician practices / urgent care (NAICS 621111)
+    {"name": "Pinnacle Primary Care", "industry": "Healthcare", "sub_industry": "Primary Care", "naics_code": "621111", "headquarters_city": "Nashville", "headquarters_state": "TN", "headquarters_country": "USA", "founded_year": 2008, "employee_count": 85, "ownership_status": "Private", "status": "Active", "description": "8-location primary care group across middle Tennessee with strong payer mix and 15% EBITDA margins."},
+    {"name": "Coastal Family Medicine", "industry": "Healthcare", "sub_industry": "Family Medicine", "naics_code": "621111", "headquarters_city": "Charleston", "headquarters_state": "SC", "headquarters_country": "USA", "founded_year": 2005, "employee_count": 120, "ownership_status": "Private", "status": "Active", "description": "12-physician family medicine practice with integrated lab and imaging, dominant position in Charleston metro."},
+    {"name": "Desert Sun Medical Group", "industry": "Healthcare", "sub_industry": "Multi-Specialty", "naics_code": "621111", "headquarters_city": "Scottsdale", "headquarters_state": "AZ", "headquarters_country": "USA", "founded_year": 2001, "employee_count": 200, "ownership_status": "Private", "status": "Active", "description": "Multi-specialty physician group with 22 providers, strong ancillary revenue from ASC and imaging center."},
+    {"name": "Heartland Urgent Care", "industry": "Healthcare", "sub_industry": "Urgent Care", "naics_code": "621498", "headquarters_city": "Indianapolis", "headquarters_state": "IN", "headquarters_country": "USA", "founded_year": 2012, "employee_count": 65, "ownership_status": "Private", "status": "Active", "description": "5-location urgent care chain in Indianapolis suburbs with occupational health contracts and 20% visit growth YoY."},
+    {"name": "Bayview Behavioral Health", "industry": "Healthcare", "sub_industry": "Behavioral Health", "naics_code": "621399", "headquarters_city": "Tampa", "headquarters_state": "FL", "headquarters_country": "USA", "founded_year": 2014, "employee_count": 95, "ownership_status": "Private", "status": "Active", "description": "Outpatient behavioral health practice with 18 therapists and psychiatrists, teletherapy-enabled, 30% revenue CAGR."},
+    # Software / IT services (various NAICS)
+    {"name": "Clearpath EHR Solutions", "industry": "Software", "sub_industry": "Healthcare IT", "naics_code": "541511", "headquarters_city": "Austin", "headquarters_state": "TX", "headquarters_country": "USA", "founded_year": 2015, "employee_count": 45, "ownership_status": "Private", "status": "Active", "description": "EHR implementation and support for small physician practices, 800+ active clients, 95% retention rate."},
+    {"name": "RedLeaf Cybersecurity", "industry": "Software", "sub_industry": "Cybersecurity", "naics_code": "541512", "headquarters_city": "Raleigh", "headquarters_state": "NC", "headquarters_country": "USA", "founded_year": 2017, "employee_count": 60, "ownership_status": "Private", "status": "Active", "description": "Managed detection and response (MDR) for mid-market companies, SOC-as-a-service with proprietary threat intelligence."},
+    {"name": "Brightline Analytics", "industry": "Software", "sub_industry": "Business Intelligence", "naics_code": "541511", "headquarters_city": "Denver", "headquarters_state": "CO", "headquarters_country": "USA", "founded_year": 2016, "employee_count": 35, "ownership_status": "Private", "status": "Active", "description": "Self-service BI platform for healthcare payers, embedded analytics for claims and utilization management."},
+    {"name": "StackVault Cloud", "industry": "Software", "sub_industry": "Cloud Infrastructure", "naics_code": "518210", "headquarters_city": "Portland", "headquarters_state": "OR", "headquarters_country": "USA", "founded_year": 2018, "employee_count": 40, "ownership_status": "VC-Backed", "status": "Active", "description": "Kubernetes-native backup and disaster recovery for SMB cloud workloads, $4.2M ARR growing 45% YoY."},
+    {"name": "ComplianceForge", "industry": "Software", "sub_industry": "RegTech", "naics_code": "541511", "headquarters_city": "Chicago", "headquarters_state": "IL", "headquarters_country": "USA", "founded_year": 2013, "employee_count": 55, "ownership_status": "Private", "status": "Active", "description": "Compliance workflow automation for community banks and credit unions, 200+ FI clients, capital-efficient growth."},
+    # Industrial / manufacturing (various NAICS)
+    {"name": "Lone Star Precision Parts", "industry": "Industrials", "sub_industry": "Precision Manufacturing", "naics_code": "332710", "headquarters_city": "Dallas", "headquarters_state": "TX", "headquarters_country": "USA", "founded_year": 2003, "employee_count": 140, "ownership_status": "Private", "status": "Active", "description": "CNC machining and wire EDM for aerospace and medical device OEMs, AS9100 and ISO 13485 certified."},
+    {"name": "Summit HVAC Services", "industry": "Industrials", "sub_industry": "HVAC", "naics_code": "238220", "headquarters_city": "Salt Lake City", "headquarters_state": "UT", "headquarters_country": "USA", "founded_year": 2006, "employee_count": 110, "ownership_status": "Private", "status": "Active", "description": "Commercial HVAC installation and service across Utah and Idaho, recurring maintenance contracts drive 60% of revenue."},
+    {"name": "Pacific Coast Packaging", "industry": "Industrials", "sub_industry": "Packaging", "naics_code": "322211", "headquarters_city": "Fresno", "headquarters_state": "CA", "headquarters_country": "USA", "founded_year": 1999, "employee_count": 180, "ownership_status": "Private", "status": "Active", "description": "Corrugated packaging for agricultural producers in Central Valley, vertically integrated with in-house printing."},
+    {"name": "Cascade Fluid Systems", "industry": "Industrials", "sub_industry": "Flow Control", "naics_code": "332911", "headquarters_city": "Portland", "headquarters_state": "OR", "headquarters_country": "USA", "founded_year": 2007, "employee_count": 75, "ownership_status": "Private", "status": "Active", "description": "Industrial pump distribution and repair for water treatment and food processing, Pacific NW market leader."},
+    {"name": "Appalachian Steel Works", "industry": "Industrials", "sub_industry": "Steel Fabrication", "naics_code": "332312", "headquarters_city": "Charleston", "headquarters_state": "WV", "headquarters_country": "USA", "founded_year": 1995, "employee_count": 220, "ownership_status": "Private", "status": "Active", "description": "Structural steel fabrication for commercial and infrastructure projects across the Mid-Atlantic region."},
+    # Auto repair (NAICS 811111 — high fragmentation)
+    {"name": "AutoCare Express", "industry": "Services", "sub_industry": "Auto Repair", "naics_code": "811111", "headquarters_city": "Phoenix", "headquarters_state": "AZ", "headquarters_country": "USA", "founded_year": 2010, "employee_count": 90, "ownership_status": "Private", "status": "Active", "description": "12-location auto repair chain in Phoenix metro with proprietary shop management software and OEM partnerships."},
+    {"name": "Mountain West Auto Group", "industry": "Services", "sub_industry": "Auto Repair", "naics_code": "811111", "headquarters_city": "Boise", "headquarters_state": "ID", "headquarters_country": "USA", "founded_year": 2008, "employee_count": 55, "ownership_status": "Private", "status": "Active", "description": "6-location general auto repair network in Boise area, strong Google reviews, 25% revenue growth from fleet contracts."},
+]
+
+INDEPENDENT_TARGET_FINANCIALS = {
+    # company_name: (base_revenue_millions, base_ebitda_margin, growth_rates, debt_ratio)
+    "Pinnacle Primary Care": (12, 15.0, [8, 10, 12, 11, 9], 0.3),
+    "Coastal Family Medicine": (22, 14.0, [6, 7, 8, 9, 10], 0.2),
+    "Desert Sun Medical Group": (45, 18.0, [5, 6, 7, 8, 7], 0.25),
+    "Heartland Urgent Care": (8, 12.0, [15, 18, 20, 22, 19], 0.35),
+    "Bayview Behavioral Health": (14, 20.0, [25, 28, 30, 32, 27], 0.15),
+    "Clearpath EHR Solutions": (6.5, 22.0, [18, 20, 25, 22, 20], 0.1),
+    "RedLeaf Cybersecurity": (9, 16.0, [30, 35, 40, 38, 32], 0.15),
+    "Brightline Analytics": (4.2, 18.0, [20, 25, 30, 28, 24], 0.1),
+    "StackVault Cloud": (4.2, -5.0, [80, 60, 45, 50, 42], 0.5),
+    "ComplianceForge": (8.5, 24.0, [12, 15, 18, 16, 14], 0.1),
+    "Lone Star Precision Parts": (28, 16.0, [6, 8, 10, 9, 7], 0.3),
+    "Summit HVAC Services": (18, 14.0, [8, 10, 12, 14, 11], 0.2),
+    "Pacific Coast Packaging": (35, 12.0, [4, 5, 6, 7, 5], 0.35),
+    "Cascade Fluid Systems": (11, 15.0, [7, 9, 11, 10, 8], 0.2),
+    "Appalachian Steel Works": (42, 11.0, [3, 4, 5, 6, 4], 0.4),
+    "AutoCare Express": (15, 16.0, [12, 15, 18, 20, 16], 0.25),
+    "Mountain West Auto Group": (7.5, 14.0, [10, 15, 20, 25, 22], 0.2),
+}
+
+
 # ===========================================================================
 # Main seeder function
 # ===========================================================================
@@ -1261,6 +1311,29 @@ async def seed_pe_demo_data(db: Session) -> Dict[str, int]:
             inv_count += 1
     db.flush()
     counts["pe_fund_investments"] = inv_count
+
+    # 14. Independent target companies (for screener)
+    target_rows = [{**t, "data_source": "demo_seeder"} for t in INDEPENDENT_TARGETS]
+    counts["pe_independent_targets"] = _upsert_rows(
+        db, PEPortfolioCompany, target_rows, ["name"], has_db_constraint=False,
+    )
+
+    # 15. Independent target financials
+    all_target_fins = []
+    for co_name, params in INDEPENDENT_TARGET_FINANCIALS.items():
+        co_id = _lookup_id(db, PEPortfolioCompany, name=co_name)
+        if not co_id:
+            logger.warning("Target company not found: %s", co_name)
+            continue
+        base_rev, base_margin, growths, debt = params
+        for fin in _generate_financials(co_name, base_revenue=base_rev,
+                                         base_ebitda_margin=base_margin,
+                                         growth_rates=growths, debt_ratio=debt):
+            all_target_fins.append({**fin, "company_id": co_id})
+    counts["pe_target_financials"] = _upsert_rows(
+        db, PECompanyFinancials, all_target_fins,
+        ["company_id", "fiscal_year", "fiscal_period"],
+    )
 
     db.commit()
 

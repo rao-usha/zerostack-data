@@ -1104,3 +1104,126 @@ async def get_roll_up_targets(
         targets=targets,
         state_summary=summary,
     )
+
+
+# =============================================================================
+# Roll-Up Screener Endpoints
+# =============================================================================
+
+
+class ScreenerTarget(BaseModel):
+    id: Optional[int] = None
+    name: Optional[str] = None
+    industry: Optional[str] = None
+    sub_industry: Optional[str] = None
+    naics_code: Optional[str] = None
+    headquarters_city: Optional[str] = None
+    headquarters_state: Optional[str] = None
+    ownership_status: Optional[str] = None
+    current_pe_owner: Optional[str] = None
+    employee_count: Optional[int] = None
+    founded_year: Optional[int] = None
+    website: Optional[str] = None
+    description: Optional[str] = None
+    revenue_usd: Optional[float] = None
+    revenue_growth_pct: Optional[float] = None
+    ebitda_margin_pct: Optional[float] = None
+    ebitda_usd: Optional[float] = None
+    target_score: float = 0
+    acquisition_rationale: Optional[str] = None
+
+
+class ScreenerResponse(BaseModel):
+    naics_code: str
+    naics_description: Optional[str] = None
+    fragmentation_score: float = 0
+    total_targets: int = 0
+    targets: List[ScreenerTarget] = []
+
+
+class StateCount(BaseModel):
+    state: str
+    count: int
+
+
+class ScreenerSummaryResponse(BaseModel):
+    naics_code: str
+    naics_description: Optional[str] = None
+    fragmentation_score: float = 0
+    total_targets: int = 0
+    total_addressable_revenue: float = 0
+    avg_revenue: float = 0
+    avg_employee_count: float = 0
+    median_revenue: float = 0
+    ownership_breakdown: Dict[str, int] = {}
+    top_states: List[StateCount] = []
+
+
+@router.get(
+    "/rollup-screener/{naics_code}/summary",
+    response_model=ScreenerSummaryResponse,
+    summary="Market overview for roll-up screening",
+)
+async def get_rollup_screener_summary(
+    naics_code: str,
+    state: Optional[str] = Query(None, description="Filter to state (2-letter code)"),
+    db: Session = Depends(get_db),
+) -> ScreenerSummaryResponse:
+    """Market overview: total addressable market, avg sizing, top geos, ownership mix."""
+    from app.core.pe_rollup_screener import RollUpScreener
+
+    screener = RollUpScreener(db)
+    result = await screener.get_summary(naics_code, state=state)
+
+    return ScreenerSummaryResponse(
+        naics_code=result.get("naics_code", naics_code),
+        naics_description=result.get("naics_description"),
+        fragmentation_score=result.get("fragmentation_score", 0),
+        total_targets=result.get("total_targets", 0),
+        total_addressable_revenue=result.get("total_addressable_revenue", 0),
+        avg_revenue=result.get("avg_revenue", 0),
+        avg_employee_count=result.get("avg_employee_count", 0),
+        median_revenue=result.get("median_revenue", 0),
+        ownership_breakdown=result.get("ownership_breakdown", {}),
+        top_states=[StateCount(**s) for s in result.get("top_states", [])],
+    )
+
+
+@router.get(
+    "/rollup-screener/{naics_code}",
+    response_model=ScreenerResponse,
+    summary="Screen for roll-up acquisition targets",
+)
+async def get_rollup_screener(
+    naics_code: str,
+    state: Optional[str] = Query(None, description="Filter to state (2-letter code)"),
+    min_revenue: Optional[float] = Query(None, description="Minimum revenue ($)"),
+    max_revenue: Optional[float] = Query(None, description="Maximum revenue ($)"),
+    exclude_pe_backed: bool = Query(False, description="Exclude PE-backed companies"),
+    top_n: int = Query(20, description="Number of targets to return"),
+    db: Session = Depends(get_db),
+) -> ScreenerResponse:
+    """Screen for acquisition targets in a fragmented industry.
+
+    Combines fragmentation analysis with company discovery. Scores targets
+    on size fit ($5-50M sweet spot), ownership status, geography, and growth.
+    """
+    from app.core.pe_rollup_screener import RollUpScreener
+
+    screener = RollUpScreener(db)
+    result = await screener.screen(
+        naics_code,
+        state=state,
+        min_revenue=min_revenue,
+        max_revenue=max_revenue,
+        exclude_pe_backed=exclude_pe_backed,
+        top_n=top_n,
+    )
+
+    return ScreenerResponse(
+        naics_code=result["naics_code"],
+        naics_description=result.get("naics_description"),
+        fragmentation_score=result.get("fragmentation_score", 0),
+        total_targets=result.get("total_targets", 0),
+        targets=[ScreenerTarget(**t) for t in result.get("targets", [])],
+    )
