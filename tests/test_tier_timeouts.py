@@ -20,9 +20,10 @@ class TestBatchLaunchBlockedStatus:
 
     @pytest.mark.asyncio
     @patch("app.core.nightly_batch_service.WORKER_MODE", True)
+    @patch("app.core.job_splitter.get_split_config", return_value=None)
     @patch("app.core.nightly_batch_service.resolve_effective_tiers")
     @patch("app.core.nightly_batch_service.submit_job")
-    async def test_tier1_pending_tier2_blocked(self, mock_submit, mock_resolve):
+    async def test_tier1_pending_tier2_blocked(self, mock_submit, mock_resolve, _mock_split):
         """Tier 1 jobs should be PENDING, tier 2+ should be BLOCKED."""
         from app.core.nightly_batch_service import launch_batch_collection
 
@@ -59,9 +60,10 @@ class TestBatchLaunchBlockedStatus:
 
     @pytest.mark.asyncio
     @patch("app.core.nightly_batch_service.WORKER_MODE", True)
+    @patch("app.core.job_splitter.get_split_config", return_value=None)
     @patch("app.core.nightly_batch_service.resolve_effective_tiers")
     @patch("app.core.nightly_batch_service.submit_job")
-    async def test_no_wait_for_tiers_in_payload(self, mock_submit, mock_resolve):
+    async def test_no_wait_for_tiers_in_payload(self, mock_submit, mock_resolve, _mock_split):
         """Payloads should NOT contain wait_for_tiers anymore."""
         from app.core.nightly_batch_service import launch_batch_collection
 
@@ -84,9 +86,10 @@ class TestBatchLaunchBlockedStatus:
 
     @pytest.mark.asyncio
     @patch("app.core.nightly_batch_service.WORKER_MODE", True)
+    @patch("app.core.job_splitter.get_split_config", return_value=None)
     @patch("app.core.nightly_batch_service.resolve_effective_tiers")
     @patch("app.core.nightly_batch_service.submit_job")
-    async def test_ingestion_job_status_matches(self, mock_submit, mock_resolve):
+    async def test_ingestion_job_status_matches(self, mock_submit, mock_resolve, _mock_split):
         """IngestionJob should also be BLOCKED for tier 2+."""
         from app.core.nightly_batch_service import launch_batch_collection, IngestionJob
 

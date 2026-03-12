@@ -373,9 +373,10 @@ class TestBlockedStatusBatchLaunch:
 
     @pytest.mark.asyncio
     @patch("app.core.nightly_batch_service.WORKER_MODE", True)
+    @patch("app.core.job_splitter.get_split_config", return_value=None)
     @patch("app.core.nightly_batch_service.resolve_effective_tiers")
     @patch("app.core.nightly_batch_service.submit_job")
-    async def test_single_tier_not_blocked(self, mock_submit, mock_resolve):
+    async def test_single_tier_not_blocked(self, mock_submit, mock_resolve, _mock_split):
         """With only 1 tier, it should be PENDING (no lower tiers)."""
         from app.core.nightly_batch_service import launch_batch_collection
 
