@@ -156,6 +156,67 @@ Every ingestion creates an `ingestion_jobs` record: `pending → running → suc
 
 ---
 
+## Worker Operations
+
+The job queue uses a separate **worker container** (`python -m app.worker.main`) that claims and executes jobs from PostgreSQL.
+
+### Starting Workers
+
+```bash
+# Start worker alongside other services
+docker-compose up -d worker
+
+# Or start everything (api + worker + postgres + frontend)
+docker-compose up -d
+
+# Note: deploy.replicas: 6 in docker-compose.yml is Swarm-only.
+# Standard compose starts 1 worker instance. For more:
+docker-compose up -d --scale worker=4
+```
+
+### Monitoring Workers
+
+```bash
+# Check if worker containers are running
+docker-compose ps worker
+
+# View worker logs
+docker-compose logs worker --tail 50
+docker-compose logs worker -f  # follow
+
+# API: worker status (active workers, queue depth, last claimed)
+curl -s http://localhost:8001/api/v1/jobs/workers | python -m json.tool
+
+# API: health check (includes worker availability)
+curl -s http://localhost:8001/health | python -m json.tool
+```
+
+### Stopping Workers
+
+```bash
+# Graceful stop (30s drain timeout)
+docker-compose stop worker
+
+# Restart after code changes
+docker-compose restart worker
+```
+
+### Job Queue Behavior
+
+- **WORKER_MODE=1** (default in docker-compose): Jobs go to PostgreSQL queue, claimed by workers via `SELECT FOR UPDATE SKIP LOCKED`
+- **WORKER_MODE=0** (fallback): Jobs run in-process via FastAPI `BackgroundTasks` — no separate worker needed
+- **Without workers running**: Jobs stay PENDING indefinitely. Auto-cancel kicks in after 4 hours (`cancel_stale_pending_jobs`)
+- **Stale heartbeat recovery**: Jobs from dead workers reset to PENDING every 5 minutes (`reset_stale_jobs`)
+- **Rate limiting**: Per-source rate limits enforced globally across all workers via `rate_limit_bucket` table
+
+### Common Issues
+
+- **Jobs stuck "pending"**: Worker container not running. Start with `docker-compose up -d worker`
+- **Nightly batch stuck**: Same cause — tier 1 jobs can't execute without workers
+- **Worker won't start**: Check `docker-compose logs worker` for import errors. Worker shares the same codebase/image as API
+
+---
+
 ## Critical Rules
 
 ### Data Safety
