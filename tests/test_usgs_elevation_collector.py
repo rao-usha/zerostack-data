@@ -12,7 +12,7 @@ from app.sources.site_intel.risk.usgs_elevation_collector import (
     LAT_OFFSET,
     LNG_OFFSET,
     METERS_TO_FEET,
-    MAX_CONCURRENT_COUNTIES,
+    MAX_CONCURRENT_STATES,
     MAX_CONCURRENT_POINTS,
     BATCH_COMMIT_SIZE,
 )
@@ -67,7 +67,7 @@ class TestUSGSElevationCollector:
 
     def test_rate_limit_delay_reduced(self):
         """Rate limit is reduced for concurrent operation."""
-        assert self.collector.rate_limit_delay == 0.05
+        assert self.collector.rate_limit_delay == 0.02
 
     def test_county_centroids_url(self):
         """County centroids URL points to Census Bureau."""
@@ -85,7 +85,7 @@ class TestUSGSElevationCollector:
 
     def test_concurrency_constants(self):
         """Concurrency settings are reasonable."""
-        assert MAX_CONCURRENT_COUNTIES == 8
+        assert MAX_CONCURRENT_STATES == 8
         assert MAX_CONCURRENT_POINTS == 5
         assert BATCH_COMMIT_SIZE == 50
 
@@ -272,3 +272,148 @@ class TestBaseCollectorConcurrency:
         assert len(result) == 2
         states_seen = {r["state"] for r in result}
         assert states_seen == {"TX", "NY"}
+
+
+@pytest.mark.unit
+class TestStateConcurrentCollect:
+    """Tests for the refactored state-concurrent collect() method."""
+
+    def setup_method(self):
+        self.mock_db = MagicMock()
+        self.collector = USGS3DEPElevationCollector(db=self.mock_db)
+        self.collector.rate_limit_delay = 0
+
+    @pytest.mark.asyncio
+    async def test_collect_groups_counties_by_state(self):
+        """collect() should group counties by state and use collect_states_concurrent."""
+        from app.sources.site_intel.types import CollectionConfig, SiteIntelDomain, SiteIntelSource, CollectionStatus
+
+        centroids = [
+            {"state": "TX", "county": "Harris", "fips_code": "48201", "lat": 29.76, "lng": -95.37},
+            {"state": "TX", "county": "Dallas", "fips_code": "48113", "lat": 32.77, "lng": -96.80},
+            {"state": "CA", "county": "LA", "fips_code": "06037", "lat": 34.05, "lng": -118.24},
+        ]
+        self.collector._county_centroids = centroids
+
+        # Mock _collect_county_elevation to return a record
+        async def mock_county_elev(county):
+            return {
+                "state": county["state"], "county": county["county"],
+                "fips_code": county["fips_code"],
+                "min_elevation_ft": 100.0, "max_elevation_ft": 200.0,
+                "mean_elevation_ft": 150.0, "elevation_range_ft": 100.0,
+                "sample_points": 5, "source": "usgs_3dep",
+                "collected_at": "2026-01-01",
+            }
+        self.collector._collect_county_elevation = mock_county_elev
+
+        # Mock bulk_upsert to avoid DB
+        self.collector.bulk_upsert = MagicMock()
+
+        config = CollectionConfig(domain=SiteIntelDomain.RISK, source=SiteIntelSource.USGS_3DEP)
+        result = await self.collector.collect(config)
+
+        assert result.status == CollectionStatus.SUCCESS
+        assert result.total_items == 3
+        assert result.inserted_items == 3
+
+    @pytest.mark.asyncio
+    async def test_collect_respects_state_filter(self):
+        """collect() with config.states should only process those states."""
+        from app.sources.site_intel.types import CollectionConfig, SiteIntelDomain, SiteIntelSource, CollectionStatus
+
+        centroids = [
+            {"state": "TX", "county": "Harris", "fips_code": "48201", "lat": 29.76, "lng": -95.37},
+            {"state": "CA", "county": "LA", "fips_code": "06037", "lat": 34.05, "lng": -118.24},
+            {"state": "NY", "county": "Kings", "fips_code": "36047", "lat": 40.63, "lng": -73.95},
+        ]
+        self.collector._county_centroids = centroids
+
+        async def mock_county_elev(county):
+            return {
+                "state": county["state"], "county": county["county"],
+                "fips_code": county["fips_code"],
+                "min_elevation_ft": 50.0, "max_elevation_ft": 100.0,
+                "mean_elevation_ft": 75.0, "elevation_range_ft": 50.0,
+                "sample_points": 5, "source": "usgs_3dep",
+                "collected_at": "2026-01-01",
+            }
+        self.collector._collect_county_elevation = mock_county_elev
+        self.collector.bulk_upsert = MagicMock()
+
+        config = CollectionConfig(domain=SiteIntelDomain.RISK, source=SiteIntelSource.USGS_3DEP, states=["TX"])
+        result = await self.collector.collect(config)
+
+        assert result.total_items == 1
+        assert result.inserted_items == 1
+
+    @pytest.mark.asyncio
+    async def test_collect_handles_partial_failure(self):
+        """collect() should report PARTIAL when some counties fail."""
+        from app.sources.site_intel.types import CollectionConfig, SiteIntelDomain, SiteIntelSource, CollectionStatus
+
+        centroids = [
+            {"state": "TX", "county": "Harris", "fips_code": "48201", "lat": 29.76, "lng": -95.37},
+            {"state": "TX", "county": "Dallas", "fips_code": "48113", "lat": 32.77, "lng": -96.80},
+        ]
+        self.collector._county_centroids = centroids
+
+        call_count = 0
+        async def mock_county_elev(county):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return None  # Simulates all 5 points failing
+            return {
+                "state": county["state"], "county": county["county"],
+                "fips_code": county["fips_code"],
+                "min_elevation_ft": 100.0, "max_elevation_ft": 200.0,
+                "mean_elevation_ft": 150.0, "elevation_range_ft": 100.0,
+                "sample_points": 5, "source": "usgs_3dep",
+                "collected_at": "2026-01-01",
+            }
+        self.collector._collect_county_elevation = mock_county_elev
+        self.collector.bulk_upsert = MagicMock()
+
+        config = CollectionConfig(domain=SiteIntelDomain.RISK, source=SiteIntelSource.USGS_3DEP)
+        result = await self.collector.collect(config)
+
+        assert result.status == CollectionStatus.PARTIAL
+        assert result.inserted_items == 1
+        assert result.failed_items == 1
+
+    @pytest.mark.asyncio
+    async def test_collect_empty_centroids_fails(self):
+        """collect() should fail if no centroids are fetched."""
+        from app.sources.site_intel.types import CollectionConfig, SiteIntelDomain, SiteIntelSource, CollectionStatus
+
+        self.collector._county_centroids = []
+
+        config = CollectionConfig(domain=SiteIntelDomain.RISK, source=SiteIntelSource.USGS_3DEP)
+        result = await self.collector.collect(config)
+
+        assert result.status == CollectionStatus.FAILED
+
+    @pytest.mark.asyncio
+    async def test_county_uses_gather_with_limit_for_points(self):
+        """_collect_county_elevation should call gather_with_limit for 5 points."""
+        gather_calls = []
+        original_gather = self.collector.gather_with_limit
+
+        async def tracking_gather(coros, max_concurrent=4):
+            gather_calls.append(max_concurrent)
+            return await original_gather(coros, max_concurrent)
+
+        self.collector.gather_with_limit = tracking_gather
+
+        async def mock_query(lat, lng):
+            return 500.0
+        self.collector._query_elevation = mock_query
+
+        county = {"state": "TX", "county": "Harris", "fips_code": "48201", "lat": 29.76, "lng": -95.37}
+        result = await self.collector._collect_county_elevation(county)
+
+        assert len(gather_calls) == 1
+        assert gather_calls[0] == MAX_CONCURRENT_POINTS
+        assert result is not None
+        assert result["sample_points"] == 5
