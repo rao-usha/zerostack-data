@@ -5,6 +5,7 @@ from app.reports.templates.portfolio_detail import PortfolioDetailTemplate
 from app.reports.templates.data_quality import DataQualityTemplate
 from app.reports.templates.medspa_market import MedSpaMarketTemplate
 from app.reports.templates.jobs_monitor import JobsMonitorPage
+from app.reports.templates.pe_portfolio_report import PEPortfolioReportTemplate
 
 __all__ = [
     "InvestorProfileTemplate",
@@ -12,4 +13,5 @@ __all__ = [
     "DataQualityTemplate",
     "MedSpaMarketTemplate",
     "JobsMonitorPage",
+    "PEPortfolioReportTemplate",
 ]

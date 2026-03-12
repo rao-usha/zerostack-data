@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexdata — PE Intelligence Demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --primary: #6366f1;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --accent: #06b6d4;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+        /* Header */
+        .demo-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1rem 2rem; background: var(--bg-card); border-bottom: 1px solid var(--border);
+        }
+        .demo-logo { display: flex; align-items: center; gap: 0.75rem; }
+        .demo-logo h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .demo-logo .tag { color: var(--accent); font-size: 0.75rem; font-weight: 600; background: rgba(6,182,212,0.15); padding: 0.2rem 0.6rem; border-radius: 10px; }
+        .demo-back { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .demo-back:hover { color: var(--text); }
+
+        /* Progress */
+        .progress-bar { display: flex; align-items: center; gap: 0; padding: 0 2rem; background: var(--bg-card); border-bottom: 1px solid var(--border); }
+        .progress-step {
+            flex: 1; padding: 0.75rem 1rem; text-align: center; font-size: 0.8rem; font-weight: 500;
+            color: var(--text-muted); border-bottom: 3px solid transparent; cursor: pointer; transition: all 0.2s;
+        }
+        .progress-step:hover { color: var(--text); background: rgba(99,102,241,0.05); }
+        .progress-step.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 700; }
+        .progress-step.completed { color: var(--success); border-bottom-color: var(--success); }
+        .progress-step .step-num {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 22px; height: 22px; border-radius: 50%; font-size: 0.7rem; font-weight: 700;
+            background: var(--bg-input); color: var(--text-muted); margin-right: 0.5rem; vertical-align: middle;
+        }
+        .progress-step.active .step-num { background: var(--primary); color: white; }
+        .progress-step.completed .step-num { background: var(--success); color: white; }
+
+        /* Content */
+        .demo-content { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        .step-panel { display: none; }
+        .step-panel.active { display: block; }
+
+        /* Narration box */
+        .narration {
+            background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(6,182,212,0.06));
+            border: 1px solid rgba(99,102,241,0.2); border-radius: 12px;
+            padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; position: relative;
+        }
+        .narration::before {
+            content: '💡'; position: absolute; top: -10px; left: 16px;
+            background: var(--bg); padding: 0 6px; font-size: 1rem;
+        }
+        .narration-title { font-size: 1rem; font-weight: 700; color: var(--primary); margin-bottom: 0.35rem; }
+        .narration-text { font-size: 0.875rem; color: var(--text-muted); line-height: 1.6; }
+
+        /* Navigation */
+        .demo-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; cursor: pointer; font-size: 0.875rem; font-weight: 600; transition: all 0.15s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: #4f46e5; }
+        .btn-secondary { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); }
+        .btn-secondary:hover { background: var(--border); color: var(--text); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { background: #16a34a; }
+
+        /* Cards & tables */
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .card-title { font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; }
+        .loading { text-align: center; padding: 2rem; color: var(--text-muted); }
+
+        /* Portfolio table */
+        .ptable { width: 100%; border-collapse: collapse; }
+        .ptable th { text-align: left; padding: 0.625rem 0.75rem; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        .ptable td { padding: 0.75rem; border-bottom: 1px solid rgba(51,65,85,0.5); font-size: 0.875rem; }
+        .ptable tbody tr { cursor: pointer; transition: background 0.12s; }
+        .ptable tbody tr:hover { background: rgba(99,102,241,0.08); }
+        .ptable tbody tr.selected { background: rgba(99,102,241,0.15); }
+
+        .pct-cell { font-weight: 600; }
+        .pct-cell.green { color: var(--success); }
+        .pct-cell.yellow { color: var(--warning); }
+        .pct-cell.red { color: var(--error); }
+
+        .pill { padding: 0.15rem 0.55rem; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
+        .pill-hc { background: rgba(239,68,68,0.12); color: #f87171; }
+        .pill-sw { background: rgba(99,102,241,0.12); color: #818cf8; }
+        .pill-ind { background: rgba(245,158,11,0.12); color: #fbbf24; }
+        .pill-tech { background: rgba(6,182,212,0.12); color: var(--accent); }
+        .pill-active { background: rgba(34,197,94,0.15); color: var(--success); font-size: 0.65rem; text-transform: uppercase; }
+        .pill-exited { background: rgba(148,163,184,0.15); color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase; }
+
+        .trend { font-size: 0.75rem; }
+        .trend.improving { color: var(--success); }
+        .trend.declining { color: var(--error); }
+        .trend.stable { color: var(--text-muted); }
+
+        /* Two-panel layout */
+        .two-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        @media (max-width: 1100px) { .two-panel { grid-template-columns: 1fr; } }
+
+        /* KPI cards */
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; }
+        @media (max-width: 768px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+        .kpi { background: var(--bg-input); border-radius: 8px; padding: 0.875rem; text-align: center; }
+        .kpi-value { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+        .kpi-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.25rem; }
+
+        /* Radar wrap */
+        .radar-wrap { display: flex; justify-content: center; min-height: 280px; }
+
+        /* Gauge */
+        .gauge-wrap { display: flex; flex-direction: column; align-items: center; margin-bottom: 1.25rem; }
+        .gauge-confidence { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+        /* Sub-score bars */
+        .ss-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+        .ss-label { width: 140px; font-size: 0.8rem; color: var(--text-muted); text-align: right; flex-shrink: 0; }
+        .ss-bar-bg { flex: 1; height: 22px; background: var(--bg-input); border-radius: 4px; overflow: hidden; }
+        .ss-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; font-size: 0.7rem; font-weight: 600; color: white; min-width: 28px; }
+        .ss-grade { width: 28px; font-size: 0.8rem; font-weight: 700; text-align: center; }
+
+        /* Recs list */
+        .recs-list { list-style: none; padding: 0; }
+        .recs-list li { padding: 0.5rem 0.75rem; border-left: 3px solid var(--primary); margin-bottom: 0.5rem; background: var(--bg-input); border-radius: 0 6px 6px 0; font-size: 0.8rem; }
+        .recs-list li.high { border-left-color: var(--error); }
+
+        /* Buyer table */
+        .buyer-type { padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+        .buyer-type.Strategic { background: rgba(34,197,94,0.12); color: #4ade80; }
+        .buyer-type.Financial { background: rgba(99,102,241,0.12); color: #818cf8; }
+        .buyer-type.PE { background: rgba(245,158,11,0.12); color: #fbbf24; }
+        .fit-bar-bg { width: 60px; height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 4px; }
+        .fit-bar-fill { height: 100%; border-radius: 4px; }
+        .buyer-rationale { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; }
+        .ticker { font-family: monospace; font-size: 0.7rem; color: var(--accent); background: rgba(6,182,212,0.1); padding: 0.1rem 0.4rem; border-radius: 3px; margin-left: 0.35rem; }
+
+        /* Data Room */
+        .dr-gauge { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+        .dr-bar { flex: 1; height: 14px; background: var(--bg-input); border-radius: 7px; overflow: hidden; }
+        .dr-fill { height: 100%; border-radius: 7px; transition: width 0.6s; }
+        .dr-pct { font-size: 1.25rem; font-weight: 700; min-width: 50px; text-align: right; }
+        .dr-sections { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+        @media (max-width: 768px) { .dr-sections { grid-template-columns: repeat(2, 1fr); } }
+        .dr-sec { background: var(--bg-input); border-radius: 8px; padding: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+        .dr-check { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
+        .dr-check.ok { background: rgba(34,197,94,0.2); color: var(--success); }
+        .dr-check.missing { background: rgba(239,68,68,0.15); color: var(--error); }
+        .dr-label { font-size: 0.8rem; font-weight: 500; }
+        .dr-count { font-size: 0.7rem; color: var(--text-muted); }
+        .gap-chip { background: rgba(239,68,68,0.1); color: #f87171; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.7rem; font-weight: 500; }
+
+        /* Force graph */
+        .graph-container { min-height: 500px; position: relative; background: var(--bg); border-radius: 8px; overflow: hidden; }
+        .graph-legend { display: flex; flex-wrap: wrap; gap: 1rem; padding: 0.75rem 1rem; font-size: 0.75rem; color: var(--text-muted); }
+        .legend-item { display: flex; align-items: center; gap: 0.35rem; }
+        .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .legend-line { width: 20px; height: 2px; border-radius: 1px; }
+
+        /* Seed overlay */
+        .seed-overlay {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 4rem 2rem; text-align: center;
+        }
+        .seed-icon { font-size: 4rem; margin-bottom: 1rem; }
+        .seed-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .seed-text { color: var(--text-muted); max-width: 480px; margin-bottom: 1.5rem; line-height: 1.5; }
+
+        /* Tooltip */
+        .graph-tooltip {
+            position: fixed; pointer-events: none; z-index: 1000;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+            padding: 10px 14px; font-size: 0.8rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            max-width: 260px; display: none;
+        }
+    </style>
+</head>
+<body>
+    <header class="demo-header">
+        <div class="demo-logo">
+            <span style="font-size:1.5rem;">📈</span>
+            <h1>Nexdata</h1>
+            <span class="tag">PE Demo</span>
+        </div>
+        <a href="index.html" class="demo-back">&larr; Back to Dashboard</a>
+    </header>
+
+    <nav class="progress-bar">
+        <div class="progress-step active" onclick="goStep(0)"><span class="step-num">1</span>Your Portfolio</div>
+        <div class="progress-step" onclick="goStep(1)"><span class="step-num">2</span>Deep Dive</div>
+        <div class="progress-step" onclick="goStep(2)"><span class="step-num">3</span>Exit Planning</div>
+        <div class="progress-step" onclick="goStep(3)"><span class="step-num">4</span>Leadership Network</div>
+    </nav>
+
+    <main class="demo-content">
+        <!-- Seed Check -->
+        <div id="seed-screen" style="display:none;">
+            <div class="seed-overlay">
+                <div class="seed-icon">🏗️</div>
+                <div class="seed-title">Demo Data Required</div>
+                <div class="seed-text">This demo needs sample PE data (3 firms, 24 portfolio companies, financials, leadership, and deal history). Click below to seed it — takes about 5 seconds.</div>
+                <button class="btn btn-success" id="seed-btn" onclick="seedData()">Seed Demo Data</button>
+            </div>
+        </div>
+
+        <!-- Step 1: Portfolio -->
+        <div id="step-0" class="step-panel active">
+            <div class="narration">
+                <div class="narration-title">Step 1: Portfolio at a Glance</div>
+                <div class="narration-text">
+                    As a PE analyst, your first stop is the <strong>portfolio heatmap</strong>. Each row is one of your portfolio companies, benchmarked against industry peers. Green cells (75th+ percentile) are outperformers; red cells (&lt;25th) need attention. Click any company to drill deeper.
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Summit Ridge Partners — Portfolio Overview</div>
+                <div style="overflow-x:auto;">
+                    <table class="ptable">
+                        <thead><tr><th>Company</th><th>Sector</th><th>Status</th><th>Rev Growth</th><th>EBITDA %</th><th>Overall</th><th>Trend</th></tr></thead>
+                        <tbody id="demo-portfolio"></tbody>
+                    </table>
+                </div>
+                <div id="demo-portfolio-empty" class="loading" style="display:none;">Loading portfolio data...</div>
+            </div>
+        </div>
+
+        <!-- Step 2: Deep Dive -->
+        <div id="step-1" class="step-panel">
+            <div class="narration">
+                <div class="narration-title">Step 2: Deep Dive into MedVantage Health Systems</div>
+                <div class="narration-text">
+                    Clicking a company reveals its <strong>financial benchmarks</strong> (radar chart comparing 6 metrics vs. industry peers) and <strong>exit readiness score</strong> (composite 0-100 across 6 dimensions). This tells you exactly where the company stands and what to improve before exit.
+                </div>
+            </div>
+            <div class="two-panel">
+                <div class="card">
+                    <div class="card-title" id="bench-title">Benchmarks</div>
+                    <div class="kpi-grid" id="bench-kpis"></div>
+                    <div class="radar-wrap"><canvas id="bench-radar" width="300" height="300"></canvas></div>
+                </div>
+                <div class="card">
+                    <div class="card-title" id="exit-title">Exit Readiness</div>
+                    <div class="gauge-wrap" id="exit-gauge"></div>
+                    <div id="exit-bars"></div>
+                    <div class="card-title" style="margin-top:1rem;">Top Recommendations</div>
+                    <ul class="recs-list" id="exit-recs"></ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Exit Planning -->
+        <div id="step-2" class="step-panel">
+            <div class="narration">
+                <div class="narration-title">Step 3: Exit Planning — Buyers & Data Room</div>
+                <div class="narration-text">
+                    Preparing for exit? The <strong>buyer analysis</strong> identifies strategic and financial acquirers with fit scores. The <strong>data room</strong> shows your due diligence readiness — what's complete, what's missing. A 100% data room dramatically accelerates deal timelines.
+                </div>
+            </div>
+            <div class="two-panel">
+                <div class="card">
+                    <div class="card-title" id="buyers-title">Potential Buyers</div>
+                    <div id="buyers-content"><div class="loading">Loading...</div></div>
+                </div>
+                <div class="card">
+                    <div class="card-title" id="dr-title">Data Room Status</div>
+                    <div id="dr-content"><div class="loading">Loading...</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: Leadership Network -->
+        <div id="step-3" class="step-panel">
+            <div class="narration">
+                <div class="narration-title">Step 4: Leadership Network</div>
+                <div class="narration-text">
+                    The <strong>leadership graph</strong> maps the connections between your firm's partners, portfolio company boards, and executive teams. This reveals cross-portfolio synergies, identifies key-person risk, and shows where your firm's influence is concentrated.
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Summit Ridge Partners — Leadership Network</div>
+                <div class="graph-legend">
+                    <div class="legend-item"><div class="legend-dot" style="background:#a855f7;"></div> PE Firm</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div> Partner</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#22c55e;"></div> Company</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#94a3b8;"></div> Executive</div>
+                    <div class="legend-item"><div class="legend-line" style="background:#3b82f6;"></div> Employment</div>
+                    <div class="legend-item"><div class="legend-line" style="background:#f97316;border-style:dashed;"></div> Board Seat</div>
+                    <div class="legend-item"><div class="legend-line" style="background:#475569;"></div> Management</div>
+                </div>
+                <div class="graph-container" id="graph-container"><div class="loading">Loading leadership network...</div></div>
+            </div>
+        </div>
+
+        <!-- Nav -->
+        <div class="demo-nav">
+            <button class="btn btn-secondary" id="prev-btn" onclick="prevStep()" disabled>&larr; Previous</button>
+            <span id="step-label" style="color:var(--text-muted);font-size:0.85rem;">Step 1 of 4</span>
+            <button class="btn btn-primary" id="next-btn" onclick="nextStep()">Next &rarr;</button>
+        </div>
+    </main>
+
+    <div class="graph-tooltip" id="graph-tooltip"></div>
+
+<script>
+    const API = '/api/v1';
+    const FIRM_ID = 166; // Summit Ridge Partners
+    let _currentStep = 0;
+    let _portfolioData = [];
+    let _targetCompanyId = null; // MedVantage
+    let _radarChart = null;
+    let _graphSim = null;
+    let _stepsLoaded = [false, false, false, false];
+
+    function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+
+    // ===== Navigation =====
+    function goStep(n) {
+        _currentStep = n;
+        document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+        document.getElementById('step-' + n).classList.add('active');
+
+        document.querySelectorAll('.progress-step').forEach((el, i) => {
+            el.classList.remove('active', 'completed');
+            if (i === n) el.classList.add('active');
+            else if (i < n) el.classList.add('completed');
+        });
+
+        document.getElementById('prev-btn').disabled = n === 0;
+        document.getElementById('next-btn').textContent = n === 3 ? 'Finish Demo' : 'Next →';
+        document.getElementById('step-label').textContent = 'Step ' + (n + 1) + ' of 4';
+
+        loadStepData(n);
+    }
+
+    function nextStep() {
+        if (_currentStep < 3) goStep(_currentStep + 1);
+        else window.location.href = 'index.html#pe';
+    }
+    function prevStep() { if (_currentStep > 0) goStep(_currentStep - 1); }
+
+    // ===== Data Loading =====
+    async function checkSeedData() {
+        try {
+            const r = await fetch(API + '/pe/benchmarks/portfolio/' + FIRM_ID);
+            if (r.ok) {
+                const data = await r.json();
+                if (data && data.length > 0) {
+                    _portfolioData = data;
+                    // Find MedVantage or first company
+                    const mv = data.find(c => c.company_name && c.company_name.includes('MedVantage'));
+                    _targetCompanyId = mv ? mv.company_id : data[0].company_id;
+                    renderPortfolio();
+                    return;
+                }
+            }
+        } catch (e) { /* fall through */ }
+
+        // No data — show seed screen
+        document.getElementById('seed-screen').style.display = '';
+        document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+    }
+
+    async function seedData() {
+        const btn = document.getElementById('seed-btn');
+        btn.disabled = true; btn.textContent = 'Seeding...';
+        try {
+            const r = await fetch(API + '/pe/seed-demo', { method: 'POST' });
+            if (!r.ok) throw new Error('Seed failed');
+            const data = await r.json();
+            btn.textContent = 'Seeded ' + data.total_rows + ' rows!';
+            setTimeout(() => {
+                document.getElementById('seed-screen').style.display = 'none';
+                document.getElementById('step-0').classList.add('active');
+                checkSeedData();
+            }, 800);
+        } catch (e) {
+            btn.textContent = 'Failed — try again';
+            btn.disabled = false;
+        }
+    }
+
+    function loadStepData(n) {
+        if (_stepsLoaded[n]) return;
+        _stepsLoaded[n] = true;
+        if (n === 0) { /* already loaded */ }
+        else if (n === 1) loadBenchmarkAndExit();
+        else if (n === 2) loadBuyersAndDataRoom();
+        else if (n === 3) loadLeadershipGraph();
+    }
+
+    // ===== Step 1: Portfolio =====
+    function renderPortfolio() {
+        const body = document.getElementById('demo-portfolio');
+        const empty = document.getElementById('demo-portfolio-empty');
+        if (!_portfolioData.length) { empty.style.display = ''; return; }
+        empty.style.display = 'none';
+
+        body.innerHTML = _portfolioData.map(c => {
+            const pctl = avgPctl(c.metrics);
+            const pc = pctl >= 75 ? 'green' : pctl >= 25 ? 'yellow' : 'red';
+            const rg = c.metrics ? c.metrics.revenue_growth : null;
+            const eb = c.metrics ? c.metrics.ebitda_margin : null;
+            const trend = avgPctl(c.metrics) >= 60 ? 'improving' : avgPctl(c.metrics) <= 35 ? 'declining' : 'stable';
+            const ti = trend === 'improving' ? '↑' : trend === 'declining' ? '↓' : '→';
+            const indCls = { Healthcare: 'pill-hc', Software: 'pill-sw', Industrials: 'pill-ind', Technology: 'pill-tech' }[c.industry] || '';
+            const stCls = c.status === 'Active' ? 'pill-active' : 'pill-exited';
+            const sel = c.company_id === _targetCompanyId ? ' selected' : '';
+            return `<tr class="${sel}" onclick="selectCompany(${c.company_id})">
+                <td><strong>${esc(c.company_name)}</strong></td>
+                <td><span class="pill ${indCls}">${esc(c.industry || '—')}</span></td>
+                <td><span class="pill ${stCls}">${esc(c.status || '—')}</span></td>
+                <td class="pct-cell ${rgColor(rg)}">${rg != null ? rg + 'th' : '—'}</td>
+                <td class="pct-cell ${rgColor(eb)}">${eb != null ? eb + 'th' : '—'}</td>
+                <td class="pct-cell ${pc}">${pctl + 'th'}</td>
+                <td><span class="trend ${trend}">${ti} ${trend}</span></td>
+            </tr>`;
+        }).join('');
+    }
+
+    function avgPctl(metrics) {
+        if (!metrics) return 0;
+        const vals = Object.values(metrics).filter(v => v != null);
+        return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+    }
+    function rgColor(v) { return v != null && v >= 50 ? 'green' : v != null && v >= 25 ? 'yellow' : 'red'; }
+
+    function selectCompany(id) {
+        _targetCompanyId = id;
+        _stepsLoaded[1] = false;
+        _stepsLoaded[2] = false;
+        renderPortfolio();
+        goStep(1);
+    }
+
+    // ===== Step 2: Benchmark + Exit =====
+    async function loadBenchmarkAndExit() {
+        if (!_targetCompanyId) return;
+        try {
+            const [bench, exit] = await Promise.all([
+                fetch(API + '/pe/benchmarks/' + _targetCompanyId).then(r => r.ok ? r.json() : null),
+                fetch(API + '/pe/exit-readiness/' + _targetCompanyId).then(r => r.ok ? r.json() : null),
+            ]);
+            if (bench) renderBenchmark(bench);
+            if (exit) renderExit(exit);
+        } catch (e) { console.error('Step 2 load error:', e); }
+    }
+
+    function renderBenchmark(data) {
+        document.getElementById('bench-title').textContent = data.company_name + ' — Benchmarks (FY' + data.fiscal_year + ')';
+        const kpiKeys = ['revenue_growth', 'ebitda_margin', 'debt_to_ebitda', 'fcf_margin'];
+        const kpiLabels = { revenue_growth: 'Rev Growth', ebitda_margin: 'EBITDA %', debt_to_ebitda: 'Debt/EBITDA', fcf_margin: 'FCF Margin' };
+        const grid = document.getElementById('bench-kpis');
+        grid.innerHTML = '';
+        for (const key of kpiKeys) {
+            const m = data.metrics.find(x => x.metric === key);
+            if (!m) continue;
+            const val = m.value != null ? (key === 'debt_to_ebitda' ? m.value.toFixed(1) + 'x' : m.value.toFixed(1) + '%') : '—';
+            const ti = m.trend === 'improving' ? '↑' : m.trend === 'declining' ? '↓' : '→';
+            grid.innerHTML += `<div class="kpi"><div class="kpi-value">${val}</div><div class="kpi-label">${kpiLabels[key]}</div><div class="trend ${m.trend || 'stable'}" style="font-size:0.7rem;margin-top:0.15rem;">${ti} ${m.percentile != null ? m.percentile + 'th' : ''}</div></div>`;
+        }
+
+        // Radar
+        const canvas = document.getElementById('bench-radar');
+        if (_radarChart) { _radarChart.destroy(); _radarChart = null; }
+        const metrics = data.metrics.filter(m => m.percentile != null);
+        if (!metrics.length) return;
+        _radarChart = new Chart(canvas, {
+            type: 'radar',
+            data: {
+                labels: metrics.map(m => m.label),
+                datasets: [{
+                    label: data.company_name, data: metrics.map(m => m.percentile),
+                    backgroundColor: 'rgba(99,102,241,0.2)', borderColor: '#6366f1', borderWidth: 2, pointBackgroundColor: '#6366f1', pointRadius: 4,
+                }, {
+                    label: 'Peer Median', data: metrics.map(() => 50),
+                    backgroundColor: 'rgba(148,163,184,0.08)', borderColor: '#64748b', borderWidth: 1, borderDash: [4,4], pointRadius: 0,
+                }],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: true,
+                plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 } } } },
+                scales: { r: { min: 0, max: 100, ticks: { stepSize: 25, color: '#64748b', backdropColor: 'transparent' }, grid: { color: 'rgba(51,65,85,0.5)' }, angleLines: { color: 'rgba(51,65,85,0.5)' }, pointLabels: { color: '#94a3b8', font: { size: 11 } } } },
+            },
+        });
+    }
+
+    function renderExit(data) {
+        document.getElementById('exit-title').textContent = data.company_name + ' — Exit Readiness';
+        const score = Math.round(data.composite_score);
+        const gc = { 'A+':'#22c55e','A':'#22c55e','A-':'#4ade80','B+':'#a3e635','B':'#eab308','B-':'#f59e0b','C+':'#f97316','C':'#f97316','C-':'#ef4444','D':'#ef4444','F':'#dc2626' };
+        const color = gc[data.grade] || '#6366f1';
+        const circ = 2 * Math.PI * 72;
+        const off = circ * (1 - score / 100);
+        document.getElementById('exit-gauge').innerHTML = `
+            <svg width="180" height="180" viewBox="0 0 180 180">
+                <circle cx="90" cy="90" r="72" fill="none" stroke="#1e293b" stroke-width="12"/>
+                <circle cx="90" cy="90" r="72" fill="none" stroke="${color}" stroke-width="12" stroke-dasharray="${circ}" stroke-dashoffset="${off}" stroke-linecap="round" transform="rotate(-90 90 90)" style="transition:stroke-dashoffset 1s;"/>
+                <text x="90" y="82" text-anchor="middle" fill="${color}" style="font-size:2.5rem;font-weight:700;">${score}</text>
+                <text x="90" y="110" text-anchor="middle" fill="${color}" style="font-size:1.25rem;font-weight:600;">${data.grade}</text>
+            </svg>
+            <div class="gauge-confidence">Confidence: ${esc(data.confidence)}</div>`;
+
+        document.getElementById('exit-bars').innerHTML = data.sub_scores.map(s => {
+            const bc = gc[s.grade] || '#6366f1';
+            return `<div class="ss-row"><div class="ss-label">${esc(s.label)}</div><div class="ss-bar-bg"><div class="ss-bar-fill" style="width:${Math.max(s.raw_score,5)}%;background:${bc};">${Math.round(s.raw_score)}</div></div><div class="ss-grade" style="color:${bc};">${s.grade}</div></div>`;
+        }).join('');
+
+        document.getElementById('exit-recs').innerHTML = data.recommendations.slice(0, 5).map((r, i) =>
+            `<li class="${i < 2 ? 'high' : ''}">${esc(r)}</li>`).join('');
+    }
+
+    // ===== Step 3: Buyers + Data Room =====
+    async function loadBuyersAndDataRoom() {
+        if (!_targetCompanyId) return;
+        try {
+            const [buyers, dr] = await Promise.all([
+                fetch(API + '/pe/buyer-analysis/' + _targetCompanyId).then(r => r.ok ? r.json() : null).catch(() => null),
+                fetch(API + '/pe/data-room/' + _targetCompanyId).then(r => r.ok ? r.json() : null).catch(() => null),
+            ]);
+            if (buyers) renderBuyers(buyers);
+            else document.getElementById('buyers-content').innerHTML = '<div class="loading">No buyer data available.</div>';
+            if (dr) renderDataRoom(dr);
+            else document.getElementById('dr-content').innerHTML = '<div class="loading">No data room available.</div>';
+        } catch (e) { console.error('Step 3 load error:', e); }
+    }
+
+    function renderBuyers(data) {
+        document.getElementById('buyers-title').textContent = data.company_name + ' — Potential Buyers (' + data.total_candidates + ')';
+        const all = [...(data.strategic_buyers || []), ...(data.financial_buyers || [])].sort((a, b) => b.fit_score - a.fit_score);
+        if (!all.length) { document.getElementById('buyers-content').innerHTML = '<div class="loading">No buyers identified.</div>'; return; }
+        let h = '<table class="ptable"><thead><tr><th>Buyer</th><th>Type</th><th>Fit</th><th>Rationale</th></tr></thead><tbody>';
+        for (const b of all) {
+            const tc = b.buyer_type === 'Strategic' ? 'Strategic' : b.buyer_type === 'Financial' ? 'Financial' : 'PE';
+            const fc = b.fit_score >= 70 ? 'var(--success)' : b.fit_score >= 40 ? 'var(--warning)' : 'var(--error)';
+            const tick = b.ticker ? `<span class="ticker">${esc(b.ticker)}</span>` : '';
+            h += `<tr><td><strong>${esc(b.name)}</strong>${tick}</td><td><span class="buyer-type ${tc}">${esc(b.buyer_type)}</span></td><td><div class="fit-bar-bg"><div class="fit-bar-fill" style="width:${b.fit_score}%;background:${fc};"></div></div> ${b.fit_score}</td><td><div class="buyer-rationale">${esc(b.rationale)}</div></td></tr>`;
+        }
+        h += '</tbody></table>';
+        document.getElementById('buyers-content').innerHTML = h;
+    }
+
+    function renderDataRoom(data) {
+        document.getElementById('dr-title').textContent = data.company_name + ' — Data Room';
+        const pct = data.completeness_pct || 0;
+        const pc = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--error)';
+        const secs = [
+            { label: 'Financials', count: (data.financials||[]).length, unit: 'years' },
+            { label: 'Leadership', count: (data.leadership||[]).length, unit: 'people' },
+            { label: 'Competitors', count: (data.competitors||[]).length, unit: 'mapped' },
+            { label: 'News', count: (data.recent_news||[]).length, unit: 'articles' },
+            { label: 'Benchmarks', count: data.benchmarks ? 1 : 0, unit: '' },
+            { label: 'Exit Score', count: data.exit_readiness ? 1 : 0, unit: '' },
+        ];
+        let h = `<div class="dr-gauge"><div class="dr-bar"><div class="dr-fill" style="width:${pct}%;background:${pc};"></div></div><div class="dr-pct" style="color:${pc};">${pct}%</div></div><div class="dr-sections">`;
+        for (const s of secs) {
+            const ok = s.count > 0;
+            h += `<div class="dr-sec"><div class="dr-check ${ok?'ok':'missing'}">${ok?'&#10003;':'&#10007;'}</div><div><div class="dr-label">${s.label}</div><div class="dr-count">${ok ? s.count + ' ' + s.unit : 'Missing'}</div></div></div>`;
+        }
+        h += '</div>';
+        if (data.missing_sections && data.missing_sections.length) {
+            h += '<div style="display:flex;flex-wrap:wrap;gap:0.375rem;margin-top:0.75rem;">';
+            data.missing_sections.forEach(m => h += `<span class="gap-chip">${esc(m)}</span>`);
+            h += '</div>';
+        }
+        document.getElementById('dr-content').innerHTML = h;
+    }
+
+    // ===== Step 4: Leadership Graph =====
+    async function loadLeadershipGraph() {
+        const container = document.getElementById('graph-container');
+        try {
+            const r = await fetch(API + '/pe/leadership-graph/' + FIRM_ID);
+            if (!r.ok) throw new Error(r.statusText);
+            const graph = await r.json();
+            if (!graph.nodes || !graph.nodes.length) {
+                container.innerHTML = '<div class="loading">No leadership data. Run seed first.</div>';
+                return;
+            }
+            renderForceGraph(container, graph);
+        } catch (e) {
+            container.innerHTML = '<div class="loading">Could not load leadership graph.</div>';
+            console.error('Graph error:', e);
+        }
+    }
+
+    function renderForceGraph(container, graph) {
+        container.innerHTML = '';
+        const w = container.clientWidth || 900;
+        const h = 500;
+        const tip = document.getElementById('graph-tooltip');
+
+        const svg = d3.select(container).append('svg')
+            .attr('width', w).attr('height', h)
+            .attr('viewBox', [0, 0, w, h]);
+
+        const g = svg.append('g');
+        svg.call(d3.zoom().scaleExtent([0.3, 4]).on('zoom', e => g.attr('transform', e.transform)));
+
+        const nodeColors = { firm: '#a855f7', pe_person: '#3b82f6', company: '#22c55e', executive: '#94a3b8' };
+        const nodeRadius = { firm: 16, pe_person: 10, company: 12, executive: 7 };
+        const linkColors = { employment: '#3b82f6', board_seat: '#f97316', management: '#475569' };
+
+        if (_graphSim) _graphSim.stop();
+
+        const simulation = d3.forceSimulation(graph.nodes)
+            .force('link', d3.forceLink(graph.links).id(d => d.id).distance(80))
+            .force('charge', d3.forceManyBody().strength(-200))
+            .force('center', d3.forceCenter(w / 2, h / 2))
+            .force('collision', d3.forceCollide().radius(d => (nodeRadius[d.type] || 8) + 5));
+        _graphSim = simulation;
+
+        const link = g.append('g').selectAll('line').data(graph.links).join('line')
+            .attr('stroke', d => linkColors[d.type] || '#475569')
+            .attr('stroke-width', d => d.type === 'board_seat' ? 2 : 1.5)
+            .attr('stroke-dasharray', d => d.type === 'board_seat' ? '6,3' : 'none')
+            .attr('stroke-opacity', 0.6);
+
+        const node = g.append('g').selectAll('g').data(graph.nodes).join('g')
+            .call(d3.drag().on('start', (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+                .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
+                .on('end', (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
+
+        node.append('circle')
+            .attr('r', d => nodeRadius[d.type] || 8)
+            .attr('fill', d => nodeColors[d.type] || '#94a3b8')
+            .attr('stroke', '#0f172a').attr('stroke-width', 2);
+
+        node.append('text')
+            .attr('dy', d => -(nodeRadius[d.type] || 8) - 4)
+            .attr('text-anchor', 'middle')
+            .attr('fill', '#94a3b8').attr('font-size', '9px')
+            .text(d => d.name.length > 18 ? d.name.substring(0, 16) + '...' : d.name);
+
+        node.on('mouseover', (e, d) => {
+            tip.style.display = 'block';
+            tip.innerHTML = `<strong style="color:${nodeColors[d.type]}">${esc(d.name)}</strong><br><span style="color:var(--text-muted)">${esc(d.title || d.type)}${d.industry ? ' — ' + esc(d.industry) : ''}</span>`;
+        }).on('mousemove', e => {
+            tip.style.left = (e.clientX + 12) + 'px';
+            tip.style.top = (e.clientY - 10) + 'px';
+        }).on('mouseout', () => { tip.style.display = 'none'; });
+
+        simulation.on('tick', () => {
+            link.attr('x1', d => d.source.x).attr('y1', d => d.source.y).attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
+    }
+
+    // ===== Init =====
+    checkSeedData();
+</script>
+</body>
+</html>
