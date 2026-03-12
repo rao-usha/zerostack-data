@@ -152,27 +152,24 @@ class EPAEnvirofactsCollector(BaseCollector):
             )
 
     async def _collect_tri_facilities(self, config: CollectionConfig) -> Dict[str, Any]:
-        """Collect TRI facilities from EPA Envirofacts with pagination."""
+        """Collect TRI facilities from EPA Envirofacts with state-level concurrency."""
         try:
-            client = await self.get_client()
-            all_facilities = []
-
             states = config.states if config.states else US_STATES
 
-            for state_idx, state in enumerate(states):
+            async def _collect_state(state: str):
+                """Fetch all TRI facilities for a single state (paginated)."""
+                client = await self.get_client()
+                state_facilities = []
                 offset = 0
-                state_count = 0
 
                 while True:
-                    await self.apply_rate_limit()
-
-                    # TRI uses STATE_ABBR (not STATE_CODE)
                     url = (
                         f"{self.ENVIROFACTS_URL}/TRI_FACILITY/STATE_ABBR/{state}"
                         f"/rows/{offset}:{offset + self.PAGE_SIZE}/JSON"
                     )
 
                     try:
+                        await self.apply_rate_limit()
                         response = await client.get(url)
 
                         if response.status_code != 200:
@@ -185,8 +182,7 @@ class EPAEnvirofactsCollector(BaseCollector):
                         if not data:
                             break
 
-                        all_facilities.extend(data)
-                        state_count += len(data)
+                        state_facilities.extend(data)
 
                         if len(data) < self.PAGE_SIZE:
                             break
@@ -198,14 +194,15 @@ class EPAEnvirofactsCollector(BaseCollector):
                         )
                         break
 
-                if state_count > 0:
-                    logger.info(f"Retrieved {state_count} TRI facilities for {state}")
+                if state_facilities:
+                    logger.info(f"Retrieved {len(state_facilities)} TRI facilities for {state}")
 
-                self.update_progress(
-                    processed=state_idx + 1,
-                    total=len(states),
-                    current_step=f"Fetched TRI facilities for {state} ({state_count} records)",
-                )
+                return state_facilities
+
+            # Use collect_states_concurrent for 4x speedup
+            all_facilities = await self.collect_states_concurrent(
+                states, _collect_state, max_concurrent=4
+            )
 
             if not all_facilities:
                 return {"processed": 0, "inserted": 0}
