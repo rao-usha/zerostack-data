@@ -31,6 +31,7 @@ from app.core.pe_models import (
     PEFund,
     PEFundInvestment,
     PEFundPerformance,
+    PEInvestmentThesis,
     PEPerson,
     PEFirmPeople,
     PEPortfolioCompany,
@@ -1074,6 +1075,13 @@ DEALS = [
     # Ironforge Industrial pipeline
     {"company_name": "Lone Star Precision Parts", "deal_name": "Lone Star Add-on to Titan Platform", "deal_type": "Add-on", "deal_sub_type": "Bolt-on", "announced_date": date(2026, 1, 20), "expected_close_date": date(2026, 3, 31), "enterprise_value_usd": Decimal("95000000"), "ev_ebitda_multiple": Decimal("8.2"), "ltm_revenue_usd": Decimal("42000000"), "ltm_ebitda_usd": Decimal("11600000"), "buyer_name": "Ironforge Industrial Capital", "seller_name": "Founder", "seller_type": "Founder", "status": "LOI", "data_source": "demo_seeder"},
     {"company_name": "Summit HVAC Services", "deal_name": "Summit HVAC Add-on to Continental", "deal_type": "Add-on", "deal_sub_type": "Bolt-on", "announced_date": date(2026, 2, 20), "enterprise_value_usd": Decimal("72000000"), "ev_ebitda_multiple": Decimal("7.8"), "ltm_revenue_usd": Decimal("28000000"), "ltm_ebitda_usd": Decimal("9200000"), "buyer_name": "Ironforge Industrial Capital", "seller_name": "Founder", "seller_type": "Founder", "status": "Screening", "data_source": "demo_seeder"},
+    # Auto-sourced deals (from market scanner / acquisition scorer automation)
+    {"company_name": "MedVantage Health Systems", "deal_name": "MedVantage Health Systems — Auto-Sourced", "deal_type": "LBO", "deal_sub_type": "Platform", "announced_date": date(2026, 3, 10), "enterprise_value_usd": Decimal("220000000"), "ev_ebitda_multiple": Decimal("12.5"), "ltm_revenue_usd": Decimal("65000000"), "ltm_ebitda_usd": Decimal("17600000"), "buyer_name": "Summit Ridge Partners", "seller_name": "Private", "seller_type": "Founder", "status": "Screening", "data_source": "market_scanner"},
+    {"company_name": "Clearpath EHR Solutions", "deal_name": "Clearpath EHR Solutions — Auto-Sourced", "deal_type": "Growth", "deal_sub_type": "Minority Growth", "announced_date": date(2026, 3, 10), "enterprise_value_usd": Decimal("48000000"), "ev_revenue_multiple": Decimal("6.3"), "ltm_revenue_usd": Decimal("7600000"), "ltm_ebitda_usd": Decimal("1900000"), "buyer_name": "Cascade Growth Equity", "seller_name": "Founders", "seller_type": "Founder", "status": "Screening", "data_source": "market_scanner"},
+    {"company_name": "Brightline Analytics", "deal_name": "Brightline Analytics — Auto-Sourced", "deal_type": "Growth", "deal_sub_type": "Minority Growth", "announced_date": date(2026, 3, 11), "enterprise_value_usd": Decimal("75000000"), "ev_revenue_multiple": Decimal("10.1"), "ltm_revenue_usd": Decimal("7400000"), "ltm_ebitda_usd": Decimal("1300000"), "buyer_name": "Cascade Growth Equity", "seller_name": "Founders", "seller_type": "VC-Backed", "status": "DD", "data_source": "acquisition_scorer"},
+    {"company_name": "Titan Precision Manufacturing", "deal_name": "Titan Precision — Auto-Sourced Bolt-on", "deal_type": "Add-on", "deal_sub_type": "Bolt-on", "announced_date": date(2026, 3, 8), "enterprise_value_usd": Decimal("110000000"), "ev_ebitda_multiple": Decimal("8.5"), "ltm_revenue_usd": Decimal("48000000"), "ltm_ebitda_usd": Decimal("12900000"), "buyer_name": "Ironforge Industrial Capital", "seller_name": "Founder", "seller_type": "Founder", "status": "Screening", "data_source": "market_scanner"},
+    {"company_name": "Great Lakes Plastics", "deal_name": "Great Lakes Plastics — Auto-Sourced", "deal_type": "LBO", "deal_sub_type": "Platform", "announced_date": date(2026, 3, 12), "enterprise_value_usd": Decimal("200000000"), "ev_ebitda_multiple": Decimal("10.5"), "ltm_revenue_usd": Decimal("78000000"), "ltm_ebitda_usd": Decimal("19000000"), "buyer_name": "Ironforge Industrial Capital", "seller_name": "Founder", "seller_type": "Founder", "status": "Screening", "data_source": "acquisition_scorer"},
+    {"company_name": "Northwest Automation Group", "deal_name": "Northwest Automation — Auto-Sourced", "deal_type": "LBO", "deal_sub_type": "Platform", "announced_date": date(2026, 3, 11), "enterprise_value_usd": Decimal("150000000"), "ev_ebitda_multiple": Decimal("12.5"), "ltm_revenue_usd": Decimal("52000000"), "ltm_ebitda_usd": Decimal("12000000"), "buyer_name": "Ironforge Industrial Capital", "seller_name": "Founder", "seller_type": "Founder", "status": "DD", "data_source": "market_scanner"},
 ]
 
 
@@ -1778,6 +1786,242 @@ async def seed_pe_demo_data(db: Session) -> Dict[str, int]:
                 sub_count += 1
     db.flush()
     counts["pe_alert_subscriptions"] = sub_count
+
+    # 23. Pre-generated investment theses (hardcoded, no LLM needed)
+    thesis_count = 0
+    demo_theses = {
+        "MedVantage Health Systems": {
+            "executive_summary": "MedVantage is a high-growth healthcare services platform with strong recurring revenue, expanding margins, and significant whitespace in the $45B ambulatory services market. The combination of organic growth (18% CAGR) and proven tuck-in M&A capability positions the company for a premium exit within 18-24 months.",
+            "strengths": [
+                "18% revenue CAGR over 3 years with accelerating trajectory",
+                "85% recurring/contracted revenue from multi-year payer agreements",
+                "Strong management team — CEO has 2 prior successful PE exits in healthcare",
+                "EBITDA margin expansion from 22% to 28% through operational improvements",
+                "Regulatory tailwinds from value-based care transition"
+            ],
+            "risks": [
+                "Reimbursement rate pressure from CMS policy changes",
+                "Key-person risk — CEO and CMO drive most strategic relationships",
+                "Integration execution risk on recent acquisitions",
+                "Competitive pressure from larger health systems building in-house capabilities"
+            ],
+            "value_creation_levers": [
+                "Revenue synergies from cross-selling diagnostics to existing patient base",
+                "Margin expansion through shared services consolidation (target: 32% EBITDA)",
+                "Geographic expansion into 3 adjacent MSAs with identified acquisition targets",
+                "Technology platform investment to enable telehealth and remote monitoring",
+                "Payer mix optimization — shift from 60% to 45% government payer exposure"
+            ],
+            "exit_strategy": {
+                "recommended_path": "Strategic Sale",
+                "target_timeline": "18-24 months",
+                "rationale": "Large strategic acquirers (UnitedHealth, CVS/Aetna) actively acquiring ambulatory platforms at 14-18x EBITDA. IPO viable as backup given scale and growth profile."
+            },
+            "comparable_multiples": {
+                "entry_multiple": "11.5x EV/EBITDA",
+                "current_implied": "13.2x EV/EBITDA",
+                "target_exit": "15.5x EV/EBITDA"
+            },
+            "key_metrics_to_watch": [
+                "Same-store revenue growth (target >10%)",
+                "Patient volume per clinic",
+                "Net revenue retention rate",
+                "EBITDA margin trajectory",
+                "Payer mix shift progress"
+            ],
+            "investment_recommendation": "Strong Buy",
+            "confidence_level": "High"
+        },
+        "CloudShield Security": {
+            "executive_summary": "CloudShield is a fast-growing cybersecurity platform addressing the $28B endpoint security market. With 35% ARR growth, 120% net retention, and a differentiated AI-driven threat detection engine, the company is positioned for a premium exit via strategic acquisition or growth equity recap.",
+            "strengths": [
+                "35% ARR growth with improving unit economics",
+                "120% net dollar retention — best-in-class for mid-market cyber",
+                "AI/ML threat detection engine provides sustainable competitive moat",
+                "Land-and-expand motion working — avg deal size up 40% YoY",
+                "Strong product-market fit in underserved mid-market segment (500-5000 employees)"
+            ],
+            "risks": [
+                "Crowded competitive landscape — CrowdStrike, SentinelOne expanding downmarket",
+                "Customer concentration — top 10 accounts represent 28% of ARR",
+                "Burn rate requires continued funding if growth doesn't translate to profitability",
+                "Key engineering talent retention in competitive Austin tech market"
+            ],
+            "value_creation_levers": [
+                "Channel partner program expansion (currently 15% of pipeline, target 40%)",
+                "FedRAMP certification to unlock $8B government cybersecurity market",
+                "Platform expansion into identity and access management (IAM)",
+                "International expansion — EMEA represents $0 today vs $12B TAM",
+                "Operational efficiency — path to breakeven at $80M ARR (currently $52M)"
+            ],
+            "exit_strategy": {
+                "recommended_path": "Strategic Sale",
+                "target_timeline": "24-36 months",
+                "rationale": "Cybersecurity M&A remains highly active — Palo Alto, Cisco, and CrowdStrike acquiring at 12-20x ARR for differentiated platforms. Achieve $80M+ ARR to maximize strategic premium."
+            },
+            "comparable_multiples": {
+                "entry_multiple": "8.5x ARR",
+                "current_implied": "10.2x ARR",
+                "target_exit": "14.0x ARR"
+            },
+            "key_metrics_to_watch": [
+                "ARR growth rate (target >30%)",
+                "Net dollar retention (target >115%)",
+                "CAC payback period",
+                "Gross margin (target >75%)",
+                "Rule of 40 score"
+            ],
+            "investment_recommendation": "Buy",
+            "confidence_level": "High"
+        },
+        "Apex Revenue Solutions": {
+            "executive_summary": "Apex is a specialized revenue cycle management (RCM) platform serving mid-market healthcare providers. The company's automation-first approach drives 15% higher collection rates than legacy competitors, creating a compelling value proposition in the $22B RCM market. Strong fundamentals support a 2.5-3.0x MOIC through operational improvements and strategic add-on acquisitions.",
+            "strengths": [
+                "95% gross revenue retention with 3-year average contract terms",
+                "Automation platform reduces client collection costs by 30% vs manual RCM",
+                "Proven M&A playbook — 3 successful tuck-ins with >90% client retention",
+                "Deep domain expertise — management team averages 18 years in healthcare RCM",
+                "Countercyclical demand — healthcare billing complexity drives outsourcing"
+            ],
+            "risks": [
+                "Technology disruption from AI-native RCM startups",
+                "Healthcare provider consolidation could shift bargaining power",
+                "Regulatory changes to surprise billing rules may reduce RCM complexity",
+                "Integration risk on future acquisitions as targets become larger"
+            ],
+            "value_creation_levers": [
+                "Platform consolidation of 3 acquired brands onto single tech stack",
+                "Upsell analytics and denial management modules to existing base",
+                "Expand into adjacent verticals (dental, behavioral health)",
+                "Nearshore delivery model to improve margins by 400-600 bps",
+                "Price optimization — current pricing 10-15% below market for equivalent service"
+            ],
+            "exit_strategy": {
+                "recommended_path": "Strategic Sale",
+                "target_timeline": "24-36 months",
+                "rationale": "Large RCM platforms (R1 RCM, Ensemble Health) actively acquiring to add mid-market capabilities. PE-to-PE secondary also viable given predictable cash flows."
+            },
+            "comparable_multiples": {
+                "entry_multiple": "10.0x EV/EBITDA",
+                "current_implied": "11.8x EV/EBITDA",
+                "target_exit": "13.5x EV/EBITDA"
+            },
+            "key_metrics_to_watch": [
+                "Net revenue per FTE",
+                "Client collection rate improvement",
+                "Platform migration completion %",
+                "Cross-sell attach rate",
+                "Employee attrition rate"
+            ],
+            "investment_recommendation": "Buy",
+            "confidence_level": "Medium"
+        },
+        "TrueNorth Behavioral": {
+            "executive_summary": "TrueNorth operates a growing behavioral health platform in one of healthcare's most supply-constrained segments. With the behavioral health market projected to grow 8% annually and severe provider shortages, TrueNorth's hybrid in-person/telehealth model and payer partnerships position it for outsized growth and a premium exit.",
+            "strengths": [
+                "Behavioral health demand far outstrips supply — 160M Americans in shortage areas",
+                "Hybrid care model (60% in-person, 40% telehealth) improves access and utilization",
+                "Value-based contracts with 3 major payers provide revenue predictability",
+                "Clinician retention rate of 88% vs industry average of 72%",
+                "Strong referral network — 60% of new patients from existing provider relationships"
+            ],
+            "risks": [
+                "Clinician recruitment remains challenging and expensive",
+                "Telehealth reimbursement parity at risk as COVID-era waivers expire",
+                "State-by-state licensing complexity limits speed of geographic expansion",
+                "Stigma and no-show rates higher in behavioral health than general medical"
+            ],
+            "value_creation_levers": [
+                "De novo clinic expansion — 8 new locations planned in high-demand MSAs",
+                "Measurement-based care platform to demonstrate outcomes and justify premium rates",
+                "School-based behavioral health contracts (growing segment, less competition)",
+                "Group therapy and intensive outpatient programs to improve clinician leverage",
+                "Payer direct contracting for substance abuse treatment (higher reimbursement)"
+            ],
+            "exit_strategy": {
+                "recommended_path": "Strategic Sale",
+                "target_timeline": "24-36 months",
+                "rationale": "Acadia Healthcare, Universal Health Services, and large health systems aggressively acquiring behavioral health platforms. Scarcity value drives 14-18x EBITDA multiples."
+            },
+            "comparable_multiples": {
+                "entry_multiple": "12.0x EV/EBITDA",
+                "current_implied": "13.5x EV/EBITDA",
+                "target_exit": "16.0x EV/EBITDA"
+            },
+            "key_metrics_to_watch": [
+                "Clinician headcount growth",
+                "Patient visits per clinician per week",
+                "No-show rate trend",
+                "Payer mix (commercial vs Medicaid)",
+                "Outcomes scores (PHQ-9, GAD-7 improvement rates)"
+            ],
+            "investment_recommendation": "Strong Buy",
+            "confidence_level": "High"
+        },
+        "Precision Lab Diagnostics": {
+            "executive_summary": "Precision Lab is a specialty diagnostics company focused on high-complexity molecular testing. While smaller than peers, the company's CLIA-certified lab network and physician relationships provide a defensible niche. The investment thesis centers on margin expansion through test menu optimization and operational efficiency gains.",
+            "strengths": [
+                "High-complexity CLIA certification creates meaningful barrier to entry",
+                "Molecular testing growing 12% annually vs 3% for routine diagnostics",
+                "Physician direct relationships — 2,400 ordering physicians in network",
+                "Proprietary test panels with premium reimbursement rates",
+                "Asset-light specimen collection model (courier network, no retail labs)"
+            ],
+            "risks": [
+                "Reimbursement risk — PAMA rate cuts have compressed lab economics",
+                "Technology platform needs modernization ($2-3M investment required)",
+                "Single-site lab concentration — disaster recovery vulnerability",
+                "Quest/Labcorp competitive pressure on commodity test volumes"
+            ],
+            "value_creation_levers": [
+                "Test menu rationalization — exit low-margin commodity panels",
+                "Pharmacogenomics (PGx) test launch targeting psychiatry and oncology",
+                "Lab automation investment to reduce cost per test by 20%",
+                "Hub-and-spoke lab model — add second processing site for redundancy",
+                "Revenue integrity program — reduce claim denial rate from 8% to 3%"
+            ],
+            "exit_strategy": {
+                "recommended_path": "Strategic Sale",
+                "target_timeline": "24-36 months",
+                "rationale": "Regional lab consolidation continues as Quest and Labcorp divest non-core assets. Specialty lab platforms command premiums — recent comps at 12-14x EBITDA for molecular-focused labs."
+            },
+            "comparable_multiples": {
+                "entry_multiple": "9.0x EV/EBITDA",
+                "current_implied": "10.0x EV/EBITDA",
+                "target_exit": "12.5x EV/EBITDA"
+            },
+            "key_metrics_to_watch": [
+                "Test volume growth by complexity tier",
+                "Revenue per test trend",
+                "Denial rate and days in AR",
+                "Clinician ordering base growth",
+                "Gross margin by test category"
+            ],
+            "investment_recommendation": "Hold",
+            "confidence_level": "Medium"
+        },
+    }
+
+    for company_name, thesis_data in demo_theses.items():
+        co_id = _lookup_id(db, PEPortfolioCompany, name=company_name)
+        if not co_id:
+            continue
+        existing = db.execute(
+            select(PEInvestmentThesis).where(PEInvestmentThesis.company_id == co_id)
+        ).scalar_one_or_none()
+        if not existing:
+            db.add(PEInvestmentThesis(
+                company_id=co_id,
+                thesis_data=thesis_data,
+                model_used="demo-seeder-v1",
+                input_tokens=0,
+                output_tokens=0,
+                cost_usd=Decimal("0.00"),
+                generated_at=datetime.utcnow(),
+            ))
+            thesis_count += 1
+    db.flush()
+    counts["pe_investment_theses"] = thesis_count
 
     db.commit()
 

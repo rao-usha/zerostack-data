@@ -1022,6 +1022,160 @@ async def get_data_room_package(
 
 
 # =============================================================================
+# Company 360 — Unified Intelligence View
+# =============================================================================
+
+
+class Company360SectionResponse(BaseModel):
+    """Generic section wrapper for optional data."""
+    pass
+
+
+class Company360Response(BaseModel):
+    company_id: int
+    company_name: str
+    profile: Optional[Dict[str, Any]] = None
+    benchmarks: Optional[Dict[str, Any]] = None
+    exit_readiness: Optional[Dict[str, Any]] = None
+    deal_score: Optional[Dict[str, Any]] = None
+    comparable_transactions: Optional[Dict[str, Any]] = None
+    buyer_analysis: Optional[Dict[str, Any]] = None
+    leadership: List[Dict[str, Any]] = []
+    competitors: List[Dict[str, Any]] = []
+    recent_alerts: List[Dict[str, Any]] = []
+    pipeline_deals: List[Dict[str, Any]] = []
+    snapshot_trend: Optional[Dict[str, Any]] = None
+    thesis: Optional[Dict[str, Any]] = None
+    data_completeness: int = 0
+
+
+@router.get("/companies/{company_id}/360", response_model=Company360Response)
+async def get_company_360_view(
+    company_id: int,
+    firm_id: Optional[int] = Query(None, description="Optional firm ID for firm-scoped data"),
+    db: Session = Depends(get_db),
+):
+    """
+    Unified Company 360 view — all intelligence about a PE target in a single response.
+
+    Aggregates 12 data sections: profile, benchmarks, exit readiness, deal score,
+    comparable transactions, buyer analysis, leadership, competitors, alerts,
+    pipeline deals, snapshot trend, and investment thesis.
+
+    Missing sections return null/empty — never error.
+    """
+    from app.core.pe_company_360 import get_company_360
+
+    result = get_company_360(db, company_id, firm_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Company {company_id} not found")
+
+    return Company360Response(
+        company_id=result.company_id,
+        company_name=result.company_name,
+        profile=result.profile,
+        benchmarks=result.benchmarks,
+        exit_readiness=result.exit_readiness,
+        deal_score=result.deal_score,
+        comparable_transactions=result.comparable_transactions,
+        buyer_analysis=result.buyer_analysis,
+        leadership=result.leadership,
+        competitors=result.competitors,
+        recent_alerts=result.recent_alerts,
+        pipeline_deals=result.pipeline_deals,
+        snapshot_trend=result.snapshot_trend,
+        thesis=result.thesis,
+        data_completeness=result.data_completeness,
+    )
+
+
+# =============================================================================
+# Investment Thesis
+# =============================================================================
+
+
+class ThesisResponse(BaseModel):
+    company_id: int
+    company_name: str
+    thesis: Optional[Dict[str, Any]] = None
+    generated_at: Optional[str] = None
+    model_used: Optional[str] = None
+    cost_usd: Optional[float] = None
+    from_cache: bool = False
+
+
+@router.get("/companies/{company_id}/thesis", response_model=ThesisResponse)
+async def get_investment_thesis(
+    company_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Get the cached investment thesis for a company.
+
+    Returns the most recent thesis if available.
+    Use POST .../thesis/refresh to generate a new one.
+    """
+    from app.core.pe_thesis_generator import generate_thesis
+
+    result = await generate_thesis(db, company_id, force_refresh=False)
+    if result is None:
+        # Company exists but no thesis — return empty
+        company = db.execute(
+            select(PEPortfolioCompany).where(PEPortfolioCompany.id == company_id)
+        ).scalar_one_or_none()
+        if not company:
+            raise HTTPException(status_code=404, detail=f"Company {company_id} not found")
+        return ThesisResponse(company_id=company_id, company_name=company.name)
+
+    return ThesisResponse(
+        company_id=result.company_id,
+        company_name=result.company_name,
+        thesis=result.thesis_data,
+        generated_at=result.generated_at.isoformat() if result.generated_at else None,
+        model_used=result.model_used,
+        cost_usd=result.cost_usd,
+        from_cache=result.from_cache,
+    )
+
+
+@router.post("/companies/{company_id}/thesis/refresh", response_model=ThesisResponse)
+async def refresh_investment_thesis(
+    company_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Force-regenerate the investment thesis for a company.
+
+    Calls the LLM to produce a fresh thesis regardless of cache age.
+    Requires OPENAI_API_KEY or ANTHROPIC_API_KEY to be set.
+    """
+    from app.core.pe_thesis_generator import generate_thesis
+
+    company = db.execute(
+        select(PEPortfolioCompany).where(PEPortfolioCompany.id == company_id)
+    ).scalar_one_or_none()
+    if not company:
+        raise HTTPException(status_code=404, detail=f"Company {company_id} not found")
+
+    result = await generate_thesis(db, company_id, force_refresh=True)
+    if result is None:
+        return ThesisResponse(
+            company_id=company_id,
+            company_name=company.name,
+        )
+
+    return ThesisResponse(
+        company_id=result.company_id,
+        company_name=result.company_name,
+        thesis=result.thesis_data,
+        generated_at=result.generated_at.isoformat() if result.generated_at else None,
+        model_used=result.model_used,
+        cost_usd=result.cost_usd,
+        from_cache=result.from_cache,
+    )
+
+
+# =============================================================================
 # Fragmentation Scoring Endpoints
 # =============================================================================
 
@@ -2561,3 +2715,91 @@ async def get_portfolio_health(
         company_statuses=statuses,
         alerts=[],
     )
+
+
+# ---------------------------------------------------------------------------
+# Deal Sourcing Endpoints
+# ---------------------------------------------------------------------------
+
+@router.post("/deal-sourcing/{firm_id}/run")
+async def run_deal_sourcing(firm_id: int, db: Session = Depends(get_db)):
+    """
+    Manually trigger deal sourcing for a firm.
+
+    Reads market signals, scores candidates, and auto-creates pipeline
+    entries for B+ (>=70) companies not already in the pipeline.
+    """
+    from app.core.pe_deal_sourcing import source_deals_from_signals
+
+    try:
+        report = source_deals_from_signals(db, firm_id)
+        return report.to_dict()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Deal sourcing failed: {e}")
+
+
+@router.get("/deal-sourcing/{firm_id}/history")
+async def deal_sourcing_history(
+    firm_id: int,
+    days: int = 30,
+    db: Session = Depends(get_db),
+):
+    """
+    Recent auto-sourced deals with conversion stats.
+
+    Returns deals created by market_scanner or acquisition_scorer
+    for the given firm within the time window.
+    """
+    from app.core.pe_deal_sourcing import get_sourcing_history
+    return get_sourcing_history(db, firm_id, days)
+
+
+@router.get("/deal-sourcing/{firm_id}/candidates")
+async def deal_sourcing_candidates(firm_id: int, db: Session = Depends(get_db)):
+    """
+    Current high-score candidates not yet in the pipeline.
+
+    Runs the scoring pipeline but returns candidates without creating
+    pipeline entries — useful for preview before committing.
+    """
+    from app.core.pe_deal_sourcing import (
+        _find_candidates_by_sector,
+        _get_pipeline_company_ids,
+        SCORE_THRESHOLD,
+    )
+    from app.core.pe_market_signals import get_high_momentum_sectors
+    from app.core.pe_deal_scorer import score_deal
+
+    try:
+        high_sectors = get_high_momentum_sectors(db, threshold=60)
+    except Exception:
+        high_sectors = []
+
+    if not high_sectors:
+        return {"candidates": [], "total": 0}
+
+    sector_names = [s["sector"] for s in high_sectors]
+    candidates = _find_candidates_by_sector(db, sector_names)
+    existing_ids = _get_pipeline_company_ids(db)
+
+    results = []
+    for co in candidates:
+        if co.id in existing_ids:
+            continue
+        try:
+            result = score_deal(db, co.id)
+            if result and result.composite_score >= SCORE_THRESHOLD:
+                results.append({
+                    "company_id": co.id,
+                    "company_name": co.name,
+                    "industry": co.industry,
+                    "score": round(result.composite_score, 1),
+                    "grade": result.grade,
+                    "strengths": result.strengths[:3],
+                    "risks": result.risks[:3],
+                })
+        except Exception:
+            continue
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return {"candidates": results, "total": len(results)}

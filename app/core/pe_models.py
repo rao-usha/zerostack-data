@@ -361,6 +361,26 @@ class PEAlert(Base):
     )
 
 
+class PEInvestmentThesis(Base):
+    """
+    AI-generated investment thesis for a portfolio company.
+
+    Cached with a TTL — only regenerated if stale or explicitly refreshed.
+    """
+
+    __tablename__ = "pe_investment_theses"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    company_id = Column(Integer, ForeignKey("pe_portfolio_companies.id"), nullable=False, index=True)
+    thesis_data = Column(JSON)  # Full structured thesis
+    model_used = Column(String(100))
+    input_tokens = Column(Integer)
+    output_tokens = Column(Integer)
+    cost_usd = Column(Numeric(10, 6))
+    generated_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+
 # =============================================================================
 # PORTFOLIO COMPANY TABLES (6)
 # =============================================================================
@@ -1133,3 +1153,33 @@ class PEFirmNews(Base):
 
     def __repr__(self):
         return f"<PEFirmNews {self.title[:50]}...>"
+
+
+class PEMarketSignal(Base):
+    """
+    Persisted market signals from scheduled sector scans.
+
+    Stores momentum scores, deal counts, and top companies per sector
+    from MarketScannerService. Enables historical trend tracking.
+    """
+
+    __tablename__ = "pe_market_signals"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    sector = Column(String(200), nullable=False, index=True)
+    momentum_score = Column(Integer, nullable=False)  # 0-100
+    deal_count = Column(Integer)
+    avg_multiple = Column(Numeric(8, 2))  # median EV/EBITDA
+    signal_type = Column(String(50))  # "bullish", "neutral", "bearish"
+    top_companies = Column(JSON, nullable=True)  # list of company names/ids
+    deal_flow_change_pct = Column(Numeric(8, 2))
+    multiple_change_pct = Column(Numeric(8, 2))
+    batch_id = Column(String(50), index=True)  # groups signals from same scan run
+    scanned_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    __table_args__ = (
+        Index("ix_market_signals_sector_scanned", "sector", "scanned_at"),
+    )
+
+    def __repr__(self):
+        return f"<PEMarketSignal {self.sector} score={self.momentum_score}>"
