@@ -387,21 +387,21 @@ async def lifespan(app: FastAPI):
 
         # Automatic batch collection — runs daily at 2:00 AM UTC
         try:
-            from app.core.nightly_batch_service import scheduled_nightly_batch
+            from app.core.batch_service import scheduled_batch_collection
             from app.core.scheduler_service import get_scheduler
             from apscheduler.triggers.cron import CronTrigger
 
             sched = get_scheduler()
             sched.add_job(
-                scheduled_nightly_batch,
+                scheduled_batch_collection,
                 trigger=CronTrigger(hour=2, minute=0),
-                id="nightly_batch",
-                name="Nightly Collection Batch",
+                id="batch_collection",
+                name="Batch Collection",
                 replace_existing=True,
             )
-            logger.info("Nightly batch collection registered (2:00 AM UTC)")
+            logger.info("Batch collection registered (2:00 AM UTC)")
         except Exception as e:
-            logger.warning(f"Failed to register nightly batch: {e}")
+            logger.warning(f"Failed to register batch collection: {e}")
 
     except Exception as e:
         logger.warning(f"Failed to start scheduler: {e}")

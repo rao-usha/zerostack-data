@@ -766,7 +766,7 @@ async def _handle_job_completion(db, job: IngestionJob):
     # Check if this completes a batch → send summary webhook
     if job.batch_run_id:
         try:
-            from app.core.nightly_batch_service import check_and_notify_batch_completion
+            from app.core.batch_service import check_and_notify_batch_completion
 
             await check_and_notify_batch_completion(db, job.batch_run_id)
         except Exception as e:
@@ -1323,7 +1323,7 @@ async def launch_batch(
         tiers: Optional list of tier levels to run (default: all)
         sources: Optional list of specific source keys to run
     """
-    from app.core.nightly_batch_service import launch_batch_collection
+    from app.core.batch_service import launch_batch_collection
 
     result = await launch_batch_collection(db, tiers=tiers, sources=sources)
     return result
@@ -1336,7 +1336,7 @@ def get_batch_run(batch_run_id: str, db: Session = Depends(get_db)):
 
     Status is computed live from job statuses — nothing can get stuck.
     """
-    from app.core.nightly_batch_service import get_batch_run_status
+    from app.core.batch_service import get_batch_run_status
 
     result = get_batch_run_status(db, batch_run_id)
     if not result:
@@ -1352,7 +1352,7 @@ def cancel_batch(batch_run_id: str, db: Session = Depends(get_db)):
     Running jobs stop within one heartbeat interval (30s).
     Already-completed jobs are unaffected.
     """
-    from app.core.nightly_batch_service import cancel_batch_run
+    from app.core.batch_service import cancel_batch_run
 
     result = cancel_batch_run(db, batch_run_id)
     if result is None:
@@ -1372,7 +1372,7 @@ async def rerun_failed_batch_jobs(
     PENDING, and returns a summary. Respects tier ordering — tier 2+ jobs
     start as BLOCKED if lower tiers have jobs being rerun.
     """
-    from app.core.nightly_batch_service import rerun_failed_in_batch
+    from app.core.batch_service import rerun_failed_in_batch
 
     result = rerun_failed_in_batch(db, batch_run_id)
     if result is None:
@@ -1387,7 +1387,7 @@ def list_batch_runs_endpoint(
     db: Session = Depends(get_db),
 ):
     """List recent batch runs with live status."""
-    from app.core.nightly_batch_service import list_batch_runs
+    from app.core.batch_service import list_batch_runs
 
     return list_batch_runs(db, limit=limit, status=status)
 
@@ -1440,46 +1440,6 @@ async def launch_backfill_endpoint(
         extra_config=request.config or None,
     )
     return result
-
-
-# =============================================================================
-# Deprecated Nightly Endpoints (wrappers for backwards compatibility)
-# =============================================================================
-
-
-@router.post("/nightly/launch", deprecated=True)
-async def launch_nightly(
-    tiers: List[int] = None,
-    sources: List[str] = None,
-    db: Session = Depends(get_db),
-):
-    """Deprecated: Use POST /batch/launch instead."""
-    from app.core.nightly_batch_service import launch_batch_collection
-
-    return await launch_batch_collection(db, tiers=tiers, sources=sources)
-
-
-@router.get("/nightly/{batch_id}", deprecated=True)
-def get_nightly_status(batch_id: str, db: Session = Depends(get_db)):
-    """Deprecated: Use GET /batch/runs/{batch_run_id} instead."""
-    from app.core.nightly_batch_service import get_batch_status
-
-    result = get_batch_status(db, batch_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Batch not found")
-    return result
-
-
-@router.get("/nightly", deprecated=True)
-def list_nightly_batches(
-    limit: int = 20,
-    status: str = None,
-    db: Session = Depends(get_db),
-):
-    """Deprecated: Use GET /batch/runs instead."""
-    from app.core.nightly_batch_service import list_batches
-
-    return list_batches(db, limit=limit, status=status)
 
 
 @router.get("/{job_id}", response_model=JobResponse)
@@ -2075,7 +2035,7 @@ def get_tier_config(db: Session = Depends(get_db)):
 
     Returns each tier with its effective settings and source list.
     """
-    from app.core.nightly_batch_service import resolve_effective_tiers, TIERS
+    from app.core.batch_service import resolve_effective_tiers, TIERS
     from app.core.models import BatchTierConfig, BatchSourceTierOverride
 
     effective = resolve_effective_tiers(db)
@@ -2118,7 +2078,7 @@ def update_tier_config(
     Creates the override if it doesn't exist. Set enabled=false to disable an entire tier.
     """
     from app.core.models import BatchTierConfig
-    from app.core.nightly_batch_service import TIER_BY_LEVEL
+    from app.core.batch_service import TIER_BY_LEVEL
 
     if tier_level not in TIER_BY_LEVEL:
         raise HTTPException(status_code=404, detail=f"Tier {tier_level} not found")

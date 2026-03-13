@@ -25,7 +25,7 @@ class TestCheckAndNotifyBatchCompletion:
         # COUNT query returns 2 pending/running
         db.query.return_value.select_from.return_value.filter.return_value.scalar.return_value = 2
 
-        from app.core.nightly_batch_service import check_and_notify_batch_completion
+        from app.core.batch_service import check_and_notify_batch_completion
 
         with patch(
             "app.core.webhook_service.notify_batch_completed", new_callable=AsyncMock
@@ -50,10 +50,10 @@ class TestCheckAndNotifyBatchCompletion:
             "top_errors": [{"source": "fred", "error": "Timeout"}],
         }
 
-        from app.core.nightly_batch_service import check_and_notify_batch_completion
+        from app.core.batch_service import check_and_notify_batch_completion
 
         with patch(
-            "app.core.nightly_batch_service.get_batch_run_status",
+            "app.core.batch_service.get_batch_run_status",
             return_value=mock_status,
         ), patch(
             "app.core.webhook_service.notify_batch_completed", new_callable=AsyncMock
@@ -87,10 +87,10 @@ class TestCheckAndNotifyBatchCompletion:
             "top_errors": [],
         }
 
-        from app.core.nightly_batch_service import check_and_notify_batch_completion
+        from app.core.batch_service import check_and_notify_batch_completion
 
         with patch(
-            "app.core.nightly_batch_service.get_batch_run_status",
+            "app.core.batch_service.get_batch_run_status",
             return_value=mock_status,
         ), patch(
             "app.core.webhook_service.notify_batch_completed", new_callable=AsyncMock
@@ -108,10 +108,10 @@ class TestCheckAndNotifyBatchCompletion:
         db = MagicMock()
         db.query.return_value.select_from.return_value.filter.return_value.scalar.return_value = 0
 
-        from app.core.nightly_batch_service import check_and_notify_batch_completion
+        from app.core.batch_service import check_and_notify_batch_completion
 
         with patch(
-            "app.core.nightly_batch_service.get_batch_run_status",
+            "app.core.batch_service.get_batch_run_status",
             return_value=None,
         ), patch(
             "app.core.webhook_service.notify_batch_completed", new_callable=AsyncMock
@@ -135,10 +135,10 @@ class TestCheckAndNotifyBatchCompletion:
             "top_errors": [],
         }
 
-        from app.core.nightly_batch_service import check_and_notify_batch_completion
+        from app.core.batch_service import check_and_notify_batch_completion
 
         with patch(
-            "app.core.nightly_batch_service.get_batch_run_status",
+            "app.core.batch_service.get_batch_run_status",
             return_value=mock_status,
         ), patch(
             "app.core.webhook_service.notify_batch_completed", new_callable=AsyncMock

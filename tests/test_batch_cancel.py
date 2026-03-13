@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 from datetime import datetime
 
 from app.core.models import IngestionJob, JobStatus
-from app.core.nightly_batch_service import cancel_batch_run
+from app.core.batch_service import cancel_batch_run
 
 
 def _make_job(status, job_id=1, batch_run_id="batch_123"):

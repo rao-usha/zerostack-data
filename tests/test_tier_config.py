@@ -13,7 +13,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from copy import deepcopy
 
-from app.core.nightly_batch_service import (
+from app.core.batch_service import (
     resolve_effective_tiers,
     TIERS,
     TIER_BY_LEVEL,

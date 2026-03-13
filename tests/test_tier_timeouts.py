@@ -19,13 +19,13 @@ class TestBatchLaunchBlockedStatus:
     """Tests that batch launch creates tier 2+ jobs as BLOCKED."""
 
     @pytest.mark.asyncio
-    @patch("app.core.nightly_batch_service.WORKER_MODE", True)
+    @patch("app.core.batch_service.WORKER_MODE", True)
     @patch("app.core.job_splitter.get_split_config", return_value=None)
-    @patch("app.core.nightly_batch_service.resolve_effective_tiers")
-    @patch("app.core.nightly_batch_service.submit_job")
+    @patch("app.core.batch_service.resolve_effective_tiers")
+    @patch("app.core.batch_service.submit_job")
     async def test_tier1_pending_tier2_blocked(self, mock_submit, mock_resolve, _mock_split):
         """Tier 1 jobs should be PENDING, tier 2+ should be BLOCKED."""
-        from app.core.nightly_batch_service import launch_batch_collection
+        from app.core.batch_service import launch_batch_collection
 
         tier1 = MagicMock()
         tier1.level = 1
@@ -59,13 +59,13 @@ class TestBatchLaunchBlockedStatus:
         assert calls_by_source["eia"] == QueueJobStatus.BLOCKED
 
     @pytest.mark.asyncio
-    @patch("app.core.nightly_batch_service.WORKER_MODE", True)
+    @patch("app.core.batch_service.WORKER_MODE", True)
     @patch("app.core.job_splitter.get_split_config", return_value=None)
-    @patch("app.core.nightly_batch_service.resolve_effective_tiers")
-    @patch("app.core.nightly_batch_service.submit_job")
+    @patch("app.core.batch_service.resolve_effective_tiers")
+    @patch("app.core.batch_service.submit_job")
     async def test_no_wait_for_tiers_in_payload(self, mock_submit, mock_resolve, _mock_split):
         """Payloads should NOT contain wait_for_tiers anymore."""
-        from app.core.nightly_batch_service import launch_batch_collection
+        from app.core.batch_service import launch_batch_collection
 
         tiers = []
         for level in [1, 2, 3]:
@@ -85,13 +85,13 @@ class TestBatchLaunchBlockedStatus:
             assert "wait_for_tiers" not in payload
 
     @pytest.mark.asyncio
-    @patch("app.core.nightly_batch_service.WORKER_MODE", True)
+    @patch("app.core.batch_service.WORKER_MODE", True)
     @patch("app.core.job_splitter.get_split_config", return_value=None)
-    @patch("app.core.nightly_batch_service.resolve_effective_tiers")
-    @patch("app.core.nightly_batch_service.submit_job")
+    @patch("app.core.batch_service.resolve_effective_tiers")
+    @patch("app.core.batch_service.submit_job")
     async def test_ingestion_job_status_matches(self, mock_submit, mock_resolve, _mock_split):
         """IngestionJob should also be BLOCKED for tier 2+."""
-        from app.core.nightly_batch_service import launch_batch_collection, IngestionJob
+        from app.core.batch_service import launch_batch_collection, IngestionJob
 
         tier1 = MagicMock()
         tier1.level = 1

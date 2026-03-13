@@ -212,7 +212,7 @@ docker-compose restart worker
 ### Common Issues
 
 - **Jobs stuck "pending"**: Worker container not running. Start with `docker-compose up -d worker`
-- **Nightly batch stuck**: Same cause — tier 1 jobs can't execute without workers
+- **Batch stuck**: Same cause — tier 1 jobs can't execute without workers
 - **Worker won't start**: Check `docker-compose logs worker` for import errors. Worker shares the same codebase/image as API
 
 ---

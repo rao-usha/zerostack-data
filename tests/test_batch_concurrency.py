@@ -20,20 +20,20 @@ class TestTierMaxConcurrentConfig:
 
     def test_tier_has_max_concurrent_default(self):
         """Tier dataclass should have max_concurrent with default 2."""
-        from app.core.nightly_batch_service import Tier
+        from app.core.batch_service import Tier
 
         tier = Tier(level=1, priority=10, name="Test")
         assert tier.max_concurrent == 2
 
     def test_tier_3_has_max_concurrent_3(self):
         """Tier 3 should have max_concurrent=3."""
-        from app.core.nightly_batch_service import TIER_3
+        from app.core.batch_service import TIER_3
 
         assert TIER_3.max_concurrent == 3
 
     def test_tier_1_has_max_concurrent_2(self):
         """Tier 1 should have max_concurrent=2 (default)."""
-        from app.core.nightly_batch_service import TIER_1
+        from app.core.batch_service import TIER_1
 
         assert TIER_1.max_concurrent == 2
 

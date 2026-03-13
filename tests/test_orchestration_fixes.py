@@ -297,12 +297,12 @@ class TestBlockedStatusBatchLaunch:
     """Tier 2+ jobs should be created as BLOCKED, not with wait_for_tiers."""
 
     @pytest.mark.asyncio
-    @patch("app.core.nightly_batch_service.WORKER_MODE", True)
-    @patch("app.core.nightly_batch_service.resolve_effective_tiers")
-    @patch("app.core.nightly_batch_service.submit_job")
+    @patch("app.core.batch_service.WORKER_MODE", True)
+    @patch("app.core.batch_service.resolve_effective_tiers")
+    @patch("app.core.batch_service.submit_job")
     async def test_skipped_tier_blocked_correctly(self, mock_submit, mock_resolve):
         """If Tier 2 is disabled, Tier 3 should be BLOCKED (has lower tier 1)."""
-        from app.core.nightly_batch_service import launch_batch_collection
+        from app.core.batch_service import launch_batch_collection
         from app.core.models_queue import QueueJobStatus
 
         tier1 = MagicMock()
@@ -336,12 +336,12 @@ class TestBlockedStatusBatchLaunch:
         assert statuses["bls"] == QueueJobStatus.BLOCKED
 
     @pytest.mark.asyncio
-    @patch("app.core.nightly_batch_service.WORKER_MODE", True)
-    @patch("app.core.nightly_batch_service.resolve_effective_tiers")
-    @patch("app.core.nightly_batch_service.submit_job")
+    @patch("app.core.batch_service.WORKER_MODE", True)
+    @patch("app.core.batch_service.resolve_effective_tiers")
+    @patch("app.core.batch_service.submit_job")
     async def test_all_tiers_blocked_status(self, mock_submit, mock_resolve):
         """With all 4 tiers, only tier 1 is PENDING; 2-4 are BLOCKED."""
-        from app.core.nightly_batch_service import launch_batch_collection
+        from app.core.batch_service import launch_batch_collection
         from app.core.models_queue import QueueJobStatus
 
         tiers = []
@@ -372,13 +372,13 @@ class TestBlockedStatusBatchLaunch:
         assert statuses["source_4"] == QueueJobStatus.BLOCKED
 
     @pytest.mark.asyncio
-    @patch("app.core.nightly_batch_service.WORKER_MODE", True)
+    @patch("app.core.batch_service.WORKER_MODE", True)
     @patch("app.core.job_splitter.get_split_config", return_value=None)
-    @patch("app.core.nightly_batch_service.resolve_effective_tiers")
-    @patch("app.core.nightly_batch_service.submit_job")
+    @patch("app.core.batch_service.resolve_effective_tiers")
+    @patch("app.core.batch_service.submit_job")
     async def test_single_tier_not_blocked(self, mock_submit, mock_resolve, _mock_split):
         """With only 1 tier, it should be PENDING (no lower tiers)."""
-        from app.core.nightly_batch_service import launch_batch_collection
+        from app.core.batch_service import launch_batch_collection
 
         tier2 = MagicMock()
         tier2.level = 2

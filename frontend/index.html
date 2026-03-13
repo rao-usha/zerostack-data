@@ -1266,6 +1266,80 @@
 
         .pe-empty { text-align: center; padding: 3rem; color: var(--text-muted); }
         .pe-empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+
+        /* PE Search Panel */
+        .pe-search-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.5rem; }
+        .pe-search-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+        .pe-search-header h3 { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+        .pe-search-header .pe-search-count { font-size: 0.8rem; color: var(--text); font-weight: 600; }
+        .pe-search-row { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; }
+        .pe-search-field { display: flex; flex-direction: column; gap: 0.25rem; }
+        .pe-search-field label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+        .pe-search-field input, .pe-search-field select { padding: 0.45rem 0.65rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.8rem; height: 34px; }
+        .pe-search-field input:focus, .pe-search-field select:focus { outline: none; border-color: var(--primary); }
+        .pe-search-field input[type="text"] { min-width: 180px; }
+        .pe-search-field select { min-width: 140px; }
+        .pe-search-field .pe-range-inputs { display: flex; gap: 0.375rem; align-items: center; }
+        .pe-search-field .pe-range-inputs input { width: 72px; min-width: auto; }
+        .pe-search-field .pe-range-inputs span { color: var(--text-muted); font-size: 0.75rem; }
+        .pe-search-actions { display: flex; gap: 0.5rem; align-self: flex-end; }
+        .pe-search-btn { padding: 0.45rem 1.25rem; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; white-space: nowrap; height: 34px; }
+        .pe-search-btn:hover { filter: brightness(1.15); }
+        .pe-search-btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+        .pe-search-btn.secondary:hover { border-color: var(--text); color: var(--text); filter: none; }
+        .pe-search-results { margin-top: 1rem; }
+        .pe-search-results table { width: 100%; border-collapse: collapse; }
+        .pe-search-results th { text-align: left; padding: 0.5rem 0.625rem; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); font-weight: 500; cursor: pointer; user-select: none; }
+        .pe-search-results th:hover { color: var(--text); }
+        .pe-search-results th .sort-arrow { font-size: 0.6rem; margin-left: 0.25rem; }
+        .pe-search-results td { padding: 0.6rem 0.625rem; font-size: 0.8rem; border-bottom: 1px solid rgba(51,65,85,0.4); }
+        .pe-search-results tbody tr { cursor: pointer; transition: background 0.12s; }
+        .pe-search-results tbody tr:hover { background: rgba(99,102,241,0.08); }
+        .pe-search-pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
+        .pe-search-pagination button { padding: 0.3rem 0.75rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 0.75rem; cursor: pointer; }
+        .pe-search-pagination button:hover:not(:disabled) { border-color: var(--primary); }
+        .pe-search-pagination button:disabled { opacity: 0.4; cursor: default; }
+        .pe-search-pagination .page-info { font-size: 0.75rem; color: var(--text-muted); }
+        .pe-search-empty { text-align: center; padding: 2.5rem 1rem; color: var(--text-muted); }
+        .pe-search-empty-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+        .pe-owner-pill { padding: 0.1rem 0.45rem; border-radius: 4px; font-size: 0.7rem; font-weight: 500; }
+        .pe-owner-pill.pe-backed { background: rgba(99,102,241,0.12); color: #818cf8; }
+        .pe-owner-pill.independent { background: rgba(34,197,94,0.12); color: #4ade80; }
+        .pe-owner-pill.public { background: rgba(6,182,212,0.12); color: var(--accent); }
+
+        /* PE Pipeline Kanban */
+        .pe-pipeline-panel { margin-top: 1.5rem; }
+        .pe-pipeline-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .pe-pipeline-header h3 { font-size: 1rem; font-weight: 600; }
+        .pe-pipeline-toggle { padding: 0.35rem 0.85rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.8rem; cursor: pointer; }
+        .pe-pipeline-toggle:hover { border-color: var(--primary); }
+        .pe-kanban { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem; min-height: 300px; }
+        @media (max-width: 1200px) { .pe-kanban { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 768px) { .pe-kanban { grid-template-columns: 1fr 1fr; } }
+        .pe-kanban-col { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem; min-height: 200px; }
+        .pe-kanban-col-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
+        .pe-kanban-col-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+        .pe-kanban-col-count { background: var(--bg-input); color: var(--text-muted); font-size: 0.65rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 999px; }
+        .pe-kanban-col.screening .pe-kanban-col-header { border-bottom-color: #6366f1; }
+        .pe-kanban-col.dd .pe-kanban-col-header { border-bottom-color: #f59e0b; }
+        .pe-kanban-col.loi .pe-kanban-col-header { border-bottom-color: #06b6d4; }
+        .pe-kanban-col.closing .pe-kanban-col-header { border-bottom-color: #8b5cf6; }
+        .pe-kanban-col.closed .pe-kanban-col-header { border-bottom-color: #22c55e; }
+        .pe-kanban-cards { display: flex; flex-direction: column; gap: 0.5rem; }
+        .pe-deal-card { background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; cursor: grab; transition: transform 0.12s, box-shadow 0.12s; }
+        .pe-deal-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .pe-deal-card.dragging { opacity: 0.5; transform: scale(0.95); }
+        .pe-deal-card-name { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.375rem; }
+        .pe-deal-card-meta { display: flex; flex-wrap: wrap; gap: 0.375rem; align-items: center; }
+        .pe-deal-card-type { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; padding: 0.1rem 0.4rem; border-radius: 4px; }
+        .pe-deal-card-type.Exit { background: rgba(34,197,94,0.12); color: #4ade80; }
+        .pe-deal-card-type.LBO { background: rgba(99,102,241,0.12); color: #818cf8; }
+        .pe-deal-card-type.Add-on { background: rgba(245,158,11,0.12); color: #fbbf24; }
+        .pe-deal-card-type.Growth { background: rgba(6,182,212,0.12); color: var(--accent); }
+        .pe-deal-card-size { font-size: 0.75rem; color: var(--text-muted); }
+        .pe-deal-card-days { font-size: 0.65rem; color: var(--text-muted); margin-top: 0.25rem; }
+        .pe-deal-card-stage-select { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.65rem; padding: 0.15rem 0.25rem; margin-top: 0.375rem; cursor: pointer; }
+        .pe-kanban-col.drag-over { background: rgba(99,102,241,0.06); border-color: var(--primary); }
     </style>
 </head>
 <body>
@@ -1514,7 +1588,7 @@
                 <div class="tab-intro-text">
                     <strong>Collection Jobs & Pipeline Control.</strong>
                     Launch data collection jobs, monitor active pipelines in real-time, and review job history.
-                    Use "Run Batch" to trigger a full nightly collection across all tiers.
+                    Use "Run Batch" to trigger a full batch collection across all tiers.
                 </div>
             </div>
             <!-- Section 1: Run Collection -->
@@ -1795,6 +1869,83 @@
                 </div>
             </div>
 
+            <!-- Company Search Panel -->
+            <div class="pe-search-panel" id="pe-search-panel">
+                <h3>Company Search & Screening</h3>
+                <div class="pe-search-row">
+                    <div class="pe-search-field">
+                        <label>Company / Keyword</label>
+                        <input type="text" id="pe-search-keyword" placeholder="e.g. Titan Manufacturing" onkeydown="if(event.key==='Enter')peRunSearch()">
+                    </div>
+                    <div class="pe-search-field">
+                        <label>NAICS Code</label>
+                        <select id="pe-search-naics">
+                            <option value="">Any Industry</option>
+                            <option value="621111">621111 — Physicians Offices</option>
+                            <option value="621210">621210 — Dental Offices</option>
+                            <option value="621310">621310 — Chiropractic</option>
+                            <option value="621340">621340 — PT / OT / Speech</option>
+                            <option value="621610">621610 — Home Health Care</option>
+                            <option value="623110">623110 — Nursing Facilities</option>
+                            <option value="238220">238220 — HVAC Contractors</option>
+                            <option value="238210">238210 — Electrical Contractors</option>
+                            <option value="238110">238110 — Plumbing & Heating</option>
+                            <option value="541330">541330 — Engineering Services</option>
+                            <option value="541511">541511 — Custom Software</option>
+                            <option value="541512">541512 — Computer Systems Design</option>
+                            <option value="811111">811111 — Auto Repair (General)</option>
+                            <option value="811121">811121 — Auto Body Repair</option>
+                            <option value="812111">812111 — Barber Shops</option>
+                            <option value="812112">812112 — Beauty Salons</option>
+                            <option value="722511">722511 — Full-Service Restaurants</option>
+                            <option value="722513">722513 — Limited-Service Restaurants</option>
+                            <option value="713940">713940 — Fitness Centers</option>
+                            <option value="531210">531210 — Real Estate Agents</option>
+                        </select>
+                    </div>
+                    <div class="pe-search-field">
+                        <label>State</label>
+                        <select id="pe-search-state">
+                            <option value="">Any State</option>
+                            <option value="CA">California</option><option value="TX">Texas</option><option value="FL">Florida</option>
+                            <option value="NY">New York</option><option value="IL">Illinois</option><option value="PA">Pennsylvania</option>
+                            <option value="OH">Ohio</option><option value="GA">Georgia</option><option value="NC">North Carolina</option>
+                            <option value="MI">Michigan</option><option value="NJ">New Jersey</option><option value="VA">Virginia</option>
+                            <option value="WA">Washington</option><option value="AZ">Arizona</option><option value="MA">Massachusetts</option>
+                            <option value="TN">Tennessee</option><option value="IN">Indiana</option><option value="MO">Missouri</option>
+                            <option value="MD">Maryland</option><option value="WI">Wisconsin</option><option value="CO">Colorado</option>
+                            <option value="MN">Minnesota</option><option value="SC">South Carolina</option><option value="AL">Alabama</option>
+                        </select>
+                    </div>
+                    <div class="pe-search-field">
+                        <label>Revenue ($M)</label>
+                        <div class="pe-range-inputs">
+                            <input type="number" id="pe-search-rev-min" placeholder="Min" min="0">
+                            <span>—</span>
+                            <input type="number" id="pe-search-rev-max" placeholder="Max" min="0">
+                        </div>
+                    </div>
+                    <button class="pe-search-btn" onclick="peRunSearch()">Search</button>
+                </div>
+                <div class="pe-search-results" id="pe-search-results" style="display:none;">
+                    <div class="pe-search-status" id="pe-search-status"></div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>Industry</th>
+                                <th>State</th>
+                                <th>Revenue</th>
+                                <th>Employees</th>
+                                <th>Status</th>
+                                <th>Frag. Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pe-search-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Firm Selector + Seed -->
             <div class="pe-controls">
                 <select id="pe-firm-select" onchange="peLoadPortfolio()">
@@ -1883,6 +2034,51 @@
                     <div class="card-title" id="pe-dataroom-title">Data Room</div>
                     <div id="pe-dataroom-content">
                         <div class="loading">Select a company to see data room status.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Deal Pipeline Board -->
+            <div class="pe-pipeline-panel" id="pe-pipeline-panel" style="display:none;">
+                <div class="pe-pipeline-header">
+                    <h3>Deal Pipeline</h3>
+                    <button class="pe-pipeline-toggle" onclick="pePipelineToggle()" id="pe-pipeline-toggle-btn">Collapse</button>
+                </div>
+                <div class="pe-kanban" id="pe-kanban">
+                    <div class="pe-kanban-col screening" data-stage="Screening" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
+                        <div class="pe-kanban-col-header">
+                            <span class="pe-kanban-col-title">Screening</span>
+                            <span class="pe-kanban-col-count" id="pe-kb-count-Screening">0</span>
+                        </div>
+                        <div class="pe-kanban-cards" id="pe-kb-cards-Screening"></div>
+                    </div>
+                    <div class="pe-kanban-col dd" data-stage="DD" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
+                        <div class="pe-kanban-col-header">
+                            <span class="pe-kanban-col-title">Due Diligence</span>
+                            <span class="pe-kanban-col-count" id="pe-kb-count-DD">0</span>
+                        </div>
+                        <div class="pe-kanban-cards" id="pe-kb-cards-DD"></div>
+                    </div>
+                    <div class="pe-kanban-col loi" data-stage="LOI" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
+                        <div class="pe-kanban-col-header">
+                            <span class="pe-kanban-col-title">LOI</span>
+                            <span class="pe-kanban-col-count" id="pe-kb-count-LOI">0</span>
+                        </div>
+                        <div class="pe-kanban-cards" id="pe-kb-cards-LOI"></div>
+                    </div>
+                    <div class="pe-kanban-col closing" data-stage="Closing" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
+                        <div class="pe-kanban-col-header">
+                            <span class="pe-kanban-col-title">Closing</span>
+                            <span class="pe-kanban-col-count" id="pe-kb-count-Closing">0</span>
+                        </div>
+                        <div class="pe-kanban-cards" id="pe-kb-cards-Closing"></div>
+                    </div>
+                    <div class="pe-kanban-col closed" data-stage="Closed" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
+                        <div class="pe-kanban-col-header">
+                            <span class="pe-kanban-col-title">Closed</span>
+                            <span class="pe-kanban-col-count" id="pe-kb-count-Closed">0</span>
+                        </div>
+                        <div class="pe-kanban-cards" id="pe-kb-cards-Closed"></div>
                     </div>
                 </div>
             </div>
@@ -9119,6 +9315,7 @@
                 document.getElementById('pe-detail-panels').style.display = 'none';
                 document.getElementById('pe-second-row').style.display = 'none';
                 peRenderPortfolio();
+                peLoadPipeline(firmId);
             } catch (e) {
                 showToast('Failed to load portfolio: ' + e.message, 'error');
             }
@@ -9459,6 +9656,320 @@
         }
 
         function peEsc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+
+        // ===== PE Company Search =====
+
+        async function peRunSearch() {
+            const keyword = document.getElementById('pe-search-keyword').value.trim();
+            const naics = document.getElementById('pe-search-naics').value;
+            const state = document.getElementById('pe-search-state').value;
+            const revMin = document.getElementById('pe-search-rev-min').value;
+            const revMax = document.getElementById('pe-search-rev-max').value;
+
+            const resultsDiv = document.getElementById('pe-search-results');
+            const statusDiv = document.getElementById('pe-search-status');
+            const tbody = document.getElementById('pe-search-body');
+            resultsDiv.style.display = 'block';
+            tbody.innerHTML = '';
+            statusDiv.textContent = 'Searching...';
+
+            let results = [];
+            let fragScores = {};
+
+            // Try fragmentation screener if NAICS selected
+            if (naics) {
+                try {
+                    const fragUrl = state
+                        ? `${API}/pe/roll-up-targets/${naics}/${state}?top_n=30`
+                        : `${API}/pe/fragmentation/${naics}?top_n=30`;
+                    const fragResp = await fetch(fragUrl);
+                    if (fragResp.ok) {
+                        const fragData = await fragResp.json();
+                        fragScores._national = fragData.score || fragData.national_score || null;
+                    }
+                } catch (e) { /* screener not available */ }
+            }
+
+            // Search portfolio companies (fallback / primary)
+            try {
+                const resp = await fetch(`${API}/pe/benchmarks/portfolio/0`);
+                // That won't work for "all" — let's search across firms we know about
+                const firmSelect = document.getElementById('pe-firm-select');
+                const firmIds = Array.from(firmSelect.options).map(o => o.value).filter(v => v);
+
+                for (const fid of firmIds) {
+                    try {
+                        const r = await fetch(`${API}/pe/benchmarks/portfolio/${fid}`);
+                        if (!r.ok) continue;
+                        const data = await r.json();
+                        for (const c of (data.companies || [])) {
+                            // Avoid duplicates
+                            if (results.find(x => x.company_id === c.company_id)) continue;
+                            results.push(c);
+                        }
+                    } catch (e) { /* skip */ }
+                }
+            } catch (e) { /* skip */ }
+
+            // Client-side filtering
+            let filtered = results;
+            if (keyword) {
+                const kw = keyword.toLowerCase();
+                filtered = filtered.filter(c =>
+                    (c.company_name || '').toLowerCase().includes(kw) ||
+                    (c.industry || '').toLowerCase().includes(kw)
+                );
+            }
+            if (state) {
+                // Try matching state in company data if available
+                filtered = filtered.filter(c => {
+                    const loc = (c.headquarters_state || c.state || '').toUpperCase();
+                    return !loc || loc === state || loc === '';
+                });
+            }
+            if (revMin) {
+                const min = parseFloat(revMin) * 1000000;
+                filtered = filtered.filter(c => {
+                    const rev = c.metrics?.revenue_usd || c.revenue_usd || 0;
+                    return rev >= min || rev === 0; // include if unknown
+                });
+            }
+            if (revMax) {
+                const max = parseFloat(revMax) * 1000000;
+                filtered = filtered.filter(c => {
+                    const rev = c.metrics?.revenue_usd || c.revenue_usd || 0;
+                    return rev <= max || rev === 0;
+                });
+            }
+
+            statusDiv.textContent = `${filtered.length} result${filtered.length !== 1 ? 's' : ''} found`;
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-muted)">No matching companies. Try broadening your search criteria.</td></tr>';
+                return;
+            }
+
+            for (const c of filtered) {
+                const name = peEsc(c.company_name || c.name || '—');
+                const industry = peEsc(c.industry || '—');
+                const st = peEsc(c.headquarters_state || c.state || '—');
+                const revRaw = c.metrics?.revenue_growth !== undefined ? null : null;
+                const rev = c.revenue_usd || c.metrics?.revenue_usd;
+                const revStr = rev ? `$${(rev / 1000000).toFixed(0)}M` : '—';
+                const emp = c.employee_count || c.employees || '—';
+                const status = c.status || 'Active';
+                const statusClass = status === 'Active' ? 'pe-status-pill Active' : 'pe-status-pill Exited';
+                const fragNat = fragScores._national;
+                let fragHtml = '—';
+                if (fragNat != null) {
+                    const fragClass = fragNat >= 70 ? 'high' : fragNat >= 40 ? 'mid' : 'low';
+                    fragHtml = `<span class="pe-frag-score ${fragClass}">${fragNat.toFixed(0)}</span>`;
+                }
+
+                tbody.innerHTML += `<tr onclick="peSearchSelect(${c.company_id})">
+                    <td style="font-weight:600">${name}</td>
+                    <td><span class="pe-industry-pill ${(c.industry || 'default').split(/\s/)[0]}">${industry}</span></td>
+                    <td>${st}</td>
+                    <td style="text-align:right">${revStr}</td>
+                    <td style="text-align:right">${emp}</td>
+                    <td><span class="${statusClass}">${peEsc(status)}</span></td>
+                    <td style="text-align:center">${fragHtml}</td>
+                </tr>`;
+            }
+        }
+
+        function peSearchSelect(companyId) {
+            // Trigger the same detail view as clicking a portfolio row
+            if (typeof peSelectCompany === 'function') {
+                peSelectCompany(companyId);
+            }
+        }
+
+        // ===== PE Deal Pipeline =====
+
+        let _pePipelineDeals = [];
+        const PE_PIPELINE_STAGES = ['Screening', 'DD', 'LOI', 'Closing', 'Closed'];
+
+        function peMapDealStatus(deal) {
+            // Map existing deal statuses to pipeline stages
+            const s = (deal.status || '').toLowerCase();
+            if (s === 'closed' || deal.closed_date) return 'Closed';
+            if (s === 'pending' || s === 'announced') return 'DD';
+            if (s === 'loi') return 'LOI';
+            if (s === 'closing') return 'Closing';
+            if (s === 'screening') return 'Screening';
+            return 'Screening';
+        }
+
+        async function peLoadPipeline(firmId) {
+            const panel = document.getElementById('pe-pipeline-panel');
+            if (!firmId) { panel.style.display = 'none'; return; }
+
+            try {
+                // Load deals from portfolio companies for this firm
+                const resp = await fetch(`${API}/pe/benchmarks/portfolio/${firmId}`);
+                if (!resp.ok) { panel.style.display = 'none'; return; }
+                const portData = await resp.json();
+                const companyIds = (portData.companies || []).map(c => c.company_id);
+
+                // For each company, check if there are deals via data-room endpoint
+                // We'll also look for deal data in the company info
+                _pePipelineDeals = [];
+
+                // Fetch deals by querying the deals we know about from seed data
+                // Using a direct DB query proxy isn't available, so we build from portfolio + data-room
+                for (const cid of companyIds) {
+                    try {
+                        const drResp = await fetch(`${API}/pe/data-room/${cid}`);
+                        if (drResp.ok) {
+                            const drData = await drResp.json();
+                            const comp = (portData.companies || []).find(c => c.company_id === cid);
+                            if (comp) {
+                                const deal = {
+                                    id: cid,
+                                    company_name: comp.company_name,
+                                    industry: comp.industry || 'Unknown',
+                                    deal_type: comp.status === 'Exited' ? 'Exit' : 'LBO',
+                                    enterprise_value: null,
+                                    announced_date: null,
+                                    status: comp.status === 'Exited' ? 'Closed' : 'Screening',
+                                    stage: comp.status === 'Exited' ? 'Closed' : 'Screening',
+                                    completeness: drData.completeness_pct || 0,
+                                };
+                                _pePipelineDeals.push(deal);
+                            }
+                        }
+                    } catch (e) { /* skip */ }
+                }
+
+                // Also try to get actual deal data if endpoint exists
+                try {
+                    const dealsResp = await fetch(`${API}/pe/deals?firm_id=${firmId}`);
+                    if (dealsResp.ok) {
+                        const dealsData = await dealsResp.json();
+                        const actualDeals = dealsData.deals || dealsData || [];
+                        if (Array.isArray(actualDeals) && actualDeals.length > 0) {
+                            _pePipelineDeals = actualDeals.map(d => ({
+                                id: d.id || d.company_id,
+                                company_name: d.company_name || d.deal_name || 'Unknown',
+                                industry: d.industry || 'Unknown',
+                                deal_type: d.deal_type || 'LBO',
+                                enterprise_value: d.enterprise_value_usd || d.enterprise_value,
+                                announced_date: d.announced_date,
+                                closed_date: d.closed_date,
+                                status: d.status,
+                                stage: peMapDealStatus(d),
+                            }));
+                        }
+                    }
+                } catch (e) { /* deals endpoint may not exist yet */ }
+
+                panel.style.display = '';
+                peRenderKanban();
+            } catch (e) {
+                panel.style.display = 'none';
+            }
+        }
+
+        function peRenderKanban() {
+            for (const stage of PE_PIPELINE_STAGES) {
+                const container = document.getElementById(`pe-kb-cards-${stage}`);
+                const countEl = document.getElementById(`pe-kb-count-${stage}`);
+                if (!container) continue;
+                container.innerHTML = '';
+
+                const deals = _pePipelineDeals.filter(d => d.stage === stage);
+                countEl.textContent = deals.length;
+
+                for (const d of deals) {
+                    const evStr = d.enterprise_value
+                        ? `$${(d.enterprise_value / 1000000).toFixed(0)}M`
+                        : '';
+                    const daysStr = peDealDays(d);
+                    const typeClass = (d.deal_type || '').replace(/[^a-zA-Z-]/g, '');
+
+                    const card = document.createElement('div');
+                    card.className = 'pe-deal-card';
+                    card.draggable = true;
+                    card.dataset.dealId = d.id;
+                    card.ondragstart = function(e) { peKanbanDragStart(e, d.id); };
+                    card.ondragend = function(e) { e.target.classList.remove('dragging'); };
+                    card.innerHTML = `
+                        <div class="pe-deal-card-name">${peEsc(d.company_name)}</div>
+                        <div class="pe-deal-card-meta">
+                            <span class="pe-deal-card-type ${typeClass}">${peEsc(d.deal_type)}</span>
+                            ${evStr ? `<span class="pe-deal-card-size">${evStr}</span>` : ''}
+                        </div>
+                        ${daysStr ? `<div class="pe-deal-card-days">${daysStr}</div>` : ''}
+                        <select class="pe-deal-card-stage-select" onchange="peMoveDeal(${d.id}, this.value)" onclick="event.stopPropagation()">
+                            ${PE_PIPELINE_STAGES.map(s => `<option value="${s}" ${s === stage ? 'selected' : ''}>${s}</option>`).join('')}
+                        </select>
+                    `;
+                    container.appendChild(card);
+                }
+            }
+        }
+
+        function peDealDays(deal) {
+            const ref = deal.announced_date || deal.created_at;
+            if (!ref) return '';
+            const start = new Date(ref);
+            const end = deal.closed_date ? new Date(deal.closed_date) : new Date();
+            const days = Math.floor((end - start) / (1000 * 60 * 60 * 24));
+            return days >= 0 ? `${days}d in pipeline` : '';
+        }
+
+        function peMoveDeal(dealId, newStage) {
+            const deal = _pePipelineDeals.find(d => d.id === dealId);
+            if (deal) {
+                deal.stage = newStage;
+                peRenderKanban();
+            }
+        }
+
+        // Drag & drop handlers
+        let _peDragDealId = null;
+
+        function peKanbanDragStart(e, dealId) {
+            _peDragDealId = dealId;
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', dealId);
+        }
+
+        function peKanbanDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const col = e.currentTarget;
+            col.classList.add('drag-over');
+        }
+
+        function peKanbanDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+
+        function peKanbanDrop(e) {
+            e.preventDefault();
+            const col = e.currentTarget;
+            col.classList.remove('drag-over');
+            const newStage = col.dataset.stage;
+            if (_peDragDealId != null && newStage) {
+                peMoveDeal(_peDragDealId, newStage);
+            }
+            _peDragDealId = null;
+        }
+
+        function pePipelineToggle() {
+            const kanban = document.getElementById('pe-kanban');
+            const btn = document.getElementById('pe-pipeline-toggle-btn');
+            if (kanban.style.display === 'none') {
+                kanban.style.display = '';
+                btn.textContent = 'Collapse';
+            } else {
+                kanban.style.display = 'none';
+                btn.textContent = 'Expand';
+            }
+        }
 
         // ===== Data Quality Tab =====
         let _dqInitialized = false;
