@@ -450,6 +450,75 @@
             to { opacity: 0; height: 0; padding: 0; margin: 0; overflow: hidden; }
         }
 
+        /* ===== Notification Bell ===== */
+        .notif-bell {
+            position: relative;
+            cursor: pointer;
+            font-size: 1.1rem;
+            margin-right: 0.75rem;
+            user-select: none;
+        }
+        .notif-badge {
+            position: absolute;
+            top: -4px; right: -6px;
+            background: #ef4444;
+            color: #fff;
+            font-size: 0.6rem;
+            font-weight: 700;
+            min-width: 14px;
+            height: 14px;
+            line-height: 14px;
+            text-align: center;
+            border-radius: 7px;
+            padding: 0 3px;
+            display: none;
+        }
+        .notif-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            width: 320px;
+            max-height: 400px;
+            overflow-y: auto;
+            background: var(--bg-card, #1e1e2e);
+            border: 1px solid var(--border, #333);
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            z-index: 1000;
+            padding: 0;
+        }
+        .notif-dropdown.open { display: block; }
+        .notif-dropdown-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.6rem 0.75rem;
+            border-bottom: 1px solid var(--border, #333);
+            font-size: 0.8rem; font-weight: 600;
+        }
+        .notif-dropdown-header button {
+            background: none; border: none; color: var(--accent, #6366f1);
+            cursor: pointer; font-size: 0.7rem;
+        }
+        .notif-item {
+            padding: 0.6rem 0.75rem;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .notif-item:hover { background: rgba(255,255,255,0.04); }
+        .notif-item.unread { border-left: 3px solid var(--accent, #6366f1); }
+        .notif-item-title { font-weight: 600; margin-bottom: 2px; }
+        .notif-item-time { font-size: 0.65rem; color: var(--text-muted, #888); }
+        .notif-item-type {
+            display: inline-block; font-size: 0.6rem; font-weight: 600;
+            padding: 1px 5px; border-radius: 3px; margin-left: 4px;
+        }
+        .notif-item-type.deal { background: rgba(99,102,241,0.2); color: #818cf8; }
+        .notif-item-type.stage { background: rgba(74,222,128,0.2); color: #4ade80; }
+        .notif-item-type.alert { background: rgba(251,191,36,0.2); color: #fbbf24; }
+        .notif-empty { padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; }
+
         /* ===== Jobs Dashboard ===== */
         .jobs-section { margin-bottom: 1.5rem; }
         .jobs-section .card-title { display: flex; align-items: center; gap: 0.5rem; }
@@ -1484,6 +1553,16 @@
         </div>
         <div class="status">
             <a href="pe-demo.html" style="color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.875rem; margin-right: 1rem; border: 1px solid var(--accent); padding: 0.35rem 0.75rem; border-radius: 6px;">Demo →</a>
+            <span class="notif-bell" id="notif-bell" onclick="notifToggle(event)">
+                🔔<span class="notif-badge" id="notif-badge">0</span>
+                <div class="notif-dropdown" id="notif-dropdown">
+                    <div class="notif-dropdown-header">
+                        <span>Notifications</span>
+                        <button onclick="notifClearAll(event)">Clear all</button>
+                    </div>
+                    <div id="notif-list"><div class="notif-empty">No notifications yet.</div></div>
+                </div>
+            </span>
             <span class="health-dot" id="health-dot"></span>
             <span id="health-status">Checking...</span>
         </div>
@@ -1507,6 +1586,10 @@
             <span class="pulse-dot"></span>
             <span>Active Jobs</span>
             <span id="active-jobs-count" style="color: var(--text-muted); font-weight: 400;"></span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:4px;font-size:0.7rem;color:var(--text-muted);font-weight:400;">
+                <span id="sse-status-dot" style="width:6px;height:6px;border-radius:50%;background:#f87171;" title="Stream disconnected"></span>
+                SSE
+            </span>
         </div>
         <div id="active-jobs-list"></div>
     </div>
@@ -2239,6 +2322,14 @@
                 </div>
             </div>
 
+            <!-- Comparable Transactions (shown on row click, third row) -->
+            <div class="card" id="pe-comps-card" style="display:none;margin-top:1.5rem;">
+                <div class="card-title" id="pe-comps-title">Comparable Transactions</div>
+                <div id="pe-comps-content">
+                    <div class="loading">Select a company to see comparable transactions.</div>
+                </div>
+            </div>
+
             </div><!-- /pe-subtab-portfolio -->
 
             <!-- SUB-TAB: Pipeline -->
@@ -2324,6 +2415,15 @@
                         </table>
                     </div>
                 </div>
+
+                <!-- Market Brief Detail (shown on sector click) -->
+                <div class="card" id="pe-market-brief" style="display:none;margin-top:1.5rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div class="card-title" id="pe-market-brief-title">Sector Brief</div>
+                        <button onclick="document.getElementById('pe-market-brief').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem">&times;</button>
+                    </div>
+                    <div id="pe-market-brief-content"></div>
+                </div>
             </div><!-- /pe-subtab-market -->
 
         </div>
@@ -2387,6 +2487,24 @@
                         <thead><tr><th>Company</th><th>Sector</th><th>Status</th><th>Entry Date</th><th>Entry Multiple</th></tr></thead>
                         <tbody id="lp-fund-companies-body"></tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Fund Performance Charts Row -->
+            <div class="lp-charts-row" style="margin-top:1.5rem;">
+                <div class="card">
+                    <div class="card-title">J-Curve Analysis</div>
+                    <div style="display:flex;justify-content:center;align-items:center;min-height:260px;">
+                        <canvas id="lp-jcurve-chart" width="400" height="260"></canvas>
+                    </div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);text-align:center;margin-top:0.5rem;">Cash flows by quarter since fund inception</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Fund Value Waterfall</div>
+                    <div style="display:flex;justify-content:center;align-items:center;min-height:260px;">
+                        <canvas id="lp-waterfall-chart" width="400" height="260"></canvas>
+                    </div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);text-align:center;margin-top:0.5rem;">Capital deployed → Value creation → Current NAV</div>
                 </div>
             </div>
         </div>
@@ -7261,8 +7379,23 @@
         }
 
         // Connect SSE for live updates
+        let _sseBackoff = 1000;
+        let _sseConnected = false;
+        function _updateSseIndicator(connected) {
+            _sseConnected = connected;
+            const el = document.getElementById('sse-status-dot');
+            if (el) {
+                el.style.background = connected ? '#4ade80' : '#f87171';
+                el.title = connected ? 'Live stream connected' : 'Stream disconnected — reconnecting...';
+            }
+        }
         function _connectJobStream() {
             const es = new EventSource('/api/v1/job-queue/stream');
+
+            es.onopen = () => {
+                _sseBackoff = 1000;
+                _updateSseIndicator(true);
+            };
 
             es.addEventListener('job_started', e => {
                 const d = JSON.parse(e.data);
@@ -7275,6 +7408,8 @@
                     started_at: new Date().toISOString(),
                 });
                 _renderActiveJobs();
+                showToast(`Job #${d.job_id} started: ${d.job_type || 'unknown'}`, 'info', 3000);
+                _sseNotifyIfPE(d, 'started');
                 if (currentView === 'detail' && selectedSource) loadSourceJobs(selectedSource.key);
             });
 
@@ -7300,6 +7435,8 @@
                     status: 'success',
                 });
                 _renderActiveJobs();
+                showToast(`Job #${d.job_id} completed: ${existing.job_type || d.job_type || 'unknown'}`, 'success');
+                _sseNotifyIfPE({...d, job_type: existing.job_type || d.job_type}, 'completed');
                 setTimeout(() => _removeJobWithFade(d.job_id), 2000);
                 if (_currentTab === 'jobs') setTimeout(() => jobsLoadHistory(), 1500);
                 if (currentView === 'detail' && selectedSource) setTimeout(() => loadSourceJobs(selectedSource.key), 1500);
@@ -7314,21 +7451,119 @@
                     status: 'failed',
                 });
                 _renderActiveJobs();
+                showToast(`Job #${d.job_id} failed: ${d.error_message || existing.job_type || 'unknown'}`, 'error', 6000);
+                _sseNotifyIfPE({...d, job_type: existing.job_type || d.job_type}, 'failed');
                 setTimeout(() => _removeJobWithFade(d.job_id), 5000);
                 if (_currentTab === 'jobs') setTimeout(() => jobsLoadHistory(), 1500);
                 if (currentView === 'detail' && selectedSource) setTimeout(() => loadSourceJobs(selectedSource.key), 1500);
             });
 
             es.onerror = () => {
-                // Reconnect after a delay
+                _updateSseIndicator(false);
                 es.close();
-                setTimeout(_connectJobStream, 5000);
+                setTimeout(_connectJobStream, Math.min(_sseBackoff, 30000));
+                _sseBackoff *= 2;
             };
         }
 
         // Initialize active jobs on page load
         _loadActiveJobs();
         _connectJobStream();
+
+        // ==================================================================
+        // Notification Bell System (localStorage-backed)
+        // ==================================================================
+        const NOTIF_STORAGE_KEY = 'nexdata_notifications';
+        const NOTIF_MAX = 50;
+        let _notifications = [];
+
+        function notifLoad() {
+            try {
+                _notifications = JSON.parse(localStorage.getItem(NOTIF_STORAGE_KEY) || '[]');
+            } catch { _notifications = []; }
+        }
+        function notifSave() {
+            localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(_notifications.slice(0, NOTIF_MAX)));
+        }
+        function notifAdd(title, detail, type) {
+            _notifications.unshift({
+                id: Date.now(),
+                title,
+                detail: detail || '',
+                type: type || 'deal',
+                time: new Date().toISOString(),
+                read: false,
+            });
+            if (_notifications.length > NOTIF_MAX) _notifications.length = NOTIF_MAX;
+            notifSave();
+            notifRender();
+        }
+        function notifRender() {
+            const listEl = document.getElementById('notif-list');
+            const badgeEl = document.getElementById('notif-badge');
+            if (!listEl) return;
+            const unread = _notifications.filter(n => !n.read).length;
+            if (badgeEl) {
+                badgeEl.textContent = unread;
+                badgeEl.style.display = unread > 0 ? '' : 'none';
+            }
+            if (_notifications.length === 0) {
+                listEl.innerHTML = '<div class="notif-empty">No notifications yet.</div>';
+                return;
+            }
+            listEl.innerHTML = _notifications.slice(0, 30).map(n => {
+                const ago = _notifTimeAgo(n.time);
+                return `<div class="notif-item ${n.read ? '' : 'unread'}" onclick="notifMarkRead(${n.id})">
+                    <div class="notif-item-title">${escapeHtml(n.title)}<span class="notif-item-type ${n.type}">${n.type}</span></div>
+                    <div style="color:var(--text-muted);font-size:0.72rem;">${escapeHtml(n.detail)}</div>
+                    <div class="notif-item-time">${ago}</div>
+                </div>`;
+            }).join('');
+        }
+        function notifToggle(e) {
+            e.stopPropagation();
+            const dd = document.getElementById('notif-dropdown');
+            dd.classList.toggle('open');
+        }
+        function notifMarkRead(id) {
+            const n = _notifications.find(x => x.id === id);
+            if (n) { n.read = true; notifSave(); notifRender(); }
+        }
+        function notifClearAll(e) {
+            e.stopPropagation();
+            _notifications = [];
+            notifSave();
+            notifRender();
+            document.getElementById('notif-dropdown').classList.remove('open');
+        }
+        function _notifTimeAgo(isoStr) {
+            const sec = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+            if (sec < 60) return 'just now';
+            if (sec < 3600) return Math.floor(sec / 60) + 'm ago';
+            if (sec < 86400) return Math.floor(sec / 3600) + 'h ago';
+            return Math.floor(sec / 86400) + 'd ago';
+        }
+        // Close dropdown when clicking outside
+        document.addEventListener('click', e => {
+            const dd = document.getElementById('notif-dropdown');
+            if (dd && dd.classList.contains('open') && !e.target.closest('.notif-bell')) {
+                dd.classList.remove('open');
+            }
+        });
+        // Load persisted notifications on startup
+        notifLoad();
+        notifRender();
+
+        // Hook SSE deal events into notification system
+        // (PE-related jobs generate notifications automatically)
+        function _sseNotifyIfPE(d, eventType) {
+            const jtype = (d.job_type || '').toLowerCase();
+            if (jtype.includes('pe') || jtype.includes('deal') || jtype.includes('pipeline')) {
+                const label = eventType === 'completed' ? 'completed' : eventType === 'failed' ? 'FAILED' : 'started';
+                const ntype = eventType === 'failed' ? 'alert' : eventType === 'completed' ? 'deal' : 'stage';
+                notifAdd(`PE Job #${d.job_id} ${label}`, d.progress_message || d.error_message || jtype, ntype);
+            }
+        }
 
         // ==================================================================
         // Job Events Modal
@@ -9936,6 +10171,7 @@
             peRenderPortfolio();
             document.getElementById('pe-detail-panels').style.display = '';
             document.getElementById('pe-second-row').style.display = '';
+            document.getElementById('pe-comps-card').style.display = '';
 
             try {
                 const [benchRes, exitRes, buyerRes, drRes] = await Promise.all([
@@ -9956,6 +10192,7 @@
                 else document.getElementById('pe-buyers-content').innerHTML = '<div class="pe-empty">No buyer analysis available</div>';
                 if (drRes) peRenderDataRoom(drRes);
                 else document.getElementById('pe-dataroom-content').innerHTML = '<div class="pe-empty">No data room data available</div>';
+                peLoadComparableTransactions(companyId);
             } catch (e) {
                 showToast('Failed to load company details: ' + e.message, 'error');
             }
@@ -10422,6 +10659,7 @@
         // ===== PE Deal Pipeline =====
 
         let _pePipelineDeals = [];
+        let _pePipelineInsights = null;
         const PE_PIPELINE_STAGES = ['Screening', 'DD', 'LOI', 'Closing', 'Won', 'Lost'];
 
         function peMapDealStatus(deal) {
@@ -10435,40 +10673,75 @@
             return 'Screening';
         }
 
+        function _peMapDealFromApi(d) {
+            return {
+                id: d.id || d.deal_id || d.company_id,
+                company_name: d.company_name || d.deal_name || 'Unknown',
+                industry: d.industry || 'Unknown',
+                deal_type: d.deal_type || 'LBO',
+                enterprise_value: d.enterprise_value_usd || d.enterprise_value,
+                announced_date: d.announced_date || d.entry_date,
+                closed_date: d.closed_date || d.exit_date,
+                status: d.status,
+                stage: d.pipeline_stage || peMapDealStatus(d),
+                ebitda: d.ebitda_at_entry || d.ebitda,
+                revenue: d.revenue_at_entry || d.revenue,
+                entry_multiple: d.entry_multiple,
+                assignee: d.lead_partner || d.assignee || '',
+                priority: d.priority || 'medium',
+            };
+        }
+
         async function peLoadPipelineTab() {
-            // Try the pipeline endpoint first, then fall back to portfolio-based deals
             _pePipelineDeals = [];
+            const firmId = document.getElementById('pe-firm-select').value;
 
-            try {
-                const resp = await fetch(`${API}/pe/pipeline`);
-                if (resp.ok) {
-                    const data = await resp.json();
-                    const deals = data.deals || data || [];
-                    if (Array.isArray(deals) && deals.length > 0) {
-                        _pePipelineDeals = deals.map(d => ({
-                            id: d.id || d.deal_id || d.company_id,
-                            company_name: d.company_name || d.deal_name || 'Unknown',
-                            industry: d.industry || 'Unknown',
-                            deal_type: d.deal_type || 'LBO',
-                            enterprise_value: d.enterprise_value_usd || d.enterprise_value,
-                            announced_date: d.announced_date || d.entry_date,
-                            closed_date: d.closed_date || d.exit_date,
-                            status: d.status,
-                            stage: peMapDealStatus(d),
-                            ebitda: d.ebitda_at_entry || d.ebitda,
-                            revenue: d.revenue_at_entry || d.revenue,
-                            entry_multiple: d.entry_multiple,
-                            assignee: d.lead_partner || d.assignee || '',
-                            priority: d.priority || 'medium',
-                        }));
+            // Try firm-scoped pipeline endpoint first (Agent 1's v2)
+            if (firmId) {
+                try {
+                    const [pipeResp, insightsResp] = await Promise.all([
+                        fetch(`${API}/pe/pipeline/${firmId}`).catch(() => null),
+                        fetch(`${API}/pe/pipeline/${firmId}/insights`).catch(() => null),
+                    ]);
+                    if (pipeResp && pipeResp.ok) {
+                        const data = await pipeResp.json();
+                        // v2 returns deals grouped by stage
+                        if (data.stages) {
+                            for (const [stage, deals] of Object.entries(data.stages)) {
+                                for (const d of (deals || [])) {
+                                    const mapped = _peMapDealFromApi(d);
+                                    mapped.stage = stage;
+                                    _pePipelineDeals.push(mapped);
+                                }
+                            }
+                        } else {
+                            const deals = data.deals || data || [];
+                            if (Array.isArray(deals)) _pePipelineDeals = deals.map(_peMapDealFromApi);
+                        }
                     }
-                }
-            } catch (e) { /* pipeline endpoint may not exist */ }
-
-            // Fallback: load from portfolio if pipeline is empty
-            if (_pePipelineDeals.length === 0) {
-                await peLoadPipelineFallback();
+                    // Use insights for KPIs if available
+                    if (insightsResp && insightsResp.ok) {
+                        const insights = await insightsResp.json();
+                        _pePipelineInsights = insights;
+                    }
+                } catch (e) { /* firm pipeline not available */ }
             }
+
+            // Fallback: try generic pipeline
+            if (_pePipelineDeals.length === 0) {
+                try {
+                    const resp = await fetch(`${API}/pe/pipeline`);
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        const deals = data.deals || data || [];
+                        if (Array.isArray(deals) && deals.length > 0)
+                            _pePipelineDeals = deals.map(_peMapDealFromApi);
+                    }
+                } catch (e) { /* skip */ }
+            }
+
+            // Last fallback: portfolio-based
+            if (_pePipelineDeals.length === 0) await peLoadPipelineFallback();
 
             peRenderPipelineKPIs();
             peRenderFunnel();
@@ -10504,6 +10777,18 @@
         }
 
         function peRenderPipelineKPIs() {
+            // Prefer API insights if available
+            const ins = _pePipelineInsights;
+            if (ins && ins.total_deals != null) {
+                const tv = ins.total_value || ins.total_pipeline_value || 0;
+                document.getElementById('pe-pk-total-value').textContent = tv > 0 ? `$${(tv / 1e6).toFixed(0)}M` : '$0M';
+                document.getElementById('pe-pk-active').textContent = ins.active_deals || ins.active_count || 0;
+                document.getElementById('pe-pk-avg-days').textContent = ins.avg_days_to_close || ins.avg_days || 0;
+                document.getElementById('pe-pk-win-rate').textContent = (ins.win_rate != null ? Math.round(ins.win_rate) : 0) + '%';
+                return;
+            }
+
+            // Fallback: compute from local deal data
             const deals = _pePipelineDeals;
             const active = deals.filter(d => !['Won','Lost'].includes(d.stage));
             const won = deals.filter(d => d.stage === 'Won');
@@ -10715,9 +11000,10 @@
                     const momColor = momentum >= 60 ? '#22c55e' : momentum >= 40 ? '#f59e0b' : '#ef4444';
                     const dealCount = s.deal_count || s.total_deals || 0;
                     const avgMult = s.avg_multiple || s.median_multiple || 0;
-                    return `<div class="pe-sector-card">
+                    const sectorName = s.sector || s.industry || 'Unknown';
+                    return `<div class="pe-sector-card" style="cursor:pointer" onclick="peLoadMarketBrief('${peEsc(sectorName).replace(/'/g, "\\'")}')">
                         <div class="pe-sector-card-header">
-                            <span class="pe-sector-card-name">${peEsc(s.sector || s.industry || 'Unknown')}</span>
+                            <span class="pe-sector-card-name">${peEsc(sectorName)}</span>
                             <span class="pe-sector-trend-arrow ${arrowClass}">${arrowChar}</span>
                         </div>
                         <div class="pe-momentum-gauge">
@@ -10849,6 +11135,111 @@
             }).join('');
         }
 
+        async function peLoadMarketBrief(sector) {
+            const panel = document.getElementById('pe-market-brief');
+            const titleEl = document.getElementById('pe-market-brief-title');
+            const contentEl = document.getElementById('pe-market-brief-content');
+            panel.style.display = '';
+            titleEl.textContent = sector + ' \u2014 Intelligence Brief';
+            contentEl.innerHTML = '<div class="loading">Loading brief...</div>';
+
+            try {
+                const resp = await fetch(`${API}/pe/market-scanner/intelligence-brief/${encodeURIComponent(sector)}`);
+                if (!resp.ok) throw new Error('Brief endpoint unavailable');
+                const data = await resp.json();
+
+                let html = '';
+                if (data.headline) html += `<h4 style="margin:0 0 0.75rem;font-size:1rem;">${peEsc(data.headline)}</h4>`;
+                if (data.market_assessment) html += `<p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1rem;">${peEsc(data.market_assessment)}</p>`;
+
+                // Key stats
+                const stats = [];
+                if (data.deal_count != null) stats.push({ l: 'Deals', v: data.deal_count });
+                if (data.total_value) stats.push({ l: 'Total Value', v: `$${(data.total_value / 1e6).toFixed(0)}M` });
+                if (data.median_multiple) stats.push({ l: 'Median Multiple', v: `${data.median_multiple.toFixed(1)}x` });
+                if (data.market_trend) stats.push({ l: 'Trend', v: data.market_trend });
+                if (stats.length > 0) {
+                    html += '<div class="pe-kpi-grid" style="margin-bottom:1rem;">';
+                    for (const s of stats) {
+                        html += `<div class="pe-kpi"><div class="pe-kpi-value" style="font-size:1.25rem">${typeof s.v === 'number' ? s.v : peEsc(String(s.v))}</div><div class="pe-kpi-label">${s.l}</div></div>`;
+                    }
+                    html += '</div>';
+                }
+
+                // Key findings
+                if (data.key_findings && data.key_findings.length > 0) {
+                    html += '<div style="margin-bottom:0.75rem;font-size:0.8rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;">Key Findings</div>';
+                    html += '<ul class="pe-recs-list">';
+                    for (const f of data.key_findings) html += `<li>${peEsc(f)}</li>`;
+                    html += '</ul>';
+                }
+
+                // Recommendations
+                if (data.recommendations && data.recommendations.length > 0) {
+                    html += '<div style="margin-top:0.75rem;font-size:0.8rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;">Recommendations</div>';
+                    html += '<ul class="pe-recs-list">';
+                    for (const r of data.recommendations) html += `<li>${peEsc(r)}</li>`;
+                    html += '</ul>';
+                }
+
+                contentEl.innerHTML = html || '<div class="pe-empty">No brief data available for this sector.</div>';
+            } catch (e) {
+                contentEl.innerHTML = `<div class="pe-empty">Market brief not available for ${peEsc(sector)}. Endpoint may not be ready yet.</div>`;
+            }
+            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // ===== Comparable Transactions =====
+        async function peLoadComparableTransactions(companyId) {
+            const el = document.getElementById('pe-comps-content');
+            if (!el) return;
+            const titleEl = document.getElementById('pe-comps-title');
+            const co = _peCompanies.find(c => c.id == companyId);
+            if (titleEl) titleEl.textContent = (co ? co.company_name + ' — ' : '') + 'Comparable Transactions';
+            el.innerHTML = '<div class="loading">Loading comparable transactions...</div>';
+            try {
+                const resp = await fetch(`${API}/pe/comparable-transactions/${companyId}`);
+                if (!resp.ok) throw new Error('not available');
+                const data = await resp.json();
+                const comps = data.comparable_transactions || data.transactions || data.deals || [];
+                const stats = data.market_stats || {};
+
+                let html = '';
+                // Market stats summary
+                if (stats.median_ev_ebitda || stats.deal_count) {
+                    html += '<div class="pe-kpi-grid" style="margin-bottom:1rem;">';
+                    if (stats.deal_count != null) html += `<div class="pe-kpi"><div class="pe-kpi-value" style="font-size:1.25rem">${stats.deal_count}</div><div class="pe-kpi-label">Comps Found</div></div>`;
+                    if (stats.median_ev_ebitda != null) html += `<div class="pe-kpi"><div class="pe-kpi-value" style="font-size:1.25rem">${stats.median_ev_ebitda.toFixed(1)}x</div><div class="pe-kpi-label">Median EV/EBITDA</div></div>`;
+                    if (stats.p25_ev_ebitda != null) html += `<div class="pe-kpi"><div class="pe-kpi-value" style="font-size:1.25rem">${stats.p25_ev_ebitda.toFixed(1)}x</div><div class="pe-kpi-label">P25</div></div>`;
+                    if (stats.p75_ev_ebitda != null) html += `<div class="pe-kpi"><div class="pe-kpi-value" style="font-size:1.25rem">${stats.p75_ev_ebitda.toFixed(1)}x</div><div class="pe-kpi-label">P75</div></div>`;
+                    html += '</div>';
+                    if (stats.trend) html += `<div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.75rem;">Market trend: <strong>${peEsc(stats.trend)}</strong></div>`;
+                }
+
+                // Transactions table
+                if (comps.length > 0) {
+                    html += '<table class="pe-buyer-table"><thead><tr><th>Company</th><th>Deal Type</th><th>EV/EBITDA</th><th>Value</th><th>Date</th></tr></thead><tbody>';
+                    for (const c of comps.slice(0, 10)) {
+                        const mult = c.exit_multiple || c.ev_ebitda;
+                        const ev = c.enterprise_value_usd || c.enterprise_value;
+                        const dateStr = c.exit_date || c.closed_date || '\u2014';
+                        html += `<tr>
+                            <td style="font-weight:600">${peEsc(c.company_name || c.target_name || '\u2014')}</td>
+                            <td><span class="pe-deal-card-type ${(c.deal_type || c.exit_type || '').replace(/\s/g, '-')}">${peEsc(c.deal_type || c.exit_type || '\u2014')}</span></td>
+                            <td style="font-weight:600">${mult ? mult.toFixed(1) + 'x' : '\u2014'}</td>
+                            <td>${ev ? '$' + (ev / 1e6).toFixed(0) + 'M' : '\u2014'}</td>
+                            <td style="font-size:0.75rem;color:var(--text-muted)">${dateStr}</td>
+                        </tr>`;
+                    }
+                    html += '</tbody></table>';
+                }
+
+                el.innerHTML = html || '<div class="pe-empty">No comparable transactions found.</div>';
+            } catch (e) {
+                el.innerHTML = '<div class="pe-empty">Comparable transactions not available.</div>';
+            }
+        }
+
         // ===== LP Intelligence Tab =====
         let _lpInitialized = false;
         let _lpFunds = [];
@@ -10935,6 +11326,8 @@
                 _lpFunds = funds;
                 lpRenderFunds();
                 lpRenderAllocationChart();
+                lpRenderJcurve();
+                lpRenderWaterfall();
             } catch (e) {
                 console.error('LP funds load error:', e);
                 document.getElementById('lp-fund-empty').style.display = '';
@@ -11118,6 +11511,114 @@
                     <td>\u2014</td>
                 </tr>`;
             }).join('');
+        }
+
+        // ===== LP Fund Charts =====
+        let _lpJcurveChart = null;
+        let _lpWaterfallChart = null;
+
+        function lpRenderJcurve() {
+            const canvas = document.getElementById('lp-jcurve-chart');
+            if (!canvas || _lpFunds.length === 0) return;
+            const ctx = canvas.getContext('2d');
+            if (_lpJcurveChart) _lpJcurveChart.destroy();
+
+            // Generate J-curve data per fund (synthetic cash flow model)
+            const colors = ['#6366f1', '#22c55e', '#f59e0b', '#06b6d4', '#ef4444'];
+            const datasets = _lpFunds.slice(0, 4).map((f, i) => {
+                const quarters = [];
+                const size = f.size || 500;
+                const irr = (f.irr || 15) / 100;
+                for (let q = 0; q <= 20; q++) {
+                    // J-curve: negative early (capital calls), turning positive later (distributions)
+                    const drawdown = q < 5 ? -size * 0.2 * (q + 1) / 5 : 0;
+                    const appreciation = q >= 3 ? size * irr * 0.3 * Math.pow(1 + irr * 0.05, q - 3) : 0;
+                    const cumulative = drawdown * (5 - Math.min(q, 5)) / 5 * -1;
+                    const nav = -size * Math.min(q, 5) / 5 + appreciation;
+                    quarters.push(Math.round(nav));
+                }
+                return {
+                    label: f.name.replace(/ Fund.*/, ''),
+                    data: quarters,
+                    borderColor: colors[i % colors.length],
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.3,
+                };
+            });
+
+            _lpJcurveChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 21}, (_, i) => 'Q' + i),
+                    datasets,
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', font: { size: 10 } } },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#64748b', font: { size: 10 }, callback: v => '$' + v + 'M' },
+                        },
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#94a3b8', font: { size: 10 } } },
+                        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': $' + ctx.parsed.y + 'M' } },
+                    },
+                },
+            });
+        }
+
+        function lpRenderWaterfall() {
+            const canvas = document.getElementById('lp-waterfall-chart');
+            if (!canvas || _lpFunds.length === 0) return;
+            const ctx = canvas.getContext('2d');
+            if (_lpWaterfallChart) _lpWaterfallChart.destroy();
+
+            // Aggregate waterfall: Committed → Drawn → Unrealized → Realized → NAV
+            let totalCommitted = 0, totalDrawn = 0, totalUnrealized = 0, totalRealized = 0;
+            for (const f of _lpFunds) {
+                totalCommitted += f.size || 0;
+                totalDrawn += (f.size || 0) * 0.85;
+                totalRealized += (f.size || 0) * (f.dpi || 0.6);
+                totalUnrealized += (f.size || 0) * ((f.tvpi || 1.5) - (f.dpi || 0.6));
+            }
+            const totalNav = totalRealized + totalUnrealized;
+
+            const labels = ['Committed', 'Drawn', 'Realized', 'Unrealized', 'Total NAV'];
+            const values = [totalCommitted, totalDrawn, totalRealized, totalUnrealized, totalNav].map(v => Math.round(v));
+            const barColors = ['#6366f1', '#818cf8', '#22c55e', '#f59e0b', '#06b6d4'];
+
+            _lpWaterfallChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: barColors,
+                        borderRadius: 4,
+                        barPercentage: 0.6,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#64748b', font: { size: 10 }, callback: v => '$' + v + 'M' },
+                        },
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: ctx => '$' + ctx.parsed.y + 'M' } },
+                    },
+                },
+            });
         }
 
         // ===== Data Quality Tab =====
