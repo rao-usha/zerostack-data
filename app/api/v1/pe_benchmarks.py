@@ -1176,6 +1176,115 @@ async def refresh_investment_thesis(
 
 
 # =============================================================================
+# Portfolio Analytics — Firm-Level Performance & Risk
+# =============================================================================
+
+
+@router.get("/analytics/{firm_id}/performance")
+async def get_firm_performance(
+    firm_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Firm-wide aggregated performance — blended IRR, MOIC, TVPI, DPI, RVPI
+    weighted by committed capital across all funds. Includes AUM breakdown
+    and per-fund summary.
+    """
+    from app.core.pe_portfolio_analytics import calculate_firm_performance
+
+    result = calculate_firm_performance(db, firm_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Firm {firm_id} not found")
+    return result
+
+
+@router.get("/analytics/{firm_id}/vintage")
+async def get_vintage_analysis(
+    firm_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Vintage cohort analysis — funds grouped by vintage year with
+    avg IRR/MOIC, best/worst fund per cohort.
+    """
+    from app.core.pe_portfolio_analytics import get_vintage_analysis as _vintage
+
+    result = _vintage(db, firm_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Firm {firm_id} not found")
+    return result
+
+
+@router.get("/analytics/{firm_id}/concentration")
+async def get_concentration(
+    firm_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Sector concentration analysis — portfolio allocation by industry,
+    HHI score, and concentration risk classification.
+    """
+    from app.core.pe_portfolio_analytics import get_sector_concentration
+
+    result = get_sector_concentration(db, firm_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Firm {firm_id} not found")
+    return result
+
+
+@router.get("/analytics/{firm_id}/risk")
+async def get_risk_dashboard(
+    firm_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Composite risk dashboard — sector, geographic, vintage concentration,
+    exit readiness distribution, management gap risk.
+    """
+    from app.core.pe_portfolio_analytics import get_portfolio_risk_dashboard
+
+    result = get_portfolio_risk_dashboard(db, firm_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Firm {firm_id} not found")
+    return result
+
+
+@router.get("/analytics/{firm_id}/pme")
+async def get_pme(
+    firm_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Public Market Equivalent — compares PE returns vs S&P 500
+    and Russell 2000 using simplified Kaplan-Schoar PME.
+    PME > 1.0 means PE outperformed public markets.
+    """
+    from app.core.pe_portfolio_analytics import calculate_pme
+
+    result = calculate_pme(db, firm_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Firm {firm_id} not found")
+    return result
+
+
+@router.get("/analytics/{firm_id}/benchmarks")
+async def get_benchmark_comparison(
+    firm_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Benchmark comparison — firm IRR/TVPI/DPI vs Cambridge Associates
+    PE median, S&P 500, and Russell 2000. Includes quartile ranking.
+    """
+    from app.core.pe_portfolio_analytics import get_benchmark_comparison as _bench
+
+    result = _bench(db, firm_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Firm {firm_id} not found")
+    return result
+
+
+# =============================================================================
 # Fragmentation Scoring Endpoints
 # =============================================================================
 
