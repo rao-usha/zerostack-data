@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import String, cast, delete, select
+from sqlalchemy import String, cast, delete, func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -103,6 +103,20 @@ class SeedDemoResponse(BaseModel):
     total_rows: int = 0
 
 
+class FirmSummaryResponse(BaseModel):
+    id: int
+    name: str
+    firm_type: Optional[str] = None
+    primary_strategy: Optional[str] = None
+    aum_usd_millions: Optional[float] = None
+    headquarters_city: Optional[str] = None
+    headquarters_state: Optional[str] = None
+    sector_focus: Optional[List[str]] = None
+    status: Optional[str] = None
+    fund_count: int = 0
+    company_count: int = 0
+
+
 class GraphNodeResponse(BaseModel):
     id: str
     name: str
@@ -125,8 +139,54 @@ class LeadershipGraphResponse(BaseModel):
 
 
 # =============================================================================
+# Helpers
+# =============================================================================
+
+
+def _build_firm_summary(
+    firm, fund_count: int, company_count: int,
+) -> Dict[str, Any]:
+    """Build a firm summary dict with counts."""
+    return {
+        "id": firm.id,
+        "name": firm.name,
+        "firm_type": firm.firm_type,
+        "primary_strategy": firm.primary_strategy,
+        "aum_usd_millions": float(firm.aum_usd_millions) if firm.aum_usd_millions else None,
+        "headquarters_city": firm.headquarters_city,
+        "headquarters_state": firm.headquarters_state,
+        "sector_focus": firm.sector_focus,
+        "status": firm.status,
+        "fund_count": fund_count,
+        "company_count": company_count,
+    }
+
+
+# =============================================================================
 # Endpoints
 # =============================================================================
+
+
+@router.get("/firms", response_model=List[FirmSummaryResponse], summary="List all PE firms")
+async def list_firms(db: Session = Depends(get_db)) -> List[FirmSummaryResponse]:
+    """Return all PE firms with their current IDs, fund counts, and company counts.
+
+    Use this to discover firm IDs dynamically instead of hardcoding.
+    """
+    firms = db.execute(select(PEFirm).order_by(PEFirm.name)).scalars().all()
+    results = []
+    for firm in firms:
+        fund_count = db.execute(
+            select(func.count(PEFund.id)).where(PEFund.firm_id == firm.id)
+        ).scalar() or 0
+        # Count companies via fund investments
+        company_count = db.execute(
+            select(func.count(func.distinct(PEFundInvestment.company_id)))
+            .join(PEFund, PEFundInvestment.fund_id == PEFund.id)
+            .where(PEFund.firm_id == firm.id)
+        ).scalar() or 0
+        results.append(FirmSummaryResponse(**_build_firm_summary(firm, fund_count, company_count)))
+    return results
 
 
 @router.post("/seed-demo", response_model=SeedDemoResponse)
@@ -1311,3 +1371,362 @@ async def get_valuation_comps(
         ev_ebitda_percentile=result.get("ev_ebitda_percentile"),
         peer_companies=[PeerCompany(**p) for p in result.get("peer_companies", [])],
     )
+
+
+# =============================================================================
+# Comparable Transactions
+# =============================================================================
+
+
+class ComparableDealResponse(BaseModel):
+    id: int
+    deal_name: Optional[str] = None
+    deal_type: Optional[str] = None
+    deal_sub_type: Optional[str] = None
+    buyer_name: Optional[str] = None
+    seller_name: Optional[str] = None
+    seller_type: Optional[str] = None
+    enterprise_value_usd: Optional[float] = None
+    ev_ebitda_multiple: Optional[float] = None
+    ev_revenue_multiple: Optional[float] = None
+    ltm_revenue_usd: Optional[float] = None
+    ltm_ebitda_usd: Optional[float] = None
+    announced_date: Optional[str] = None
+    closed_date: Optional[str] = None
+    status: Optional[str] = None
+
+
+class MarketStatsResponse(BaseModel):
+    total_deals: int = 0
+    deals_with_multiples: int = 0
+    ev_ebitda_median: Optional[float] = None
+    ev_ebitda_p25: Optional[float] = None
+    ev_ebitda_p75: Optional[float] = None
+    ev_ebitda_min: Optional[float] = None
+    ev_ebitda_max: Optional[float] = None
+    ev_revenue_median: Optional[float] = None
+    total_deal_value_usd: Optional[float] = None
+    seller_type_breakdown: Dict[str, int] = {}
+    multiple_trend: Optional[str] = None
+
+
+class ComparableTransactionsResponse(BaseModel):
+    company_id: int
+    company_name: Optional[str] = None
+    industry: Optional[str] = None
+    sub_industry: Optional[str] = None
+    comparable_deals: List[ComparableDealResponse] = []
+    deal_count: int = 0
+    market_stats: MarketStatsResponse = MarketStatsResponse()
+
+
+@router.get(
+    "/comparable-transactions/{company_id}",
+    response_model=ComparableTransactionsResponse,
+    summary="Comparable exit transactions for valuation support",
+)
+async def get_comparable_transactions(
+    company_id: int,
+    years_back: int = Query(5, ge=1, le=20, description="Years of history"),
+    include_pending: bool = Query(False, description="Include pending deals"),
+    db: Session = Depends(get_db),
+) -> ComparableTransactionsResponse:
+    """Get comparable exit transactions in the same industry as a target company.
+
+    Returns historical deal details with multiples plus aggregate market
+    statistics (median multiple, volume, trend direction).
+    """
+    from app.core.pe_comparable_transactions import ComparableTransactionService
+
+    service = ComparableTransactionService(db)
+    result = service.get_comps(company_id, years_back=years_back, include_pending=include_pending)
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return ComparableTransactionsResponse(
+        company_id=result["company_id"],
+        company_name=result.get("company_name"),
+        industry=result.get("industry"),
+        sub_industry=result.get("sub_industry"),
+        comparable_deals=[ComparableDealResponse(**d) for d in result.get("comparable_deals", [])],
+        deal_count=result.get("deal_count", 0),
+        market_stats=MarketStatsResponse(**result.get("market_stats", {})),
+    )
+
+
+# =============================================================================
+# Market Scanner & Intelligence Brief
+# =============================================================================
+
+
+class BuyerInfo(BaseModel):
+    buyer_name: str
+    deal_count: int
+
+
+class EvEbitdaRange(BaseModel):
+    min: Optional[float] = None
+    max: Optional[float] = None
+
+
+class SectorOverviewResponse(BaseModel):
+    industry: str
+    deal_count: int = 0
+    total_deal_value_usd: float = 0
+    median_ev_ebitda: Optional[float] = None
+    median_ev_revenue: Optional[float] = None
+    ev_ebitda_range: Optional[EvEbitdaRange] = None
+    deal_type_breakdown: Dict[str, int] = {}
+    seller_type_breakdown: Dict[str, int] = {}
+    top_buyers: List[BuyerInfo] = []
+    yoy_deal_count_change: Optional[float] = None
+    yoy_multiple_change: Optional[float] = None
+
+
+class IntelligenceBriefResponse(BaseModel):
+    industry: str
+    headline: str
+    key_findings: List[str] = []
+    recommendations: List[str] = []
+    deal_count: int = 0
+    total_deal_value_usd: float = 0
+    median_ev_ebitda: Optional[float] = None
+
+
+class MarketSignalResponse(BaseModel):
+    industry: str
+    recent_deal_count: int = 0
+    prior_deal_count: int = 0
+    current_median_ev_ebitda: Optional[float] = None
+    prior_median_ev_ebitda: Optional[float] = None
+    momentum: str = "neutral"
+    deal_flow_change_pct: Optional[float] = None
+    multiple_change_pct: Optional[float] = None
+
+
+@router.get(
+    "/market-scanner/signals",
+    response_model=List[MarketSignalResponse],
+    summary="Cross-sector momentum signals",
+)
+async def get_market_signals(
+    db: Session = Depends(get_db),
+) -> List[MarketSignalResponse]:
+    """Get momentum signals across all active sectors.
+
+    Compares recent deal flow and multiples vs prior period to identify
+    bullish, bearish, or neutral momentum for each industry.
+    """
+    from app.core.pe_market_scanner import MarketScannerService
+
+    service = MarketScannerService(db)
+    signals = service.get_market_signals()
+    return [MarketSignalResponse(**s) for s in signals]
+
+
+@router.get(
+    "/market-scanner/sector/{industry}",
+    response_model=SectorOverviewResponse,
+    summary="Sector deal flow overview",
+)
+async def get_sector_overview(
+    industry: str,
+    years_back: int = Query(3, ge=1, le=10, description="Years of history"),
+    db: Session = Depends(get_db),
+) -> SectorOverviewResponse:
+    """Get sector overview with deal stats, multiples, and top buyers."""
+    from app.core.pe_market_scanner import MarketScannerService
+
+    service = MarketScannerService(db)
+    result = service.get_sector_overview(industry, years_back=years_back)
+
+    ev_range = result.get("ev_ebitda_range")
+    return SectorOverviewResponse(
+        industry=result["industry"],
+        deal_count=result["deal_count"],
+        total_deal_value_usd=result.get("total_deal_value_usd", 0),
+        median_ev_ebitda=result.get("median_ev_ebitda"),
+        median_ev_revenue=result.get("median_ev_revenue"),
+        ev_ebitda_range=EvEbitdaRange(**ev_range) if ev_range else None,
+        deal_type_breakdown=result.get("deal_type_breakdown", {}),
+        seller_type_breakdown=result.get("seller_type_breakdown", {}),
+        top_buyers=[BuyerInfo(**b) for b in result.get("top_buyers", [])],
+        yoy_deal_count_change=result.get("yoy_deal_count_change"),
+        yoy_multiple_change=result.get("yoy_multiple_change"),
+    )
+
+
+@router.get(
+    "/market-scanner/intelligence-brief/{industry}",
+    response_model=IntelligenceBriefResponse,
+    summary="AI-generated sector intelligence brief",
+)
+async def get_intelligence_brief(
+    industry: str,
+    years_back: int = Query(3, ge=1, le=10, description="Years of history"),
+    db: Session = Depends(get_db),
+) -> IntelligenceBriefResponse:
+    """Generate an intelligence brief with key findings and recommendations."""
+    from app.core.pe_market_scanner import MarketScannerService
+
+    service = MarketScannerService(db)
+    brief = service.get_intelligence_brief(industry, years_back=years_back)
+    return IntelligenceBriefResponse(**brief)
+
+
+# =============================================================================
+# Deal Pipeline
+# =============================================================================
+
+
+class PipelineDealResponse(BaseModel):
+    id: int
+    company_id: Optional[int] = None
+    deal_name: Optional[str] = None
+    deal_type: Optional[str] = None
+    deal_sub_type: Optional[str] = None
+    status: Optional[str] = None
+    enterprise_value_usd: Optional[float] = None
+    ev_ebitda_multiple: Optional[float] = None
+    ev_revenue_multiple: Optional[float] = None
+    ltm_revenue_usd: Optional[float] = None
+    ltm_ebitda_usd: Optional[float] = None
+    buyer_name: Optional[str] = None
+    seller_name: Optional[str] = None
+    seller_type: Optional[str] = None
+    announced_date: Optional[str] = None
+    closed_date: Optional[str] = None
+    expected_close_date: Optional[str] = None
+
+
+class PipelineCreateRequest(BaseModel):
+    company_id: int
+    deal_name: str
+    deal_type: str = "LBO"
+    deal_sub_type: Optional[str] = None
+    status: str = "Announced"
+    enterprise_value_usd: Optional[float] = None
+    ev_ebitda_multiple: Optional[float] = None
+    ev_revenue_multiple: Optional[float] = None
+    ltm_revenue_usd: Optional[float] = None
+    ltm_ebitda_usd: Optional[float] = None
+    buyer_name: Optional[str] = None
+    seller_name: Optional[str] = None
+    seller_type: Optional[str] = None
+    announced_date: Optional[date] = None
+    expected_close_date: Optional[date] = None
+
+
+class PipelineUpdateRequest(BaseModel):
+    status: Optional[str] = None
+    deal_name: Optional[str] = None
+    enterprise_value_usd: Optional[float] = None
+    ev_ebitda_multiple: Optional[float] = None
+    buyer_name: Optional[str] = None
+    seller_name: Optional[str] = None
+    expected_close_date: Optional[date] = None
+    closed_date: Optional[date] = None
+
+
+class UpcomingCloseResponse(BaseModel):
+    deal_id: int
+    expected_close_date: str
+
+
+class PipelineInsightsResponse(BaseModel):
+    total_pipeline_deals: int = 0
+    active_deals: int = 0
+    total_pipeline_value_usd: float = 0
+    stage_breakdown: Dict[str, int] = {}
+    deal_type_breakdown: Dict[str, int] = {}
+    avg_deal_size_usd: float = 0
+    upcoming_closes: List[UpcomingCloseResponse] = []
+
+
+@router.get(
+    "/pipeline/insights",
+    response_model=PipelineInsightsResponse,
+    summary="Pipeline health and insights",
+)
+async def get_pipeline_insights(
+    db: Session = Depends(get_db),
+) -> PipelineInsightsResponse:
+    """Get pipeline health summary: stage counts, total value, upcoming closes."""
+    from app.core.pe_deal_pipeline import DealPipelineService
+
+    service = DealPipelineService(db)
+    insights = service.get_insights()
+    return PipelineInsightsResponse(
+        total_pipeline_deals=insights["total_pipeline_deals"],
+        active_deals=insights["active_deals"],
+        total_pipeline_value_usd=insights["total_pipeline_value_usd"],
+        stage_breakdown=insights["stage_breakdown"],
+        deal_type_breakdown=insights["deal_type_breakdown"],
+        avg_deal_size_usd=insights["avg_deal_size_usd"],
+        upcoming_closes=[UpcomingCloseResponse(**c) for c in insights.get("upcoming_closes", [])],
+    )
+
+
+@router.get(
+    "/pipeline",
+    response_model=List[PipelineDealResponse],
+    summary="List pipeline deals",
+)
+async def list_pipeline_deals(
+    status: Optional[str] = Query(None, description="Filter by status"),
+    deal_type: Optional[str] = Query(None, description="Filter by deal type"),
+    active_only: bool = Query(False, description="Only active (non-closed) deals"),
+    db: Session = Depends(get_db),
+) -> List[PipelineDealResponse]:
+    """List all pipeline deals with optional status/type filters."""
+    from app.core.pe_deal_pipeline import DealPipelineService
+
+    service = DealPipelineService(db)
+    deals = service.list_deals(status=status, deal_type=deal_type, active_only=active_only)
+    return [PipelineDealResponse(**d) for d in deals]
+
+
+@router.post(
+    "/pipeline",
+    response_model=PipelineDealResponse,
+    summary="Create a pipeline deal",
+    status_code=201,
+)
+async def create_pipeline_deal(
+    request: PipelineCreateRequest,
+    db: Session = Depends(get_db),
+) -> PipelineDealResponse:
+    """Create a new deal in the pipeline."""
+    from app.core.pe_deal_pipeline import DealPipelineService
+
+    service = DealPipelineService(db)
+    result = service.create_deal(request.model_dump())
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return PipelineDealResponse(**result)
+
+
+@router.patch(
+    "/pipeline/{deal_id}",
+    response_model=PipelineDealResponse,
+    summary="Update a pipeline deal",
+)
+async def update_pipeline_deal(
+    deal_id: int,
+    request: PipelineUpdateRequest,
+    db: Session = Depends(get_db),
+) -> PipelineDealResponse:
+    """Update a deal's status, value, or other fields."""
+    from app.core.pe_deal_pipeline import DealPipelineService
+
+    service = DealPipelineService(db)
+    updates = {k: v for k, v in request.model_dump().items() if v is not None}
+    result = service.update_deal(deal_id, updates)
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return PipelineDealResponse(**result)
