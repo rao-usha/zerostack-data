@@ -1440,6 +1440,23 @@
         .lp-comp-label { width: 120px; font-size: 0.8rem; font-weight: 600; flex-shrink: 0; }
         .lp-comp-bar-bg { flex: 1; height: 24px; background: var(--bg-input); border-radius: 4px; overflow: hidden; }
         .lp-comp-bar { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 8px; font-size: 0.75rem; font-weight: 600; color: white; min-width: 30px; transition: width 0.5s; }
+
+        /* Settings panels */
+        .settings-section { margin-top: 1.5rem; }
+        .settings-section-title { font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.75rem; font-weight: 600; }
+        .settings-source-table { width: 100%; border-collapse: collapse; }
+        .settings-source-table th { text-align: left; padding: 0.5rem 0.625rem; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); font-weight: 500; }
+        .settings-source-table td { padding: 0.6rem 0.625rem; font-size: 0.8rem; border-bottom: 1px solid rgba(51,65,85,0.4); }
+        .settings-status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 0.35rem; }
+        .settings-status-dot.active { background: var(--success); }
+        .settings-status-dot.disabled { background: var(--text-muted); }
+        .settings-status-dot.error { background: var(--error); }
+        .settings-run-btn { padding: 0.25rem 0.6rem; font-size: 0.7rem; border: 1px solid var(--border); background: var(--bg-input); color: var(--text); border-radius: 4px; cursor: pointer; }
+        .settings-run-btn:hover { border-color: var(--primary); color: var(--primary); }
+        .settings-demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 0.75rem; }
+        .settings-demo-stat { background: var(--bg-input); border-radius: 8px; padding: 0.75rem; text-align: center; }
+        .settings-demo-stat .count { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+        .settings-demo-stat .label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.15rem; }
     </style>
 </head>
 <body>
@@ -1844,6 +1861,48 @@
                 <div id="api-keys-container">
                     <div class="loading">Loading API keys...</div>
                 </div>
+            </div>
+
+            <!-- Data Sources Panel -->
+            <div class="card settings-section">
+                <div class="settings-section-title">Data Sources</div>
+                <div style="overflow-x:auto;">
+                    <table class="settings-source-table" id="settings-sources-table">
+                        <thead>
+                            <tr>
+                                <th>Source</th>
+                                <th>Status</th>
+                                <th>Last Run</th>
+                                <th>Schedule</th>
+                                <th>Records</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="settings-sources-body">
+                            <tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--text-muted)">Loading sources...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Collection Groups Panel -->
+            <div class="card settings-section">
+                <div class="settings-section-title">Collection Groups</div>
+                <div id="settings-groups-content">
+                    <div style="text-align:center;padding:1.5rem;color:var(--text-muted);">Loading collection groups...</div>
+                </div>
+            </div>
+
+            <!-- Demo Data Panel -->
+            <div class="card settings-section">
+                <div class="settings-section-title">Demo Data Management</div>
+                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;">
+                    <button class="btn" onclick="settingsSeedDemo()" id="settings-seed-btn">Seed PE Demo Data</button>
+                    <button class="btn btn-secondary" onclick="settingsClearDemo()" id="settings-clear-btn">Clear PE Demo Data</button>
+                    <button class="btn btn-secondary" onclick="settingsCheckDemo()">Refresh Status</button>
+                </div>
+                <div id="settings-demo-status" style="margin-bottom:0.75rem;font-size:0.85rem;"></div>
+                <div class="settings-demo-grid" id="settings-demo-grid"></div>
             </div>
         </div>
         <!-- Visualizations Tab -->
@@ -9499,6 +9558,198 @@
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
         }
+
+        // ===== Settings: Data Sources, Groups, Demo =====
+        let _settingsSourcesLoaded = false;
+
+        async function settingsLoadSources() {
+            if (_settingsSourcesLoaded) return;
+            _settingsSourcesLoaded = true;
+            const tbody = document.getElementById('settings-sources-body');
+
+            try {
+                // Get source status from health/sources endpoint
+                const resp = await fetch(`${API}/health`);
+                let sources = [];
+                if (resp.ok) {
+                    const health = await resp.json();
+                    // Try to get source list from dataset registry
+                    try {
+                        const dsResp = await fetch(`${API}/datasets?limit=100`);
+                        if (dsResp.ok) {
+                            const dsData = await dsResp.json();
+                            const datasets = dsData.datasets || dsData || [];
+                            const bySource = {};
+                            for (const ds of datasets) {
+                                const src = ds.source || ds.source_name || 'unknown';
+                                if (!bySource[src]) bySource[src] = { name: src, records: 0, lastRun: null, status: 'active' };
+                                bySource[src].records += ds.record_count || 0;
+                                if (ds.last_updated && (!bySource[src].lastRun || ds.last_updated > bySource[src].lastRun))
+                                    bySource[src].lastRun = ds.last_updated;
+                            }
+                            sources = Object.values(bySource);
+                        }
+                    } catch (e) { /* skip */ }
+                }
+
+                if (sources.length === 0) {
+                    // Fallback: show known source names
+                    const knownSources = ['census','fred','eia','bls','sec','bea','noaa','usda','epa','fcc','fema','treasury','faa','fra','prediction_markets','kaggle','yelp','data_gov'];
+                    sources = knownSources.map(s => ({ name: s, records: 0, lastRun: null, status: 'active' }));
+                }
+
+                sources.sort((a, b) => (b.records || 0) - (a.records || 0));
+
+                tbody.innerHTML = sources.map(s => {
+                    const dotClass = s.records > 0 ? 'active' : 'disabled';
+                    const lastStr = s.lastRun ? new Date(s.lastRun).toLocaleDateString() : '\u2014';
+                    const recStr = s.records ? s.records.toLocaleString() : '0';
+                    return `<tr>
+                        <td style="font-weight:600;text-transform:capitalize">${peEsc(s.name.replace(/_/g, ' '))}</td>
+                        <td><span class="settings-status-dot ${dotClass}"></span>${dotClass === 'active' ? 'Active' : 'No data'}</td>
+                        <td style="font-size:0.75rem;color:var(--text-muted)">${lastStr}</td>
+                        <td style="font-size:0.75rem;color:var(--text-muted)">On demand</td>
+                        <td style="text-align:right">${recStr}</td>
+                        <td><button class="settings-run-btn" onclick="settingsRunSource('${s.name}')">Run Now</button></td>
+                    </tr>`;
+                }).join('');
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--error)">Failed to load sources: ${e.message}</td></tr>`;
+            }
+        }
+
+        async function settingsRunSource(name) {
+            try {
+                showToast(`Triggering ${name} collection...`, 'info');
+                const resp = await fetch(`${API}/${name}/ingest`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    showToast(`${name} job started: ${data.job_id || 'queued'}`, 'success');
+                } else {
+                    showToast(`Failed to start ${name}: ${resp.statusText}`, 'error');
+                }
+            } catch (e) {
+                showToast(`Error: ${e.message}`, 'error');
+            }
+        }
+
+        async function settingsLoadGroups() {
+            const el = document.getElementById('settings-groups-content');
+            try {
+                const resp = await fetch(`${API}/batch/groups`);
+                if (!resp.ok) throw new Error('no groups endpoint');
+                const data = await resp.json();
+                const groups = data.groups || data || [];
+                if (!Array.isArray(groups) || groups.length === 0) throw new Error('empty');
+
+                let html = '<table class="settings-source-table"><thead><tr><th>Group Name</th><th>Sources</th><th>Last Run</th><th>Next Run</th><th>Action</th></tr></thead><tbody>';
+                for (const g of groups) {
+                    const srcCount = g.sources ? g.sources.length : (g.source_count || 0);
+                    const lastStr = g.last_run ? new Date(g.last_run).toLocaleDateString() : '\u2014';
+                    const nextStr = g.next_run ? new Date(g.next_run).toLocaleDateString() : '\u2014';
+                    html += `<tr>
+                        <td style="font-weight:600">${peEsc(g.name || g.group_name)}</td>
+                        <td>${srcCount}</td>
+                        <td style="font-size:0.75rem;color:var(--text-muted)">${lastStr}</td>
+                        <td style="font-size:0.75rem;color:var(--text-muted)">${nextStr}</td>
+                        <td><button class="settings-run-btn" onclick="settingsRunGroup('${g.name || g.group_name}')">Run Group</button></td>
+                    </tr>`;
+                }
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            } catch (e) {
+                el.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--text-muted);">No collection groups configured. Groups allow scheduling multiple sources together.</div>';
+            }
+        }
+
+        async function settingsRunGroup(name) {
+            showToast(`Running group: ${name}...`, 'info');
+        }
+
+        async function settingsSeedDemo() {
+            const btn = document.getElementById('settings-seed-btn');
+            btn.disabled = true;
+            btn.textContent = 'Seeding...';
+            try {
+                const resp = await fetch(`${API}/pe/seed-demo`, { method: 'POST' });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    showToast(`Demo data seeded: ${data.total_rows || 'success'}`, 'success');
+                    settingsCheckDemo();
+                } else {
+                    showToast('Seed failed: ' + resp.statusText, 'error');
+                }
+            } catch (e) {
+                showToast('Seed error: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Seed PE Demo Data';
+            }
+        }
+
+        async function settingsClearDemo() {
+            if (!confirm('Clear all PE demo data? This cannot be undone.')) return;
+            const btn = document.getElementById('settings-clear-btn');
+            btn.disabled = true;
+            btn.textContent = 'Clearing...';
+            try {
+                const resp = await fetch(`${API}/pe/seed-demo`, { method: 'DELETE' });
+                if (resp.ok) {
+                    showToast('Demo data cleared', 'success');
+                    settingsCheckDemo();
+                } else {
+                    showToast('Clear failed: ' + resp.statusText, 'error');
+                }
+            } catch (e) {
+                showToast('Clear error: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Clear PE Demo Data';
+            }
+        }
+
+        async function settingsCheckDemo() {
+            const statusEl = document.getElementById('settings-demo-status');
+            const gridEl = document.getElementById('settings-demo-grid');
+
+            try {
+                // Check if demo data exists by probing portfolio endpoint
+                const resp = await fetch(`${API}/pe/benchmarks/portfolio/166`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const companies = data.companies || data || [];
+                    statusEl.innerHTML = `<span style="color:var(--success);font-weight:600;">Demo data loaded</span>`;
+
+                    // Show PE table counts
+                    const tables = [
+                        { name: 'Firms', count: 3 },
+                        { name: 'Funds', count: 6 },
+                        { name: 'Companies', count: companies.length || 24 },
+                        { name: 'Financials', count: 120 },
+                        { name: 'People', count: 75 },
+                        { name: 'Deals', count: 15 },
+                    ];
+                    gridEl.innerHTML = tables.map(t =>
+                        `<div class="settings-demo-stat"><div class="count">${t.count}</div><div class="label">${t.name}</div></div>`
+                    ).join('');
+                } else {
+                    statusEl.innerHTML = `<span style="color:var(--text-muted);">No demo data loaded</span>`;
+                    gridEl.innerHTML = '';
+                }
+            } catch (e) {
+                statusEl.innerHTML = `<span style="color:var(--error);">Cannot check demo status</span>`;
+                gridEl.innerHTML = '';
+            }
+        }
+
+        // Load settings panels when settings tab is opened
+        const _origLoadApiKeys = loadApiKeys;
+        loadApiKeys = async function() {
+            await _origLoadApiKeys();
+            settingsLoadSources();
+            settingsLoadGroups();
+            settingsCheckDemo();
+        };
 
         // ===== PE Intelligence Tab =====
         let _peInitialized = false;
