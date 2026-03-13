@@ -226,12 +226,23 @@ async def lifespan(app: FastAPI):
                 WHERE batch_run_id IS NOT NULL
             """))
 
-            # Backfill from legacy NightlyBatch records
+            # Rename legacy nightly_batch table → batch_runs (idempotent)
+            conn.execute(sa_text("""
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM information_schema.tables
+                               WHERE table_name = 'nightly_batch') THEN
+                        ALTER TABLE nightly_batch RENAME TO batch_runs;
+                    END IF;
+                END $$
+            """))
+
+            # Backfill from legacy batch_runs records
             conn.execute(sa_text("""
                 UPDATE ingestion_jobs
                 SET batch_run_id = 'legacy_batch_' || nb.id::text,
                     trigger = 'batch'
-                FROM nightly_batch nb
+                FROM batch_runs nb
                 WHERE ingestion_jobs.id = ANY(
                     SELECT jsonb_array_elements_text(nb.job_ids::jsonb)::int
                 )

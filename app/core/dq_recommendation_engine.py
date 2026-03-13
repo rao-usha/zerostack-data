@@ -497,7 +497,7 @@ def _analyze_tier_performance(db: Session) -> List[Recommendation]:
     recs: List[Recommendation] = []
     month_ago = datetime.utcnow() - timedelta(days=30)
 
-    # Only works if tier column exists (added in nightly batch)
+    # Only works if tier column exists (added in batch system)
     try:
         tier_stats = (
             db.query(

@@ -1017,8 +1017,3 @@ async def scheduled_batch_collection():
         logger.error(f"Scheduled batch collection failed: {e}", exc_info=True)
     finally:
         db.close()
-
-
-# Backwards-compat aliases (will be removed in a future release)
-scheduled_nightly_batch = scheduled_batch_collection
-launch_nightly_batch = launch_batch_collection

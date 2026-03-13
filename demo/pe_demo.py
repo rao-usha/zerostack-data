@@ -554,7 +554,7 @@ def acq_monitoring():
             if detail:
                 print(f"    {C.DIM}{str(detail)[:80]}{C.E}")
     else:
-        info("No hiring alerts yet — alerts trigger after nightly collection runs")
+        info("No hiring alerts yet — alerts trigger after batch collection runs")
 
     # Generate a report
     section("Auto-Generated Reports")
@@ -1072,7 +1072,7 @@ def disp_closing():
   {C.BD}Key differentiator:{C.E}
     {C.CY}Exit Readiness Score{C.E} — nobody else has this.
     6 signals (financials, trajectory, leadership, valuation, market, hold period)
-    scored nightly. Your board knows when it's time to sell.
+    scored continuously. Your board knows when it's time to sell.
 
   {C.BD}Time saved:{C.E} {C.G}4-6 months of exit prep → continuous readiness + instant export{C.E}
 """)

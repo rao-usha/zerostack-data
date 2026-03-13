@@ -172,11 +172,11 @@ class NightlyBatch(Base):
     creating NightlyBatch records. Status is computed live from job
     statuses — nothing can get "stuck."
 
-    Do NOT create new NightlyBatch records. Use launch_batch_collection()
-    from nightly_batch_service.py instead.
+    Do NOT create new records. Use launch_batch_collection()
+    from batch_service.py instead.
     """
 
-    __tablename__ = "nightly_batch"
+    __tablename__ = "batch_runs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     status = Column(
