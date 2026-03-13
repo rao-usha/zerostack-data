@@ -99,6 +99,7 @@ from app.api.v1 import (
     pe_deals,
     pe_collection,
     pe_benchmarks,
+    pe_import,
     app_stores,
     opencorporates,
     people,
@@ -1452,6 +1453,7 @@ app.include_router(pe_people.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_deals.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_collection.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_benchmarks.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(pe_import.router, prefix="/api/v1", dependencies=_auth)
 
 # 13F Quarterly Analysis
 app.include_router(quarterly_diff.router, prefix="/api/v1", dependencies=_auth)
