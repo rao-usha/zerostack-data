@@ -392,10 +392,28 @@ async def launch_batch_collection(
     config = config or {}
     skip_sources = set(config.get("skip_sources", []))
     batch_run_id = _generate_batch_run_id()
+    trigger_type = "incremental" if mode == "incremental" else "batch"
+
+    # Build watermark lookup for incremental mode
+    watermark_map: Dict[str, Optional[datetime]] = {}
+    if mode == "incremental":
+        from app.core.models import SourceWatermark
+        watermarks = db.query(SourceWatermark).all()
+        watermark_map = {w.source: w.last_success_at for w in watermarks}
 
     total = 0
     job_ids = []
     effective_tiers = resolve_effective_tiers(db)
+
+    # Filter by group_name if specified
+    if group_name:
+        # Map group names to tier levels for backward compat
+        group_to_sources = {}
+        for dflt in DEFAULT_COLLECTION_GROUPS:
+            group_to_sources[dflt["name"]] = set(dflt["sources"])
+        if group_name in group_to_sources:
+            sources = list(group_to_sources[group_name]) if not sources else sources
+
     target_tiers = [t for t in effective_tiers if tiers is None or t.level in tiers]
 
     from app.core.job_splitter import get_split_config, create_split_jobs
@@ -423,13 +441,20 @@ async def launch_batch_collection(
                 # Skip agentic-only check — site_intel sources use split
                 pass
 
+            # Build source config with incremental watermark if applicable
+            source_config = dict(source_def.default_config)
+            if mode == "incremental" and source_def.key in watermark_map:
+                last_run = watermark_map[source_def.key]
+                if last_run:
+                    source_config["since"] = last_run.isoformat()
+
             if split_config:
                 # Create N parallel jobs instead of 1
                 base_payload = {
                     "source": source_def.key,
-                    "config": source_def.default_config,
+                    "config": source_config,
                     "batch_id": batch_run_id,
-                    "trigger": "batch",
+                    "trigger": trigger_type,
                     "tier": tier.level,
                     "tier_max_concurrent": tier.max_concurrent,
                 }
@@ -455,9 +480,9 @@ async def launch_batch_collection(
             ing_job = IngestionJob(
                 source=source_def.key,
                 status=ing_status,
-                config=source_def.default_config,
+                config=source_config,
                 batch_run_id=batch_run_id,
-                trigger="batch",
+                trigger=trigger_type,
                 tier=tier.level,
             )
             db.add(ing_job)
@@ -466,10 +491,10 @@ async def launch_batch_collection(
             # Build queue payload
             payload = {
                 "source": source_def.key,
-                "config": source_def.default_config,
+                "config": source_config,
                 "ingestion_job_id": ing_job.id,
                 "batch_id": batch_run_id,
-                "trigger": "batch",
+                "trigger": trigger_type,
                 "tier": tier.level,
                 "tier_max_concurrent": tier.max_concurrent,
             }
