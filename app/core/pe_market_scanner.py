@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select, and_, func, extract
 from sqlalchemy.orm import Session
 
-from app.core.pe_models import PEDeal, PEPortfolioCompany
+from app.core.pe_models import PECompanyNews, PEDeal, PEPortfolioCompany
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +68,7 @@ class MarketScannerService:
         return brief
 
     def get_market_signals(self) -> List[Dict[str, Any]]:
-        """Cross-sector momentum signals."""
-        # Get all industries with deals
+        """Cross-sector momentum signals with 0-100 momentum score."""
         industries = self._get_active_industries()
         signals = []
 
@@ -91,11 +90,15 @@ class MarketScannerService:
                 round(statistics.median(prior_multiples), 2) if prior_multiples else None
             )
 
+            # News sentiment for sector
+            sentiment = self._get_sector_sentiment(industry)
+
             momentum = self._compute_momentum(
                 current_deals=len(recent),
                 prior_deals=len(prior),
                 current_median=current_median,
                 prior_median=prior_median,
+                sentiment_score=sentiment.get("avg_sentiment"),
             )
 
             signals.append({
@@ -104,14 +107,31 @@ class MarketScannerService:
                 "prior_deal_count": len(prior),
                 "current_median_ev_ebitda": current_median,
                 "prior_median_ev_ebitda": prior_median,
+                "news_sentiment": sentiment,
                 **momentum,
             })
 
-        # Sort by deal flow change descending (most active first)
+        # Sort by momentum_score descending
         signals.sort(
-            key=lambda s: abs(s.get("deal_flow_change_pct") or 0), reverse=True
+            key=lambda s: s.get("momentum_score", 50), reverse=True
         )
         return signals
+
+    def get_sectors_ranked(self) -> List[Dict[str, Any]]:
+        """Return sectors ranked by momentum score (0-100)."""
+        signals = self.get_market_signals()
+        return [
+            {
+                "rank": i + 1,
+                "industry": s["industry"],
+                "momentum_score": s["momentum_score"],
+                "momentum": s["momentum"],
+                "recent_deal_count": s["recent_deal_count"],
+                "current_median_ev_ebitda": s["current_median_ev_ebitda"],
+                "news_sentiment": s.get("news_sentiment", {}),
+            }
+            for i, s in enumerate(signals)
+        ]
 
     # ------------------------------------------------------------------
     # Internal: data fetching
@@ -137,6 +157,47 @@ class MarketScannerService:
             .order_by(PEDeal.closed_date.desc().nullslast())
         )
         return list(self.db.execute(stmt).scalars().all())
+
+    def _get_sector_sentiment(self, industry: str) -> Dict[str, Any]:
+        """Aggregate news sentiment for companies in an industry."""
+        stmt = (
+            select(
+                func.count(PECompanyNews.id),
+                func.avg(PECompanyNews.sentiment_score),
+            )
+            .join(PEPortfolioCompany, PECompanyNews.company_id == PEPortfolioCompany.id)
+            .where(PEPortfolioCompany.industry == industry)
+        )
+        row = self.db.execute(stmt).one()
+        count = row[0] or 0
+        avg_score = round(float(row[1]), 3) if row[1] is not None else None
+
+        # Sentiment breakdown
+        pos_count = neg_count = neutral_count = 0
+        if count > 0:
+            for sentiment_val, label in [("Positive", "pos"), ("Negative", "neg"), ("Neutral", "neutral")]:
+                c = self.db.execute(
+                    select(func.count(PECompanyNews.id))
+                    .join(PEPortfolioCompany, PECompanyNews.company_id == PEPortfolioCompany.id)
+                    .where(
+                        PEPortfolioCompany.industry == industry,
+                        PECompanyNews.sentiment == sentiment_val,
+                    )
+                ).scalar() or 0
+                if label == "pos":
+                    pos_count = c
+                elif label == "neg":
+                    neg_count = c
+                else:
+                    neutral_count = c
+
+        return {
+            "total_articles": count,
+            "avg_sentiment": avg_score,
+            "positive": pos_count,
+            "negative": neg_count,
+            "neutral": neutral_count,
+        }
 
     def _get_active_industries(self) -> List[str]:
         """Get industries that have at least one closed deal."""
@@ -328,8 +389,15 @@ class MarketScannerService:
         prior_deals: int,
         current_median: Optional[float],
         prior_median: Optional[float],
+        sentiment_score: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Compute momentum signal from current vs prior period."""
+        """Compute momentum signal and 0-100 score from current vs prior period.
+
+        Score components (total 100):
+        - Deal flow change: 40 pts (positive change = higher score)
+        - Multiple change: 35 pts (expanding multiples = higher)
+        - Sentiment: 25 pts (positive sentiment = higher)
+        """
         deal_change = (
             round((current_deals - prior_deals) / prior_deals, 2)
             if prior_deals > 0 else None
@@ -339,31 +407,39 @@ class MarketScannerService:
             if current_median and prior_median else None
         )
 
-        # Determine momentum
-        bullish_signals = 0
-        bearish_signals = 0
+        # Momentum score 0-100
+        score = 50.0  # baseline
 
+        # Deal flow component (40 pts: -20 to +20 from baseline)
         if deal_change is not None:
-            if deal_change > 0.1:
-                bullish_signals += 1
-            elif deal_change < -0.1:
-                bearish_signals += 1
+            # Clamp to [-1, 1] range, scale to [-20, +20]
+            clamped = max(-1.0, min(1.0, deal_change))
+            score += clamped * 20.0
 
+        # Multiple change component (35 pts: -17.5 to +17.5)
         if mult_change is not None:
-            if mult_change > 0.05:
-                bullish_signals += 1
-            elif mult_change < -0.05:
-                bearish_signals += 1
+            clamped = max(-1.0, min(1.0, mult_change * 2))  # amplify since changes are small
+            score += clamped * 17.5
 
-        if bullish_signals > bearish_signals:
+        # Sentiment component (25 pts: -12.5 to +12.5)
+        if sentiment_score is not None:
+            # sentiment_score is -1.0 to 1.0
+            score += sentiment_score * 12.5
+
+        # Clamp to 0-100
+        score = round(max(0, min(100, score)))
+
+        # Determine momentum label
+        if score >= 65:
             momentum = "bullish"
-        elif bearish_signals > bullish_signals:
+        elif score <= 35:
             momentum = "bearish"
         else:
             momentum = "neutral"
 
         return {
             "momentum": momentum,
+            "momentum_score": score,
             "deal_flow_change_pct": deal_change,
             "multiple_change_pct": mult_change,
         }

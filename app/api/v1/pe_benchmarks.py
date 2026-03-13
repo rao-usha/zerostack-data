@@ -1494,6 +1494,14 @@ class IntelligenceBriefResponse(BaseModel):
     median_ev_ebitda: Optional[float] = None
 
 
+class NewsSentimentResponse(BaseModel):
+    total_articles: int = 0
+    avg_sentiment: Optional[float] = None
+    positive: int = 0
+    negative: int = 0
+    neutral: int = 0
+
+
 class MarketSignalResponse(BaseModel):
     industry: str
     recent_deal_count: int = 0
@@ -1501,8 +1509,20 @@ class MarketSignalResponse(BaseModel):
     current_median_ev_ebitda: Optional[float] = None
     prior_median_ev_ebitda: Optional[float] = None
     momentum: str = "neutral"
+    momentum_score: int = 50
     deal_flow_change_pct: Optional[float] = None
     multiple_change_pct: Optional[float] = None
+    news_sentiment: Optional[NewsSentimentResponse] = None
+
+
+class SectorRankResponse(BaseModel):
+    rank: int
+    industry: str
+    momentum_score: int = 50
+    momentum: str = "neutral"
+    recent_deal_count: int = 0
+    current_median_ev_ebitda: Optional[float] = None
+    news_sentiment: Optional[NewsSentimentResponse] = None
 
 
 @router.get(
@@ -1573,6 +1593,58 @@ async def get_intelligence_brief(
     service = MarketScannerService(db)
     brief = service.get_intelligence_brief(industry, years_back=years_back)
     return IntelligenceBriefResponse(**brief)
+
+
+# New /market/ endpoints (aliases with momentum scoring)
+
+@router.get(
+    "/market/scan",
+    response_model=List[MarketSignalResponse],
+    summary="Market scan — signals across all sectors with momentum scores",
+)
+async def market_scan(
+    db: Session = Depends(get_db),
+) -> List[MarketSignalResponse]:
+    """Current signals across all sectors with 0-100 momentum scoring."""
+    from app.core.pe_market_scanner import MarketScannerService
+
+    service = MarketScannerService(db)
+    signals = service.get_market_signals()
+    return [MarketSignalResponse(**s) for s in signals]
+
+
+@router.get(
+    "/market/brief/{sector}",
+    response_model=IntelligenceBriefResponse,
+    summary="Detailed sector intelligence brief",
+)
+async def market_brief(
+    sector: str,
+    years_back: int = Query(3, ge=1, le=10),
+    db: Session = Depends(get_db),
+) -> IntelligenceBriefResponse:
+    """Detailed sector brief with key findings and recommendations."""
+    from app.core.pe_market_scanner import MarketScannerService
+
+    service = MarketScannerService(db)
+    brief = service.get_intelligence_brief(sector, years_back=years_back)
+    return IntelligenceBriefResponse(**brief)
+
+
+@router.get(
+    "/market/sectors",
+    response_model=List[SectorRankResponse],
+    summary="Sectors ranked by momentum score",
+)
+async def market_sectors(
+    db: Session = Depends(get_db),
+) -> List[SectorRankResponse]:
+    """Return all active sectors ranked by momentum score (0-100)."""
+    from app.core.pe_market_scanner import MarketScannerService
+
+    service = MarketScannerService(db)
+    ranked = service.get_sectors_ranked()
+    return [SectorRankResponse(**s) for s in ranked]
 
 
 # =============================================================================

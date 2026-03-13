@@ -109,15 +109,16 @@ class TestMarketSignals:
     """Tests for cross-sector market signals."""
 
     def test_market_signals_momentum(self):
-        """T5: Momentum computed from deal flow changes."""
+        """T5: Momentum computed from deal flow changes, returns 0-100 score."""
         from app.core.pe_market_scanner import MarketScannerService
 
-        # Positive deal flow change = bullish momentum
+        # Strong positive deal flow + multiple expansion = bullish
         signal = MarketScannerService._compute_momentum(
-            current_deals=10, prior_deals=7,
-            current_median=12.0, prior_median=11.0,
+            current_deals=15, prior_deals=7,
+            current_median=14.0, prior_median=10.0,
         )
         assert signal["momentum"] == "bullish"
+        assert signal["momentum_score"] >= 65
         assert signal["deal_flow_change_pct"] > 0
         assert signal["multiple_change_pct"] > 0
 
@@ -130,3 +131,37 @@ class TestMarketSignals:
             current_median=9.0, prior_median=12.0,
         )
         assert signal["momentum"] == "bearish"
+        assert signal["momentum_score"] <= 35
+
+    def test_momentum_score_with_sentiment(self):
+        """Sentiment boosts momentum score."""
+        from app.core.pe_market_scanner import MarketScannerService
+
+        # Neutral deal flow but positive sentiment
+        signal = MarketScannerService._compute_momentum(
+            current_deals=10, prior_deals=10,
+            current_median=12.0, prior_median=12.0,
+            sentiment_score=0.8,
+        )
+        assert signal["momentum_score"] > 50  # boosted by sentiment
+        assert signal["momentum_score"] <= 100
+
+    def test_momentum_score_range(self):
+        """Momentum score always between 0 and 100."""
+        from app.core.pe_market_scanner import MarketScannerService
+
+        # Extreme bullish
+        signal = MarketScannerService._compute_momentum(
+            current_deals=20, prior_deals=2,
+            current_median=25.0, prior_median=5.0,
+            sentiment_score=1.0,
+        )
+        assert 0 <= signal["momentum_score"] <= 100
+
+        # Extreme bearish
+        signal = MarketScannerService._compute_momentum(
+            current_deals=1, prior_deals=20,
+            current_median=5.0, prior_median=25.0,
+            sentiment_score=-1.0,
+        )
+        assert 0 <= signal["momentum_score"] <= 100
