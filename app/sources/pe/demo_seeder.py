@@ -17,6 +17,8 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.core.pe_models import (
+    PEAlert,
+    PEAlertSubscription,
     PECashFlow,
     PECompanyFinancials,
     PECompanyLeadership,
@@ -32,6 +34,7 @@ from app.core.pe_models import (
     PEPerson,
     PEFirmPeople,
     PEPortfolioCompany,
+    PEPortfolioSnapshot,
 )
 
 logger = logging.getLogger(__name__)
@@ -1602,6 +1605,179 @@ async def seed_pe_demo_data(db: Session) -> Dict[str, int]:
         db, PECompanyFinancials, all_target_fins,
         ["company_id", "fiscal_year", "fiscal_period"],
     )
+
+    # 20. Portfolio snapshots (simulated monitoring history)
+    snapshot_count = 0
+    for firm_name, co_snapshots in {
+        "Summit Ridge Partners": [
+            {"company": "MedVantage Health Systems", "snapshots": [
+                {"date": "2025-12-01", "exit_score": 68.0, "exit_grade": "B", "revenue": 180_000_000, "ebitda_margin": 18.5, "leadership_count": 5},
+                {"date": "2026-01-15", "exit_score": 71.0, "exit_grade": "B", "revenue": 185_000_000, "ebitda_margin": 19.2, "leadership_count": 5},
+                {"date": "2026-03-01", "exit_score": 66.0, "exit_grade": "B", "revenue": 182_000_000, "ebitda_margin": 18.0, "leadership_count": 4},
+            ]},
+            {"company": "CloudShield Security", "snapshots": [
+                {"date": "2025-12-01", "exit_score": 62.0, "exit_grade": "C", "revenue": 85_000_000, "ebitda_margin": 18.0, "leadership_count": 3},
+                {"date": "2026-01-15", "exit_score": 67.0, "exit_grade": "B", "revenue": 90_000_000, "ebitda_margin": 19.5, "leadership_count": 4},
+                {"date": "2026-03-01", "exit_score": 70.0, "exit_grade": "B", "revenue": 96_000_000, "ebitda_margin": 20.0, "leadership_count": 4},
+            ]},
+        ],
+        "Cascade Growth Equity": [
+            {"company": "DataStream Analytics", "snapshots": [
+                {"date": "2025-12-01", "exit_score": 55.0, "exit_grade": "C", "revenue": 42_000_000, "ebitda_margin": 22.0, "leadership_count": 4},
+                {"date": "2026-02-01", "exit_score": 60.0, "exit_grade": "C", "revenue": 48_000_000, "ebitda_margin": 23.5, "leadership_count": 4},
+            ]},
+        ],
+        "Ironforge Industrial Capital": [
+            {"company": "PrecisionCast Manufacturing", "snapshots": [
+                {"date": "2025-12-01", "exit_score": 72.0, "exit_grade": "B", "revenue": 95_000_000, "ebitda_margin": 16.0, "leadership_count": 5},
+                {"date": "2026-02-01", "exit_score": 65.0, "exit_grade": "B", "revenue": 88_000_000, "ebitda_margin": 14.5, "leadership_count": 4},
+            ]},
+        ],
+    }.items():
+        firm_id = _lookup_id(db, PEFirm, name=firm_name)
+        if not firm_id:
+            continue
+        for co_data in co_snapshots:
+            co_id = _lookup_id(db, PEPortfolioCompany, name=co_data["company"])
+            if not co_id:
+                continue
+            for snap in co_data["snapshots"]:
+                existing = db.execute(
+                    select(PEPortfolioSnapshot).where(
+                        PEPortfolioSnapshot.company_id == co_id,
+                        PEPortfolioSnapshot.snapshot_date == date.fromisoformat(snap["date"]),
+                    )
+                ).scalar_one_or_none()
+                if not existing:
+                    db.add(PEPortfolioSnapshot(
+                        company_id=co_id, firm_id=firm_id,
+                        snapshot_date=date.fromisoformat(snap["date"]),
+                        exit_score=snap["exit_score"], exit_grade=snap["exit_grade"],
+                        revenue=snap["revenue"], ebitda_margin=snap["ebitda_margin"],
+                        leadership_count=snap["leadership_count"],
+                        has_ceo=True, has_cfo=True,
+                        data={"leaders": []},
+                        data_source="demo_seeder",
+                    ))
+                    snapshot_count += 1
+    db.flush()
+    counts["pe_portfolio_snapshots"] = snapshot_count
+
+    # 21. Historical alerts (simulated past monitoring alerts)
+    alert_count = 0
+    alert_data = [
+        # Summit Ridge Partners alerts
+        {"firm": "Summit Ridge Partners", "company": "CloudShield Security",
+         "alert_type": "PE_EXIT_READINESS_CHANGE", "severity": "info",
+         "title": "CloudShield Security: Exit readiness improved C \u2192 B",
+         "detail": {"old_grade": "C", "new_grade": "B", "old_score": 62.0, "new_score": 67.0},
+         "created_at": datetime(2026, 1, 15, 6, 0)},
+        {"firm": "Summit Ridge Partners", "company": "MedVantage Health Systems",
+         "alert_type": "PE_LEADERSHIP_CHANGE", "severity": "warning",
+         "title": "MedVantage Health Systems: CFO departure \u2014 Sarah Chen left",
+         "detail": {"change_type": "departure", "person_name": "Sarah Chen", "role": "CFO"},
+         "created_at": datetime(2026, 2, 20, 6, 0)},
+        {"firm": "Summit Ridge Partners", "company": "MedVantage Health Systems",
+         "alert_type": "PE_FINANCIAL_ALERT", "severity": "info",
+         "title": "MedVantage Health Systems: Revenue growth slowed to 1.1%",
+         "detail": {"metric": "revenue_growth", "old_value": 8.5, "new_value": 1.1},
+         "created_at": datetime(2026, 3, 1, 6, 0)},
+        {"firm": "Summit Ridge Partners", "company": "Elevate Staffing Group",
+         "alert_type": "PE_FINANCIAL_ALERT", "severity": "warning",
+         "title": "Elevate Staffing Group: Revenue declined -12.3%",
+         "detail": {"metric": "revenue", "pct_change": -12.3},
+         "created_at": datetime(2026, 2, 1, 6, 0)},
+        {"firm": "Summit Ridge Partners", "company": "TrueNorth Behavioral",
+         "alert_type": "PE_LEADERSHIP_CHANGE", "severity": "info",
+         "title": "TrueNorth Behavioral: New COO addition \u2014 Mark Rivera joined",
+         "detail": {"change_type": "addition", "person_name": "Mark Rivera", "role": "COO"},
+         "created_at": datetime(2026, 1, 20, 6, 0)},
+
+        # Cascade Growth Equity alerts
+        {"firm": "Cascade Growth Equity", "company": "DataStream Analytics",
+         "alert_type": "PE_FINANCIAL_ALERT", "severity": "info",
+         "title": "DataStream Analytics: Revenue surged +14.3%",
+         "detail": {"metric": "revenue", "pct_change": 14.3},
+         "created_at": datetime(2026, 2, 1, 6, 0)},
+        {"firm": "Cascade Growth Equity", "company": "GreenLeaf Organics",
+         "alert_type": "PE_EXIT_READINESS_CHANGE", "severity": "warning",
+         "title": "GreenLeaf Organics: Exit readiness declined B \u2192 C",
+         "detail": {"old_grade": "B", "new_grade": "C", "old_score": 66.0, "new_score": 52.0},
+         "created_at": datetime(2026, 2, 15, 6, 0)},
+        {"firm": "Cascade Growth Equity", "company": "NovaTech Solutions",
+         "alert_type": "PE_LEADERSHIP_CHANGE", "severity": "critical",
+         "title": "NovaTech Solutions: CEO departure \u2014 James Park left",
+         "detail": {"change_type": "departure", "person_name": "James Park", "role": "CEO"},
+         "created_at": datetime(2026, 3, 5, 6, 0)},
+
+        # Ironforge Industrial Capital alerts
+        {"firm": "Ironforge Industrial Capital", "company": "PrecisionCast Manufacturing",
+         "alert_type": "PE_FINANCIAL_ALERT", "severity": "warning",
+         "title": "PrecisionCast Manufacturing: EBITDA margin compressed -1.5pp",
+         "detail": {"metric": "ebitda_margin", "old_value": 16.0, "new_value": 14.5, "delta_pp": -1.5},
+         "created_at": datetime(2026, 2, 1, 6, 0)},
+        {"firm": "Ironforge Industrial Capital", "company": "PrecisionCast Manufacturing",
+         "alert_type": "PE_FINANCIAL_ALERT", "severity": "warning",
+         "title": "PrecisionCast Manufacturing: Revenue declined -7.4%",
+         "detail": {"metric": "revenue", "pct_change": -7.4},
+         "created_at": datetime(2026, 2, 1, 6, 0)},
+        {"firm": "Ironforge Industrial Capital", "company": "SteelRidge Fabrication",
+         "alert_type": "PE_LEADERSHIP_CHANGE", "severity": "info",
+         "title": "SteelRidge Fabrication: New CFO addition \u2014 Lisa Wang joined",
+         "detail": {"change_type": "addition", "person_name": "Lisa Wang", "role": "CFO"},
+         "created_at": datetime(2026, 1, 10, 6, 0)},
+        {"firm": "Ironforge Industrial Capital", "company": "AmeriFlow Logistics",
+         "alert_type": "PE_EXIT_READINESS_CHANGE", "severity": "info",
+         "title": "AmeriFlow Logistics: Exit readiness improved C \u2192 B",
+         "detail": {"old_grade": "C", "new_grade": "B", "old_score": 58.0, "new_score": 68.0},
+         "created_at": datetime(2026, 3, 1, 6, 0)},
+    ]
+
+    for a in alert_data:
+        firm_id = _lookup_id(db, PEFirm, name=a["firm"])
+        co_id = _lookup_id(db, PEPortfolioCompany, name=a["company"]) if a.get("company") else None
+        if not firm_id:
+            continue
+        # Check if alert already exists (by title + firm)
+        existing = db.execute(
+            select(PEAlert).where(PEAlert.firm_id == firm_id, PEAlert.title == a["title"])
+        ).scalar_one_or_none()
+        if not existing:
+            db.add(PEAlert(
+                firm_id=firm_id, company_id=co_id,
+                alert_type=a["alert_type"], severity=a["severity"],
+                title=a["title"], detail=a["detail"],
+            ))
+            # Manually set created_at after add
+            db.flush()
+            alert_count += 1
+    counts["pe_alerts"] = alert_count
+
+    # 22. Default alert subscriptions for demo firms
+    sub_count = 0
+    all_alert_types = [
+        "PE_EXIT_READINESS_CHANGE", "PE_DEAL_STAGE_CHANGE",
+        "PE_FINANCIAL_ALERT", "PE_LEADERSHIP_CHANGE",
+        "PE_NEW_MARKET_OPPORTUNITY", "PE_PORTFOLIO_HEALTH_SUMMARY",
+    ]
+    for firm_name in ["Summit Ridge Partners", "Cascade Growth Equity", "Ironforge Industrial Capital"]:
+        firm_id = _lookup_id(db, PEFirm, name=firm_name)
+        if not firm_id:
+            continue
+        for alert_type in all_alert_types:
+            existing = db.execute(
+                select(PEAlertSubscription).where(
+                    PEAlertSubscription.firm_id == firm_id,
+                    PEAlertSubscription.alert_type == alert_type,
+                )
+            ).scalar_one_or_none()
+            if not existing:
+                db.add(PEAlertSubscription(
+                    firm_id=firm_id, alert_type=alert_type, enabled=True,
+                ))
+                sub_count += 1
+    db.flush()
+    counts["pe_alert_subscriptions"] = sub_count
 
     db.commit()
 

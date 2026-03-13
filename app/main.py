@@ -162,7 +162,7 @@ from app.api.v1 import (
 )
 
 # Collection Management
-from app.api.v1 import source_configs, audit
+from app.api.v1 import source_configs, audit, source_health
 
 # Settings
 from app.api.v1 import settings as settings_router
@@ -413,6 +413,116 @@ async def lifespan(app: FastAPI):
             logger.info("Batch collection registered (2:00 AM UTC)")
         except Exception as e:
             logger.warning(f"Failed to register batch collection: {e}")
+
+        # PE Portfolio Monitoring — daily health check at 6 AM UTC
+        try:
+            from app.core.scheduler_service import get_scheduler
+            from apscheduler.triggers.cron import CronTrigger
+
+            async def scheduled_pe_portfolio_check():
+                """Daily PE portfolio health check for all firms with subscriptions."""
+                from app.core.database import get_session_factory
+                from app.core.pe_alert_subscriptions import AlertSubscriptionService
+                from app.core.pe_portfolio_monitor import PortfolioMonitorService
+                from app.core.pe_models import PEAlertSubscription, PEFirm
+                from sqlalchemy import select
+
+                logger.info("Starting scheduled PE portfolio check")
+                SessionLocal = get_session_factory()
+                db = SessionLocal()
+                try:
+                    # Find firms with active subscriptions
+                    firm_ids = db.execute(
+                        select(PEAlertSubscription.firm_id)
+                        .where(PEAlertSubscription.enabled == True)
+                        .distinct()
+                    ).scalars().all()
+
+                    for firm_id in firm_ids:
+                        try:
+                            monitor = PortfolioMonitorService(db)
+                            report = monitor.run_full_portfolio_check(firm_id)
+                            logger.info(
+                                "PE portfolio check firm %d: %d companies, %d alerts",
+                                firm_id, report.companies_checked, report.alerts_generated,
+                            )
+                        except Exception as e:
+                            logger.error("PE portfolio check failed for firm %d: %s", firm_id, e)
+                finally:
+                    db.close()
+
+            sched = get_scheduler()
+            sched.add_job(
+                scheduled_pe_portfolio_check,
+                trigger=CronTrigger(hour=6, minute=0),
+                id="pe_portfolio_daily_check",
+                name="PE Portfolio Daily Check",
+                replace_existing=True,
+            )
+            logger.info("PE portfolio daily check registered (6:00 AM UTC)")
+        except Exception as e:
+            logger.warning(f"Failed to register PE portfolio check: {e}")
+
+        # PE Portfolio Weekly Digest — Mondays at 8 AM UTC
+        try:
+            from app.core.scheduler_service import get_scheduler
+            from apscheduler.triggers.cron import CronTrigger
+
+            async def scheduled_pe_weekly_digest():
+                """Weekly PE portfolio health summary digest."""
+                from app.core.database import get_session_factory
+                from app.core.pe_portfolio_monitor import PortfolioMonitorService
+                from app.core.pe_models import PEAlertSubscription
+                from sqlalchemy import select
+
+                logger.info("Starting PE weekly digest")
+                SessionLocal = get_session_factory()
+                db = SessionLocal()
+                try:
+                    firm_ids = db.execute(
+                        select(PEAlertSubscription.firm_id)
+                        .where(
+                            PEAlertSubscription.enabled == True,
+                            PEAlertSubscription.alert_type == "PE_PORTFOLIO_HEALTH_SUMMARY",
+                        )
+                        .distinct()
+                    ).scalars().all()
+
+                    for firm_id in firm_ids:
+                        try:
+                            monitor = PortfolioMonitorService(db)
+                            report = monitor.run_full_portfolio_check(firm_id)
+                            # Fire webhook with summary
+                            try:
+                                from app.core.webhook_service import trigger_webhooks
+                                await trigger_webhooks(
+                                    "pe_portfolio_health_summary",
+                                    {
+                                        "firm_id": firm_id,
+                                        "firm_name": report.firm_name,
+                                        "companies_checked": report.companies_checked,
+                                        "alerts_generated": report.alerts_generated,
+                                        "check_date": report.check_date,
+                                    },
+                                )
+                            except Exception:
+                                pass
+                        except Exception as e:
+                            logger.error("PE weekly digest failed for firm %d: %s", firm_id, e)
+                finally:
+                    db.close()
+
+            sched = get_scheduler()
+            sched.add_job(
+                scheduled_pe_weekly_digest,
+                trigger=CronTrigger(day_of_week="mon", hour=8, minute=0),
+                id="pe_portfolio_weekly_digest",
+                name="PE Portfolio Weekly Digest",
+                replace_existing=True,
+            )
+            logger.info("PE portfolio weekly digest registered (Mondays 8:00 AM UTC)")
+        except Exception as e:
+            logger.warning(f"Failed to register PE weekly digest: {e}")
 
     except Exception as e:
         logger.warning(f"Failed to start scheduler: {e}")
@@ -1297,6 +1407,7 @@ app.include_router(datacenter_sites.router, prefix="/api/v1", dependencies=_auth
 
 # Collection Management
 app.include_router(source_configs.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(source_health.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(audit.router, prefix="/api/v1", dependencies=_auth)
 
 # Settings

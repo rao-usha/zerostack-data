@@ -1930,6 +1930,14 @@ class WebhookEventType(str, enum.Enum):
     ALERT_CONSECUTIVE_FAILURES = "alert_consecutive_failures"
     BATCH_COMPLETED = "batch_completed"
 
+    # PE Portfolio Monitoring
+    PE_EXIT_READINESS_CHANGE = "pe_exit_readiness_change"
+    PE_DEAL_STAGE_CHANGE = "pe_deal_stage_change"
+    PE_FINANCIAL_ALERT = "pe_financial_alert"
+    PE_LEADERSHIP_CHANGE = "pe_leadership_change"
+    PE_NEW_MARKET_OPPORTUNITY = "pe_new_market_opportunity"
+    PE_PORTFOLIO_HEALTH_SUMMARY = "pe_portfolio_health_summary"
+
 
 class Webhook(Base):
     """

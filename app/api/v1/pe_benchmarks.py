@@ -19,6 +19,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.pe_models import (
+    PEAlert,
+    PEAlertSubscription,
     PECashFlow,
     PECompanyFinancials,
     PECompanyLeadership,
@@ -33,6 +35,7 @@ from app.core.pe_models import (
     PEFundPerformance,
     PEPerson,
     PEPortfolioCompany,
+    PEPortfolioSnapshot,
 )
 
 logger = logging.getLogger(__name__)
@@ -336,6 +339,33 @@ async def cleanup_demo_data(db: Session = Depends(get_db)):
                 )
             )
             counts["pe_cash_flows"] = r.rowcount
+
+        # 10c. Portfolio snapshots
+        if demo_firm_ids:
+            r = db.execute(
+                delete(PEPortfolioSnapshot).where(
+                    PEPortfolioSnapshot.firm_id.in_(demo_firm_ids)
+                )
+            )
+            counts["pe_portfolio_snapshots"] = r.rowcount
+
+        # 10d. Alerts
+        if demo_firm_ids:
+            r = db.execute(
+                delete(PEAlert).where(
+                    PEAlert.firm_id.in_(demo_firm_ids)
+                )
+            )
+            counts["pe_alerts"] = r.rowcount
+
+        # 10e. Alert subscriptions
+        if demo_firm_ids:
+            r = db.execute(
+                delete(PEAlertSubscription).where(
+                    PEAlertSubscription.firm_id.in_(demo_firm_ids)
+                )
+            )
+            counts["pe_alert_subscriptions"] = r.rowcount
 
         # 11. Portfolio companies
         if demo_company_ids:
@@ -2283,4 +2313,251 @@ async def get_deal_score(
         strengths=result.strengths,
         risks=result.risks,
         data_gaps=result.data_gaps,
+    )
+
+
+# =============================================================================
+# Portfolio Monitoring & Alerts (Phase 2)
+# =============================================================================
+
+
+class AlertResponse(BaseModel):
+    id: Optional[int] = None
+    firm_id: int
+    company_id: Optional[int] = None
+    alert_type: str
+    severity: str = "info"
+    title: str
+    detail: Optional[Dict[str, Any]] = None
+    created_at: Optional[str] = None
+    acknowledged_at: Optional[str] = None
+
+
+class SubscriptionResponse(BaseModel):
+    id: Optional[int] = None
+    firm_id: int
+    alert_type: str
+    webhook_id: Optional[int] = None
+    enabled: bool = True
+    created_at: Optional[str] = None
+
+
+class SubscribeRequest(BaseModel):
+    alert_types: List[str] = Field(..., description="Alert types to subscribe to")
+    webhook_id: Optional[int] = Field(None, description="Optional webhook to receive alerts")
+
+
+class UnsubscribeRequest(BaseModel):
+    alert_types: List[str] = Field(..., description="Alert types to unsubscribe from")
+
+
+class CompanyHealthStatus(BaseModel):
+    company_id: int
+    company_name: str
+    exit_score: Optional[float] = None
+    exit_grade: Optional[str] = None
+    revenue: Optional[float] = None
+    ebitda_margin: Optional[float] = None
+    leadership_count: int = 0
+    alert_count: int = 0
+    trend: str = "stable"
+
+
+class PortfolioHealthResponse(BaseModel):
+    firm_id: int
+    firm_name: str
+    check_date: str
+    companies_checked: int = 0
+    alerts_generated: int = 0
+    company_statuses: List[CompanyHealthStatus] = []
+    alerts: List[AlertResponse] = []
+
+
+@router.get(
+    "/alerts/{firm_id}",
+    response_model=List[AlertResponse],
+    summary="Recent alerts for firm",
+)
+async def get_firm_alerts(
+    firm_id: int,
+    limit: int = Query(50, ge=1, le=200),
+    alert_type: Optional[str] = Query(None, description="Filter by alert type"),
+    severity: Optional[str] = Query(None, description="Filter by severity"),
+    db: Session = Depends(get_db),
+) -> List[AlertResponse]:
+    """Recent portfolio monitoring alerts for a PE firm."""
+    from app.core.pe_alert_subscriptions import AlertSubscriptionService
+
+    service = AlertSubscriptionService(db)
+    alerts = service.get_alert_history(firm_id, limit=limit, alert_type=alert_type, severity=severity)
+    return [AlertResponse(**a) for a in alerts]
+
+
+@router.post(
+    "/alerts/{firm_id}/subscribe",
+    response_model=List[SubscriptionResponse],
+    summary="Subscribe to alert types",
+)
+async def subscribe_to_alerts(
+    firm_id: int,
+    request: SubscribeRequest,
+    db: Session = Depends(get_db),
+) -> List[SubscriptionResponse]:
+    """Subscribe a firm to PE alert types."""
+    from app.core.pe_alert_subscriptions import AlertSubscriptionService
+
+    firm = db.execute(select(PEFirm).where(PEFirm.id == firm_id)).scalar_one_or_none()
+    if not firm:
+        raise HTTPException(status_code=404, detail=f"Firm {firm_id} not found")
+
+    service = AlertSubscriptionService(db)
+    subs = service.subscribe(firm_id, request.alert_types, webhook_id=request.webhook_id)
+    return [SubscriptionResponse(**s) for s in subs]
+
+
+@router.delete(
+    "/alerts/{firm_id}/subscribe",
+    summary="Unsubscribe from alert types",
+)
+async def unsubscribe_from_alerts(
+    firm_id: int,
+    request: UnsubscribeRequest,
+    db: Session = Depends(get_db),
+):
+    """Unsubscribe a firm from PE alert types."""
+    from app.core.pe_alert_subscriptions import AlertSubscriptionService
+
+    service = AlertSubscriptionService(db)
+    count = service.unsubscribe(firm_id, request.alert_types)
+    return {"status": "ok", "disabled": count}
+
+
+@router.get(
+    "/alerts/{firm_id}/subscriptions",
+    response_model=List[SubscriptionResponse],
+    summary="List active subscriptions",
+)
+async def list_alert_subscriptions(
+    firm_id: int,
+    db: Session = Depends(get_db),
+) -> List[SubscriptionResponse]:
+    """List active alert subscriptions for a PE firm."""
+    from app.core.pe_alert_subscriptions import AlertSubscriptionService
+
+    service = AlertSubscriptionService(db)
+    subs = service.list_subscriptions(firm_id)
+    return [SubscriptionResponse(**s) for s in subs]
+
+
+@router.post(
+    "/monitor/{firm_id}/run",
+    response_model=PortfolioHealthResponse,
+    summary="Run portfolio health check",
+)
+async def run_portfolio_health_check(
+    firm_id: int,
+    db: Session = Depends(get_db),
+) -> PortfolioHealthResponse:
+    """Manually trigger a full portfolio health check for a firm.
+
+    Compares current state against snapshots, generates alerts for
+    significant changes, stores new snapshots.
+    """
+    from app.core.pe_portfolio_monitor import PortfolioMonitorService
+
+    firm = db.execute(select(PEFirm).where(PEFirm.id == firm_id)).scalar_one_or_none()
+    if not firm:
+        raise HTTPException(status_code=404, detail=f"Firm {firm_id} not found")
+
+    service = PortfolioMonitorService(db)
+    report = service.run_full_portfolio_check(firm_id)
+
+    return PortfolioHealthResponse(
+        firm_id=report.firm_id,
+        firm_name=report.firm_name,
+        check_date=report.check_date,
+        companies_checked=report.companies_checked,
+        alerts_generated=report.alerts_generated,
+        company_statuses=[
+            CompanyHealthStatus(
+                company_id=s.company_id, company_name=s.company_name,
+                exit_score=s.exit_score, exit_grade=s.exit_grade,
+                revenue=s.revenue, ebitda_margin=s.ebitda_margin,
+                leadership_count=s.leadership_count, alert_count=s.alert_count,
+                trend=s.trend,
+            )
+            for s in report.company_statuses
+        ],
+        alerts=[AlertResponse(**a) for a in report.alerts],
+    )
+
+
+@router.get(
+    "/monitor/{firm_id}/health",
+    response_model=PortfolioHealthResponse,
+    summary="Portfolio health dashboard",
+)
+async def get_portfolio_health(
+    firm_id: int,
+    db: Session = Depends(get_db),
+) -> PortfolioHealthResponse:
+    """Current portfolio health dashboard data.
+
+    Returns latest snapshot data with company scores, trend arrows, and alert counts.
+    Does NOT run a new check — uses cached snapshot data.
+    """
+    from app.core.pe_portfolio_monitor import PortfolioMonitorService, CompanyStatus
+    from app.core.pe_models import PEPortfolioSnapshot, PEAlert as PEAlertModel
+
+    firm = db.execute(select(PEFirm).where(PEFirm.id == firm_id)).scalar_one_or_none()
+    if not firm:
+        raise HTTPException(status_code=404, detail=f"Firm {firm_id} not found")
+
+    monitor = PortfolioMonitorService(db)
+    companies = monitor._get_portfolio_companies(firm_id)
+
+    statuses = []
+    for company in companies:
+        snapshot = monitor._get_latest_snapshot(company.id)
+
+        # Count recent alerts (last 30 days)
+        from datetime import datetime, timedelta
+        cutoff = datetime.utcnow() - timedelta(days=30)
+        alert_count = db.execute(
+            select(func.count(PEAlertModel.id)).where(
+                PEAlertModel.company_id == company.id,
+                PEAlertModel.created_at >= cutoff,
+            )
+        ).scalar() or 0
+
+        statuses.append(CompanyHealthStatus(
+            company_id=company.id,
+            company_name=company.name,
+            exit_score=float(snapshot.exit_score) if snapshot and snapshot.exit_score else None,
+            exit_grade=snapshot.exit_grade if snapshot else None,
+            revenue=float(snapshot.revenue) if snapshot and snapshot.revenue else None,
+            ebitda_margin=float(snapshot.ebitda_margin) if snapshot and snapshot.ebitda_margin else None,
+            leadership_count=snapshot.leadership_count if snapshot else 0,
+            alert_count=alert_count,
+            trend="stable",
+        ))
+
+    # Total alerts for this firm in last 30 days
+    from datetime import datetime, timedelta
+    cutoff = datetime.utcnow() - timedelta(days=30)
+    total_alerts = db.execute(
+        select(func.count(PEAlertModel.id)).where(
+            PEAlertModel.firm_id == firm_id,
+            PEAlertModel.created_at >= cutoff,
+        )
+    ).scalar() or 0
+
+    return PortfolioHealthResponse(
+        firm_id=firm.id,
+        firm_name=firm.name,
+        check_date=date.today().isoformat(),
+        companies_checked=len(statuses),
+        alerts_generated=total_alerts,
+        company_statuses=statuses,
+        alerts=[],
     )
