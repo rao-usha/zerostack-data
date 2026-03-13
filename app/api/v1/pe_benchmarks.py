@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.pe_models import (
+    PECashFlow,
     PECompanyFinancials,
     PECompanyLeadership,
     PECompanyNews,
@@ -327,6 +328,14 @@ async def cleanup_demo_data(db: Session = Depends(get_db)):
                 )
             )
             counts["pe_fund_performance"] = r.rowcount
+
+            # 10b. Cash flows
+            r = db.execute(
+                delete(PECashFlow).where(
+                    PECashFlow.fund_id.in_(demo_fund_ids)
+                )
+            )
+            counts["pe_cash_flows"] = r.rowcount
 
         # 11. Portfolio companies
         if demo_company_ids:
@@ -1936,3 +1945,342 @@ async def get_firm_pipeline_insights(
         raise HTTPException(status_code=404, detail=result["error"])
 
     return FirmInsightsResponse(**result)
+
+
+# =============================================================================
+# Fund Performance Endpoints (Phase 3)
+# =============================================================================
+
+
+class CashFlowItem(BaseModel):
+    id: int
+    date: str
+    amount: float
+    type: str
+    description: Optional[str] = None
+
+
+class FundMetricsResponse(BaseModel):
+    fund_id: int
+    fund_name: str
+    as_of_date: str
+    irr_pct: Optional[float] = None
+    moic: Optional[float] = None
+    tvpi: Optional[float] = None
+    dpi: Optional[float] = None
+    rvpi: Optional[float] = None
+    called_capital: float = 0
+    distributed: float = 0
+    nav: float = 0
+    cash_flow_count: int = 0
+
+
+class FundSummaryWithMetrics(BaseModel):
+    fund_id: int
+    fund_name: str
+    vintage_year: Optional[int] = None
+    strategy: Optional[str] = None
+    target_size_usd_millions: Optional[float] = None
+    status: Optional[str] = None
+    metrics: FundMetricsResponse
+
+
+class FirmFundsResponse(BaseModel):
+    firm_id: int
+    firm_name: str
+    funds: List[FundSummaryWithMetrics] = []
+
+
+class QuarterlySnapshot(BaseModel):
+    quarter: str
+    called_capital: float
+    distributed: float
+    nav: float
+    tvpi: Optional[float] = None
+    dpi: Optional[float] = None
+    net_cash: float
+
+
+class FundTimeseriesResponse(BaseModel):
+    fund_id: int
+    fund_name: str
+    timeseries: List[QuarterlySnapshot] = []
+
+
+class FundCashFlowsResponse(BaseModel):
+    fund_id: int
+    fund_name: str
+    cash_flows: List[CashFlowItem] = []
+
+
+class JCurvePoint(BaseModel):
+    date: str
+    cumulative_net: float
+    type: str
+
+
+class FundJCurveResponse(BaseModel):
+    fund_id: int
+    fund_name: str
+    j_curve: List[JCurvePoint] = []
+
+
+class FundComparisonResponse(BaseModel):
+    funds: List[FundMetricsResponse] = []
+
+
+@router.get(
+    "/funds/{firm_id}",
+    response_model=FirmFundsResponse,
+    summary="All funds with live-calculated metrics",
+)
+async def get_firm_funds(
+    firm_id: int,
+    db: Session = Depends(get_db),
+) -> FirmFundsResponse:
+    """List all funds for a firm with IRR/MOIC/TVPI calculated from cash flows.
+
+    Replaces hardcoded performance numbers with live calculations.
+    """
+    from app.core.pe_fund_performance import FundPerformanceService
+
+    firm = db.execute(
+        select(PEFirm).where(PEFirm.id == firm_id)
+    ).scalar_one_or_none()
+    if not firm:
+        raise HTTPException(status_code=404, detail=f"Firm {firm_id} not found")
+
+    funds = db.execute(
+        select(PEFund).where(PEFund.firm_id == firm_id).order_by(PEFund.vintage_year)
+    ).scalars().all()
+
+    perf_service = FundPerformanceService(db)
+    fund_list = []
+    for fund in funds:
+        # Get NAV from fund performance record if available
+        perf = db.execute(
+            select(PEFundPerformance)
+            .where(PEFundPerformance.fund_id == fund.id)
+            .order_by(PEFundPerformance.as_of_date.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        nav = float(perf.remaining_value or 0) if perf else 0.0
+
+        metrics = perf_service.calculate_fund_returns(fund.id, nav=nav)
+        fund_list.append(FundSummaryWithMetrics(
+            fund_id=fund.id,
+            fund_name=fund.name,
+            vintage_year=fund.vintage_year,
+            strategy=fund.strategy,
+            target_size_usd_millions=float(fund.target_size_usd_millions) if fund.target_size_usd_millions else None,
+            status=fund.status,
+            metrics=FundMetricsResponse(**metrics),
+        ))
+
+    return FirmFundsResponse(
+        firm_id=firm.id,
+        firm_name=firm.name,
+        funds=fund_list,
+    )
+
+
+@router.get(
+    "/fund-performance/compare",
+    response_model=FundComparisonResponse,
+    summary="Side-by-side fund comparison",
+)
+async def compare_funds(
+    fund_ids: str = Query(..., description="Comma-separated fund IDs (e.g. 1,2,3)"),
+    db: Session = Depends(get_db),
+) -> FundComparisonResponse:
+    """Compare multiple funds side-by-side with IRR, MOIC, TVPI, DPI, RVPI."""
+    from app.core.pe_fund_performance import FundPerformanceService
+
+    service = FundPerformanceService(db)
+    results = []
+
+    for fid_str in fund_ids.split(","):
+        fid = int(fid_str.strip())
+        # Get NAV
+        perf = db.execute(
+            select(PEFundPerformance)
+            .where(PEFundPerformance.fund_id == fid)
+            .order_by(PEFundPerformance.as_of_date.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        nav = float(perf.remaining_value or 0) if perf else 0.0
+
+        metrics = service.calculate_fund_returns(fid, nav=nav)
+        if "error" not in metrics:
+            results.append(FundMetricsResponse(**metrics))
+
+    return FundComparisonResponse(funds=results)
+
+
+@router.get(
+    "/fund-performance/{fund_id}",
+    response_model=FundTimeseriesResponse,
+    summary="Quarterly performance time series",
+)
+async def get_fund_timeseries(
+    fund_id: int,
+    db: Session = Depends(get_db),
+) -> FundTimeseriesResponse:
+    """Quarterly performance snapshots from inception to present.
+
+    Returns cumulative called capital, distributions, TVPI, DPI per quarter.
+    """
+    from app.core.pe_fund_performance import FundPerformanceService
+
+    perf = db.execute(
+        select(PEFundPerformance)
+        .where(PEFundPerformance.fund_id == fund_id)
+        .order_by(PEFundPerformance.as_of_date.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    nav = float(perf.remaining_value or 0) if perf else 0.0
+
+    service = FundPerformanceService(db)
+    result = service.calculate_fund_timeseries(fund_id, nav=nav)
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return FundTimeseriesResponse(
+        fund_id=result["fund_id"],
+        fund_name=result["fund_name"],
+        timeseries=[QuarterlySnapshot(**s) for s in result["timeseries"]],
+    )
+
+
+@router.get(
+    "/fund-performance/{fund_id}/cashflows",
+    response_model=FundCashFlowsResponse,
+    summary="Raw cash flow ledger",
+)
+async def get_fund_cashflows(
+    fund_id: int,
+    db: Session = Depends(get_db),
+) -> FundCashFlowsResponse:
+    """Raw cash flow ledger for a fund — every capital call and distribution."""
+    from app.core.pe_fund_performance import FundPerformanceService
+
+    service = FundPerformanceService(db)
+    result = service.get_cash_flows(fund_id)
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return FundCashFlowsResponse(
+        fund_id=result["fund_id"],
+        fund_name=result["fund_name"],
+        cash_flows=[CashFlowItem(**cf) for cf in result["cash_flows"]],
+    )
+
+
+@router.get(
+    "/fund-performance/{fund_id}/j-curve",
+    response_model=FundJCurveResponse,
+    summary="J-curve visualization data",
+)
+async def get_fund_j_curve(
+    fund_id: int,
+    db: Session = Depends(get_db),
+) -> FundJCurveResponse:
+    """J-curve data: cumulative net cash position over time.
+
+    Shows the classic PE J-curve pattern — negative early (capital calls),
+    then crossing zero and going positive as distributions flow back.
+    """
+    from app.core.pe_fund_performance import FundPerformanceService
+
+    perf = db.execute(
+        select(PEFundPerformance)
+        .where(PEFundPerformance.fund_id == fund_id)
+        .order_by(PEFundPerformance.as_of_date.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    nav = float(perf.remaining_value or 0) if perf else 0.0
+
+    service = FundPerformanceService(db)
+    result = service.get_j_curve(fund_id, nav=nav)
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return FundJCurveResponse(
+        fund_id=result["fund_id"],
+        fund_name=result["fund_name"],
+        j_curve=[JCurvePoint(**p) for p in result["j_curve"]],
+    )
+
+
+# =============================================================================
+# Deal Scoring Endpoint (Phase 4)
+# =============================================================================
+
+
+class DealDimensionResponse(BaseModel):
+    dimension: str
+    label: str
+    weight: float
+    raw_score: float
+    weighted_score: float
+    grade: str
+    explanation: str
+    data_gaps: List[str] = []
+
+
+class DealScoreResponse(BaseModel):
+    company_id: int
+    company_name: str
+    composite_score: float
+    grade: str
+    dimensions: List[DealDimensionResponse] = []
+    strengths: List[str] = []
+    risks: List[str] = []
+    data_gaps: List[str] = []
+
+
+@router.get(
+    "/deal-score/{company_id}",
+    response_model=DealScoreResponse,
+    summary="Score acquisition target",
+)
+async def get_deal_score(
+    company_id: int,
+    db: Session = Depends(get_db),
+) -> DealScoreResponse:
+    """Score an acquisition target across 5 dimensions.
+
+    Evaluates financial quality (35%), market position (20%), management (15%),
+    growth trajectory (20%), and deal attractiveness (10%).
+    """
+    from app.core.pe_deal_scorer import score_deal
+
+    result = score_deal(db, company_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Company {company_id} not found")
+
+    return DealScoreResponse(
+        company_id=result.company_id,
+        company_name=result.company_name,
+        composite_score=result.composite_score,
+        grade=result.grade,
+        dimensions=[
+            DealDimensionResponse(
+                dimension=d.dimension,
+                label=d.label,
+                weight=d.weight,
+                raw_score=d.raw_score,
+                weighted_score=d.weighted_score,
+                grade=d.grade,
+                explanation=d.explanation,
+                data_gaps=d.data_gaps,
+            )
+            for d in result.dimensions
+        ],
+        strengths=result.strengths,
+        risks=result.risks,
+        data_gaps=result.data_gaps,
+    )

@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.core.pe_models import (
+    PECashFlow,
     PECompanyFinancials,
     PECompanyLeadership,
     PECompanyNews,
@@ -365,6 +366,102 @@ FUND_PERFORMANCE = {
     ],
     "Ironforge Industrial Fund V": [
         {"as_of_date": date(2025, 6, 30), "reporting_quarter": "Q2 2025", "net_irr_pct": Decimal("10.8"), "gross_irr_pct": Decimal("14.2"), "tvpi": Decimal("1.18"), "dpi": Decimal("0.00"), "rvpi": Decimal("1.18"), "active_investments": 4, "realized_investments": 0, "written_off_investments": 0, "data_source": "demo_seeder"},
+    ],
+}
+
+
+# ---------------------------------------------------------------------------
+# Cash flows per fund (negative = capital call, positive = distribution)
+# ---------------------------------------------------------------------------
+
+CASH_FLOWS = {
+    # Summit Ridge Fund III: 2019 vintage, ~19% IRR, 2.1x TVPI, mature
+    "Summit Ridge Partners Fund III": [
+        # Capital calls
+        {"flow_date": date(2019, 4, 1), "amount": Decimal("-125000000"), "cash_flow_type": "capital_call", "description": "Initial close — MedVantage platform"},
+        {"flow_date": date(2019, 7, 1), "amount": Decimal("-5000000"), "cash_flow_type": "management_fee", "description": "Q3 2019 management fee"},
+        {"flow_date": date(2019, 10, 1), "amount": Decimal("-80000000"), "cash_flow_type": "capital_call", "description": "Apex Revenue Solutions platform"},
+        {"flow_date": date(2020, 1, 1), "amount": Decimal("-5000000"), "cash_flow_type": "management_fee", "description": "Q1 2020 management fee"},
+        {"flow_date": date(2020, 3, 1), "amount": Decimal("-150000000"), "cash_flow_type": "capital_call", "description": "NovaCare platform acquisition"},
+        {"flow_date": date(2020, 7, 1), "amount": Decimal("-5000000"), "cash_flow_type": "management_fee", "description": "Q3 2020 management fee"},
+        {"flow_date": date(2020, 9, 15), "amount": Decimal("-30000000"), "cash_flow_type": "capital_call", "description": "DataBridge growth investment"},
+        {"flow_date": date(2021, 1, 1), "amount": Decimal("-5000000"), "cash_flow_type": "management_fee", "description": "Q1 2021 management fee"},
+        {"flow_date": date(2021, 7, 1), "amount": Decimal("-5000000"), "cash_flow_type": "management_fee", "description": "Q3 2021 management fee"},
+        {"flow_date": date(2022, 1, 1), "amount": Decimal("-5000000"), "cash_flow_type": "management_fee", "description": "Q1 2022 management fee"},
+        # Distributions
+        {"flow_date": date(2022, 6, 15), "amount": Decimal("35000000"), "cash_flow_type": "distribution", "description": "MedVantage dividend recap"},
+        {"flow_date": date(2023, 3, 1), "amount": Decimal("45000000"), "cash_flow_type": "distribution", "description": "Apex partial realization"},
+        {"flow_date": date(2024, 6, 1), "amount": Decimal("384000000"), "cash_flow_type": "distribution", "description": "NovaCare exit — sale to National Health Corp"},
+        {"flow_date": date(2024, 11, 15), "amount": Decimal("99000000"), "cash_flow_type": "distribution", "description": "DataBridge exit — sale to Optum Insight"},
+        {"flow_date": date(2025, 3, 1), "amount": Decimal("25000000"), "cash_flow_type": "distribution", "description": "Apex ongoing distributions"},
+        {"flow_date": date(2025, 6, 30), "amount": Decimal("12000000"), "cash_flow_type": "carried_interest", "description": "GP carried interest distribution"},
+    ],
+    # Summit Ridge Fund IV: 2023 vintage, ~12.5% IRR, 1.28x, early stage
+    "Summit Ridge Partners Fund IV": [
+        {"flow_date": date(2023, 4, 1), "amount": Decimal("-95000000"), "cash_flow_type": "capital_call", "description": "CloudShield platform"},
+        {"flow_date": date(2023, 7, 1), "amount": Decimal("-7500000"), "cash_flow_type": "management_fee", "description": "Q3 2023 management fee"},
+        {"flow_date": date(2023, 7, 15), "amount": Decimal("-200000000"), "cash_flow_type": "capital_call", "description": "TrueNorth Behavioral platform"},
+        {"flow_date": date(2023, 11, 1), "amount": Decimal("-110000000"), "cash_flow_type": "capital_call", "description": "Precision Lab Diagnostics"},
+        {"flow_date": date(2024, 1, 1), "amount": Decimal("-7500000"), "cash_flow_type": "management_fee", "description": "Q1 2024 management fee"},
+        {"flow_date": date(2024, 2, 15), "amount": Decimal("-55000000"), "cash_flow_type": "capital_call", "description": "Elevate Staffing Group"},
+        {"flow_date": date(2024, 7, 1), "amount": Decimal("-7500000"), "cash_flow_type": "management_fee", "description": "Q3 2024 management fee"},
+        {"flow_date": date(2025, 1, 1), "amount": Decimal("-7500000"), "cash_flow_type": "management_fee", "description": "Q1 2025 management fee"},
+    ],
+    # Cascade Growth Fund II: 2020 vintage, ~27% IRR, 2.68x, strong performer
+    "Cascade Growth Fund II": [
+        {"flow_date": date(2020, 9, 1), "amount": Decimal("-45000000"), "cash_flow_type": "capital_call", "description": "FinLedger Technologies growth"},
+        {"flow_date": date(2021, 1, 15), "amount": Decimal("-35000000"), "cash_flow_type": "capital_call", "description": "Nimbus Data Cloud growth"},
+        {"flow_date": date(2021, 3, 1), "amount": Decimal("-20000000"), "cash_flow_type": "capital_call", "description": "CloudMetrics Pro growth"},
+        {"flow_date": date(2021, 6, 1), "amount": Decimal("-75000000"), "cash_flow_type": "capital_call", "description": "PayGrid Systems growth"},
+        {"flow_date": date(2021, 7, 1), "amount": Decimal("-3750000"), "cash_flow_type": "management_fee", "description": "Q3 2021 management fee"},
+        {"flow_date": date(2021, 8, 1), "amount": Decimal("-15000000"), "cash_flow_type": "capital_call", "description": "TrueVault Data growth"},
+        {"flow_date": date(2022, 1, 1), "amount": Decimal("-3750000"), "cash_flow_type": "management_fee", "description": "Q1 2022 management fee"},
+        {"flow_date": date(2022, 7, 1), "amount": Decimal("-3750000"), "cash_flow_type": "management_fee", "description": "Q3 2022 management fee"},
+        {"flow_date": date(2023, 1, 1), "amount": Decimal("-3750000"), "cash_flow_type": "management_fee", "description": "Q1 2023 management fee"},
+        # Distributions
+        {"flow_date": date(2023, 6, 1), "amount": Decimal("40000000"), "cash_flow_type": "distribution", "description": "PayGrid secondary sale (partial)"},
+        {"flow_date": date(2024, 3, 1), "amount": Decimal("55000000"), "cash_flow_type": "distribution", "description": "FinLedger partial realization"},
+        {"flow_date": date(2025, 4, 1), "amount": Decimal("77000000"), "cash_flow_type": "distribution", "description": "CloudMetrics exit — sale to Datadog"},
+        {"flow_date": date(2025, 6, 1), "amount": Decimal("120000000"), "cash_flow_type": "distribution", "description": "Nimbus secondary sale"},
+        {"flow_date": date(2025, 6, 30), "amount": Decimal("18000000"), "cash_flow_type": "carried_interest", "description": "GP carried interest"},
+    ],
+    # Cascade Growth Fund III: 2024 vintage, ~8.2% IRR, 1.10x, very early
+    "Cascade Growth Fund III": [
+        {"flow_date": date(2024, 4, 1), "amount": Decimal("-40000000"), "cash_flow_type": "capital_call", "description": "VeriComply AI growth"},
+        {"flow_date": date(2024, 6, 15), "amount": Decimal("-55000000"), "cash_flow_type": "capital_call", "description": "InsightFlow Analytics growth"},
+        {"flow_date": date(2024, 7, 1), "amount": Decimal("-3000000"), "cash_flow_type": "management_fee", "description": "Q3 2024 management fee"},
+        {"flow_date": date(2024, 9, 1), "amount": Decimal("-25000000"), "cash_flow_type": "capital_call", "description": "ShieldPay growth"},
+        {"flow_date": date(2025, 1, 1), "amount": Decimal("-3000000"), "cash_flow_type": "management_fee", "description": "Q1 2025 management fee"},
+    ],
+    # Ironforge Industrial Fund IV: 2018 vintage, ~16.3% IRR, 1.88x
+    "Ironforge Industrial Fund IV": [
+        {"flow_date": date(2018, 7, 1), "amount": Decimal("-200000000"), "cash_flow_type": "capital_call", "description": "Titan Precision platform"},
+        {"flow_date": date(2018, 10, 1), "amount": Decimal("-7000000"), "cash_flow_type": "management_fee", "description": "Q4 2018 management fee"},
+        {"flow_date": date(2019, 2, 1), "amount": Decimal("-120000000"), "cash_flow_type": "capital_call", "description": "AeroSpec Coatings platform"},
+        {"flow_date": date(2019, 6, 15), "amount": Decimal("-85000000"), "cash_flow_type": "capital_call", "description": "Great Lakes Plastics platform"},
+        {"flow_date": date(2019, 7, 1), "amount": Decimal("-7000000"), "cash_flow_type": "management_fee", "description": "Q3 2019 management fee"},
+        {"flow_date": date(2020, 1, 1), "amount": Decimal("-7000000"), "cash_flow_type": "management_fee", "description": "Q1 2020 management fee"},
+        {"flow_date": date(2020, 1, 15), "amount": Decimal("-60000000"), "cash_flow_type": "capital_call", "description": "Northwest Automation platform"},
+        {"flow_date": date(2020, 7, 1), "amount": Decimal("-7000000"), "cash_flow_type": "management_fee", "description": "Q3 2020 management fee"},
+        {"flow_date": date(2021, 7, 1), "amount": Decimal("-7000000"), "cash_flow_type": "management_fee", "description": "Q3 2021 management fee"},
+        # Distributions
+        {"flow_date": date(2022, 3, 1), "amount": Decimal("50000000"), "cash_flow_type": "distribution", "description": "Titan dividend recap"},
+        {"flow_date": date(2023, 6, 1), "amount": Decimal("75000000"), "cash_flow_type": "distribution", "description": "AeroSpec partial exit"},
+        {"flow_date": date(2024, 9, 1), "amount": Decimal("136500000"), "cash_flow_type": "distribution", "description": "Great Lakes exit — sale to Berry Global"},
+        {"flow_date": date(2025, 1, 15), "amount": Decimal("94250000"), "cash_flow_type": "distribution", "description": "Northwest Automation exit — sale to Rockwell"},
+        {"flow_date": date(2025, 6, 1), "amount": Decimal("180000000"), "cash_flow_type": "distribution", "description": "Titan partial exit"},
+        {"flow_date": date(2025, 6, 30), "amount": Decimal("15000000"), "cash_flow_type": "carried_interest", "description": "GP carried interest"},
+    ],
+    # Ironforge Industrial Fund V: 2023 vintage, ~10.8% IRR, 1.18x, early
+    "Ironforge Industrial Fund V": [
+        {"flow_date": date(2023, 8, 1), "amount": Decimal("-250000000"), "cash_flow_type": "capital_call", "description": "Continental Packaging platform"},
+        {"flow_date": date(2023, 10, 1), "amount": Decimal("-10000000"), "cash_flow_type": "management_fee", "description": "Q4 2023 management fee"},
+        {"flow_date": date(2023, 11, 15), "amount": Decimal("-160000000"), "cash_flow_type": "capital_call", "description": "Midwest Valve platform"},
+        {"flow_date": date(2024, 1, 1), "amount": Decimal("-10000000"), "cash_flow_type": "management_fee", "description": "Q1 2024 management fee"},
+        {"flow_date": date(2024, 3, 1), "amount": Decimal("-100000000"), "cash_flow_type": "capital_call", "description": "SteelCore Fabrication platform"},
+        {"flow_date": date(2024, 7, 1), "amount": Decimal("-10000000"), "cash_flow_type": "management_fee", "description": "Q3 2024 management fee"},
+        {"flow_date": date(2024, 7, 15), "amount": Decimal("-90000000"), "cash_flow_type": "capital_call", "description": "DefenseTech Systems platform"},
+        {"flow_date": date(2025, 1, 1), "amount": Decimal("-10000000"), "cash_flow_type": "management_fee", "description": "Q1 2025 management fee"},
     ],
 }
 
@@ -1194,6 +1291,19 @@ async def seed_pe_demo_data(db: Session) -> Dict[str, int]:
             all_perf.append({**perf, "fund_id": fund_id})
     counts["pe_fund_performance"] = _upsert_rows(
         db, PEFundPerformance, all_perf, ["fund_id", "as_of_date"],
+    )
+
+    # 3b. Cash flows
+    all_cash_flows = []
+    for fund_name, flow_list in CASH_FLOWS.items():
+        fund_id = _lookup_id(db, PEFund, name=fund_name)
+        if not fund_id:
+            logger.warning("Fund not found for cash flows: %s", fund_name)
+            continue
+        for flow in flow_list:
+            all_cash_flows.append({**flow, "fund_id": fund_id, "data_source": "demo_seeder"})
+    counts["pe_cash_flows"] = _upsert_rows(
+        db, PECashFlow, all_cash_flows, ["fund_id", "flow_date", "amount"], has_db_constraint=False,
     )
 
     # 4. Portfolio companies

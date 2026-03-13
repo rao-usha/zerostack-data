@@ -231,6 +231,44 @@ class PEFundPerformance(Base):
         return f"<PEFundPerformance Fund {self.fund_id} @ {self.as_of_date}>"
 
 
+class PECashFlow(Base):
+    """
+    Fund cash flow ledger.
+
+    Individual capital calls, distributions, fees, and carried interest.
+    Negative amounts = outflows (calls), positive = inflows (distributions).
+    """
+
+    __tablename__ = "pe_cash_flows"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    fund_id = Column(Integer, ForeignKey("pe_funds.id"), nullable=False, index=True)
+
+    # Cash flow details
+    flow_date = Column(Date, nullable=False, index=True)
+    amount = Column(Numeric(15, 2), nullable=False)  # negative = call, positive = distribution
+    cash_flow_type = Column(
+        String(50), nullable=False
+    )  # capital_call, distribution, management_fee, carried_interest
+    description = Column(String(500))
+
+    # Optional: link to specific investment
+    investment_id = Column(Integer, ForeignKey("pe_fund_investments.id"))
+
+    # Data source
+    data_source = Column(String(100))
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_cash_flows_fund_date", "fund_id", "flow_date"),
+    )
+
+    def __repr__(self):
+        return f"<PECashFlow Fund {self.fund_id} {self.flow_date} {self.amount}>"
+
+
 # =============================================================================
 # PORTFOLIO COMPANY TABLES (6)
 # =============================================================================
