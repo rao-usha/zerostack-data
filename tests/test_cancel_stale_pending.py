@@ -24,7 +24,7 @@ class TestCancelStalePendingJobs:
         job.completed_at = None
         return job
 
-    @patch("app.core.job_queue_service.get_session_factory")
+    @patch("app.core.database.get_session_factory")
     def test_cancels_old_pending_jobs(self, mock_factory):
         from app.core.job_queue_service import cancel_stale_pending_jobs
 
@@ -41,7 +41,7 @@ class TestCancelStalePendingJobs:
         assert old_job.completed_at is not None
         db.commit.assert_called_once()
 
-    @patch("app.core.job_queue_service.get_session_factory")
+    @patch("app.core.database.get_session_factory")
     def test_skips_recently_created_jobs(self, mock_factory):
         from app.core.job_queue_service import cancel_stale_pending_jobs
 
@@ -54,7 +54,7 @@ class TestCancelStalePendingJobs:
         assert result == 0
         db.commit.assert_not_called()
 
-    @patch("app.core.job_queue_service.get_session_factory")
+    @patch("app.core.database.get_session_factory")
     def test_cancels_blocked_jobs_too(self, mock_factory):
         from app.core.job_queue_service import cancel_stale_pending_jobs
 
@@ -68,7 +68,7 @@ class TestCancelStalePendingJobs:
         assert result == 1
         assert blocked_job.status == QueueJobStatus.FAILED
 
-    @patch("app.core.job_queue_service.get_session_factory")
+    @patch("app.core.database.get_session_factory")
     def test_handles_db_error(self, mock_factory):
         from app.core.job_queue_service import cancel_stale_pending_jobs
 
@@ -82,7 +82,7 @@ class TestCancelStalePendingJobs:
         db.rollback.assert_called_once()
         db.close.assert_called_once()
 
-    @patch("app.core.job_queue_service.get_session_factory")
+    @patch("app.core.database.get_session_factory")
     def test_multiple_jobs_cancelled(self, mock_factory):
         from app.core.job_queue_service import cancel_stale_pending_jobs
 
