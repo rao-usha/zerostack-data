@@ -22,6 +22,7 @@ from app.reports.templates.medspa_opportunity_map import MedSpaOpportunityMapTem
 from app.reports.templates.pe_portfolio_report import PEPortfolioReportTemplate
 from app.reports.templates.pe_fund_tearsheet import PEFundTearsheetTemplate
 from app.reports.templates.pe_deal_memo import PEDealMemoTemplate
+from app.reports.templates.pe_market_brief import PEMarketBriefTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ class ReportBuilder:
             "pe_portfolio": PEPortfolioReportTemplate(),
             "pe_fund_tearsheet": PEFundTearsheetTemplate(),
             "pe_deal_memo": PEDealMemoTemplate(),
+            "pe_market_brief": PEMarketBriefTemplate(),
         }
         self._ensure_table()
 
