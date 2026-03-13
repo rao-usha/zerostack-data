@@ -1227,3 +1227,87 @@ async def get_rollup_screener(
         total_targets=result.get("total_targets", 0),
         targets=[ScreenerTarget(**t) for t in result.get("targets", [])],
     )
+
+
+# =============================================================================
+# Valuation Comparables Endpoints
+# =============================================================================
+
+
+class PeerCompany(BaseModel):
+    id: Optional[int] = None
+    name: Optional[str] = None
+    industry: Optional[str] = None
+    sub_industry: Optional[str] = None
+    enterprise_value: Optional[float] = None
+    revenue: Optional[float] = None
+    ebitda: Optional[float] = None
+    ev_revenue: Optional[float] = None
+    ev_ebitda: Optional[float] = None
+    ownership_status: Optional[str] = None
+
+
+class PeerStats(BaseModel):
+    median: Optional[float] = None
+    p25: Optional[float] = None
+    p75: Optional[float] = None
+    min: Optional[float] = None
+    max: Optional[float] = None
+    count: int = 0
+
+
+class ValuationCompsResponse(BaseModel):
+    company_id: int
+    company_name: Optional[str] = None
+    industry: Optional[str] = None
+    sub_industry: Optional[str] = None
+    enterprise_value: Optional[float] = None
+    revenue: Optional[float] = None
+    ebitda: Optional[float] = None
+    ev_revenue: Optional[float] = None
+    ev_ebitda: Optional[float] = None
+    peer_ev_revenue: Dict[str, Any] = {}
+    peer_ev_ebitda: Dict[str, Any] = {}
+    ev_revenue_percentile: Optional[int] = None
+    ev_ebitda_percentile: Optional[int] = None
+    peer_companies: List[PeerCompany] = []
+
+
+@router.get(
+    "/valuation-comps/{company_id}",
+    response_model=ValuationCompsResponse,
+    summary="Valuation comparables with peer benchmarks",
+)
+async def get_valuation_comps(
+    company_id: int,
+    db: Session = Depends(get_db),
+) -> ValuationCompsResponse:
+    """Get EV/Revenue and EV/EBITDA multiples for a company vs. peers.
+
+    Returns company multiples, peer set stats (median, P25, P75),
+    and percentile rank within the peer group.
+    """
+    from app.core.pe_valuation_comps import ValuationCompsService
+
+    service = ValuationCompsService(db)
+    result = service.get_comps(company_id)
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return ValuationCompsResponse(
+        company_id=result["company_id"],
+        company_name=result.get("company_name"),
+        industry=result.get("industry"),
+        sub_industry=result.get("sub_industry"),
+        enterprise_value=result.get("enterprise_value"),
+        revenue=result.get("revenue"),
+        ebitda=result.get("ebitda"),
+        ev_revenue=result.get("ev_revenue"),
+        ev_ebitda=result.get("ev_ebitda"),
+        peer_ev_revenue=result.get("peer_ev_revenue", {}),
+        peer_ev_ebitda=result.get("peer_ev_ebitda", {}),
+        ev_revenue_percentile=result.get("ev_revenue_percentile"),
+        ev_ebitda_percentile=result.get("ev_ebitda_percentile"),
+        peer_companies=[PeerCompany(**p) for p in result.get("peer_companies", [])],
+    )

@@ -20,6 +20,7 @@ from app.core.pe_models import (
     PECompanyFinancials,
     PECompanyLeadership,
     PECompanyNews,
+    PECompanyValuation,
     PECompetitorMapping,
     PEDeal,
     PEDealParticipant,
@@ -1050,6 +1051,38 @@ INDEPENDENT_TARGET_FINANCIALS = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Valuation records (for comp analysis)
+# ---------------------------------------------------------------------------
+
+# (company_name, valuation_date, enterprise_value_M, ev_revenue, ev_ebitda,
+#  valuation_type, methodology, event_type)
+VALUATIONS = [
+    # Summit Ridge — Healthcare
+    ("MedVantage Health Systems", date(2025, 9, 30), 310, 2.5, 11.2, "Mark-to-Market", "Comparable Companies", "Quarterly Mark"),
+    ("MedVantage Health Systems", date(2024, 9, 30), 250, 2.2, 10.5, "Mark-to-Market", "Comparable Companies", "Quarterly Mark"),
+    ("Apex Revenue Solutions", date(2025, 9, 30), 195, 2.6, 10.8, "Mark-to-Market", "DCF", "Quarterly Mark"),
+    ("CloudShield Security", date(2025, 9, 30), 280, 4.8, 22.5, "Mark-to-Market", "Comparable Companies", "Quarterly Mark"),
+    ("TrueNorth Behavioral", date(2025, 9, 30), 520, 2.4, 12.5, "Mark-to-Market", "DCF", "Quarterly Mark"),
+    ("Precision Lab Diagnostics", date(2025, 9, 30), 230, 2.8, 10.2, "Mark-to-Market", "Comparable Companies", "Quarterly Mark"),
+    ("Elevate Staffing Group", date(2025, 9, 30), 140, 2.2, 14.0, "Mark-to-Market", "DCF", "Quarterly Mark"),
+    # Cascade — Software
+    ("FinLedger Technologies", date(2025, 9, 30), 350, 5.5, 28.0, "Mark-to-Market", "Comparable Companies", "Quarterly Mark"),
+    ("Nimbus Data Cloud", date(2025, 9, 30), 280, 6.2, None, "Mark-to-Market", "Revenue Multiple", "Quarterly Mark"),
+    ("VeriComply AI", date(2025, 9, 30), 190, 7.5, None, "Mark-to-Market", "Revenue Multiple", "Quarterly Mark"),
+    ("PayGrid Systems", date(2025, 9, 30), 420, 4.2, 18.5, "Mark-to-Market", "Comparable Companies", "Quarterly Mark"),
+    ("InsightFlow Analytics", date(2025, 9, 30), 240, 4.5, 20.0, "Mark-to-Market", "DCF", "Quarterly Mark"),
+    ("ShieldPay Fraud Detection", date(2025, 9, 30), 120, 8.0, None, "Mark-to-Market", "Revenue Multiple", "Quarterly Mark"),
+    # Ironforge — Industrials
+    ("Titan Precision Manufacturing", date(2025, 9, 30), 550, 1.8, 9.5, "Mark-to-Market", "Comparable Companies", "Quarterly Mark"),
+    ("AeroSpec Coatings", date(2025, 9, 30), 290, 2.1, 10.8, "Mark-to-Market", "DCF", "Quarterly Mark"),
+    ("Continental Packaging Solutions", date(2025, 9, 30), 520, 1.6, 9.0, "Mark-to-Market", "Comparable Companies", "Quarterly Mark"),
+    ("Midwest Valve & Controls", date(2025, 9, 30), 350, 2.0, 10.0, "Mark-to-Market", "DCF", "Quarterly Mark"),
+    ("SteelCore Fabrication", date(2025, 9, 30), 210, 1.7, 9.8, "Mark-to-Market", "Comparable Companies", "Quarterly Mark"),
+    ("DefenseTech Systems", date(2025, 9, 30), 200, 2.5, 13.5, "Mark-to-Market", "Comparable Companies", "Quarterly Mark"),
+]
+
+
 # ===========================================================================
 # Main seeder function
 # ===========================================================================
@@ -1312,7 +1345,39 @@ async def seed_pe_demo_data(db: Session) -> Dict[str, int]:
     db.flush()
     counts["pe_fund_investments"] = inv_count
 
-    # 14. Independent target companies (for screener)
+    # 14. Valuations (for comp analysis)
+    val_count = 0
+    for (co_name, val_date, ev_m, ev_rev, ev_ebitda, val_type, method, event) in VALUATIONS:
+        co_id = _lookup_id(db, PEPortfolioCompany, name=co_name)
+        if not co_id:
+            logger.warning("Company not found for valuation: %s", co_name)
+            continue
+        existing = db.execute(
+            select(PECompanyValuation.id).where(
+                PECompanyValuation.company_id == co_id,
+                PECompanyValuation.valuation_date == val_date,
+            )
+        ).scalar_one_or_none()
+        if existing:
+            val_count += 1
+            continue
+        db.add(PECompanyValuation(
+            company_id=co_id,
+            valuation_date=val_date,
+            enterprise_value_usd=Decimal(str(ev_m * 1_000_000)),
+            ev_revenue_multiple=Decimal(str(ev_rev)) if ev_rev else None,
+            ev_ebitda_multiple=Decimal(str(ev_ebitda)) if ev_ebitda else None,
+            valuation_type=val_type,
+            methodology=method,
+            event_type=event,
+            data_source="demo_seeder",
+            confidence="high",
+        ))
+        val_count += 1
+    db.flush()
+    counts["pe_valuations"] = val_count
+
+    # 15. Independent target companies (for screener)
     target_rows = [{**t, "data_source": "demo_seeder"} for t in INDEPENDENT_TARGETS]
     counts["pe_independent_targets"] = _upsert_rows(
         db, PEPortfolioCompany, target_rows, ["name"], has_db_constraint=False,
