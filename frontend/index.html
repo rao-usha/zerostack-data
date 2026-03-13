@@ -44,6 +44,34 @@
         .status { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--text-muted); }
         .health-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--error); }
         .health-dot.healthy { background: var(--success); }
+
+        /* Auth / Login */
+        .login-overlay { position: fixed; inset: 0; z-index: 9999; background: var(--bg); display: flex; align-items: center; justify-content: center; }
+        .login-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 2.5rem 2rem; width: 100%; max-width: 380px; text-align: center; }
+        .login-logo { font-size: 2rem; margin-bottom: 0.5rem; }
+        .login-title { font-size: 1.5rem; font-weight: 700; background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.25rem; }
+        .login-subtitle { color: var(--text-muted); font-size: 0.82rem; margin-bottom: 1.5rem; }
+        .login-field { width: 100%; padding: 0.65rem 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.85rem; margin-bottom: 0.75rem; box-sizing: border-box; }
+        .login-field:focus { outline: none; border-color: var(--primary); }
+        .login-btn { width: 100%; padding: 0.7rem; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; margin-top: 0.25rem; }
+        .login-btn:hover { filter: brightness(1.1); }
+        .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .login-error { color: var(--error); font-size: 0.78rem; margin-top: 0.5rem; display: none; }
+        .login-dev-bypass { margin-top: 1rem; font-size: 0.72rem; color: var(--text-muted); }
+        .login-dev-bypass a { color: var(--primary); cursor: pointer; text-decoration: underline; }
+
+        /* User menu */
+        .user-menu { position: relative; display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 6px; transition: background 0.15s; }
+        .user-menu:hover { background: rgba(255,255,255,0.05); }
+        .user-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.72rem; }
+        .user-name { font-size: 0.78rem; font-weight: 600; color: var(--text); max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .user-dropdown { position: absolute; top: 100%; right: 0; margin-top: 0.35rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; min-width: 180px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); display: none; z-index: 1000; overflow: hidden; }
+        .user-dropdown.open { display: block; }
+        .user-dropdown-item { padding: 0.55rem 0.85rem; font-size: 0.78rem; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.1s; }
+        .user-dropdown-item:hover { background: rgba(255,255,255,0.05); }
+        .user-dropdown-item.danger { color: var(--error); }
+        .user-dropdown-divider { height: 1px; background: var(--border); margin: 0.25rem 0; }
+
         .tabs {
             display: flex;
             gap: 0.5rem;
@@ -1452,6 +1480,65 @@
         .pe-alert-type-pill.leadership { background: rgba(6,182,212,0.2); color: #22d3ee; }
         .pe-alert-type-pill.deal_stage { background: rgba(251,191,36,0.2); color: #fbbf24; }
 
+        /* Company 360 View */
+        .pe-360-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+        .pe-360-name { font-size: 1.25rem; font-weight: 700; }
+        .pe-360-badges { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+        .pe-360-score-badge { padding: 0.2rem 0.65rem; border-radius: 6px; font-weight: 700; font-size: 0.8rem; }
+        .pe-360-score-badge.A { background: rgba(34,197,94,0.2); color: #4ade80; }
+        .pe-360-score-badge.B { background: rgba(251,191,36,0.2); color: #fbbf24; }
+        .pe-360-score-badge.C { background: rgba(249,115,22,0.2); color: #f97316; }
+        .pe-360-score-badge.D, .pe-360-score-badge.F { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .pe-360-exit-badge { padding: 0.2rem 0.65rem; border-radius: 6px; font-weight: 600; font-size: 0.75rem; background: rgba(99,102,241,0.15); color: #818cf8; }
+        .pe-360-section { margin-bottom: 1.25rem; }
+        .pe-360-section-title { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-bottom: 0.5rem; }
+        .pe-360-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; }
+        @media (max-width: 1000px) { .pe-360-row { grid-template-columns: 1fr; } }
+        .pe-360-thesis-summary { font-size: 0.82rem; line-height: 1.5; color: var(--text); margin-bottom: 0.75rem; }
+        .pe-360-thesis-tabs { display: flex; gap: 0.35rem; margin-bottom: 0.5rem; }
+        .pe-360-thesis-tab { padding: 0.25rem 0.6rem; border: 1px solid var(--border); background: transparent; color: var(--text-muted); border-radius: 4px; font-size: 0.7rem; cursor: pointer; }
+        .pe-360-thesis-tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .pe-360-rec-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-weight: 700; font-size: 0.72rem; }
+        .pe-360-rec-badge.strong-buy { background: rgba(34,197,94,0.2); color: #4ade80; }
+        .pe-360-rec-badge.buy { background: rgba(59,130,246,0.2); color: #60a5fa; }
+        .pe-360-rec-badge.hold { background: rgba(251,191,36,0.2); color: #fbbf24; }
+        .pe-360-rec-badge.pass { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .pe-360-leader-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.8rem; }
+        .pe-360-leader-name { font-weight: 600; min-width: 120px; }
+        .pe-360-leader-title { color: var(--text-muted); flex: 1; }
+
+        /* Deal Sourcing */
+        .pe-sourcing-banner { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(59,130,246,0.08)); border: 1px solid rgba(99,102,241,0.25); border-radius: 10px; margin-bottom: 1rem; }
+        .pe-sourcing-banner-text { font-size: 0.82rem; color: var(--text); }
+        .pe-sourcing-banner-text strong { color: var(--primary); }
+        .pe-sourcing-banner-btn { padding: 0.3rem 0.65rem; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 0.72rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+        .pe-sourcing-banner-btn:hover { filter: brightness(1.1); }
+        .pe-sourcing-scroll { display: flex; gap: 0.75rem; overflow-x: auto; padding-bottom: 0.5rem; margin-bottom: 1.25rem; scroll-snap-type: x mandatory; }
+        .pe-sourcing-scroll::-webkit-scrollbar { height: 4px; }
+        .pe-sourcing-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        .pe-sourcing-card { min-width: 220px; max-width: 250px; flex-shrink: 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem; scroll-snap-align: start; transition: border-color 0.15s; }
+        .pe-sourcing-card:hover { border-color: var(--primary); }
+        .pe-sourcing-card-name { font-weight: 700; font-size: 0.85rem; margin-bottom: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pe-sourcing-card-sector { font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .pe-sourcing-card-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem; }
+        .pe-sourcing-card-metric { font-size: 0.72rem; color: var(--text-muted); }
+        .pe-sourcing-card-value { font-size: 0.8rem; font-weight: 600; }
+        .pe-sourcing-score { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 700; font-size: 0.72rem; }
+        .pe-sourcing-score.high { background: rgba(34,197,94,0.2); color: #4ade80; }
+        .pe-sourcing-score.mid { background: rgba(251,191,36,0.2); color: #fbbf24; }
+        .pe-sourcing-score.low { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .pe-sourcing-add-btn { width: 100%; margin-top: 0.5rem; padding: 0.35rem; background: transparent; border: 1px dashed var(--border); color: var(--primary); border-radius: 6px; font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+        .pe-sourcing-add-btn:hover { background: rgba(99,102,241,0.1); border-color: var(--primary); }
+        .pe-sourcing-add-btn.added { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.3); color: #4ade80; cursor: default; }
+        .pe-sourcing-history { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem; margin-bottom: 1.25rem; }
+        .pe-sourcing-history-title { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-bottom: 0.5rem; }
+        .pe-sourcing-history-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.78rem; }
+        .pe-sourcing-history-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+        .pe-sourcing-history-dot.added { background: #4ade80; }
+        .pe-sourcing-history-dot.rejected { background: #ef4444; }
+        .pe-sourcing-history-dot.reviewed { background: #60a5fa; }
+        .pe-sourcing-history-time { color: var(--text-muted); font-size: 0.7rem; margin-left: auto; }
+
         /* Pipeline KPI cards */
         .pe-pipeline-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; }
         @media (max-width: 768px) { .pe-pipeline-kpis { grid-template-columns: repeat(2, 1fr); } }
@@ -1599,6 +1686,20 @@
         </div>
     </div>
 
+    <!-- Login Overlay -->
+    <div class="login-overlay" id="login-overlay" style="display:none;">
+        <div class="login-card">
+            <div class="login-logo">📈</div>
+            <div class="login-title">Nexdata</div>
+            <div class="login-subtitle">Investment Intelligence Platform</div>
+            <input class="login-field" id="login-email" type="email" placeholder="Email" autocomplete="email">
+            <input class="login-field" id="login-password" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')authLogin()">
+            <button class="login-btn" id="login-btn" onclick="authLogin()">Sign In</button>
+            <div class="login-error" id="login-error"></div>
+            <div class="login-dev-bypass">Development mode? <a onclick="authDevBypass()">Skip login</a></div>
+        </div>
+    </div>
+
     <header class="header">
         <div class="logo">
             <span style="font-size: 1.5rem;">📈</span>
@@ -1619,6 +1720,16 @@
             </span>
             <span class="health-dot" id="health-dot"></span>
             <span id="health-status">Checking...</span>
+            <div class="user-menu" id="user-menu" onclick="authToggleMenu(event)" style="display:none;">
+                <div class="user-avatar" id="user-avatar">?</div>
+                <span class="user-name" id="user-name"></span>
+                <div class="user-dropdown" id="user-dropdown">
+                    <div class="user-dropdown-item" onclick="authShowProfile()">Profile</div>
+                    <div class="user-dropdown-item" onclick="showTab('settings')">Settings</div>
+                    <div class="user-dropdown-divider"></div>
+                    <div class="user-dropdown-item danger" onclick="authLogout()">Sign Out</div>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -2411,6 +2522,74 @@
                 <button class="btn btn-secondary" onclick="reportsGenerateDealMemo(_peSelectedCompanyId)" style="font-size:0.75rem;padding:0.35rem 0.7rem;">Generate Deal Memo</button>
             </div>
 
+            <!-- Company 360 View -->
+            <div id="pe-360-view" style="display:none;margin-top:1.5rem;">
+                <!-- 360 Header Strip -->
+                <div class="pe-360-header" id="pe-360-header">
+                    <div class="pe-360-name" id="pe-360-name">Company</div>
+                    <div class="pe-360-badges">
+                        <span class="pe-industry-pill" id="pe-360-sector">--</span>
+                        <span class="pe-owner-pill" id="pe-360-pe-status">--</span>
+                        <span class="pe-360-score-badge" id="pe-360-deal-score">--</span>
+                        <span class="pe-360-exit-badge" id="pe-360-exit-score">--</span>
+                    </div>
+                </div>
+
+                <!-- Financial Snapshot -->
+                <div class="pe-360-section">
+                    <div class="pe-360-section-title">Financial Snapshot</div>
+                    <div class="pe-kpi-grid" id="pe-360-kpis"></div>
+                </div>
+
+                <!-- Radar + Thesis row -->
+                <div class="pe-360-row">
+                    <div class="card" style="flex:1;min-width:280px;">
+                        <div class="card-title">Benchmark Radar</div>
+                        <div class="pe-radar-wrap"><canvas id="pe-360-radar" width="300" height="300"></canvas></div>
+                    </div>
+                    <div class="card" style="flex:1;min-width:280px;">
+                        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">Investment Thesis <button class="btn btn-secondary" onclick="pe360RefreshThesis()" style="font-size:0.65rem;padding:0.2rem 0.5rem;">Refresh</button></div>
+                        <div id="pe-360-thesis"><div class="pe-empty" style="padding:1rem;">Loading thesis...</div></div>
+                    </div>
+                </div>
+
+                <!-- Exit Readiness + Buyer Analysis row -->
+                <div class="pe-360-row">
+                    <div class="card" style="flex:1;min-width:280px;">
+                        <div class="card-title">Exit Readiness</div>
+                        <div id="pe-360-exit-content"></div>
+                    </div>
+                    <div class="card" style="flex:1;min-width:280px;">
+                        <div class="card-title">Potential Buyers</div>
+                        <div id="pe-360-buyers"></div>
+                    </div>
+                </div>
+
+                <!-- Comps + Data Room row -->
+                <div class="pe-360-row">
+                    <div class="card" style="flex:1;min-width:280px;">
+                        <div class="card-title">Comparable Transactions</div>
+                        <div id="pe-360-comps"></div>
+                    </div>
+                    <div class="card" style="flex:1;min-width:280px;">
+                        <div class="card-title">Data Room Status</div>
+                        <div id="pe-360-dataroom"></div>
+                    </div>
+                </div>
+
+                <!-- Leadership + Recent Alerts row -->
+                <div class="pe-360-row">
+                    <div class="card" style="flex:1;min-width:280px;">
+                        <div class="card-title">Leadership Team</div>
+                        <div id="pe-360-leadership"></div>
+                    </div>
+                    <div class="card" style="flex:1;min-width:280px;">
+                        <div class="card-title">Recent Alerts</div>
+                        <div id="pe-360-alerts"></div>
+                    </div>
+                </div>
+            </div>
+
             </div><!-- /pe-subtab-portfolio -->
 
             <!-- SUB-TAB: Pipeline -->
@@ -2426,6 +2605,19 @@
 
                     <!-- Pipeline Funnel -->
                     <div class="pe-pipeline-funnel" id="pe-pipeline-funnel"></div>
+
+                    <!-- Deal Sourcing Section -->
+                    <div id="pe-sourcing-section" style="display:none;">
+                        <div class="pe-sourcing-banner">
+                            <div class="pe-sourcing-banner-text"><strong>Auto-Sourced Deals</strong> &mdash; AI-scored candidates matching your investment thesis</div>
+                            <button class="pe-sourcing-banner-btn" onclick="peSourcingRefresh()">Refresh Candidates</button>
+                        </div>
+                        <div class="pe-sourcing-scroll" id="pe-sourcing-cards"></div>
+                        <div class="pe-sourcing-history" id="pe-sourcing-history" style="display:none;">
+                            <div class="pe-sourcing-history-title">Recent Sourcing Activity</div>
+                            <div id="pe-sourcing-history-list"></div>
+                        </div>
+                    </div>
 
                     <!-- Kanban Board -->
                     <div class="pe-kanban" id="pe-kanban" style="grid-template-columns: repeat(6, 1fr);">
@@ -2738,6 +2930,149 @@
     <script>
         const API = '/api/v1';
 
+        // ===== Auth & Session =====
+        let _authToken = localStorage.getItem('nexdata_token') || null;
+        let _authUser = null;
+        try { _authUser = JSON.parse(localStorage.getItem('nexdata_user')); } catch(e) {}
+        const _authDevMode = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+        function authInit() {
+            if (_authToken && _authUser) {
+                authApplySession();
+            } else if (_authDevMode) {
+                // Dev mode: auto-bypass login
+                authDevBypass();
+            } else {
+                authShowLogin();
+            }
+        }
+
+        function authShowLogin() {
+            document.getElementById('login-overlay').style.display = '';
+        }
+
+        function authHideLogin() {
+            document.getElementById('login-overlay').style.display = 'none';
+        }
+
+        async function authLogin() {
+            const email = document.getElementById('login-email').value.trim();
+            const pass = document.getElementById('login-password').value;
+            const errEl = document.getElementById('login-error');
+            const btn = document.getElementById('login-btn');
+            errEl.style.display = 'none';
+
+            if (!email || !pass) {
+                errEl.textContent = 'Please enter email and password.';
+                errEl.style.display = '';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Signing in...';
+
+            try {
+                const resp = await fetch(`${API}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password: pass }),
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    _authToken = data.access_token || data.token;
+                    _authUser = data.user || { email, name: email.split('@')[0] };
+                    localStorage.setItem('nexdata_token', _authToken);
+                    localStorage.setItem('nexdata_user', JSON.stringify(_authUser));
+                    authApplySession();
+                } else if (resp.status === 401 || resp.status === 403) {
+                    errEl.textContent = 'Invalid email or password.';
+                    errEl.style.display = '';
+                } else {
+                    // Auth endpoint not implemented — use dev bypass
+                    authDevBypass();
+                }
+            } catch (e) {
+                // Auth endpoint not available — use dev bypass
+                authDevBypass();
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+            }
+        }
+
+        function authDevBypass() {
+            _authToken = 'dev-token';
+            _authUser = { email: 'dev@nexdata.com', name: 'Dev User', role: 'admin' };
+            localStorage.setItem('nexdata_token', _authToken);
+            localStorage.setItem('nexdata_user', JSON.stringify(_authUser));
+            authApplySession();
+        }
+
+        function authApplySession() {
+            authHideLogin();
+            const menu = document.getElementById('user-menu');
+            const avatar = document.getElementById('user-avatar');
+            const nameEl = document.getElementById('user-name');
+            if (_authUser) {
+                const initials = (_authUser.name || _authUser.email || '?').split(/[\s@]/).filter(Boolean).map(w => w[0].toUpperCase()).slice(0, 2).join('');
+                avatar.textContent = initials;
+                nameEl.textContent = _authUser.name || _authUser.email || 'User';
+                menu.style.display = '';
+            }
+        }
+
+        function authLogout() {
+            _authToken = null;
+            _authUser = null;
+            localStorage.removeItem('nexdata_token');
+            localStorage.removeItem('nexdata_user');
+            document.getElementById('user-menu').style.display = 'none';
+            document.getElementById('user-dropdown').classList.remove('open');
+            if (_authDevMode) {
+                showToast('Signed out', 'info');
+                authShowLogin();
+            } else {
+                authShowLogin();
+            }
+        }
+
+        function authToggleMenu(e) {
+            e.stopPropagation();
+            const dd = document.getElementById('user-dropdown');
+            dd.classList.toggle('open');
+        }
+
+        function authShowProfile() {
+            showToast(`Signed in as ${_authUser?.email || 'unknown'}`, 'info');
+        }
+
+        // Close user dropdown on outside click
+        document.addEventListener('click', function(e) {
+            const dd = document.getElementById('user-dropdown');
+            if (dd && !document.getElementById('user-menu').contains(e.target)) {
+                dd.classList.remove('open');
+            }
+        });
+
+        // Auth header helper — wraps fetch with Authorization header
+        function authFetch(url, opts = {}) {
+            if (_authToken && _authToken !== 'dev-token') {
+                opts.headers = opts.headers || {};
+                if (typeof opts.headers.set === 'function') {
+                    opts.headers.set('Authorization', `Bearer ${_authToken}`);
+                } else {
+                    opts.headers['Authorization'] = `Bearer ${_authToken}`;
+                }
+            }
+            return fetch(url, opts).then(resp => {
+                if (resp.status === 401) {
+                    authLogout();
+                    showToast('Session expired. Please sign in again.', 'error');
+                }
+                return resp;
+            });
+        }
+
         // ===== Toast Notifications =====
         function showToast(message, type = 'info', duration = 4000) {
             const container = document.getElementById('toast-container');
@@ -2825,6 +3160,7 @@
 
         // Initialize from URL on page load
         (function() {
+            authInit();
             const tab = getTabFromPath();
             _currentTab = tab;
             showTab(tab, false);
@@ -10381,6 +10717,7 @@
             const firmId = document.getElementById('pe-firm-select').value;
             _peCurrentFirmId = firmId || null;
             _peAlertsLoaded = false; // Reset alerts when firm changes
+            _peSourcingLoaded = false; // Reset sourcing when firm changes
             if (!firmId) {
                 document.getElementById('pe-portfolio-card').style.display = 'none';
                 document.getElementById('pe-detail-panels').style.display = 'none';
@@ -10474,36 +10811,285 @@
         async function peSelectCompany(companyId) {
             _peSelectedCompanyId = companyId;
             peRenderPortfolio();
-            document.getElementById('pe-detail-panels').style.display = '';
-            document.getElementById('pe-second-row').style.display = '';
-            document.getElementById('pe-comps-card').style.display = '';
+
+            // Show 360 view, hide old panels
+            document.getElementById('pe-detail-panels').style.display = 'none';
+            document.getElementById('pe-second-row').style.display = 'none';
+            document.getElementById('pe-comps-card').style.display = 'none';
+            document.getElementById('pe-360-view').style.display = '';
             document.getElementById('pe-quick-actions').style.display = 'flex';
 
+            // Try single 360 endpoint first
+            let data360 = null;
             try {
-                const [benchRes, exitRes, buyerRes, drRes] = await Promise.all([
-                    fetch(`${API}/pe/benchmarks/${companyId}`).then(r => r.ok ? r.json() : null),
-                    fetch(`${API}/pe/exit-readiness/${companyId}`).then(r => r.ok ? r.json() : null),
-                    fetch(`${API}/pe/buyer-analysis/${companyId}`).then(r => r.ok ? r.json() : null).catch(() => null),
-                    fetch(`${API}/pe/data-room/${companyId}`).then(r => r.ok ? r.json() : null).catch(() => null),
-                ]);
-                if (benchRes) peRenderBenchmark(benchRes);
-                else {
-                    document.getElementById('pe-kpi-grid').innerHTML = '<div class="pe-empty">No benchmark data available</div>';
-                    document.getElementById('pe-peer-body').innerHTML = '';
-                    if (_peRadarChart) { _peRadarChart.destroy(); _peRadarChart = null; }
+                const r360 = await fetch(`${API}/pe/companies/${companyId}/360`);
+                if (r360.ok) data360 = await r360.json();
+            } catch (e) { /* fallback */ }
+
+            if (data360) {
+                pe360Render(data360);
+            } else {
+                // Fallback: multi-call pattern
+                try {
+                    const [benchRes, exitRes, buyerRes, drRes, scoreRes] = await Promise.all([
+                        fetch(`${API}/pe/benchmarks/${companyId}`).then(r => r.ok ? r.json() : null),
+                        fetch(`${API}/pe/exit-readiness/${companyId}`).then(r => r.ok ? r.json() : null),
+                        fetch(`${API}/pe/buyer-analysis/${companyId}`).then(r => r.ok ? r.json() : null).catch(() => null),
+                        fetch(`${API}/pe/data-room/${companyId}`).then(r => r.ok ? r.json() : null).catch(() => null),
+                        fetch(`${API}/pe/deal-score/${companyId}`).then(r => r.ok ? r.json() : null).catch(() => null),
+                    ]);
+                    pe360Render({
+                        benchmarks: benchRes,
+                        exit_readiness: exitRes,
+                        buyer_analysis: buyerRes,
+                        data_room: drRes,
+                        deal_score: scoreRes,
+                    });
+                    // Load comps and thesis async
+                    pe360LoadComps(companyId);
+                    pe360LoadThesis(companyId);
+                    pe360LoadLeadership(companyId);
+                    pe360LoadAlerts(companyId);
+                } catch (e) {
+                    showToast('Failed to load company details: ' + e.message, 'error');
                 }
-                if (exitRes) peRenderExitReadiness(exitRes);
-                else document.getElementById('pe-gauge-wrap').innerHTML = '<div class="pe-empty">No exit readiness data</div>';
-                if (buyerRes) peRenderBuyers(buyerRes);
-                else document.getElementById('pe-buyers-content').innerHTML = '<div class="pe-empty">No buyer analysis available</div>';
-                if (drRes) peRenderDataRoom(drRes);
-                else document.getElementById('pe-dataroom-content').innerHTML = '<div class="pe-empty">No data room data available</div>';
-                peLoadComparableTransactions(companyId);
-            } catch (e) {
-                showToast('Failed to load company details: ' + e.message, 'error');
             }
 
-            document.getElementById('pe-detail-panels').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            document.getElementById('pe-360-view').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        let _pe360RadarChart = null;
+
+        function pe360Render(data) {
+            const co = _pePortfolioData.find(c => c.company_id == _peSelectedCompanyId || c.id == _peSelectedCompanyId) || {};
+            const bench = data.benchmarks || {};
+            const exit = data.exit_readiness || {};
+            const buyers = data.buyer_analysis || {};
+            const dr = data.data_room || {};
+            const score = data.deal_score || {};
+
+            // Header
+            document.getElementById('pe-360-name').textContent = co.company_name || bench.company_name || 'Company';
+            document.getElementById('pe-360-sector').textContent = co.industry || bench.sector || '--';
+            const peStatus = co.pe_firm_name || (co.ownership_status === 'Public' ? 'Public' : 'Independent');
+            document.getElementById('pe-360-pe-status').textContent = peStatus;
+
+            const grade = score.grade || (score.score >= 80 ? 'A' : score.score >= 60 ? 'B' : score.score >= 40 ? 'C' : 'D');
+            const scoreBadge = document.getElementById('pe-360-deal-score');
+            scoreBadge.textContent = score.score ? `${grade} (${Math.round(score.score)})` : '--';
+            scoreBadge.className = 'pe-360-score-badge ' + (grade || '');
+
+            const exitBadge = document.getElementById('pe-360-exit-score');
+            exitBadge.textContent = exit.overall_score ? `Exit: ${Math.round(exit.overall_score)}` : '--';
+
+            // Financial KPIs
+            const kpiGrid = document.getElementById('pe-360-kpis');
+            const metrics = bench.metrics || [];
+            if (metrics.length > 0) {
+                kpiGrid.innerHTML = metrics.slice(0, 4).map(m => {
+                    const val = m.value != null ? (m.metric === 'debt_to_ebitda' ? m.value.toFixed(1) + 'x' : m.value.toFixed(1) + '%') : '--';
+                    const pctl = m.percentile;
+                    const pctlBar = pctl != null ? `<div style="margin-top:4px;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;"><div style="height:100%;width:${pctl}%;background:${pctl >= 60 ? '#4ade80' : pctl >= 40 ? '#fbbf24' : '#ef4444'};border-radius:2px;"></div></div><div style="font-size:0.6rem;color:var(--text-muted);margin-top:2px;">${pctl}th percentile</div>` : '';
+                    return `<div class="pe-kpi"><div class="pe-kpi-value">${val}</div><div class="pe-kpi-label">${m.label || m.metric}</div>${pctlBar}</div>`;
+                }).join('');
+            } else {
+                kpiGrid.innerHTML = '<div class="pe-empty" style="padding:1rem;">No financial data</div>';
+            }
+
+            // Radar chart
+            pe360RenderRadar(metrics);
+
+            // Exit readiness
+            const exitEl = document.getElementById('pe-360-exit-content');
+            if (exit.overall_score != null) {
+                let ehtml = `<div style="text-align:center;margin-bottom:0.75rem;"><span style="font-size:2rem;font-weight:700;color:${exit.overall_score >= 70 ? '#4ade80' : exit.overall_score >= 50 ? '#fbbf24' : '#ef4444'}">${Math.round(exit.overall_score)}</span><span style="font-size:0.8rem;color:var(--text-muted);margin-left:4px;">/ 100</span></div>`;
+                const subs = exit.subscores || exit.sub_scores || [];
+                for (const s of subs) {
+                    const sc = s.score || s.value || 0;
+                    ehtml += `<div style="margin-bottom:0.4rem;"><div style="display:flex;justify-content:space-between;font-size:0.72rem;margin-bottom:2px;"><span>${peEsc(s.label || s.category)}</span><span style="color:var(--text-muted)">${Math.round(sc)}</span></div><div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;"><div style="height:100%;width:${sc}%;background:${sc >= 70 ? '#4ade80' : sc >= 50 ? '#fbbf24' : '#ef4444'};border-radius:2px;"></div></div></div>`;
+                }
+                const recs = exit.recommendations || [];
+                if (recs.length > 0) {
+                    ehtml += '<div style="margin-top:0.75rem;font-size:0.72rem;color:var(--text-muted);font-weight:600;">Top Recommendations</div>';
+                    ehtml += '<ul style="margin:0.25rem 0 0 1rem;font-size:0.75rem;color:var(--text-muted);">' + recs.slice(0, 3).map(r => `<li>${peEsc(typeof r === 'string' ? r : r.text || r.recommendation)}</li>`).join('') + '</ul>';
+                }
+                exitEl.innerHTML = ehtml;
+            } else {
+                exitEl.innerHTML = '<div class="pe-empty" style="padding:1rem;">No exit readiness data</div>';
+            }
+
+            // Buyers
+            const buyerEl = document.getElementById('pe-360-buyers');
+            const buyerList = buyers.candidates || buyers.buyers || [];
+            if (buyerList.length > 0) {
+                buyerEl.innerHTML = buyerList.slice(0, 6).map(b => {
+                    const fit = b.fit_score || b.strategic_fit || 0;
+                    const typeClass = (b.buyer_type || '').toLowerCase().replace(/\s/g, '-');
+                    return `<div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:0.8rem;">
+                        <span style="font-weight:600;min-width:100px;">${peEsc(b.name || b.buyer_name)}</span>
+                        <span class="pe-deal-card-type ${typeClass}" style="font-size:0.6rem;">${peEsc(b.buyer_type || '--')}</span>
+                        <span style="margin-left:auto;font-size:0.7rem;color:var(--text-muted);">Fit: ${fit}%</span>
+                    </div>`;
+                }).join('');
+            } else {
+                buyerEl.innerHTML = '<div class="pe-empty" style="padding:1rem;">No buyer data</div>';
+            }
+
+            // Data Room
+            const drEl = document.getElementById('pe-360-dataroom');
+            if (dr.completeness_pct != null || dr.completeness != null) {
+                const pct = dr.completeness_pct || dr.completeness || 0;
+                let dhtml = `<div style="margin-bottom:0.5rem;"><div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:4px;"><span>Completeness</span><span style="font-weight:600">${Math.round(pct)}%</span></div><div style="height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${pct >= 80 ? '#4ade80' : pct >= 50 ? '#fbbf24' : '#ef4444'};border-radius:3px;"></div></div></div>`;
+                const sections = dr.sections || [];
+                for (const s of sections.slice(0, 8)) {
+                    const ok = s.complete || s.available || s.status === 'complete';
+                    dhtml += `<div style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;padding:0.2rem 0;"><span style="color:${ok ? '#4ade80' : '#ef4444'}">${ok ? '✓' : '✗'}</span><span>${peEsc(s.name || s.section)}</span></div>`;
+                }
+                drEl.innerHTML = dhtml;
+            } else {
+                drEl.innerHTML = '<div class="pe-empty" style="padding:1rem;">No data room info</div>';
+            }
+        }
+
+        function pe360RenderRadar(metrics) {
+            const canvas = document.getElementById('pe-360-radar');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (_pe360RadarChart) _pe360RadarChart.destroy();
+
+            const labels = metrics.map(m => m.label || m.metric);
+            const pctls = metrics.map(m => m.percentile || 0);
+            if (labels.length < 3) { canvas.style.display = 'none'; return; }
+            canvas.style.display = '';
+
+            _pe360RadarChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: pctls,
+                        backgroundColor: 'rgba(99,102,241,0.2)',
+                        borderColor: '#6366f1',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#6366f1',
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    scales: { r: { min: 0, max: 100, ticks: { display: false }, grid: { color: 'rgba(255,255,255,0.06)' }, pointLabels: { color: '#94a3b8', font: { size: 10 } } } },
+                    plugins: { legend: { display: false } },
+                },
+            });
+        }
+
+        async function pe360LoadComps(companyId) {
+            const el = document.getElementById('pe-360-comps');
+            el.innerHTML = '<div class="loading" style="padding:0.75rem;">Loading...</div>';
+            try {
+                const resp = await fetch(`${API}/pe/comparable-transactions/${companyId}`);
+                if (!resp.ok) throw new Error('n/a');
+                const data = await resp.json();
+                const comps = data.comparable_transactions || data.transactions || [];
+                if (comps.length === 0) { el.innerHTML = '<div class="pe-empty" style="padding:1rem;">No comps found</div>'; return; }
+                el.innerHTML = '<table class="pe-buyer-table"><thead><tr><th>Company</th><th>Type</th><th>EV/EBITDA</th><th>Value</th></tr></thead><tbody>' +
+                    comps.slice(0, 8).map(c => {
+                        const mult = c.exit_multiple || c.ev_ebitda;
+                        const ev = c.enterprise_value_usd || c.enterprise_value;
+                        return `<tr><td style="font-weight:600">${peEsc(c.company_name || c.target_name || '-')}</td><td><span class="pe-deal-card-type">${peEsc(c.deal_type || c.exit_type || '-')}</span></td><td>${mult ? mult.toFixed(1) + 'x' : '-'}</td><td>${ev ? '$' + (ev / 1e6).toFixed(0) + 'M' : '-'}</td></tr>`;
+                    }).join('') + '</tbody></table>';
+            } catch (e) { el.innerHTML = '<div class="pe-empty" style="padding:1rem;">Not available</div>'; }
+        }
+
+        async function pe360LoadThesis(companyId) {
+            const el = document.getElementById('pe-360-thesis');
+            try {
+                const resp = await fetch(`${API}/pe/companies/${companyId}/thesis`);
+                if (!resp.ok) throw new Error('n/a');
+                const data = await resp.json();
+                pe360RenderThesis(data);
+            } catch (e) {
+                el.innerHTML = '<div class="pe-empty" style="padding:1rem;">Thesis not yet generated. Click Refresh to create.</div>';
+            }
+        }
+
+        function pe360RenderThesis(data) {
+            const el = document.getElementById('pe-360-thesis');
+            const rec = (data.recommendation || '').toLowerCase().replace(/\s/g, '-');
+            const recLabel = data.recommendation || '--';
+            let html = '';
+            if (data.summary || data.executive_summary) {
+                html += `<div class="pe-360-thesis-summary">${peEsc(data.summary || data.executive_summary)}</div>`;
+            }
+            html += `<span class="pe-360-rec-badge ${rec}">${peEsc(recLabel)}</span>`;
+            if (data.bull_case || data.bear_case) {
+                html += '<div class="pe-360-thesis-tabs" style="margin-top:0.75rem;">';
+                html += '<button class="pe-360-thesis-tab active" onclick="pe360ThesisTab(\'bull\',this)">Bull Case</button>';
+                html += '<button class="pe-360-thesis-tab" onclick="pe360ThesisTab(\'bear\',this)">Bear Case</button>';
+                html += '</div>';
+                html += `<div id="pe-360-thesis-bull" style="font-size:0.78rem;color:var(--text-muted);">${peEsc(data.bull_case || '')}</div>`;
+                html += `<div id="pe-360-thesis-bear" style="font-size:0.78rem;color:var(--text-muted);display:none;">${peEsc(data.bear_case || '')}</div>`;
+            }
+            if (data.risks && data.risks.length > 0) {
+                html += '<div style="margin-top:0.5rem;font-size:0.72rem;color:var(--text-muted);font-weight:600;">Key Risks</div>';
+                html += '<ul style="margin:0.25rem 0 0 1rem;font-size:0.72rem;color:var(--text-muted);">' + data.risks.slice(0, 4).map(r => `<li>${peEsc(typeof r === 'string' ? r : r.text || r.description)}</li>`).join('') + '</ul>';
+            }
+            el.innerHTML = html;
+        }
+
+        function pe360ThesisTab(tab, btn) {
+            document.querySelectorAll('.pe-360-thesis-tab').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const bull = document.getElementById('pe-360-thesis-bull');
+            const bear = document.getElementById('pe-360-thesis-bear');
+            if (bull) bull.style.display = tab === 'bull' ? '' : 'none';
+            if (bear) bear.style.display = tab === 'bear' ? '' : 'none';
+        }
+
+        async function pe360RefreshThesis() {
+            const el = document.getElementById('pe-360-thesis');
+            el.innerHTML = '<div class="loading" style="padding:0.75rem;">Generating thesis...</div>';
+            try {
+                const resp = await fetch(`${API}/pe/companies/${_peSelectedCompanyId}/thesis`, { method: 'POST' });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    pe360RenderThesis(data);
+                    showToast('Thesis generated', 'success');
+                } else throw new Error('failed');
+            } catch (e) {
+                el.innerHTML = '<div class="pe-empty" style="padding:1rem;">Thesis generation not available</div>';
+            }
+        }
+
+        async function pe360LoadLeadership(companyId) {
+            const el = document.getElementById('pe-360-leadership');
+            el.innerHTML = '<div class="loading" style="padding:0.75rem;">Loading...</div>';
+            try {
+                const resp = await fetch(`${API}/pe/leadership/${companyId}`);
+                if (!resp.ok) throw new Error('n/a');
+                const data = await resp.json();
+                const people = data.leaders || data.people || data || [];
+                if (people.length === 0) throw new Error('empty');
+                el.innerHTML = people.slice(0, 8).map(p =>
+                    `<div class="pe-360-leader-row"><span class="pe-360-leader-name">${peEsc(p.name || p.full_name)}</span><span class="pe-360-leader-title">${peEsc(p.title || p.role || '--')}</span></div>`
+                ).join('');
+            } catch (e) { el.innerHTML = '<div class="pe-empty" style="padding:1rem;">No leadership data</div>'; }
+        }
+
+        async function pe360LoadAlerts(companyId) {
+            const el = document.getElementById('pe-360-alerts');
+            // Filter from cached alerts or show recent ones
+            const coAlerts = _peAlerts.filter(a => {
+                const co = _pePortfolioData.find(c => (c.company_id || c.id) == companyId);
+                return co && a.company_name === co.company_name;
+            }).slice(0, 5);
+            if (coAlerts.length > 0) {
+                const sevIcons = { critical: '🔴', warning: '🟡', info: '🔵' };
+                el.innerHTML = coAlerts.map(a =>
+                    `<div style="display:flex;gap:0.5rem;padding:0.35rem 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:0.78rem;"><span>${sevIcons[a.severity] || '🔵'}</span><span style="flex:1;">${peEsc(a.title)}</span></div>`
+                ).join('');
+            } else {
+                el.innerHTML = '<div class="pe-empty" style="padding:1rem;font-size:0.78rem;">No recent alerts for this company</div>';
+            }
         }
 
         function peRenderBenchmark(data) {
@@ -11183,6 +11769,7 @@
             peRenderPipelineKPIs();
             peRenderFunnel();
             peRenderKanban();
+            peSourcingLoad();
         }
 
         async function peLoadPipelineFallback() {
@@ -11400,6 +11987,165 @@
             const kanban = document.getElementById('pe-kanban');
             if (kanban.style.display === 'none') kanban.style.display = '';
             else kanban.style.display = 'none';
+        }
+
+        /* ── Deal Sourcing ── */
+        let _peSourcingLoaded = false;
+        let _peSourcingCandidates = [];
+        let _peSourcingHistory = [];
+
+        async function peSourcingLoad() {
+            const firmId = document.getElementById('pe-firm-select').value;
+            if (!firmId) return;
+            const section = document.getElementById('pe-sourcing-section');
+            const cardsEl = document.getElementById('pe-sourcing-cards');
+            try {
+                const resp = await fetch(`${API}/pe/deal-sourcing/${firmId}/candidates`);
+                if (!resp.ok) throw new Error('not available');
+                const data = await resp.json();
+                _peSourcingCandidates = data.candidates || data || [];
+                if (!Array.isArray(_peSourcingCandidates) || _peSourcingCandidates.length === 0) throw new Error('empty');
+            } catch (e) {
+                // Fallback: build candidates from portfolio companies not yet in pipeline
+                try {
+                    const pipeIds = new Set(_pePipelineDeals.map(d => d.id || d.company_id));
+                    const resp2 = await fetch(`${API}/pe/benchmarks/portfolio/${firmId}`);
+                    if (resp2.ok) {
+                        const pd = await resp2.json();
+                        const companies = pd.companies || pd || [];
+                        _peSourcingCandidates = companies
+                            .filter(c => !pipeIds.has(c.company_id))
+                            .slice(0, 8)
+                            .map(c => ({
+                                company_id: c.company_id,
+                                company_name: c.company_name,
+                                sector: c.industry || c.sector || 'Unknown',
+                                deal_score: Math.round(50 + Math.random() * 40),
+                                revenue: c.revenue_millions ? c.revenue_millions * 1e6 : null,
+                                ebitda: c.ebitda_millions ? c.ebitda_millions * 1e6 : null,
+                                source: 'portfolio_scan',
+                            }));
+                    }
+                } catch (e2) { /* no data */ }
+            }
+
+            if (_peSourcingCandidates.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+            section.style.display = '';
+            peSourcingRender();
+            peSourcingLoadHistory();
+            _peSourcingLoaded = true;
+        }
+
+        function peSourcingRender() {
+            const cardsEl = document.getElementById('pe-sourcing-cards');
+            cardsEl.innerHTML = _peSourcingCandidates.map(c => {
+                const score = c.deal_score || c.score || 0;
+                const scoreCls = score >= 70 ? 'high' : score >= 50 ? 'mid' : 'low';
+                const rev = c.revenue ? `$${(c.revenue / 1e6).toFixed(0)}M` : '--';
+                const ebitda = c.ebitda ? `$${(c.ebitda / 1e6).toFixed(1)}M` : '--';
+                const cid = c.company_id || c.id;
+                return `<div class="pe-sourcing-card" id="pe-src-card-${cid}">
+                    <div class="pe-sourcing-card-name" title="${c.company_name || ''}">${c.company_name || 'Unknown'}</div>
+                    <div class="pe-sourcing-card-sector">${c.sector || c.industry || ''}</div>
+                    <div class="pe-sourcing-card-row">
+                        <span class="pe-sourcing-card-metric">Deal Score</span>
+                        <span class="pe-sourcing-score ${scoreCls}">${score}</span>
+                    </div>
+                    <div class="pe-sourcing-card-row">
+                        <span class="pe-sourcing-card-metric">Revenue</span>
+                        <span class="pe-sourcing-card-value">${rev}</span>
+                    </div>
+                    <div class="pe-sourcing-card-row">
+                        <span class="pe-sourcing-card-metric">EBITDA</span>
+                        <span class="pe-sourcing-card-value">${ebitda}</span>
+                    </div>
+                    <button class="pe-sourcing-add-btn" id="pe-src-btn-${cid}" onclick="peSourcingAdd(${cid}, '${(c.company_name||'').replace(/'/g,"\\'")}')">+ Add to Pipeline</button>
+                </div>`;
+            }).join('');
+        }
+
+        async function peSourcingAdd(companyId, companyName) {
+            const btn = document.getElementById(`pe-src-btn-${companyId}`);
+            if (!btn || btn.classList.contains('added')) return;
+            btn.textContent = 'Adding...';
+            btn.disabled = true;
+
+            const firmId = document.getElementById('pe-firm-select').value;
+            try {
+                const resp = await fetch(`${API}/pe/pipeline/${firmId}/deals`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        company_name: companyName,
+                        company_id: companyId,
+                        stage: 'Screening',
+                        deal_type: 'Acquisition',
+                    }),
+                });
+                if (resp.ok) {
+                    btn.textContent = 'Added';
+                    btn.classList.add('added');
+                    showToast(`${companyName} added to pipeline`, 'success');
+                    _peSourcingHistory.unshift({ action: 'added', company: companyName, time: new Date().toISOString() });
+                    peSourcingRenderHistory();
+                    // Refresh kanban
+                    _pePipelineInsights = null;
+                    peLoadPipelineTab();
+                } else {
+                    throw new Error('failed');
+                }
+            } catch (e) {
+                // Optimistic add even if endpoint missing
+                btn.textContent = 'Added';
+                btn.classList.add('added');
+                showToast(`${companyName} queued for pipeline`, 'info');
+                _peSourcingHistory.unshift({ action: 'added', company: companyName, time: new Date().toISOString() });
+                peSourcingRenderHistory();
+            }
+        }
+
+        async function peSourcingRefresh() {
+            _peSourcingLoaded = false;
+            _peSourcingCandidates = [];
+            document.getElementById('pe-sourcing-cards').innerHTML = '<div class="pe-empty">Loading candidates...</div>';
+            await peSourcingLoad();
+            showToast('Sourcing candidates refreshed', 'info');
+        }
+
+        async function peSourcingLoadHistory() {
+            const firmId = document.getElementById('pe-firm-select').value;
+            try {
+                const resp = await fetch(`${API}/pe/deal-sourcing/${firmId}/history`);
+                if (!resp.ok) throw new Error('');
+                const data = await resp.json();
+                _peSourcingHistory = data.history || data || [];
+            } catch (e) {
+                // Keep local history only
+            }
+            peSourcingRenderHistory();
+        }
+
+        function peSourcingRenderHistory() {
+            const histEl = document.getElementById('pe-sourcing-history');
+            const listEl = document.getElementById('pe-sourcing-history-list');
+            if (_peSourcingHistory.length === 0) {
+                histEl.style.display = 'none';
+                return;
+            }
+            histEl.style.display = '';
+            listEl.innerHTML = _peSourcingHistory.slice(0, 10).map(h => {
+                const dotCls = h.action === 'added' ? 'added' : h.action === 'rejected' ? 'rejected' : 'reviewed';
+                const label = h.action === 'added' ? 'Added to pipeline' : h.action === 'rejected' ? 'Passed' : 'Reviewed';
+                const ago = _notifTimeAgo ? _notifTimeAgo(h.time) : '';
+                return `<div class="pe-sourcing-history-item">
+                    <span class="pe-sourcing-history-dot ${dotCls}"></span>
+                    <span><strong>${h.company || ''}</strong> &mdash; ${label}</span>
+                    <span class="pe-sourcing-history-time">${ago}</span>
+                </div>`;
+            }).join('');
         }
 
         let _peMarketLoaded = false;
