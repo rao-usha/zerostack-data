@@ -23,8 +23,8 @@ from app.reports.templates.pe_portfolio_report import PEPortfolioReportTemplate
 
 logger = logging.getLogger(__name__)
 
-# Report storage directory
-REPORTS_DIR = Path("/tmp/nexdata_reports")
+# Report storage directory — volume-mounted for persistence across restarts
+REPORTS_DIR = Path("/app/data/reports")
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 

@@ -9768,27 +9768,66 @@
         async function peLoadFirms() {
             const select = document.getElementById('pe-firm-select');
             try {
-                const found = [];
-                const tryIds = [1, 2, 3, 166, 167, 168, 169, 170];
-                const promises = tryIds.map(id =>
-                    fetch(`${API}/pe/benchmarks/portfolio/${id}`)
-                        .then(r => r.ok ? r.json().then(data => ({ id, data })) : null)
-                        .catch(() => null)
-                );
-                const results = await Promise.all(promises);
-                for (const r of results) {
-                    if (r && r.data && r.data.length > 0) {
-                        found.push({ id: r.id, companies: r.data });
+                let found = [];
+
+                // Try /pe/firms endpoint first (Agent 1 builds this)
+                try {
+                    const firmsResp = await fetch(`${API}/pe/firms`);
+                    if (firmsResp.ok) {
+                        const firmsData = await firmsResp.json();
+                        const firms = firmsData.firms || firmsData || [];
+                        if (Array.isArray(firms) && firms.length > 0) {
+                            // Load portfolio for each firm
+                            const promises = firms.map(f => {
+                                const fid = f.id || f.firm_id;
+                                return fetch(`${API}/pe/benchmarks/portfolio/${fid}`)
+                                    .then(r => r.ok ? r.json().then(data => ({ id: fid, name: f.name || f.firm_name, data })) : null)
+                                    .catch(() => null);
+                            });
+                            const results = await Promise.all(promises);
+                            for (const r of results) {
+                                if (r && r.data) {
+                                    const companies = r.data.companies || r.data || [];
+                                    if (companies.length > 0) found.push({ id: r.id, name: r.name, companies });
+                                }
+                            }
+                        }
+                    }
+                } catch (e) { /* /pe/firms not available yet */ }
+
+                // Fallback: probe a wider range of IDs
+                if (found.length === 0) {
+                    const tryIds = [];
+                    for (let i = 1; i <= 10; i++) tryIds.push(i);
+                    for (let i = 160; i <= 200; i++) tryIds.push(i);
+                    // Batch probes in groups of 20 for speed
+                    for (let batch = 0; batch < tryIds.length; batch += 20) {
+                        const chunk = tryIds.slice(batch, batch + 20);
+                        const promises = chunk.map(id =>
+                            fetch(`${API}/pe/benchmarks/portfolio/${id}`)
+                                .then(r => r.ok ? r.json().then(data => ({ id, data })) : null)
+                                .catch(() => null)
+                        );
+                        const results = await Promise.all(promises);
+                        for (const r of results) {
+                            if (r && r.data) {
+                                const companies = r.data.companies || r.data || [];
+                                if (companies.length > 0) found.push({ id: r.id, companies });
+                            }
+                        }
+                        if (found.length >= 3) break; // Found enough
                     }
                 }
 
                 select.innerHTML = '<option value="">Select a PE Firm...</option>';
                 if (found.length === 0) {
-                    select.innerHTML += '<option value="" disabled>No firms found — seed demo data first</option>';
+                    select.innerHTML += '<option value="" disabled>No firms found \u2014 seed demo data first</option>';
                 } else {
                     for (const f of found) {
                         const industries = [...new Set(f.companies.map(c => c.industry))];
-                        const label = `Firm #${f.id} — ${f.companies.length} companies (${industries.join(', ')})`;
+                        const label = f.name
+                            ? `${f.name} \u2014 ${f.companies.length} companies (${industries.join(', ')})`
+                            : `Firm #${f.id} \u2014 ${f.companies.length} companies (${industries.join(', ')})`;
                         select.innerHTML += `<option value="${f.id}">${peEsc(label)}</option>`;
                     }
                     select.value = found[0].id;

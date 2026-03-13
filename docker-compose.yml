@@ -93,6 +93,7 @@ services:
       - ./alembic.ini:/app/alembic.ini
       - ./data/kaggle:/app/data/kaggle
       - ./data/seeds:/app/data/seeds
+      - ./data/reports:/app/data/reports
       - ./scripts:/app/scripts
       - ./.kaggle:/home/appuser/.kaggle:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
