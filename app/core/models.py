@@ -193,13 +193,22 @@ class SourceConfig(Base):
     rate_limit_rps = Column(Numeric(6, 2), default=5.0)
     max_concurrent = Column(Integer, default=4)
     description = Column(Text, nullable=True)
+    # Scheduling fields (Phase 3 — flexible collection groups)
+    schedule_cron = Column(String(50), nullable=True)  # e.g., "0 2 * * *"
+    schedule_frequency = Column(String(20), nullable=True)  # hourly/daily/weekly/monthly/manual
+    collection_group = Column(String(50), nullable=True)  # FK to collection_groups.name
+    priority = Column(Integer, default=5)  # 1-10, lower runs first within group
+    depends_on = Column(JSON, nullable=True)  # list of source keys that must complete first
+    enabled = Column(Boolean, default=True)
+    supports_incremental = Column(Boolean, default=False)
+    watermark_column = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def __repr__(self) -> str:
         return (
             f"<SourceConfig(source={self.source}, timeout={self.timeout_seconds}s, "
-            f"retries={self.max_retries})>"
+            f"retries={self.max_retries}, group={self.collection_group})>"
         )
 
 
@@ -218,6 +227,32 @@ class SourceWatermark(Base):
         return (
             f"<SourceWatermark(source={self.source}, "
             f"last_success_at={self.last_success_at})>"
+        )
+
+
+class CollectionGroup(Base):
+    """
+    User-defined collection group (replaces rigid tier system).
+
+    Sources are assigned to groups instead of hardcoded tiers.
+    Groups have priority ordering and concurrency limits.
+    """
+
+    __tablename__ = "collection_groups"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(50), unique=True, nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    priority = Column(Integer, nullable=False, default=5)  # 1-10, lower runs first
+    max_concurrent = Column(Integer, nullable=False, default=4)
+    enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return (
+            f"<CollectionGroup(name={self.name}, priority={self.priority}, "
+            f"max_concurrent={self.max_concurrent}, enabled={self.enabled})>"
         )
 
 

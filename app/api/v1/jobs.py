@@ -1310,22 +1310,27 @@ def get_worker_status(db: Session = Depends(get_db)):
 async def launch_batch(
     tiers: List[int] = None,
     sources: List[str] = None,
+    group: str = None,
+    mode: str = "full",
     db: Session = Depends(get_db),
 ):
     """
     Launch a batch collection.
 
-    Enqueues all data sources across 4 priority tiers.
-    Each job is tagged with a shared batch_run_id. Status is always
-    computed live from individual job statuses — nothing can get stuck.
+    Target all sources, a specific collection group, or a list of source keys.
+    Status is computed live from individual job statuses — nothing can get stuck.
 
     Args:
-        tiers: Optional list of tier levels to run (default: all)
+        tiers: Optional tier levels (legacy — prefer group or sources)
         sources: Optional list of specific source keys to run
+        group: Optional collection group name (e.g., "critical", "economic")
+        mode: "full" or "incremental" (default: full)
     """
     from app.core.batch_service import launch_batch_collection
 
-    result = await launch_batch_collection(db, tiers=tiers, sources=sources)
+    result = await launch_batch_collection(
+        db, tiers=tiers, sources=sources, group_name=group, mode=mode
+    )
     return result
 
 
@@ -1440,6 +1445,136 @@ async def launch_backfill_endpoint(
         extra_config=request.config or None,
     )
     return result
+
+
+# =============================================================================
+# Collection Groups
+# =============================================================================
+
+
+@router.get("/collection-groups")
+def list_collection_groups(db: Session = Depends(get_db)):
+    """List all collection groups with their assigned sources."""
+    from app.core.batch_service import resolve_collection_groups
+    return resolve_collection_groups(db)
+
+
+@router.post("/collection-groups")
+def create_collection_group(
+    name: str,
+    description: str = "",
+    priority: int = 5,
+    max_concurrent: int = 4,
+    db: Session = Depends(get_db),
+):
+    """Create a new collection group."""
+    from app.core.models import CollectionGroup
+
+    existing = db.query(CollectionGroup).filter(CollectionGroup.name == name).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Group '{name}' already exists")
+
+    group = CollectionGroup(
+        name=name,
+        description=description,
+        priority=priority,
+        max_concurrent=max_concurrent,
+    )
+    db.add(group)
+    db.commit()
+    return {"name": name, "priority": priority, "max_concurrent": max_concurrent, "status": "created"}
+
+
+@router.put("/collection-groups/{name}")
+def update_collection_group(
+    name: str,
+    description: str = None,
+    priority: int = None,
+    max_concurrent: int = None,
+    enabled: bool = None,
+    db: Session = Depends(get_db),
+):
+    """Update an existing collection group."""
+    from app.core.models import CollectionGroup
+
+    group = db.query(CollectionGroup).filter(CollectionGroup.name == name).first()
+    if not group:
+        raise HTTPException(status_code=404, detail=f"Group '{name}' not found")
+
+    if description is not None:
+        group.description = description
+    if priority is not None:
+        group.priority = priority
+    if max_concurrent is not None:
+        group.max_concurrent = max_concurrent
+    if enabled is not None:
+        group.enabled = enabled
+    db.commit()
+    return {"name": name, "status": "updated"}
+
+
+@router.get("/sources/schedules")
+def list_source_schedules(db: Session = Depends(get_db)):
+    """List all source schedules and group assignments."""
+    from app.core.models import SourceConfig
+
+    configs = db.query(SourceConfig).order_by(SourceConfig.collection_group, SourceConfig.priority).all()
+    return [
+        {
+            "source": sc.source,
+            "collection_group": sc.collection_group,
+            "schedule_cron": sc.schedule_cron,
+            "schedule_frequency": sc.schedule_frequency,
+            "priority": sc.priority,
+            "depends_on": sc.depends_on,
+            "enabled": sc.enabled,
+            "supports_incremental": sc.supports_incremental,
+        }
+        for sc in configs
+    ]
+
+
+@router.put("/sources/{source_key}/schedule")
+def set_source_schedule(
+    source_key: str,
+    collection_group: str = None,
+    schedule_cron: str = None,
+    schedule_frequency: str = None,
+    priority: int = None,
+    depends_on: List[str] = None,
+    enabled: bool = None,
+    db: Session = Depends(get_db),
+):
+    """Set or update schedule and group assignment for a source."""
+    from app.core.models import SourceConfig
+
+    sc = db.query(SourceConfig).filter(SourceConfig.source == source_key).first()
+    if not sc:
+        sc = SourceConfig(source=source_key)
+        db.add(sc)
+
+    if collection_group is not None:
+        sc.collection_group = collection_group
+    if schedule_cron is not None:
+        sc.schedule_cron = schedule_cron
+    if schedule_frequency is not None:
+        sc.schedule_frequency = schedule_frequency
+    if priority is not None:
+        sc.priority = priority
+    if depends_on is not None:
+        sc.depends_on = depends_on
+    if enabled is not None:
+        sc.enabled = enabled
+    db.commit()
+    return {"source": source_key, "status": "updated"}
+
+
+@router.post("/collection-groups/seed-defaults")
+def seed_default_groups(db: Session = Depends(get_db)):
+    """Seed default collection groups from tier definitions."""
+    from app.core.batch_service import seed_default_collection_groups
+    created = seed_default_collection_groups(db)
+    return {"groups_created": created}
 
 
 @router.get("/{job_id}", response_model=JobResponse)

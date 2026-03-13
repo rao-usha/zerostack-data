@@ -28,4 +28,7 @@ from app.core.batch_service import (  # explicit re-exports for patch targets
     scheduled_nightly_batch,
     launch_nightly_batch,
     submit_job,
+    resolve_collection_groups,
+    seed_default_collection_groups,
+    DEFAULT_COLLECTION_GROUPS,
 )

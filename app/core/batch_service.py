@@ -198,6 +198,129 @@ def resolve_effective_tiers(db) -> list:
     return [t for t in effective if t.sources]  # Drop empty tiers
 
 
+# =============================================================================
+# Collection groups (flexible replacement for hardcoded tiers)
+# =============================================================================
+
+# Default groups seeded from current tier definitions
+DEFAULT_COLLECTION_GROUPS = [
+    {"name": "critical", "description": "Daily fast APIs — rates, treasury, markets", "priority": 1, "max_concurrent": 2,
+     "sources": ["treasury", "fred", "prediction_markets"]},
+    {"name": "economic", "description": "Weekly energy, trade, and weather data", "priority": 3, "max_concurrent": 3,
+     "sources": ["eia", "cftc_cot", "noaa"]},
+    {"name": "government", "description": "Monthly government releases and regulatory filings", "priority": 5, "max_concurrent": 4,
+     "sources": ["bea", "bls", "fema", "fdic", "sec:formadv", "cms", "fbi_crime", "irs_soi",
+                  "data_commons:us_states", "fcc_broadband:all_states", "job_postings:all"]},
+    {"name": "deep", "description": "Quarterly Census, SEC, trade, and slow-moving data", "priority": 8, "max_concurrent": 3,
+     "sources": ["census", "uspto", "us_trade:summary", "bts", "international_econ:worldbank_countries",
+                  "realestate", "usda:annual_summary"]},
+]
+
+# Map from default group sources to their default configs (from tier defs)
+_DEFAULT_SOURCE_CONFIGS: Dict[str, Dict] = {}
+for _tier in TIERS:
+    for _src in _tier.sources:
+        _DEFAULT_SOURCE_CONFIGS[_src.key] = _src.default_config
+
+
+def resolve_collection_groups(db) -> List[Dict]:
+    """
+    Build the effective list of collection groups from DB + defaults.
+
+    If CollectionGroup table has rows, use those. Otherwise seed from defaults.
+    Each group includes its sources resolved from SourceConfig or fallback defaults.
+
+    Returns list of dicts: [{name, priority, max_concurrent, sources: [{key, config}]}]
+    """
+    from app.core.models import CollectionGroup, SourceConfig
+
+    db_groups = db.query(CollectionGroup).filter(CollectionGroup.enabled == True).all()  # noqa: E712
+
+    if db_groups:
+        groups = []
+        for g in db_groups:
+            # Find sources assigned to this group
+            source_configs = (
+                db.query(SourceConfig)
+                .filter(SourceConfig.collection_group == g.name, SourceConfig.enabled == True)  # noqa: E712
+                .order_by(SourceConfig.priority)
+                .all()
+            )
+            sources = []
+            for sc in source_configs:
+                sources.append({
+                    "key": sc.source,
+                    "config": {},
+                    "depends_on": sc.depends_on or [],
+                })
+            groups.append({
+                "name": g.name,
+                "priority": g.priority,
+                "max_concurrent": g.max_concurrent,
+                "sources": sources,
+            })
+        return sorted(groups, key=lambda g: g["priority"])
+
+    # Fallback: use defaults (matches current tier behavior)
+    groups = []
+    for dflt in DEFAULT_COLLECTION_GROUPS:
+        sources = []
+        for key in dflt["sources"]:
+            sources.append({
+                "key": key,
+                "config": _DEFAULT_SOURCE_CONFIGS.get(key, {}),
+                "depends_on": [],
+            })
+        groups.append({
+            "name": dflt["name"],
+            "priority": dflt["priority"],
+            "max_concurrent": dflt["max_concurrent"],
+            "sources": sources,
+        })
+    return groups
+
+
+def seed_default_collection_groups(db) -> int:
+    """
+    Seed default collection groups and source configs into DB.
+
+    Idempotent — skips groups/sources that already exist.
+    Returns number of groups created.
+    """
+    from app.core.models import CollectionGroup, SourceConfig
+
+    created = 0
+    for dflt in DEFAULT_COLLECTION_GROUPS:
+        existing = db.query(CollectionGroup).filter(CollectionGroup.name == dflt["name"]).first()
+        if not existing:
+            db.add(CollectionGroup(
+                name=dflt["name"],
+                description=dflt["description"],
+                priority=dflt["priority"],
+                max_concurrent=dflt["max_concurrent"],
+            ))
+            created += 1
+
+        # Ensure source configs exist with group assignment
+        for source_key in dflt["sources"]:
+            sc = db.query(SourceConfig).filter(SourceConfig.source == source_key).first()
+            if sc:
+                if not sc.collection_group:
+                    sc.collection_group = dflt["name"]
+            else:
+                db.add(SourceConfig(
+                    source=source_key,
+                    collection_group=dflt["name"],
+                    priority=dflt["priority"],
+                ))
+
+    if created:
+        db.commit()
+        logger.info(f"Seeded {created} default collection groups")
+
+    return created
+
+
 def _get_source_display_name(source_key: str) -> str:
     """Get human-readable display name for a source from the registry."""
     try:
@@ -239,19 +362,23 @@ async def launch_batch_collection(
     config: Optional[Dict] = None,
     tiers: Optional[List[int]] = None,
     sources: Optional[List[str]] = None,
+    group_name: Optional[str] = None,
+    mode: str = "full",
 ) -> Dict:
     """
     Launch a batch collection.
 
-    Creates an IngestionJob + JobQueue entry for each source in each tier.
-    Each job is tagged with a shared batch_run_id, trigger="batch", and tier.
-    No separate batch record — status is computed live from jobs.
+    Creates an IngestionJob + JobQueue entry for each source.
+    Each job is tagged with a shared batch_run_id and trigger="batch".
+    Status is computed live from jobs — nothing can get stuck.
 
     Args:
         db: Database session
         config: Optional overrides (e.g. {"skip_sources": ["kaggle"]})
-        tiers: Optional list of tier levels to run (default: all)
+        tiers: Optional list of tier levels to run (legacy, default: all)
         sources: Optional list of specific source keys to run
+        group_name: Optional collection group name to target
+        mode: "full" or "incremental" (incremental uses watermarks)
 
     Returns:
         Dict with batch_run_id, total_jobs, and started_at
