@@ -1907,14 +1907,23 @@
                         <label>State</label>
                         <select id="pe-search-state">
                             <option value="">Any State</option>
-                            <option value="CA">California</option><option value="TX">Texas</option><option value="FL">Florida</option>
-                            <option value="NY">New York</option><option value="IL">Illinois</option><option value="PA">Pennsylvania</option>
-                            <option value="OH">Ohio</option><option value="GA">Georgia</option><option value="NC">North Carolina</option>
-                            <option value="MI">Michigan</option><option value="NJ">New Jersey</option><option value="VA">Virginia</option>
-                            <option value="WA">Washington</option><option value="AZ">Arizona</option><option value="MA">Massachusetts</option>
-                            <option value="TN">Tennessee</option><option value="IN">Indiana</option><option value="MO">Missouri</option>
-                            <option value="MD">Maryland</option><option value="WI">Wisconsin</option><option value="CO">Colorado</option>
-                            <option value="MN">Minnesota</option><option value="SC">South Carolina</option><option value="AL">Alabama</option>
+                            <option value="AL">Alabama</option><option value="AK">Alaska</option><option value="AZ">Arizona</option>
+                            <option value="AR">Arkansas</option><option value="CA">California</option><option value="CO">Colorado</option>
+                            <option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="DC">District of Columbia</option>
+                            <option value="FL">Florida</option><option value="GA">Georgia</option><option value="HI">Hawaii</option>
+                            <option value="ID">Idaho</option><option value="IL">Illinois</option><option value="IN">Indiana</option>
+                            <option value="IA">Iowa</option><option value="KS">Kansas</option><option value="KY">Kentucky</option>
+                            <option value="LA">Louisiana</option><option value="ME">Maine</option><option value="MD">Maryland</option>
+                            <option value="MA">Massachusetts</option><option value="MI">Michigan</option><option value="MN">Minnesota</option>
+                            <option value="MS">Mississippi</option><option value="MO">Missouri</option><option value="MT">Montana</option>
+                            <option value="NE">Nebraska</option><option value="NV">Nevada</option><option value="NH">New Hampshire</option>
+                            <option value="NJ">New Jersey</option><option value="NM">New Mexico</option><option value="NY">New York</option>
+                            <option value="NC">North Carolina</option><option value="ND">North Dakota</option><option value="OH">Ohio</option>
+                            <option value="OK">Oklahoma</option><option value="OR">Oregon</option><option value="PA">Pennsylvania</option>
+                            <option value="RI">Rhode Island</option><option value="SC">South Carolina</option><option value="SD">South Dakota</option>
+                            <option value="TN">Tennessee</option><option value="TX">Texas</option><option value="UT">Utah</option>
+                            <option value="VT">Vermont</option><option value="VA">Virginia</option><option value="WA">Washington</option>
+                            <option value="WV">West Virginia</option><option value="WI">Wisconsin</option><option value="WY">Wyoming</option>
                         </select>
                     </div>
                     <div class="pe-search-field">
@@ -1925,6 +1934,23 @@
                             <input type="number" id="pe-search-rev-max" placeholder="Max" min="0">
                         </div>
                     </div>
+                    <div class="pe-search-field">
+                        <label>Employees</label>
+                        <div class="pe-range-inputs">
+                            <input type="number" id="pe-search-emp-min" placeholder="Min" min="0">
+                            <span>—</span>
+                            <input type="number" id="pe-search-emp-max" placeholder="Max" min="0">
+                        </div>
+                    </div>
+                    <div class="pe-search-field">
+                        <label>PE Status</label>
+                        <select id="pe-search-pe-status">
+                            <option value="">All</option>
+                            <option value="PE-Backed">PE-Backed</option>
+                            <option value="Independent">Independent</option>
+                            <option value="Public">Public</option>
+                        </select>
+                    </div>
                     <button class="pe-search-btn" onclick="peRunSearch()">Search</button>
                 </div>
                 <div class="pe-search-results" id="pe-search-results" style="display:none;">
@@ -1932,17 +1958,22 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Company</th>
-                                <th>Industry</th>
-                                <th>State</th>
-                                <th>Revenue</th>
-                                <th>Employees</th>
-                                <th>Status</th>
-                                <th>Frag. Score</th>
+                                <th onclick="peSortSearch('company_name')" style="cursor:pointer">Company <span class="sort-arrow" id="pe-sarr-company_name"></span></th>
+                                <th onclick="peSortSearch('industry')" style="cursor:pointer">Industry <span class="sort-arrow" id="pe-sarr-industry"></span></th>
+                                <th onclick="peSortSearch('state')" style="cursor:pointer">State <span class="sort-arrow" id="pe-sarr-state"></span></th>
+                                <th onclick="peSortSearch('revenue')" style="cursor:pointer">Revenue <span class="sort-arrow" id="pe-sarr-revenue"></span></th>
+                                <th onclick="peSortSearch('employees')" style="cursor:pointer">Employees <span class="sort-arrow" id="pe-sarr-employees"></span></th>
+                                <th onclick="peSortSearch('pe_owner')" style="cursor:pointer">PE Owner <span class="sort-arrow" id="pe-sarr-pe_owner"></span></th>
+                                <th onclick="peSortSearch('status')" style="cursor:pointer">Status <span class="sort-arrow" id="pe-sarr-status"></span></th>
                             </tr>
                         </thead>
                         <tbody id="pe-search-body"></tbody>
                     </table>
+                    <div class="pe-search-pagination" id="pe-search-pagination" style="display:none;">
+                        <button onclick="peSearchPage(-1)" id="pe-search-prev">Prev</button>
+                        <span class="page-info" id="pe-search-page-info"></span>
+                        <button onclick="peSearchPage(1)" id="pe-search-next">Next</button>
+                    </div>
                 </div>
             </div>
 
@@ -9658,6 +9689,11 @@
         function peEsc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
 
         // ===== PE Company Search =====
+        let _peSearchResults = [];
+        let _peSearchPage = 0;
+        const _peSearchPerPage = 25;
+        let _peSearchSortCol = 'company_name';
+        let _peSearchSortAsc = true;
 
         async function peRunSearch() {
             const keyword = document.getElementById('pe-search-keyword').value.trim();
@@ -9665,51 +9701,48 @@
             const state = document.getElementById('pe-search-state').value;
             const revMin = document.getElementById('pe-search-rev-min').value;
             const revMax = document.getElementById('pe-search-rev-max').value;
+            const empMin = document.getElementById('pe-search-emp-min').value;
+            const empMax = document.getElementById('pe-search-emp-max').value;
+            const peStatus = document.getElementById('pe-search-pe-status').value;
 
             const resultsDiv = document.getElementById('pe-search-results');
             const statusDiv = document.getElementById('pe-search-status');
-            const tbody = document.getElementById('pe-search-body');
             resultsDiv.style.display = 'block';
-            tbody.innerHTML = '';
             statusDiv.textContent = 'Searching...';
 
             let results = [];
-            let fragScores = {};
 
-            // Try fragmentation screener if NAICS selected
+            // Search portfolio companies across all known firms
+            try {
+                const firmSelect = document.getElementById('pe-firm-select');
+                const firmIds = Array.from(firmSelect.options).map(o => o.value).filter(v => v);
+                const promises = firmIds.map(fid =>
+                    fetch(`${API}/pe/benchmarks/portfolio/${fid}`).then(r => r.ok ? r.json() : null).catch(() => null)
+                );
+                const allData = await Promise.all(promises);
+                for (const data of allData) {
+                    if (!data) continue;
+                    const companies = data.companies || data || [];
+                    for (const c of companies) {
+                        if (!results.find(x => x.company_id === c.company_id)) results.push(c);
+                    }
+                }
+            } catch (e) { /* skip */ }
+
+            // Also try rollup screener if NAICS selected
             if (naics) {
                 try {
-                    const fragUrl = state
-                        ? `${API}/pe/roll-up-targets/${naics}/${state}?top_n=30`
-                        : `${API}/pe/fragmentation/${naics}?top_n=30`;
-                    const fragResp = await fetch(fragUrl);
-                    if (fragResp.ok) {
-                        const fragData = await fragResp.json();
-                        fragScores._national = fragData.score || fragData.national_score || null;
+                    const url = `${API}/pe/rollup-screener/${naics}` + (state ? `?state=${state}` : '');
+                    const r = await fetch(url);
+                    if (r.ok) {
+                        const data = await r.json();
+                        const targets = data.targets || data || [];
+                        for (const t of targets) {
+                            if (!results.find(x => x.company_id === t.company_id)) results.push(t);
+                        }
                     }
                 } catch (e) { /* screener not available */ }
             }
-
-            // Search portfolio companies (fallback / primary)
-            try {
-                const resp = await fetch(`${API}/pe/benchmarks/portfolio/0`);
-                // That won't work for "all" — let's search across firms we know about
-                const firmSelect = document.getElementById('pe-firm-select');
-                const firmIds = Array.from(firmSelect.options).map(o => o.value).filter(v => v);
-
-                for (const fid of firmIds) {
-                    try {
-                        const r = await fetch(`${API}/pe/benchmarks/portfolio/${fid}`);
-                        if (!r.ok) continue;
-                        const data = await r.json();
-                        for (const c of (data.companies || [])) {
-                            // Avoid duplicates
-                            if (results.find(x => x.company_id === c.company_id)) continue;
-                            results.push(c);
-                        }
-                    } catch (e) { /* skip */ }
-                }
-            } catch (e) { /* skip */ }
 
             // Client-side filtering
             let filtered = results;
@@ -9721,65 +9754,143 @@
                 );
             }
             if (state) {
-                // Try matching state in company data if available
                 filtered = filtered.filter(c => {
                     const loc = (c.headquarters_state || c.state || '').toUpperCase();
-                    return !loc || loc === state || loc === '';
+                    return !loc || loc === state;
                 });
             }
             if (revMin) {
                 const min = parseFloat(revMin) * 1000000;
                 filtered = filtered.filter(c => {
-                    const rev = c.metrics?.revenue_usd || c.revenue_usd || 0;
-                    return rev >= min || rev === 0; // include if unknown
+                    const rev = c.revenue_usd || c.metrics?.revenue_usd || 0;
+                    return rev >= min || rev === 0;
                 });
             }
             if (revMax) {
                 const max = parseFloat(revMax) * 1000000;
                 filtered = filtered.filter(c => {
-                    const rev = c.metrics?.revenue_usd || c.revenue_usd || 0;
+                    const rev = c.revenue_usd || c.metrics?.revenue_usd || 0;
                     return rev <= max || rev === 0;
                 });
             }
+            if (empMin) {
+                const min = parseInt(empMin);
+                filtered = filtered.filter(c => {
+                    const emp = c.employee_count || c.employees || 0;
+                    return emp >= min || emp === 0;
+                });
+            }
+            if (empMax) {
+                const max = parseInt(empMax);
+                filtered = filtered.filter(c => {
+                    const emp = c.employee_count || c.employees || 0;
+                    return emp <= max || emp === 0;
+                });
+            }
+            if (peStatus) {
+                filtered = filtered.filter(c => {
+                    const ownership = (c.ownership_status || c.pe_owner || c.status || '').toLowerCase();
+                    if (peStatus === 'PE-Backed') return ownership.includes('pe') || ownership.includes('backed') || (c.pe_firm_name && c.pe_firm_name !== '');
+                    if (peStatus === 'Independent') return ownership.includes('independent') || ownership.includes('private') || (!c.pe_firm_name && ownership !== 'public');
+                    if (peStatus === 'Public') return ownership.includes('public');
+                    return true;
+                });
+            }
 
-            statusDiv.textContent = `${filtered.length} result${filtered.length !== 1 ? 's' : ''} found`;
+            _peSearchResults = filtered;
+            _peSearchPage = 0;
+            peRenderSearchResults();
+        }
+
+        function peRenderSearchResults() {
+            const statusDiv = document.getElementById('pe-search-status');
+            const tbody = document.getElementById('pe-search-body');
+            const pagination = document.getElementById('pe-search-pagination');
+            const filtered = _peSearchResults;
+
+            statusDiv.textContent = `Found ${filtered.length} compan${filtered.length !== 1 ? 'ies' : 'y'}`;
 
             if (filtered.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-muted)">No matching companies. Try broadening your search criteria.</td></tr>';
+                pagination.style.display = 'none';
                 return;
             }
 
-            for (const c of filtered) {
-                const name = peEsc(c.company_name || c.name || '—');
-                const industry = peEsc(c.industry || '—');
-                const st = peEsc(c.headquarters_state || c.state || '—');
-                const revRaw = c.metrics?.revenue_growth !== undefined ? null : null;
-                const rev = c.revenue_usd || c.metrics?.revenue_usd;
-                const revStr = rev ? `$${(rev / 1000000).toFixed(0)}M` : '—';
-                const emp = c.employee_count || c.employees || '—';
-                const status = c.status || 'Active';
-                const statusClass = status === 'Active' ? 'pe-status-pill Active' : 'pe-status-pill Exited';
-                const fragNat = fragScores._national;
-                let fragHtml = '—';
-                if (fragNat != null) {
-                    const fragClass = fragNat >= 70 ? 'high' : fragNat >= 40 ? 'mid' : 'low';
-                    fragHtml = `<span class="pe-frag-score ${fragClass}">${fragNat.toFixed(0)}</span>`;
-                }
+            // Sort
+            const sorted = [...filtered].sort((a, b) => {
+                let av, bv;
+                const col = _peSearchSortCol;
+                if (col === 'company_name') { av = a.company_name || ''; bv = b.company_name || ''; }
+                else if (col === 'industry') { av = a.industry || ''; bv = b.industry || ''; }
+                else if (col === 'state') { av = a.headquarters_state || a.state || ''; bv = b.headquarters_state || b.state || ''; }
+                else if (col === 'revenue') { av = a.revenue_usd || a.metrics?.revenue_usd || 0; bv = b.revenue_usd || b.metrics?.revenue_usd || 0; }
+                else if (col === 'employees') { av = a.employee_count || a.employees || 0; bv = b.employee_count || b.employees || 0; }
+                else if (col === 'pe_owner') { av = a.pe_firm_name || ''; bv = b.pe_firm_name || ''; }
+                else if (col === 'status') { av = a.status || ''; bv = b.status || ''; }
+                else { av = a.company_name || ''; bv = b.company_name || ''; }
+                if (typeof av === 'string') return _peSearchSortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+                return _peSearchSortAsc ? av - bv : bv - av;
+            });
 
-                tbody.innerHTML += `<tr onclick="peSearchSelect(${c.company_id})">
+            // Update sort arrows
+            const cols = ['company_name','industry','state','revenue','employees','pe_owner','status'];
+            for (const c of cols) {
+                const el = document.getElementById('pe-sarr-' + c);
+                if (el) el.textContent = _peSearchSortCol === c ? (_peSearchSortAsc ? '\u25B2' : '\u25BC') : '';
+            }
+
+            // Paginate
+            const totalPages = Math.ceil(sorted.length / _peSearchPerPage);
+            if (_peSearchPage >= totalPages) _peSearchPage = totalPages - 1;
+            const start = _peSearchPage * _peSearchPerPage;
+            const page = sorted.slice(start, start + _peSearchPerPage);
+
+            tbody.innerHTML = page.map(c => {
+                const name = peEsc(c.company_name || c.name || '\u2014');
+                const industry = peEsc(c.industry || '\u2014');
+                const indClass = ['Healthcare','Software','Industrials','Technology'].includes(c.industry) ? c.industry : 'default';
+                const st = peEsc(c.headquarters_state || c.state || '\u2014');
+                const rev = c.revenue_usd || c.metrics?.revenue_usd;
+                const revStr = rev ? `$${(rev / 1000000).toFixed(0)}M` : '\u2014';
+                const emp = c.employee_count || c.employees || '\u2014';
+                const peOwner = c.pe_firm_name || (c.ownership_status === 'Public' ? 'Public' : 'Independent');
+                const ownerClass = c.pe_firm_name ? 'pe-backed' : (c.ownership_status === 'Public' ? 'public' : 'independent');
+                const status = c.status || 'Active';
+                const statusClass = status === 'Active' ? 'Active' : 'Exited';
+                return `<tr onclick="peSearchSelect(${c.company_id})">
                     <td style="font-weight:600">${name}</td>
-                    <td><span class="pe-industry-pill ${(c.industry || 'default').split(/\s/)[0]}">${industry}</span></td>
+                    <td><span class="pe-industry-pill ${indClass}">${industry}</span></td>
                     <td>${st}</td>
                     <td style="text-align:right">${revStr}</td>
                     <td style="text-align:right">${emp}</td>
-                    <td><span class="${statusClass}">${peEsc(status)}</span></td>
-                    <td style="text-align:center">${fragHtml}</td>
+                    <td><span class="pe-owner-pill ${ownerClass}">${peEsc(peOwner)}</span></td>
+                    <td><span class="pe-status-pill ${statusClass}">${peEsc(status)}</span></td>
                 </tr>`;
+            }).join('');
+
+            // Pagination controls
+            if (totalPages > 1) {
+                pagination.style.display = '';
+                document.getElementById('pe-search-prev').disabled = _peSearchPage === 0;
+                document.getElementById('pe-search-next').disabled = _peSearchPage >= totalPages - 1;
+                document.getElementById('pe-search-page-info').textContent = `Page ${_peSearchPage + 1} of ${totalPages} (${start + 1}\u2013${Math.min(start + _peSearchPerPage, sorted.length)} of ${sorted.length})`;
+            } else {
+                pagination.style.display = 'none';
             }
         }
 
+        function peSortSearch(col) {
+            if (_peSearchSortCol === col) _peSearchSortAsc = !_peSearchSortAsc;
+            else { _peSearchSortCol = col; _peSearchSortAsc = col === 'company_name' || col === 'industry' || col === 'state'; }
+            peRenderSearchResults();
+        }
+
+        function peSearchPage(delta) {
+            _peSearchPage += delta;
+            peRenderSearchResults();
+        }
+
         function peSearchSelect(companyId) {
-            // Trigger the same detail view as clicking a portfolio row
             if (typeof peSelectCompany === 'function') {
                 peSelectCompany(companyId);
             }
