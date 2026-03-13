@@ -524,6 +524,108 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Failed to register PE weekly digest: {e}")
 
+        # PE Market Scanner — daily sector momentum scan at 7 AM UTC
+        try:
+            from app.core.scheduler_service import get_scheduler
+            from apscheduler.triggers.cron import CronTrigger
+
+            async def scheduled_market_scan():
+                """Daily market scan — refresh sector momentum signals."""
+                from app.core.database import get_session_factory
+                from app.core.pe_market_signals import run_market_scan
+
+                logger.info("Starting scheduled market scan")
+                SessionLocal = get_session_factory()
+                db = SessionLocal()
+                try:
+                    result = run_market_scan(db)
+                    logger.info(
+                        "Market scan complete: %d signals, %d high-momentum sectors",
+                        result.get("signals_stored", 0),
+                        len(result.get("high_momentum", [])),
+                    )
+                except Exception as e:
+                    logger.error("Scheduled market scan failed: %s", e)
+                finally:
+                    db.close()
+
+            sched = get_scheduler()
+            sched.add_job(
+                scheduled_market_scan,
+                trigger=CronTrigger(hour=7, minute=0),
+                id="pe_market_scan_daily",
+                name="PE Market Scan (Daily)",
+                replace_existing=True,
+            )
+            logger.info("PE market scan registered (7:00 AM UTC)")
+        except Exception as e:
+            logger.warning(f"Failed to register PE market scan: {e}")
+
+        # PE Deal Sourcing — weekly on Tuesdays at 8 AM UTC
+        try:
+            from app.core.scheduler_service import get_scheduler
+            from apscheduler.triggers.cron import CronTrigger
+
+            async def scheduled_deal_sourcing():
+                """Weekly automated deal sourcing for PE firms with subscriptions."""
+                from app.core.database import get_session_factory
+                from app.core.pe_deal_sourcing import source_deals_from_signals
+                from app.core.pe_models import PEAlertSubscription
+                from sqlalchemy import select
+
+                logger.info("Starting scheduled deal sourcing")
+                SessionLocal = get_session_factory()
+                db = SessionLocal()
+                try:
+                    # Find firms with active subscriptions
+                    firm_ids = db.execute(
+                        select(PEAlertSubscription.firm_id)
+                        .where(PEAlertSubscription.enabled == True)
+                        .distinct()
+                    ).scalars().all()
+
+                    for firm_id in firm_ids:
+                        try:
+                            report = source_deals_from_signals(db, firm_id)
+                            logger.info(
+                                "Deal sourcing firm %d: %d candidates, %d deals created",
+                                firm_id,
+                                report.candidates_found,
+                                report.deals_created,
+                            )
+
+                            # Fire webhook if deals were created
+                            if report.deals_created > 0:
+                                try:
+                                    from app.core.webhook_service import trigger_webhooks
+                                    await trigger_webhooks(
+                                        "pe_new_market_opportunity",
+                                        {
+                                            "firm_id": firm_id,
+                                            "deals_created": report.deals_created,
+                                            "candidates_found": report.candidates_found,
+                                            "top_opportunities": report.top_opportunities[:5],
+                                        },
+                                    )
+                                except Exception:
+                                    pass
+                        except Exception as e:
+                            logger.error("Deal sourcing failed for firm %d: %s", firm_id, e)
+                finally:
+                    db.close()
+
+            sched = get_scheduler()
+            sched.add_job(
+                scheduled_deal_sourcing,
+                trigger=CronTrigger(day_of_week="tue", hour=8, minute=0),
+                id="pe_deal_sourcing_weekly",
+                name="PE Deal Sourcing (Weekly)",
+                replace_existing=True,
+            )
+            logger.info("PE deal sourcing registered (Tuesdays 8:00 AM UTC)")
+        except Exception as e:
+            logger.warning(f"Failed to register PE deal sourcing: {e}")
+
     except Exception as e:
         logger.warning(f"Failed to start scheduler: {e}")
 
