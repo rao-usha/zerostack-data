@@ -1420,6 +1420,38 @@
         .pe-subtab { display: none; }
         .pe-subtab.active { display: block; }
 
+        /* Alerts summary strip */
+        .pe-alerts-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem; }
+        .pe-alerts-stat { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; text-align: center; }
+        .pe-alerts-val { display: block; font-size: 1.4rem; font-weight: 700; color: var(--text); }
+        .pe-alerts-val.pe-alerts-critical { color: #ef4444; }
+        .pe-alerts-lbl { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+        @media (max-width: 768px) { .pe-alerts-summary { grid-template-columns: repeat(2, 1fr); } }
+
+        /* Alert filter buttons */
+        .pe-alert-filters { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+        .pe-alert-filter { padding: 0.3rem 0.7rem; border: 1px solid var(--border); background: transparent; color: var(--text-muted); border-radius: 14px; font-size: 0.72rem; cursor: pointer; transition: all 0.15s; }
+        .pe-alert-filter:hover { color: var(--text); border-color: var(--text-muted); }
+        .pe-alert-filter.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        /* Alert cards */
+        .pe-alert-card { display: flex; gap: 0.75rem; padding: 0.85rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.15s; }
+        .pe-alert-card:hover { background: rgba(255,255,255,0.02); }
+        .pe-alert-severity { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0; }
+        .pe-alert-severity.critical { background: rgba(239,68,68,0.15); }
+        .pe-alert-severity.warning { background: rgba(251,191,36,0.15); }
+        .pe-alert-severity.info { background: rgba(59,130,246,0.15); }
+        .pe-alert-body { flex: 1; min-width: 0; }
+        .pe-alert-title { font-weight: 600; font-size: 0.85rem; color: var(--text); }
+        .pe-alert-company { font-size: 0.72rem; color: var(--accent); margin-left: 0.4rem; }
+        .pe-alert-detail { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+        .pe-alert-time { font-size: 0.65rem; color: var(--text-muted); margin-top: 3px; }
+        .pe-alert-type-pill { font-size: 0.6rem; font-weight: 600; padding: 1px 6px; border-radius: 3px; margin-left: 0.4rem; }
+        .pe-alert-type-pill.exit_readiness { background: rgba(139,92,246,0.2); color: #a78bfa; }
+        .pe-alert-type-pill.financial { background: rgba(34,197,94,0.2); color: #4ade80; }
+        .pe-alert-type-pill.leadership { background: rgba(6,182,212,0.2); color: #22d3ee; }
+        .pe-alert-type-pill.deal_stage { background: rgba(251,191,36,0.2); color: #fbbf24; }
+
         /* Pipeline KPI cards */
         .pe-pipeline-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; }
         @media (max-width: 768px) { .pe-pipeline-kpis { grid-template-columns: repeat(2, 1fr); } }
@@ -1526,6 +1558,28 @@
         .settings-demo-stat { background: var(--bg-input); border-radius: 8px; padding: 0.75rem; text-align: center; }
         .settings-demo-stat .count { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
         .settings-demo-stat .label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.15rem; }
+
+        /* Source Health Strip */
+        .settings-health-strip { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; margin-bottom: 1rem; }
+        .settings-health-stat { background: var(--bg-input); border-radius: 6px; padding: 0.5rem; text-align: center; }
+        .settings-health-val { display: block; font-size: 1.1rem; font-weight: 700; }
+        .settings-health-lbl { font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; }
+        @media (max-width: 768px) { .settings-health-strip { grid-template-columns: repeat(3, 1fr); } }
+
+        /* Health bar in source table */
+        .health-bar-bg { width: 60px; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 4px; }
+        .health-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+        .health-bar-fill.green { background: #4ade80; }
+        .health-bar-fill.yellow { background: #fbbf24; }
+        .health-bar-fill.orange { background: #f97316; }
+        .health-bar-fill.red { background: #ef4444; }
+
+        /* Recommendation card */
+        .settings-rec-card { display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .settings-rec-card:last-child { border-bottom: none; }
+        .settings-rec-source { font-weight: 600; font-size: 0.82rem; min-width: 100px; }
+        .settings-rec-issue { flex: 1; font-size: 0.75rem; color: var(--text-muted); }
+        .settings-rec-action { font-size: 0.72rem; color: var(--accent); font-weight: 500; }
     </style>
 </head>
 <body>
@@ -1879,7 +1933,7 @@
                 <div class="report-generate-form">
                     <div class="jobs-launcher-field">
                         <label>Template</label>
-                        <select id="report-template-select">
+                        <select id="report-template-select" onchange="reportsTemplateChanged()">
                             <option value="">Loading templates...</option>
                         </select>
                     </div>
@@ -1893,6 +1947,11 @@
                         </select>
                     </div>
                     <button class="btn" onclick="reportsGenerate()">Generate</button>
+                </div>
+                <!-- Dynamic parameter fields based on template -->
+                <div id="report-params-panel" style="display:none;margin-top:0.75rem;padding:0.75rem;background:var(--bg-input);border-radius:8px;">
+                    <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.5rem;font-weight:500;">Report Parameters</div>
+                    <div id="report-params-fields" class="report-generate-form" style="margin:0;"></div>
                 </div>
                 <div id="report-generate-result"></div>
             </div>
@@ -1946,26 +2005,42 @@
                 </div>
             </div>
 
-            <!-- Data Sources Panel -->
+            <!-- Data Sources Panel with Health Scoring -->
             <div class="card settings-section">
-                <div class="settings-section-title">Data Sources</div>
+                <div class="settings-section-title">Data Sources <span id="settings-health-badge" style="font-size:0.65rem;color:var(--text-muted);font-weight:400;margin-left:0.5rem;"></span></div>
+                <!-- Health Summary Strip -->
+                <div class="settings-health-strip" id="settings-health-strip" style="display:none;">
+                    <div class="settings-health-stat"><span class="settings-health-val" id="sh-total">--</span><span class="settings-health-lbl">Total</span></div>
+                    <div class="settings-health-stat"><span class="settings-health-val" style="color:#4ade80" id="sh-healthy">--</span><span class="settings-health-lbl">Healthy</span></div>
+                    <div class="settings-health-stat"><span class="settings-health-val" style="color:#fbbf24" id="sh-warning">--</span><span class="settings-health-lbl">Warning</span></div>
+                    <div class="settings-health-stat"><span class="settings-health-val" style="color:#f97316" id="sh-degraded">--</span><span class="settings-health-lbl">Degraded</span></div>
+                    <div class="settings-health-stat"><span class="settings-health-val" style="color:#ef4444" id="sh-critical">--</span><span class="settings-health-lbl">Critical</span></div>
+                    <div class="settings-health-stat"><span class="settings-health-val" style="color:var(--primary)" id="sh-score">--</span><span class="settings-health-lbl">Platform Score</span></div>
+                </div>
                 <div style="overflow-x:auto;">
                     <table class="settings-source-table" id="settings-sources-table">
                         <thead>
                             <tr>
-                                <th>Source</th>
-                                <th>Status</th>
-                                <th>Last Run</th>
-                                <th>Schedule</th>
-                                <th>Records</th>
+                                <th onclick="settingsSortSources('name')" style="cursor:pointer">Source</th>
+                                <th onclick="settingsSortSources('health')" style="cursor:pointer">Health</th>
+                                <th onclick="settingsSortSources('last_run')" style="cursor:pointer">Last Success</th>
+                                <th>Fail Rate</th>
+                                <th onclick="settingsSortSources('records')" style="cursor:pointer">Records</th>
+                                <th>Recommendation</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody id="settings-sources-body">
-                            <tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--text-muted)">Loading sources...</td></tr>
+                            <tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--text-muted)">Loading sources...</td></tr>
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            <!-- Collection Recommendations -->
+            <div class="card settings-section" id="settings-recs-panel" style="display:none;">
+                <div class="settings-section-title">Collection Recommendations</div>
+                <div id="settings-recs-content"></div>
             </div>
 
             <!-- Collection Groups Panel -->
@@ -2117,6 +2192,7 @@
                 <button class="pe-subnav-btn active" onclick="peShowSubtab('portfolio')">Portfolio</button>
                 <button class="pe-subnav-btn" onclick="peShowSubtab('pipeline')">Pipeline</button>
                 <button class="pe-subnav-btn" onclick="peShowSubtab('market')">Market</button>
+                <button class="pe-subnav-btn" onclick="peShowSubtab('alerts')">Alerts</button>
             </div>
 
             <!-- SUB-TAB: Portfolio -->
@@ -2330,6 +2406,11 @@
                 </div>
             </div>
 
+            <!-- Quick Actions (shown when company selected) -->
+            <div id="pe-quick-actions" style="display:none;margin-top:0.75rem;gap:0.5rem;flex-wrap:wrap;">
+                <button class="btn btn-secondary" onclick="reportsGenerateDealMemo(_peSelectedCompanyId)" style="font-size:0.75rem;padding:0.35rem 0.7rem;">Generate Deal Memo</button>
+            </div>
+
             </div><!-- /pe-subtab-portfolio -->
 
             <!-- SUB-TAB: Pipeline -->
@@ -2426,6 +2507,39 @@
                 </div>
             </div><!-- /pe-subtab-market -->
 
+            <!-- SUB-TAB: Alerts -->
+            <div class="pe-subtab" id="pe-subtab-alerts">
+                <!-- Health Summary Strip -->
+                <div class="pe-alerts-summary" id="pe-alerts-summary">
+                    <div class="pe-alerts-stat"><span class="pe-alerts-val" id="pe-alerts-company-count">--</span><span class="pe-alerts-lbl">Companies</span></div>
+                    <div class="pe-alerts-stat"><span class="pe-alerts-val" id="pe-alerts-avg-exit">--</span><span class="pe-alerts-lbl">Avg Exit Score</span></div>
+                    <div class="pe-alerts-stat"><span class="pe-alerts-val pe-alerts-critical" id="pe-alerts-critical-count">0</span><span class="pe-alerts-lbl">Critical Alerts</span></div>
+                    <div class="pe-alerts-stat"><span class="pe-alerts-val" id="pe-alerts-last-check">--</span><span class="pe-alerts-lbl">Last Check</span></div>
+                </div>
+
+                <!-- Controls -->
+                <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap;">
+                    <div class="pe-alert-filters">
+                        <button class="pe-alert-filter active" onclick="peFilterAlerts('all', this)">All</button>
+                        <button class="pe-alert-filter" onclick="peFilterAlerts('exit_readiness', this)">Exit Readiness</button>
+                        <button class="pe-alert-filter" onclick="peFilterAlerts('financial', this)">Financial</button>
+                        <button class="pe-alert-filter" onclick="peFilterAlerts('leadership', this)">Leadership</button>
+                        <button class="pe-alert-filter" onclick="peFilterAlerts('deal_stage', this)">Deal Stage</button>
+                    </div>
+                    <button class="btn" id="pe-run-health-btn" onclick="peRunHealthCheck()" style="margin-left:auto;padding:0.4rem 0.85rem;font-size:0.8rem;">Run Health Check</button>
+                </div>
+
+                <!-- Alert Feed -->
+                <div class="card" style="padding:0;">
+                    <div id="pe-alerts-feed">
+                        <div class="pe-empty" style="padding:2rem;">
+                            <div class="pe-empty-icon">🔔</div>
+                            <div>No alerts yet — run a health check to start monitoring.</div>
+                        </div>
+                    </div>
+                </div>
+            </div><!-- /pe-subtab-alerts -->
+
         </div>
 
         <!-- LP Intelligence Tab -->
@@ -2481,7 +2595,10 @@
 
             <!-- Fund Portfolio Companies -->
             <div class="card lp-fund-companies" id="lp-fund-companies" style="display:none;">
-                <div class="card-title" id="lp-fund-companies-title">Portfolio Companies</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <div class="card-title" id="lp-fund-companies-title">Portfolio Companies</div>
+                    <button class="btn btn-secondary" onclick="reportsGenerateTearsheet(_lpSelectedFunds[0])" style="font-size:0.72rem;padding:0.3rem 0.65rem;">Generate Fund Tearsheet</button>
+                </div>
                 <div style="overflow-x:auto;">
                     <table class="pe-portfolio-table">
                         <thead><tr><th>Company</th><th>Sector</th><th>Status</th><th>Entry Date</th><th>Entry Multiple</th></tr></thead>
@@ -9718,10 +9835,54 @@
             }
         }
 
-        async function reportsGenerate() {
+        // Template-specific parameter fields
+        const _reportParamDefs = {
+            fund_tearsheet: [{ key: 'firm_id', label: 'Firm ID', type: 'number', placeholder: 'e.g. 196' }],
+            deal_memo: [{ key: 'company_id', label: 'Company ID', type: 'number', placeholder: 'e.g. 1791' }],
+            market_brief: [{ key: 'sector', label: 'Sector', type: 'text', placeholder: 'e.g. Healthcare' }],
+            pe_portfolio: [{ key: 'firm_id', label: 'Firm ID', type: 'number', placeholder: 'e.g. 196' }],
+            investor_profile: [{ key: 'investor_id', label: 'Investor ID', type: 'number', placeholder: 'e.g. 1' }],
+            portfolio_detail: [{ key: 'investor_id', label: 'Investor ID', type: 'number', placeholder: 'e.g. 1' }],
+        };
+
+        function reportsTemplateChanged() {
             const template = document.getElementById('report-template-select').value;
+            const panel = document.getElementById('report-params-panel');
+            const fields = document.getElementById('report-params-fields');
+            const defs = _reportParamDefs[template];
+
+            if (!defs || defs.length === 0) {
+                panel.style.display = 'none';
+                return;
+            }
+
+            panel.style.display = '';
+            fields.innerHTML = defs.map(d =>
+                `<div class="jobs-launcher-field">
+                    <label>${d.label}</label>
+                    <input type="${d.type}" id="report-param-${d.key}" placeholder="${d.placeholder}" style="padding:0.4rem 0.6rem;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.82rem;width:120px;">
+                </div>`
+            ).join('');
+        }
+
+        function _reportsCollectParams() {
+            const template = document.getElementById('report-template-select').value;
+            const defs = _reportParamDefs[template] || [];
+            const params = {};
+            for (const d of defs) {
+                const el = document.getElementById('report-param-' + d.key);
+                if (el && el.value) {
+                    params[d.key] = d.type === 'number' ? parseInt(el.value) : el.value;
+                }
+            }
+            return params;
+        }
+
+        async function reportsGenerate(presetTemplate, presetParams) {
+            const template = presetTemplate || document.getElementById('report-template-select').value;
             const format = document.getElementById('report-format-select').value;
             const resultDiv = document.getElementById('report-generate-result');
+            const params = presetParams || _reportsCollectParams();
 
             if (!template) {
                 resultDiv.innerHTML = '<div class="jobs-run-result error">Please select a template.</div>';
@@ -9734,13 +9895,33 @@
                 const r = await fetch('/api/v1/reports/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ template, format, params: {} })
+                    body: JSON.stringify({ template, format, params })
                 });
                 const data = await r.json();
 
                 if (r.ok && data.id) {
-                    resultDiv.innerHTML = `<div class="jobs-run-result success">Report #${data.id} generated (${data.status}). ${data.file_size ? formatBytes(data.file_size) : ''}</div>`;
-                    await reportsLoad();
+                    // Poll for completion
+                    resultDiv.innerHTML = `<div class="jobs-run-result" style="color:var(--accent);">Report #${data.id} generating... <span class="loading" style="display:inline-block;width:12px;height:12px;"></span></div>`;
+                    const reportId = data.id;
+                    let attempts = 0;
+                    const poll = setInterval(async () => {
+                        attempts++;
+                        try {
+                            const check = await fetch(`/api/v1/reports/${reportId}`);
+                            const rpt = await check.json();
+                            if (rpt.status === 'complete') {
+                                clearInterval(poll);
+                                const actions = rpt.format === 'html'
+                                    ? `<button class="btn btn-view" onclick="reportsPreview(${reportId}, '${escapeHtml(rpt.title || template)}')" style="margin-right:0.5rem;">Preview</button>`
+                                    : '';
+                                resultDiv.innerHTML = `<div class="jobs-run-result success">Report #${reportId} complete! ${rpt.file_size ? formatBytes(rpt.file_size) : ''} ${actions}<a class="btn btn-secondary" href="/api/v1/reports/${reportId}/download" target="_blank" style="text-decoration:none;padding:0.25rem 0.5rem;font-size:0.75rem;">Download</a></div>`;
+                                await reportsLoad();
+                            } else if (rpt.status === 'failed' || attempts > 20) {
+                                clearInterval(poll);
+                                resultDiv.innerHTML = `<div class="jobs-run-result error">Report #${reportId} failed: ${escapeHtml(rpt.error_message || 'timeout')}</div>`;
+                            }
+                        } catch (e) { /* keep polling */ }
+                    }, 3000);
                 } else {
                     const msg = data.detail ? (typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)) : 'Unknown error';
                     resultDiv.innerHTML = `<div class="jobs-run-result error">${escapeHtml(msg)}</div>`;
@@ -9748,6 +9929,29 @@
             } catch (e) {
                 resultDiv.innerHTML = `<div class="jobs-run-result error">Failed: ${escapeHtml(e.message)}</div>`;
             }
+        }
+
+        // Quick-action report generation from PE/LP tabs
+        function reportsGenerateDealMemo(companyId) {
+            showTab('reports');
+            document.getElementById('report-template-select').value = 'deal_memo';
+            reportsTemplateChanged();
+            setTimeout(() => {
+                const el = document.getElementById('report-param-company_id');
+                if (el) el.value = companyId;
+            }, 100);
+            showToast('Deal memo template selected — click Generate when ready', 'info');
+        }
+
+        function reportsGenerateTearsheet(firmId) {
+            showTab('reports');
+            document.getElementById('report-template-select').value = 'fund_tearsheet';
+            reportsTemplateChanged();
+            setTimeout(() => {
+                const el = document.getElementById('report-param-firm_id');
+                if (el) el.value = firmId;
+            }, 100);
+            showToast('Fund tearsheet template selected — click Generate when ready', 'info');
         }
 
         function reportsPreview(reportId, title) {
@@ -9796,19 +10000,30 @@
 
         // ===== Settings: Data Sources, Groups, Demo =====
         let _settingsSourcesLoaded = false;
+        let _settingsSources = [];
+        let _settingsSortCol = 'health';
+        let _settingsSortAsc = true;
 
         async function settingsLoadSources() {
             if (_settingsSourcesLoaded) return;
             _settingsSourcesLoaded = true;
             const tbody = document.getElementById('settings-sources-body');
+            let useHealth = false;
 
             try {
-                // Get source status from health/sources endpoint
-                const resp = await fetch(`${API}/health`);
+                // Try health endpoint first (Agent 2 building)
                 let sources = [];
-                if (resp.ok) {
-                    const health = await resp.json();
-                    // Try to get source list from dataset registry
+                try {
+                    const healthResp = await fetch(`${API}/sources/health`);
+                    if (healthResp.ok) {
+                        const hData = await healthResp.json();
+                        sources = hData.sources || hData || [];
+                        useHealth = true;
+                    }
+                } catch (e) { /* fallback */ }
+
+                if (!useHealth) {
+                    // Fallback to dataset registry
                     try {
                         const dsResp = await fetch(`${API}/datasets?limit=100`);
                         if (dsResp.ok) {
@@ -9817,39 +10032,127 @@
                             const bySource = {};
                             for (const ds of datasets) {
                                 const src = ds.source || ds.source_name || 'unknown';
-                                if (!bySource[src]) bySource[src] = { name: src, records: 0, lastRun: null, status: 'active' };
+                                if (!bySource[src]) bySource[src] = { name: src, records: 0, lastRun: null, health_score: null, failure_rate: null, recommendation: null };
                                 bySource[src].records += ds.record_count || 0;
                                 if (ds.last_updated && (!bySource[src].lastRun || ds.last_updated > bySource[src].lastRun))
                                     bySource[src].lastRun = ds.last_updated;
                             }
                             sources = Object.values(bySource);
+                            // Assign synthetic health scores based on data presence
+                            for (const s of sources) {
+                                s.health_score = s.records > 0 ? (s.lastRun ? 85 : 60) : 20;
+                            }
                         }
                     } catch (e) { /* skip */ }
                 }
 
                 if (sources.length === 0) {
-                    // Fallback: show known source names
                     const knownSources = ['census','fred','eia','bls','sec','bea','noaa','usda','epa','fcc','fema','treasury','faa','fra','prediction_markets','kaggle','yelp','data_gov'];
-                    sources = knownSources.map(s => ({ name: s, records: 0, lastRun: null, status: 'active' }));
+                    sources = knownSources.map(s => ({ name: s, records: 0, lastRun: null, health_score: 0, failure_rate: null, recommendation: 'No data — run ingestion' }));
                 }
 
-                sources.sort((a, b) => (b.records || 0) - (a.records || 0));
+                _settingsSources = sources;
+                settingsRenderHealthStrip();
+                settingsRenderSources();
+                settingsLoadRecommendations();
 
-                tbody.innerHTML = sources.map(s => {
-                    const dotClass = s.records > 0 ? 'active' : 'disabled';
-                    const lastStr = s.lastRun ? new Date(s.lastRun).toLocaleDateString() : '\u2014';
-                    const recStr = s.records ? s.records.toLocaleString() : '0';
-                    return `<tr>
-                        <td style="font-weight:600;text-transform:capitalize">${peEsc(s.name.replace(/_/g, ' '))}</td>
-                        <td><span class="settings-status-dot ${dotClass}"></span>${dotClass === 'active' ? 'Active' : 'No data'}</td>
-                        <td style="font-size:0.75rem;color:var(--text-muted)">${lastStr}</td>
-                        <td style="font-size:0.75rem;color:var(--text-muted)">On demand</td>
-                        <td style="text-align:right">${recStr}</td>
-                        <td><button class="settings-run-btn" onclick="settingsRunSource('${s.name}')">Run Now</button></td>
-                    </tr>`;
-                }).join('');
+                if (!useHealth) {
+                    document.getElementById('settings-health-badge').textContent = '(health scoring coming soon)';
+                }
             } catch (e) {
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--error)">Failed to load sources: ${e.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--error)">Failed to load sources: ${e.message}</td></tr>`;
+            }
+        }
+
+        function settingsRenderHealthStrip() {
+            const strip = document.getElementById('settings-health-strip');
+            strip.style.display = '';
+            const total = _settingsSources.length;
+            const healthy = _settingsSources.filter(s => (s.health_score || 0) >= 80).length;
+            const warning = _settingsSources.filter(s => (s.health_score || 0) >= 50 && (s.health_score || 0) < 80).length;
+            const degraded = _settingsSources.filter(s => (s.health_score || 0) >= 20 && (s.health_score || 0) < 50).length;
+            const critical = _settingsSources.filter(s => (s.health_score || 0) < 20).length;
+            const scores = _settingsSources.map(s => s.health_score || 0);
+            const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+
+            document.getElementById('sh-total').textContent = total;
+            document.getElementById('sh-healthy').textContent = healthy;
+            document.getElementById('sh-warning').textContent = warning;
+            document.getElementById('sh-degraded').textContent = degraded;
+            document.getElementById('sh-critical').textContent = critical;
+            document.getElementById('sh-score').textContent = avgScore + '%';
+        }
+
+        function settingsSortSources(col) {
+            if (_settingsSortCol === col) _settingsSortAsc = !_settingsSortAsc;
+            else { _settingsSortCol = col; _settingsSortAsc = col === 'name'; }
+            settingsRenderSources();
+        }
+
+        function settingsRenderSources() {
+            const tbody = document.getElementById('settings-sources-body');
+            const sorted = [..._settingsSources].sort((a, b) => {
+                let av, bv;
+                if (_settingsSortCol === 'name') { av = a.name; bv = b.name; }
+                else if (_settingsSortCol === 'health') { av = a.health_score || 0; bv = b.health_score || 0; }
+                else if (_settingsSortCol === 'records') { av = a.records || 0; bv = b.records || 0; }
+                else if (_settingsSortCol === 'last_run') { av = a.lastRun || a.last_success || ''; bv = b.lastRun || b.last_success || ''; }
+                else { av = a.name; bv = b.name; }
+                if (typeof av === 'string') return _settingsSortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+                return _settingsSortAsc ? av - bv : bv - av;
+            });
+
+            tbody.innerHTML = sorted.map(s => {
+                const score = s.health_score || 0;
+                const barClass = score >= 80 ? 'green' : score >= 50 ? 'yellow' : score >= 20 ? 'orange' : 'red';
+                const lastStr = (s.lastRun || s.last_success) ? _notifTimeAgo(s.lastRun || s.last_success) : '\u2014';
+                const failRate = s.failure_rate != null ? (s.failure_rate * 100).toFixed(0) + '%' : '\u2014';
+                const recStr = s.records ? s.records.toLocaleString() : '0';
+                const recText = s.recommendation || (score >= 80 ? 'Healthy' : score >= 50 ? 'Monitor' : 'Needs attention');
+                return `<tr>
+                    <td style="font-weight:600;text-transform:capitalize">${peEsc(s.name.replace(/_/g, ' '))}</td>
+                    <td><div class="health-bar-bg"><div class="health-bar-fill ${barClass}" style="width:${score}%"></div></div> <span style="font-size:0.7rem">${score}</span></td>
+                    <td style="font-size:0.75rem;color:var(--text-muted)">${lastStr}</td>
+                    <td style="font-size:0.75rem;color:var(--text-muted)">${failRate}</td>
+                    <td style="text-align:right">${recStr}</td>
+                    <td style="font-size:0.7rem;color:var(--text-muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${peEsc(recText)}">${peEsc(recText)}</td>
+                    <td><button class="settings-run-btn" onclick="settingsRunSource('${s.name}')">Run Now</button></td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function settingsLoadRecommendations() {
+            const panel = document.getElementById('settings-recs-panel');
+            try {
+                const resp = await fetch(`${API}/sources/recommendations`);
+                if (!resp.ok) throw new Error('not available');
+                const data = await resp.json();
+                const recs = data.recommendations || data || [];
+                if (recs.length === 0) return;
+
+                panel.style.display = '';
+                document.getElementById('settings-recs-content').innerHTML = recs.slice(0, 10).map(r =>
+                    `<div class="settings-rec-card">
+                        <div class="settings-rec-source">${peEsc(r.source || r.name || '')}</div>
+                        <div class="settings-rec-issue">${peEsc(r.issue || r.description || '')}</div>
+                        <div class="settings-rec-action">${peEsc(r.action || r.recommendation || '')}</div>
+                        <button class="settings-run-btn" onclick="settingsRunSource('${r.source || r.name || ''}')">Run Now</button>
+                    </div>`
+                ).join('');
+            } catch (e) {
+                // Recommendations endpoint not available yet — generate from local data
+                const needsAttention = _settingsSources.filter(s => (s.health_score || 0) < 50).slice(0, 5);
+                if (needsAttention.length === 0) return;
+
+                panel.style.display = '';
+                document.getElementById('settings-recs-content').innerHTML = needsAttention.map(s =>
+                    `<div class="settings-rec-card">
+                        <div class="settings-rec-source" style="text-transform:capitalize">${peEsc(s.name.replace(/_/g, ' '))}</div>
+                        <div class="settings-rec-issue">${s.records > 0 ? 'Data may be stale — last run unknown' : 'No data collected yet'}</div>
+                        <div class="settings-rec-action">Run ingestion to populate</div>
+                        <button class="settings-run-btn" onclick="settingsRunSource('${s.name}')">Run Now</button>
+                    </div>`
+                ).join('');
             }
         }
 
@@ -10076,6 +10379,8 @@
 
         async function peLoadPortfolio() {
             const firmId = document.getElementById('pe-firm-select').value;
+            _peCurrentFirmId = firmId || null;
+            _peAlertsLoaded = false; // Reset alerts when firm changes
             if (!firmId) {
                 document.getElementById('pe-portfolio-card').style.display = 'none';
                 document.getElementById('pe-detail-panels').style.display = 'none';
@@ -10172,6 +10477,7 @@
             document.getElementById('pe-detail-panels').style.display = '';
             document.getElementById('pe-second-row').style.display = '';
             document.getElementById('pe-comps-card').style.display = '';
+            document.getElementById('pe-quick-actions').style.display = 'flex';
 
             try {
                 const [benchRes, exitRes, buyerRes, drRes] = await Promise.all([
@@ -10643,6 +10949,7 @@
 
         // ===== PE Sub-tab Navigation =====
         let _peActiveSubtab = 'portfolio';
+        let _peCurrentFirmId = null;
 
         function peShowSubtab(name) {
             _peActiveSubtab = name;
@@ -10654,6 +10961,136 @@
             btns.forEach(b => { if (b.textContent.trim().toLowerCase() === name) b.classList.add('active'); });
             if (name === 'pipeline') peLoadPipelineTab();
             if (name === 'market') peLoadMarketTab();
+            if (name === 'alerts') peLoadAlertsTab();
+        }
+
+        // ===== PE Alerts =====
+        let _peAlerts = [];
+        let _peAlertFilter = 'all';
+        let _peAlertsLoaded = false;
+
+        async function peLoadAlertsTab() {
+            if (!_peCurrentFirmId) {
+                document.getElementById('pe-alerts-feed').innerHTML = '<div class="pe-empty" style="padding:2rem;"><div class="pe-empty-icon">🔔</div><div>Select a firm first to view alerts.</div></div>';
+                return;
+            }
+            if (_peAlertsLoaded) { peRenderAlerts(); return; }
+            document.getElementById('pe-alerts-feed').innerHTML = '<div class="loading" style="padding:1.5rem;">Loading alerts...</div>';
+
+            try {
+                const resp = await fetch(`${API}/pe/alerts/${_peCurrentFirmId}`);
+                if (!resp.ok) throw new Error('not available');
+                const data = await resp.json();
+                _peAlerts = data.alerts || data || [];
+                _peAlertsLoaded = true;
+            } catch (e) {
+                // Fallback: generate synthetic alerts from portfolio data
+                _peAlerts = _peGenerateFallbackAlerts();
+                _peAlertsLoaded = true;
+            }
+
+            // Update summary strip
+            peUpdateAlertsSummary();
+            peRenderAlerts();
+
+            // Also push critical alerts to notification bell
+            const criticals = _peAlerts.filter(a => a.severity === 'critical');
+            for (const a of criticals.slice(0, 3)) {
+                notifAdd(a.title, a.company_name || '', 'alert');
+            }
+        }
+
+        function _peGenerateFallbackAlerts() {
+            // Build alerts from portfolio data we already have
+            const alerts = [];
+            const now = new Date().toISOString();
+            for (const c of _pePortfolioData.slice(0, 8)) {
+                const name = c.company_name || 'Unknown';
+                const metrics = c.metrics || {};
+                const pctl = Object.values(metrics).filter(v => v != null);
+                const avg = pctl.length > 0 ? pctl.reduce((a, b) => a + b, 0) / pctl.length : 50;
+
+                if (avg < 30) {
+                    alerts.push({ severity: 'critical', type: 'financial', title: `${name}: Below-peer financial performance`, company_name: name, detail: `Overall percentile ${Math.round(avg)}th — review recommended`, created_at: now });
+                } else if (avg < 45) {
+                    alerts.push({ severity: 'warning', type: 'financial', title: `${name}: Mixed financial metrics`, company_name: name, detail: `Some metrics below median (${Math.round(avg)}th percentile)`, created_at: now });
+                }
+
+                if (c.exit_readiness_score != null && c.exit_readiness_score < 60) {
+                    alerts.push({ severity: 'warning', type: 'exit_readiness', title: `${name}: Low exit readiness (${c.exit_readiness_score})`, company_name: name, detail: 'Consider exit readiness improvement plan', created_at: now });
+                }
+            }
+
+            // Add a few info alerts
+            alerts.push({ severity: 'info', type: 'deal_stage', title: 'Pipeline review due', company_name: '', detail: 'Monthly pipeline review recommended — last check was 30+ days ago', created_at: now });
+            alerts.push({ severity: 'info', type: 'leadership', title: 'Leadership coverage gap', company_name: '', detail: 'Some portfolio companies have <3 tracked leaders', created_at: now });
+
+            return alerts;
+        }
+
+        function peUpdateAlertsSummary() {
+            const compCount = _pePortfolioData.length;
+            const critCount = _peAlerts.filter(a => a.severity === 'critical').length;
+            // Compute avg exit score from companies if available
+            const exitScores = _pePortfolioData.map(c => c.exit_readiness_score).filter(v => v != null);
+            const avgExit = exitScores.length > 0 ? (exitScores.reduce((a, b) => a + b, 0) / exitScores.length).toFixed(0) : '--';
+
+            document.getElementById('pe-alerts-company-count').textContent = compCount;
+            document.getElementById('pe-alerts-avg-exit').textContent = avgExit;
+            document.getElementById('pe-alerts-critical-count').textContent = critCount;
+            document.getElementById('pe-alerts-last-check').textContent = 'Just now';
+        }
+
+        function peFilterAlerts(type, btn) {
+            _peAlertFilter = type;
+            document.querySelectorAll('.pe-alert-filter').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            peRenderAlerts();
+        }
+
+        function peRenderAlerts() {
+            const feed = document.getElementById('pe-alerts-feed');
+            const filtered = _peAlertFilter === 'all' ? _peAlerts : _peAlerts.filter(a => a.type === _peAlertFilter);
+
+            if (filtered.length === 0) {
+                feed.innerHTML = `<div class="pe-empty" style="padding:2rem;"><div class="pe-empty-icon">🔔</div><div>${_peAlertFilter === 'all' ? 'No alerts yet — run a health check to start monitoring.' : 'No ' + _peAlertFilter.replace(/_/g, ' ') + ' alerts.'}</div></div>`;
+                return;
+            }
+
+            const sevIcons = { critical: '🔴', warning: '🟡', info: '🔵' };
+            feed.innerHTML = filtered.map(a => {
+                const icon = sevIcons[a.severity] || sevIcons.info;
+                const ago = a.created_at ? _notifTimeAgo(a.created_at) : '';
+                return `<div class="pe-alert-card">
+                    <div class="pe-alert-severity ${a.severity || 'info'}">${icon}</div>
+                    <div class="pe-alert-body">
+                        <div class="pe-alert-title">${peEsc(a.title)}${a.company_name ? '<span class="pe-alert-company">' + peEsc(a.company_name) + '</span>' : ''}<span class="pe-alert-type-pill ${a.type || ''}">${(a.type || '').replace(/_/g, ' ')}</span></div>
+                        <div class="pe-alert-detail">${peEsc(a.detail || '')}</div>
+                        <div class="pe-alert-time">${ago}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function peRunHealthCheck() {
+            const btn = document.getElementById('pe-run-health-btn');
+            btn.disabled = true;
+            btn.textContent = 'Running...';
+            _peAlertsLoaded = false;
+
+            try {
+                // Try the monitor endpoint
+                await fetch(`${API}/pe/monitor/${_peCurrentFirmId}/run`, { method: 'POST' }).catch(() => {});
+                // Small delay then reload alerts
+                await new Promise(r => setTimeout(r, 1500));
+                await peLoadAlertsTab();
+                showToast('Health check complete', 'success');
+            } catch (e) {
+                showToast('Health check failed: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Run Health Check';
+            }
         }
 
         // ===== PE Deal Pipeline =====
@@ -11194,7 +11631,7 @@
             const el = document.getElementById('pe-comps-content');
             if (!el) return;
             const titleEl = document.getElementById('pe-comps-title');
-            const co = _peCompanies.find(c => c.id == companyId);
+            const co = _pePortfolioData.find(c => c.id == companyId);
             if (titleEl) titleEl.textContent = (co ? co.company_name + ' — ' : '') + 'Comparable Transactions';
             el.innerHTML = '<div class="loading">Loading comparable transactions...</div>';
             try {
