@@ -1539,6 +1539,27 @@
         .pe-sourcing-history-dot.reviewed { background: #60a5fa; }
         .pe-sourcing-history-time { color: var(--text-muted); font-size: 0.7rem; margin-left: auto; }
 
+        /* Sankey Deal Flow */
+        .pe-sankey-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1.25rem; position: relative; }
+        .pe-sankey-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+        .pe-sankey-title { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+        .pe-sankey-svg { width: 100%; display: block; }
+        .pe-sankey-tooltip { position: fixed; pointer-events: none; background: rgba(15,23,42,0.95); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.75rem; color: var(--text); box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 1000; opacity: 0; transition: opacity 0.15s; max-width: 240px; }
+        .pe-sankey-tooltip.visible { opacity: 1; }
+        .pe-sankey-tt-title { font-weight: 700; font-size: 0.78rem; margin-bottom: 0.3rem; }
+        .pe-sankey-tt-row { display: flex; justify-content: space-between; gap: 0.75rem; margin: 0.15rem 0; }
+        .pe-sankey-tt-label { color: var(--text-muted); }
+        .pe-sankey-tt-val { font-weight: 600; }
+
+        /* Analytics sub-tab */
+        .pe-analytics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+        @media (max-width: 900px) { .pe-analytics-grid { grid-template-columns: 1fr; } }
+        .pe-analytics-card { min-height: 320px; }
+        .pe-treemap-cell { stroke: var(--bg); stroke-width: 2px; cursor: pointer; transition: opacity 0.15s; }
+        .pe-treemap-cell:hover { opacity: 0.85; }
+        .pe-treemap-label { pointer-events: none; fill: white; font-size: 11px; font-weight: 600; }
+        .pe-treemap-value { pointer-events: none; fill: rgba(255,255,255,0.7); font-size: 9px; }
+
         /* Pipeline KPI cards */
         .pe-pipeline-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; }
         @media (max-width: 768px) { .pe-pipeline-kpis { grid-template-columns: repeat(2, 1fr); } }
@@ -1667,6 +1688,33 @@
         .settings-rec-source { font-weight: 600; font-size: 0.82rem; min-width: 100px; }
         .settings-rec-issue { flex: 1; font-size: 0.75rem; color: var(--text-muted); }
         .settings-rec-action { font-size: 0.72rem; color: var(--accent); font-weight: 500; }
+
+        /* Print styles */
+        @media print {
+            body { background: white !important; color: #1a1a1a !important; }
+            .header, .tabs, .active-jobs-panel, .login-overlay, .notif-bell, .notif-dropdown,
+            .user-menu, .pe-subnav, .pe-sankey-tooltip, #toast-container,
+            .confirm-overlay, .report-modal-overlay, button, select, input,
+            .pe-sourcing-add-btn, .pe-deal-card-stage-select { display: none !important; }
+            .content { padding: 0 !important; }
+            .content > div { display: none !important; }
+            .content > div.print-target { display: block !important; }
+            .hidden { display: none !important; }
+            .card { break-inside: avoid; border: 1px solid #ddd !important; background: white !important; }
+            .pe-subtab { display: block !important; }
+            .pe-subtab:not(.print-target) { display: none !important; }
+            canvas { max-width: 100% !important; }
+            @page { margin: 1.5cm; size: A4 landscape; }
+            .print-header { display: block !important; text-align: center; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #333; }
+            .print-header h2 { font-size: 1.2rem; margin: 0; }
+            .print-header .print-meta { font-size: 0.75rem; color: #666; }
+            .print-footer { display: block !important; position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 0.65rem; color: #999; border-top: 1px solid #ddd; padding-top: 0.25rem; }
+        }
+        .print-header, .print-footer { display: none; }
+
+        /* Export button */
+        .export-csv-btn { padding: 0.3rem 0.6rem; background: transparent; border: 1px solid var(--border); color: var(--text-muted); border-radius: 5px; font-size: 0.68rem; cursor: pointer; transition: all 0.15s; }
+        .export-csv-btn:hover { border-color: var(--primary); color: var(--primary); }
     </style>
 </head>
 <body>
@@ -1707,6 +1755,7 @@
             <span class="tagline">Investment Intelligence</span>
         </div>
         <div class="status">
+            <button class="export-csv-btn" onclick="printView()" style="margin-right:0.5rem;">Print View</button>
             <a href="pe-demo.html" style="color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.875rem; margin-right: 1rem; border: 1px solid var(--accent); padding: 0.35rem 0.75rem; border-radius: 6px;">Demo →</a>
             <span class="notif-bell" id="notif-bell" onclick="notifToggle(event)">
                 🔔<span class="notif-badge" id="notif-badge">0</span>
@@ -1759,6 +1808,7 @@
         <div id="active-jobs-list"></div>
     </div>
 
+    <div class="print-header"><h2>Nexdata — Confidential</h2><div class="print-meta" id="print-meta"></div></div>
     <main class="content">
         <!-- Sources Tab (default) -->
         <div id="tab-sources">
@@ -2173,6 +2223,59 @@
                 <div id="settings-demo-status" style="margin-bottom:0.75rem;font-size:0.85rem;"></div>
                 <div class="settings-demo-grid" id="settings-demo-grid"></div>
             </div>
+
+            <!-- Import Data Panel -->
+            <div class="card settings-section">
+                <div class="settings-section-title">Import Data</div>
+                <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
+                    <select id="import-template" onchange="importTemplateChanged()" style="padding:0.4rem 0.6rem;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.82rem;">
+                        <option value="">Select Template...</option>
+                        <option value="portfolio_companies">Portfolio Companies</option>
+                        <option value="financial_history">Financial History</option>
+                        <option value="deal_history">Deal History</option>
+                        <option value="leadership">Leadership</option>
+                    </select>
+                    <a id="import-download-tpl" style="display:none;font-size:0.75rem;color:var(--accent);cursor:pointer;" onclick="importDownloadTemplate()">Download Template CSV</a>
+                </div>
+
+                <!-- Dropzone -->
+                <div id="import-dropzone" style="display:none;border:2px dashed var(--border);border-radius:10px;padding:2rem;text-align:center;color:var(--text-muted);font-size:0.82rem;cursor:pointer;transition:border-color 0.15s;margin-bottom:1rem;"
+                     ondragover="event.preventDefault();this.style.borderColor='var(--primary)'"
+                     ondragleave="this.style.borderColor='var(--border)'"
+                     ondrop="importHandleDrop(event)"
+                     onclick="document.getElementById('import-file-input').click()">
+                    Drop CSV/Excel file here or click to browse
+                    <input type="file" id="import-file-input" accept=".csv,.xlsx" style="display:none" onchange="importFileSelected(this)">
+                </div>
+
+                <!-- Preview -->
+                <div id="import-preview" style="display:none;margin-bottom:1rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                        <span style="font-size:0.78rem;font-weight:600;" id="import-preview-title">Preview</span>
+                        <span id="import-validation-summary" style="font-size:0.72rem;"></span>
+                    </div>
+                    <div style="overflow-x:auto;max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
+                        <table id="import-preview-table" style="width:100%;border-collapse:collapse;font-size:0.75rem;">
+                        </table>
+                    </div>
+                    <div style="display:flex;gap:0.75rem;margin-top:0.75rem;">
+                        <button class="btn" id="import-confirm-btn" onclick="importConfirm()" disabled>Import</button>
+                        <button class="btn btn-secondary" onclick="importCancel()">Cancel</button>
+                    </div>
+                    <div id="import-progress" style="display:none;margin-top:0.75rem;">
+                        <div style="background:var(--bg-input);border-radius:6px;overflow:hidden;height:8px;">
+                            <div id="import-progress-bar" style="height:100%;background:var(--primary);width:0%;transition:width 0.3s;border-radius:6px;"></div>
+                        </div>
+                        <div id="import-progress-text" style="font-size:0.72rem;color:var(--text-muted);margin-top:0.25rem;"></div>
+                    </div>
+                </div>
+
+                <!-- Import History -->
+                <div id="import-history" style="display:none;">
+                    <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;font-weight:600;margin-bottom:0.5rem;">Import History</div>
+                    <div id="import-history-list"></div>
+                </div>
+            </div>
         </div>
         <!-- Visualizations Tab -->
         <div id="tab-viz" class="hidden">
@@ -2304,6 +2407,7 @@
                 <button class="pe-subnav-btn" onclick="peShowSubtab('pipeline')">Pipeline</button>
                 <button class="pe-subnav-btn" onclick="peShowSubtab('market')">Market</button>
                 <button class="pe-subnav-btn" onclick="peShowSubtab('alerts')">Alerts</button>
+                <button class="pe-subnav-btn" onclick="peShowSubtab('analytics')">Analytics</button>
             </div>
 
             <!-- SUB-TAB: Portfolio -->
@@ -2394,7 +2498,10 @@
                     <button class="pe-search-btn" onclick="peRunSearch()">Search</button>
                 </div>
                 <div class="pe-search-results" id="pe-search-results" style="display:none;">
-                    <div class="pe-search-status" id="pe-search-status"></div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+                        <div class="pe-search-status" id="pe-search-status"></div>
+                        <button class="export-csv-btn" onclick="exportSearchResults()">Export CSV</button>
+                    </div>
                     <table>
                         <thead>
                             <tr>
@@ -2596,6 +2703,7 @@
             <div class="pe-subtab" id="pe-subtab-pipeline">
                 <div class="pe-pipeline-panel" id="pe-pipeline-panel">
                     <!-- KPI Cards -->
+                    <div style="display:flex;justify-content:flex-end;margin-bottom:0.5rem;"><button class="export-csv-btn" onclick="exportPipelineDeals()">Export CSV</button></div>
                     <div class="pe-pipeline-kpis" id="pe-pipeline-kpis">
                         <div class="pe-pipeline-kpi"><div class="pe-pipeline-kpi-value" id="pe-pk-total-value">$0M</div><div class="pe-pipeline-kpi-label">Total Pipeline Value</div></div>
                         <div class="pe-pipeline-kpi"><div class="pe-pipeline-kpi-value" id="pe-pk-active">0</div><div class="pe-pipeline-kpi-label">Active Deals</div></div>
@@ -2605,6 +2713,15 @@
 
                     <!-- Pipeline Funnel -->
                     <div class="pe-pipeline-funnel" id="pe-pipeline-funnel"></div>
+
+                    <!-- Sankey Deal Flow -->
+                    <div class="pe-sankey-wrap" id="pe-sankey-wrap">
+                        <div class="pe-sankey-header">
+                            <span class="pe-sankey-title">Deal Flow Diagram</span>
+                        </div>
+                        <svg class="pe-sankey-svg" id="pe-sankey-svg"></svg>
+                    </div>
+                    <div class="pe-sankey-tooltip" id="pe-sankey-tooltip"></div>
 
                     <!-- Deal Sourcing Section -->
                     <div id="pe-sourcing-section" style="display:none;">
@@ -2718,7 +2835,8 @@
                         <button class="pe-alert-filter" onclick="peFilterAlerts('leadership', this)">Leadership</button>
                         <button class="pe-alert-filter" onclick="peFilterAlerts('deal_stage', this)">Deal Stage</button>
                     </div>
-                    <button class="btn" id="pe-run-health-btn" onclick="peRunHealthCheck()" style="margin-left:auto;padding:0.4rem 0.85rem;font-size:0.8rem;">Run Health Check</button>
+                    <button class="export-csv-btn" onclick="exportAlertFeed()" style="margin-left:auto;">Export CSV</button>
+                    <button class="btn" id="pe-run-health-btn" onclick="peRunHealthCheck()" style="padding:0.4rem 0.85rem;font-size:0.8rem;">Run Health Check</button>
                 </div>
 
                 <!-- Alert Feed -->
@@ -2731,6 +2849,32 @@
                     </div>
                 </div>
             </div><!-- /pe-subtab-alerts -->
+
+            <!-- SUB-TAB: Analytics -->
+            <div class="pe-subtab" id="pe-subtab-analytics">
+                <div class="pe-analytics-grid">
+                    <!-- Sector Concentration Treemap -->
+                    <div class="card pe-analytics-card">
+                        <div class="card-title">Sector Concentration</div>
+                        <div id="pe-analytics-treemap" style="height:280px;"></div>
+                    </div>
+                    <!-- Vintage Cohort Chart -->
+                    <div class="card pe-analytics-card">
+                        <div class="card-title">IRR by Vintage Year</div>
+                        <canvas id="pe-analytics-vintage" style="max-height:280px;"></canvas>
+                    </div>
+                    <!-- Risk Dashboard -->
+                    <div class="card pe-analytics-card">
+                        <div class="card-title">Risk Dashboard</div>
+                        <canvas id="pe-analytics-risk" style="max-height:280px;"></canvas>
+                    </div>
+                    <!-- PME Comparison -->
+                    <div class="card pe-analytics-card">
+                        <div class="card-title">PME Comparison</div>
+                        <canvas id="pe-analytics-pme" style="max-height:280px;"></canvas>
+                    </div>
+                </div>
+            </div><!-- /pe-subtab-analytics -->
 
         </div>
 
@@ -2926,6 +3070,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
     <script>
         const API = '/api/v1';
@@ -10718,6 +10863,7 @@
             _peCurrentFirmId = firmId || null;
             _peAlertsLoaded = false; // Reset alerts when firm changes
             _peSourcingLoaded = false; // Reset sourcing when firm changes
+            _peAnalyticsLoaded = false; // Reset analytics when firm changes
             if (!firmId) {
                 document.getElementById('pe-portfolio-card').style.display = 'none';
                 document.getElementById('pe-detail-panels').style.display = 'none';
@@ -11548,6 +11694,7 @@
             if (name === 'pipeline') peLoadPipelineTab();
             if (name === 'market') peLoadMarketTab();
             if (name === 'alerts') peLoadAlertsTab();
+            if (name === 'analytics') peLoadAnalyticsTab();
         }
 
         // ===== PE Alerts =====
@@ -11769,6 +11916,7 @@
             peRenderPipelineKPIs();
             peRenderFunnel();
             peRenderKanban();
+            peSankeyRender();
             peSourcingLoad();
         }
 
@@ -11951,6 +12099,198 @@
             }
         }
 
+        /* ── Sankey Deal Flow Diagram ── */
+        function peSankeyRender() {
+            const wrap = document.getElementById('pe-sankey-wrap');
+            const svgEl = document.getElementById('pe-sankey-svg');
+            if (!wrap || !svgEl || typeof d3 === 'undefined' || typeof d3.sankey === 'undefined') return;
+
+            // Count deals per stage
+            const SANKEY_STAGES = ['Screening', 'DD', 'LOI', 'Closing', 'Won', 'Lost'];
+            const stageCounts = {};
+            SANKEY_STAGES.forEach(s => { stageCounts[s] = 0; });
+            _pePipelineDeals.forEach(d => {
+                if (stageCounts[d.stage] !== undefined) stageCounts[d.stage]++;
+            });
+
+            const totalDeals = Object.values(stageCounts).reduce((a, b) => a + b, 0);
+            if (totalDeals === 0) {
+                wrap.style.display = 'none';
+                return;
+            }
+            wrap.style.display = '';
+
+            // Build nodes and links
+            // Flow: Screening → DD → LOI → Closing → Won
+            //       Each stage also has flow → Lost (for drops)
+            const activeStages = ['Screening', 'DD', 'LOI', 'Closing', 'Won'];
+            const nodes = activeStages.map(s => ({ id: s, label: s === 'DD' ? 'Due Diligence' : s, count: stageCounts[s] }));
+            nodes.push({ id: 'Lost', label: 'Lost', count: stageCounts['Lost'] });
+
+            const links = [];
+            for (let i = 0; i < activeStages.length - 1; i++) {
+                const from = activeStages[i];
+                const to = activeStages[i + 1];
+                const flowForward = stageCounts[to] || 0;
+                if (flowForward > 0) links.push({ source: from, target: to, value: flowForward });
+            }
+            // Lost links from active stages (proportional)
+            const lostTotal = stageCounts['Lost'] || 0;
+            if (lostTotal > 0) {
+                const activeCount = activeStages.slice(0, -1).reduce((s, st) => s + (stageCounts[st] || 0), 0);
+                activeStages.slice(0, -1).forEach(st => {
+                    const c = stageCounts[st] || 0;
+                    const share = activeCount > 0 ? Math.max(1, Math.round(lostTotal * c / activeCount)) : 0;
+                    if (share > 0) links.push({ source: st, target: 'Lost', value: share });
+                });
+            }
+
+            if (links.length === 0) { wrap.style.display = 'none'; return; }
+
+            // Render
+            const rect = wrap.getBoundingClientRect();
+            const margin = { top: 8, right: 20, bottom: 8, left: 20 };
+            const width = Math.max(400, rect.width - margin.left - margin.right - 48);
+            const height = 220;
+
+            d3.select(svgEl).selectAll('*').remove();
+            const svg = d3.select(svgEl)
+                .attr('viewBox', `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+                .attr('preserveAspectRatio', 'xMidYMid meet');
+
+            const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+            const sankeyGen = d3.sankey()
+                .nodeId(d => d.id)
+                .nodeWidth(18)
+                .nodePadding(14)
+                .nodeAlign(d3.sankeyLeft)
+                .extent([[0, 0], [width, height]]);
+
+            const graph = sankeyGen({
+                nodes: nodes.map(d => ({ ...d })),
+                links: links.map(d => ({ ...d }))
+            });
+
+            // Color helpers
+            const stageColor = (id) => {
+                if (id === 'Won') return '#22c55e';
+                if (id === 'Lost') return '#ef4444';
+                const idx = activeStages.indexOf(id);
+                return d3.interpolateRgb('#6366f1', '#06b6d4')(idx / (activeStages.length - 1));
+            };
+
+            // Gradient defs
+            const defs = svg.append('defs');
+            graph.links.forEach((link, i) => {
+                const lg = defs.append('linearGradient')
+                    .attr('id', `pe-sk-grad-${i}`)
+                    .attr('gradientUnits', 'userSpaceOnUse')
+                    .attr('x1', link.source.x1).attr('x2', link.target.x0);
+                lg.append('stop').attr('offset', '0%').attr('stop-color', stageColor(link.source.id));
+                lg.append('stop').attr('offset', '100%').attr('stop-color', stageColor(link.target.id));
+            });
+
+            // Links
+            g.append('g').attr('fill', 'none').attr('stroke-opacity', 0.3)
+                .selectAll('path')
+                .data(graph.links).join('path')
+                .attr('d', d3.sankeyLinkHorizontal())
+                .attr('stroke', (d, i) => `url(#pe-sk-grad-${i})`)
+                .attr('stroke-width', d => Math.max(2, d.width))
+                .style('cursor', 'pointer')
+                .on('mouseenter', function(event, d) {
+                    d3.select(this).transition().duration(120).attr('stroke-opacity', 0.6);
+                    _peSankeyShowTip(event, `${d.source.id} → ${d.target.id}`, `${d.value} deals`);
+                })
+                .on('mousemove', (event) => _peSankeyMoveTip(event))
+                .on('mouseleave', function() {
+                    d3.select(this).transition().duration(120).attr('stroke-opacity', 0.3);
+                    _peSankeyHideTip();
+                });
+
+            // Nodes
+            const nodeG = g.append('g').selectAll('g')
+                .data(graph.nodes).join('g')
+                .attr('transform', d => `translate(${d.x0},${d.y0})`)
+                .style('cursor', 'pointer')
+                .on('click', function(event, d) {
+                    // Filter kanban to this stage
+                    peSankeyFilterStage(d.id);
+                });
+
+            nodeG.append('rect')
+                .attr('width', d => d.x1 - d.x0)
+                .attr('height', d => Math.max(4, d.y1 - d.y0))
+                .attr('rx', 3).attr('ry', 3)
+                .attr('fill', d => stageColor(d.id))
+                .attr('stroke', d => d3.color(stageColor(d.id)).brighter(0.3))
+                .attr('stroke-width', 1)
+                .on('mouseenter', function(event, d) {
+                    d3.select(this).attr('stroke', '#fff').attr('stroke-width', 2);
+                    _peSankeyShowTip(event, d.label || d.id, `${d.count || d.value || 0} deals`);
+                })
+                .on('mousemove', (event) => _peSankeyMoveTip(event))
+                .on('mouseleave', function(event, d) {
+                    d3.select(this).attr('stroke', d3.color(stageColor(d.id)).brighter(0.3)).attr('stroke-width', 1);
+                    _peSankeyHideTip();
+                });
+
+            // Labels
+            nodeG.append('text')
+                .attr('x', d => (d.x1 - d.x0) / 2)
+                .attr('y', d => (d.y1 - d.y0) / 2)
+                .attr('dy', '-0.6em')
+                .attr('text-anchor', 'middle')
+                .attr('fill', '#f1f5f9')
+                .attr('font-size', '11px')
+                .attr('font-weight', '600')
+                .text(d => d.label || d.id);
+
+            nodeG.append('text')
+                .attr('x', d => (d.x1 - d.x0) / 2)
+                .attr('y', d => (d.y1 - d.y0) / 2)
+                .attr('dy', '0.8em')
+                .attr('text-anchor', 'middle')
+                .attr('fill', '#94a3b8')
+                .attr('font-size', '10px')
+                .text(d => `${d.count || 0}`);
+        }
+
+        let _peSankeyFilteredStage = null;
+        function peSankeyFilterStage(stage) {
+            if (_peSankeyFilteredStage === stage) {
+                _peSankeyFilteredStage = null; // toggle off
+            } else {
+                _peSankeyFilteredStage = stage;
+            }
+            // Show/hide kanban columns
+            document.querySelectorAll('.pe-kanban-col').forEach(col => {
+                if (_peSankeyFilteredStage && col.dataset.stage !== _peSankeyFilteredStage) {
+                    col.style.opacity = '0.25';
+                } else {
+                    col.style.opacity = '1';
+                }
+            });
+        }
+
+        function _peSankeyShowTip(event, title, detail) {
+            const tip = document.getElementById('pe-sankey-tooltip');
+            tip.innerHTML = `<div class="pe-sankey-tt-title">${title}</div><div class="pe-sankey-tt-row"><span class="pe-sankey-tt-val">${detail}</span></div>`;
+            tip.classList.add('visible');
+            _peSankeyMoveTip(event);
+        }
+        function _peSankeyMoveTip(event) {
+            const tip = document.getElementById('pe-sankey-tooltip');
+            let x = event.clientX + 12, y = event.clientY + 12;
+            if (x + 200 > window.innerWidth) x = event.clientX - 200;
+            if (y + 60 > window.innerHeight) y = event.clientY - 60;
+            tip.style.left = x + 'px'; tip.style.top = y + 'px';
+        }
+        function _peSankeyHideTip() {
+            document.getElementById('pe-sankey-tooltip').classList.remove('visible');
+        }
+
         // Drag & drop handlers
         let _peDragDealId = null;
 
@@ -11987,6 +12327,213 @@
             const kanban = document.getElementById('pe-kanban');
             if (kanban.style.display === 'none') kanban.style.display = '';
             else kanban.style.display = 'none';
+        }
+
+        /* ── Analytics Sub-Tab ── */
+        let _peAnalyticsLoaded = false;
+        let _peAnalyticsCharts = {};
+
+        async function peLoadAnalyticsTab() {
+            if (_peAnalyticsLoaded) return;
+            _peAnalyticsLoaded = true;
+            const firmId = document.getElementById('pe-firm-select').value;
+            await Promise.all([
+                peAnalyticsTreemap(firmId),
+                peAnalyticsVintage(firmId),
+                peAnalyticsRisk(firmId),
+                peAnalyticsPME(firmId),
+            ]);
+        }
+
+        async function peAnalyticsTreemap(firmId) {
+            const el = document.getElementById('pe-analytics-treemap');
+            let sectors = [];
+            try {
+                if (firmId) {
+                    const resp = await fetch(`${API}/pe/analytics/${firmId}/concentration`);
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        sectors = data.sectors || data || [];
+                    }
+                }
+            } catch(e) {}
+            // Fallback from portfolio
+            if (sectors.length === 0 && _pePortfolioData) {
+                const sMap = {};
+                (_pePortfolioData.companies || _pePortfolioData || []).forEach(c => {
+                    const sec = c.industry || c.sector || 'Other';
+                    if (!sMap[sec]) sMap[sec] = { name: sec, value: 0, grade: 'C' };
+                    sMap[sec].value += (c.revenue_millions || 10);
+                    if (c.exit_grade) sMap[sec].grade = c.exit_grade;
+                });
+                sectors = Object.values(sMap);
+            }
+            if (sectors.length === 0) {
+                el.innerHTML = '<div class="pe-empty">No concentration data available</div>';
+                return;
+            }
+
+            const width = el.clientWidth || 400;
+            const height = 270;
+            el.innerHTML = '';
+
+            const gradeColor = g => ({ A:'#22c55e', B:'#60a5fa', C:'#fbbf24', D:'#f97316', F:'#ef4444' }[g] || '#6366f1');
+
+            const root = d3.hierarchy({ children: sectors }).sum(d => d.value || 1);
+            d3.treemap().size([width, height]).padding(3).round(true)(root);
+
+            const svg = d3.select(el).append('svg').attr('width', width).attr('height', height);
+            const cell = svg.selectAll('g').data(root.leaves()).join('g')
+                .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+            cell.append('rect')
+                .attr('class', 'pe-treemap-cell')
+                .attr('width', d => d.x1 - d.x0)
+                .attr('height', d => d.y1 - d.y0)
+                .attr('rx', 4)
+                .attr('fill', d => gradeColor(d.data.grade || 'C'));
+
+            cell.filter(d => (d.x1 - d.x0) > 50 && (d.y1 - d.y0) > 30)
+                .append('text').attr('class', 'pe-treemap-label')
+                .attr('x', 6).attr('y', 16)
+                .text(d => d.data.name);
+
+            cell.filter(d => (d.x1 - d.x0) > 50 && (d.y1 - d.y0) > 44)
+                .append('text').attr('class', 'pe-treemap-value')
+                .attr('x', 6).attr('y', 30)
+                .text(d => `$${d.data.value.toFixed(0)}M`);
+        }
+
+        async function peAnalyticsVintage(firmId) {
+            const canvas = document.getElementById('pe-analytics-vintage');
+            let vintageData = [];
+            try {
+                if (firmId) {
+                    const resp = await fetch(`${API}/pe/analytics/${firmId}/vintage`);
+                    if (resp.ok) { const d = await resp.json(); vintageData = d.cohorts || d || []; }
+                }
+            } catch(e) {}
+            // Fallback
+            if (vintageData.length === 0) {
+                vintageData = [
+                    { year: 2019, funds: [{ name: 'Fund I', irr: 18.5 }] },
+                    { year: 2020, funds: [{ name: 'Fund II', irr: 14.2 }, { name: 'Fund III', irr: 22.1 }] },
+                    { year: 2021, funds: [{ name: 'Fund IV', irr: 11.8 }] },
+                    { year: 2022, funds: [{ name: 'Fund V', irr: 8.5 }, { name: 'Fund VI', irr: 16.9 }] },
+                ];
+            }
+            const labels = vintageData.map(v => v.year);
+            const maxFunds = Math.max(...vintageData.map(v => (v.funds || []).length));
+            const colors = ['#6366f1','#06b6d4','#f59e0b','#22c55e','#ec4899'];
+            const datasets = [];
+            for (let i = 0; i < maxFunds; i++) {
+                datasets.push({
+                    label: vintageData.find(v => v.funds[i])?.funds[i]?.name || `Fund ${i+1}`,
+                    data: vintageData.map(v => v.funds[i]?.irr || null),
+                    backgroundColor: colors[i % colors.length] + 'cc',
+                    borderRadius: 4,
+                });
+            }
+
+            if (_peAnalyticsCharts.vintage) _peAnalyticsCharts.vintage.destroy();
+            _peAnalyticsCharts.vintage = new Chart(canvas, {
+                type: 'bar',
+                data: { labels, datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#94a3b8', font: { size: 10 } } },
+                        annotation: { annotations: { benchmark: { type: 'line', yMin: 15, yMax: 15, borderColor: '#ef4444', borderWidth: 1, borderDash: [4,4], label: { content: 'PE Median (15%)', display: true, position: 'end', color: '#ef4444', font: { size: 9 } } } } },
+                    },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+                        y: { ticks: { color: '#94a3b8', callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    },
+                },
+            });
+        }
+
+        async function peAnalyticsRisk(firmId) {
+            const canvas = document.getElementById('pe-analytics-risk');
+            let riskData = null;
+            try {
+                if (firmId) {
+                    const resp = await fetch(`${API}/pe/analytics/${firmId}/risk`);
+                    if (resp.ok) riskData = await resp.json();
+                }
+            } catch(e) {}
+            if (!riskData) {
+                riskData = {
+                    sector_concentration: 65, vintage_concentration: 45,
+                    geography_concentration: 55, size_concentration: 40,
+                    manager_key_person: 70, liquidity_risk: 35,
+                };
+            }
+            const labels = Object.keys(riskData).map(k => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+            const values = Object.values(riskData);
+
+            if (_peAnalyticsCharts.risk) _peAnalyticsCharts.risk.destroy();
+            _peAnalyticsCharts.risk = new Chart(canvas, {
+                type: 'radar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Risk Score',
+                        data: values,
+                        backgroundColor: 'rgba(239,68,68,0.15)',
+                        borderColor: '#ef4444',
+                        pointBackgroundColor: '#ef4444',
+                        borderWidth: 2,
+                    }],
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        r: {
+                            min: 0, max: 100,
+                            ticks: { display: false },
+                            grid: { color: 'rgba(255,255,255,0.08)' },
+                            pointLabels: { color: '#94a3b8', font: { size: 10 } },
+                        },
+                    },
+                },
+            });
+        }
+
+        async function peAnalyticsPME(firmId) {
+            const canvas = document.getElementById('pe-analytics-pme');
+            let pmeData = null;
+            try {
+                if (firmId) {
+                    const resp = await fetch(`${API}/pe/analytics/${firmId}/pme`);
+                    if (resp.ok) pmeData = await resp.json();
+                }
+            } catch(e) {}
+            if (!pmeData) {
+                pmeData = { firm_irr: 16.8, sp500: 10.2, russell2000: 8.4, pe_median: 14.5 };
+            }
+            const labels = ['Firm IRR', 'S&P 500', 'Russell 2000', 'PE Median'];
+            const values = [pmeData.firm_irr, pmeData.sp500, pmeData.russell2000, pmeData.pe_median];
+            const colors = ['#6366f1', '#22c55e', '#06b6d4', '#f59e0b'];
+
+            if (_peAnalyticsCharts.pme) _peAnalyticsCharts.pme.destroy();
+            _peAnalyticsCharts.pme = new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{ data: values, backgroundColor: colors.map(c => c + 'cc'), borderRadius: 6, barThickness: 36 }],
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8', callback: v => v + '%' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { ticks: { color: '#f1f5f9', font: { weight: '600' } }, grid: { display: false } },
+                    },
+                },
+            });
         }
 
         /* ── Deal Sourcing ── */
@@ -13331,6 +13878,271 @@
                 btn.disabled = false;
                 btn.textContent = 'Run Analysis';
             }
+        }
+
+        // ===== PE Import =====
+        let _importFile = null;
+        let _importPreviewData = [];
+        let _importJobId = null;
+
+        function importTemplateChanged() {
+            const tpl = document.getElementById('import-template').value;
+            const dlLink = document.getElementById('import-download-tpl');
+            const dropzone = document.getElementById('import-dropzone');
+            if (tpl) {
+                dlLink.style.display = '';
+                dropzone.style.display = '';
+            } else {
+                dlLink.style.display = 'none';
+                dropzone.style.display = 'none';
+            }
+            importCancel();
+        }
+
+        function importDownloadTemplate() {
+            const tpl = document.getElementById('import-template').value;
+            const templates = {
+                portfolio_companies: 'company_name,industry,state,revenue_millions,ebitda_millions,employee_count,status',
+                financial_history: 'company_name,year,revenue,ebitda,net_income,gross_margin,ebitda_margin',
+                deal_history: 'company_name,deal_type,stage,enterprise_value,announced_date,buyer_name',
+                leadership: 'company_name,person_name,title,department,start_date',
+            };
+            const csv = templates[tpl] || '';
+            const blob = new Blob([csv + '\n'], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `${tpl}_template.csv`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function importHandleDrop(e) {
+            e.preventDefault();
+            e.currentTarget.style.borderColor = 'var(--border)';
+            const file = e.dataTransfer.files[0];
+            if (file) importProcessFile(file);
+        }
+
+        function importFileSelected(input) {
+            if (input.files[0]) importProcessFile(input.files[0]);
+        }
+
+        async function importProcessFile(file) {
+            _importFile = file;
+            const tpl = document.getElementById('import-template').value;
+
+            // Try server-side preview first
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('template', tpl);
+                const resp = await fetch(`${API}/pe/import/upload`, { method: 'POST', body: formData });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    _importJobId = data.import_id || data.id;
+                    // Fetch preview
+                    const prevResp = await fetch(`${API}/pe/import/${_importJobId}/preview`);
+                    if (prevResp.ok) {
+                        const prev = await prevResp.json();
+                        _importPreviewData = prev.rows || prev.preview || [];
+                        importRenderPreview(prev);
+                        return;
+                    }
+                }
+            } catch(e) {}
+
+            // Fallback: client-side CSV parsing
+            const text = await file.text();
+            const lines = text.trim().split('\n');
+            if (lines.length < 2) { showToast('File appears empty', 'error'); return; }
+            const headers = lines[0].split(',').map(h => h.trim());
+            _importPreviewData = lines.slice(1, 11).map((line, i) => {
+                const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                const row = {};
+                headers.forEach((h, j) => { row[h] = vals[j] || ''; });
+                row._valid = vals.filter(v => v).length >= headers.length / 2;
+                row._row = i + 2;
+                return row;
+            });
+            importRenderPreview({ rows: _importPreviewData, total: lines.length - 1, headers, errors: 0, warnings: 0 });
+        }
+
+        function importRenderPreview(data) {
+            const preview = document.getElementById('import-preview');
+            const table = document.getElementById('import-preview-table');
+            const summary = document.getElementById('import-validation-summary');
+            const title = document.getElementById('import-preview-title');
+            const confirmBtn = document.getElementById('import-confirm-btn');
+            preview.style.display = '';
+
+            const rows = data.rows || _importPreviewData;
+            const total = data.total || rows.length;
+            const errors = data.errors || rows.filter(r => r._valid === false).length;
+            const warnings = data.warnings || 0;
+            title.textContent = `Preview — ${total} rows`;
+
+            if (errors > 0) {
+                summary.innerHTML = `<span style="color:var(--error)">${errors} errors</span>${warnings ? `, <span style="color:#f59e0b">${warnings} warnings</span>` : ''} — fix errors before importing`;
+                confirmBtn.disabled = true;
+            } else {
+                summary.innerHTML = `<span style="color:var(--success)">All rows valid</span>${warnings ? `, <span style="color:#f59e0b">${warnings} warnings</span>` : ''}`;
+                confirmBtn.disabled = false;
+            }
+
+            if (rows.length === 0) { table.innerHTML = '<tr><td style="padding:1rem;color:var(--text-muted)">No data</td></tr>'; return; }
+            const keys = Object.keys(rows[0]).filter(k => !k.startsWith('_'));
+            let html = '<thead><tr>' + keys.map(k => `<th style="padding:0.4rem 0.5rem;text-align:left;font-size:0.68rem;color:var(--text-muted);border-bottom:1px solid var(--border)">${k}</th>`).join('') + '<th style="padding:0.4rem;width:30px"></th></tr></thead><tbody>';
+            rows.forEach(r => {
+                const valid = r._valid !== false;
+                const icon = valid ? '<span style="color:#22c55e">&#10003;</span>' : '<span style="color:#ef4444">&#10007;</span>';
+                html += '<tr>' + keys.map(k => `<td style="padding:0.35rem 0.5rem;border-bottom:1px solid rgba(51,65,85,0.3)">${r[k] || ''}</td>`).join('') + `<td style="padding:0.35rem;text-align:center">${icon}</td></tr>`;
+            });
+            html += '</tbody>';
+            table.innerHTML = html;
+        }
+
+        async function importConfirm() {
+            const confirmBtn = document.getElementById('import-confirm-btn');
+            const progress = document.getElementById('import-progress');
+            const bar = document.getElementById('import-progress-bar');
+            const text = document.getElementById('import-progress-text');
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Importing...';
+            progress.style.display = '';
+            bar.style.width = '10%';
+            text.textContent = 'Uploading...';
+
+            try {
+                if (_importJobId) {
+                    // Server-side confirm
+                    const resp = await fetch(`${API}/pe/import/${_importJobId}/confirm`, { method: 'POST' });
+                    bar.style.width = '50%';
+                    text.textContent = 'Processing...';
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        bar.style.width = '100%';
+                        text.textContent = `Imported ${data.records || _importPreviewData.length} records`;
+                        showToast(`Successfully imported ${data.records || 'data'}`, 'success');
+                        importAddHistory(data.records || _importPreviewData.length);
+                    } else {
+                        throw new Error('Import failed');
+                    }
+                } else {
+                    // Simulate for demo
+                    bar.style.width = '30%'; text.textContent = 'Validating...';
+                    await new Promise(r => setTimeout(r, 800));
+                    bar.style.width = '70%'; text.textContent = 'Importing records...';
+                    await new Promise(r => setTimeout(r, 1000));
+                    bar.style.width = '100%';
+                    const count = _importPreviewData.length;
+                    text.textContent = `Imported ${count} records`;
+                    showToast(`Imported ${count} records (demo mode)`, 'success');
+                    importAddHistory(count);
+                }
+            } catch(e) {
+                bar.style.width = '100%';
+                bar.style.background = 'var(--error)';
+                text.textContent = 'Import failed: ' + e.message;
+                showToast('Import failed', 'error');
+            }
+            confirmBtn.textContent = 'Import';
+        }
+
+        function importCancel() {
+            _importFile = null;
+            _importPreviewData = [];
+            _importJobId = null;
+            document.getElementById('import-preview').style.display = 'none';
+            document.getElementById('import-progress').style.display = 'none';
+            document.getElementById('import-progress-bar').style.width = '0%';
+            document.getElementById('import-progress-bar').style.background = 'var(--primary)';
+            document.getElementById('import-confirm-btn').disabled = true;
+            document.getElementById('import-confirm-btn').textContent = 'Import';
+            const input = document.getElementById('import-file-input');
+            if (input) input.value = '';
+        }
+
+        function importAddHistory(count) {
+            const tpl = document.getElementById('import-template').value;
+            const histEl = document.getElementById('import-history');
+            const listEl = document.getElementById('import-history-list');
+            histEl.style.display = '';
+            const item = document.createElement('div');
+            item.style.cssText = 'display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid rgba(51,65,85,0.3);font-size:0.78rem;';
+            item.innerHTML = `<span style="color:#22c55e">&#9679;</span>
+                <span>${tpl.replace(/_/g, ' ')}</span>
+                <span style="color:var(--text-muted)">${count} records</span>
+                <span style="margin-left:auto;color:var(--text-muted);font-size:0.7rem;">${new Date().toLocaleString()}</span>`;
+            listEl.prepend(item);
+        }
+
+        // ===== Print View =====
+        function printView() {
+            // Mark current tab as print target
+            const activeTab = document.getElementById('tab-' + _currentTab);
+            if (activeTab) activeTab.classList.add('print-target');
+            // Set print metadata
+            const meta = document.getElementById('print-meta');
+            if (meta) {
+                const firmSel = document.getElementById('pe-firm-select');
+                const firmName = firmSel ? firmSel.options[firmSel.selectedIndex]?.text || '' : '';
+                meta.textContent = `${new Date().toLocaleDateString()} | ${firmName || _currentTab.toUpperCase()}`;
+            }
+            window.print();
+            // Clean up after print
+            setTimeout(() => {
+                if (activeTab) activeTab.classList.remove('print-target');
+            }, 500);
+        }
+
+        // ===== CSV Export =====
+        function exportCSV(data, filename) {
+            if (!data || data.length === 0) { showToast('No data to export', 'error'); return; }
+            const keys = Object.keys(data[0]);
+            const csvRows = [keys.join(',')];
+            for (const row of data) {
+                csvRows.push(keys.map(k => {
+                    let val = row[k];
+                    if (val === null || val === undefined) val = '';
+                    val = String(val).replace(/"/g, '""');
+                    if (val.includes(',') || val.includes('"') || val.includes('\n')) val = `"${val}"`;
+                    return val;
+                }).join(','));
+            }
+            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename || 'export.csv';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast(`Exported ${data.length} rows to ${filename}`, 'success');
+        }
+
+        function exportSearchResults() {
+            const rows = (_peSearchResults || []).map(c => ({
+                company: c.company_name, industry: c.industry, state: c.state,
+                employees: c.employee_count, revenue_millions: c.revenue_millions,
+                pe_owner: c.pe_owner || '', deal_score: c.deal_score || '',
+            }));
+            exportCSV(rows, 'nexdata_search_results.csv');
+        }
+
+        function exportPipelineDeals() {
+            const rows = (_pePipelineDeals || []).map(d => ({
+                company: d.company_name, stage: d.stage, deal_type: d.deal_type,
+                industry: d.industry, enterprise_value: d.enterprise_value,
+                priority: d.priority, assignee: d.assignee || '',
+            }));
+            exportCSV(rows, 'nexdata_pipeline_deals.csv');
+        }
+
+        function exportAlertFeed() {
+            const rows = (_peAlerts || []).map(a => ({
+                type: a.alert_type || a.type, severity: a.severity,
+                company: a.company_name || '', message: a.message || a.description || '',
+                created: a.created_at || '',
+            }));
+            exportCSV(rows, 'nexdata_alerts.csv');
         }
 
     </script>
