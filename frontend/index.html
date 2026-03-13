@@ -1313,8 +1313,8 @@
         .pe-pipeline-header h3 { font-size: 1rem; font-weight: 600; }
         .pe-pipeline-toggle { padding: 0.35rem 0.85rem; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.8rem; cursor: pointer; }
         .pe-pipeline-toggle:hover { border-color: var(--primary); }
-        .pe-kanban { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem; min-height: 300px; }
-        @media (max-width: 1200px) { .pe-kanban { grid-template-columns: repeat(3, 1fr); } }
+        .pe-kanban { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.75rem; min-height: 300px; }
+        @media (max-width: 1400px) { .pe-kanban { grid-template-columns: repeat(3, 1fr); } }
         @media (max-width: 768px) { .pe-kanban { grid-template-columns: 1fr 1fr; } }
         .pe-kanban-col { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem; min-height: 200px; }
         .pe-kanban-col-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border); }
@@ -1340,6 +1340,41 @@
         .pe-deal-card-days { font-size: 0.65rem; color: var(--text-muted); margin-top: 0.25rem; }
         .pe-deal-card-stage-select { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 0.65rem; padding: 0.15rem 0.25rem; margin-top: 0.375rem; cursor: pointer; }
         .pe-kanban-col.drag-over { background: rgba(99,102,241,0.06); border-color: var(--primary); }
+        .pe-kanban-col.won .pe-kanban-col-header { border-bottom-color: #10b981; }
+        .pe-kanban-col.lost .pe-kanban-col-header { border-bottom-color: #ef4444; }
+
+        /* PE Sub-navigation */
+        .pe-subnav { display: flex; gap: 0.25rem; margin-bottom: 1.5rem; background: var(--bg-input); border-radius: 8px; padding: 0.25rem; width: fit-content; }
+        .pe-subnav-btn { padding: 0.5rem 1.25rem; border: none; background: transparent; color: var(--text-muted); font-size: 0.85rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+        .pe-subnav-btn:hover { color: var(--text); }
+        .pe-subnav-btn.active { background: var(--primary); color: white; }
+        .pe-subtab { display: none; }
+        .pe-subtab.active { display: block; }
+
+        /* Pipeline KPI cards */
+        .pe-pipeline-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; }
+        @media (max-width: 768px) { .pe-pipeline-kpis { grid-template-columns: repeat(2, 1fr); } }
+        .pe-pipeline-kpi { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; text-align: center; }
+        .pe-pipeline-kpi-value { font-size: 1.75rem; font-weight: 700; color: var(--primary); }
+        .pe-pipeline-kpi-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.25rem; letter-spacing: 0.03em; }
+
+        /* Pipeline funnel */
+        .pe-pipeline-funnel { margin-bottom: 1.25rem; }
+        .pe-funnel-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
+        .pe-funnel-label { width: 90px; font-size: 0.75rem; color: var(--text-muted); text-align: right; flex-shrink: 0; }
+        .pe-funnel-track { flex: 1; height: 22px; background: var(--bg-input); border-radius: 4px; overflow: hidden; }
+        .pe-funnel-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 6px; font-size: 0.7rem; font-weight: 600; color: white; min-width: 20px; transition: width 0.4s; }
+        .pe-funnel-count { width: 30px; font-size: 0.75rem; font-weight: 600; color: var(--text); }
+
+        /* Deal card expanded */
+        .pe-deal-card-expanded { background: var(--bg-card); border: 1px solid var(--primary); border-radius: 10px; padding: 1rem; margin-top: 1rem; }
+        .pe-deal-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.75rem; }
+        .pe-deal-detail-item { font-size: 0.8rem; }
+        .pe-deal-detail-item .label { color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; }
+        .pe-deal-detail-item .value { font-weight: 600; margin-top: 0.15rem; }
+        .pe-deal-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+        .pe-deal-actions button { padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 5px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text); cursor: pointer; }
+        .pe-deal-actions button:hover { border-color: var(--primary); color: var(--primary); }
     </style>
 </head>
 <body>
@@ -1869,6 +1904,16 @@
                 </div>
             </div>
 
+            <!-- PE Sub-navigation -->
+            <div class="pe-subnav">
+                <button class="pe-subnav-btn active" onclick="peShowSubtab('portfolio')">Portfolio</button>
+                <button class="pe-subnav-btn" onclick="peShowSubtab('pipeline')">Pipeline</button>
+                <button class="pe-subnav-btn" onclick="peShowSubtab('market')">Market</button>
+            </div>
+
+            <!-- SUB-TAB: Portfolio -->
+            <div class="pe-subtab active" id="pe-subtab-portfolio">
+
             <!-- Company Search Panel -->
             <div class="pe-search-panel" id="pe-search-panel">
                 <h3>Company Search & Screening</h3>
@@ -2069,50 +2114,63 @@
                 </div>
             </div>
 
-            <!-- Deal Pipeline Board -->
-            <div class="pe-pipeline-panel" id="pe-pipeline-panel" style="display:none;">
-                <div class="pe-pipeline-header">
-                    <h3>Deal Pipeline</h3>
-                    <button class="pe-pipeline-toggle" onclick="pePipelineToggle()" id="pe-pipeline-toggle-btn">Collapse</button>
+            </div><!-- /pe-subtab-portfolio -->
+
+            <!-- SUB-TAB: Pipeline -->
+            <div class="pe-subtab" id="pe-subtab-pipeline">
+                <div class="pe-pipeline-panel" id="pe-pipeline-panel">
+                    <!-- KPI Cards -->
+                    <div class="pe-pipeline-kpis" id="pe-pipeline-kpis">
+                        <div class="pe-pipeline-kpi"><div class="pe-pipeline-kpi-value" id="pe-pk-total-value">$0M</div><div class="pe-pipeline-kpi-label">Total Pipeline Value</div></div>
+                        <div class="pe-pipeline-kpi"><div class="pe-pipeline-kpi-value" id="pe-pk-active">0</div><div class="pe-pipeline-kpi-label">Active Deals</div></div>
+                        <div class="pe-pipeline-kpi"><div class="pe-pipeline-kpi-value" id="pe-pk-avg-days">0</div><div class="pe-pipeline-kpi-label">Avg Days to Close</div></div>
+                        <div class="pe-pipeline-kpi"><div class="pe-pipeline-kpi-value" id="pe-pk-win-rate">0%</div><div class="pe-pipeline-kpi-label">Win Rate</div></div>
+                    </div>
+
+                    <!-- Pipeline Funnel -->
+                    <div class="pe-pipeline-funnel" id="pe-pipeline-funnel"></div>
+
+                    <!-- Kanban Board -->
+                    <div class="pe-kanban" id="pe-kanban" style="grid-template-columns: repeat(6, 1fr);">
+                        <div class="pe-kanban-col screening" data-stage="Screening" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
+                            <div class="pe-kanban-col-header"><span class="pe-kanban-col-title">Screening</span><span class="pe-kanban-col-count" id="pe-kb-count-Screening">0</span></div>
+                            <div class="pe-kanban-cards" id="pe-kb-cards-Screening"></div>
+                        </div>
+                        <div class="pe-kanban-col dd" data-stage="DD" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
+                            <div class="pe-kanban-col-header"><span class="pe-kanban-col-title">Due Diligence</span><span class="pe-kanban-col-count" id="pe-kb-count-DD">0</span></div>
+                            <div class="pe-kanban-cards" id="pe-kb-cards-DD"></div>
+                        </div>
+                        <div class="pe-kanban-col loi" data-stage="LOI" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
+                            <div class="pe-kanban-col-header"><span class="pe-kanban-col-title">LOI</span><span class="pe-kanban-col-count" id="pe-kb-count-LOI">0</span></div>
+                            <div class="pe-kanban-cards" id="pe-kb-cards-LOI"></div>
+                        </div>
+                        <div class="pe-kanban-col closing" data-stage="Closing" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
+                            <div class="pe-kanban-col-header"><span class="pe-kanban-col-title">Closing</span><span class="pe-kanban-col-count" id="pe-kb-count-Closing">0</span></div>
+                            <div class="pe-kanban-cards" id="pe-kb-cards-Closing"></div>
+                        </div>
+                        <div class="pe-kanban-col won" data-stage="Won" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
+                            <div class="pe-kanban-col-header"><span class="pe-kanban-col-title">Won</span><span class="pe-kanban-col-count" id="pe-kb-count-Won">0</span></div>
+                            <div class="pe-kanban-cards" id="pe-kb-cards-Won"></div>
+                        </div>
+                        <div class="pe-kanban-col lost" data-stage="Lost" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
+                            <div class="pe-kanban-col-header"><span class="pe-kanban-col-title">Lost</span><span class="pe-kanban-col-count" id="pe-kb-count-Lost">0</span></div>
+                            <div class="pe-kanban-cards" id="pe-kb-cards-Lost"></div>
+                        </div>
+                    </div>
+
+                    <!-- Expanded deal detail -->
+                    <div class="pe-deal-card-expanded" id="pe-deal-expanded" style="display:none;"></div>
                 </div>
-                <div class="pe-kanban" id="pe-kanban">
-                    <div class="pe-kanban-col screening" data-stage="Screening" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
-                        <div class="pe-kanban-col-header">
-                            <span class="pe-kanban-col-title">Screening</span>
-                            <span class="pe-kanban-col-count" id="pe-kb-count-Screening">0</span>
-                        </div>
-                        <div class="pe-kanban-cards" id="pe-kb-cards-Screening"></div>
-                    </div>
-                    <div class="pe-kanban-col dd" data-stage="DD" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
-                        <div class="pe-kanban-col-header">
-                            <span class="pe-kanban-col-title">Due Diligence</span>
-                            <span class="pe-kanban-col-count" id="pe-kb-count-DD">0</span>
-                        </div>
-                        <div class="pe-kanban-cards" id="pe-kb-cards-DD"></div>
-                    </div>
-                    <div class="pe-kanban-col loi" data-stage="LOI" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
-                        <div class="pe-kanban-col-header">
-                            <span class="pe-kanban-col-title">LOI</span>
-                            <span class="pe-kanban-col-count" id="pe-kb-count-LOI">0</span>
-                        </div>
-                        <div class="pe-kanban-cards" id="pe-kb-cards-LOI"></div>
-                    </div>
-                    <div class="pe-kanban-col closing" data-stage="Closing" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
-                        <div class="pe-kanban-col-header">
-                            <span class="pe-kanban-col-title">Closing</span>
-                            <span class="pe-kanban-col-count" id="pe-kb-count-Closing">0</span>
-                        </div>
-                        <div class="pe-kanban-cards" id="pe-kb-cards-Closing"></div>
-                    </div>
-                    <div class="pe-kanban-col closed" data-stage="Closed" ondrop="peKanbanDrop(event)" ondragover="peKanbanDragOver(event)" ondragleave="peKanbanDragLeave(event)">
-                        <div class="pe-kanban-col-header">
-                            <span class="pe-kanban-col-title">Closed</span>
-                            <span class="pe-kanban-col-count" id="pe-kb-count-Closed">0</span>
-                        </div>
-                        <div class="pe-kanban-cards" id="pe-kb-cards-Closed"></div>
-                    </div>
+            </div><!-- /pe-subtab-pipeline -->
+
+            <!-- SUB-TAB: Market (Phase 3) -->
+            <div class="pe-subtab" id="pe-subtab-market">
+                <div class="pe-empty">
+                    <div class="pe-empty-icon">📈</div>
+                    <div>Market Intelligence loading...</div>
                 </div>
-            </div>
+            </div><!-- /pe-subtab-market -->
+
         </div>
 
         <div id="tab-dq" class="hidden">
@@ -9896,15 +9954,30 @@
             }
         }
 
+        // ===== PE Sub-tab Navigation =====
+        let _peActiveSubtab = 'portfolio';
+
+        function peShowSubtab(name) {
+            _peActiveSubtab = name;
+            document.querySelectorAll('.pe-subtab').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.pe-subnav-btn').forEach(el => el.classList.remove('active'));
+            const tab = document.getElementById('pe-subtab-' + name);
+            if (tab) tab.classList.add('active');
+            const btns = document.querySelectorAll('.pe-subnav-btn');
+            btns.forEach(b => { if (b.textContent.trim().toLowerCase() === name) b.classList.add('active'); });
+            if (name === 'pipeline') peLoadPipelineTab();
+            if (name === 'market') peLoadMarketTab();
+        }
+
         // ===== PE Deal Pipeline =====
 
         let _pePipelineDeals = [];
-        const PE_PIPELINE_STAGES = ['Screening', 'DD', 'LOI', 'Closing', 'Closed'];
+        const PE_PIPELINE_STAGES = ['Screening', 'DD', 'LOI', 'Closing', 'Won', 'Lost'];
 
         function peMapDealStatus(deal) {
-            // Map existing deal statuses to pipeline stages
             const s = (deal.status || '').toLowerCase();
-            if (s === 'closed' || deal.closed_date) return 'Closed';
+            if (s === 'closed' || s === 'won' || (deal.closed_date && s !== 'lost')) return 'Won';
+            if (s === 'lost' || s === 'dead' || s === 'withdrawn') return 'Lost';
             if (s === 'pending' || s === 'announced') return 'DD';
             if (s === 'loi') return 'LOI';
             if (s === 'closing') return 'Closing';
@@ -9912,77 +9985,114 @@
             return 'Screening';
         }
 
-        async function peLoadPipeline(firmId) {
-            const panel = document.getElementById('pe-pipeline-panel');
-            if (!firmId) { panel.style.display = 'none'; return; }
+        async function peLoadPipelineTab() {
+            // Try the pipeline endpoint first, then fall back to portfolio-based deals
+            _pePipelineDeals = [];
 
             try {
-                // Load deals from portfolio companies for this firm
-                const resp = await fetch(`${API}/pe/benchmarks/portfolio/${firmId}`);
-                if (!resp.ok) { panel.style.display = 'none'; return; }
-                const portData = await resp.json();
-                const companyIds = (portData.companies || []).map(c => c.company_id);
-
-                // For each company, check if there are deals via data-room endpoint
-                // We'll also look for deal data in the company info
-                _pePipelineDeals = [];
-
-                // Fetch deals by querying the deals we know about from seed data
-                // Using a direct DB query proxy isn't available, so we build from portfolio + data-room
-                for (const cid of companyIds) {
-                    try {
-                        const drResp = await fetch(`${API}/pe/data-room/${cid}`);
-                        if (drResp.ok) {
-                            const drData = await drResp.json();
-                            const comp = (portData.companies || []).find(c => c.company_id === cid);
-                            if (comp) {
-                                const deal = {
-                                    id: cid,
-                                    company_name: comp.company_name,
-                                    industry: comp.industry || 'Unknown',
-                                    deal_type: comp.status === 'Exited' ? 'Exit' : 'LBO',
-                                    enterprise_value: null,
-                                    announced_date: null,
-                                    status: comp.status === 'Exited' ? 'Closed' : 'Screening',
-                                    stage: comp.status === 'Exited' ? 'Closed' : 'Screening',
-                                    completeness: drData.completeness_pct || 0,
-                                };
-                                _pePipelineDeals.push(deal);
-                            }
-                        }
-                    } catch (e) { /* skip */ }
-                }
-
-                // Also try to get actual deal data if endpoint exists
-                try {
-                    const dealsResp = await fetch(`${API}/pe/deals?firm_id=${firmId}`);
-                    if (dealsResp.ok) {
-                        const dealsData = await dealsResp.json();
-                        const actualDeals = dealsData.deals || dealsData || [];
-                        if (Array.isArray(actualDeals) && actualDeals.length > 0) {
-                            _pePipelineDeals = actualDeals.map(d => ({
-                                id: d.id || d.company_id,
-                                company_name: d.company_name || d.deal_name || 'Unknown',
-                                industry: d.industry || 'Unknown',
-                                deal_type: d.deal_type || 'LBO',
-                                enterprise_value: d.enterprise_value_usd || d.enterprise_value,
-                                announced_date: d.announced_date,
-                                closed_date: d.closed_date,
-                                status: d.status,
-                                stage: peMapDealStatus(d),
-                            }));
-                        }
+                const resp = await fetch(`${API}/pe/pipeline`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const deals = data.deals || data || [];
+                    if (Array.isArray(deals) && deals.length > 0) {
+                        _pePipelineDeals = deals.map(d => ({
+                            id: d.id || d.deal_id || d.company_id,
+                            company_name: d.company_name || d.deal_name || 'Unknown',
+                            industry: d.industry || 'Unknown',
+                            deal_type: d.deal_type || 'LBO',
+                            enterprise_value: d.enterprise_value_usd || d.enterprise_value,
+                            announced_date: d.announced_date || d.entry_date,
+                            closed_date: d.closed_date || d.exit_date,
+                            status: d.status,
+                            stage: peMapDealStatus(d),
+                            ebitda: d.ebitda_at_entry || d.ebitda,
+                            revenue: d.revenue_at_entry || d.revenue,
+                            entry_multiple: d.entry_multiple,
+                            assignee: d.lead_partner || d.assignee || '',
+                            priority: d.priority || 'medium',
+                        }));
                     }
-                } catch (e) { /* deals endpoint may not exist yet */ }
+                }
+            } catch (e) { /* pipeline endpoint may not exist */ }
 
-                panel.style.display = '';
-                peRenderKanban();
-            } catch (e) {
-                panel.style.display = 'none';
+            // Fallback: load from portfolio if pipeline is empty
+            if (_pePipelineDeals.length === 0) {
+                await peLoadPipelineFallback();
             }
+
+            peRenderPipelineKPIs();
+            peRenderFunnel();
+            peRenderKanban();
+        }
+
+        async function peLoadPipelineFallback() {
+            const firmId = document.getElementById('pe-firm-select').value;
+            if (!firmId) return;
+            try {
+                const resp = await fetch(`${API}/pe/benchmarks/portfolio/${firmId}`);
+                if (!resp.ok) return;
+                const portData = await resp.json();
+                const companies = portData.companies || portData || [];
+                _pePipelineDeals = companies.map(c => ({
+                    id: c.company_id,
+                    company_name: c.company_name,
+                    industry: c.industry || 'Unknown',
+                    deal_type: c.status === 'Exited' ? 'Exit' : 'LBO',
+                    enterprise_value: null,
+                    announced_date: null,
+                    status: c.status,
+                    stage: c.status === 'Exited' ? 'Won' : 'Screening',
+                    priority: 'medium',
+                    assignee: '',
+                }));
+            } catch (e) { /* skip */ }
+        }
+
+        async function peLoadPipeline(firmId) {
+            // Called from peLoadPortfolio — if on pipeline subtab, reload
+            if (_peActiveSubtab === 'pipeline') peLoadPipelineTab();
+        }
+
+        function peRenderPipelineKPIs() {
+            const deals = _pePipelineDeals;
+            const active = deals.filter(d => !['Won','Lost'].includes(d.stage));
+            const won = deals.filter(d => d.stage === 'Won');
+            const lost = deals.filter(d => d.stage === 'Lost');
+            const totalValue = deals.reduce((s, d) => s + (d.enterprise_value || 0), 0);
+            const avgDays = active.length > 0
+                ? Math.round(active.reduce((s, d) => {
+                    const ref = d.announced_date ? new Date(d.announced_date) : new Date();
+                    return s + Math.max(0, (new Date() - ref) / 86400000);
+                }, 0) / active.length)
+                : 0;
+            const winRate = (won.length + lost.length) > 0
+                ? Math.round((won.length / (won.length + lost.length)) * 100)
+                : 0;
+
+            document.getElementById('pe-pk-total-value').textContent = totalValue > 0 ? `$${(totalValue / 1e6).toFixed(0)}M` : '$0M';
+            document.getElementById('pe-pk-active').textContent = active.length;
+            document.getElementById('pe-pk-avg-days').textContent = avgDays;
+            document.getElementById('pe-pk-win-rate').textContent = winRate + '%';
+        }
+
+        function peRenderFunnel() {
+            const el = document.getElementById('pe-pipeline-funnel');
+            const stages = PE_PIPELINE_STAGES;
+            const colors = { Screening: '#6366f1', DD: '#f59e0b', LOI: '#06b6d4', Closing: '#8b5cf6', Won: '#10b981', Lost: '#ef4444' };
+            const max = Math.max(1, ...stages.map(s => _pePipelineDeals.filter(d => d.stage === s).length));
+            el.innerHTML = stages.map(s => {
+                const count = _pePipelineDeals.filter(d => d.stage === s).length;
+                const pct = Math.max(5, (count / max) * 100);
+                return `<div class="pe-funnel-bar">
+                    <span class="pe-funnel-label">${s}</span>
+                    <div class="pe-funnel-track"><div class="pe-funnel-fill" style="width:${pct}%;background:${colors[s] || '#6366f1'}"></div></div>
+                    <span class="pe-funnel-count">${count}</span>
+                </div>`;
+            }).join('');
         }
 
         function peRenderKanban() {
+            const stageValues = {};
             for (const stage of PE_PIPELINE_STAGES) {
                 const container = document.getElementById(`pe-kb-cards-${stage}`);
                 const countEl = document.getElementById(`pe-kb-count-${stage}`);
@@ -9991,13 +10101,15 @@
 
                 const deals = _pePipelineDeals.filter(d => d.stage === stage);
                 countEl.textContent = deals.length;
+                stageValues[stage] = deals.reduce((s, d) => s + (d.enterprise_value || 0), 0);
 
                 for (const d of deals) {
-                    const evStr = d.enterprise_value
-                        ? `$${(d.enterprise_value / 1000000).toFixed(0)}M`
-                        : '';
+                    const evStr = d.enterprise_value ? `$${(d.enterprise_value / 1e6).toFixed(0)}M` : '';
                     const daysStr = peDealDays(d);
                     const typeClass = (d.deal_type || '').replace(/[^a-zA-Z-]/g, '');
+                    const indClass = ['Healthcare','Software','Industrials','Technology'].includes(d.industry) ? d.industry : 'default';
+                    const priColor = d.priority === 'high' ? '#ef4444' : d.priority === 'low' ? '#22c55e' : '#f59e0b';
+                    const initials = d.assignee ? d.assignee.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2) : '';
 
                     const card = document.createElement('div');
                     card.className = 'pe-deal-card';
@@ -10005,13 +10117,21 @@
                     card.dataset.dealId = d.id;
                     card.ondragstart = function(e) { peKanbanDragStart(e, d.id); };
                     card.ondragend = function(e) { e.target.classList.remove('dragging'); };
+                    card.onclick = function(e) { if (e.target.tagName !== 'SELECT') peExpandDeal(d.id); };
                     card.innerHTML = `
-                        <div class="pe-deal-card-name">${peEsc(d.company_name)}</div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div class="pe-deal-card-name">${peEsc(d.company_name)}</div>
+                            <span style="width:8px;height:8px;border-radius:50%;background:${priColor};flex-shrink:0;" title="${d.priority} priority"></span>
+                        </div>
                         <div class="pe-deal-card-meta">
+                            <span class="pe-industry-pill ${indClass}" style="font-size:0.6rem;">${peEsc(d.industry)}</span>
                             <span class="pe-deal-card-type ${typeClass}">${peEsc(d.deal_type)}</span>
                             ${evStr ? `<span class="pe-deal-card-size">${evStr}</span>` : ''}
                         </div>
-                        ${daysStr ? `<div class="pe-deal-card-days">${daysStr}</div>` : ''}
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.35rem;">
+                            ${daysStr ? `<span class="pe-deal-card-days" style="margin:0">${daysStr}</span>` : '<span></span>'}
+                            ${initials ? `<span style="background:var(--bg);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:700;color:var(--text-muted)">${initials}</span>` : ''}
+                        </div>
                         <select class="pe-deal-card-stage-select" onchange="peMoveDeal(${d.id}, this.value)" onclick="event.stopPropagation()">
                             ${PE_PIPELINE_STAGES.map(s => `<option value="${s}" ${s === stage ? 'selected' : ''}>${s}</option>`).join('')}
                         </select>
@@ -10019,6 +10139,40 @@
                     container.appendChild(card);
                 }
             }
+        }
+
+        function peExpandDeal(dealId) {
+            const deal = _pePipelineDeals.find(d => d.id === dealId);
+            const el = document.getElementById('pe-deal-expanded');
+            if (!deal) { el.style.display = 'none'; return; }
+            if (el.dataset.dealId == dealId && el.style.display !== 'none') { el.style.display = 'none'; return; }
+            el.dataset.dealId = dealId;
+            el.style.display = '';
+            const evStr = deal.enterprise_value ? `$${(deal.enterprise_value / 1e6).toFixed(1)}M` : '\u2014';
+            const revStr = deal.revenue ? `$${(deal.revenue / 1e6).toFixed(1)}M` : '\u2014';
+            const ebitdaStr = deal.ebitda ? `$${(deal.ebitda / 1e6).toFixed(1)}M` : '\u2014';
+            const multStr = deal.entry_multiple ? `${deal.entry_multiple.toFixed(1)}x` : '\u2014';
+            el.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <h4 style="margin:0;font-size:1rem;">${peEsc(deal.company_name)}</h4>
+                    <button onclick="document.getElementById('pe-deal-expanded').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.2rem">\u2715</button>
+                </div>
+                <div class="pe-deal-detail-grid">
+                    <div class="pe-deal-detail-item"><div class="label">Enterprise Value</div><div class="value">${evStr}</div></div>
+                    <div class="pe-deal-detail-item"><div class="label">Entry Multiple</div><div class="value">${multStr}</div></div>
+                    <div class="pe-deal-detail-item"><div class="label">Revenue</div><div class="value">${revStr}</div></div>
+                    <div class="pe-deal-detail-item"><div class="label">EBITDA</div><div class="value">${ebitdaStr}</div></div>
+                    <div class="pe-deal-detail-item"><div class="label">Deal Type</div><div class="value">${peEsc(deal.deal_type)}</div></div>
+                    <div class="pe-deal-detail-item"><div class="label">Current Stage</div><div class="value">${peEsc(deal.stage)}</div></div>
+                    <div class="pe-deal-detail-item"><div class="label">Entry Date</div><div class="value">${deal.announced_date || '\u2014'}</div></div>
+                    <div class="pe-deal-detail-item"><div class="label">Days in Pipeline</div><div class="value">${peDealDays(deal) || '0d'}</div></div>
+                </div>
+                <div class="pe-deal-actions">
+                    <button onclick="peSelectCompany(${deal.id})">View Benchmarks</button>
+                    <button onclick="peSelectCompany(${deal.id})">View Exit Readiness</button>
+                </div>
+            `;
+            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
         function peDealDays(deal) {
@@ -10072,14 +10226,12 @@
 
         function pePipelineToggle() {
             const kanban = document.getElementById('pe-kanban');
-            const btn = document.getElementById('pe-pipeline-toggle-btn');
-            if (kanban.style.display === 'none') {
-                kanban.style.display = '';
-                btn.textContent = 'Collapse';
-            } else {
-                kanban.style.display = 'none';
-                btn.textContent = 'Expand';
-            }
+            if (kanban.style.display === 'none') kanban.style.display = '';
+            else kanban.style.display = 'none';
+        }
+
+        async function peLoadMarketTab() {
+            // Placeholder — implemented in Phase 3
         }
 
         // ===== Data Quality Tab =====
