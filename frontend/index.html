@@ -1375,6 +1375,45 @@
         .pe-deal-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
         .pe-deal-actions button { padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 5px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text); cursor: pointer; }
         .pe-deal-actions button:hover { border-color: var(--primary); color: var(--primary); }
+
+        /* Market Intelligence */
+        .pe-market-sectors { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .pe-sector-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; }
+        .pe-sector-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+        .pe-sector-card-name { font-size: 1rem; font-weight: 700; }
+        .pe-sector-trend-arrow { font-size: 1.25rem; }
+        .pe-sector-trend-arrow.up { color: var(--success); }
+        .pe-sector-trend-arrow.down { color: var(--error); }
+        .pe-sector-trend-arrow.flat { color: var(--text-muted); }
+        .pe-momentum-gauge { position: relative; height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; margin-bottom: 0.5rem; }
+        .pe-momentum-fill { height: 100%; border-radius: 4px; transition: width 0.6s; }
+        .pe-sector-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+        .pe-sector-stat { font-size: 0.75rem; }
+        .pe-sector-stat .label { color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase; }
+        .pe-sector-stat .value { font-weight: 600; font-size: 0.9rem; }
+
+        /* Deals Timeline */
+        .pe-deals-timeline { margin-bottom: 1.5rem; }
+        .pe-timeline-item { display: flex; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid rgba(51,65,85,0.4); }
+        .pe-timeline-date { width: 70px; flex-shrink: 0; font-size: 0.7rem; color: var(--text-muted); padding-top: 0.15rem; }
+        .pe-timeline-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 0.3rem; }
+        .pe-timeline-content { flex: 1; }
+        .pe-timeline-title { font-size: 0.85rem; font-weight: 600; }
+        .pe-timeline-meta { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted); }
+        .pe-deal-type-pill { padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+        .pe-deal-type-pill.strategic { background: rgba(34,197,94,0.12); color: #4ade80; }
+        .pe-deal-type-pill.secondary { background: rgba(99,102,241,0.12); color: #818cf8; }
+        .pe-deal-type-pill.ipo { background: rgba(245,158,11,0.12); color: #fbbf24; }
+        .pe-deal-type-pill.lbo { background: rgba(6,182,212,0.12); color: var(--accent); }
+
+        /* Fragmentation Heatmap */
+        .pe-frag-heatmap { width: 100%; border-collapse: collapse; }
+        .pe-frag-heatmap th { text-align: left; padding: 0.5rem 0.625rem; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        .pe-frag-heatmap td { padding: 0.6rem 0.625rem; font-size: 0.8rem; border-bottom: 1px solid rgba(51,65,85,0.4); }
+        .pe-frag-bar { height: 18px; border-radius: 3px; display: flex; align-items: center; padding-left: 6px; font-size: 0.7rem; font-weight: 600; color: white; min-width: 24px; }
+        .pe-frag-bar.high { background: linear-gradient(90deg, #22c55e, #10b981); }
+        .pe-frag-bar.mid { background: linear-gradient(90deg, #f59e0b, #eab308); }
+        .pe-frag-bar.low { background: linear-gradient(90deg, #ef4444, #dc2626); }
     </style>
 </head>
 <body>
@@ -2163,11 +2202,41 @@
                 </div>
             </div><!-- /pe-subtab-pipeline -->
 
-            <!-- SUB-TAB: Market (Phase 3) -->
+            <!-- SUB-TAB: Market -->
             <div class="pe-subtab" id="pe-subtab-market">
-                <div class="pe-empty">
-                    <div class="pe-empty-icon">📈</div>
-                    <div>Market Intelligence loading...</div>
+                <!-- Sector Overview Cards -->
+                <div class="card" style="margin-bottom:1.5rem;">
+                    <div class="card-title">Sector Overview</div>
+                    <div class="pe-market-sectors" id="pe-market-sectors">
+                        <div class="pe-empty"><div class="pe-empty-icon">📈</div><div>Loading sector data...</div></div>
+                    </div>
+                </div>
+
+                <!-- Recent Deals Timeline -->
+                <div class="card" style="margin-bottom:1.5rem;">
+                    <div class="card-title">Recent Deals</div>
+                    <div class="pe-deals-timeline" id="pe-deals-timeline">
+                        <div class="pe-empty">No recent deals to display.</div>
+                    </div>
+                </div>
+
+                <!-- Fragmentation Heatmap -->
+                <div class="card">
+                    <div class="card-title">Industry Fragmentation</div>
+                    <div style="overflow-x:auto;">
+                        <table class="pe-frag-heatmap" id="pe-frag-heatmap">
+                            <thead>
+                                <tr>
+                                    <th>Industry</th>
+                                    <th>NAICS</th>
+                                    <th>Fragmentation Score</th>
+                                    <th>Establishments</th>
+                                    <th>Top States</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pe-frag-heatmap-body"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div><!-- /pe-subtab-market -->
 
@@ -10230,8 +10299,173 @@
             else kanban.style.display = 'none';
         }
 
+        let _peMarketLoaded = false;
+
         async function peLoadMarketTab() {
-            // Placeholder — implemented in Phase 3
+            if (_peMarketLoaded) return;
+            _peMarketLoaded = true;
+
+            // Load all 3 sections in parallel
+            await Promise.all([
+                peLoadSectorOverview(),
+                peLoadDealsTimeline(),
+                peLoadFragmentationHeatmap(),
+            ]);
+        }
+
+        async function peLoadSectorOverview() {
+            const el = document.getElementById('pe-market-sectors');
+            try {
+                const resp = await fetch(`${API}/pe/market-scanner/signals`);
+                if (!resp.ok) throw new Error('signals endpoint not available');
+                const data = await resp.json();
+                const sectors = data.sectors || data.signals || data || [];
+
+                if (!Array.isArray(sectors) || sectors.length === 0) {
+                    el.innerHTML = '<div class="pe-empty">No sector data available. Seed demo data first.</div>';
+                    return;
+                }
+
+                el.innerHTML = sectors.map(s => {
+                    const momentum = s.momentum_score || s.momentum || 50;
+                    const signal = (s.signal || s.momentum_signal || 'neutral').toLowerCase();
+                    const arrowClass = signal === 'bullish' ? 'up' : signal === 'bearish' ? 'down' : 'flat';
+                    const arrowChar = signal === 'bullish' ? '\u2191' : signal === 'bearish' ? '\u2193' : '\u2192';
+                    const momColor = momentum >= 60 ? '#22c55e' : momentum >= 40 ? '#f59e0b' : '#ef4444';
+                    const dealCount = s.deal_count || s.total_deals || 0;
+                    const avgMult = s.avg_multiple || s.median_multiple || 0;
+                    return `<div class="pe-sector-card">
+                        <div class="pe-sector-card-header">
+                            <span class="pe-sector-card-name">${peEsc(s.sector || s.industry || 'Unknown')}</span>
+                            <span class="pe-sector-trend-arrow ${arrowClass}">${arrowChar}</span>
+                        </div>
+                        <div class="pe-momentum-gauge">
+                            <div class="pe-momentum-fill" style="width:${momentum}%;background:${momColor}"></div>
+                        </div>
+                        <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem;">Momentum: ${momentum}/100 (${signal})</div>
+                        <div class="pe-sector-stats">
+                            <div class="pe-sector-stat"><div class="label">Deals (12mo)</div><div class="value">${dealCount}</div></div>
+                            <div class="pe-sector-stat"><div class="label">Avg Multiple</div><div class="value">${avgMult ? avgMult.toFixed(1) + 'x' : '\u2014'}</div></div>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                // Fallback: show static sectors
+                el.innerHTML = ['Healthcare', 'Software/Technology', 'Industrials'].map(name => `
+                    <div class="pe-sector-card">
+                        <div class="pe-sector-card-header">
+                            <span class="pe-sector-card-name">${name}</span>
+                            <span class="pe-sector-trend-arrow flat">\u2192</span>
+                        </div>
+                        <div class="pe-momentum-gauge"><div class="pe-momentum-fill" style="width:50%;background:#f59e0b"></div></div>
+                        <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem;">Momentum: data pending</div>
+                        <div class="pe-sector-stats">
+                            <div class="pe-sector-stat"><div class="label">Deals (12mo)</div><div class="value">\u2014</div></div>
+                            <div class="pe-sector-stat"><div class="label">Avg Multiple</div><div class="value">\u2014</div></div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        async function peLoadDealsTimeline() {
+            const el = document.getElementById('pe-deals-timeline');
+            try {
+                const resp = await fetch(`${API}/pe/pipeline`);
+                if (!resp.ok) throw new Error('no deals');
+                const data = await resp.json();
+                let deals = data.deals || data || [];
+                if (!Array.isArray(deals)) deals = [];
+
+                // Sort by date descending, take recent 15
+                deals.sort((a, b) => {
+                    const da = a.closed_date || a.announced_date || a.exit_date || '';
+                    const db = b.closed_date || b.announced_date || b.exit_date || '';
+                    return db.localeCompare(da);
+                });
+                deals = deals.slice(0, 15);
+
+                if (deals.length === 0) {
+                    el.innerHTML = '<div class="pe-empty">No recent deals to display.</div>';
+                    return;
+                }
+
+                const typeColors = { 'Exit': '#22c55e', 'LBO': '#6366f1', 'Add-on': '#f59e0b', 'Growth': '#06b6d4', 'Strategic Sale': '#22c55e', 'Secondary Buyout': '#818cf8', 'IPO': '#fbbf24' };
+
+                el.innerHTML = deals.map(d => {
+                    const date = d.closed_date || d.announced_date || d.exit_date || '';
+                    const dateStr = date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '\u2014';
+                    const dealType = d.deal_type || d.exit_type || 'LBO';
+                    const typeClass = dealType.toLowerCase().includes('strategic') ? 'strategic' : dealType.toLowerCase().includes('secondary') ? 'secondary' : dealType.toLowerCase().includes('ipo') ? 'ipo' : 'lbo';
+                    const dotColor = typeColors[dealType] || '#6366f1';
+                    const ev = d.enterprise_value_usd || d.enterprise_value;
+                    const evStr = ev ? `$${(ev / 1e6).toFixed(0)}M` : '';
+                    const mult = d.exit_multiple || d.entry_multiple;
+                    const multStr = mult ? `${mult.toFixed(1)}x` : '';
+                    return `<div class="pe-timeline-item">
+                        <div class="pe-timeline-date">${dateStr}</div>
+                        <div class="pe-timeline-dot" style="background:${dotColor}"></div>
+                        <div class="pe-timeline-content">
+                            <div class="pe-timeline-title">${peEsc(d.company_name || d.deal_name || 'Unknown')}</div>
+                            <div class="pe-timeline-meta">
+                                <span class="pe-deal-type-pill ${typeClass}">${peEsc(dealType)}</span>
+                                ${evStr ? `<span>${evStr}</span>` : ''}
+                                ${multStr ? `<span>${multStr}</span>` : ''}
+                                ${d.industry ? `<span>${peEsc(d.industry)}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                el.innerHTML = '<div class="pe-empty">No deal data available. Seed demo data first.</div>';
+            }
+        }
+
+        async function peLoadFragmentationHeatmap() {
+            const tbody = document.getElementById('pe-frag-heatmap-body');
+            const industries = [
+                { name: 'Physicians Offices', naics: '621111' },
+                { name: 'HVAC Contractors', naics: '238220' },
+                { name: 'Auto Repair', naics: '811111' },
+                { name: 'Dental Offices', naics: '621210' },
+                { name: 'Custom Software', naics: '541511' },
+                { name: 'Engineering Services', naics: '541330' },
+            ];
+
+            const promises = industries.map(async ind => {
+                try {
+                    const resp = await fetch(`${API}/pe/fragmentation/${ind.naics}`);
+                    if (!resp.ok) return { ...ind, score: null };
+                    const data = await resp.json();
+                    return {
+                        ...ind,
+                        score: data.score || data.fragmentation_score || null,
+                        establishments: data.total_establishments || data.establishments || null,
+                        topStates: data.top_counties ? data.top_counties.slice(0, 3).map(c => c.state || c.county).join(', ') : (data.top_states || []).slice(0, 3).join(', '),
+                    };
+                } catch (e) { return { ...ind, score: null }; }
+            });
+
+            const results = await Promise.all(promises);
+            const valid = results.filter(r => r.score != null);
+
+            if (valid.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted)">Fragmentation data not available. Run fragmentation scan first.</td></tr>';
+                return;
+            }
+
+            valid.sort((a, b) => b.score - a.score);
+            tbody.innerHTML = valid.map(r => {
+                const fragClass = r.score >= 70 ? 'high' : r.score >= 40 ? 'mid' : 'low';
+                const estStr = r.establishments ? r.establishments.toLocaleString() : '\u2014';
+                return `<tr>
+                    <td style="font-weight:600">${peEsc(r.name)}</td>
+                    <td style="font-family:monospace;font-size:0.75rem">${r.naics}</td>
+                    <td><div class="pe-frag-bar ${fragClass}" style="width:${Math.max(20, r.score)}%">${r.score.toFixed(0)}</div></td>
+                    <td style="text-align:right">${estStr}</td>
+                    <td style="font-size:0.75rem;color:var(--text-muted)">${peEsc(r.topStates || '\u2014')}</td>
+                </tr>`;
+            }).join('');
         }
 
         // ===== Data Quality Tab =====
