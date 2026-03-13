@@ -30,6 +30,8 @@ from app.sources.pe.demo_seeder import (
     DEALS,
     INVESTMENTS,
     FUND_PERFORMANCE,
+    INDEPENDENT_TARGETS,
+    HISTORICAL_EXIT_COMPANIES,
     _generate_financials,
 )
 
@@ -110,11 +112,15 @@ class TestPEDemoSeeder:
             assert r1["ebitda_usd"] == r2["ebitda_usd"]
 
     def test_seeder_deals_reference_valid_companies(self):
-        """Bonus: All deals reference companies that exist in PORTFOLIO_COMPANIES."""
+        """Bonus: All deals reference companies that exist in any company list."""
         all_company_names = set()
         for firm_name, companies in PORTFOLIO_COMPANIES.items():
             for co in companies:
                 all_company_names.add(co["name"])
+        for target in INDEPENDENT_TARGETS:
+            all_company_names.add(target["name"])
+        for co in HISTORICAL_EXIT_COMPANIES:
+            all_company_names.add(co["name"])
 
         for deal in DEALS:
             assert deal["company_name"] in all_company_names, (
