@@ -1716,6 +1716,47 @@ class PipelineInsightsResponse(BaseModel):
     upcoming_closes: List[UpcomingCloseResponse] = []
 
 
+class FirmPipelineResponse(BaseModel):
+    firm_id: int
+    firm_name: str
+    total_deals: int = 0
+    stages: Dict[str, List[PipelineDealResponse]] = {}
+
+
+class FirmPipelineCreateRequest(BaseModel):
+    company_id: int
+    deal_name: str
+    deal_type: str = "LBO"
+    deal_sub_type: Optional[str] = None
+    status: str = "Screening"
+    enterprise_value_usd: Optional[float] = None
+    ev_ebitda_multiple: Optional[float] = None
+    ev_revenue_multiple: Optional[float] = None
+    ltm_revenue_usd: Optional[float] = None
+    ltm_ebitda_usd: Optional[float] = None
+    seller_name: Optional[str] = None
+    seller_type: Optional[str] = None
+    announced_date: Optional[date] = None
+    expected_close_date: Optional[date] = None
+
+
+class StageUpdateRequest(BaseModel):
+    stage: str
+
+
+class FirmInsightsResponse(BaseModel):
+    firm_id: int = 0
+    firm_name: str = ""
+    total_deals: int = 0
+    active_deals: int = 0
+    won_deals: int = 0
+    lost_deals: int = 0
+    total_pipeline_value_usd: float = 0
+    avg_deal_size_usd: float = 0
+    win_rate_pct: Optional[float] = None
+    stage_breakdown: Dict[str, int] = {}
+
+
 @router.get(
     "/pipeline/insights",
     response_model=PipelineInsightsResponse,
@@ -1802,3 +1843,96 @@ async def update_pipeline_deal(
         raise HTTPException(status_code=404, detail=result["error"])
 
     return PipelineDealResponse(**result)
+
+
+# =============================================================================
+# Firm-Scoped Pipeline (v2)
+# =============================================================================
+
+
+@router.get(
+    "/pipeline/{firm_id}",
+    response_model=FirmPipelineResponse,
+    summary="Firm pipeline by stage",
+)
+async def get_firm_pipeline(
+    firm_id: int,
+    db: Session = Depends(get_db),
+) -> FirmPipelineResponse:
+    """Get a firm's deal pipeline grouped by stage (Screening, DD, LOI, Closing, Won, Lost)."""
+    from app.core.pe_deal_pipeline import DealPipelineService
+
+    service = DealPipelineService(db)
+    result = service.list_firm_deals(firm_id)
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return FirmPipelineResponse(**result)
+
+
+@router.post(
+    "/pipeline/{firm_id}/deals",
+    response_model=PipelineDealResponse,
+    summary="Create firm pipeline deal",
+    status_code=201,
+)
+async def create_firm_pipeline_deal(
+    firm_id: int,
+    request: FirmPipelineCreateRequest,
+    db: Session = Depends(get_db),
+) -> PipelineDealResponse:
+    """Create a deal in a firm's pipeline. Links deal to firm via participant record."""
+    from app.core.pe_deal_pipeline import DealPipelineService
+
+    service = DealPipelineService(db)
+    result = service.create_firm_deal(firm_id, request.model_dump())
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return PipelineDealResponse(**result)
+
+
+@router.patch(
+    "/deals/{deal_id}/stage",
+    response_model=PipelineDealResponse,
+    summary="Move deal to stage",
+)
+async def update_deal_stage(
+    deal_id: int,
+    request: StageUpdateRequest,
+    db: Session = Depends(get_db),
+) -> PipelineDealResponse:
+    """Move a deal between pipeline stages (Screening, DD, LOI, Closing, Won, Lost)."""
+    from app.core.pe_deal_pipeline import DealPipelineService
+
+    service = DealPipelineService(db)
+    result = service.update_deal_stage(deal_id, request.stage)
+
+    if "error" in result:
+        status = 400 if "Invalid stage" in result["error"] else 404
+        raise HTTPException(status_code=status, detail=result["error"])
+
+    return PipelineDealResponse(**result)
+
+
+@router.get(
+    "/pipeline/{firm_id}/insights",
+    response_model=FirmInsightsResponse,
+    summary="Firm pipeline health",
+)
+async def get_firm_pipeline_insights(
+    firm_id: int,
+    db: Session = Depends(get_db),
+) -> FirmInsightsResponse:
+    """Pipeline health for a specific firm: total value, conversion rates, stage breakdown."""
+    from app.core.pe_deal_pipeline import DealPipelineService
+
+    service = DealPipelineService(db)
+    result = service.get_firm_insights(firm_id)
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return FirmInsightsResponse(**result)
