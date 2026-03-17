@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
+_tables_ensured = False
+
 # Valid pipeline stages
 PIPELINE_STAGES = [
     "sourced",
@@ -29,10 +31,24 @@ class DealTracker:
 
     def __init__(self, db: Session):
         self.db = db
-        self._ensure_tables()
+        global _tables_ensured
+        if not _tables_ensured:
+            self._ensure_tables()
+            _tables_ensured = True
 
     def _ensure_tables(self):
         """Create tables if they don't exist."""
+        # Skip if deals table already exists — avoids PostgreSQL privilege check
+        # on CREATE INDEX even when IF NOT EXISTS would be a no-op.
+        exists = self.db.execute(
+            text(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_name = 'deals' AND table_schema = 'public'"
+            )
+        ).scalar()
+        if exists:
+            return
+
         self.db.execute(
             text("""
             CREATE TABLE IF NOT EXISTS deals (

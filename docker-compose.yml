@@ -48,6 +48,18 @@ x-api-keys: &api-keys
   PITCHBOOK_API_KEY: ${PITCHBOOK_API_KEY:-}
 
 services:
+  cloudsqlproxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:latest
+    command: --address 0.0.0.0 --port 5432 nexdata-cloud:us-central1:nexdata-pg
+    ports:
+      - "5435:5432"
+    volumes:
+      - ${APPDATA}/gcloud/application_default_credentials.json:/credentials.json:ro
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /credentials.json
+    profiles:
+      - cloud
+
   postgres:
     image: postgres:14-alpine
     environment:
@@ -76,7 +88,8 @@ services:
       - 8.8.8.8
       - 8.8.4.4
     environment:
-      DATABASE_URL: postgresql://nexdata:nexdata_dev_password@postgres:5432/nexdata
+      DATABASE_URL: ${DATABASE_URL:-postgresql://nexdata:nexdata_dev_password@postgres:5432/nexdata}
+      NEXDATA_ENV: ${NEXDATA_ENV:-local}
       <<: *api-keys
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
       MAX_CONCURRENCY: 4
@@ -104,7 +117,8 @@ services:
       args:
         INSTALL_BROWSERS: ${INSTALL_BROWSERS:-0}
     environment:
-      DATABASE_URL: postgresql://nexdata:nexdata_dev_password@postgres:5432/nexdata
+      DATABASE_URL: ${DATABASE_URL:-postgresql://nexdata:nexdata_dev_password@postgres:5432/nexdata}
+      NEXDATA_ENV: ${NEXDATA_ENV:-local}
       <<: *api-keys
       WORKER_MODE: "1"
       WORKER_POLL_INTERVAL: "2.0"

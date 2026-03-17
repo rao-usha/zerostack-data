@@ -43,6 +43,7 @@ htmlcov/
 
 # Environment
 .env
+.env.active
 .env.local
 .env.*.local
 
@@ -50,6 +51,8 @@ htmlcov/
 *.db
 *.sqlite
 *.sqlite3
+*.dump
+cloud-sql-proxy*
 
 # Logs
 *.log
