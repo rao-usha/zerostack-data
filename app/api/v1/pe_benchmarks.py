@@ -105,6 +105,7 @@ class SeedDemoResponse(BaseModel):
     status: str
     tables: Dict[str, int] = {}
     total_rows: int = 0
+    firm_id: Optional[int] = None
 
 
 class FirmSummaryResponse(BaseModel):
@@ -203,10 +204,14 @@ async def seed_demo_data(db: Session = Depends(get_db)):
 
     try:
         counts = await seed_pe_demo_data(db)
+        summit_ridge = db.execute(
+            select(PEFirm.id).where(PEFirm.name == "Summit Ridge Partners")
+        ).scalar_one_or_none()
         return SeedDemoResponse(
             status="success",
             tables=counts,
             total_rows=sum(counts.values()),
+            firm_id=summit_ridge,
         )
     except Exception as e:
         logger.exception("Demo seeder failed: %s", e)

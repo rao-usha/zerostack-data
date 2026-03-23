@@ -322,7 +322,7 @@
 
 <script>
     const API = '/api/v1';
-    const FIRM_ID = 166; // Summit Ridge Partners
+    let _firmId = null; // resolved dynamically from DB
     let _currentStep = 0;
     let _portfolioData = [];
     let _targetCompanyId = null; // MedVantage
@@ -358,21 +358,35 @@
     function prevStep() { if (_currentStep > 0) goStep(_currentStep - 1); }
 
     // ===== Data Loading =====
-    async function checkSeedData() {
+    async function resolveFirmId() {
+        // Look up Summit Ridge Partners by name so we aren't tied to a hardcoded ID
         try {
-            const r = await fetch(API + '/pe/benchmarks/portfolio/' + FIRM_ID);
+            const r = await fetch(API + '/pe/firms/search?q=Summit+Ridge+Partners&limit=1');
             if (r.ok) {
                 const data = await r.json();
-                if (data && data.length > 0) {
-                    _portfolioData = data;
-                    // Find MedVantage or first company
-                    const mv = data.find(c => c.company_name && c.company_name.includes('MedVantage'));
-                    _targetCompanyId = mv ? mv.company_id : data[0].company_id;
-                    renderPortfolio();
-                    return;
-                }
+                if (data && data.length > 0) { _firmId = data[0].id; return true; }
             }
         } catch (e) { /* fall through */ }
+        return false;
+    }
+
+    async function checkSeedData() {
+        const found = await resolveFirmId();
+        if (found && _firmId) {
+            try {
+                const r = await fetch(API + '/pe/benchmarks/portfolio/' + _firmId);
+                if (r.ok) {
+                    const data = await r.json();
+                    if (data && data.length > 0) {
+                        _portfolioData = data;
+                        const mv = data.find(c => c.company_name && c.company_name.includes('MedVantage'));
+                        _targetCompanyId = mv ? mv.company_id : data[0].company_id;
+                        renderPortfolio();
+                        return;
+                    }
+                }
+            } catch (e) { /* fall through */ }
+        }
 
         // No data — show seed screen
         document.getElementById('seed-screen').style.display = '';
@@ -386,6 +400,7 @@
             const r = await fetch(API + '/pe/seed-demo', { method: 'POST' });
             if (!r.ok) throw new Error('Seed failed');
             const data = await r.json();
+            if (data.firm_id) _firmId = data.firm_id;
             btn.textContent = 'Seeded ' + data.total_rows + ' rows!';
             setTimeout(() => {
                 document.getElementById('seed-screen').style.display = 'none';
@@ -588,7 +603,7 @@
     async function loadLeadershipGraph() {
         const container = document.getElementById('graph-container');
         try {
-            const r = await fetch(API + '/pe/leadership-graph/' + FIRM_ID);
+            const r = await fetch(API + '/pe/leadership-graph/' + _firmId);
             if (!r.ok) throw new Error(r.statusText);
             const graph = await r.json();
             if (!graph.nodes || !graph.nodes.length) {
