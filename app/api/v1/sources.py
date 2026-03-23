@@ -150,7 +150,7 @@ def _schedule_info(db: Session, source: str) -> Optional[Dict[str, Any]]:
         SELECT id, name, frequency, cron_expression, is_active,
                last_run_at, next_run_at
         FROM ingestion_schedules
-        WHERE source = :source AND is_active = true
+        WHERE source = :source AND is_active = 1
         ORDER BY id
         LIMIT 1
     """)

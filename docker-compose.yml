@@ -54,7 +54,7 @@ services:
     ports:
       - "5435:5432"
     volumes:
-      - ${APPDATA}/gcloud/application_default_credentials.json:/credentials.json:ro
+      - ${HOME}/.config/gcloud/application_default_credentials.json:/credentials.json:ro
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /credentials.json
     profiles:
