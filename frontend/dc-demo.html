@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexdata — Datacenter Site Selection Demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --primary: #6366f1;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --accent: #06b6d4;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+        /* Header */
+        .demo-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1rem 2rem; background: var(--bg-card); border-bottom: 1px solid var(--border);
+        }
+        .demo-logo { display: flex; align-items: center; gap: 0.75rem; }
+        .demo-logo h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .demo-logo .tag { color: var(--accent); font-size: 0.75rem; font-weight: 600; background: rgba(6,182,212,0.15); padding: 0.2rem 0.6rem; border-radius: 10px; }
+        .demo-back { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; }
+        .demo-back:hover { color: var(--text); }
+
+        /* Progress */
+        .progress-bar { display: flex; align-items: center; gap: 0; padding: 0 2rem; background: var(--bg-card); border-bottom: 1px solid var(--border); }
+        .progress-step {
+            flex: 1; padding: 0.75rem 1rem; text-align: center; font-size: 0.8rem; font-weight: 500;
+            color: var(--text-muted); border-bottom: 3px solid transparent; cursor: pointer; transition: all 0.2s;
+        }
+        .progress-step:hover { color: var(--text); background: rgba(99,102,241,0.05); }
+        .progress-step.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 700; }
+        .progress-step.completed { color: var(--success); border-bottom-color: var(--success); }
+        .progress-step .step-num {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 22px; height: 22px; border-radius: 50%; font-size: 0.7rem; font-weight: 700;
+            background: var(--bg-input); color: var(--text-muted); margin-right: 0.5rem; vertical-align: middle;
+        }
+        .progress-step.active .step-num { background: var(--primary); color: white; }
+        .progress-step.completed .step-num { background: var(--success); color: white; }
+
+        /* Content */
+        .demo-content { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        .step-panel { display: none; }
+        .step-panel.active { display: block; }
+
+        /* Narration box */
+        .narration {
+            background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(6,182,212,0.06));
+            border: 1px solid rgba(99,102,241,0.2); border-radius: 12px;
+            padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; position: relative;
+        }
+        .narration::before {
+            content: '💡'; position: absolute; top: -10px; left: 16px;
+            background: var(--bg); padding: 0 6px; font-size: 1rem;
+        }
+        .narration-title { font-size: 1rem; font-weight: 700; color: var(--primary); margin-bottom: 0.35rem; }
+        .narration-text { font-size: 0.875rem; color: var(--text-muted); line-height: 1.6; }
+
+        /* Navigation */
+        .demo-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+        .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; cursor: pointer; font-size: 0.875rem; font-weight: 600; transition: all 0.15s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: #4f46e5; }
+        .btn-secondary { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); }
+        .btn-secondary:hover { background: var(--border); color: var(--text); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { background: #16a34a; }
+
+        /* Cards & tables */
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .card-title { font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; }
+        .loading { text-align: center; padding: 2rem; color: var(--text-muted); }
+
+        /* Portfolio table */
+        .ptable { width: 100%; border-collapse: collapse; }
+        .ptable th { text-align: left; padding: 0.625rem 0.75rem; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        .ptable td { padding: 0.75rem; border-bottom: 1px solid rgba(51,65,85,0.5); font-size: 0.875rem; }
+        .ptable tbody tr { cursor: pointer; transition: background 0.12s; }
+        .ptable tbody tr:hover { background: rgba(99,102,241,0.08); }
+        .ptable tbody tr.selected { background: rgba(99,102,241,0.15); }
+
+        .pct-cell { font-weight: 600; }
+        .pct-cell.green { color: var(--success); }
+        .pct-cell.yellow { color: var(--warning); }
+        .pct-cell.red { color: var(--error); }
+
+        /* KPI cards */
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.25rem; }
+        @media (max-width: 768px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+        .kpi { background: var(--bg-input); border-radius: 8px; padding: 0.875rem; text-align: center; }
+        .kpi-value { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+        .kpi-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.25rem; }
+
+        /* Two-panel layout */
+        .two-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        @media (max-width: 1100px) { .two-panel { grid-template-columns: 1fr; } }
+
+        /* Sub-score bars */
+        .ss-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+        .ss-label { width: 140px; font-size: 0.8rem; color: var(--text-muted); text-align: right; flex-shrink: 0; }
+        .ss-bar-bg { flex: 1; height: 22px; background: var(--bg-input); border-radius: 4px; overflow: hidden; }
+        .ss-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; font-size: 0.7rem; font-weight: 600; color: white; min-width: 28px; }
+        .ss-grade { width: 28px; font-size: 0.8rem; font-weight: 700; text-align: center; }
+
+        .pill { padding: 0.15rem 0.55rem; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
+        .pill-active { background: rgba(34,197,94,0.15); color: var(--success); font-size: 0.65rem; text-transform: uppercase; }
+
+        /* Seed overlay */
+        .seed-overlay {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 4rem 2rem; text-align: center;
+        }
+        .seed-icon { font-size: 4rem; margin-bottom: 1rem; }
+        .seed-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .seed-text { color: var(--text-muted); max-width: 480px; margin-bottom: 1.5rem; line-height: 1.5; }
+
+        /* State scorecard grid */
+        .state-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
+        .state-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; cursor: pointer; transition: border-color 0.15s; text-align: center; }
+        .state-card:hover { border-color: var(--primary); }
+        .state-card.selected { border-color: var(--primary); background: rgba(99,102,241,0.08); }
+        .state-card .sc-state { font-size: 1.25rem; font-weight: 700; }
+        .state-card .sc-score { font-size: 1.75rem; font-weight: 700; color: var(--primary); }
+        .state-card .sc-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
+        .state-card .sc-badge { font-size: 0.7rem; padding: 0.1rem 0.5rem; border-radius: 10px; margin-top: 6px; display: inline-block; font-weight: 600; }
+        .badge-green { background: rgba(34,197,94,0.15); color: var(--success); }
+        .badge-yellow { background: rgba(245,158,11,0.15); color: var(--warning); }
+        .badge-red { background: rgba(239,68,68,0.12); color: var(--error); }
+
+        /* Thesis card */
+        .thesis-card { background: rgba(99,102,241,0.05); border: 1px solid rgba(99,102,241,0.2); border-radius: 10px; padding: 1.25rem; margin-top: 1rem; font-size: 0.875rem; line-height: 1.7; color: var(--text-muted); }
+        .thesis-card.loading { font-style: italic; }
+
+        /* Toast */
+        .toast { position: fixed; bottom: 24px; right: 24px; background: var(--success); color: white; padding: 0.75rem 1.25rem; border-radius: 8px; font-size: 0.875rem; font-weight: 600; opacity: 0; transition: opacity 0.3s; z-index: 9999; }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+    <header class="demo-header">
+        <div class="demo-logo">
+            <span style="font-size:1.5rem;">🏗️</span>
+            <h1>Nexdata</h1>
+            <span class="tag">Site Intel Demo</span>
+        </div>
+        <a href="index.html" class="demo-back">&larr; Back to Dashboard</a>
+    </header>
+
+    <nav class="progress-bar">
+        <div class="progress-step active" onclick="goStep(0)"><span class="step-num">1</span>Market Overview</div>
+        <div class="progress-step" onclick="goStep(1)"><span class="step-num">2</span>County Rankings</div>
+        <div class="progress-step" onclick="goStep(2)"><span class="step-num">3</span>Site Deep Dive</div>
+        <div class="progress-step" onclick="goStep(3)"><span class="step-num">4</span>Site Pipeline</div>
+    </nav>
+
+    <main class="demo-content">
+
+        <!-- No-data overlay -->
+        <div id="no-data-screen" style="display:none;">
+            <div class="seed-overlay">
+                <div class="seed-icon">📊</div>
+                <div class="seed-title">No Scoring Data Found</div>
+                <div class="seed-text">Run county scoring first: POST /api/v1/datacenter-sites/score-counties</div>
+            </div>
+        </div>
+
+        <!-- Step 0: Market Overview -->
+        <div id="step-0" class="step-panel active">
+            <div class="narration">
+                <div class="narration-title">Step 1: National Market — Where's the Power?</div>
+                <div class="narration-text">We scored every US county across <strong>18 live data sources</strong> — power capacity, fiber density, regulatory speed, workforce, environmental risk, and tax incentives. Click any state to drill into county rankings.</div>
+            </div>
+            <div class="kpi-grid" id="overview-kpis"></div>
+            <div id="state-grid" class="state-grid"></div>
+            <div id="overview-loading" class="loading">Loading national data...</div>
+            <div class="demo-nav">
+                <span></span>
+                <button class="btn btn-primary" onclick="goStep(1)" id="btn-to-rankings" disabled>View County Rankings &rarr;</button>
+            </div>
+        </div>
+
+        <!-- Step 1: County Rankings -->
+        <div id="step-1" class="step-panel">
+            <div class="narration">
+                <div class="narration-title" id="rankings-title">Step 2: County Rankings</div>
+                <div class="narration-text">Every county scored 0–100. Power infrastructure accounts for <strong>30% of the score</strong>. Click any county to see its full investment breakdown.</div>
+            </div>
+            <div class="card">
+                <div class="card-title" id="rankings-card-title">Top Counties</div>
+                <div style="overflow-x:auto;">
+                    <table class="ptable">
+                        <thead><tr><th>#</th><th>County</th><th>State</th><th>Overall</th><th>Power</th><th>Connectivity</th><th>Regulatory</th><th>Labor</th><th>Risk</th></tr></thead>
+                        <tbody id="rankings-body"></tbody>
+                    </table>
+                </div>
+                <div id="rankings-loading" class="loading" style="display:none;">Loading rankings...</div>
+            </div>
+            <div class="demo-nav">
+                <button class="btn btn-secondary" onclick="goStep(0)">&larr; Back</button>
+                <button class="btn btn-primary" onclick="goStep(2)" id="btn-to-deepdive" disabled>Deep Dive &rarr;</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Deep Dive -->
+        <div id="step-2" class="step-panel">
+            <div class="narration">
+                <div class="narration-title" id="deepdive-title">Step 3: Site Deep Dive</div>
+                <div class="narration-text">Full score breakdown with raw infrastructure metrics. Generate an AI-written investment memo for this site.</div>
+            </div>
+            <div class="two-panel">
+                <div class="card">
+                    <div class="card-title">Score Breakdown</div>
+                    <div class="kpi-grid" id="dd-kpis"></div>
+                    <div id="dd-bars"></div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Raw Infrastructure Metrics</div>
+                    <div id="dd-metrics"></div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Investment Thesis</div>
+                <button class="btn btn-primary" onclick="generateThesis()" id="btn-thesis">Generate Investment Thesis</button>
+                <div id="thesis-output" style="display:none;" class="thesis-card"></div>
+            </div>
+            <div class="demo-nav">
+                <button class="btn btn-secondary" onclick="goStep(1)">&larr; Back</button>
+                <button class="btn btn-success" onclick="addToPipeline()" id="btn-pipeline">Add to Pipeline &rarr;</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Pipeline -->
+        <div id="step-3" class="step-panel">
+            <div class="narration">
+                <div class="narration-title">Step 4: Your Site Pipeline</div>
+                <div class="narration-text">Shortlisted sites tracked through your selection process. Scores update automatically as new data is ingested.</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Active Pipeline</div>
+                <div style="overflow-x:auto;">
+                    <table class="ptable">
+                        <thead><tr><th>County</th><th>State</th><th>Score</th><th>Grade</th><th>Target MW</th><th>Status</th><th>Added</th></tr></thead>
+                        <tbody id="pipeline-body"></tbody>
+                    </table>
+                </div>
+                <div id="pipeline-empty" class="loading" style="display:none;">No sites in pipeline yet. Add one from the Deep Dive step.</div>
+            </div>
+            <div class="demo-nav">
+                <button class="btn btn-secondary" onclick="goStep(2)">&larr; Back to Deep Dive</button>
+                <span></span>
+            </div>
+        </div>
+
+    </main>
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const API = 'http://localhost:8001/api/v1';
+        let _selectedState = 'TX';
+        let _selectedFips = null;
+        let _selectedCountyName = '';
+        let _stepsLoaded = {};
+
+        function goStep(n) {
+            document.querySelectorAll('.step-panel').forEach((p, i) => p.classList.toggle('active', i === n));
+            document.querySelectorAll('.progress-step').forEach((s, i) => {
+                s.classList.remove('active', 'completed');
+                if (i < n) s.classList.add('completed');
+                else if (i === n) s.classList.add('active');
+            });
+            if (!_stepsLoaded[n]) { _stepsLoaded[n] = true; loadStepData(n); }
+        }
+
+        function loadStepData(n) {
+            if (n === 0) loadOverview();
+            else if (n === 1) loadRankings();
+            else if (n === 2) loadDeepDive();
+            else if (n === 3) loadPipeline();
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        function scoreColor(s) { return s >= 85 ? 'green' : s >= 70 ? 'yellow' : 'red'; }
+        function gradeBadgeClass(s) { return s >= 85 ? 'badge-green' : s >= 70 ? 'badge-yellow' : 'badge-red'; }
+        function fmt(v, d=1) { return v != null ? Number(v).toFixed(d) : 'N/A'; }
+        function fmtDate(s) { if (!s) return '—'; return new Date(s).toLocaleDateString('en-US', {month:'short',day:'numeric'}); }
+        function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+        async function loadOverview() {
+            const loading = document.getElementById('overview-loading');
+            try {
+                const r = await fetch(API + '/datacenter-sites/top-states?limit=15');
+                if (!r.ok) throw new Error('No data');
+                const data = await r.json();
+                loading.style.display = 'none';
+
+                if (!data.states || !data.states.length) {
+                    document.getElementById('no-data-screen').style.display = '';
+                    document.getElementById('step-0').style.display = 'none';
+                    return;
+                }
+
+                const totalCounties = data.states.reduce((s, x) => s + (x.county_count || 0), 0);
+                const totalA = data.states.reduce((s, x) => s + (x.a_grade || 0), 0);
+                const avgScore = (data.states.reduce((s, x) => s + (x.avg_score || 0), 0) / data.states.length).toFixed(1);
+                document.getElementById('overview-kpis').innerHTML = `
+                    <div class="kpi"><div class="kpi-value">${data.states.length}</div><div class="kpi-label">States Scored</div></div>
+                    <div class="kpi"><div class="kpi-value">${totalCounties.toLocaleString()}</div><div class="kpi-label">Counties Analyzed</div></div>
+                    <div class="kpi"><div class="kpi-value">${totalA}</div><div class="kpi-label">A-Grade Counties</div></div>
+                    <div class="kpi"><div class="kpi-value">${avgScore}</div><div class="kpi-label">Avg National Score</div></div>
+                `;
+
+                document.getElementById('state-grid').innerHTML = data.states.map(s => `
+                    <div class="state-card ${s.state === _selectedState ? 'selected' : ''}" onclick="selectState('${s.state}')">
+                        <div class="sc-state">${s.state}</div>
+                        <div class="sc-score">${fmt(s.avg_score)}</div>
+                        <div class="sc-label">avg score</div>
+                        <div class="sc-badge ${gradeBadgeClass(s.avg_score)}">${s.a_grade || 0} A-grade</div>
+                    </div>
+                `).join('');
+
+                document.getElementById('btn-to-rankings').disabled = false;
+            } catch(e) {
+                loading.textContent = 'No scoring data found. Run POST /api/v1/datacenter-sites/score-counties first.';
+            }
+        }
+
+        function selectState(state) {
+            _selectedState = state;
+            document.querySelectorAll('.state-card').forEach(c => {
+                c.classList.toggle('selected', c.querySelector('.sc-state').textContent === state);
+            });
+            document.getElementById('btn-to-rankings').disabled = false;
+            _stepsLoaded[1] = false;
+        }
+
+        async function loadRankings() {
+            const loading = document.getElementById('rankings-loading');
+            const body = document.getElementById('rankings-body');
+            loading.style.display = '';
+            body.innerHTML = '';
+            document.getElementById('rankings-title').textContent = `Step 2: County Rankings — ${_selectedState}`;
+            document.getElementById('rankings-card-title').textContent = `Top Counties in ${_selectedState}`;
+            try {
+                const r = await fetch(API + `/datacenter-sites/rankings?state=${_selectedState}&limit=20`);
+                if (!r.ok) throw new Error('Failed');
+                const data = await r.json();
+                loading.style.display = 'none';
+
+                if (!data.counties || !data.counties.length) {
+                    loading.style.display = '';
+                    loading.textContent = `No scored counties for ${_selectedState}.`;
+                    return;
+                }
+
+                body.innerHTML = data.counties.map((c, i) => {
+                    const sc = scoreColor(c.overall_score);
+                    return `<tr class="${c.county_fips === _selectedFips ? 'selected' : ''}" onclick="selectCounty('${c.county_fips}', '${esc(c.county_name)}', event)">
+                        <td><strong>${c.state_rank || (i+1)}</strong></td>
+                        <td><strong>${esc(c.county_name)}</strong></td>
+                        <td>${c.state}</td>
+                        <td class="pct-cell ${sc}">${fmt(c.overall_score)} <small style="color:var(--text-muted)">${c.grade||''}</small></td>
+                        <td>${fmt(c.power_score)}</td>
+                        <td>${fmt(c.connectivity_score)}</td>
+                        <td>${fmt(c.regulatory_score)}</td>
+                        <td>${fmt(c.labor_score)}</td>
+                        <td>${fmt(c.risk_score)}</td>
+                    </tr>`;
+                }).join('');
+            } catch(e) {
+                loading.style.display = '';
+                loading.textContent = 'Failed to load rankings.';
+            }
+        }
+
+        function selectCounty(fips, name, e) {
+            _selectedFips = fips;
+            _selectedCountyName = name;
+            document.querySelectorAll('#rankings-body tr').forEach(r => r.classList.remove('selected'));
+            if (e && e.currentTarget) e.currentTarget.classList.add('selected');
+            document.getElementById('btn-to-deepdive').disabled = false;
+            _stepsLoaded[2] = false;
+        }
+
+        async function loadDeepDive() {
+            if (!_selectedFips) return;
+            document.getElementById('deepdive-title').textContent = `Step 3: ${_selectedCountyName} — Deep Dive`;
+            document.getElementById('dd-kpis').innerHTML = '<div class="loading">Loading...</div>';
+            document.getElementById('thesis-output').style.display = 'none';
+            const btn = document.getElementById('btn-thesis');
+            btn.disabled = false;
+            btn.textContent = 'Generate Investment Thesis';
+            const pipeBtn = document.getElementById('btn-pipeline');
+            pipeBtn.disabled = false;
+            pipeBtn.textContent = 'Add to Pipeline \u2192';
+
+            try {
+                const r = await fetch(API + `/datacenter-sites/${_selectedFips}`);
+                if (!r.ok) throw new Error('Not found');
+                const c = await r.json();
+
+                document.getElementById('dd-kpis').innerHTML = [
+                    ['Overall', c.overall_score, c.grade || ''],
+                    ['Power', c.power_score, '30%'],
+                    ['Connectivity', c.connectivity_score, '20%'],
+                    ['Regulatory', c.regulatory_score, '20%'],
+                    ['Labor', c.labor_score, '15%'],
+                    ['Risk', c.risk_score, '10%'],
+                ].map(([label, val, sub]) => `
+                    <div class="kpi">
+                        <div class="kpi-value" style="color:${val>=85?'var(--success)':val>=70?'var(--warning)':'var(--error)'}">${fmt(val)}</div>
+                        <div class="kpi-label">${label} <small style="color:var(--text-muted)">${sub}</small></div>
+                    </div>`).join('');
+
+                document.getElementById('dd-bars').innerHTML = [
+                    ['Power Infrastructure', c.power_score],
+                    ['Connectivity & Fiber', c.connectivity_score],
+                    ['Regulatory Speed', c.regulatory_score],
+                    ['Labor Workforce', c.labor_score],
+                    ['Risk & Environment', c.risk_score],
+                    ['Cost & Incentives', c.cost_incentive_score],
+                ].map(([label, val]) => {
+                    const pct = Math.round(val || 0);
+                    const col = pct>=85?'var(--success)':pct>=70?'var(--warning)':'var(--error)';
+                    return `<div class="ss-row">
+                        <div class="ss-label">${label}</div>
+                        <div class="ss-bar-bg"><div class="ss-bar-fill" style="width:${pct}%;background:${col}">${pct}</div></div>
+                    </div>`;
+                }).join('');
+
+                const metrics = [
+                    ['Power Capacity Nearby', c.power_capacity_nearby_mw, ' MW'],
+                    ['Substations Count', c.substations_count, ''],
+                    ['Electricity Price', c.electricity_price_cents_kwh, '\u00a2/kWh'],
+                    ['Internet Exchanges', c.ix_count, ''],
+                    ['DC Facilities Nearby', c.dc_facility_count, ''],
+                    ['Broadband Coverage', c.broadband_coverage_pct, '%'],
+                    ['Tech Employment', c.tech_employment, ' workers'],
+                    ['Tech Avg Wage', c.tech_avg_wage, null],
+                    ['Flood High-Risk Zones', c.flood_high_risk_zones, ''],
+                    ['Wetland Acres', c.wetland_acres, ' ac'],
+                    ['Incentive Programs', c.incentive_program_count, ''],
+                    ['Opportunity Zone', c.opportunity_zone ? 'Yes' : 'No', ''],
+                ];
+                document.getElementById('dd-metrics').innerHTML = `<table class="ptable"><tbody>
+                    ${metrics.map(([label, val, unit]) => `<tr>
+                        <td style="color:var(--text-muted)">${label}</td>
+                        <td><strong>${val != null ? (unit === null ? '$' + Number(val).toLocaleString() : (typeof val === 'string' ? val : Number(val).toLocaleString()) + (unit||'')) : 'N/A'}</strong></td>
+                    </tr>`).join('')}
+                </tbody></table>`;
+
+            } catch(e) {
+                document.getElementById('dd-kpis').innerHTML = '<div class="loading">Failed to load site data.</div>';
+            }
+        }
+
+        async function generateThesis() {
+            if (!_selectedFips) return;
+            const btn = document.getElementById('btn-thesis');
+            const output = document.getElementById('thesis-output');
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            output.className = 'thesis-card loading';
+            output.textContent = 'Analyzing 18 data dimensions and generating investment memo...';
+            output.style.display = '';
+
+            try {
+                const r = await fetch(API + `/datacenter-sites/${_selectedFips}/thesis`, { method: 'POST' });
+                if (!r.ok) throw new Error('Not available');
+                const data = await r.json();
+                output.className = 'thesis-card';
+                if (data.thesis) {
+                    output.innerHTML = data.thesis.replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>');
+                    output.innerHTML = '<p>' + output.innerHTML + '</p>';
+                } else {
+                    output.textContent = data.error || 'Thesis generation requires OPENAI_API_KEY or ANTHROPIC_API_KEY.';
+                }
+            } catch(e) {
+                output.className = 'thesis-card';
+                output.textContent = 'Thesis endpoint not yet available — deploy Agent 2 changes and restart API.';
+            }
+            btn.disabled = false;
+            btn.textContent = 'Regenerate Thesis';
+        }
+
+        async function addToPipeline() {
+            if (!_selectedFips) return;
+            const btn = document.getElementById('btn-pipeline');
+            btn.disabled = true;
+            btn.textContent = 'Adding...';
+
+            try {
+                const r = await fetch(API + `/datacenter-sites/pipeline/${_selectedFips}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ target_mw: 50, notes: '', status: 'Evaluating' }),
+                });
+                if (!r.ok) throw new Error('Not available');
+                showToast(`${_selectedCountyName} added to pipeline`);
+                _stepsLoaded[3] = false;
+                goStep(3);
+            } catch(e) {
+                showToast('Pipeline endpoint not yet available — deploy Agent 3 changes.');
+                btn.disabled = false;
+                btn.textContent = 'Add to Pipeline \u2192';
+            }
+        }
+
+        async function loadPipeline() {
+            const body = document.getElementById('pipeline-body');
+            const empty = document.getElementById('pipeline-empty');
+            body.innerHTML = '';
+            empty.style.display = 'none';
+
+            try {
+                const r = await fetch(API + '/datacenter-sites/pipeline');
+                if (!r.ok) throw new Error('Not available');
+                const data = await r.json();
+
+                if (!data || !data.length) {
+                    empty.style.display = '';
+                    return;
+                }
+
+                body.innerHTML = data.map(s => `<tr>
+                    <td><strong>${esc(s.county_name)}</strong></td>
+                    <td>${s.state}</td>
+                    <td class="pct-cell ${scoreColor(s.overall_score)}">${fmt(s.overall_score)}</td>
+                    <td>${s.grade || '—'}</td>
+                    <td>${s.target_mw ? s.target_mw + ' MW' : '—'}</td>
+                    <td><span class="pill pill-active">${esc(s.status)}</span></td>
+                    <td style="color:var(--text-muted)">${fmtDate(s.added_at)}</td>
+                </tr>`).join('');
+            } catch(e) {
+                empty.style.display = '';
+                empty.textContent = 'Pipeline endpoint not yet available — deploy Agent 3 changes and restart API.';
+            }
+        }
+
+        // Init
+        loadOverview();
+    </script>
+</body>
+</html>

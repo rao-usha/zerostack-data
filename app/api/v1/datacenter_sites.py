@@ -46,6 +46,12 @@ class ReportRequest(BaseModel):
     title: Optional[str] = None
 
 
+class PipelineAddRequest(BaseModel):
+    target_mw: int = Field(50, ge=1, le=2000)
+    notes: str = Field("", max_length=1000)
+    status: str = Field("Evaluating")
+
+
 # =============================================================================
 # ENDPOINTS
 # =============================================================================
@@ -269,6 +275,253 @@ def get_data_sources(db: Session = Depends(get_db)):
             })
 
     return {"sources": sources}
+
+
+@router.post("/{county_fips}/thesis")
+async def generate_county_thesis(
+    county_fips: str,
+    db: Session = Depends(get_db),
+):
+    """Generate AI investment thesis for a scored county. Cached 24h per county."""
+    import os
+    from datetime import date
+    from sqlalchemy import text as _text
+
+    # Add thesis columns if they don't exist yet
+    try:
+        db.execute(_text("ALTER TABLE datacenter_site_scores ADD COLUMN IF NOT EXISTS thesis_text TEXT"))
+        db.execute(_text("ALTER TABLE datacenter_site_scores ADD COLUMN IF NOT EXISTS thesis_generated_at TIMESTAMP"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    # Fetch latest score for this county (base columns only)
+    score_res = db.execute(
+        _text("""
+            SELECT county_fips, county_name, state, overall_score, grade,
+                   power_score, connectivity_score, regulatory_score,
+                   labor_score, risk_score, cost_incentive_score,
+                   electricity_price_cents_kwh, power_capacity_nearby_mw,
+                   substations_count, ix_count, tech_employment, tech_avg_wage,
+                   incentive_program_count, opportunity_zone
+            FROM datacenter_site_scores
+            WHERE county_fips = :fips
+            ORDER BY score_date DESC LIMIT 1
+        """),
+        {"fips": county_fips},
+    )
+    result = score_res.fetchone()
+
+    if not result:
+        raise HTTPException(status_code=404, detail=f"County {county_fips} not scored. Run score-counties first.")
+
+    row = dict(zip(score_res.keys(), result))
+
+    # Check for cached thesis separately (columns may have just been added)
+    try:
+        cached_res = db.execute(
+            _text("""
+                SELECT thesis_text, thesis_generated_at
+                FROM datacenter_site_scores
+                WHERE county_fips = :fips
+                ORDER BY score_date DESC LIMIT 1
+            """),
+            {"fips": county_fips},
+        ).fetchone()
+        if cached_res and cached_res[1] and cached_res[0]:
+            if cached_res[1].date() == date.today():
+                return {
+                    "county_fips": row["county_fips"],
+                    "county_name": row["county_name"],
+                    "state": row["state"],
+                    "overall_score": float(row["overall_score"]),
+                    "thesis": cached_res[0],
+                    "generated_at": cached_res[1].isoformat(),
+                    "from_cache": True,
+                }
+    except Exception:
+        pass  # Columns not yet visible — proceed to generate
+
+    # Check for LLM API key
+    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return {
+            "county_fips": county_fips,
+            "county_name": row["county_name"],
+            "state": row["state"],
+            "overall_score": float(row["overall_score"]),
+            "thesis": None,
+            "error": "LLM not configured — set OPENAI_API_KEY or ANTHROPIC_API_KEY",
+        }
+
+    # Build prompt with actual score data
+    ozone = "Yes" if row.get("opportunity_zone") else "No"
+    prompt = f"""You are a real estate investment analyst. Write a concise investment thesis for a datacenter development site in {row['county_name']} County, {row['state']}.
+
+Site Scores (0-100 scale):
+- Overall: {row['overall_score']} (Grade {row['grade']})
+- Power Infrastructure (30% weight): {row['power_score']} — {row.get('power_capacity_nearby_mw') or 'N/A'} MW nearby, {row.get('substations_count') or 'N/A'} substations, {row.get('electricity_price_cents_kwh') or 'N/A'}¢/kWh electricity
+- Connectivity (20% weight): {row['connectivity_score']} — {row.get('ix_count') or 'N/A'} internet exchanges nearby
+- Regulatory Speed (20% weight): {row['regulatory_score']}
+- Labor Workforce (15% weight): {row['labor_score']} — {row.get('tech_employment') or 'N/A'} tech workers, avg wage ${row.get('tech_avg_wage') or 'N/A'}
+- Risk/Environment (10% weight): {row['risk_score']}
+- Cost/Incentives (5% weight): {row['cost_incentive_score']} — {row.get('incentive_program_count') or 'N/A'} incentive programs, Opportunity Zone: {ozone}
+
+Write exactly 3 paragraphs (~200 words total):
+1. Why this site is compelling for datacenter investment (lead with the strongest scores)
+2. Key risks to underwrite before committing capital
+3. Recommended next steps for due diligence
+
+Reference the actual scores and metrics. Be specific and analytical."""
+
+    try:
+        from app.agentic.llm_client import LLMClient
+        provider = "openai" if os.environ.get("OPENAI_API_KEY") else "anthropic"
+        client = LLMClient(provider=provider, api_key=api_key, max_tokens=600, temperature=0.3)
+        response = await client.complete(prompt=prompt)
+        thesis_text = response.content.strip()
+
+        # Cache to DB
+        db.execute(
+            _text("""
+                UPDATE datacenter_site_scores
+                SET thesis_text = :thesis, thesis_generated_at = NOW()
+                WHERE county_fips = :fips
+                AND score_date = (SELECT MAX(score_date) FROM datacenter_site_scores WHERE county_fips = :fips2)
+            """),
+            {"thesis": thesis_text, "fips": county_fips, "fips2": county_fips},
+        )
+        db.commit()
+
+        return {
+            "county_fips": county_fips,
+            "county_name": row["county_name"],
+            "state": row["state"],
+            "overall_score": float(row["overall_score"]),
+            "thesis": thesis_text,
+            "generated_at": "now",
+            "from_cache": False,
+        }
+
+    except Exception as e:
+        logger.warning(f"Thesis LLM call failed for {county_fips}: {e}")
+        return {
+            "county_fips": county_fips,
+            "county_name": row["county_name"],
+            "state": row["state"],
+            "overall_score": float(row["overall_score"]),
+            "thesis": None,
+            "error": f"LLM call failed: {str(e)}",
+        }
+
+
+@router.post("/pipeline/{county_fips}")
+def add_to_pipeline(
+    county_fips: str,
+    request: PipelineAddRequest,
+    db: Session = Depends(get_db),
+):
+    """Add or update a county in the site selection pipeline. Idempotent."""
+    from sqlalchemy import text as _text
+
+    score_result = db.execute(
+        _text("""
+            SELECT county_fips, county_name, state, overall_score, grade
+            FROM datacenter_site_scores
+            WHERE county_fips = :fips
+            ORDER BY score_date DESC LIMIT 1
+        """),
+        {"fips": county_fips},
+    )
+    score_row = score_result.fetchone()
+
+    if not score_row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"County {county_fips} not scored. Run score-counties first.",
+        )
+
+    score = dict(zip(score_result.keys(), score_row))
+
+    db.execute(
+        _text("""
+            INSERT INTO datacenter_site_pipeline
+                (county_fips, county_name, state, overall_score, grade,
+                 status, notes, target_mw, added_at, updated_at)
+            VALUES
+                (:fips, :name, :state, :score, :grade,
+                 :status, :notes, :mw, NOW(), NOW())
+            ON CONFLICT (county_fips) DO UPDATE SET
+                status = EXCLUDED.status,
+                notes = EXCLUDED.notes,
+                target_mw = EXCLUDED.target_mw,
+                updated_at = NOW()
+        """),
+        {
+            "fips": county_fips,
+            "name": score["county_name"],
+            "state": score["state"],
+            "score": float(score["overall_score"]),
+            "grade": score["grade"],
+            "status": request.status,
+            "notes": request.notes,
+            "mw": request.target_mw,
+        },
+    )
+    db.commit()
+
+    return {
+        "county_fips": county_fips,
+        "county_name": score["county_name"],
+        "state": score["state"],
+        "overall_score": float(score["overall_score"]),
+        "grade": score["grade"],
+        "status": request.status,
+        "target_mw": request.target_mw,
+        "notes": request.notes,
+    }
+
+
+@router.get("/pipeline")
+def get_pipeline(
+    status: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Get shortlisted sites in the selection pipeline."""
+    from sqlalchemy import text as _text
+
+    conditions = ["1=1"]
+    params: Dict[str, Any] = {}
+    if status:
+        conditions.append("status = :status")
+        params["status"] = status
+    if state:
+        conditions.append("state = :state")
+        params["state"] = state.upper()
+
+    where = " AND ".join(conditions)
+    try:
+        result = db.execute(
+            _text(f"""
+                SELECT county_fips, county_name, state, overall_score, grade,
+                       status, notes, target_mw, added_at, updated_at
+                FROM datacenter_site_pipeline
+                WHERE {where}
+                ORDER BY overall_score DESC
+            """),
+            params,
+        )
+        rows = [dict(zip(result.keys(), r)) for r in result.fetchall()]
+        for r in rows:
+            if r.get("added_at"):
+                r["added_at"] = r["added_at"].isoformat()
+            if r.get("updated_at"):
+                r["updated_at"] = r["updated_at"].isoformat()
+        return rows
+    except Exception as e:
+        logger.warning(f"Pipeline query failed: {e}")
+        return []
 
 
 # /{county_fips} MUST be last — it's a catch-all path parameter

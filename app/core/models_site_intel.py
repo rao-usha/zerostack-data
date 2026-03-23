@@ -1995,3 +1995,25 @@ class EpochDatacenter(Base):
         Index("idx_epoch_dc_location", "latitude", "longitude"),
         Index("idx_epoch_dc_state", "state"),
     )
+
+
+class DatacenterSitePipeline(Base):
+    """Shortlisted datacenter sites being tracked through the selection process."""
+
+    __tablename__ = "datacenter_site_pipeline"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    county_fips = Column(String(5), nullable=False, index=True)
+    county_name = Column(String(255))
+    state = Column(String(2), index=True)
+    overall_score = Column(Numeric(5, 2))
+    grade = Column(String(1))
+    status = Column(String(50), default="Evaluating")
+    notes = Column(Text, nullable=True)
+    target_mw = Column(Integer, nullable=True)
+    added_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("county_fips", name="uq_dc_pipeline_county"),
+    )
