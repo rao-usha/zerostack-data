@@ -27,6 +27,8 @@ PE Feature Tables (6):
 - people_watchlist_people: People in watchlists
 """
 
+from datetime import datetime
+
 from sqlalchemy import (
     Column,
     Integer,
@@ -799,3 +801,121 @@ class PeopleWatchlistPerson(Base):
 
     def __repr__(self):
         return f"<PeopleWatchlistPerson Watchlist {self.watchlist_id} - Person {self.person_id}>"
+
+
+# =============================================================================
+# EXECUTIVE INTELLIGENCE TABLES (PLAN_033)
+# =============================================================================
+
+
+class PersonPedigreeScore(Base):
+    """Cached career pedigree score per person. Recomputed on demand or nightly."""
+    __tablename__ = "person_pedigree_scores"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    person_id = Column(Integer, ForeignKey("people.id"), nullable=False, index=True)
+
+    overall_pedigree_score = Column(Numeric(5, 1))
+    employer_quality_score = Column(Numeric(5, 1))
+    career_velocity_score  = Column(Numeric(5, 1))
+    education_score        = Column(Numeric(5, 1))
+
+    pe_experience   = Column(Boolean, default=False)
+    exit_experience = Column(Boolean, default=False)
+    elite_education = Column(Boolean, default=False)
+    tier1_employer  = Column(Boolean, default=False)
+
+    mba_school        = Column(String(200))
+    top_employers     = Column(JSON)
+    pe_employers      = Column(JSON)
+    total_roles       = Column(Integer)
+    avg_tenure_months = Column(Integer)
+
+    scored_at  = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("person_id", name="uq_pedigree_person"),
+        Index("ix_pedigree_score", "overall_pedigree_score"),
+        Index("ix_pedigree_flags", "pe_experience", "exit_experience", "tier1_employer"),
+    )
+
+
+class BoardSeat(Base):
+    """Every board seat held by a person — current and historical."""
+    __tablename__ = "board_seats"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    person_id    = Column(Integer, ForeignKey("people.id"), nullable=False, index=True)
+    company_name = Column(String(500), nullable=False)
+    company_id   = Column(Integer, ForeignKey("industrial_companies.id"))
+    company_type = Column(String(50))
+    ticker       = Column(String(20))
+
+    role      = Column(String(200))
+    committee = Column(String(500))
+    is_chair  = Column(Boolean, default=False)
+
+    start_date = Column(Date)
+    end_date   = Column(Date)
+    is_current = Column(Boolean, default=True, index=True)
+
+    source     = Column(String(100))
+    source_url = Column(String(500))
+    scraped_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("person_id", "company_name", "is_current", name="uq_board_seat"),
+        Index("ix_board_seat_person", "person_id", "is_current"),
+        Index("ix_board_seat_company", "company_name"),
+    )
+
+
+class BoardInterlock(Base):
+    """Computed co-director pairings."""
+    __tablename__ = "board_interlocks"
+
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    person_id_a    = Column(Integer, ForeignKey("people.id"), nullable=False)
+    person_id_b    = Column(Integer, ForeignKey("people.id"), nullable=False)
+    shared_company = Column(String(500), nullable=False)
+    company_id     = Column(Integer, ForeignKey("industrial_companies.id"))
+    overlap_start  = Column(Date)
+    overlap_end    = Column(Date)
+    is_current     = Column(Boolean, default=True, index=True)
+    computed_at    = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("person_id_a", "person_id_b", "shared_company", name="uq_interlock"),
+        Index("ix_interlock_a", "person_id_a", "is_current"),
+        Index("ix_interlock_b", "person_id_b", "is_current"),
+    )
+
+
+class InsiderTransaction(Base):
+    """SEC Form 4 insider buy/sell activity per person per company."""
+    __tablename__ = "insider_transactions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    person_id    = Column(Integer, ForeignKey("people.id"), index=True)
+    company_id   = Column(Integer, ForeignKey("industrial_companies.id"), index=True)
+    company_name = Column(String(500))
+    ticker       = Column(String(20))
+
+    transaction_date   = Column(Date, nullable=False, index=True)
+    transaction_type   = Column(String(50))
+    shares             = Column(Integer)
+    price_per_share    = Column(Numeric(10, 2))
+    total_value_usd    = Column(Numeric(15, 2))
+    shares_owned_after = Column(Integer)
+
+    is_10b5_plan = Column(Boolean, default=False)
+    form4_url    = Column(String(500))
+    filed_at     = Column(Date)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_insider_person_date", "person_id", "transaction_date"),
+        Index("ix_insider_company_date", "company_id", "transaction_date"),
+    )

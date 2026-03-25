@@ -1441,6 +1441,10 @@
         .pe-kanban-col.lost .pe-kanban-col-header { border-bottom-color: #ef4444; }
 
         /* PE Sub-navigation */
+        .analytics-subnav { display: flex; gap: 0; margin-bottom: 2rem; border-bottom: 2px solid var(--border); }
+        .analytics-subnav-btn { padding: 0.75rem 1.75rem; background: transparent; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--text-muted); font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: color 0.15s, border-color 0.15s; white-space: nowrap; }
+        .analytics-subnav-btn:hover { color: var(--text); }
+        .analytics-subnav-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
         .pe-subnav { display: flex; gap: 0.25rem; margin-bottom: 1.5rem; background: var(--bg-input); border-radius: 8px; padding: 0.25rem; width: fit-content; }
         .pe-subnav-btn { padding: 0.5rem 1.25rem; border: none; background: transparent; color: var(--text-muted); font-size: 0.85rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
         .pe-subnav-btn:hover { color: var(--text); }
@@ -1784,12 +1788,9 @@
 
     <nav class="tabs">
         <button class="tab active" onclick="showTab('sources')">📡 Sources</button>
-        <button class="tab" onclick="showTab('intel')">🧠 Intelligence</button>
+        <button class="tab" onclick="showTab('analytics')">📊 Analytics</button>
         <button class="tab" onclick="showTab('jobs')">🚀 Jobs</button>
-        <button class="tab" onclick="showTab('viz')">🗺️ Visualizations</button>
         <button class="tab" onclick="showTab('reports')">📄 Reports</button>
-        <button class="tab" onclick="showTab('pe')">💼 PE Intelligence</button>
-        <button class="tab" onclick="showTab('lp')">📊 LP Intelligence</button>
         <button class="tab" onclick="showTab('dq')">🔍 Data Quality</button>
         <button class="tab" onclick="showTab('settings')">⚙️ Settings</button>
     </nav>
@@ -1825,177 +1826,7 @@
             <div id="sources-content" class="hidden"></div>
         </div>
 
-        <!-- Intelligence Tab -->
-        <div id="tab-intel" class="hidden">
-            <div class="tab-intro">
-                <span class="tab-intro-icon">🧠</span>
-                <div class="tab-intro-text">
-                    <strong>Scores, Rankings & Market Intelligence.</strong>
-                    Custom composite scores derived from 28+ public data sources — no guesswork.
-                    Each metric shows exactly what data feeds it, how it's calculated, and what the score means for your investment thesis.
-                </div>
-            </div>
-
-            <div class="intel-nav">
-                <button class="intel-nav-btn active" onclick="showIntelPanel('companies')">Company Health</button>
-                <button class="intel-nav-btn" onclick="showIntelPanel('exit')">Exit Readiness</button>
-                <button class="intel-nav-btn" onclick="showIntelPanel('leadership')">Leadership Network</button>
-                <button class="intel-nav-btn" onclick="showIntelPanel('markets')">Market Opportunities</button>
-                <button class="intel-nav-btn" onclick="showIntelPanel('sites')">Datacenter Sites</button>
-            </div>
-
-            <!-- Company Health Panel -->
-            <div id="intel-companies" class="intel-panel active">
-                <div class="chart-row">
-                    <div class="card">
-                        <div class="card-title">Score Distribution <span class="metric-help">?<span class="metric-tooltip"><strong>Score Distribution</strong>Shows how companies are graded across the A-F scale. A = top performers (80+), F = significant risk (&lt;40).<span class="mt-sources">Sources: Job postings, Tranco web rank, Glassdoor, SEC filings</span></span></span></div>
-                        <div class="chart-container"><canvas id="chart-health-dist"></canvas></div>
-                    </div>
-                    <div class="card">
-                        <div class="card-title">Sub-Score Averages <span class="metric-help">?<span class="metric-tooltip"><strong>Sub-Score Breakdown</strong>Radar view of average scores across all signal categories. Spikes show collective strengths; dips show systemic gaps.<span class="mt-sources">Sources: BLS QCEW, Indeed/LinkedIn, Tranco, Glassdoor</span></span></span></div>
-                        <div class="chart-container"><canvas id="chart-health-radar"></canvas></div>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">Company Health Rankings</div>
-                    <div class="intel-toolbar">
-                        <select id="health-grade-filter" onchange="loadHealthScores()">
-                            <option value="">All Grades</option>
-                            <option value="A">Grade A</option>
-                            <option value="B">Grade B</option>
-                            <option value="C">Grade C</option>
-                            <option value="D">Grade D</option>
-                            <option value="F">Grade F</option>
-                        </select>
-                        <span style="color:var(--text-muted);font-size:0.8rem;" id="health-count"></span>
-                    </div>
-                    <div id="health-table-container"><div class="loading">Loading scores...</div></div>
-                </div>
-            </div>
-
-            <!-- Exit Readiness Panel -->
-            <div id="intel-exit" class="intel-panel">
-                <div class="chart-row">
-                    <div class="card">
-                        <div class="card-title">Exit Readiness Distribution <span class="metric-help">?<span class="metric-tooltip"><strong>Exit Readiness Score</strong>Measures how prepared a PE portfolio company is for a liquidity event. Combines financial health, leadership stability, hiring signals, and hold period. 80+ = ready for exit marketing.<span class="mt-formula">Score = weighted(financial, trajectory, leadership, valuation, market, hold, hiring)</span><span class="mt-sources">Sources: SEC 10-K/10-Q, BLS, job postings, company websites</span></span></span></div>
-                        <div class="chart-container"><canvas id="chart-exit-dist"></canvas></div>
-                    </div>
-                    <div class="card">
-                        <div class="card-title">Sub-Score Averages <span class="metric-help">?<span class="metric-tooltip"><strong>Exit Sub-Scores</strong>7 dimensions of exit readiness. Financial Health = revenue + margin trends. Leadership Stability = C-suite tenure + turnover. Hold Period = years since acquisition vs typical 5-7yr hold.<span class="mt-sources">Sources: SEC EDGAR, LinkedIn, news, job boards</span></span></span></div>
-                        <div class="chart-container"><canvas id="chart-exit-radar"></canvas></div>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">Exit Readiness Rankings</div>
-                    <div class="intel-toolbar">
-                        <select id="exit-grade-filter" onchange="loadExitReadiness()">
-                            <option value="">All Grades</option>
-                            <option value="A">Grade A</option>
-                            <option value="B">Grade B</option>
-                            <option value="C">Grade C</option>
-                            <option value="D">Grade D</option>
-                            <option value="F">Grade F</option>
-                        </select>
-                        <span style="color:var(--text-muted);font-size:0.8rem;" id="exit-count"></span>
-                    </div>
-                    <div id="exit-table-container"><div class="loading">Loading scores...</div></div>
-                </div>
-            </div>
-
-            <!-- Leadership Network Panel -->
-            <div id="intel-leadership" class="intel-panel">
-                <div class="card">
-                    <div class="card-title">Portfolio Leadership Network <span class="metric-help">?<span class="metric-tooltip"><strong>Leadership Network Graph</strong>Interactive force-directed graph showing the leadership connections across a PE firm's portfolio. Firm partners sit on portfolio company boards, connecting the network.<span class="mt-sources">Sources: PE demo data, company leadership records</span></span></span></div>
-                    <div class="intel-toolbar">
-                        <select id="leadership-firm-select" onchange="loadLeadershipGraph()">
-                            <option value="">Select a PE Firm...</option>
-                        </select>
-                        <label style="margin-left:12px;font-size:0.8rem;color:var(--text-muted);cursor:pointer;">
-                            <input type="checkbox" id="leadership-labels" checked onchange="updateLeadershipHighlight()"> Labels
-                        </label>
-                        <span style="color:var(--text-muted);font-size:0.8rem;margin-left:12px;" id="leadership-stats"></span>
-                    </div>
-                    <div id="leadership-graph-container" style="min-height:500px;position:relative;">
-                        <div class="loading">Select a PE firm to view its leadership network.</div>
-                    </div>
-                    <div id="leadership-tooltip" class="viz-tooltip" style="display:none;position:fixed;pointer-events:none;z-index:1000;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:0.8rem;box-shadow:0 4px 12px rgba(0,0,0,0.3);max-width:280px;"></div>
-                    <div id="leadership-legend" style="display:none;margin-top:12px;padding:12px 16px;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;">
-                        <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">Legend</div>
-                        <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:0.8rem;">
-                            <span><svg width="14" height="14"><circle cx="7" cy="7" r="6" fill="#6366f1"/></svg> PE Firm</span>
-                            <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#3b82f6"/></svg> PE Partner</span>
-                            <span><svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#22c55e"/></svg> Portfolio Company</span>
-                            <span><svg width="14" height="14"><circle cx="7" cy="7" r="4" fill="#94a3b8"/></svg> Executive</span>
-                            <span style="margin-left:12px;"><svg width="24" height="14"><line x1="0" y1="7" x2="24" y2="7" stroke="#3b82f6" stroke-width="2"/></svg> Employment</span>
-                            <span><svg width="24" height="14"><line x1="0" y1="7" x2="24" y2="7" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4,3"/></svg> Board Seat</span>
-                            <span><svg width="24" height="14"><line x1="0" y1="7" x2="24" y2="7" stroke="#64748b" stroke-width="1"/></svg> Management</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Market Opportunities Panel -->
-            <div id="intel-markets" class="intel-panel">
-                <div class="chart-row">
-                    <div class="card">
-                        <div class="card-title">ZIP Score Distribution <span class="metric-help">?<span class="metric-tooltip"><strong>ZIP Revenue Potential Score</strong>Composite score (0-100) predicting med-spa revenue potential in a ZIP code. Combines affluence density, discretionary wealth, market size, professional density, and wealth concentration.<span class="mt-formula">Score = weighted(affluence, wealth, market_size, professionals, concentration)</span><span class="mt-sources">Sources: IRS SOI (income by ZIP), Census ACS (demographics), NPPES (providers)</span></span></span></div>
-                        <div class="chart-container"><canvas id="chart-zip-dist"></canvas></div>
-                    </div>
-                    <div class="card">
-                        <div class="card-title">Top States by Average Score</div>
-                        <div class="chart-container"><canvas id="chart-zip-states"></canvas></div>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">ZIP Code Market Rankings</div>
-                    <div class="intel-toolbar">
-                        <select id="zip-state-filter" onchange="loadZipScores()">
-                            <option value="">All States</option>
-                        </select>
-                        <select id="zip-grade-filter" onchange="loadZipScores()">
-                            <option value="">All Grades</option>
-                            <option value="A">Grade A</option>
-                            <option value="B">Grade B</option>
-                            <option value="C">Grade C</option>
-                        </select>
-                        <span style="color:var(--text-muted);font-size:0.8rem;" id="zip-count"></span>
-                    </div>
-                    <div id="zip-table-container"><div class="loading">Loading scores...</div></div>
-                </div>
-            </div>
-
-            <!-- Datacenter Sites Panel -->
-            <div id="intel-sites" class="intel-panel">
-                <div class="chart-row">
-                    <div class="card">
-                        <div class="card-title">County Grade Distribution <span class="metric-help">?<span class="metric-tooltip"><strong>Datacenter Site Score</strong>County-level composite score for datacenter development suitability. Aggregates 6 infrastructure domains: power capacity, network connectivity, regulatory environment, labor availability, natural disaster risk, and cost/incentives.<span class="mt-formula">Score = 0.30*power + 0.25*connectivity + 0.15*regulatory + 0.12*labor + 0.10*risk + 0.08*incentives</span><span class="mt-sources">Sources: EIA, HIFLD, PeeringDB, Epoch AI, BLS, FEMA, Good Jobs First, State EDOs</span></span></span></div>
-                        <div class="chart-container"><canvas id="chart-dc-dist"></canvas></div>
-                    </div>
-                    <div class="card">
-                        <div class="card-title">Domain Score Averages <span class="metric-help">?<span class="metric-tooltip"><strong>6 Domain Scores</strong><strong>Power:</strong> Substations, generation capacity, utility rates.<br><strong>Connectivity:</strong> Internet exchanges, fiber, existing DCs.<br><strong>Regulatory:</strong> Permits, environmental compliance.<br><strong>Labor:</strong> Tech workforce, wage competitiveness.<br><strong>Risk:</strong> Flood, seismic, wildfire, hurricane.<br><strong>Incentives:</strong> Tax breaks, enterprise zones, grants.</span></span></div>
-                        <div class="chart-container"><canvas id="chart-dc-radar"></canvas></div>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">County Rankings</div>
-                    <div class="intel-toolbar">
-                        <select id="dc-state-filter" onchange="loadDcRankings()">
-                            <option value="">All States</option>
-                        </select>
-                        <select id="dc-grade-filter" onchange="loadDcRankings()">
-                            <option value="">All Grades</option>
-                            <option value="A">Grade A</option>
-                            <option value="B">Grade B</option>
-                            <option value="C">Grade C</option>
-                            <option value="D">Grade D</option>
-                            <option value="F">Grade F</option>
-                        </select>
-                        <span style="color:var(--text-muted);font-size:0.8rem;" id="dc-count"></span>
-                    </div>
-                    <div id="dc-table-container"><div class="loading">Loading scores...</div></div>
-                </div>
-            </div>
-        </div>
+        <!-- [Intelligence tab removed] -->
 
         <!-- Jobs Tab -->
         <div id="tab-jobs" class="hidden">
@@ -2085,6 +1916,29 @@
                 <div class="tab-intro-text">
                     <strong>Report Manager.</strong>
                     Generate, preview, download, and manage HTML reports. View interactive reports inline or download for sharing.
+                </div>
+            </div>
+
+            <!-- Interactive Demos -->
+            <div class="card">
+                <h2 class="card-title">Interactive Demos</h2>
+                <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+                    <a href="pe-demo.html" target="_blank" style="display:flex;align-items:center;gap:0.75rem;padding:0.875rem 1.25rem;background:var(--bg-input);border:1px solid var(--border);border-radius:10px;text-decoration:none;color:var(--text);flex:1;min-width:200px;">
+                        <span style="font-size:1.5rem;">💼</span>
+                        <div>
+                            <div style="font-weight:600;font-size:0.9rem;">PE Deal Flow Demo</div>
+                            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;">Acquisition sourcing &amp; exit preparation</div>
+                        </div>
+                        <span style="margin-left:auto;color:var(--accent);font-size:0.8rem;">Open →</span>
+                    </a>
+                    <a href="dc-demo.html" target="_blank" style="display:flex;align-items:center;gap:0.75rem;padding:0.875rem 1.25rem;background:var(--bg-input);border:1px solid var(--border);border-radius:10px;text-decoration:none;color:var(--text);flex:1;min-width:200px;">
+                        <span style="font-size:1.5rem;">🏗️</span>
+                        <div>
+                            <div style="font-weight:600;font-size:0.9rem;">Datacenter Site Selection Demo</div>
+                            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.2rem;">4-step interactive site scoring &amp; pipeline</div>
+                        </div>
+                        <span style="margin-left:auto;color:var(--accent);font-size:0.8rem;">Open →</span>
+                    </a>
                 </div>
             </div>
 
@@ -2277,8 +2131,14 @@
                 </div>
             </div>
         </div>
-        <!-- Visualizations Tab -->
-        <div id="tab-viz" class="hidden">
+        <!-- Analytics Tab -->
+        <div id="tab-analytics" class="hidden">
+            <div class="analytics-subnav">
+                <button class="analytics-subnav-btn active" onclick="analyticsShowSub('viz')">🗺️ Visualizations</button>
+                <button class="analytics-subnav-btn" onclick="analyticsShowSub('pe')">💼 PE Intelligence</button>
+                <button class="analytics-subnav-btn" onclick="analyticsShowSub('lp')">📊 LP Intelligence</button>
+            </div>
+            <div id="analytics-sub-viz">
             <div class="tab-intro">
                 <span class="tab-intro-icon">🗺️</span>
                 <div class="tab-intro-text">
@@ -2389,10 +2249,8 @@
                     <div id="force-tooltip" class="viz-tooltip"></div>
                 </div>
             </div>
-        </div>
-        <!-- Data Quality Tab -->
-        <!-- PE Intelligence Tab -->
-        <div id="tab-pe" class="hidden">
+            </div>
+            <div id="analytics-sub-pe" class="hidden">
             <div class="tab-intro">
                 <span class="tab-intro-icon">💼</span>
                 <div class="tab-intro-text">
@@ -2876,10 +2734,9 @@
                 </div>
             </div><!-- /pe-subtab-analytics -->
 
-        </div>
+            </div>
 
-        <!-- LP Intelligence Tab -->
-        <div id="tab-lp" class="hidden">
+            <div id="analytics-sub-lp" class="hidden">
             <div class="tab-intro">
                 <span class="tab-intro-icon">📊</span>
                 <div class="tab-intro-text">
@@ -2959,6 +2816,7 @@
                     </div>
                     <div style="font-size:0.7rem;color:var(--text-muted);text-align:center;margin-top:0.5rem;">Capital deployed → Value creation → Current NAV</div>
                 </div>
+            </div>
             </div>
         </div>
 
@@ -3259,7 +3117,7 @@
         }
 
         // ===== Tab Navigation with URL routing =====
-        const TAB_ROUTES = ['sources', 'intel', 'jobs', 'viz', 'reports', 'pe', 'lp', 'dq', 'settings'];
+        const TAB_ROUTES = ['sources', 'analytics', 'jobs', 'reports', 'dq', 'settings'];
         let _currentTab = 'sources';
 
         function showTab(tab, pushState) {
@@ -3274,11 +3132,8 @@
             _currentTab = tab;
             if (tab === 'settings') loadApiKeys();
             if (tab === 'jobs') jobsInitialize();
-            if (tab === 'intel') intelInitialize();
-            if (tab === 'viz') vizInitialize();
+            if (tab === 'analytics') analyticsInitialize();
             if (tab === 'reports') reportsInitialize();
-            if (tab === 'pe') peInitialize();
-            if (tab === 'lp') lpInitialize();
             if (tab === 'dq') dqInitialize();
             // Update URL
             if (pushState !== false) {
@@ -3298,7 +3153,7 @@
             const path = location.pathname.replace(/^\/+|\/+$/g, '');
             if (!path || path === 'index.html') return 'sources';
             // Map common aliases
-            const aliases = { intelligence: 'intel', visualizations: 'viz', dataquality: 'dq', 'data-quality': 'dq', 'pe-intelligence': 'pe', 'private-equity': 'pe', 'lp-intelligence': 'lp', 'fund-performance': 'lp' };
+            const aliases = { analytics: 'analytics', visualizations: 'analytics', viz: 'analytics', 'pe-intelligence': 'analytics', pe: 'analytics', 'lp-intelligence': 'analytics', lp: 'analytics', dataquality: 'dq', 'data-quality': 'dq' };
             const mapped = aliases[path] || path;
             return TAB_ROUTES.includes(mapped) ? mapped : 'sources';
         }
@@ -9631,6 +9486,27 @@
                 container.innerHTML = emptyState('🏗️', 'Could not load datacenter rankings.',
                     'Run site intel collection + <code>POST /datacenter-sites/score-counties</code>.');
             }
+        }
+
+        // ===== Analytics Tab =====
+        let _analyticsActiveSub = 'viz';
+
+        function analyticsInitialize() {
+            analyticsShowSub(_analyticsActiveSub);
+        }
+
+        function analyticsShowSub(name) {
+            _analyticsActiveSub = name;
+            ['viz', 'pe', 'lp'].forEach(s => {
+                const el = document.getElementById('analytics-sub-' + s);
+                if (el) el.classList.toggle('hidden', s !== name);
+            });
+            document.querySelectorAll('.analytics-subnav-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('onclick').includes("'" + name + "'"));
+            });
+            if (name === 'viz') vizInitialize();
+            if (name === 'pe') peInitialize();
+            if (name === 'lp') lpInitialize();
         }
 
         // ===== Visualizations Tab =====

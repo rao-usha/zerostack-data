@@ -528,3 +528,199 @@ async def search_executives(
         )
 
     return items
+
+
+@router.get("/{person_id}/pedigree")
+async def get_person_pedigree(
+    person_id: int,
+    recompute: bool = Query(False, description="Force recompute even if cached"),
+    db: Session = Depends(get_db),
+):
+    """Return pedigree score for a person, optionally recomputing."""
+    from app.core.people_models import PersonPedigreeScore
+    from app.services.pedigree_scorer import PedigreeScorer
+    person = db.query(Person).filter(Person.id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    if recompute:
+        scorer = PedigreeScorer()
+        score = scorer.score_person(person_id, db)
+    else:
+        score = db.query(PersonPedigreeScore).filter_by(person_id=person_id).first()
+        if not score:
+            scorer = PedigreeScorer()
+            score = scorer.score_person(person_id, db)
+    if not score:
+        raise HTTPException(status_code=404, detail="Insufficient data to score this person")
+    return {
+        "person_id": person_id,
+        "full_name": person.full_name,
+        "overall_pedigree_score": float(score.overall_pedigree_score or 0),
+        "employer_quality_score": float(score.employer_quality_score or 0),
+        "career_velocity_score": float(score.career_velocity_score or 0),
+        "education_score": float(score.education_score or 0),
+        "pe_experience": score.pe_experience,
+        "exit_experience": score.exit_experience,
+        "tier1_employer": score.tier1_employer,
+        "elite_education": score.elite_education,
+        "top_employers": score.top_employers or [],
+        "mba_school": score.mba_school,
+        "avg_tenure_months": score.avg_tenure_months,
+        "scored_at": score.scored_at.isoformat() if score.scored_at else None,
+    }
+
+
+# ── Compensation & Insider Transactions ──────────────────────────────────────
+
+@router.get("/{person_id}/compensation-history")
+async def get_compensation_history(
+    person_id: int,
+    db: Session = Depends(get_db),
+):
+    """Multi-year compensation across all public company roles for a person."""
+    from app.core.people_models import CompanyPerson, IndustrialCompany
+    person = db.query(Person).filter(Person.id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    rows = (
+        db.query(CompanyPerson, IndustrialCompany)
+        .join(IndustrialCompany, CompanyPerson.company_id == IndustrialCompany.id)
+        .filter(
+            CompanyPerson.person_id == person_id,
+            CompanyPerson.total_compensation_usd.isnot(None),
+        )
+        .order_by(CompanyPerson.compensation_year.desc().nullslast())
+        .all()
+    )
+    return {
+        "person_id": person_id,
+        "full_name": person.full_name,
+        "compensation_history": [
+            {
+                "company": co.name,
+                "title": cp.title,
+                "year": cp.compensation_year,
+                "base_salary_usd": float(cp.base_salary_usd) if cp.base_salary_usd else None,
+                "total_compensation_usd": float(cp.total_compensation_usd),
+                "equity_awards_usd": float(cp.equity_awards_usd) if cp.equity_awards_usd else None,
+            }
+            for cp, co in rows
+        ],
+    }
+
+
+@router.get("/{person_id}/insider-transactions")
+async def get_insider_transactions(
+    person_id: int,
+    limit: int = Query(50, le=200),
+    transaction_type: Optional[str] = Query(None, description="buy, sell, option_exercise"),
+    db: Session = Depends(get_db),
+):
+    """Form 4 insider transaction history for a person."""
+    from app.core.people_models import InsiderTransaction
+    person = db.query(Person).filter(Person.id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    q = db.query(InsiderTransaction).filter(InsiderTransaction.person_id == person_id)
+    if transaction_type:
+        q = q.filter(InsiderTransaction.transaction_type == transaction_type)
+    txns = q.order_by(InsiderTransaction.transaction_date.desc()).limit(limit).all()
+    total_sold   = sum(float(t.total_value_usd or 0) for t in txns if t.transaction_type == "sell")
+    total_bought = sum(float(t.total_value_usd or 0) for t in txns if t.transaction_type == "buy")
+    return {
+        "person_id": person_id,
+        "full_name": person.full_name,
+        "summary": {
+            "total_transactions": len(txns),
+            "total_sold_usd": total_sold,
+            "total_bought_usd": total_bought,
+            "net_activity": "selling" if total_sold > total_bought else "buying" if total_bought > total_sold else "neutral",
+        },
+        "transactions": [
+            {
+                "date": t.transaction_date.isoformat(),
+                "type": t.transaction_type,
+                "company": t.company_name,
+                "shares": t.shares,
+                "price": float(t.price_per_share) if t.price_per_share else None,
+                "total_value_usd": float(t.total_value_usd) if t.total_value_usd else None,
+                "shares_owned_after": t.shares_owned_after,
+                "is_10b5_plan": t.is_10b5_plan,
+            }
+            for t in txns
+        ],
+    }
+
+
+@router.post("/companies/{company_id}/collect-comp")
+async def collect_executive_comp(
+    company_id: int,
+    include_form4: bool = Query(True, description="Also collect Form 4 insider transactions"),
+    db: Session = Depends(get_db),
+):
+    """
+    Trigger SEC proxy comp collection for a company.
+    Requires company to have a CIK set. Populates base_salary_usd, total_compensation_usd,
+    equity_awards_usd on existing company_people rows.
+    """
+    from app.core.people_models import IndustrialCompany
+    from app.sources.people_collection.proxy_comp_agent import ProxyCompAgent
+    company = db.query(IndustrialCompany).filter(IndustrialCompany.id == company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    if not company.cik:
+        raise HTTPException(status_code=400, detail="Company has no CIK")
+    agent = ProxyCompAgent()
+    try:
+        comp_result = await agent.collect_comp(
+            company_id=company_id, cik=company.cik,
+            company_name=company.name, db=db,
+        )
+        form4_result = {}
+        if include_form4:
+            form4_result = await agent.collect_form4(
+                company_id=company_id, cik=company.cik,
+                company_name=company.name, db=db,
+            )
+    finally:
+        await agent.close()
+    return {**comp_result, "form4": form4_result}
+
+
+@router.get("/companies/{company_id}/executive-comp")
+async def get_executive_comp(
+    company_id: int,
+    db: Session = Depends(get_db),
+):
+    """Current team compensation table for a company."""
+    from app.core.people_models import CompanyPerson, IndustrialCompany
+    company = db.query(IndustrialCompany).filter(IndustrialCompany.id == company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    rows = (
+        db.query(CompanyPerson, Person)
+        .join(Person, CompanyPerson.person_id == Person.id)
+        .filter(
+            CompanyPerson.company_id == company_id,
+            CompanyPerson.is_current == True,
+            CompanyPerson.total_compensation_usd.isnot(None),
+        )
+        .order_by(CompanyPerson.total_compensation_usd.desc().nullslast())
+        .all()
+    )
+    return {
+        "company_id": company_id,
+        "company_name": company.name,
+        "executives": [
+            {
+                "person_id": cp.person_id,
+                "full_name": p.full_name,
+                "title": cp.title,
+                "year": cp.compensation_year,
+                "base_salary_usd": float(cp.base_salary_usd) if cp.base_salary_usd else None,
+                "total_compensation_usd": float(cp.total_compensation_usd),
+                "equity_awards_usd": float(cp.equity_awards_usd) if cp.equity_awards_usd else None,
+            }
+            for cp, p in rows
+        ],
+    }

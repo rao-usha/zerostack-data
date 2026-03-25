@@ -113,6 +113,7 @@ from app.api.v1 import (
     people_data_quality,
     people_dedup,
     people_jobs,
+    board_interlocks,
 
     llm_costs,
     freshness,
@@ -1470,6 +1471,7 @@ app.include_router(people_reports.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(people_data_quality.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(people_dedup.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(people_jobs.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(board_interlocks.router, prefix="/api/v1", dependencies=_auth)
 
 # Job Posting Intelligence
 app.include_router(job_postings.router, prefix="/api/v1", dependencies=_auth)

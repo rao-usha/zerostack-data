@@ -193,6 +193,12 @@
             padding: 10px 14px; font-size: 0.8rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             max-width: 260px; display: none;
         }
+
+        .story-toggle { display:flex; gap:0.5rem; justify-content:center; margin-bottom:1.5rem; }
+        .toggle-btn { padding:0.45rem 1.2rem; border-radius:6px; border:1px solid var(--border);
+          background:transparent; color:var(--text-muted); cursor:pointer; font-size:0.875rem;
+          transition:all 0.2s; }
+        .toggle-btn.active { background:var(--primary); color:#fff; border-color:var(--primary); }
     </style>
 </head>
 <body>
@@ -205,11 +211,17 @@
         <a href="index.html" class="demo-back">&larr; Back to Dashboard</a>
     </header>
 
+    <div class="story-toggle" id="story-toggle">
+      <button class="toggle-btn active" id="btn-exit" onclick="switchStory('exit')">Exit / Disposition</button>
+      <button class="toggle-btn" id="btn-acq" onclick="switchStory('acq')">Acquisition</button>
+    </div>
+
     <nav class="progress-bar">
         <div class="progress-step active" onclick="goStep(0)"><span class="step-num">1</span>Your Portfolio</div>
         <div class="progress-step" onclick="goStep(1)"><span class="step-num">2</span>Deep Dive</div>
         <div class="progress-step" onclick="goStep(2)"><span class="step-num">3</span>Exit Planning</div>
-        <div class="progress-step" onclick="goStep(3)"><span class="step-num">4</span>Leadership Network</div>
+        <div class="progress-step" onclick="goStep(3)"><span class="step-num">4</span>LP Reporting</div>
+        <div class="progress-step" onclick="goStep(4)"><span class="step-num">5</span>Leadership Network</div>
     </nav>
 
     <main class="demo-content">
@@ -223,6 +235,7 @@
             </div>
         </div>
 
+        <div id="exit-story">
         <!-- Step 1: Portfolio -->
         <div id="step-0" class="step-panel active">
             <div class="narration">
@@ -287,10 +300,44 @@
             </div>
         </div>
 
-        <!-- Step 4: Leadership Network -->
-        <div id="step-3" class="step-panel">
+        <!-- Step 4: Fund Performance / LP Reporting -->
+        <div id="step-3" class="step-panel" style="display:none">
+          <div class="narration-box">
+            <p>When this exit closes, your LP quarterly report is already built. Here's the fund performance your investors see.</p>
+          </div>
+
+          <div class="kpi-grid" style="margin-bottom:1.5rem">
+            <div class="kpi-card"><div class="kpi-value" id="fund-blended-irr">--</div><div class="kpi-label">Blended Net IRR</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="fund-tvpi">--</div><div class="kpi-label">TVPI</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="fund-dpi">--</div><div class="kpi-label">DPI (Realized)</div></div>
+            <div class="kpi-card"><div class="kpi-value" id="fund-moic">--</div><div class="kpi-label">MOIC</div></div>
+          </div>
+
+          <h4 style="color:var(--text-muted);font-size:0.8rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:0.75rem">Fund Breakdown</h4>
+          <table class="data-table">
+            <thead>
+              <tr><th>Fund</th><th>Vintage</th><th>IRR</th><th>TVPI</th><th>DPI</th><th>Status</th></tr>
+            </thead>
+            <tbody id="fund-perf-body"></tbody>
+          </table>
+
+          <div style="margin-top:1.5rem;text-align:right">
+            <button class="btn" style="background:transparent;border:1px solid var(--border);color:var(--text-muted)"
+              onclick="alert('LP memo generation would trigger here')">
+              Generate LP Memo &#8594;
+            </button>
+          </div>
+
+          <div class="step-nav">
+            <button class="btn" onclick="goStep(2)">&#8592; Back</button>
+            <button class="btn btn-primary" onclick="goStep(4)">Leadership Network &#8594;</button>
+          </div>
+        </div>
+
+        <!-- Step 5: Leadership Network -->
+        <div id="step-4" class="step-panel">
             <div class="narration">
-                <div class="narration-title">Step 4: Leadership Network</div>
+                <div class="narration-title">Step 5: Leadership Network</div>
                 <div class="narration-text">
                     The <strong>leadership graph</strong> maps the connections between your firm's partners, portfolio company boards, and executive teams. This reveals cross-portfolio synergies, identifies key-person risk, and shows where your firm's influence is concentrated.
                 </div>
@@ -309,11 +356,72 @@
                 <div class="graph-container" id="graph-container"><div class="loading">Loading leadership network...</div></div>
             </div>
         </div>
+        </div><!-- end #exit-story -->
+
+        <div id="acq-story" style="display:none">
+          <!-- Step A1: Market Scanner -->
+          <div id="acq-step-1">
+            <div class="narration-box">
+              <p>Before we source a deal, we scan the market. Which sectors have momentum right now?</p>
+            </div>
+            <div class="kpi-grid">
+              <div class="kpi-card"><div class="kpi-value" id="acq-s1-firm-irr">--</div><div class="kpi-label">Firm Net IRR</div></div>
+              <div class="kpi-card"><div class="kpi-value" id="acq-s1-bench-irr">--</div><div class="kpi-label">PE Median IRR</div></div>
+              <div class="kpi-card"><div class="kpi-value" id="acq-s1-tvpi">--</div><div class="kpi-label">Firm TVPI</div></div>
+              <div class="kpi-card"><div class="kpi-value" id="acq-s1-quartile">--</div><div class="kpi-label">Quartile</div></div>
+            </div>
+            <div class="step-nav">
+              <span></span>
+              <button class="btn btn-primary" onclick="acqNextStep(2)">Scan Targets &rarr;</button>
+            </div>
+          </div>
+
+          <!-- Step A2: Target Discovery -->
+          <div id="acq-step-2" style="display:none">
+            <div class="narration-box">
+              <p>Here are today's highest-scored acquisition targets — ranked by AI deal score.</p>
+            </div>
+            <table class="data-table">
+              <thead><tr><th>Company</th><th>Industry</th><th>Score</th><th>Strengths</th><th></th></tr></thead>
+              <tbody id="acq-candidates-body"></tbody>
+            </table>
+            <div class="step-nav">
+              <button class="btn" onclick="acqNextStep(1)">&larr; Back</button>
+            </div>
+          </div>
+
+          <!-- Step A3: Company Deep Dive -->
+          <div id="acq-step-3" style="display:none">
+            <div class="narration-box">
+              <p>AI-generated investment thesis — built from 28 public data sources.</p>
+            </div>
+            <h3 id="acq-target-name" style="margin-bottom:1rem"></h3>
+            <div class="narration-box">
+              <p id="acq-thesis-text" style="line-height:1.7">Select a target from step 2 first.</p>
+            </div>
+            <div class="step-nav">
+              <button class="btn" onclick="acqNextStep(2)">&larr; Back</button>
+              <button class="btn btn-primary" onclick="acqNextStep(4)">Add to Pipeline &rarr;</button>
+            </div>
+          </div>
+
+          <!-- Step A4: Add to Pipeline -->
+          <div id="acq-step-4" style="display:none">
+            <div class="narration-box">
+              <p>One click to track this deal. Win probability scoring runs overnight.</p>
+            </div>
+            <button class="btn btn-primary" id="acq-add-btn" onclick="addAcqToPipeline()">Add to Pipeline &rarr;</button>
+            <div id="acq-pipeline-result" style="margin-top:1rem"></div>
+            <div class="step-nav">
+              <button class="btn" onclick="acqNextStep(3)">&larr; Back</button>
+            </div>
+          </div>
+        </div><!-- end #acq-story -->
 
         <!-- Nav -->
         <div class="demo-nav">
             <button class="btn btn-secondary" id="prev-btn" onclick="prevStep()" disabled>&larr; Previous</button>
-            <span id="step-label" style="color:var(--text-muted);font-size:0.85rem;">Step 1 of 4</span>
+            <span id="step-label" style="color:var(--text-muted);font-size:0.85rem;">Step 1 of 5</span>
             <button class="btn btn-primary" id="next-btn" onclick="nextStep()">Next &rarr;</button>
         </div>
     </main>
@@ -328,7 +436,7 @@
     let _targetCompanyId = null; // MedVantage
     let _radarChart = null;
     let _graphSim = null;
-    let _stepsLoaded = [false, false, false, false];
+    let _stepsLoaded = [false, false, false, false, false];
 
     function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
 
@@ -345,14 +453,14 @@
         });
 
         document.getElementById('prev-btn').disabled = n === 0;
-        document.getElementById('next-btn').textContent = n === 3 ? 'Finish Demo' : 'Next →';
-        document.getElementById('step-label').textContent = 'Step ' + (n + 1) + ' of 4';
+        document.getElementById('next-btn').textContent = n === 4 ? 'Finish Demo' : 'Next →';
+        document.getElementById('step-label').textContent = 'Step ' + (n + 1) + ' of 5';
 
         loadStepData(n);
     }
 
     function nextStep() {
-        if (_currentStep < 3) goStep(_currentStep + 1);
+        if (_currentStep < 4) goStep(_currentStep + 1);
         else window.location.href = 'index.html#pe';
     }
     function prevStep() { if (_currentStep > 0) goStep(_currentStep - 1); }
@@ -419,7 +527,8 @@
         if (n === 0) { /* already loaded */ }
         else if (n === 1) loadBenchmarkAndExit();
         else if (n === 2) loadBuyersAndDataRoom();
-        else if (n === 3) loadLeadershipGraph();
+        else if (n === 3) loadFundPerformance();
+        else if (n === 4) loadLeadershipGraph();
     }
 
     // ===== Step 1: Portfolio =====
@@ -679,8 +788,164 @@
         });
     }
 
+    // ===== Step 4: Fund Performance / LP Reporting =====
+    async function loadFundPerformance() {
+      // Firm-wide blended metrics
+      try {
+        const r = await fetch(API + '/pe/analytics/' + _firmId + '/performance');
+        const d = await r.json();
+        document.getElementById('fund-blended-irr').textContent = d.blended_irr != null ? d.blended_irr.toFixed(1) + '%' : '--';
+        document.getElementById('fund-tvpi').textContent         = d.blended_tvpi != null ? d.blended_tvpi.toFixed(2) + 'x' : '--';
+        document.getElementById('fund-dpi').textContent          = d.blended_dpi  != null ? d.blended_dpi.toFixed(2) + 'x' : '--';
+        document.getElementById('fund-moic').textContent         = d.blended_moic != null ? d.blended_moic.toFixed(2) + 'x' : '--';
+      } catch(e) {
+        console.warn('Performance fetch failed', e);
+      }
+
+      // Per-fund breakdown
+      try {
+        const r2 = await fetch(API + '/pe/funds/' + _firmId);
+        const d2 = await r2.json();
+        const tbody = document.getElementById('fund-perf-body');
+        tbody.innerHTML = '';
+        for (const f of (d2.funds || [])) {
+          const m = f.metrics || {};
+          const irr = m.irr != null ? m.irr.toFixed(1) + '%' : '--';
+          const irrColor = m.irr >= 20 ? 'var(--success)' : m.irr >= 10 ? 'var(--warning)' : m.irr != null ? 'var(--danger)' : 'var(--text-muted)';
+          tbody.innerHTML += '<tr>' +
+            '<td>' + f.fund_name + '</td>' +
+            '<td>' + (f.vintage_year || '--') + '</td>' +
+            '<td style="font-weight:600;color:' + irrColor + '">' + irr + '</td>' +
+            '<td>' + (m.tvpi != null ? m.tvpi.toFixed(2) + 'x' : '--') + '</td>' +
+            '<td>' + (m.dpi  != null ? m.dpi.toFixed(2)  + 'x' : '--') + '</td>' +
+            '<td>' + (f.status || '--') + '</td>' +
+          '</tr>';
+        }
+        if (!d2.funds || d2.funds.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No fund data \u2014 seed demo first</td></tr>';
+        }
+      } catch(e) {
+        console.warn('Funds fetch failed', e);
+      }
+    }
+
     // ===== Init =====
     checkSeedData();
+
+    // ===== Story Toggle =====
+    const API_BASE = API; // alias used by acq functions
+
+    function switchStory(mode) {
+      document.getElementById('exit-story').style.display = mode === 'exit' ? '' : 'none';
+      document.getElementById('acq-story').style.display  = mode === 'acq'  ? '' : 'none';
+      document.getElementById('btn-exit').classList.toggle('active', mode === 'exit');
+      document.getElementById('btn-acq').classList.toggle('active', mode === 'acq');
+      if (mode === 'acq') acqNextStep(1);
+    }
+
+    let _acqStep = 1;
+    const ACQ_STEPS = 4;
+
+    function acqNextStep(target) {
+      _acqStep = target || _acqStep + 1;
+      for (let i = 1; i <= ACQ_STEPS; i++) {
+        const el = document.getElementById('acq-step-' + i);
+        if (el) el.style.display = i === _acqStep ? '' : 'none';
+      }
+      if (_acqStep === 1) loadAcqStep1();
+      if (_acqStep === 2) loadAcqStep2();
+      if (_acqStep === 3) loadAcqStep3();
+    }
+
+    function acqPrevStep() { if (_acqStep > 1) acqNextStep(_acqStep - 1); }
+
+    let _acqTargetId = null, _acqTargetName = '';
+    function selectAcqTarget(id, name) {
+      _acqTargetId = id; _acqTargetName = name;
+      document.getElementById('acq-target-name').textContent = name;
+      acqNextStep(3);
+    }
+
+    async function loadAcqStep1() {
+      try {
+        const r = await fetch(API_BASE + '/pe/analytics/' + _firmId + '/benchmarks');
+        const data = await r.json();
+        document.getElementById('acq-s1-firm-irr').textContent  = (data.firm_irr  != null ? data.firm_irr.toFixed(1)  + '%' : '--');
+        document.getElementById('acq-s1-bench-irr').textContent = (data.benchmark_irr != null ? data.benchmark_irr.toFixed(1) + '%' : '--');
+        document.getElementById('acq-s1-tvpi').textContent      = (data.firm_tvpi != null ? data.firm_tvpi.toFixed(2) + 'x' : '--');
+        document.getElementById('acq-s1-quartile').textContent  = data.quartile || '--';
+      } catch(e) {
+        console.warn('loadAcqStep1 failed', e);
+      }
+    }
+
+    async function loadAcqStep2() {
+      const r = await fetch(API_BASE + '/pe/deal-sourcing/' + _firmId + '/candidates');
+      const data = await r.json();
+      const tbody = document.getElementById('acq-candidates-body');
+      tbody.innerHTML = '';
+      if (!data.candidates || data.candidates.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No candidates — run market scan first</td></tr>';
+        return;
+      }
+      for (const co of data.candidates) {
+        const scoreColor = co.score >= 75 ? 'var(--success)' : co.score >= 55 ? 'var(--warning)' : 'var(--danger)';
+        tbody.innerHTML += '<tr>' +
+          '<td>' + co.company_name + '</td>' +
+          '<td>' + (co.industry || '--') + '</td>' +
+          '<td style="font-weight:600;color:' + scoreColor + '">' + co.score + ' <span style="font-weight:400;color:var(--text-muted)">(' + co.grade + ')</span></td>' +
+          '<td style="font-size:0.78rem;color:var(--text-muted)">' + (co.strengths || []).slice(0,2).join(' · ') + '</td>' +
+          '<td><button class="btn" style="padding:0.25rem 0.6rem;font-size:0.8rem" onclick="selectAcqTarget(' + co.company_id + ',\'' + (co.company_name || '').replace(/'/g, "\\'") + '\')">Deep Dive \u2192</button></td>' +
+        '</tr>';
+      }
+    }
+
+    async function loadAcqStep3() {
+      if (!_acqTargetId) return;
+      document.getElementById('acq-thesis-text').textContent = 'Generating thesis\u2026';
+      try {
+        const r = await fetch(API_BASE + '/pe/companies/' + _acqTargetId + '/thesis/refresh', {method:'POST'});
+        const data = await r.json();
+        const thesis = data.thesis;
+        if (thesis && thesis.summary) {
+          document.getElementById('acq-thesis-text').textContent = thesis.summary;
+        } else if (thesis && thesis.thesis) {
+          document.getElementById('acq-thesis-text').textContent = thesis.thesis;
+        } else {
+          document.getElementById('acq-thesis-text').textContent = 'Thesis generation requires LLM API key.';
+        }
+      } catch(e) {
+        document.getElementById('acq-thesis-text').textContent = 'Unable to generate thesis \u2014 check API connection.';
+      }
+    }
+
+    async function addAcqToPipeline() {
+      if (!_acqTargetId) return;
+      const btn = document.getElementById('acq-add-btn');
+      btn.disabled = true; btn.textContent = 'Adding\u2026';
+      try {
+        const r = await fetch(API_BASE + '/deals', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            company_name: _acqTargetName,
+            stage: 'prospecting',
+            deal_type: 'acquisition',
+            notes: 'Added from AI deal sourcing'
+          })
+        });
+        const data = await r.json();
+        document.getElementById('acq-pipeline-result').innerHTML =
+          '<div class="narration-box" style="border-color:var(--success)">' +
+            '\u2713 <strong>' + _acqTargetName + '</strong> added to pipeline \u2014 Deal ID: ' + (data.id || data.deal_id || '\u2014') + '<br>' +
+            '<span style="color:var(--text-muted);font-size:0.85rem">Win probability scoring will run overnight</span>' +
+          '</div>';
+        btn.style.display = 'none';
+      } catch(e) {
+        btn.disabled = false; btn.textContent = 'Add to Pipeline';
+        document.getElementById('acq-pipeline-result').textContent = 'Error \u2014 check API connection.';
+      }
+    }
 </script>
 </body>
 </html>

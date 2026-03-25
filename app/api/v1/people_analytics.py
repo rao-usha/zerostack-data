@@ -370,3 +370,91 @@ async def get_portfolio_analytics(
         raise HTTPException(status_code=404, detail=result["error"])
 
     return PortfolioAnalyticsResponse(**result)
+
+
+# ── Pedigree Scoring ──────────────────────────────────────────────────────────
+
+@router.post("/companies/{company_id}/score-pedigree")
+async def score_company_pedigree(
+    company_id: int,
+    db: Session = Depends(get_db),
+):
+    """Compute and cache pedigree scores for all current executives at a company."""
+    from app.services.pedigree_scorer import PedigreeScorer
+    scorer = PedigreeScorer()
+    scores = scorer.score_company(company_id, db)
+    if not scores:
+        raise HTTPException(status_code=404, detail="No executives found for company")
+    return {
+        "company_id": company_id,
+        "scored": len(scores),
+        "team_avg_pedigree": round(sum(float(s.overall_pedigree_score or 0) for s in scores) / len(scores), 1),
+        "pe_experienced": sum(1 for s in scores if s.pe_experience),
+        "tier1_employers": sum(1 for s in scores if s.tier1_employer),
+        "elite_educated": sum(1 for s in scores if s.elite_education),
+        "members": [
+            {
+                "person_id": s.person_id,
+                "overall": float(s.overall_pedigree_score or 0),
+                "pe_experience": s.pe_experience,
+                "exit_experience": s.exit_experience,
+                "tier1_employer": s.tier1_employer,
+                "elite_education": s.elite_education,
+                "top_employers": s.top_employers or [],
+                "mba_school": s.mba_school,
+            }
+            for s in sorted(scores, key=lambda x: float(x.overall_pedigree_score or 0), reverse=True)
+        ],
+    }
+
+
+@router.get("/companies/{company_id}/pedigree-report")
+async def get_company_pedigree_report(
+    company_id: int,
+    db: Session = Depends(get_db),
+):
+    """Return cached pedigree scores for a company's leadership team."""
+    from app.core.people_models import PersonPedigreeScore, CompanyPerson, Person
+    rows = (
+        db.query(PersonPedigreeScore, Person)
+        .join(Person, PersonPedigreeScore.person_id == Person.id)
+        .join(CompanyPerson, CompanyPerson.person_id == Person.id)
+        .filter(
+            CompanyPerson.company_id == company_id,
+            CompanyPerson.is_current == True,
+        )
+        .order_by(PersonPedigreeScore.overall_pedigree_score.desc().nullslast())
+        .all()
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail="No pedigree data — run POST /score-pedigree first")
+    scores = [r[0] for r in rows]
+    people = [r[1] for r in rows]
+    return {
+        "company_id": company_id,
+        "scored_count": len(scores),
+        "team_avg_pedigree": round(sum(float(s.overall_pedigree_score or 0) for s in scores) / len(scores), 1),
+        "flags": {
+            "pe_experienced_pct": round(sum(1 for s in scores if s.pe_experience) / len(scores) * 100),
+            "tier1_employer_pct": round(sum(1 for s in scores if s.tier1_employer) / len(scores) * 100),
+            "elite_education_pct": round(sum(1 for s in scores if s.elite_education) / len(scores) * 100),
+        },
+        "members": [
+            {
+                "person_id": s.person_id,
+                "full_name": p.full_name,
+                "overall_pedigree_score": float(s.overall_pedigree_score or 0),
+                "employer_quality_score": float(s.employer_quality_score or 0),
+                "career_velocity_score": float(s.career_velocity_score or 0),
+                "pe_experience": s.pe_experience,
+                "exit_experience": s.exit_experience,
+                "tier1_employer": s.tier1_employer,
+                "elite_education": s.elite_education,
+                "top_employers": s.top_employers or [],
+                "mba_school": s.mba_school,
+                "avg_tenure_months": s.avg_tenure_months,
+                "scored_at": s.scored_at.isoformat() if s.scored_at else None,
+            }
+            for s, p in zip(scores, people)
+        ],
+    }
