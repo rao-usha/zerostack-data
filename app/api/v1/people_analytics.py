@@ -149,6 +149,26 @@ class PortfolioAnalyticsResponse(BaseModel):
 # =============================================================================
 
 
+@router.get("/companies-with-pedigrees")
+async def list_companies_with_pedigrees(
+    db: Session = Depends(get_db),
+):
+    """List companies that have pedigree scores computed."""
+    from app.core.people_models import PersonPedigreeScore, CompanyPerson, IndustrialCompany
+    from sqlalchemy import func
+
+    rows = (
+        db.query(IndustrialCompany.id, IndustrialCompany.name, func.count(PersonPedigreeScore.id))
+        .join(CompanyPerson, CompanyPerson.company_id == IndustrialCompany.id)
+        .join(PersonPedigreeScore, PersonPedigreeScore.person_id == CompanyPerson.person_id)
+        .filter(CompanyPerson.is_current == True)
+        .group_by(IndustrialCompany.id, IndustrialCompany.name)
+        .order_by(IndustrialCompany.name)
+        .all()
+    )
+    return [{"id": r[0], "name": r[1], "scored_count": r[2]} for r in rows]
+
+
 @router.get("/industries", response_model=List[str])
 async def list_industries(
     db: Session = Depends(get_db),
@@ -408,6 +428,86 @@ async def score_company_pedigree(
     }
 
 
+@router.post("/parse-bios")
+async def parse_bios_batch(
+    limit: int = 100,
+    overwrite: bool = False,
+    background_tasks = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Trigger LLM bio parsing for all people with biography text.
+
+    Parses bio → PersonExperience + PersonEducation rows.
+    Runs synchronously (returns stats when done).
+    Use limit to control batch size (default 100).
+    """
+    import asyncio
+    from app.services.bio_parser_service import BioParserService
+
+    service = BioParserService()
+    stats = await service.parse_all(db, limit=limit, overwrite=overwrite)
+    return {
+        "status": "complete",
+        "limit": limit,
+        "overwrite": overwrite,
+        **stats,
+    }
+
+
+@router.post("/score-all-pedigrees")
+async def score_all_pedigrees(
+    db: Session = Depends(get_db),
+):
+    """
+    Run PedigreeScorer for all companies that have experience data.
+
+    Returns summary: companies scored, people scored, avg pedigree score.
+    """
+    from app.core.people_models import PersonExperience, CompanyPerson, IndustrialCompany
+    from app.services.pedigree_scorer import PedigreeScorer
+    from sqlalchemy import distinct
+
+    # Find companies where at least one current person has experience data
+    company_ids_with_exp = [
+        r[0] for r in
+        db.query(distinct(CompanyPerson.company_id))
+        .join(PersonExperience, PersonExperience.person_id == CompanyPerson.person_id)
+        .filter(CompanyPerson.is_current == True)
+        .all()
+    ]
+
+    if not company_ids_with_exp:
+        return {
+            "companies_scored": 0,
+            "people_scored": 0,
+            "avg_pedigree_score": None,
+            "message": "No experience data found — run POST /parse-bios first",
+        }
+
+    scorer = PedigreeScorer()
+    all_scores = []
+    companies_scored = 0
+
+    for company_id in company_ids_with_exp:
+        scores = scorer.score_company(company_id, db)
+        if scores:
+            all_scores.extend(scores)
+            companies_scored += 1
+
+    avg = None
+    if all_scores:
+        avg = round(
+            sum(float(s.overall_pedigree_score or 0) for s in all_scores) / len(all_scores), 1
+        )
+
+    return {
+        "companies_scored": companies_scored,
+        "people_scored": len(all_scores),
+        "avg_pedigree_score": avg,
+    }
+
+
 @router.get("/companies/{company_id}/pedigree-report")
 async def get_company_pedigree_report(
     company_id: int,
@@ -416,7 +516,7 @@ async def get_company_pedigree_report(
     """Return cached pedigree scores for a company's leadership team."""
     from app.core.people_models import PersonPedigreeScore, CompanyPerson, Person
     rows = (
-        db.query(PersonPedigreeScore, Person)
+        db.query(PersonPedigreeScore, Person, CompanyPerson)
         .join(Person, PersonPedigreeScore.person_id == Person.id)
         .join(CompanyPerson, CompanyPerson.person_id == Person.id)
         .filter(
@@ -430,6 +530,7 @@ async def get_company_pedigree_report(
         raise HTTPException(status_code=404, detail="No pedigree data — run POST /score-pedigree first")
     scores = [r[0] for r in rows]
     people = [r[1] for r in rows]
+    cps = [r[2] for r in rows]
     return {
         "company_id": company_id,
         "scored_count": len(scores),
@@ -443,6 +544,7 @@ async def get_company_pedigree_report(
             {
                 "person_id": s.person_id,
                 "full_name": p.full_name,
+                "title": cp.title,
                 "overall_pedigree_score": float(s.overall_pedigree_score or 0),
                 "employer_quality_score": float(s.employer_quality_score or 0),
                 "career_velocity_score": float(s.career_velocity_score or 0),
@@ -455,6 +557,6 @@ async def get_company_pedigree_report(
                 "avg_tenure_months": s.avg_tenure_months,
                 "scored_at": s.scored_at.isoformat() if s.scored_at else None,
             }
-            for s, p in zip(scores, people)
+            for s, p, cp in zip(scores, people, cps)
         ],
     }

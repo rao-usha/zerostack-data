@@ -731,6 +731,169 @@ async def get_pe_firms_stats(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/{firm_id}/org-intelligence")
+async def get_firm_org_intelligence(firm_id: int, db: Session = Depends(get_db)):
+    """
+    Return IC roster, operating partner network, headcount by role tier, and recent org changes.
+
+    Data is drawn from the classified pe_firm_people rows and the latest org snapshot.
+    Run POST /{firm_id}/org-snapshot first to populate classification and snapshot data.
+    """
+    try:
+        # Verify firm exists
+        firm_row = db.execute(
+            text("SELECT id, name FROM pe_firms WHERE id = :fid"), {"fid": firm_id}
+        ).fetchone()
+        if not firm_row:
+            raise HTTPException(status_code=404, detail="Firm not found")
+
+        # IC members
+        ic_rows = db.execute(
+            text("""
+                SELECT ic.role, p.id, p.full_name, p.current_title
+                FROM pe_investment_committees ic
+                JOIN pe_people p ON ic.person_id = p.id
+                WHERE ic.firm_id = :fid AND ic.is_current = true
+                ORDER BY p.full_name
+            """),
+            {"fid": firm_id},
+        ).fetchall()
+        ic_members = [
+            {"person_id": r[1], "name": r[2], "title": r[3], "ic_role": r[0]}
+            for r in ic_rows
+        ]
+
+        # Operating partners
+        op_rows = db.execute(
+            text("""
+                SELECT p.id, p.full_name, COALESCE(p.current_title, fp.title)
+                FROM pe_firm_people fp
+                JOIN pe_people p ON fp.person_id = p.id
+                WHERE fp.firm_id = :fid
+                  AND fp.is_current = true
+                  AND fp.role_type = 'operating_partner'
+                ORDER BY p.full_name
+            """),
+            {"fid": firm_id},
+        ).fetchall()
+        operating_partners = [
+            {"person_id": r[0], "name": r[1], "title": r[2]} for r in op_rows
+        ]
+
+        # Headcount by role_type
+        hc_rows = db.execute(
+            text("""
+                SELECT COALESCE(role_type, 'unclassified'), COUNT(*)
+                FROM pe_firm_people
+                WHERE firm_id = :fid AND is_current = true
+                GROUP BY role_type
+            """),
+            {"fid": firm_id},
+        ).fetchall()
+        headcount_by_role = {r[0]: r[1] for r in hc_rows}
+
+        # Latest org snapshot
+        snap_row = db.execute(
+            text("""
+                SELECT snapshot_date, changes_from_prior
+                FROM pe_firm_org_snapshots
+                WHERE firm_id = :fid
+                ORDER BY snapshot_date DESC
+                LIMIT 1
+            """),
+            {"fid": firm_id},
+        ).fetchone()
+
+        return {
+            "firm_id": firm_id,
+            "firm_name": firm_row[1],
+            "investment_committee": ic_members,
+            "operating_partners": operating_partners,
+            "headcount_by_role": headcount_by_role,
+            "total_headcount": sum(headcount_by_role.values()),
+            "latest_snapshot_date": snap_row[0].isoformat() if snap_row else None,
+            "recent_changes": snap_row[1] if snap_row else None,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching org intelligence for firm {firm_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{firm_id}/org-snapshot/latest")
+async def get_latest_org_snapshot(firm_id: int, db: Session = Depends(get_db)):
+    """
+    Return the latest full org snapshot JSON for a PE firm.
+    """
+    try:
+        firm_row = db.execute(
+            text("SELECT id FROM pe_firms WHERE id = :fid"), {"fid": firm_id}
+        ).fetchone()
+        if not firm_row:
+            raise HTTPException(status_code=404, detail="Firm not found")
+
+        snap_row = db.execute(
+            text("""
+                SELECT id, snapshot_date, ic_member_count, op_partner_count,
+                       investment_team_count, total_headcount, org_json, changes_from_prior
+                FROM pe_firm_org_snapshots
+                WHERE firm_id = :fid
+                ORDER BY snapshot_date DESC
+                LIMIT 1
+            """),
+            {"fid": firm_id},
+        ).fetchone()
+
+        if not snap_row:
+            raise HTTPException(status_code=404, detail="No org snapshot found for this firm")
+
+        return {
+            "firm_id": firm_id,
+            "snapshot_id": snap_row[0],
+            "snapshot_date": snap_row[1].isoformat(),
+            "ic_member_count": snap_row[2],
+            "op_partner_count": snap_row[3],
+            "investment_team_count": snap_row[4],
+            "total_headcount": snap_row[5],
+            "org": snap_row[6],
+            "changes_from_prior": snap_row[7],
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching org snapshot for firm {firm_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{firm_id}/org-snapshot")
+async def create_org_snapshot(firm_id: int, db: Session = Depends(get_db)):
+    """
+    Classify team members and take an org snapshot for a PE firm.
+
+    Runs role classification on all current team members, builds IC membership
+    records, then persists a full org snapshot with diff vs prior.
+    """
+    try:
+        firm_row = db.execute(
+            text("SELECT id FROM pe_firms WHERE id = :fid"), {"fid": firm_id}
+        ).fetchone()
+        if not firm_row:
+            raise HTTPException(status_code=404, detail="Firm not found")
+
+        from app.services.pe_org_snapshot import build_org_snapshot
+        result = build_org_snapshot(db, firm_id)
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating org snapshot for firm {firm_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/{firm_id}")
 async def delete_pe_firm(firm_id: int, db: Session = Depends(get_db)):
     """

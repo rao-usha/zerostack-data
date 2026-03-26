@@ -133,6 +133,8 @@
     <button class="filter-tab" onclick="setFilter('gold')" id="ft-gold" style="border-color:rgba(99,102,241,.4);color:#6366f1">Gold</button>
     <button class="filter-tab" onclick="setFilter('silver')" id="ft-silver" style="border-color:rgba(6,182,212,.4);color:#06b6d4">Silver+</button>
     <div class="sep"></div>
+    <select id="co-select" style="display:none;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:5px 10px;color:#f1f5f9;font-size:12px;cursor:pointer;outline:none"></select>
+    <div class="sep"></div>
     <div class="search-box">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" id="search-input" placeholder="Search executives..." autocomplete="off">
@@ -209,7 +211,7 @@ const HUB_COLORS = {
   corporate:"#f59e0b", military:"#ef4444",
 };
 
-const PEOPLE = [
+let PEOPLE = [
   { id:"p1",  label:"James Walsh",    role:"CEO, Acme Industrial",     score:92, tier:"platinum",
     career:["hbs","mck","ge"],    background:"Harvard MBA '02, McKinsey 3yr, GE Capital 5yr, CEO 2018",
     breakdown:{education:95,experience:90,caliber:92,network:88,track:94} },
@@ -273,19 +275,17 @@ const PEOPLE = [
 ];
 
 // Add "jwalsh" also connects to military (Harvard+military crossover example)
-// Build all nodes
-const nodes = [
-  ...HUBS.map(h=>({...h})),
-  ...PEOPLE.map(p=>({...p, type:"person"})),
-];
-
-// Career links: person → hub
-const links = [];
-PEOPLE.forEach(p=>{
-  (p.career||[]).forEach(hid=>{
-    links.push({ source:p.id, target:hid, type:"career" });
+// Career links — rebuilt when PEOPLE changes
+let links = [];
+function rebuildLinks() {
+  links = [];
+  PEOPLE.forEach(p=>{
+    (p.career||[]).forEach(hid=>{
+      links.push({ source:p.id, target:hid, type:"career" });
+    });
   });
-});
+}
+rebuildLinks();
 
 // ──────────────────────────────────────────────────────────────
 // COLORS / SIZES
@@ -652,10 +652,127 @@ window.addEventListener("resize",()=>{
 });
 
 // ──────────────────────────────────────────────────────────────
+// API LOADING
+// ──────────────────────────────────────────────────────────────
+
+// Map top_employers / mba_school to hub IDs
+const HUB_EMPLOYER_MAP = [
+  { hub:"mck",     keywords:["mckinsey","bain","bcg","boston consulting","monitor","booz"] },
+  { hub:"gs",      keywords:["goldman","morgan stanley","jp morgan","blackstone","kkr","carlyle","apollo","warburg"] },
+  { hub:"hbs",     keywords:["harvard"] },
+  { hub:"wharton", keywords:["wharton"] },
+  { hub:"stanford",keywords:["stanford"] },
+  { hub:"ge",      keywords:["ge capital","general electric"] },
+  { hub:"military",keywords:["army","navy","air force","marine","military","west point"] },
+  { hub:"big4",    keywords:["deloitte","pwc","ernst","kpmg","pricewaterhous","e&y"] },
+  { hub:"bain",    keywords:["bain ","bcg","boston consulting"] },
+  { hub:"mit",     keywords:["mit sloan","massachusetts institute"] },
+];
+
+function mapToHubs(topEmployers, mbaSchool) {
+  const hubs = new Set();
+  const sources = [...(topEmployers || []), mbaSchool].filter(Boolean).map(s => s.toLowerCase());
+  for (const s of sources) {
+    for (const { hub, keywords } of HUB_EMPLOYER_MAP) {
+      if (keywords.some(k => s.includes(k))) { hubs.add(hub); break; }
+    }
+  }
+  return [...hubs];
+}
+
+function scoreTier(score) {
+  if (score >= 85) return "platinum";
+  if (score >= 70) return "gold";
+  if (score >= 55) return "silver";
+  return "standard";
+}
+
+function transformApiToPeople(apiData) {
+  return (apiData.members || []).map(m => {
+    const score = Math.round(m.overall_pedigree_score || 0);
+    const tier = scoreTier(score);
+    const career = mapToHubs(m.top_employers, m.mba_school);
+    const role = m.title ? `${m.title}` : "Executive";
+    return {
+      id: `p_${m.person_id}`,
+      label: m.full_name,
+      role,
+      score,
+      tier,
+      career,
+      background: [
+        m.mba_school ? `${m.mba_school} MBA` : null,
+        m.top_employers?.length ? m.top_employers.slice(0,2).join(", ") : null,
+        m.pe_experience ? "PE experience" : null,
+        m.avg_tenure_months ? `Avg tenure ${Math.round(m.avg_tenure_months/12)}yr` : null,
+      ].filter(Boolean).join(" · ") || "Executive",
+      breakdown: {
+        education: Math.round(m.overall_pedigree_score || 0),
+        experience: Math.round(m.career_velocity_score || 0),
+        caliber: Math.round(m.employer_quality_score || 0),
+        network: m.elite_education ? 80 : m.tier1_employer ? 65 : 40,
+        track: m.exit_experience ? 75 : m.pe_experience ? 65 : 50,
+      },
+    };
+  });
+}
+
+async function loadCompany(companyId) {
+  try {
+    const resp = await fetch(`/api/v1/people-analytics/companies/${companyId}/pedigree-report`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data.members || data.members.length === 0) return;
+    PEOPLE = transformApiToPeople(data);
+    rebuildLinks();
+    build(currentFilter);
+    renderSidebar();
+    updateStats(currentFilter);
+  } catch(e) {
+    console.warn("API load failed, using static data:", e);
+  }
+}
+
+async function populateCompanySelector() {
+  try {
+    const resp = await fetch("/api/v1/people-analytics/companies-with-pedigrees");
+    if (!resp.ok) return null;
+    const companies = await resp.json();
+    const sel = document.getElementById("co-select");
+    if (!sel || !companies.length) return null;
+    sel.innerHTML = companies.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+    sel.style.display = "inline-block";
+    sel.addEventListener("change", () => {
+      const id = sel.value;
+      const url = new URL(window.location);
+      url.searchParams.set("company_id", id);
+      window.history.replaceState(null, "", url);
+      loadCompany(id);
+    });
+    return companies;
+  } catch(e) { return null; }
+}
+
+// ──────────────────────────────────────────────────────────────
 // INIT
 // ──────────────────────────────────────────────────────────────
-build("all");
-renderSidebar();
+(async () => {
+  const params = new URLSearchParams(window.location.search);
+  const coIdParam = params.get("company_id");
+  const companies = await populateCompanySelector();
+  if (coIdParam) {
+    const sel = document.getElementById("co-select");
+    if (sel) sel.value = coIdParam;
+    await loadCompany(coIdParam);
+  } else if (companies?.length) {
+    const sel = document.getElementById("co-select");
+    if (sel) sel.value = companies[0].id;
+    await loadCompany(companies[0].id);
+  } else {
+    build("all");
+    renderSidebar();
+  }
+})();
 </script>
 </body>
 </html>

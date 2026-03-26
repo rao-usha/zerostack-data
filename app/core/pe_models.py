@@ -42,6 +42,7 @@ from sqlalchemy import (
     DateTime,
     Boolean,
     Numeric,
+    Float,
     JSON,
     ForeignKey,
     Index,
@@ -1009,6 +1010,9 @@ class PEFirmPeople(Base):
     title = Column(String(300), nullable=False)
     seniority = Column(String(100))  # Partner, Principal, VP, Associate, Analyst
     department = Column(String(200))  # Investment, Operations, IR, Finance
+    role_type = Column(String(50), nullable=True)
+    # Values: 'investment_team', 'operating_partner', 'advisory_board',
+    #         'lpac_member', 'ir_fundraising', 'finance_ops'
 
     # Investment Focus
     sector_focus = Column(JSON)
@@ -1183,3 +1187,121 @@ class PEMarketSignal(Base):
 
     def __repr__(self):
         return f"<PEMarketSignal {self.sector} score={self.momentum_score}>"
+
+
+# =============================================================================
+# ORG INTELLIGENCE TABLES
+# =============================================================================
+
+
+class PEInvestmentCommittee(Base):
+    """
+    Investment Committee membership records for PE firms.
+
+    Tracks which partners/MDs sit on the IC, their role, and tenure.
+    Built automatically by classify_firm_people() from PEFirmPeople data.
+    """
+
+    __tablename__ = "pe_investment_committees"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    firm_id = Column(
+        Integer, ForeignKey("pe_firms.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    person_id = Column(
+        Integer, ForeignKey("pe_people.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    role = Column(String(50), nullable=False, default="voting_member")
+    # 'voting_member', 'observer', 'chair'
+    is_current = Column(Boolean, default=True)
+    start_date = Column(DateTime, nullable=True)
+    end_date = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("firm_id", "person_id", name="uq_pe_ic_firm_person"),
+    )
+
+    def __repr__(self):
+        return f"<PEInvestmentCommittee Person {self.person_id} @ Firm {self.firm_id} ({self.role})>"
+
+
+class PEFirmOrgSnapshot(Base):
+    """
+    Point-in-time org structure snapshot for a PE firm.
+
+    Captures headcount by role tier, full hierarchy JSON, and diff vs prior
+    snapshot. Built by build_org_snapshot() in pe_org_snapshot.py.
+    """
+
+    __tablename__ = "pe_firm_org_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    firm_id = Column(
+        Integer, ForeignKey("pe_firms.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    snapshot_date = Column(DateTime, nullable=False, index=True)
+    org_json = Column(JSON, nullable=True)  # full hierarchy
+    ic_member_count = Column(Integer, default=0)
+    op_partner_count = Column(Integer, default=0)
+    investment_team_count = Column(Integer, default=0)
+    total_headcount = Column(Integer, default=0)
+    changes_from_prior = Column(JSON, nullable=True)  # diff vs previous snapshot
+    created_at = Column(DateTime, server_default=func.now())
+
+    def __repr__(self):
+        return (
+            f"<PEFirmOrgSnapshot Firm {self.firm_id} @ {self.snapshot_date} "
+            f"headcount={self.total_headcount}>"
+        )
+
+
+# =============================================================================
+# LP CONVICTION TABLES
+# =============================================================================
+
+
+class PEFundConvictionScore(Base):
+    """
+    LP conviction score for a PE fund vintage.
+
+    Aggregates LP quality, re-up rate, oversubscription, diversity,
+    time-to-close, and GP commitment signals into a 0-100 score.
+    Built by pe_fund_conviction_scorer.py.
+    """
+
+    __tablename__ = "pe_fund_conviction_scores"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    fund_id = Column(
+        Integer, ForeignKey("pe_funds.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    scored_at = Column(DateTime, server_default=func.now())
+    conviction_score = Column(Float, nullable=True)  # 0-100
+    conviction_grade = Column(String(2), nullable=True)  # A/B/C/D/F
+
+    # Sub-scores (0-100 each)
+    lp_quality_score = Column(Float, nullable=True)
+    reup_rate_score = Column(Float, nullable=True)
+    oversubscription_score = Column(Float, nullable=True)
+    lp_diversity_score = Column(Float, nullable=True)
+    time_to_close_score = Column(Float, nullable=True)
+    gp_commitment_score = Column(Float, nullable=True)
+
+    # Raw signals
+    lp_count = Column(Integer, nullable=True)
+    repeat_lp_count = Column(Integer, nullable=True)
+    tier1_lp_count = Column(Integer, nullable=True)
+    oversubscription_ratio = Column(Float, nullable=True)
+    days_to_final_close = Column(Integer, nullable=True)
+    reup_rate_pct = Column(Float, nullable=True)
+    data_completeness = Column(Float, nullable=True)  # 0-1
+    scoring_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    def __repr__(self):
+        return (
+            f"<PEFundConvictionScore Fund {self.fund_id} "
+            f"score={self.conviction_score} grade={self.conviction_grade}>"
+        )

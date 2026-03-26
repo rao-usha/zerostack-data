@@ -724,6 +724,83 @@ class CafrParser(BaseCollector):
 
         return text[chunk_start:chunk_end]
 
+    async def extract_pe_portfolio_schedule(self, text: str) -> list:
+        """
+        Extract PE portfolio schedule from CAFR text.
+
+        Targets sections titled "Private Equity Portfolio", "Investment Schedule",
+        "Alternative Investments Schedule", "Appendix", or similar.
+
+        Args:
+            text: Full extracted CAFR text
+
+        Returns:
+            List of dicts with PE investment records, or empty list if none found.
+        """
+        llm = self._get_llm_client()
+        if not llm:
+            logger.warning("LLM client not available; cannot extract PE portfolio schedule")
+            return []
+
+        # PE-schedule-specific keywords to locate the relevant chunk
+        pe_keywords = [
+            "private equity portfolio",
+            "investment schedule",
+            "alternative investments",
+            "venture capital",
+            "private equity",
+            "appendix",
+            "fund commitments",
+            "private market",
+        ]
+
+        chunk = self._find_relevant_chunk(text, pe_keywords, chunk_size=20000)
+        if not chunk:
+            logger.debug("No PE portfolio section found in CAFR text")
+            return []
+
+        prompt = """You are extracting a PE investment schedule from a pension fund annual report (CAFR).
+Find any table or list showing the fund's private equity, venture capital, or alternative investments portfolio.
+Look for sections titled "Private Equity Portfolio", "Investment Schedule", "Alternative Investments", or similar.
+
+For each investment record found, extract:
+- manager_name: the GP/fund manager name (required)
+- fund_name: specific fund name e.g. "KKR Americas Fund XII" (if present)
+- vintage_year: integer year the fund was launched (if present)
+- commitment_amount_usd: LP's total commitment in USD (if present)
+- called_capital_usd: capital called/drawn to date (if present)
+- fair_value_usd: current fair value/NAV (if present)
+- net_irr_pct: net IRR as decimal e.g. 0.152 for 15.2% (if present)
+
+Return a JSON array. If no PE schedule is found, return [].
+Extract all records found, typically 10-100 entries.
+
+TEXT TO ANALYZE:
+{text}
+""".format(text=chunk)
+
+        try:
+            response = await llm.complete(
+                prompt=prompt,
+                system_prompt="You extract structured financial data from pension fund documents. Return valid JSON only.",
+            )
+            data = response.parse_json()
+            if isinstance(data, list):
+                # Filter out records without a manager_name
+                valid = [r for r in data if isinstance(r, dict) and r.get("manager_name")]
+                logger.info(f"PE portfolio schedule: extracted {len(valid)} records")
+                return valid
+            elif isinstance(data, dict) and "investments" in data:
+                # Some LLMs wrap the array
+                records = data["investments"]
+                valid = [r for r in records if isinstance(r, dict) and r.get("manager_name")]
+                logger.info(f"PE portfolio schedule: extracted {len(valid)} records (wrapped)")
+                return valid
+        except Exception as e:
+            logger.warning(f"LLM PE portfolio extraction failed: {e}")
+
+        return []
+
     def _extract_with_regex(
         self,
         text: str,

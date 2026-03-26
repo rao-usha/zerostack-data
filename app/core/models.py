@@ -3705,3 +3705,80 @@ class SourceFreshnessSLA(Base):
             f"<SourceFreshnessSLA(source='{self.source}', "
             f"max_age_hours={self.max_age_hours})>"
         )
+
+
+# =============================================================================
+# LP-GP COMMITMENT & RELATIONSHIP TABLES
+# =============================================================================
+
+
+class LpGpCommitment(Base):
+    """Tracks LP commitment to a specific PE fund vintage."""
+
+    __tablename__ = "lp_gp_commitments"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lp_id = Column(
+        Integer, ForeignKey("lp_fund.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    gp_name = Column(String(255), nullable=False)  # canonical GP name
+    gp_firm_id = Column(Integer, nullable=True)  # linked to pe_firms if resolved
+    fund_name = Column(String(255), nullable=True)
+    fund_vintage = Column(Integer, nullable=True)
+    commitment_amount_usd = Column(Float, nullable=True)
+    commitment_date = Column(DateTime, nullable=True)
+    capital_called_pct = Column(Float, nullable=True)
+    status = Column(String(50), nullable=True)  # 'active','harvesting','exited'
+    data_source = Column(String(50), nullable=True)  # 'cafr','pension_ir','form_990','form_d'
+    source_url = Column(Text, nullable=True)
+    as_of_date = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "lp_id", "gp_name", "fund_vintage", "fund_name",
+            name="uq_lp_gp_commitment",
+        ),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<LpGpCommitment(lp_id={self.lp_id}, gp='{self.gp_name}', "
+            f"vintage={self.fund_vintage}, amount={self.commitment_amount_usd})>"
+        )
+
+
+class LpGpRelationship(Base):
+    """Summarized LP-GP relationship — re-up history and commitment trend."""
+
+    __tablename__ = "lp_gp_relationships"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lp_id = Column(
+        Integer, ForeignKey("lp_fund.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    gp_name = Column(String(255), nullable=False)
+    gp_firm_id = Column(Integer, nullable=True)
+    first_vintage = Column(Integer, nullable=True)
+    last_vintage = Column(Integer, nullable=True)
+    total_vintages_committed = Column(Integer, default=1)  # re-up count
+    total_committed_usd = Column(Float, nullable=True)
+    avg_commitment_usd = Column(Float, nullable=True)
+    commitment_trend = Column(String(20), nullable=True)  # 'growing','stable','declining','new'
+    last_updated = Column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("lp_id", "gp_name", name="uq_lp_gp_relationship"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<LpGpRelationship(lp_id={self.lp_id}, gp='{self.gp_name}', "
+            f"vintages={self.total_vintages_committed}, trend='{self.commitment_trend}')>"
+        )

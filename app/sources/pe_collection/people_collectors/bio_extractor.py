@@ -60,7 +60,8 @@ Return ONLY valid JSON — an array of person objects:
     "experience": [
       {{"company": "Goldman Sachs", "title": "Vice President", "start_year": 1998, "end_year": 2005}}
     ],
-    "focus_areas": ["Technology", "Healthcare"]
+    "focus_areas": ["Technology", "Healthcare"],
+    "role_type": "investment_team"
   }}
 ]
 
@@ -73,6 +74,7 @@ Rules:
 - department should be the business unit or function (e.g. "Private Equity", "Real Estate", "Finance")
 - start_year_at_firm: year they joined {firm_name} (integer), null if unknown
 - graduation_year, start_year, end_year: integers (e.g. 2005), null if unknown
+- role_type: one of: 'investment_team' (deal professionals), 'operating_partner' (ops/value-creation advisors with prior CEO/COO/operator experience), 'advisory_board' (external advisors, senior advisors), 'ir_fundraising' (investor relations, fundraising roles), 'finance_ops' (CFO, COO, finance, admin, compliance), 'lpac_member' (LP advisory committee). Default to 'investment_team' if unclear.
 
 Page text:
 {text}"""
@@ -218,6 +220,7 @@ class BioExtractor(BasePECollector):
                             "title": person.get("title"),
                             "seniority": person.get("seniority"),
                             "department": person.get("department"),
+                            "role_type": person.get("role_type"),
                             "start_year_at_firm": person.get("start_year_at_firm"),
                             "bio": person.get("bio"),
                             "education": person.get("education", []),

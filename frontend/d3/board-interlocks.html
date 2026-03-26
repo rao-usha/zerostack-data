@@ -113,6 +113,8 @@
       Directors
     </button>
     <div class="sep"></div>
+    <select id="co-select" style="display:none;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:5px 10px;color:#f1f5f9;font-size:12px;cursor:pointer;outline:none"></select>
+    <div class="sep"></div>
     <div class="search-box">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" id="search-input" placeholder="Search companies, directors..." autocomplete="off">
@@ -163,7 +165,7 @@
 // ──────────────────────────────────────────────────────────────
 // DATA
 // ──────────────────────────────────────────────────────────────
-const COMPANIES = [
+let COMPANIES = [
   { id:"acme",     label:"Acme Industrial",     sector:"Manufacturing", revenue:"$420M", employees:3200, hq:"Columbus, OH" },
   { id:"precision",label:"Precision Mfg",        sector:"Manufacturing", revenue:"$180M", employees:1100, hq:"Detroit, MI"  },
   { id:"national", label:"National Logistics",   sector:"Logistics",     revenue:"$310M", employees:2800, hq:"Atlanta, GA"  },
@@ -174,7 +176,7 @@ const COMPANIES = [
   { id:"pacific",  label:"Pacific Distribution", sector:"Logistics",     revenue:"$195M", employees:1400, hq:"Phoenix, AZ"  },
 ];
 
-const DIRECTORS = [
+let DIRECTORS = [
   { id:"rchen",  label:"Robert Chen",    role:"Independent Director", boards:["acme","precision","heritage"],               prev:"GE Capital, McKinsey", seats:3 },
   { id:"phuang", label:"Patricia Huang", role:"Independent Director", boards:["acme","national","pacific"],                 prev:"Goldman Sachs, Advent", seats:3 },
   { id:"lpark",  label:"Linda Park",     role:"Independent Director", boards:["precision","national","consol"],             prev:"Deloitte, Wharton MBA", seats:3 },
@@ -186,36 +188,36 @@ const DIRECTORS = [
   { id:"jwalsh", label:"James Walsh",    role:"CEO / Board Member",   boards:["acme","precision","consol"],                 prev:"Army, Wharton MBA", seats:3 },
 ];
 
-// Build nodes array
-const nodes = [
-  ...COMPANIES.map(c => ({ ...c, type:"company" })),
-  ...DIRECTORS.map(d => ({ ...d, type:"director" })),
-];
+// Derived data — rebuilt after COMPANIES/DIRECTORS change
+let nodes, seatLinks, interlockLinks, links;
 
-// Build seat links (director → company)
-const seatLinks = [];
-DIRECTORS.forEach(d => {
-  d.boards.forEach(cid => {
-    seatLinks.push({ source:d.id, target:cid, type:"seat", director:d.label });
+function rebuildDerivedData() {
+  nodes = [
+    ...COMPANIES.map(c => ({ ...c, type:"company" })),
+    ...DIRECTORS.map(d => ({ ...d, type:"director" })),
+  ];
+  seatLinks = [];
+  DIRECTORS.forEach(d => {
+    d.boards.forEach(cid => {
+      seatLinks.push({ source:d.id, target:cid, type:"seat", director:d.label });
+    });
   });
-});
-
-// Build interlock links (company ↔ company via shared directors)
-const interlockMap = {};
-DIRECTORS.forEach(d => {
-  const bs = d.boards;
-  for (let i=0;i<bs.length;i++) {
-    for (let j=i+1;j<bs.length;j++) {
-      const key = [bs[i],bs[j]].sort().join("__");
-      if (!interlockMap[key]) interlockMap[key] = { source:bs[i], target:bs[j], type:"interlock", shared:[] };
-      interlockMap[key].shared.push(d.label);
+  const interlockMap = {};
+  DIRECTORS.forEach(d => {
+    const bs = d.boards;
+    for (let i=0;i<bs.length;i++) {
+      for (let j=i+1;j<bs.length;j++) {
+        const key = [bs[i],bs[j]].sort().join("__");
+        if (!interlockMap[key]) interlockMap[key] = { source:bs[i], target:bs[j], type:"interlock", shared:[] };
+        interlockMap[key].shared.push(d.label);
+      }
     }
-  }
-});
-const interlockLinks = Object.values(interlockMap);
+  });
+  interlockLinks = Object.values(interlockMap);
+  links = [...seatLinks, ...interlockLinks];
+}
 
-// All links combined
-let links = [...seatLinks, ...interlockLinks];
+rebuildDerivedData();
 
 // ──────────────────────────────────────────────────────────────
 // STATE
@@ -575,9 +577,109 @@ window.addEventListener("resize",()=>{
 });
 
 // ──────────────────────────────────────────────────────────────
+// API LOADING
+// ──────────────────────────────────────────────────────────────
+function transformApiToBipartite(apiData, centerName) {
+  const coNames = new Set([centerName]);
+  apiData.edges.forEach(e => { if(e.shared_company) coNames.add(e.shared_company); });
+
+  const newCompanies = [...coNames].map((name, i) => ({
+    id:`co_${i}`, label:name, type:"company", sector:"", revenue:"", employees:0, hq:""
+  }));
+  const coIdMap = {};
+  newCompanies.forEach(c => { coIdMap[c.label] = c.id; });
+
+  const personBoards = {};
+  apiData.nodes.forEach(n => { personBoards[n.id] = new Set(); });
+  apiData.nodes.filter(n=>n.is_center_board).forEach(n => personBoards[n.id].add(centerName));
+  apiData.edges.forEach(e => {
+    if(e.shared_company) {
+      if(personBoards[e.source] !== undefined) personBoards[e.source].add(e.shared_company);
+      if(personBoards[e.target] !== undefined) personBoards[e.target].add(e.shared_company);
+    }
+  });
+
+  const newDirectors = apiData.nodes.map(n => {
+    const boardLabels = [...(personBoards[n.id] || [])];
+    return {
+      id:`p_${n.id}`, label:n.name,
+      role: n.is_center_board ? "Board Member" : "External Director",
+      boards: boardLabels.map(l => coIdMap[l]).filter(Boolean),
+      prev: boardLabels.length > 1 ? `${boardLabels.length} boards` : "Board member",
+      seats: boardLabels.length
+    };
+  });
+
+  return { companies: newCompanies, directors: newDirectors };
+}
+
+function updateStatsBar() {
+  document.getElementById("stat-companies").textContent = COMPANIES.length;
+  document.getElementById("stat-directors").textContent = DIRECTORS.length;
+  document.getElementById("stat-seats").textContent = seatLinks.length;
+  document.getElementById("stat-interlocks").textContent = interlockLinks.length;
+  const topDir = [...DIRECTORS].sort((a,b) => b.seats - a.seats)[0];
+  document.getElementById("stat-top").textContent = topDir?.label || "—";
+}
+
+async function loadCompany(companyId) {
+  const sel = document.getElementById("co-select");
+  const centerName = sel?.options[sel.selectedIndex]?.text || `Company ${companyId}`;
+  try {
+    const resp = await fetch(`/api/v1/board-interlocks/company/${companyId}/network`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data.nodes || data.nodes.length === 0) return;
+    const t = transformApiToBipartite(data, centerName);
+    COMPANIES = t.companies;
+    DIRECTORS = t.directors;
+    rebuildDerivedData();
+    updateStatsBar();
+    build();
+  } catch(e) {
+    console.warn("API load failed, using static data:", e);
+  }
+}
+
+async function populateCompanySelector() {
+  try {
+    const resp = await fetch("/api/v1/board-interlocks/companies");
+    if (!resp.ok) return null;
+    const companies = await resp.json();
+    const sel = document.getElementById("co-select");
+    if (!sel || !companies.length) return null;
+    sel.innerHTML = companies.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+    sel.style.display = "inline-block";
+    sel.addEventListener("change", () => {
+      const id = sel.value;
+      const url = new URL(window.location);
+      url.searchParams.set("company_id", id);
+      window.history.replaceState(null, "", url);
+      loadCompany(id);
+    });
+    return companies;
+  } catch(e) { return null; }
+}
+
+// ──────────────────────────────────────────────────────────────
 // INIT
 // ──────────────────────────────────────────────────────────────
-build();
+(async () => {
+  const params = new URLSearchParams(window.location.search);
+  const coIdParam = params.get("company_id");
+  const companies = await populateCompanySelector();
+  if (coIdParam) {
+    const sel = document.getElementById("co-select");
+    if (sel) sel.value = coIdParam;
+    await loadCompany(coIdParam);
+  } else if (companies?.length) {
+    const sel = document.getElementById("co-select");
+    if (sel) sel.value = companies[0].id;
+    await loadCompany(companies[0].id);
+  } else {
+    build();
+  }
+})();
 </script>
 </body>
 </html>

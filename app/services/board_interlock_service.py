@@ -97,8 +97,11 @@ class BoardInterlockService:
             all_pids.add(il.person_id_b)
 
         people = {p.id: p for p in db.query(Person).filter(Person.id.in_(all_pids)).all()}
+        def clean_name(p):
+            return (p.full_name or "").split('\n')[0].strip() if p else ""
+
         nodes = [
-            {"id": pid, "name": people[pid].full_name if pid in people else f"Person {pid}",
+            {"id": pid, "name": clean_name(people[pid]) if pid in people else f"Person {pid}",
              "is_center_board": pid in board_pids}
             for pid in all_pids
         ]
