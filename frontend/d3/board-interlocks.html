@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Board Interlock Network — Shared Directorship Analysis</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f172a;--card:#1e293b;--border:#334155;--text:#f1f5f9;
+    --muted:#94a3b8;--primary:#6366f1;--accent:#06b6d4;--orange:#f59e0b;
+    --green:#22c55e;--red:#ef4444;
+  }
+  html,body{height:100%;overflow:hidden;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text)}
+  body{display:flex;flex-direction:column}
+
+  /* Header */
+  .header{padding:14px 24px;display:flex;align-items:center;gap:20px;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0;flex-wrap:wrap}
+  .back-link{color:var(--muted);text-decoration:none;font-size:0.82rem;flex-shrink:0;white-space:nowrap}
+  .back-link:hover{color:var(--text)}
+  .header-title h1{font-size:18px;font-weight:700;letter-spacing:-0.3px}
+  .header-title p{font-size:11px;color:var(--muted);margin-top:1px}
+
+  /* Filter Tabs */
+  .filter-row{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap}
+  .filter-tab{padding:5px 14px;border:1px solid var(--border);border-radius:20px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;transition:all .15s}
+  .filter-tab:hover{border-color:var(--primary);color:var(--text)}
+  .filter-tab.active{background:var(--primary);border-color:var(--primary);color:white}
+  .toggle-btn{padding:5px 14px;border:1px solid var(--border);border-radius:20px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px}
+  .toggle-btn:hover{border-color:var(--accent);color:var(--text)}
+  .toggle-btn.on{border-color:var(--accent);color:var(--accent);background:rgba(6,182,212,0.08)}
+  .sep{width:1px;height:20px;background:var(--border);flex-shrink:0}
+
+  /* Search */
+  .search-box{position:relative;flex-shrink:0}
+  .search-box input{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 12px 7px 30px;color:var(--text);font-size:12px;width:200px;outline:none;transition:border-color .2s}
+  .search-box input:focus{border-color:var(--primary)}
+  .search-box input::placeholder{color:var(--muted)}
+  .search-box svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+  .search-results{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-top:4px;max-height:180px;overflow-y:auto;z-index:200;display:none}
+  .search-results.show{display:block}
+  .sri{padding:7px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .sri:last-child{border-bottom:none}
+  .sri:hover{background:rgba(99,102,241,0.08)}
+  .sri-badge{font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600}
+  .sri-badge.company{background:rgba(99,102,241,0.2);color:var(--primary)}
+  .sri-badge.director{background:rgba(245,158,11,0.2);color:var(--orange)}
+
+  /* Stats */
+  .stats-bar{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0;overflow-x:auto}
+  .stat{display:flex;flex-direction:column;align-items:center;padding:10px 28px;border-right:1px solid var(--border);min-width:110px}
+  .stat:last-child{border-right:none}
+  .stat-value{font-size:20px;font-weight:700;color:var(--primary)}
+  .stat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:1px;white-space:nowrap}
+
+  /* Graph */
+  .graph-container{flex:1;position:relative;overflow:hidden}
+  svg{width:100%;height:100%;display:block}
+
+  /* Legend */
+  .legend{position:absolute;bottom:18px;left:18px;background:rgba(30,41,59,0.92);border:1px solid var(--border);border-radius:12px;padding:14px 18px;font-size:11px;z-index:10;min-width:190px;backdrop-filter:blur(8px)}
+  .legend h3{font-size:12px;font-weight:600;margin-bottom:10px}
+  .legend-section{margin-bottom:9px}
+  .legend-section:last-child{margin-bottom:0}
+  .legend-section-title{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+  .legend-item{display:flex;align-items:center;gap:7px;margin-bottom:3px;color:var(--muted)}
+  .legend-circle{flex-shrink:0;border-radius:50%}
+  .legend-line{height:0;flex-shrink:0;border-radius:2px}
+
+  /* Controls */
+  .controls{position:absolute;top:16px;right:16px;display:flex;flex-direction:column;gap:5px;z-index:10}
+  .ctrl-btn{background:rgba(30,41,59,0.9);border:1px solid var(--border);border-radius:8px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);transition:all .15s;font-size:15px;backdrop-filter:blur(4px)}
+  .ctrl-btn:hover{border-color:var(--primary);color:var(--text)}
+
+  /* Tooltip */
+  .tooltip{position:absolute;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;pointer-events:none;opacity:0;transition:opacity .15s;z-index:50;max-width:280px;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+  .tooltip h4{font-size:14px;font-weight:600;margin-bottom:4px}
+  .tooltip .type-tag{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+  .tooltip .rows{font-size:12px;color:var(--muted);line-height:1.7}
+  .tooltip .rows strong{color:var(--text)}
+
+  /* Info panel */
+  .info-panel{position:absolute;top:16px;left:16px;background:rgba(30,41,59,0.95);border:1px solid var(--primary);border-radius:12px;padding:16px 18px;font-size:12px;z-index:10;max-width:240px;backdrop-filter:blur(8px);display:none}
+  .info-panel.show{display:block}
+  .info-close{float:right;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;margin-left:8px}
+  .info-close:hover{color:var(--text)}
+  .info-title{font-size:13px;font-weight:700;margin-bottom:6px;padding-right:20px}
+  .info-sub{font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+  .info-row{display:flex;justify-content:space-between;margin-bottom:4px}
+  .info-key{color:var(--muted)}
+  .info-val{color:var(--text);font-weight:600}
+  .info-boards{margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+  .info-board-tag{display:inline-block;background:rgba(99,102,241,.15);color:var(--primary);border:1px solid rgba(99,102,241,.3);border-radius:4px;font-size:10px;padding:2px 7px;margin:2px}
+
+  .node-label{pointer-events:none;text-anchor:middle;font-family:'Inter','Segoe UI',system-ui,sans-serif}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <a href="index.html" class="back-link">← Gallery</a>
+  <div class="header-title">
+    <h1>Board Interlock Network</h1>
+    <p>Shared Directorship &amp; Executive Co-Membership Analysis</p>
+  </div>
+  <div class="filter-row">
+    <button class="filter-tab active" onclick="setFilter('all')" id="ft-all">All</button>
+    <button class="filter-tab" onclick="setFilter('interlocked')" id="ft-interlocked">Interlocked Only</button>
+    <div class="sep"></div>
+    <button class="toggle-btn on" id="toggle-execs" onclick="toggleExecs()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg>
+      Directors
+    </button>
+    <div class="sep"></div>
+    <div class="search-box">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="search-input" placeholder="Search companies, directors..." autocomplete="off">
+      <div class="search-results" id="search-results"></div>
+    </div>
+  </div>
+</div>
+
+<div class="stats-bar">
+  <div class="stat"><span class="stat-value" id="stat-companies">8</span><span class="stat-label">Companies</span></div>
+  <div class="stat"><span class="stat-value" id="stat-directors">9</span><span class="stat-label">Directors</span></div>
+  <div class="stat"><span class="stat-value" id="stat-seats">28</span><span class="stat-label">Board Seats</span></div>
+  <div class="stat"><span class="stat-value" id="stat-interlocks">18</span><span class="stat-label">Interlock Pairs</span></div>
+  <div class="stat"><span class="stat-value" id="stat-top">Robert Chen</span><span class="stat-label">Top Connector</span></div>
+</div>
+
+<div class="graph-container" id="graph-container">
+  <svg id="network-svg"></svg>
+  <div class="legend">
+    <h3>Legend</h3>
+    <div class="legend-section">
+      <div class="legend-section-title">Nodes</div>
+      <div class="legend-item"><div class="legend-circle" style="width:20px;height:20px;background:#6366f1;border:2px solid #818cf8"></div>Portfolio Company</div>
+      <div class="legend-item"><div class="legend-circle" style="width:12px;height:12px;background:#f59e0b;border:2px solid #fcd34d"></div>Director (1 board)</div>
+      <div class="legend-item"><div class="legend-circle" style="width:15px;height:15px;background:#f59e0b;border:2px solid #fcd34d"></div>Director (2 boards)</div>
+      <div class="legend-item"><div class="legend-circle" style="width:18px;height:18px;background:#ef4444;border:2px solid #f87171"></div>Connector (3+ boards)</div>
+    </div>
+    <div class="legend-section">
+      <div class="legend-section-title">Links</div>
+      <div class="legend-item"><div class="legend-line" style="width:24px;border-top:1.5px dashed #94a3b8;opacity:0.5"></div>Board Seat</div>
+      <div class="legend-item"><div class="legend-line" style="width:24px;border-top:3px solid #06b6d4"></div>Interlock (1 shared)</div>
+      <div class="legend-item"><div class="legend-line" style="width:24px;border-top:4px solid #6366f1"></div>Interlock (2+ shared)</div>
+    </div>
+  </div>
+  <div class="controls">
+    <div class="ctrl-btn" id="zoom-in" title="Zoom In">+</div>
+    <div class="ctrl-btn" id="zoom-out" title="Zoom Out">−</div>
+    <div class="ctrl-btn" id="zoom-reset" title="Reset">↺</div>
+  </div>
+  <div class="tooltip" id="tooltip"></div>
+  <div class="info-panel" id="info-panel">
+    <span class="info-close" onclick="closeInfo()">×</span>
+    <div id="info-content"></div>
+  </div>
+</div>
+
+<script>
+// ──────────────────────────────────────────────────────────────
+// DATA
+// ──────────────────────────────────────────────────────────────
+const COMPANIES = [
+  { id:"acme",     label:"Acme Industrial",     sector:"Manufacturing", revenue:"$420M", employees:3200, hq:"Columbus, OH" },
+  { id:"precision",label:"Precision Mfg",        sector:"Manufacturing", revenue:"$180M", employees:1100, hq:"Detroit, MI"  },
+  { id:"national", label:"National Logistics",   sector:"Logistics",     revenue:"$310M", employees:2800, hq:"Atlanta, GA"  },
+  { id:"summit",   label:"Summit Foods",         sector:"Food & Bev",    revenue:"$240M", employees:1900, hq:"Nashville, TN"},
+  { id:"heritage", label:"Heritage HVAC",        sector:"Services",      revenue:"$95M",  employees: 680, hq:"Charlotte, NC"},
+  { id:"techmould",label:"TechMould Industries", sector:"Industrials",   revenue:"$135M", employees: 920, hq:"Cincinnati, OH"},
+  { id:"consol",   label:"Consol. Maintenance",  sector:"Services",      revenue:"$78M",  employees: 560, hq:"Dallas, TX"   },
+  { id:"pacific",  label:"Pacific Distribution", sector:"Logistics",     revenue:"$195M", employees:1400, hq:"Phoenix, AZ"  },
+];
+
+const DIRECTORS = [
+  { id:"rchen",  label:"Robert Chen",    role:"Independent Director", boards:["acme","precision","heritage"],               prev:"GE Capital, McKinsey", seats:3 },
+  { id:"phuang", label:"Patricia Huang", role:"Independent Director", boards:["acme","national","pacific"],                 prev:"Goldman Sachs, Advent", seats:3 },
+  { id:"lpark",  label:"Linda Park",     role:"Independent Director", boards:["precision","national","consol"],             prev:"Deloitte, Wharton MBA", seats:3 },
+  { id:"dmoore", label:"David Moore",    role:"Independent Director", boards:["acme","summit","techmould"],                 prev:"P&G, HBS MBA", seats:3 },
+  { id:"wfoster",label:"William Foster", role:"Independent Director", boards:["national","summit","pacific"],               prev:"McKinsey, Yale", seats:3 },
+  { id:"treed",  label:"Thomas Reed",    role:"Independent Director", boards:["summit","heritage"],                         prev:"GE Capital, Dartmouth", seats:2 },
+  { id:"aliu",   label:"Anna Liu",       role:"Independent Director", boards:["heritage","techmould","pacific"],            prev:"Stanford MBA, McKinsey", seats:3 },
+  { id:"gchen",  label:"George Chen",    role:"Independent Director", boards:["techmould","consol"],                        prev:"Wharton MBA, Big 4", seats:2 },
+  { id:"jwalsh", label:"James Walsh",    role:"CEO / Board Member",   boards:["acme","precision","consol"],                 prev:"Army, Wharton MBA", seats:3 },
+];
+
+// Build nodes array
+const nodes = [
+  ...COMPANIES.map(c => ({ ...c, type:"company" })),
+  ...DIRECTORS.map(d => ({ ...d, type:"director" })),
+];
+
+// Build seat links (director → company)
+const seatLinks = [];
+DIRECTORS.forEach(d => {
+  d.boards.forEach(cid => {
+    seatLinks.push({ source:d.id, target:cid, type:"seat", director:d.label });
+  });
+});
+
+// Build interlock links (company ↔ company via shared directors)
+const interlockMap = {};
+DIRECTORS.forEach(d => {
+  const bs = d.boards;
+  for (let i=0;i<bs.length;i++) {
+    for (let j=i+1;j<bs.length;j++) {
+      const key = [bs[i],bs[j]].sort().join("__");
+      if (!interlockMap[key]) interlockMap[key] = { source:bs[i], target:bs[j], type:"interlock", shared:[] };
+      interlockMap[key].shared.push(d.label);
+    }
+  }
+});
+const interlockLinks = Object.values(interlockMap);
+
+// All links combined
+let links = [...seatLinks, ...interlockLinks];
+
+// ──────────────────────────────────────────────────────────────
+// STATE
+// ──────────────────────────────────────────────────────────────
+let showExecs = true;
+let currentFilter = "all";
+let highlighted = null;
+
+// ──────────────────────────────────────────────────────────────
+// GRAPH SETUP
+// ──────────────────────────────────────────────────────────────
+const container = document.getElementById("graph-container");
+const svgEl = document.getElementById("network-svg");
+const svg = d3.select(svgEl);
+const tooltip = document.getElementById("tooltip");
+const infoPanel = document.getElementById("info-panel");
+const infoContent = document.getElementById("info-content");
+
+let w = container.clientWidth;
+let h = container.clientHeight;
+
+const zoomBehavior = d3.zoom()
+  .scaleExtent([0.1, 6])
+  .on("zoom", ({transform}) => g.attr("transform", transform));
+svg.call(zoomBehavior);
+
+const defs = svg.append("defs");
+
+// Glow filter
+const glow = defs.append("filter").attr("id","glow");
+glow.append("feGaussianBlur").attr("stdDeviation","3").attr("result","coloredBlur");
+const feMerge = glow.append("feMerge");
+feMerge.append("feMergeNode").attr("in","coloredBlur");
+feMerge.append("feMergeNode").attr("in","SourceGraphic");
+
+const g = svg.append("g");
+let linkGroup, nodeGroup, labelGroup, simulation;
+
+function nodeRadius(d) {
+  if (d.type==="company") return 26;
+  if (d.seats>=3) return 14;
+  if (d.seats===2) return 11;
+  return 8;
+}
+function nodeColor(d) {
+  if (d.type==="company") return "#6366f1";
+  if (d.seats>=3) return "#ef4444";
+  if (d.seats===2) return "#f59e0b";
+  return "#f59e0b";
+}
+function nodeBorder(d) {
+  if (d.type==="company") return "#818cf8";
+  if (d.seats>=3) return "#f87171";
+  return "#fcd34d";
+}
+
+function build() {
+  g.selectAll("*").remove();
+
+  const visibleDirectorIds = new Set(
+    showExecs ? DIRECTORS.map(d=>d.id) : []
+  );
+
+  // Filter to only interlocked companies if needed
+  let visibleCompanyIds;
+  if (currentFilter==="interlocked") {
+    const interlocked = new Set();
+    interlockLinks.forEach(l => { interlocked.add(l.source); interlocked.add(l.target); });
+    visibleCompanyIds = interlocked;
+  } else {
+    visibleCompanyIds = new Set(COMPANIES.map(c=>c.id));
+  }
+
+  const visibleNodes = nodes.filter(n =>
+    (n.type==="company" && visibleCompanyIds.has(n.id)) ||
+    (n.type==="director" && showExecs && visibleDirectorIds.has(n.id) &&
+      n.boards.some(b=>visibleCompanyIds.has(b)))
+  );
+  const visibleIds = new Set(visibleNodes.map(n=>n.id));
+
+  const visibleLinks = [];
+  if (showExecs) {
+    seatLinks.forEach(l => {
+      if (visibleIds.has(l.source) && visibleIds.has(l.target)) visibleLinks.push(l);
+    });
+  } else {
+    interlockLinks.forEach(l => {
+      if (visibleIds.has(l.source) && visibleIds.has(l.target)) visibleLinks.push(l);
+    });
+  }
+
+  simulation = d3.forceSimulation(visibleNodes)
+    .force("link", d3.forceLink(visibleLinks).id(d=>d.id)
+      .distance(d => d.type==="seat" ? 90 : d.shared?.length>1 ? 160 : 200)
+      .strength(d => d.type==="seat" ? 0.6 : 0.25))
+    .force("charge", d3.forceManyBody().strength(d=>d.type==="company"?-380:-120).distanceMax(450))
+    .force("center", d3.forceCenter(w/2, h/2))
+    .force("collision", d3.forceCollide().radius(d=>nodeRadius(d)+10))
+    .force("x", d3.forceX(w/2).strength(0.04))
+    .force("y", d3.forceY(h/2).strength(0.04))
+    .on("tick", ticked);
+
+  linkGroup = g.append("g").attr("class","links");
+  const link = linkGroup.selectAll("line")
+    .data(visibleLinks)
+    .join("line")
+    .attr("stroke", d => {
+      if (d.type==="seat") return "#94a3b8";
+      if (d.shared?.length>1) return "#6366f1";
+      return "#06b6d4";
+    })
+    .attr("stroke-width", d => {
+      if (d.type==="seat") return 1;
+      if (d.shared?.length>1) return 3.5;
+      return 2.5;
+    })
+    .attr("stroke-dasharray", d => d.type==="seat" ? "5 3" : "none")
+    .attr("stroke-opacity", d => d.type==="seat" ? 0.35 : 0.7)
+    .style("cursor", d => d.type==="interlock"?"pointer":"default")
+    .on("mouseover", (e,d) => { if(d.type==="interlock") showLinkTooltip(e,d); })
+    .on("mousemove", (e,d) => { if(d.type==="interlock") moveTip(e); })
+    .on("mouseout", hideTip);
+
+  nodeGroup = g.append("g").attr("class","nodes");
+  const node = nodeGroup.selectAll("g")
+    .data(visibleNodes)
+    .join("g")
+    .style("cursor","pointer")
+    .call(d3.drag()
+      .on("start",(e,d)=>{ if(!e.active) simulation.alphaTarget(0.3).restart(); d.fx=d.x;d.fy=d.y; })
+      .on("drag",(e,d)=>{ d.fx=e.x;d.fy=e.y; })
+      .on("end",(e,d)=>{ if(!e.active) simulation.alphaTarget(0); d.fx=null;d.fy=null; }))
+    .on("mouseover",(e,d)=>showNodeTooltip(e,d))
+    .on("mousemove",(e)=>moveTip(e))
+    .on("mouseout",hideTip)
+    .on("click",(e,d)=>{ e.stopPropagation(); showInfo(d); });
+
+  // Company nodes: rounded square feel via thick ring
+  node.filter(n=>n.type==="company")
+    .append("circle")
+    .attr("r", d=>nodeRadius(d))
+    .attr("fill", d=>nodeColor(d))
+    .attr("fill-opacity", 0.18)
+    .attr("stroke", d=>nodeBorder(d))
+    .attr("stroke-width", 2.5);
+
+  node.filter(n=>n.type==="company")
+    .append("circle")
+    .attr("r", d=>nodeRadius(d)-6)
+    .attr("fill", d=>nodeColor(d))
+    .attr("opacity", 0.9);
+
+  node.filter(n=>n.type==="company")
+    .append("text")
+    .attr("text-anchor","middle")
+    .attr("dominant-baseline","central")
+    .attr("font-size",10)
+    .attr("font-weight",700)
+    .attr("fill","#0f172a")
+    .attr("pointer-events","none")
+    .text(d=>d.label.substring(0,2).toUpperCase());
+
+  // Director nodes
+  node.filter(n=>n.type==="director")
+    .append("circle")
+    .attr("r",d=>nodeRadius(d))
+    .attr("fill",d=>nodeColor(d))
+    .attr("stroke",d=>nodeBorder(d))
+    .attr("stroke-width",1.5)
+    .attr("opacity",0.88);
+
+  // Labels
+  labelGroup = g.append("g").attr("class","labels");
+  labelGroup.selectAll("text")
+    .data(visibleNodes)
+    .join("text")
+    .attr("class","node-label")
+    .attr("dy",d=>nodeRadius(d)+13)
+    .attr("font-size",d=>d.type==="company"?11:9)
+    .attr("font-weight",d=>d.type==="company"?600:400)
+    .attr("fill",d=>d.type==="company"?"#f1f5f9":"#94a3b8")
+    .attr("pointer-events","none")
+    .text(d=>d.label);
+
+  svg.on("click",()=>closeInfo());
+}
+
+function ticked(){
+  if(!linkGroup) return;
+  linkGroup.selectAll("line")
+    .attr("x1",d=>d.source.x).attr("y1",d=>d.source.y)
+    .attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+  nodeGroup.selectAll("g")
+    .attr("transform",d=>`translate(${d.x},${d.y})`);
+  labelGroup.selectAll("text")
+    .attr("x",d=>d.x).attr("y",d=>d.y);
+}
+
+// ──────────────────────────────────────────────────────────────
+// TOOLTIPS
+// ──────────────────────────────────────────────────────────────
+function showNodeTooltip(e,d){
+  let html = `<h4>${d.label}</h4>`;
+  if(d.type==="company"){
+    html+=`<div class="type-tag">Portfolio Company · ${d.sector}</div>`;
+    html+=`<div class="rows">
+      <div><strong>Revenue</strong> ${d.revenue}</div>
+      <div><strong>Employees</strong> ${d.employees.toLocaleString()}</div>
+      <div><strong>HQ</strong> ${d.hq}</div>
+      <div><strong>Board seats shared with</strong> ${getInterlockPartners(d.id).length} companies</div>
+    </div>`;
+  } else {
+    const tier = d.seats>=3?"Connector (3 boards)":d.seats===2?"Director (2 boards)":"Director (1 board)";
+    html+=`<div class="type-tag">${d.role} · ${tier}</div>`;
+    html+=`<div class="rows">
+      <div><strong>Boards</strong> ${d.boards.map(b=>COMPANIES.find(c=>c.id===b)?.label||b).join(", ")}</div>
+      <div><strong>Background</strong> ${d.prev}</div>
+    </div>`;
+  }
+  tooltip.innerHTML=html;
+  tooltip.style.opacity=1;
+  moveTip(e);
+}
+function showLinkTooltip(e,d){
+  const c1 = COMPANIES.find(c=>c.id===d.source.id||c.id===d.source);
+  const c2 = COMPANIES.find(c=>c.id===d.target.id||c.id===d.target);
+  const html=`<h4>Board Interlock</h4>
+    <div class="type-tag">${c1?.label} ↔ ${c2?.label}</div>
+    <div class="rows">
+      <div><strong>Shared directors</strong> ${d.shared.length}</div>
+      <div>${d.shared.join(", ")}</div>
+    </div>`;
+  tooltip.innerHTML=html;
+  tooltip.style.opacity=1;
+  moveTip(e);
+}
+function moveTip(e){
+  const r=svgEl.getBoundingClientRect();
+  let x=e.clientX-r.left+14, y=e.clientY-r.top-10;
+  if(x+290>r.width) x=e.clientX-r.left-300;
+  if(y+100>r.height) y=e.clientY-r.top-120;
+  tooltip.style.left=x+"px"; tooltip.style.top=y+"px";
+}
+function hideTip(){ tooltip.style.opacity=0; }
+
+// ──────────────────────────────────────────────────────────────
+// INFO PANEL
+// ──────────────────────────────────────────────────────────────
+function getInterlockPartners(cid){
+  return interlockLinks.filter(l=>{
+    const s = typeof l.source==="object"?l.source.id:l.source;
+    const t = typeof l.target==="object"?l.target.id:l.target;
+    return s===cid||t===cid;
+  });
+}
+function showInfo(d){
+  let html="";
+  if(d.type==="company"){
+    const partners = getInterlockPartners(d.id);
+    html=`<div class="info-title">${d.label}</div>
+    <div class="info-sub">Portfolio Company · ${d.sector}</div>
+    <div class="info-row"><span class="info-key">Revenue</span><span class="info-val">${d.revenue}</span></div>
+    <div class="info-row"><span class="info-key">Employees</span><span class="info-val">${d.employees.toLocaleString()}</span></div>
+    <div class="info-row"><span class="info-key">HQ</span><span class="info-val">${d.hq}</span></div>
+    <div class="info-row"><span class="info-key">Interlock partners</span><span class="info-val">${partners.length}</span></div>
+    <div class="info-boards"><div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Shared directors with:</div>
+    ${partners.map(p=>{
+      const oid = (typeof p.source==="object"?p.source.id:p.source)===d.id
+        ? (typeof p.target==="object"?p.target.id:p.target)
+        : (typeof p.source==="object"?p.source.id:p.source);
+      const co=COMPANIES.find(c=>c.id===oid);
+      return `<div class="info-board-tag">${co?.label||oid} <span style="opacity:0.6">(${p.shared.length})</span></div>`;
+    }).join("")}</div>`;
+  } else {
+    const boardNames = d.boards.map(b=>COMPANIES.find(c=>c.id===b)?.label||b);
+    html=`<div class="info-title">${d.label}</div>
+    <div class="info-sub">${d.role}</div>
+    <div class="info-row"><span class="info-key">Board seats</span><span class="info-val">${d.seats}</span></div>
+    <div class="info-row"><span class="info-key">Background</span><span class="info-val" style="font-size:11px">${d.prev}</span></div>
+    <div class="info-boards"><div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Serves on:</div>
+    ${boardNames.map(b=>`<div class="info-board-tag">${b}</div>`).join("")}</div>`;
+  }
+  infoContent.innerHTML=html;
+  infoPanel.classList.add("show");
+}
+function closeInfo(){ infoPanel.classList.remove("show"); }
+
+// ──────────────────────────────────────────────────────────────
+// CONTROLS
+// ──────────────────────────────────────────────────────────────
+function setFilter(f){
+  currentFilter=f;
+  document.querySelectorAll(".filter-tab").forEach(b=>b.classList.remove("active"));
+  document.getElementById("ft-"+f)?.classList.add("active");
+  build();
+}
+function toggleExecs(){
+  showExecs=!showExecs;
+  const btn=document.getElementById("toggle-execs");
+  btn.classList.toggle("on",showExecs);
+  build();
+}
+
+document.getElementById("zoom-in").addEventListener("click",()=>{
+  svg.transition().duration(300).call(zoomBehavior.scaleBy,1.4);
+});
+document.getElementById("zoom-out").addEventListener("click",()=>{
+  svg.transition().duration(300).call(zoomBehavior.scaleBy,0.7);
+});
+document.getElementById("zoom-reset").addEventListener("click",()=>{
+  svg.transition().duration(500).call(zoomBehavior.transform, d3.zoomIdentity);
+});
+
+// ──────────────────────────────────────────────────────────────
+// SEARCH
+// ──────────────────────────────────────────────────────────────
+const searchInput = document.getElementById("search-input");
+const searchResults = document.getElementById("search-results");
+searchInput.addEventListener("input",()=>{
+  const q=searchInput.value.trim().toLowerCase();
+  if(!q){ searchResults.classList.remove("show"); return; }
+  const matches=[
+    ...COMPANIES.filter(c=>c.label.toLowerCase().includes(q)).map(c=>({...c,type:"company"})),
+    ...DIRECTORS.filter(d=>d.label.toLowerCase().includes(q)).map(d=>({...d,type:"director"})),
+  ].slice(0,8);
+  if(!matches.length){ searchResults.classList.remove("show"); return; }
+  searchResults.innerHTML=matches.map(m=>`
+    <div class="sri" onclick="focusNode('${m.id}')">
+      <span>${m.label}</span>
+      <span class="sri-badge ${m.type==="company"?"company":"director"}">${m.type==="company"?"Company":"Director"}</span>
+    </div>`).join("");
+  searchResults.classList.add("show");
+});
+document.addEventListener("click",e=>{ if(!e.target.closest(".search-box")) searchResults.classList.remove("show"); });
+
+function focusNode(id){
+  searchResults.classList.remove("show");
+  searchInput.value="";
+  const d=nodeGroup?.selectAll("g").data().find(n=>n.id===id);
+  if(!d||!d.x) return;
+  const scale=1.8;
+  const tx=w/2-scale*d.x, ty=h/2-scale*d.y;
+  svg.transition().duration(700).call(zoomBehavior.transform, d3.zoomIdentity.translate(tx,ty).scale(scale));
+  setTimeout(()=>showInfo(d),400);
+}
+
+// ──────────────────────────────────────────────────────────────
+// RESIZE
+// ──────────────────────────────────────────────────────────────
+let resizeTimer;
+window.addEventListener("resize",()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer=setTimeout(()=>{
+    w=container.clientWidth; h=container.clientHeight;
+    if(simulation) simulation.force("center",d3.forceCenter(w/2,h/2)).alpha(0.3).restart();
+  },200);
+});
+
+// ──────────────────────────────────────────────────────────────
+// INIT
+// ──────────────────────────────────────────────────────────────
+build();
+</script>
+</body>
+</html>

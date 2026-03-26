@@ -214,6 +214,64 @@
             background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 30px 30px, 30px 30px;
         }
 
+        /* Board Interlocks preview */
+        .preview-interlocks .preview-bg {
+            background: radial-gradient(circle at 25% 50%, #6366f1 0%, transparent 45%),
+                        radial-gradient(circle at 75% 50%, #6366f1 0%, transparent 45%),
+                        radial-gradient(circle at 50% 20%, #f59e0b 0%, transparent 35%),
+                        #0f172a;
+        }
+        .preview-interlocks .preview-bg::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                /* company nodes */
+                radial-gradient(circle at 22% 50%, rgba(99,102,241,0.5) 9px, transparent 9px),
+                radial-gradient(circle at 78% 50%, rgba(99,102,241,0.5) 9px, transparent 9px),
+                radial-gradient(circle at 50% 18%, rgba(99,102,241,0.45) 8px, transparent 8px),
+                radial-gradient(circle at 50% 78%, rgba(99,102,241,0.4) 7px, transparent 7px),
+                /* connector dots (directors) */
+                radial-gradient(circle at 36% 34%, rgba(245,158,11,0.7) 4px, transparent 4px),
+                radial-gradient(circle at 64% 34%, rgba(239,68,68,0.7) 5px, transparent 5px),
+                radial-gradient(circle at 36% 64%, rgba(245,158,11,0.6) 4px, transparent 4px),
+                radial-gradient(circle at 64% 64%, rgba(245,158,11,0.6) 4px, transparent 4px),
+                radial-gradient(circle at 50% 48%, rgba(239,68,68,0.75) 5px, transparent 5px),
+                /* interlock lines via gradient stripes */
+                linear-gradient(135deg, rgba(6,182,212,0.15) 1px, transparent 1px),
+                linear-gradient(45deg,  rgba(6,182,212,0.12) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%,
+                             100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%,
+                             18px 18px, 18px 18px;
+        }
+
+        /* Pedigree preview */
+        .preview-pedigree .preview-bg {
+            background: radial-gradient(ellipse at 35% 40%, #f59e0b 0%, transparent 40%),
+                        radial-gradient(ellipse at 70% 60%, #6366f1 0%, transparent 35%),
+                        radial-gradient(ellipse at 50% 20%, #a855f7 0%, transparent 30%),
+                        #0f172a;
+        }
+        .preview-pedigree .preview-bg::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                /* hub nodes */
+                radial-gradient(circle at 35% 40%, rgba(245,158,11,0.5) 12px, transparent 12px),
+                radial-gradient(circle at 70% 58%, rgba(99,102,241,0.45) 10px, transparent 10px),
+                radial-gradient(circle at 50% 22%, rgba(168,85,247,0.45) 10px, transparent 10px),
+                radial-gradient(circle at 20% 70%, rgba(6,182,212,0.4) 8px, transparent 8px),
+                /* person nodes (platinum = gold) */
+                radial-gradient(circle at 52% 43%, rgba(245,158,11,0.85) 5px, transparent 5px),
+                radial-gradient(circle at 28% 36%, rgba(245,158,11,0.8) 5px, transparent 5px),
+                radial-gradient(circle at 60% 32%, rgba(245,158,11,0.75) 4px, transparent 4px),
+                /* gold/silver */
+                radial-gradient(circle at 45% 60%, rgba(99,102,241,0.7) 4px, transparent 4px),
+                radial-gradient(circle at 76% 44%, rgba(6,182,212,0.6) 3px, transparent 3px),
+                radial-gradient(circle at 30% 55%, rgba(99,102,241,0.65) 4px, transparent 4px);
+        }
+
         .preview-orgchart .preview-bg {
             background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
         }
@@ -280,7 +338,7 @@
             </div>
         </div>
         <h1>Nexdata D3 Visualization Prototypes</h1>
-        <p class="subtitle">Interactive data visualization concepts for PE intelligence</p>
+        <p class="subtitle">7 interactive visualization prototypes for PE &amp; executive intelligence</p>
     </header>
 
     <main class="grid">
@@ -376,6 +434,56 @@
             <div class="card-body">
                 <h2>Organization Chart</h2>
                 <p>Interactive leadership hierarchy visualization with expand/collapse, search, and reporting chain highlights.</p>
+                <span class="card-link">View Prototype <span>&rarr;</span></span>
+            </div>
+        </a>
+
+        <!-- 6. Board Interlock Network -->
+        <a href="board-interlocks.html" class="card">
+            <div class="card-preview preview-interlocks">
+                <div class="preview-bg"></div>
+                <div class="preview-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="7" width="6" height="4" rx="1"/>
+                        <rect x="9" y="2" width="6" height="4" rx="1"/>
+                        <rect x="16" y="7" width="6" height="4" rx="1"/>
+                        <rect x="9" y="14" width="6" height="4" rx="1"/>
+                        <line x1="8" y1="9" x2="9" y2="4"/>
+                        <line x1="16" y1="9" x2="15" y2="4"/>
+                        <line x1="12" y1="11" x2="12" y2="14"/>
+                        <line x1="8" y1="9" x2="9" y2="16"/>
+                        <line x1="16" y1="9" x2="15" y2="16"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="card-body">
+                <h2>Board Interlock Network</h2>
+                <p>Shared directorship analysis — map co-memberships across portfolio company boards and identify key connector executives.</p>
+                <span class="card-link">View Prototype <span>&rarr;</span></span>
+            </div>
+        </a>
+
+        <!-- 7. Executive Pedigree Constellation -->
+        <a href="pedigree.html" class="card">
+            <div class="card-preview preview-pedigree">
+                <div class="preview-bg"></div>
+                <div class="preview-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"/>
+                        <circle cx="4"  cy="6"  r="2"/>
+                        <circle cx="20" cy="6"  r="2"/>
+                        <circle cx="4"  cy="18" r="2"/>
+                        <circle cx="20" cy="18" r="2"/>
+                        <line x1="6"  y1="7"  x2="10" y2="11"/>
+                        <line x1="18" y1="7"  x2="14" y2="11"/>
+                        <line x1="6"  y1="17" x2="10" y2="13"/>
+                        <line x1="18" y1="17" x2="14" y2="13"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="card-body">
+                <h2>Executive Pedigree Constellation</h2>
+                <p>Career galaxy force graph — rank executives by pedigree score and trace their institutional connections (MBB, Ivy, Goldman, Military).</p>
                 <span class="card-link">View Prototype <span>&rarr;</span></span>
             </div>
         </a>
