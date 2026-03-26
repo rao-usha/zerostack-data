@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, desc
 
 from app.core.database import get_db
@@ -23,12 +23,12 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/score/{fund_id}")
-async def compute_conviction_score(fund_id: int, db: AsyncSession = Depends(get_db)):
+async def compute_conviction_score(fund_id: int, db: Session = Depends(get_db)):
     """Compute or refresh the LP conviction score for a PE fund."""
     from app.core.pe_models import PEFund, PEFundConvictionScore
     from app.services.pe_fund_conviction_scorer import FundConvictionScorer
 
-    fund = await db.get(PEFund, fund_id)
+    fund = db.get(PEFund, fund_id)
     if not fund:
         raise HTTPException(status_code=404, detail="Fund not found")
 
@@ -58,7 +58,7 @@ async def compute_conviction_score(fund_id: int, db: AsyncSession = Depends(get_
     lp_stmt = select(LpGpRelationship).where(
         LpGpRelationship.gp_firm_id == fund.firm_id
     )
-    lp_rels = (await db.execute(lp_stmt)).scalars().all()
+    lp_rels = db.execute(lp_stmt).scalars().all()
 
     if lp_rels:
         total_lps = len(lp_rels)
@@ -98,8 +98,8 @@ async def compute_conviction_score(fund_id: int, db: AsyncSession = Depends(get_
         scored_at=datetime.utcnow(),
     )
     db.add(score_record)
-    await db.commit()
-    await db.refresh(score_record)
+    db.commit()
+    db.refresh(score_record)
 
     return {
         "fund_id": fund_id,
@@ -123,11 +123,11 @@ async def compute_conviction_score(fund_id: int, db: AsyncSession = Depends(get_
 
 
 @router.get("/score/{fund_id}")
-async def get_conviction_score(fund_id: int, db: AsyncSession = Depends(get_db)):
+async def get_conviction_score(fund_id: int, db: Session = Depends(get_db)):
     """Get the latest conviction score for a PE fund."""
     from app.core.pe_models import PEFundConvictionScore, PEFund
 
-    fund = await db.get(PEFund, fund_id)
+    fund = db.get(PEFund, fund_id)
     if not fund:
         raise HTTPException(status_code=404, detail="Fund not found")
 
@@ -137,7 +137,7 @@ async def get_conviction_score(fund_id: int, db: AsyncSession = Depends(get_db))
         .order_by(desc(PEFundConvictionScore.scored_at))
         .limit(1)
     )
-    score = (await db.execute(stmt)).scalar_one_or_none()
+    score = db.execute(stmt).scalar_one_or_none()
 
     if not score:
         raise HTTPException(
@@ -173,12 +173,12 @@ async def get_conviction_score(fund_id: int, db: AsyncSession = Depends(get_db))
 
 
 @router.get("/lp-base/{firm_id}")
-async def get_firm_lp_base(firm_id: int, db: AsyncSession = Depends(get_db)):
+async def get_firm_lp_base(firm_id: int, db: Session = Depends(get_db)):
     """Get LP investor base composition and re-up history for a PE firm."""
     from app.core.pe_models import PEFirm
     from app.core.models import LpGpRelationship, LpFund
 
-    firm = await db.get(PEFirm, firm_id)
+    firm = db.get(PEFirm, firm_id)
     if not firm:
         raise HTTPException(status_code=404, detail="Firm not found")
 
@@ -189,7 +189,7 @@ async def get_firm_lp_base(firm_id: int, db: AsyncSession = Depends(get_db)):
         .where(LpGpRelationship.gp_firm_id == firm_id)
         .order_by(desc(LpGpRelationship.total_vintages_committed))
     )
-    results = (await db.execute(stmt)).all()
+    results = db.execute(stmt).all()
 
     lp_base = [
         {
@@ -224,7 +224,7 @@ async def get_firm_lp_base(firm_id: int, db: AsyncSession = Depends(get_db)):
 async def get_market_conviction_signals(
     strategy: Optional[str] = None,
     min_score: float = 0,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get market-wide LP conviction signals, optionally filtered by PE strategy."""
     from app.core.pe_models import PEFundConvictionScore, PEFund, PEFirm
@@ -239,7 +239,7 @@ async def get_market_conviction_signals(
     if strategy:
         stmt = stmt.where(PEFirm.primary_strategy.ilike(f"%{strategy}%"))
 
-    results = (await db.execute(stmt)).all()
+    results = db.execute(stmt).all()
 
     signals = [
         {
@@ -263,15 +263,16 @@ async def get_market_conviction_signals(
 async def trigger_lp_collection(
     background_tasks: BackgroundTasks,
     sources: Optional[list] = None,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Trigger LP commitment collection from all configured sources."""
     from app.agents.fund_lp_tracker_agent import FundLPTrackerAgent
+    import asyncio
 
-    async def run_collection():
+    def run_collection():
         agent = FundLPTrackerAgent(db)
-        result = await agent.run(sources=sources)
-        logger.info(f"LP collection complete: {result}")
+        asyncio.run(agent.run(sources=sources))
+        logger.info("LP collection complete")
 
     background_tasks.add_task(run_collection)
 

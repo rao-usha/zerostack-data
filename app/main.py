@@ -100,6 +100,7 @@ from app.api.v1 import (
     pe_collection,
     pe_benchmarks,
     pe_import,
+    pe_conviction,
     app_stores,
     opencorporates,
     people,
@@ -1221,6 +1222,7 @@ Browse the endpoint sections below to see what's available:
         {"name": "PE Intelligence - Deals", "description": "💰 **PE Deals** - M&A transactions, add-ons, exits, and deal multiples"},
         {"name": "PE Intelligence - Collection", "description": "⚙️ **PE Data Collection** - Automated PE data collection pipelines"},
         {"name": "PE Intelligence - Benchmarks", "description": "📊 **PE Benchmarks & Exit Readiness** - Financial benchmarking, portfolio heatmaps, and exit readiness scoring"},
+        {"name": "PE Conviction", "description": "🎯 **LP Conviction Signals** - LP conviction signals for PE funds, pension commitments, and fund raise intelligence"},
         # ── Site Intelligence ──────────────────────────────────────────
         {"name": "Site Intel - Power", "description": "⚡ **Power Infrastructure** - Power plants, substations, and energy capacity near sites"},
         {"name": "Site Intel - Telecom", "description": "📡 **Telecom Infrastructure** - Cell towers, fiber routes, and broadband availability"},
@@ -1455,6 +1457,7 @@ app.include_router(pe_deals.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_collection.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_benchmarks.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_import.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(pe_conviction.router, prefix="/api/v1", dependencies=_auth)
 
 # 13F Quarterly Analysis
 app.include_router(quarterly_diff.router, prefix="/api/v1", dependencies=_auth)
