@@ -13,7 +13,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, func, distinct
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class FundLPTrackerAgent:
     """Agentic orchestrator for LP→GP commitment collection and conviction scoring."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: Session):
         self.db = db
 
     async def run(
@@ -78,24 +78,23 @@ class FundLPTrackerAgent:
 
         summary["records_collected"] = len(all_records)
 
-        # Step 2: Resolve GP names + persist
-        persisted = await self._persist_commitments(all_records, lp_ids)
+        # Step 2: Resolve GP names + persist (sync)
+        persisted = self._persist_commitments(all_records, lp_ids)
         summary["records_persisted"] = persisted
 
-        # Step 3: Rebuild relationship summaries
-        updated = await self._rebuild_relationships()
+        # Step 3: Rebuild relationship summaries (sync)
+        updated = self._rebuild_relationships()
         summary["relationships_updated"] = updated
 
         summary["completed_at"] = datetime.utcnow().isoformat()
         return summary
 
-    async def _resolve_lp_id(self, lp_name: str) -> Optional[int]:
+    def _resolve_lp_id(self, lp_name: str) -> Optional[int]:
         """Resolve LP short name to lp_fund.id via fuzzy match."""
         from app.core.models import LpFund
 
         stmt = select(LpFund).where(LpFund.name.ilike(f"%{lp_name.split()[0]}%"))
-        result = await self.db.execute(stmt)
-        matches = result.scalars().all()
+        matches = self.db.execute(stmt).scalars().all()
         if not matches:
             return None
         if len(matches) == 1:
@@ -106,7 +105,7 @@ class FundLPTrackerAgent:
                 return m.id
         return matches[0].id
 
-    async def _resolve_gp_firm_id(self, gp_name: str) -> Optional[int]:
+    def _resolve_gp_firm_id(self, gp_name: str) -> Optional[int]:
         """Try to link GP name to a pe_firms record via fuzzy match."""
         try:
             from app.core.pe_models import PEFirm
@@ -117,13 +116,12 @@ class FundLPTrackerAgent:
                 clean = clean.split(suffix)[0]
 
             stmt = select(PEFirm).where(PEFirm.name.ilike(f"%{clean[:20]}%"))
-            result = await self.db.execute(stmt)
-            matches = result.scalars().all()
+            matches = self.db.execute(stmt).scalars().all()
             return matches[0].id if matches else None
         except Exception:
             return None
 
-    async def _persist_commitments(
+    def _persist_commitments(
         self,
         records: list,
         allowed_lp_ids: Optional[list],
@@ -135,12 +133,12 @@ class FundLPTrackerAgent:
         for rec in records:
             try:
                 lp_name = rec.get("lp_name", "")
-                lp_id = await self._resolve_lp_id(lp_name)
+                lp_id = self._resolve_lp_id(lp_name)
                 if not lp_id:
                     # Create a placeholder LP if not found
                     new_lp = LpFund(name=lp_name, lp_type="public_pension")
                     self.db.add(new_lp)
-                    await self.db.flush()
+                    self.db.flush()
                     lp_id = new_lp.id
 
                 if allowed_lp_ids and lp_id not in allowed_lp_ids:
@@ -150,7 +148,7 @@ class FundLPTrackerAgent:
                 if not gp_name:
                     continue
 
-                gp_firm_id = await self._resolve_gp_firm_id(gp_name)
+                gp_firm_id = self._resolve_gp_firm_id(gp_name)
 
                 vintage = rec.get("fund_vintage") or rec.get("vintage_year")
                 amount = rec.get("commitment_amount_usd") or rec.get("fair_value_usd")
@@ -163,7 +161,7 @@ class FundLPTrackerAgent:
                     LpGpCommitment.fund_vintage == vintage,
                     LpGpCommitment.fund_name == fund_name_val,
                 )
-                existing = (await self.db.execute(stmt)).scalar_one_or_none()
+                existing = self.db.execute(stmt).scalar_one_or_none()
 
                 if existing:
                     # Update if we have new data
@@ -190,10 +188,10 @@ class FundLPTrackerAgent:
             except Exception as e:
                 logger.error(f"Error persisting commitment record: {e}")
 
-        await self.db.commit()
+        self.db.commit()
         return persisted
 
-    async def _rebuild_relationships(self) -> int:
+    def _rebuild_relationships(self) -> int:
         """Rebuild LpGpRelationship summaries from LpGpCommitment records."""
         from app.core.models import LpGpCommitment, LpGpRelationship
 
@@ -215,8 +213,7 @@ class FundLPTrackerAgent:
                 LpGpCommitment.gp_firm_id,
             )
         )
-        result = await self.db.execute(stmt)
-        rows = result.all()
+        rows = self.db.execute(stmt).all()
 
         updated = 0
         for row in rows:
@@ -232,7 +229,7 @@ class FundLPTrackerAgent:
                 LpGpRelationship.lp_id == row.lp_id,
                 LpGpRelationship.gp_name == row.gp_name,
             )
-            existing = (await self.db.execute(existing_stmt)).scalar_one_or_none()
+            existing = self.db.execute(existing_stmt).scalar_one_or_none()
 
             if existing:
                 existing.first_vintage = row.first_vintage
@@ -257,5 +254,5 @@ class FundLPTrackerAgent:
                 self.db.add(rel)
             updated += 1
 
-        await self.db.commit()
+        self.db.commit()
         return updated

@@ -537,26 +537,42 @@ async def get_current_macro_environment(db: Session = Depends(get_db)):
 async def collect_edgar_facts(
     background_tasks: BackgroundTasks,
     tickers: Optional[list[str]] = None,
-    db: Session = Depends(get_db),
 ):
     """Trigger SEC EDGAR XBRL company facts ingestion for anchor companies."""
     import asyncio
-    from app.sources.edgar_company_facts.ingest import EdgarCompanyFactsIngestor
 
-    _db = db  # capture for background task
+    target_tickers = tickers or ["SHW", "DHI", "LEN", "HD", "LOW", "XOM"]
 
     def run_ingest():
-        ingestor = EdgarCompanyFactsIngestor()
-        asyncio.run(ingestor.run(tickers=tickers))
-        logger.info("EDGAR company facts ingestion complete")
+        from app.sources.edgar_company_facts.client import EDGARCompanyFactsClient, TARGET_COMPANIES
+        from app.sources.edgar_company_facts.ingest import EDGARCompanyFactsIngestor
+        from app.core.database import get_engine
+        import psycopg2
+
+        # Filter companies to requested tickers
+        companies = [c for c in TARGET_COMPANIES if c["ticker"] in target_tickers]
+
+        # Fetch from EDGAR
+        client = EDGARCompanyFactsClient()
+        records = asyncio.run(client.fetch_all())
+
+        if tickers:
+            records = [r for r in records if r["ticker"] in target_tickers]
+
+        # Get raw psycopg2 connection via SQLAlchemy engine
+        engine = get_engine()
+        with engine.connect() as sa_conn:
+            raw_conn = sa_conn.connection.dbapi_connection
+            ingestor = EDGARCompanyFactsIngestor(raw_conn)
+            result = ingestor.upsert_records(records)
+            logger.info(f"EDGAR ingest complete: {result}")
 
     background_tasks.add_task(run_ingest)
 
-    targets = tickers or ["SHW", "DHI", "LEN", "HD", "LOW", "XOM"]
     return {
         "status": "started",
         "message": "SEC EDGAR company facts ingestion started in background",
-        "tickers": targets,
+        "tickers": target_tickers,
     }
 
 
@@ -590,6 +606,106 @@ async def collect_sensitivity(
         "status": "started",
         "message": "10-K macro sensitivity extraction started in background",
         "tickers": tickers or "all PE portfolio companies",
+    }
+
+
+@router.post("/collect/sync-node-values")
+async def sync_node_values(db: Session = Depends(get_db)):
+    """
+    Sync current_value on all macro nodes from the underlying FRED/BLS data tables.
+
+    Reads the most recent observation for each series_id from:
+    - fred_economic_indicators (for fred_series nodes)
+    - bls_ppi (for bls_series nodes with series_id starting with WPU/PCU)
+
+    Updates macro_nodes.current_value + current_value_date in place.
+    Returns count of nodes updated.
+    """
+    from sqlalchemy import text
+    from app.core.macro_models import MacroNode
+
+    updated = 0
+    skipped = 0
+
+    # Load all nodes that have a series_id
+    nodes = db.execute(
+        select(MacroNode).where(MacroNode.series_id.isnot(None))
+    ).scalars().all()
+
+    for node in nodes:
+        sid = node.series_id
+        latest_value = None
+        latest_date = None
+
+        # FRED series — search across all fred_* category tables
+        if node.node_type in ("fred_series", "custom") or (
+            sid and not sid.startswith(("WPU", "PCU", "CEU", "LNS", "CES"))
+        ):
+            fred_tables = [
+                "fred_economic_indicators",
+                "fred_housing_market",
+                "fred_consumer_sentiment",
+                "fred_commodities",
+                "fred_interest_rates",
+                "fred_monetary_aggregates",
+                "fred_industrial_production",
+            ]
+            for tbl in fred_tables:
+                try:
+                    row = db.execute(
+                        text(
+                            f"SELECT value, date FROM {tbl} "
+                            "WHERE series_id = :sid ORDER BY date DESC LIMIT 1"
+                        ),
+                        {"sid": sid},
+                    ).fetchone()
+                    if row and row[0] is not None:
+                        latest_value = float(row[0])
+                        latest_date = row[1]
+                        break
+                except Exception:
+                    continue
+
+        # BLS PPI series (WPU prefix)
+        if latest_value is None and sid and sid.startswith(("WPU", "PCU")):
+            row = db.execute(
+                text(
+                    "SELECT value, year, period_name FROM bls_ppi "
+                    "WHERE series_id = :sid ORDER BY year DESC, period_name DESC LIMIT 1"
+                ),
+                {"sid": sid},
+            ).fetchone()
+            if row:
+                latest_value = float(row[0]) if row[0] is not None else None
+                # Construct approximate date from year + period
+                try:
+                    import datetime
+                    year = int(row[1])
+                    period = str(row[2])  # e.g. "December", "September"
+                    month_map = {
+                        "January": 1, "February": 2, "March": 3, "April": 4,
+                        "May": 5, "June": 6, "July": 7, "August": 8,
+                        "September": 9, "October": 10, "November": 11, "December": 12,
+                    }
+                    month = month_map.get(period, 12)
+                    latest_date = datetime.date(year, month, 1)
+                except Exception:
+                    latest_date = None
+
+        if latest_value is not None:
+            node.current_value = latest_value
+            node.current_value_date = latest_date
+            updated += 1
+        else:
+            skipped += 1
+
+    db.commit()
+
+    return {
+        "status": "complete",
+        "nodes_updated": updated,
+        "nodes_skipped_no_data": skipped,
+        "message": f"Synced current_value for {updated} macro nodes ({skipped} had no data yet).",
     }
 
 
