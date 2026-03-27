@@ -226,4 +226,20 @@ COMMON_SERIES = {
         "pce": "PCE",  # Personal Consumption Expenditures
         "retail_sales": "RSXFS",  # Retail Sales
     },
+    "housing_market": {
+        "housing_starts": "HOUST",  # Housing Starts, Total: New Privately Owned
+        "new_homes_sold": "HSN1F",  # New One Family Houses Sold
+        "existing_home_sales": "EXHOSLUSM495S",  # Existing Home Sales
+        "building_permits": "PERMIT",  # New Private Housing Units Authorized by Building Permits
+        "mortgage_30y": "MORTGAGE30US",  # 30-Year Fixed Rate Mortgage Average
+        "case_shiller_hpi": "CSUSHPINSA",  # S&P/Case-Shiller U.S. National Home Price Index
+        "nahb_hmi": "BSXRNSA",  # NAHB/Wells Fargo Housing Market Index
+    },
+    "consumer_sentiment": {
+        "umich_sentiment": "UMCSENT",  # University of Michigan Consumer Sentiment
+    },
+    "commodities": {
+        "wti_crude_oil": "DCOILWTICO",  # Crude Oil Prices: West Texas Intermediate (WTI)
+        "henry_hub_natural_gas": "DHHNGSP",  # Henry Hub Natural Gas Spot Price
+    },
 }

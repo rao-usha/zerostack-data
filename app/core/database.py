@@ -17,6 +17,9 @@ from app.core.models import Base
 
 # Import Site Intelligence Platform models
 
+# Import Macro Causal Graph models
+import app.core.macro_models  # noqa: F401 — registers tables with Base.metadata
+
 # Import Job Queue model for distributed workers
 import logging
 

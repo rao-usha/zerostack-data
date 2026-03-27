@@ -336,6 +336,12 @@ PPI_SERIES = {
     # Industry-specific
     "ppi_manufacturing": "PCU31-33--31-33--",  # PPI Manufacturing Industries
     "ppi_construction": "PCU23----23----",  # PPI Construction
+    # Industry-specific PPI (for causal graph linkages)
+    "ppi_paint_coatings": "WPU0613",  # Paint, Varnish, Lacquers, Coatings
+    "ppi_construction_materials": "WPU132",  # Construction Materials
+    "ppi_lumber_wood": "WPU081",  # Lumber and Wood Products
+    "ppi_plastics_materials": "WPU0622",  # Plastics Materials and Basic Forms
+    "ppi_sand_gravel_stone": "WPU1311",  # Sand, Gravel, Crushed Stone
 }
 
 # Occupational Employment Statistics (OES)

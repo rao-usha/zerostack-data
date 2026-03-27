@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexdata — Macro Causal Network</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #6366f1;
+      --bg: #0f1117;
+      --bg-card: #1e293b;
+      --bg-input: #334155;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --accent: #06b6d4;
+
+      /* sector colors */
+      --housing: #3b82f6;
+      --credit: #f59e0b;
+      --energy: #ef4444;
+      --consumer: #10b981;
+      --labor: #10b981;
+      --industrial: #8b5cf6;
+      --monetary: #6366f1;
+    }
+
+    html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+    body { display: flex; flex-direction: column; }
+
+    /* ── Header ── */
+    .header {
+      padding: 12px 24px; display: flex; align-items: center; gap: 16px;
+      background: var(--bg-card); border-bottom: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap;
+    }
+    .header-brand { display: flex; flex-direction: column; }
+    .header-brand h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.3px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .header-brand p { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    .back-link { color: var(--text-muted); text-decoration: none; font-size: 0.82rem; flex-shrink: 0; }
+    .back-link:hover { color: var(--text); }
+    .header-filters { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+    .filter-pill {
+      padding: 4px 14px; border: 1px solid var(--border); border-radius: 20px;
+      background: transparent; color: var(--text-muted); font-size: 0.75rem; cursor: pointer; transition: all .15s;
+    }
+    .filter-pill:hover { border-color: var(--primary); color: var(--text); }
+    .filter-pill.active { color: #fff; border-color: transparent; }
+    .filter-pill[data-sector="all"].active    { background: var(--primary); }
+    .filter-pill[data-sector="housing"].active  { background: var(--housing); }
+    .filter-pill[data-sector="credit"].active   { background: var(--credit); }
+    .filter-pill[data-sector="energy"].active   { background: var(--energy); }
+    .filter-pill[data-sector="consumer"].active { background: var(--consumer); }
+
+    /* ── Main layout ── */
+    .main { flex: 1; display: flex; overflow: hidden; }
+
+    /* ── Graph panel (left 65%) ── */
+    .graph-panel { flex: 0 0 65%; position: relative; background: var(--bg); overflow: hidden; border-right: 1px solid var(--border); }
+    .graph-svg { width: 100%; height: 100%; display: block; }
+    .graph-controls { position: absolute; top: 14px; right: 14px; display: flex; flex-direction: column; gap: 5px; z-index: 10; }
+    .ctrl-btn {
+      background: rgba(30,41,59,0.9); border: 1px solid var(--border); border-radius: 8px;
+      width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: var(--text-muted); font-size: 14px; transition: all .15s; backdrop-filter: blur(4px);
+    }
+    .ctrl-btn:hover { border-color: var(--primary); color: var(--text); }
+    .graph-legend {
+      position: absolute; bottom: 14px; left: 14px;
+      background: rgba(30,41,59,0.92); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 16px; font-size: 0.7rem; z-index: 10; backdrop-filter: blur(8px);
+    }
+    .graph-legend h4 { font-size: 0.72rem; font-weight: 600; margin-bottom: 8px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; color: var(--text-muted); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .legend-diamond { width: 10px; height: 10px; transform: rotate(45deg); flex-shrink: 0; }
+    .legend-rect { width: 12px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+    .legend-line { width: 18px; height: 2px; border-radius: 1px; flex-shrink: 0; }
+    .empty-graph {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; text-align: center; padding: 2rem;
+    }
+    .empty-graph .icon { font-size: 3.5rem; margin-bottom: 1rem; }
+    .empty-graph h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .empty-graph p { font-size: 0.875rem; color: var(--text-muted); max-width: 360px; line-height: 1.6; margin-bottom: 1.25rem; }
+    .btn { padding: 0.6rem 1.25rem; border: none; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: all .15s; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-danger { background: var(--error); color: #fff; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-sm { padding: 0.45rem 0.9rem; font-size: 0.8rem; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .loading-spinner {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 1rem; background: rgba(15,17,23,0.7); z-index: 20;
+    }
+    .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-spinner p { color: var(--text-muted); font-size: 0.875rem; }
+
+    /* ── Right panel (35%) ── */
+    .side-panel { flex: 0 0 35%; display: flex; flex-direction: column; overflow: hidden; }
+    .side-panel-scroll { flex: 1; overflow-y: auto; padding: 16px; }
+    .side-panel-scroll::-webkit-scrollbar { width: 4px; }
+    .side-panel-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* Panel sections */
+    .panel-section { display: none; }
+    .panel-section.active { display: block; }
+
+    /* Summary cards */
+    .summary-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+    .summary-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
+    .summary-card .val { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+    .summary-card .lbl { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .4px; margin-top: 2px; }
+
+    /* Environment table */
+    .env-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    .env-table th { text-align: left; padding: 6px 8px; font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+    .env-table td { padding: 7px 8px; font-size: 0.8rem; border-bottom: 1px solid rgba(51,65,85,0.4); }
+    .dir-up { color: var(--error); font-weight: 600; }
+    .dir-down { color: var(--success); font-weight: 600; }
+    .dir-flat { color: var(--text-muted); }
+
+    /* Source legend */
+    .source-legend { display: flex; gap: 12px; flex-wrap: wrap; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; }
+    .source-item { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--text-muted); }
+    .source-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Section header */
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .section-title { font-size: 0.95rem; font-weight: 600; }
+    .section-sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; margin-bottom: 12px; }
+
+    /* Scenario panel */
+    .scenario-node-badge {
+      background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(6,182,212,0.1));
+      border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; padding: 10px 14px;
+      margin-bottom: 14px; font-size: 0.85rem; font-weight: 600;
+    }
+    .scenario-node-badge .node-type-tag { font-size: 0.68rem; color: var(--text-muted); font-weight: 400; margin-top: 2px; }
+
+    .form-group { margin-bottom: 12px; }
+    .form-label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 5px; font-weight: 500; }
+    .slider-row { display: flex; align-items: center; gap: 10px; }
+    .slider-row input[type=range] { flex: 1; accent-color: var(--primary); }
+    .slider-val { font-size: 0.85rem; font-weight: 700; min-width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+    .slider-val.positive { color: var(--error); }
+    .slider-val.negative { color: var(--success); }
+    select.form-select {
+      width: 100%; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px;
+      padding: 7px 10px; color: var(--text); font-size: 0.82rem; outline: none; cursor: pointer;
+    }
+    select.form-select:focus { border-color: var(--primary); }
+
+    /* Results table */
+    .results-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin-top: 10px; }
+    .results-table th { text-align: left; padding: 6px 8px; font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .results-table td { padding: 7px 8px; border-bottom: 1px solid rgba(51,65,85,0.35); vertical-align: middle; }
+    .results-table tr.positive td { background: rgba(34,197,94,0.04); }
+    .results-table tr.negative td { background: rgba(239,68,68,0.04); }
+    .results-table tr:hover td { background: rgba(99,102,241,0.07); }
+    .impact-val { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .impact-val.pos { color: var(--success); }
+    .impact-val.neg { color: var(--error); }
+    .conf-bar-bg { width: 40px; height: 5px; background: var(--bg-input); border-radius: 3px; display: inline-block; vertical-align: middle; }
+    .conf-bar-fill { height: 100%; border-radius: 3px; background: var(--accent); }
+    .path-pill {
+      font-size: 0.62rem; background: var(--bg-input); color: var(--text-muted);
+      padding: 1px 6px; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; display: inline-block; vertical-align: middle;
+    }
+    .sector-tag {
+      font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; font-weight: 600;
+      display: inline-block; white-space: nowrap;
+    }
+    .sector-housing  { background: rgba(59,130,246,0.15); color: #60a5fa; }
+    .sector-credit   { background: rgba(245,158,11,0.15); color: #fbbf24; }
+    .sector-energy   { background: rgba(239,68,68,0.15);  color: #f87171; }
+    .sector-consumer { background: rgba(16,185,129,0.15); color: #34d399; }
+    .sector-labor    { background: rgba(16,185,129,0.15); color: #34d399; }
+    .sector-industrial { background: rgba(139,92,246,0.15); color: #a78bfa; }
+    .sector-monetary { background: rgba(99,102,241,0.15); color: #818cf8; }
+
+    /* Tooltip */
+    .d3-tooltip {
+      position: fixed; pointer-events: none; z-index: 500;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 16px; font-size: 0.78rem; box-shadow: 0 8px 24px rgba(0,0,0,.5);
+      max-width: 250px; opacity: 0; transition: opacity .12s;
+    }
+    .d3-tooltip h4 { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
+    .d3-tooltip .type-tag { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+    .d3-tooltip .rows { font-size: 0.75rem; color: var(--text-muted); line-height: 1.7; }
+    .d3-tooltip .rows strong { color: var(--text); }
+
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+    .card-title { font-size: 0.88rem; font-weight: 600; margin-bottom: 10px; color: var(--text); }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <a href="index.html" class="back-link">← Demo Index</a>
+  <div class="header-brand">
+    <h1>Macro Causal Network</h1>
+    <p>Model economic cascades and their downstream impact on portfolio companies</p>
+  </div>
+  <div class="header-filters">
+    <button class="filter-pill active" data-sector="all" onclick="filterBySector('all', this)">All Sectors</button>
+    <button class="filter-pill" data-sector="housing" onclick="filterBySector('housing', this)">Housing Cascade</button>
+    <button class="filter-pill" data-sector="credit" onclick="filterBySector('credit', this)">Credit / PE Cascade</button>
+    <button class="filter-pill" data-sector="energy" onclick="filterBySector('energy', this)">Energy Cascade</button>
+    <button class="filter-pill" data-sector="consumer" onclick="filterBySector('consumer', this)">Consumer Cascade</button>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Left: D3 Graph -->
+  <div class="graph-panel" id="graph-panel">
+    <svg class="graph-svg" id="graph-svg"></svg>
+
+    <div class="graph-controls">
+      <div class="ctrl-btn" id="zoom-in" title="Zoom In">+</div>
+      <div class="ctrl-btn" id="zoom-out" title="Zoom Out">−</div>
+      <div class="ctrl-btn" id="zoom-reset" title="Reset View">↺</div>
+    </div>
+
+    <div class="graph-legend">
+      <h4>Node Types</h4>
+      <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div> Housing</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div> Credit</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div> Energy</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div> Consumer / Labor</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div> Industrial</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#6366f1"></div> Monetary Policy</div>
+      <div style="margin-top:8px;margin-bottom:4px;font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px">Edge Direction</div>
+      <div class="legend-item"><div class="legend-line" style="background:#22c55e"></div> Positive</div>
+      <div class="legend-item"><div class="legend-line" style="background:#ef4444"></div> Negative</div>
+    </div>
+
+    <!-- Spinner -->
+    <div class="loading-spinner" id="spinner" style="display:none">
+      <div class="spinner"></div>
+      <p id="spinner-msg">Loading graph…</p>
+    </div>
+
+    <!-- Empty state -->
+    <div class="empty-graph" id="empty-state" style="display:none">
+      <div class="icon">&#127760;</div>
+      <h2>No Graph Data Yet</h2>
+      <p>The macro causal graph has not been seeded. Run the seed command to populate nodes and relationships.</p>
+      <button class="btn btn-primary" onclick="seedGraph()">Seed Causal Graph</button>
+    </div>
+  </div>
+
+  <!-- Right: Control Panel -->
+  <div class="side-panel">
+    <div class="side-panel-scroll">
+
+      <!-- Browse state (default) -->
+      <div class="panel-section active" id="panel-browse">
+        <div class="section-header">
+          <div class="section-title">Macro Environment</div>
+          <button class="btn btn-primary btn-sm" onclick="seedGraph()" title="Re-seed causal graph">Seed Graph</button>
+        </div>
+
+        <div class="summary-cards" id="summary-cards">
+          <div class="summary-card"><div class="val" id="stat-nodes">—</div><div class="lbl">Nodes</div></div>
+          <div class="summary-card"><div class="val" id="stat-edges">—</div><div class="lbl">Relationships</div></div>
+          <div class="summary-card"><div class="val" id="stat-sectors">—</div><div class="lbl">Sectors</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Current Macro Readings</div>
+          <table class="env-table" id="env-table">
+            <thead><tr><th>Series</th><th>Value</th><th>vs 3mo</th></tr></thead>
+            <tbody id="env-table-body">
+              <tr><td colspan="3" style="color:var(--text-muted);font-size:0.8rem;padding:12px 8px">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Data Sources</div>
+          <div class="source-legend">
+            <div class="source-item"><div class="source-dot" style="background:#3b82f6"></div>FRED Series</div>
+            <div class="source-item"><div class="source-dot" style="background:#f59e0b"></div>BLS Series</div>
+            <div class="source-item"><div class="source-dot" style="background:#94a3b8"></div>Custom / Sector</div>
+            <div class="source-item"><div class="source-dot" style="background:#10b981"></div>Company Node</div>
+          </div>
+          <p style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;line-height:1.5">
+            Click any node in the graph to run a cascade simulation and see downstream impact on all connected macro variables and portfolio companies.
+          </p>
+        </div>
+      </div>
+
+      <!-- Scenario mode (node clicked) -->
+      <div class="panel-section" id="panel-scenario">
+        <div class="section-header">
+          <div class="section-title">Cascade Simulation</div>
+          <button class="btn btn-sm" style="background:var(--bg-input);color:var(--text-muted);border:1px solid var(--border)" onclick="exitScenario()">× Close</button>
+        </div>
+
+        <div class="scenario-node-badge" id="scenario-node-badge">
+          <div id="scenario-node-name">Select a node</div>
+          <div class="node-type-tag" id="scenario-node-meta"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Shock Magnitude</label>
+          <div class="slider-row">
+            <input type="range" id="change-slider" min="-50" max="50" step="1" value="0" oninput="updateSlider()">
+            <span class="slider-val" id="slider-display">0%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:var(--text-muted);margin-top:3px">
+            <span>−50%</span><span>0</span><span>+50%</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Horizon (months)</label>
+          <select class="form-select" id="horizon-select">
+            <option value="6">6 months</option>
+            <option value="12">12 months</option>
+            <option value="18">18 months</option>
+            <option value="24" selected>24 months</option>
+          </select>
+        </div>
+
+        <button class="btn btn-primary" style="width:100%;margin-bottom:14px" id="run-btn" onclick="runSimulation()">Run Cascade</button>
+
+        <div id="results-area" style="display:none">
+          <div class="section-header" style="margin-bottom:8px">
+            <div class="section-title">Most Impacted Nodes</div>
+            <span id="results-count" style="font-size:0.72rem;color:var(--text-muted)"></span>
+          </div>
+          <div class="section-sub" id="results-meta"></div>
+          <div style="overflow-x:auto">
+            <table class="results-table">
+              <thead>
+                <tr>
+                  <th>Node</th>
+                  <th>Sector</th>
+                  <th>Impact</th>
+                  <th>Lag</th>
+                  <th>Conf</th>
+                </tr>
+              </thead>
+              <tbody id="results-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- D3 Tooltip -->
+<div class="d3-tooltip" id="d3-tooltip"></div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────────────────────────
+const API = 'http://localhost:8001/api/v1';
+
+// Sector → fill color
+const SECTOR_COLORS = {
+  housing:    '#3b82f6',
+  credit:     '#f59e0b',
+  energy:     '#ef4444',
+  consumer:   '#10b981',
+  labor:      '#10b981',
+  industrial: '#8b5cf6',
+  monetary:   '#6366f1',
+};
+function sectorColor(tag) {
+  return SECTOR_COLORS[tag] || '#6366f1';
+}
+
+// ─────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────
+let allNodes = [];
+let allEdges = [];
+let simulation = null;
+let selectedNodeId = null;
+let currentSectorFilter = 'all';
+let cascadeImpactMap = {}; // node_id → {impact_pct, confidence}
+
+// D3 selection handles updated on each render
+let svgSel, gSel, zoomBehavior;
+let linkSel, nodeSel;
+
+// ─────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  initSvg();
+  loadGraph();
+  loadEnvironment();
+});
+
+// ─────────────────────────────────────────────────────────────────
+// SVG + ZOOM SETUP
+// ─────────────────────────────────────────────────────────────────
+function initSvg() {
+  svgSel = d3.select('#graph-svg');
+  zoomBehavior = d3.zoom()
+    .scaleExtent([0.1, 8])
+    .on('zoom', ({ transform }) => gSel && gSel.attr('transform', transform));
+  svgSel.call(zoomBehavior);
+  gSel = svgSel.append('g').attr('id', 'main-g');
+
+  // Arrow markers
+  const defs = svgSel.append('defs');
+  ['positive', 'negative', 'neutral'].forEach(dir => {
+    defs.append('marker')
+      .attr('id', `arrow-${dir}`)
+      .attr('viewBox', '0 -5 10 10')
+      .attr('refX', 18)
+      .attr('refY', 0)
+      .attr('markerWidth', 6)
+      .attr('markerHeight', 6)
+      .attr('orient', 'auto')
+      .append('path')
+      .attr('d', 'M0,-5L10,0L0,5')
+      .attr('fill', dir === 'positive' ? '#22c55e' : dir === 'negative' ? '#ef4444' : '#94a3b8');
+  });
+
+  // Glow filter
+  const glow = defs.append('filter').attr('id', 'glow');
+  glow.append('feGaussianBlur').attr('stdDeviation', '3.5').attr('result', 'coloredBlur');
+  const merge = glow.append('feMerge');
+  merge.append('feMergeNode').attr('in', 'coloredBlur');
+  merge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+  // Impact glow filters (positive / negative)
+  ['impact-pos', 'impact-neg'].forEach(id => {
+    const f = defs.append('filter').attr('id', id);
+    f.append('feColorMatrix')
+      .attr('type', 'matrix')
+      .attr('values', id === 'impact-pos'
+        ? '0 0 0 0 0.13  0 0 0 0 0.72  0 0 0 0 0.50  0 0 0 1 0'
+        : '0 0 0 0 0.94  0 0 0 0 0.26  0 0 0 0 0.26  0 0 0 1 0')
+      .attr('result', 'colorOut');
+    const fm = f.append('feMerge');
+    fm.append('feMergeNode').attr('in', 'colorOut');
+    fm.append('feMergeNode').attr('in', 'SourceGraphic');
+  });
+
+  // Zoom controls
+  document.getElementById('zoom-in').onclick  = () => svgSel.transition().call(zoomBehavior.scaleBy, 1.4);
+  document.getElementById('zoom-out').onclick = () => svgSel.transition().call(zoomBehavior.scaleBy, 0.7);
+  document.getElementById('zoom-reset').onclick = resetZoom;
+
+  // Click outside to deselect
+  svgSel.on('click', (e) => {
+    if (e.target === svgSel.node() || e.target.tagName === 'svg') exitScenario();
+  });
+}
+
+function resetZoom() {
+  const panel = document.getElementById('graph-panel');
+  svgSel.transition().duration(500).call(
+    zoomBehavior.transform,
+    d3.zoomIdentity.translate(panel.clientWidth / 2, panel.clientHeight / 2).scale(0.85)
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// DATA LOADING
+// ─────────────────────────────────────────────────────────────────
+async function loadGraph(sectorTag) {
+  showSpinner('Loading causal graph…');
+  try {
+    const url = sectorTag && sectorTag !== 'all'
+      ? `${API}/macro/graph?sector_tag=${encodeURIComponent(sectorTag)}`
+      : `${API}/macro/graph`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+
+    allNodes = data.nodes || [];
+    allEdges = data.edges || [];
+
+    document.getElementById('stat-nodes').textContent = data.node_count ?? allNodes.length;
+    document.getElementById('stat-edges').textContent = data.edge_count ?? allEdges.length;
+    const sectors = new Set(allNodes.map(n => n.sector_tag).filter(Boolean));
+    document.getElementById('stat-sectors').textContent = sectors.size;
+
+    if (allNodes.length === 0) {
+      hideSpinner();
+      document.getElementById('empty-state').style.display = 'flex';
+      return;
+    }
+    document.getElementById('empty-state').style.display = 'none';
+    renderD3Graph(allNodes, allEdges);
+  } catch (err) {
+    hideSpinner();
+    console.error('loadGraph error:', err);
+    // If table doesn't exist or server unreachable, show empty state
+    document.getElementById('empty-state').style.display = 'flex';
+  }
+}
+
+async function loadEnvironment() {
+  try {
+    const resp = await fetch(`${API}/macro/current-environment`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    renderEnvironmentTable(data.indicators || []);
+  } catch (e) {
+    // Silently ignore if FRED table not populated yet
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// D3 GRAPH RENDERING
+// ─────────────────────────────────────────────────────────────────
+function renderD3Graph(nodes, edges) {
+  hideSpinner();
+  gSel.selectAll('*').remove();
+  cascadeImpactMap = {};
+
+  const panel = document.getElementById('graph-panel');
+  const W = panel.clientWidth;
+  const H = panel.clientHeight;
+
+  // Build id→node map for edge source/target resolution
+  const nodeById = new Map(nodes.map(n => [n.id, n]));
+
+  // Filter edges to only those with both endpoints in the visible node set
+  const visibleIds = new Set(nodes.map(n => n.id));
+  const visibleEdges = edges.filter(e => visibleIds.has(e.source) && visibleIds.has(e.target));
+
+  // Use copies so D3 doesn't mutate original edge objects
+  const edgeCopies = visibleEdges.map(e => ({ ...e, sourceId: e.source, targetId: e.target }));
+
+  if (simulation) simulation.stop();
+
+  simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(edgeCopies)
+      .id(d => d.id)
+      .distance(120)
+      .strength(0.35))
+    .force('charge', d3.forceManyBody()
+      .strength(d => nodeRadius(d) > 10 ? -320 : -180)
+      .distanceMax(500))
+    .force('center', d3.forceCenter(W / 2, H / 2))
+    .force('collision', d3.forceCollide().radius(d => nodeRadius(d) + 14))
+    .force('x', d3.forceX(W / 2).strength(0.04))
+    .force('y', d3.forceY(H / 2).strength(0.04));
+
+  // Edges (lines)
+  const linkGroup = gSel.append('g').attr('class', 'links');
+  linkSel = linkGroup.selectAll('line')
+    .data(edgeCopies)
+    .join('line')
+    .attr('stroke', d => d.direction === 'positive' ? '#22c55e' : '#ef4444')
+    .attr('stroke-opacity', d => Math.max(0.25, d.confidence || 0.5))
+    .attr('stroke-width', d => {
+      const c = d.confidence || 0.7;
+      return c >= 0.9 ? 3 : c >= 0.8 ? 2 : 1.2;
+    })
+    .attr('marker-end', d => `url(#arrow-${d.direction === 'positive' ? 'positive' : 'negative'})`)
+    .attr('class', 'edge');
+
+  // Node group
+  const nodeGroup = gSel.append('g').attr('class', 'nodes');
+  nodeSel = nodeGroup.selectAll('g.node-g')
+    .data(nodes)
+    .join('g')
+    .attr('class', 'node-g')
+    .style('cursor', 'pointer')
+    .call(d3.drag()
+      .on('start', (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag',  (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on('end',   (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }))
+    .on('mouseover', showTooltip)
+    .on('mousemove', moveTooltip)
+    .on('mouseout',  hideTooltip)
+    .on('click', (e, d) => { e.stopPropagation(); selectNode(d); });
+
+  // Render shapes by node_type
+  nodeSel.each(function(d) {
+    const g = d3.select(this);
+    const r = nodeRadius(d);
+    const fill = sectorColor(d.sector_tag);
+    const isLeading = d.is_leading_indicator;
+
+    if (d.node_type === 'company') {
+      // Diamond (rotated rect)
+      const s = r * 1.4;
+      g.append('rect')
+        .attr('x', -s / 2).attr('y', -s / 2)
+        .attr('width', s).attr('height', s)
+        .attr('rx', 2)
+        .attr('transform', 'rotate(45)')
+        .attr('fill', fill)
+        .attr('fill-opacity', 0.18)
+        .attr('stroke', fill)
+        .attr('stroke-width', 2);
+    } else if (d.node_type === 'sector' || d.node_type === 'custom') {
+      // Rounded rectangle
+      g.append('rect')
+        .attr('x', -r).attr('y', -r * 0.65)
+        .attr('width', r * 2).attr('height', r * 1.3)
+        .attr('rx', 5)
+        .attr('fill', fill)
+        .attr('fill-opacity', 0.18)
+        .attr('stroke', fill)
+        .attr('stroke-width', 2);
+    } else {
+      // Circle (fred_series, bls_series, default)
+      g.append('circle')
+        .attr('r', r)
+        .attr('fill', fill)
+        .attr('fill-opacity', 0.2)
+        .attr('stroke', fill)
+        .attr('stroke-width', isLeading ? 2.5 : 1.8)
+        .attr('stroke-dasharray', isLeading ? 'none' : '4 2');
+    }
+
+    // Node label
+    g.append('text')
+      .attr('class', 'node-label')
+      .attr('y', r + 12)
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#94a3b8')
+      .attr('font-size', '9px')
+      .attr('pointer-events', 'none')
+      .text(shortLabel(d.name));
+  });
+
+  simulation.on('tick', () => {
+    linkSel
+      .attr('x1', d => d.source.x)
+      .attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x)
+      .attr('y2', d => d.target.y);
+    nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+
+  // After layout settles, do initial zoom to fit
+  simulation.on('end', () => resetZoom());
+}
+
+function nodeRadius(d) {
+  if (d.node_type === 'company')  return 10;
+  if (d.is_leading_indicator)     return 14;
+  return 10;
+}
+
+function shortLabel(name) {
+  if (!name) return '';
+  if (name.length <= 18) return name;
+  // Try to abbreviate
+  return name.substring(0, 16) + '…';
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SECTOR FILTER
+// ─────────────────────────────────────────────────────────────────
+function filterBySector(sector, btn) {
+  document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentSectorFilter = sector;
+  exitScenario();
+  loadGraph(sector === 'all' ? null : sector);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// NODE SELECTION → SCENARIO MODE
+// ─────────────────────────────────────────────────────────────────
+function selectNode(d) {
+  selectedNodeId = d.id;
+
+  // Gold ring on selected node
+  gSel.selectAll('.node-g .selected-ring').remove();
+  gSel.selectAll('.node-g')
+    .filter(n => n.id === d.id)
+    .append('circle')
+    .attr('class', 'selected-ring')
+    .attr('r', nodeRadius(d) + 5)
+    .attr('fill', 'none')
+    .attr('stroke', '#fbbf24')
+    .attr('stroke-width', 2)
+    .attr('pointer-events', 'none');
+
+  // Reset slider
+  document.getElementById('change-slider').value = 0;
+  updateSlider();
+  document.getElementById('results-area').style.display = 'none';
+  document.getElementById('run-btn').disabled = false;
+
+  // Populate badge
+  document.getElementById('scenario-node-name').textContent = d.name;
+  document.getElementById('scenario-node-meta').textContent = [
+    d.node_type,
+    d.sector_tag,
+    d.series_id,
+    d.current_value != null ? `Current: ${d.current_value} ${d.unit || ''}` : null,
+  ].filter(Boolean).join('  ·  ');
+
+  switchPanel('panel-scenario');
+}
+
+function exitScenario() {
+  selectedNodeId = null;
+  gSel && gSel.selectAll('.node-g .selected-ring').remove();
+  clearCascadeHighlight();
+  switchPanel('panel-browse');
+}
+
+function switchPanel(id) {
+  document.querySelectorAll('.panel-section').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SCENARIO CONTROLS
+// ─────────────────────────────────────────────────────────────────
+function updateSlider() {
+  const val = parseInt(document.getElementById('change-slider').value, 10);
+  const disp = document.getElementById('slider-display');
+  disp.textContent = (val >= 0 ? '+' : '') + val + '%';
+  disp.className = 'slider-val ' + (val > 0 ? 'positive' : val < 0 ? 'negative' : '');
+}
+
+async function runSimulation() {
+  if (!selectedNodeId) return;
+  const changePct = parseFloat(document.getElementById('change-slider').value);
+  const horizonMonths = parseInt(document.getElementById('horizon-select').value, 10);
+
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.textContent = 'Running…';
+  showSpinner('Running cascade simulation…');
+
+  try {
+    const body = { node_id: selectedNodeId, change_pct: changePct, horizon_months: horizonMonths };
+    const resp = await fetch(`${API}/macro/simulate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    hideSpinner();
+    renderSimulationResults(data);
+    highlightCascade(data.results || []);
+  } catch (err) {
+    hideSpinner();
+    alert('Simulation error: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run Cascade';
+  }
+}
+
+function renderSimulationResults(data) {
+  const results = (data.results || []).slice(0, 30); // show top 30
+  document.getElementById('results-count').textContent = `${results.length} nodes impacted`;
+  document.getElementById('results-meta').textContent =
+    `${data.input_node_name}  ${data.input_change_pct >= 0 ? '+' : ''}${data.input_change_pct}%  over ${data.horizon_months} months`;
+
+  const tbody = document.getElementById('results-body');
+  tbody.innerHTML = results.map(r => {
+    const impact = r.estimated_impact_pct;
+    const impClass = impact > 0 ? 'pos' : 'neg';
+    const rowClass = impact > 0 ? 'positive' : 'negative';
+    const conf = r.confidence != null ? r.confidence : 0;
+    const confBarWidth = Math.round(conf * 40);
+    const sectorTag = r.sector_tag || '';
+    const pathStr = Array.isArray(r.impact_path) ? r.impact_path.join(' → ') : (r.impact_path || '');
+    return `<tr class="${rowClass}">
+      <td style="font-weight:500;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.node_name)}">${esc(r.node_name)}</td>
+      <td><span class="sector-tag sector-${sectorTag}">${sectorTag || '—'}</span></td>
+      <td><span class="impact-val ${impClass}">${impact >= 0 ? '+' : ''}${impact.toFixed(1)}%</span></td>
+      <td style="color:var(--text-muted)">${r.peak_impact_month != null ? r.peak_impact_month + 'mo' : '—'}</td>
+      <td>
+        <div class="conf-bar-bg"><div class="conf-bar-fill" style="width:${confBarWidth}px"></div></div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('results-area').style.display = 'block';
+}
+
+// ─────────────────────────────────────────────────────────────────
+// CASCADE HIGHLIGHT
+// ─────────────────────────────────────────────────────────────────
+function highlightCascade(results) {
+  if (!results || !results.length) return;
+
+  cascadeImpactMap = {};
+  let maxAbs = 0;
+  results.forEach(r => {
+    cascadeImpactMap[r.node_id] = r.estimated_impact_pct;
+    maxAbs = Math.max(maxAbs, Math.abs(r.estimated_impact_pct));
+  });
+
+  if (!nodeSel) return;
+
+  nodeSel.each(function(d) {
+    const g = d3.select(this);
+    g.selectAll('.impact-overlay').remove();
+    const impact = cascadeImpactMap[d.id];
+    if (impact == null) return;
+
+    const absNorm = maxAbs > 0 ? Math.abs(impact) / maxAbs : 0;
+    const r = nodeRadius(d);
+    g.append('circle')
+      .attr('class', 'impact-overlay')
+      .attr('r', r + 3)
+      .attr('fill', impact > 0 ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)')
+      .attr('stroke', impact > 0 ? '#22c55e' : '#ef4444')
+      .attr('stroke-width', 1.5)
+      .attr('opacity', 0.3 + absNorm * 0.7)
+      .attr('pointer-events', 'none')
+      .attr('filter', impact > 0 ? 'url(#impact-pos)' : 'url(#impact-neg)');
+  });
+}
+
+function clearCascadeHighlight() {
+  cascadeImpactMap = {};
+  gSel && gSel.selectAll('.impact-overlay').remove();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SEED
+// ─────────────────────────────────────────────────────────────────
+async function seedGraph() {
+  showSpinner('Seeding causal graph…');
+  document.getElementById('empty-state').style.display = 'none';
+  try {
+    const resp = await fetch(`${API}/macro/collect/seed-relationships`, { method: 'POST' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    console.log('Seed result:', data);
+    await loadGraph(currentSectorFilter === 'all' ? null : currentSectorFilter);
+    await loadEnvironment();
+  } catch (err) {
+    hideSpinner();
+    alert('Seed error: ' + err.message);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ENVIRONMENT TABLE
+// ─────────────────────────────────────────────────────────────────
+function renderEnvironmentTable(indicators) {
+  const tbody = document.getElementById('env-table-body');
+  if (!indicators.length) {
+    tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-muted);font-size:0.8rem;padding:12px 8px">No FRED data. Seed graph first.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = indicators.map(ind => {
+    const val = ind.current_value != null ? formatValue(ind.current_value, ind.series_id) : '—';
+    const dirClass = ind.direction === 'up' ? 'dir-up' : ind.direction === 'down' ? 'dir-down' : 'dir-flat';
+    const dirArrow = ind.direction === 'up' ? '▲' : ind.direction === 'down' ? '▼' : '—';
+    const change = ind.change_vs_3mo != null
+      ? `<span class="${dirClass}">${dirArrow} ${Math.abs(ind.change_vs_3mo).toFixed(2)}</span>`
+      : `<span class="dir-flat">—</span>`;
+    return `<tr>
+      <td style="font-weight:500">${esc(ind.label || ind.series_id)}</td>
+      <td>${val}</td>
+      <td>${change}</td>
+    </tr>`;
+  }).join('');
+}
+
+function formatValue(v, seriesId) {
+  if (v == null) return '—';
+  // Rates as percent
+  if (['DFF', 'MORTGAGE30US', 'UNRATE'].includes(seriesId)) return v.toFixed(2) + '%';
+  // Housing starts in thousands
+  if (seriesId === 'HOUST') return (v / 1000).toFixed(1) + 'M';
+  if (seriesId === 'UMCSENT') return v.toFixed(1);
+  if (seriesId === 'CSUSHPINSA') return v.toFixed(1);
+  return v.toFixed(2);
+}
+
+// ─────────────────────────────────────────────────────────────────
+// TOOLTIP
+// ─────────────────────────────────────────────────────────────────
+const tooltipEl = document.getElementById('d3-tooltip');
+
+function showTooltip(event, d) {
+  const impact = cascadeImpactMap[d.id];
+  const impactLine = impact != null
+    ? `<div><strong>Cascade Impact:</strong> <span style="color:${impact >= 0 ? '#22c55e' : '#ef4444'};font-weight:700">${impact >= 0 ? '+' : ''}${impact.toFixed(1)}%</span></div>`
+    : '';
+
+  tooltipEl.innerHTML = `
+    <h4>${esc(d.name)}</h4>
+    <div class="type-tag">${d.node_type}${d.series_id ? ' · ' + d.series_id : ''}${d.sector_tag ? ' · ' + d.sector_tag : ''}</div>
+    <div class="rows">
+      ${d.current_value != null ? `<div><strong>Current:</strong> ${d.current_value} ${d.unit || ''}</div>` : ''}
+      ${d.is_leading_indicator ? '<div style="color:#06b6d4">Leading Indicator</div>' : ''}
+      ${d.description ? `<div style="margin-top:4px;color:var(--text-muted)">${esc(d.description.substring(0, 100))}${d.description.length > 100 ? '…' : ''}</div>` : ''}
+      ${impactLine}
+      <div style="margin-top:4px;color:#6366f1;font-size:0.7rem">Click to simulate cascade</div>
+    </div>
+  `;
+  tooltipEl.style.opacity = '1';
+  moveTooltip(event);
+}
+
+function moveTooltip(event) {
+  const x = event.clientX + 14;
+  const y = event.clientY - 10;
+  const maxX = window.innerWidth - 280;
+  tooltipEl.style.left = Math.min(x, maxX) + 'px';
+  tooltipEl.style.top  = y + 'px';
+}
+
+function hideTooltip() {
+  tooltipEl.style.opacity = '0';
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SPINNER HELPERS
+// ─────────────────────────────────────────────────────────────────
+function showSpinner(msg) {
+  document.getElementById('spinner-msg').textContent = msg || 'Loading…';
+  document.getElementById('spinner').style.display = 'flex';
+}
+function hideSpinner() {
+  document.getElementById('spinner').style.display = 'none';
+}
+
+// ─────────────────────────────────────────────────────────────────
+// UTILITY
+// ─────────────────────────────────────────────────────────────────
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>
