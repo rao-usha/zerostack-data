@@ -127,7 +127,6 @@ async def ingest_company_filings(
     # Initialize SEC client
     client = SECClient(
         max_concurrency=settings.max_concurrency,
-        max_requests_per_second=8,  # SEC limit is 10/sec, we use 8 to be safe
         max_retries=settings.max_retries,
         backoff_factor=settings.retry_backoff_factor,
     )

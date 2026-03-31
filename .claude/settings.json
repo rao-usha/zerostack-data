@@ -69,6 +69,18 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/auto-log-stop.sh",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }

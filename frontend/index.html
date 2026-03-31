@@ -146,6 +146,33 @@
         }
         .footer a { color: var(--accent); text-decoration: none; }
 
+        /* ===== Health View / Mode Toggle (PLAN_049) ===== */
+        .mode-btn { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 0.3rem 0.875rem; border-radius: 6px; cursor: pointer; font-size: 0.78rem; transition: all 0.15s; }
+        .mode-btn.active { background: var(--primary); border-color: var(--primary); color: white; }
+        .mode-btn:hover:not(.active) { border-color: var(--text-muted); color: var(--text); }
+        .sources-status-banner { padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.82rem; display: flex; align-items: center; justify-content: space-between; }
+        .sources-status-banner.fresh  { background: rgba(34,197,94,0.07);  border: 1px solid rgba(34,197,94,0.25);  border-left: 4px solid var(--success); }
+        .sources-status-banner.warning{ background: rgba(245,158,11,0.07); border: 1px solid rgba(245,158,11,0.25); border-left: 4px solid var(--warning); }
+        .sources-status-banner.danger { background: rgba(239,68,68,0.07);  border: 1px solid rgba(239,68,68,0.25);  border-left: 4px solid var(--error); }
+        .swim-lane { margin-bottom: 1.5rem; }
+        .swim-lane-header { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.625rem; padding-bottom: 0.375rem; border-bottom: 1px solid var(--border); }
+        .source-card { background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; transition: border-color 0.15s; }
+        .source-card:hover { border-color: var(--primary); }
+        .source-card-name { font-size: 0.82rem; font-weight: 600; min-width: 160px; cursor: pointer; }
+        .source-card-name:hover { color: var(--primary); }
+        .source-card-meta { display: flex; gap: 1.25rem; flex: 1; font-size: 0.75rem; color: var(--text-muted); flex-wrap: wrap; }
+        .source-card-meta span { white-space: nowrap; }
+        .source-card-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+        .gov-section { margin-bottom: 2rem; }
+        .gov-section-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 0.875rem; padding-bottom: 0.375rem; border-bottom: 1px solid var(--border); }
+        .quality-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; }
+        .anomaly-row { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.625rem 0; border-bottom: 1px solid rgba(51,65,85,0.4); font-size: 0.78rem; }
+        .rec-card { background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.78rem; gap: 0.75rem; }
+        .rec-card .rec-priority { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; padding: 0.15rem 0.4rem; border-radius: 4px; flex-shrink: 0; }
+        .rec-priority.HIGH   { background: rgba(239,68,68,0.15);  color: var(--error); }
+        .rec-priority.MEDIUM { background: rgba(245,158,11,0.15); color: var(--warning); }
+        .rec-priority.LOW    { background: rgba(148,163,184,0.15); color: var(--text-muted); }
+
         /* ===== Data Sources Styles ===== */
         .ds-hero { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
         .ds-hero-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; text-align: center; }
@@ -1821,9 +1848,31 @@
                     Click any source to explore its tables, preview data, or trigger a new ingestion.
                 </div>
             </div>
-            <div id="sources-analytics-bar" class="ds-hero" style="display:none;"></div>
-            <div id="sources-loading" class="loading">Loading data sources...</div>
-            <div id="sources-content" class="hidden"></div>
+
+            <!-- Status Banner (replaces hero stats in Health mode) -->
+            <div id="sources-status-banner" class="sources-status-banner fresh" style="display:none;">
+                <span id="sources-banner-text"></span>
+                <button onclick="showIssuesModal()" style="background:transparent;border:1px solid currentColor;padding:0.25rem 0.75rem;border-radius:6px;cursor:pointer;font-size:0.75rem;flex-shrink:0;">See Issues ↗</button>
+            </div>
+
+            <!-- Mode Toggle -->
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+                <button id="mode-health"  class="mode-btn active" onclick="setSourceMode('health')">&#9679; Health</button>
+                <button id="mode-explore" class="mode-btn"        onclick="setSourceMode('explore')">&#8862; Explore</button>
+            </div>
+
+            <!-- Health View -->
+            <div id="sources-health-view">
+                <div id="swim-lanes"><div class="loading">Loading health data...</div></div>
+                <div id="governance-panel" style="margin-top:2rem;"></div>
+            </div>
+
+            <!-- Explore View (existing sources content, hidden by default) -->
+            <div id="sources-explore-view" style="display:none;">
+                <div id="sources-analytics-bar" class="ds-hero" style="display:none;"></div>
+                <div id="sources-loading" class="loading">Loading data sources...</div>
+                <div id="sources-content" class="hidden"></div>
+            </div>
         </div>
 
         <!-- [Intelligence tab removed] -->
@@ -2343,6 +2392,42 @@
                                 <div style="font-size:0.95rem;font-weight:700;margin-bottom:0.3rem">Executive Pedigree Constellation <span style="font-size:0.65rem;background:rgba(245,158,11,0.15);color:#f59e0b;padding:1px 6px;border-radius:4px;font-weight:600;vertical-align:middle">NEW</span></div>
                                 <div style="color:var(--text-muted);font-size:0.8rem;line-height:1.45">Career galaxy — rank executives by pedigree score, trace MBB/Ivy/Goldman institutional connections.</div>
                                 <div style="margin-top:0.75rem;font-size:0.78rem;font-weight:600;color:#f59e0b">View &rarr;</div>
+                            </div>
+                        </a>
+
+                        <!-- Eval Builder -->
+                        <a href="/eval-dashboard.html" style="display:block;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;text-decoration:none;color:inherit;transition:border-color 0.2s,transform 0.2s" onmouseover="this.style.borderColor='#22c55e';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform=''">
+                            <div style="height:80px;background:linear-gradient(135deg,#052e16,#0f172a);display:flex;align-items:center;justify-content:center">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                            </div>
+                            <div style="padding:1rem 1.1rem 1.2rem">
+                                <div style="font-size:0.95rem;font-weight:700;margin-bottom:0.3rem">Eval Builder <span style="font-size:0.65rem;background:rgba(34,197,94,0.15);color:#22c55e;padding:1px 6px;border-radius:4px;font-weight:600;vertical-align:middle">NEW</span></div>
+                                <div style="color:var(--text-muted);font-size:0.8rem;line-height:1.45">Eval framework for all 23 agentic pipelines — scored runs, regression detection, editable assertion cases.</div>
+                                <div style="margin-top:0.75rem;font-size:0.78rem;font-weight:600;color:#22c55e">View &rarr;</div>
+                            </div>
+                        </a>
+
+                        <!-- People Data QA -->
+                        <a href="/d3/qa-dashboard.html" style="display:block;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;text-decoration:none;color:inherit;transition:border-color 0.2s,transform 0.2s" onmouseover="this.style.borderColor='#6366f1';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform=''">
+                            <div style="height:80px;background:linear-gradient(135deg,#1e1b4b,#0f172a);display:flex;align-items:center;justify-content:center">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            </div>
+                            <div style="padding:1rem 1.1rem 1.2rem">
+                                <div style="font-size:0.95rem;font-weight:700;margin-bottom:0.3rem">People Data QA <span style="font-size:0.65rem;background:rgba(99,102,241,0.15);color:#6366f1;padding:1px 6px;border-radius:4px;font-weight:600;vertical-align:middle">NEW</span></div>
+                                <div style="color:var(--text-muted);font-size:0.8rem;line-height:1.45">Rule-based data quality checks — org chart health scores, missing CEOs, stale data, merge candidate review.</div>
+                                <div style="margin-top:0.75rem;font-size:0.78rem;font-weight:600;color:#6366f1">View &rarr;</div>
+                            </div>
+                        </a>
+
+                        <!-- US Economic Intelligence -->
+                        <a href="/economic-intelligence.html" style="display:block;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;text-decoration:none;color:inherit;display:flex;flex-direction:column;transition:transform .2s,box-shadow .2s,border-color .2s" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 28px rgba(99,179,237,0.15)';this.style.borderColor='rgba(99,179,237,0.4)'" onmouseout="this.style.transform='';this.style.boxShadow='';this.style.borderColor=''">
+                            <div style="height:80px;background:linear-gradient(135deg,#0b3060 0%,#1a365d 40%,#0f172a 100%);display:flex;align-items:center;justify-content:center">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#63b3ed" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                            </div>
+                            <div style="padding:1rem 1.1rem 1.2rem">
+                                <div style="font-size:0.95rem;font-weight:700;margin-bottom:0.3rem">US Economic Intelligence <span style="font-size:0.65rem;background:rgba(99,179,237,0.15);color:#63b3ed;padding:1px 6px;border-radius:4px;font-weight:600;vertical-align:middle">NEW</span></div>
+                                <div style="color:var(--text-muted);font-size:0.8rem;line-height:1.45">Live macro signals — FRED, BLS, BEA, Census. Rate environment, sector momentum, geographic divergence, PE synthesis.</div>
+                                <div style="margin-top:0.75rem;font-size:0.78rem;font-weight:600;color:#63b3ed">View &rarr;</div>
                             </div>
                         </a>
 
@@ -5397,6 +5482,339 @@
         let openApiFetchPromise = null;
         let endpointDocsLoading = false;
 
+        // ── Health View (PLAN_049) ──────────────────────────────────────────────
+
+        let currentSourceMode = 'health'; // 'health' | 'explore'
+
+        function setSourceMode(mode) {
+            currentSourceMode = mode;
+            const healthEl   = document.getElementById('sources-health-view');
+            const exploreEl  = document.getElementById('sources-explore-view');
+            const btnHealth  = document.getElementById('mode-health');
+            const btnExplore = document.getElementById('mode-explore');
+            if (healthEl)  healthEl.style.display  = mode === 'health'  ? '' : 'none';
+            if (exploreEl) exploreEl.style.display  = mode === 'explore' ? '' : 'none';
+            if (btnHealth)  btnHealth.classList.toggle('active',  mode === 'health');
+            if (btnExplore) btnExplore.classList.toggle('active', mode === 'explore');
+            if (mode === 'health') {
+                loadHealthView();
+            } else {
+                // Trigger the existing explore render
+                renderSources();
+            }
+        }
+
+        async function loadHealthView() {
+            const lanesEl = document.getElementById('swim-lanes');
+            const govEl   = document.getElementById('governance-panel');
+            if (lanesEl) lanesEl.innerHTML = '<div class="loading">Loading health data...</div>';
+            if (govEl)   govEl.innerHTML   = '';
+
+            let data = null;
+            try {
+                const res = await fetch('/api/v1/sources/health-summary');
+                if (res.ok) data = await res.json();
+            } catch (e) { /* network error — fall through to fallback */ }
+
+            if (!data) {
+                // Fallback: build a minimal health view from existing local data
+                data = buildFallbackHealthData();
+            }
+
+            renderHealthBanner(data.banner || {});
+            renderSwimLanes(data.domains || []);
+            renderGovernancePanel(data.governance || {});
+        }
+
+        function buildFallbackHealthData() {
+            // Build minimal health summary from local SOURCE_REGISTRY + cached data
+            const domainMap = {
+                macro_economic:  { key: 'macro_economic',  label: 'Macro Economic',    keys: ['fred','bls','bea','census','eia','noaa'] },
+                pe_intelligence: { key: 'pe_intelligence', label: 'PE Intelligence',   keys: ['sec','form_d','pe_benchmarks','international_econ'] },
+                people_orgs:     { key: 'people_orgs',     label: 'People & Orgs',     keys: ['people','org_chart','company'] },
+                site_intel:      { key: 'site_intel',      label: 'Site Intelligence', keys: [] }, // filled below
+            };
+
+            // Collect site_intel source keys from registry
+            const siCat = SOURCE_REGISTRY['site_intel'];
+            if (siCat) domainMap.site_intel.keys = siCat.sources.map(s => s.key);
+
+            const domains = Object.values(domainMap).map(domain => {
+                const sources = [];
+                for (const [catKey, cat] of Object.entries(SOURCE_REGISTRY)) {
+                    for (const src of cat.sources) {
+                        if (domain.keys.includes(src.key) || (catKey === domain.key)) {
+                            const rows = getDbRecords(src);
+                            const st   = getSourceStatus(src.key);
+                            const freq = getFrequency(src.key);
+                            const sched = getScheduleMap()[src.key];
+                            sources.push({
+                                key: src.key,
+                                display_name: src.label,
+                                status: st,
+                                total_rows: rows,
+                                row_trend: 'stable',
+                                last_run_at: sched?.last_run_at || null,
+                                quality_score: null,
+                                quality_breakdown: null,
+                                sla_status: st === 'ok' ? 'fresh' : st === 'stale' ? 'stale' : 'unknown',
+                                tables: getSourceTableNames(src),
+                            });
+                        }
+                    }
+                }
+                return { key: domain.key, label: domain.label, sources };
+            }).filter(d => d.sources.length > 0);
+
+            const activeSources = domains.flatMap(d => d.sources).filter(s => s.total_rows > 0);
+            const staleSources  = domains.flatMap(d => d.sources).filter(s => s.status === 'stale');
+
+            return {
+                banner: {
+                    active_count: activeSources.length,
+                    stale_count:  staleSources.length,
+                    never_run_count: domains.flatMap(d => d.sources).filter(s => s.status === 'idle' && s.total_rows === 0).length,
+                    open_anomaly_count: 0,
+                    last_activity_at: null,
+                    overall_status: staleSources.length > 0 ? 'warning' : 'ok',
+                },
+                domains,
+                governance: {},
+            };
+        }
+
+        function renderHealthBanner(banner) {
+            const el = document.getElementById('sources-status-banner');
+            const txt = document.getElementById('sources-banner-text');
+            if (!el || !txt) return;
+
+            const active  = banner.active_count       ?? '—';
+            const stale   = banner.stale_count        ?? 0;
+            const never   = banner.never_run_count    ?? 0;
+            const anom    = banner.open_anomaly_count ?? 0;
+            const lastAct = banner.last_activity_at   ? timeAgo(banner.last_activity_at) : null;
+            const overall = banner.overall_status     || 'ok';
+
+            let parts = [`${active} sources active`];
+            if (stale > 0)  parts.push(`${stale} stale`);
+            if (never > 0)  parts.push(`${never} never run`);
+            if (anom  > 0)  parts.push(`${anom} anomaly open`);
+            if (lastAct)    parts.push(`Last activity ${lastAct}`);
+
+            txt.textContent = parts.join('  ·  ');
+
+            el.className = 'sources-status-banner ' +
+                (overall === 'ok' ? 'fresh' : overall === 'warning' ? 'warning' : 'danger');
+            el.style.display = 'flex';
+        }
+
+        function renderSwimLanes(domains) {
+            const el = document.getElementById('swim-lanes');
+            if (!el) return;
+            if (!domains.length) {
+                el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:1rem 0;">No domain data available. Switch to Explore mode to view sources.</div>';
+                return;
+            }
+
+            let html = '';
+            for (const domain of domains) {
+                if (!domain.sources || !domain.sources.length) continue;
+                html += `<div class="swim-lane">
+                    <div class="swim-lane-header">${domain.label}</div>`;
+                for (const src of domain.sources) {
+                    html += renderSourceCard(src, domain.key);
+                }
+                html += `</div>`;
+            }
+            el.innerHTML = html;
+        }
+
+        function renderSourceCard(src, domainKey) {
+            const dotColor = src.status === 'ok'    ? 'var(--success)' :
+                             src.status === 'stale'  ? 'var(--warning)' :
+                             src.status === 'error'  ? 'var(--error)'   : 'var(--text-muted)';
+
+            const rowsLabel = src.total_rows > 0 ? fmtNum(src.total_rows) + ' rows' : 'No data';
+            const trendIcon = src.row_trend === 'growing'  ? ' <span style="color:var(--success)">↑</span>' :
+                              src.row_trend === 'shrinking' ? ' <span style="color:var(--error)">↓</span>'   : ' <span style="color:var(--text-muted)">→</span>';
+            const lastRun   = src.last_run_at ? timeAgo(src.last_run_at) : 'Never';
+            const qScore    = src.quality_score != null
+                ? `<span style="color:${src.quality_score >= 80 ? 'var(--success)' : src.quality_score >= 60 ? 'var(--warning)' : 'var(--error)'};">${src.quality_score}/100</span>`
+                : `<span style="color:var(--text-muted);">—</span>`;
+
+            // Find the source in registry for openSourceDetail
+            let catKey = domainKey;
+            for (const [ck, cat] of Object.entries(SOURCE_REGISTRY)) {
+                if (cat.sources.find(s => s.key === src.key)) { catKey = ck; break; }
+            }
+
+            return `<div class="source-card">
+                <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;display:inline-block;"></span>
+                <div class="source-card-name" onclick="setSourceMode('explore');openSourceDetail('${src.key}','${catKey}')" title="Click to explore detail">${src.display_name}</div>
+                <div class="source-card-meta">
+                    <span>${rowsLabel}${trendIcon}</span>
+                    <span>Last: ${lastRun}</span>
+                    <span>Score: ${qScore}</span>
+                    ${src.tables && src.tables.length ? `<span style="color:var(--text-muted);font-size:0.7rem;">${src.tables.slice(0,2).join(', ')}${src.tables.length > 2 ? ` +${src.tables.length-2}` : ''}</span>` : ''}
+                </div>
+                <div class="source-card-actions">
+                    <button class="btn btn-secondary" style="padding:0.25rem 0.625rem;font-size:0.72rem;" onclick="healthRunSource('${src.key}','${catKey}')">Run</button>
+                    <button class="btn btn-secondary" style="padding:0.25rem 0.625rem;font-size:0.72rem;" onclick="setSourceMode('explore');openSourceDetail('${src.key}','${catKey}');setTimeout(()=>document.querySelector('.schedule-section')?.scrollIntoView({behavior:'smooth'}),400)">Schedule</button>
+                </div>
+            </div>`;
+        }
+
+        async function healthRunSource(sourceKey, catKey) {
+            // Open explore detail then trigger the run flow
+            setSourceMode('explore');
+            await openSourceDetail(sourceKey, catKey);
+        }
+
+        function renderGovernancePanel(gov) {
+            const el = document.getElementById('governance-panel');
+            if (!el) return;
+
+            const slaData   = gov.sla_timeline        || [];
+            const anomalies = gov.open_anomalies      || [];
+            const recs      = gov.top_recommendations || [];
+
+            if (!slaData.length && !anomalies.length && !recs.length) {
+                el.innerHTML = `<div style="color:var(--text-muted);font-size:0.82rem;padding:0.75rem 0;border-top:1px solid var(--border);">
+                    Governance data unavailable — run <code style="background:var(--bg-input);padding:0.1rem 0.4rem;border-radius:4px;">GET /api/v1/sources/health-summary</code> to populate.
+                </div>`;
+                return;
+            }
+
+            let html = `<div style="border-top:1px solid var(--border);padding-top:1.5rem;">
+                <div style="font-size:1rem;font-weight:700;margin-bottom:1.5rem;">Data Governance</div>`;
+
+            // A. SLA Timeline
+            if (slaData.length) {
+                html += `<div class="gov-section">
+                    <div class="gov-section-title">SLA Compliance (30-day)</div>
+                    ${renderSlaTimeline(slaData)}
+                </div>`;
+            }
+
+            // B. Quality Scorecards — sourced from domains if available
+            const qualitySources = (gov.quality_sources || []);
+            if (qualitySources.length) {
+                html += `<div class="gov-section">
+                    <div class="gov-section-title">Quality Scorecards</div>
+                    <div class="quality-cards-grid">
+                        ${qualitySources.map(s => renderQualityCard(s)).join('')}
+                    </div>
+                </div>`;
+            }
+
+            // C. Anomalies + Recommendations (side by side)
+            if (anomalies.length || recs.length) {
+                html += `<div class="gov-section">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;flex-wrap:wrap;">`;
+
+                if (anomalies.length) {
+                    html += `<div>
+                        <div class="gov-section-title">Open Anomalies</div>
+                        ${anomalies.map(a => {
+                            const sevColor = a.severity === 'CRITICAL' ? 'var(--error)' : a.severity === 'WARNING' ? 'var(--warning)' : 'var(--text-muted)';
+                            return `<div class="anomaly-row">
+                                <span style="width:8px;height:8px;border-radius:50%;background:${sevColor};flex-shrink:0;margin-top:4px;display:inline-block;"></span>
+                                <div>
+                                    <div style="font-weight:600;font-size:0.75rem;color:${sevColor};">${a.alert_type || ''}</div>
+                                    <div style="color:var(--text-muted);font-size:0.72rem;">${a.table_name || ''} &mdash; ${a.message || ''}</div>
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>`;
+                }
+
+                if (recs.length) {
+                    html += `<div>
+                        <div class="gov-section-title">Top Recommendations</div>
+                        ${recs.map(r => `<div class="rec-card">
+                            <span class="rec-priority ${r.priority}">${r.priority}</span>
+                            <div style="flex:1;font-size:0.78rem;">${r.message || ''}</div>
+                            ${r.fix_action ? `<button class="btn btn-secondary" style="padding:0.2rem 0.5rem;font-size:0.7rem;" onclick="runFixAction('${r.fix_action}')">Fix</button>` : ''}
+                        </div>`).join('')}
+                    </div>`;
+                }
+
+                html += `</div></div>`;
+            }
+
+            html += `</div>`;
+            el.innerHTML = html;
+        }
+
+        function renderSlaTimeline(slaData) {
+            return slaData.map(s => `
+                <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;">
+                    <div style="width:120px;font-size:0.75rem;color:var(--text-muted);flex-shrink:0;">${s.source}</div>
+                    <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;">
+                        <div style="width:${Math.min(100, s.compliance_pct || 0)}%;height:100%;background:${(s.compliance_pct||0) > 80 ? 'var(--success)' : (s.compliance_pct||0) > 50 ? 'var(--warning)' : 'var(--error)'};border-radius:4px;"></div>
+                    </div>
+                    <div style="width:50px;font-size:0.72rem;color:var(--text-muted);text-align:right;">${s.compliance_pct != null ? s.compliance_pct + '%' : '—'}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderQualityCard(source) {
+            const dims = ['completeness', 'freshness', 'validity', 'consistency'];
+            const bars = dims.map(d => {
+                const val = source.quality_breakdown?.[d] ?? null;
+                const color = val === null ? 'var(--border)' : val >= 80 ? 'var(--success)' : val >= 60 ? 'var(--warning)' : 'var(--error)';
+                const width = val === null ? 0 : Math.min(100, val);
+                return `<div style="margin-bottom:0.25rem;">
+                    <div style="display:flex;justify-content:space-between;font-size:0.68rem;color:var(--text-muted);margin-bottom:2px;">
+                        <span>${d}</span><span>${val !== null ? val + '%' : '—'}</span>
+                    </div>
+                    <div style="height:4px;background:var(--border);border-radius:2px;">
+                        <div style="width:${width}%;height:100%;background:${color};border-radius:2px;"></div>
+                    </div>
+                </div>`;
+            }).join('');
+            const scoreColor = (source.quality_score||0) >= 80 ? 'var(--success)' : 'var(--warning)';
+            return `<div style="background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:0.875rem;">
+                <div style="font-size:0.8rem;font-weight:600;margin-bottom:0.5rem;">${source.display_name}</div>
+                <div style="font-size:1.1rem;font-weight:700;margin-bottom:0.5rem;color:${scoreColor};">
+                    ${source.quality_score != null ? source.quality_score + '/100' : '—'}
+                </div>
+                ${bars}
+            </div>`;
+        }
+
+        function showIssuesModal() {
+            // Simple inline modal showing stale/errored sources
+            const stale = [];
+            for (const [catKey, cat] of Object.entries(SOURCE_REGISTRY)) {
+                for (const src of cat.sources) {
+                    const st = getSourceStatus(src.key);
+                    if (st === 'stale' || st === 'error') {
+                        stale.push({ src, catKey, st });
+                    }
+                }
+            }
+            if (!stale.length) { alert('No issues detected.'); return; }
+
+            let msg = `Issues (${stale.length} sources):\n\n`;
+            stale.forEach(({ src, st }) => {
+                msg += `• ${src.label} — ${st}\n`;
+            });
+            alert(msg);
+        }
+
+        async function runFixAction(action) {
+            // action is like "POST /bls/ingest/ces"
+            const parts = action.trim().split(' ');
+            const method = parts[0] || 'POST';
+            const path   = parts[1] || '';
+            if (!path) return;
+            try {
+                await fetch('/api/v1' + path, { method });
+                setTimeout(loadHealthView, 1500);
+            } catch (e) { console.warn('runFixAction failed:', e); }
+        }
+
         // Helpers
         function timeAgo(dateStr) {
             if (!dateStr) return 'Never';
@@ -7666,6 +8084,8 @@
             document.getElementById('sources-loading').classList.add('hidden');
             document.getElementById('sources-content').classList.remove('hidden');
             renderSources();
+            // Kick off health view load (PLAN_049) — data is now ready for fallback build
+            if (currentSourceMode === 'health') loadHealthView();
         }
 
         // Phase 2: detail data (lazy)
@@ -7696,6 +8116,7 @@
             document.getElementById('sources-loading').classList.remove('hidden');
             document.getElementById('sources-content').classList.add('hidden');
             loadPhase1();
+            if (currentSourceMode === 'health') loadHealthView();
         }
 
         // Start loading sources immediately

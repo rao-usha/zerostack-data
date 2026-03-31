@@ -133,6 +133,12 @@ SOURCE_DISPATCH: Dict[str, Tuple[str, str, List[str]]] = {
         "create_noaa_table",
         ["dataset_key"],
     ),
+    # ── AFDC (EV Infrastructure) ───────────────────────────────────────────
+    "afdc": (
+        "app.sources.afdc.ingest",
+        "ingest_afdc_dataset",
+        ["dataset", "api_key"],
+    ),
     # ── BLS ───────────────────────────────────────────────────────────────
     "bls": (
         "app.sources.bls.ingest",

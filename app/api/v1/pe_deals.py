@@ -243,6 +243,79 @@ async def create_deal(deal: DealCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/pipeline-summary")
+async def get_pipeline_summary(db: Session = Depends(get_db)):
+    """
+    Return Sankey-compatible deal pipeline data from real pe_deals.
+
+    Nodes: deal_type → deal_sub_type → status
+    Links: weighted by deal count at each transition.
+    """
+    from app.core.pe_models import PEDeal
+    from sqlalchemy import func
+    from collections import defaultdict
+
+    rows = (
+        db.query(
+            PEDeal.deal_type,
+            func.coalesce(PEDeal.deal_sub_type, "Unspecified").label("deal_sub_type"),
+            PEDeal.status,
+            func.count(PEDeal.id).label("deal_count"),
+        )
+        .filter(
+            PEDeal.deal_type.isnot(None),
+            PEDeal.deal_type != "8-K Event",
+        )
+        .group_by(PEDeal.deal_type, PEDeal.deal_sub_type, PEDeal.status)
+        .all()
+    )
+
+    if not rows:
+        return {"nodes": [], "links": [], "summary": {"total_deals": 0}}
+
+    # Build node IDs and collect link weights
+    node_set = {}
+    type_to_sub = defaultdict(int)
+    sub_to_status = defaultdict(int)
+
+    for deal_type, deal_sub_type, status, count in rows:
+        type_id = f"type_{deal_type}"
+        sub_id = f"sub_{deal_sub_type}"
+        status_id = f"status_{status or 'Unknown'}"
+
+        if type_id not in node_set:
+            node_set[type_id] = {"id": type_id, "label": deal_type, "category": "type"}
+        if sub_id not in node_set:
+            node_set[sub_id] = {"id": sub_id, "label": deal_sub_type, "category": "sub_type"}
+        if status_id not in node_set:
+            node_set[status_id] = {"id": status_id, "label": status or "Unknown", "category": "status"}
+
+        type_to_sub[(type_id, sub_id)] += count
+        sub_to_status[(sub_id, status_id)] += count
+
+    links = []
+    for (src, tgt), count in type_to_sub.items():
+        links.append({"source": src, "target": tgt, "value": count})
+    for (src, tgt), count in sub_to_status.items():
+        links.append({"source": src, "target": tgt, "value": count})
+
+    total_deals = sum(r[3] for r in rows)
+    type_counts = defaultdict(int)
+    for deal_type, _, _, count in rows:
+        type_counts[deal_type] += count
+    top_type = max(type_counts, key=type_counts.get) if type_counts else None
+
+    return {
+        "nodes": list(node_set.values()),
+        "links": links,
+        "summary": {
+            "total_deals": total_deals,
+            "top_deal_type": top_type,
+            "deal_types": dict(type_counts),
+        },
+    }
+
+
 @router.get("/{deal_id}")
 async def get_deal(deal_id: int, db: Session = Depends(get_db)):
     """

@@ -1150,7 +1150,7 @@ class BISClient:
         """
         url = f"{self.BASE_URL}/data/{dataset}/{key}"
 
-        params = {"format": "jsondata"}
+        params = {"format": "sdmx-json"}
         if start_period:
             params["startPeriod"] = start_period
         if end_period:
@@ -1163,10 +1163,13 @@ class BISClient:
     def _parse_bis_json(
         self, response: Dict[str, Any], dataset: str
     ) -> List[Dict[str, Any]]:
-        """Parse BIS JSON data format."""
+        """Parse BIS JSON data format (sdmx-json wraps payload in 'data' key)."""
         records = []
 
         try:
+            # sdmx-json format wraps dataSets/structure under a "data" key
+            if "data" in response:
+                response = response["data"]
             dataSets = response.get("dataSets", [])
             if not dataSets:
                 return []

@@ -508,6 +508,169 @@ async def score_all_pedigrees(
     }
 
 
+@router.get("/companies-with-org-charts")
+async def list_companies_with_org_charts(
+    db: Session = Depends(get_db),
+):
+    """List all companies that have org chart snapshots in the DB."""
+    from app.core.people_models import OrgChartSnapshot, IndustrialCompany
+    from sqlalchemy import func
+
+    # Subquery: latest snapshot per company
+    latest = (
+        db.query(
+            OrgChartSnapshot.company_id,
+            func.max(OrgChartSnapshot.snapshot_date).label("max_date"),
+        )
+        .group_by(OrgChartSnapshot.company_id)
+        .subquery()
+    )
+    rows = (
+        db.query(
+            IndustrialCompany.id,
+            IndustrialCompany.name,
+            OrgChartSnapshot.total_people,
+            OrgChartSnapshot.departments,
+            OrgChartSnapshot.snapshot_date,
+        )
+        .join(latest, latest.c.company_id == IndustrialCompany.id)
+        .join(
+            OrgChartSnapshot,
+            (OrgChartSnapshot.company_id == IndustrialCompany.id)
+            & (OrgChartSnapshot.snapshot_date == latest.c.max_date),
+        )
+        .order_by(IndustrialCompany.name)
+        .all()
+    )
+    return [
+        {
+            "id": r[0],
+            "name": r[1],
+            "total_people": r[2],
+            "departments": r[3] or [],
+            "snapshot_date": r[4].isoformat() if r[4] else None,
+        }
+        for r in rows
+    ]
+
+
+def _normalize_name(name: str) -> str:
+    """Normalize a person's name for dedup comparison.
+
+    Strips middle initials, suffixes, and extra whitespace so that
+    'Andrew F. Sullivan' and 'Andrew Sullivan' compare as equal.
+    """
+    import re
+
+    name = name.lower().strip()
+    name = re.sub(r"\s+[a-z]\.\s+", " ", name)  # strip middle initial "F."
+    name = re.sub(r"\b(jr|sr|ii|iii|iv|phd|md|esq|cpa|cfa|jd|mba)\.?\b", "", name)
+    return re.sub(r"\s+", " ", name).strip()
+
+
+def _count_desc(node: dict) -> int:
+    """Count total descendants of a chart node."""
+    return sum(1 + _count_desc(c) for c in node.get("children", []))
+
+
+def _sanitize_org_chart(chart_data: dict) -> dict:
+    """Dedup org chart nodes by person_id and normalized name.
+
+    Multiple collection runs can create duplicate company_people rows for the
+    same person (e.g., 'Andrew Sullivan' from SEC + 'Andrew F. Sullivan' from
+    website). This pass removes duplicates, keeping the node with the most
+    descendants (richest data).
+    """
+    import copy
+
+    chart_data = copy.deepcopy(chart_data)
+    root = chart_data.get("root")
+    if not root:
+        return chart_data
+
+    # Pass 1: find the richest node per person_id
+    best_by_pid: dict = {}
+
+    def _collect(node: dict) -> None:
+        pid = node.get("person_id")
+        if pid is not None:
+            if pid not in best_by_pid or _count_desc(node) > _count_desc(best_by_pid[pid]):
+                best_by_pid[pid] = node
+        for child in node.get("children", []):
+            _collect(child)
+
+    _collect(root)
+
+    # Pass 2: also track best node per normalized name (catches middle-initial variants)
+    best_by_name: dict = {}
+    for node in best_by_pid.values():
+        norm = _normalize_name(node.get("name", ""))
+        if norm and (norm not in best_by_name or _count_desc(node) > _count_desc(best_by_name[norm])):
+            best_by_name[norm] = node
+
+    # Pass 3: dedup traversal — remove any node whose person_id or normalized
+    # name has already been seen
+    seen_pids: set = set()
+    seen_names: set = set()
+
+    def _dedup(node: dict):
+        pid = node.get("person_id")
+        norm = _normalize_name(node.get("name", ""))
+
+        if pid is not None:
+            if pid in seen_pids:
+                return None
+            if norm and norm in seen_names:
+                return None
+            seen_pids.add(pid)
+            if norm:
+                seen_names.add(norm)
+
+        node["children"] = [
+            c for c in [_dedup(c) for c in node.get("children", [])]
+            if c is not None
+        ]
+        return node
+
+    _dedup(root)
+    chart_data["root"] = root
+    return chart_data
+
+
+@router.get("/companies/{company_id}/org-chart")
+async def get_company_org_chart(
+    company_id: int,
+    db: Session = Depends(get_db),
+):
+    """Return the most recent org chart snapshot for a company."""
+    from app.core.people_models import OrgChartSnapshot, IndustrialCompany
+
+    company = db.query(IndustrialCompany).filter(IndustrialCompany.id == company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    snapshot = (
+        db.query(OrgChartSnapshot)
+        .filter(OrgChartSnapshot.company_id == company_id)
+        .order_by(OrgChartSnapshot.snapshot_date.desc())
+        .first()
+    )
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="No org chart found for this company")
+
+    chart_data = _sanitize_org_chart(snapshot.chart_data or {})
+
+    return {
+        "company_id": company_id,
+        "company_name": company.name,
+        "snapshot_date": snapshot.snapshot_date.isoformat() if snapshot.snapshot_date else None,
+        "total_people": snapshot.total_people,
+        "max_depth": snapshot.max_depth,
+        "departments": snapshot.departments or [],
+        "chart_data": chart_data,
+    }
+
+
 @router.get("/companies/{company_id}/pedigree-report")
 async def get_company_pedigree_report(
     company_id: int,
@@ -560,3 +723,144 @@ async def get_company_pedigree_report(
             for s, p, cp in zip(scores, people, cps)
         ],
     }
+
+
+# ---------------------------------------------------------------------------
+# QA Endpoints (SPEC_030)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/qa-report")
+async def get_qa_report(
+    limit: int = Query(100, ge=1, le=500, description="Max companies to evaluate"),
+    db: Session = Depends(get_db),
+):
+    """Run rule-based QA checks across all active companies.
+
+    Returns a list sorted by health_score ascending (worst first).
+    Health score is 0-100: 100 = no issues, deducted per severity.
+    """
+    from app.services.people_qa_service import PeopleQAService
+
+    reports = PeopleQAService().run_all(db, limit=limit)
+    # Serialize QualityReport dataclasses; add legacy aliases so
+    # the qa-dashboard.html frontend continues to work unchanged.
+    return [
+        {
+            **r.to_dict(),
+            "company_id": r.entity_id,
+            "company_name": r.entity_name,
+            "health_score": r.quality_score,
+        }
+        for r in reports
+    ]
+
+
+@router.get("/qa/merge-candidates")
+async def list_merge_candidates(
+    status: str = Query("pending", description="Filter by status: pending, approved, rejected, auto_merged"),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    """Return merge candidates enriched with person + company details for review UI."""
+    from app.core.people_models import PeopleMergeCandidate, Person, CompanyPerson, IndustrialCompany
+
+    candidates = (
+        db.query(PeopleMergeCandidate)
+        .filter(PeopleMergeCandidate.status == status)
+        .order_by(PeopleMergeCandidate.similarity_score.desc())
+        .limit(limit)
+        .all()
+    )
+
+    def _person_card(person_id: int) -> dict:
+        person = db.query(Person).filter(Person.id == person_id).first()
+        if not person:
+            return {"id": person_id, "name": "Unknown", "title": None, "company": None, "sources": []}
+        cp = (
+            db.query(CompanyPerson)
+            .filter(CompanyPerson.person_id == person_id, CompanyPerson.is_current.is_(True))
+            .order_by(CompanyPerson.extraction_date.desc())
+            .first()
+        )
+        return {
+            "id": person_id,
+            "name": person.full_name,
+            "title": cp.title if cp else None,
+            "company": (
+                db.query(IndustrialCompany).filter(IndustrialCompany.id == cp.company_id).first()
+            ).name if cp and cp.company_id else None,
+            "company_id": cp.company_id if cp else None,
+            "source": cp.source if cp else None,
+            "confidence": cp.confidence if cp else None,
+            "confidence_score": float(person.confidence_score) if person.confidence_score else None,
+            "data_sources": person.data_sources or [],
+        }
+
+    return [
+        {
+            "id": c.id,
+            "similarity_score": float(c.similarity_score) if c.similarity_score else None,
+            "match_type": c.match_type,
+            "status": c.status,
+            "evidence_notes": c.evidence_notes,
+            "shared_company_ids": c.shared_company_ids or [],
+            "person_a": _person_card(c.person_id_a),
+            "person_b": _person_card(c.person_id_b),
+        }
+        for c in candidates
+    ]
+
+
+class MergeResolveBody(BaseModel):
+    action: str  # "approve" | "reject"
+
+
+@router.post("/qa/merge-candidates/{candidate_id}/resolve")
+async def resolve_merge_candidate(
+    candidate_id: int,
+    body: MergeResolveBody,
+    db: Session = Depends(get_db),
+):
+    """Approve or reject a merge candidate.
+
+    - approve: marks lower-confidence person as non-canonical, sets canonical_id → winner
+    - reject: marks as rejected, no person record changes
+    """
+    from app.core.people_models import PeopleMergeCandidate, Person
+
+    if body.action not in ("approve", "reject"):
+        raise HTTPException(status_code=400, detail="action must be 'approve' or 'reject'")
+
+    candidate = db.query(PeopleMergeCandidate).filter(PeopleMergeCandidate.id == candidate_id).first()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Merge candidate not found")
+    if candidate.status not in ("pending",):
+        raise HTTPException(status_code=409, detail=f"Candidate already resolved: {candidate.status}")
+
+    if body.action == "approve":
+        person_a = db.query(Person).filter(Person.id == candidate.person_id_a).first()
+        person_b = db.query(Person).filter(Person.id == candidate.person_id_b).first()
+
+        if person_a and person_b:
+            # Winner = higher confidence_score; tie-break on lower id (earlier/more established)
+            score_a = float(person_a.confidence_score or 0)
+            score_b = float(person_b.confidence_score or 0)
+            if score_a >= score_b:
+                winner, loser = person_a, person_b
+            else:
+                winner, loser = person_b, person_a
+
+            loser.canonical_id = winner.id
+            loser.is_canonical = False
+            candidate.canonical_person_id = winner.id
+
+        candidate.status = "approved"
+    else:
+        candidate.status = "rejected"
+
+    from datetime import datetime
+    candidate.reviewed_at = datetime.utcnow()
+    db.commit()
+
+    return {"status": "ok", "action": body.action, "candidate_id": candidate_id}

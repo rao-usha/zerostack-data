@@ -464,6 +464,7 @@ class LpFund(Base):
     lp_type = Column(
         String(100), nullable=False, index=True
     )  # e.g., 'public_pension', 'sovereign_wealth', 'endowment'
+    lp_tier = Column(Integer, nullable=True)  # 1=sovereign/endowment, 2=large_pension, 3=mid, 4=corp, 5=family_office
     jurisdiction = Column(String(100), nullable=True)  # e.g., 'CA', 'NY', 'TX'
     website_url = Column(Text, nullable=True)
 
@@ -3781,4 +3782,113 @@ class LpGpRelationship(Base):
         return (
             f"<LpGpRelationship(lp_id={self.lp_id}, gp='{self.gp_name}', "
             f"vintages={self.total_vintages_committed}, trend='{self.commitment_trend}')>"
+        )
+
+
+class EconDataRevision(Base):
+    """Tracks when BEA/BLS retroactively revises historical economic data."""
+
+    __tablename__ = "econ_data_revisions"
+
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    source           = Column(String(50), nullable=False)       # "bea", "bls", "fred"
+    table_name       = Column(String(100), nullable=False)
+    series_id        = Column(String(100))
+    geo_fips         = Column(String(10))                       # for regional data
+    period           = Column(String(20), nullable=False)       # "2022" or "2024-01"
+    old_value        = Column(Numeric(20, 4))
+    new_value        = Column(Numeric(20, 4))
+    revision_pct     = Column(Numeric(10, 4))                   # ((new-old)/old)*100
+    detected_at      = Column(DateTime, nullable=False, default=datetime.utcnow)
+    ingestion_job_id = Column(Integer, ForeignKey("ingestion_jobs.id"), nullable=True)
+
+    __table_args__ = (
+        Index("ix_econ_data_revisions_source", "source"),
+        Index("ix_econ_data_revisions_table", "table_name"),
+        Index("ix_econ_data_revisions_detected_at", "detected_at"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Metro Development Profiles (PLAN_051)
+# ---------------------------------------------------------------------------
+
+class MetroReference(Base):
+    """
+    Reference table of US Core Based Statistical Areas (CBSAs).
+    Seeded from Census Bureau CBSA definitions (2023 vintage).
+    ~400 Metropolitan + ~100 Micropolitan = top 500 by population.
+    """
+
+    __tablename__ = "metro_reference"
+
+    cbsa_code       = Column(String(5), primary_key=True)   # 5-digit CBSA code
+    cbsa_name       = Column(Text, nullable=False)           # full metro name
+    metro_type      = Column(String(20), nullable=False)     # "metropolitan" | "micropolitan"
+    state_abbr      = Column(String(20), nullable=True)      # primary state(s), e.g. "NY-NJ-PA"
+    population_rank = Column(Integer, nullable=True)         # 1 = largest
+    created_at      = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<MetroReference({self.cbsa_code}, '{self.cbsa_name}')>"
+
+
+class MetroProfile(Base):
+    """
+    Per-metro development characteristics dataset.
+    One row per (cbsa_code, data_vintage). Sources: Census BPS, FHFA HPI, ACS, BLS LAUS.
+    Derived scores: build_hostility_score (0-100, higher = harder to build).
+    """
+
+    __tablename__ = "metro_profiles"
+
+    id              = Column(Integer, primary_key=True, autoincrement=True)
+    cbsa_code       = Column(String(5), ForeignKey("metro_reference.cbsa_code"), nullable=False, index=True)
+    data_vintage    = Column(String(10), nullable=False)     # e.g. "2024" or "2024-Q3"
+
+    # --- Census BPS: building permit counts (annual) ---
+    permits_total           = Column(Integer, nullable=True)
+    permits_1unit           = Column(Integer, nullable=True)
+    permits_2to4            = Column(Integer, nullable=True)
+    permits_5plus           = Column(Integer, nullable=True)
+    permits_per_1000_units  = Column(Numeric(10, 2), nullable=True)
+    multifamily_share_pct   = Column(Numeric(5, 2), nullable=True)
+
+    # --- FHFA HPI: house price index (MSA level) ---
+    hpi_current     = Column(Numeric(10, 3), nullable=True)
+    hpi_yoy_pct     = Column(Numeric(6, 2), nullable=True)
+    hpi_5yr_pct     = Column(Numeric(6, 2), nullable=True)
+
+    # --- Census ACS: demographics + housing stock ---
+    population              = Column(Integer, nullable=True)
+    median_hh_income        = Column(Integer, nullable=True)
+    housing_units_total     = Column(Integer, nullable=True)
+    cost_burden_severe_pct  = Column(Numeric(5, 2), nullable=True)  # % households 50%+ income on rent
+
+    # --- BLS LAUS: labor market ---
+    unemployment_rate   = Column(Numeric(5, 2), nullable=True)
+    labor_force_size    = Column(Integer, nullable=True)
+
+    # --- Derived scores (0-100, higher = more hostile to development) ---
+    permit_velocity_score   = Column(Numeric(5, 1), nullable=True)
+    multifamily_score       = Column(Numeric(5, 1), nullable=True)
+    supply_elasticity_score = Column(Numeric(5, 1), nullable=True)
+    build_hostility_score   = Column(Numeric(5, 1), nullable=True)
+    build_hostility_grade   = Column(String(1), nullable=True)       # A=very buildable, D=very hostile
+
+    # --- Metadata ---
+    sources_available       = Column(JSON, nullable=True)            # ["bps","fhfa","acs","laus"]
+    data_completeness_pct   = Column(Numeric(5, 1), nullable=True)
+    updated_at              = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("cbsa_code", "data_vintage", name="uq_metro_profile_vintage"),
+        Index("ix_metro_profiles_hostility", "build_hostility_score"),
+        Index("ix_metro_profiles_cbsa", "cbsa_code"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<MetroProfile({self.cbsa_code}, vintage={self.data_vintage}, "
+            f"hostility={self.build_hostility_score})>"
         )

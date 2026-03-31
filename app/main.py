@@ -7,6 +7,7 @@ Source-agnostic entry point that routes to appropriate adapters.
 import logging
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -116,6 +117,7 @@ from app.api.v1 import (
     people_dedup,
     people_jobs,
     board_interlocks,
+    evals,
 
     llm_costs,
     freshness,
@@ -164,6 +166,15 @@ from app.api.v1 import (
     site_intel_sites,
     datacenter_sites,
 )
+
+# Investor Intelligence (PLAN_039)
+from app.api.v1 import afdc, investor_intelligence
+
+# Economic Intelligence + DQ + PE Macro (PLAN_046/047/048)
+from app.api.v1 import econ_snapshot, econ_dq, pe_macro
+
+# Metro Development Profiles (PLAN_051)
+from app.api.v1 import metro_profiles
 
 # Collection Management
 from app.api.v1 import source_configs, audit, source_health
@@ -630,6 +641,47 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Failed to register PE deal sourcing: {e}")
 
+        # Les Schwab AV report — weekly on Sundays at 6 AM UTC
+        try:
+            from app.core.scheduler_service import get_scheduler
+            from apscheduler.triggers.cron import CronTrigger
+
+            async def scheduled_les_schwab_report():
+                """Weekly Les Schwab AV deep dive report generation."""
+                from app.core.database import get_session_factory
+                from app.reports.builder import ReportBuilder
+
+                SessionLocal = get_session_factory()
+                db = SessionLocal()
+                try:
+                    builder = ReportBuilder(db)
+                    report = builder.generate(
+                        template_name="les_schwab_av",
+                        format="html",
+                        params={},
+                        title=f"Les Schwab AV Deep Dive — {datetime.utcnow().strftime('%Y-%m-%d')}",
+                    )
+                    logger.info(
+                        "Les Schwab AV report generated: id=%s file=%s",
+                        report["id"], report.get("file_path"),
+                    )
+                except Exception as exc:
+                    logger.warning("Les Schwab report generation failed: %s", exc)
+                finally:
+                    db.close()
+
+            sched = get_scheduler()
+            sched.add_job(
+                scheduled_les_schwab_report,
+                trigger=CronTrigger(day_of_week="sun", hour=6, minute=0),
+                id="les_schwab_av_weekly",
+                name="Les Schwab AV Report (Weekly)",
+                replace_existing=True,
+            )
+            logger.info("Les Schwab AV report registered (Sundays 6:00 AM UTC)")
+        except Exception as e:
+            logger.warning(f"Failed to register Les Schwab report scheduler: {e}")
+
     except Exception as e:
         logger.warning(f"Failed to start scheduler: {e}")
 
@@ -657,6 +709,23 @@ async def lifespan(app: FastAPI):
         logger.info("PG listener started for job event streaming")
     except Exception as e:
         logger.warning(f"Failed to start PG listener: {e}")
+
+    # Eval Builder scheduled runs — P1 daily, P2 weekly, P3 monthly
+    try:
+        from app.core.scheduler_service import get_scheduler
+        from app.services.eval_runner import scheduled_eval_p1, scheduled_eval_p2, scheduled_eval_p3
+        from apscheduler.triggers.cron import CronTrigger
+
+        sched = get_scheduler()
+        sched.add_job(scheduled_eval_p1, CronTrigger(hour=5, minute=0),
+                      id="eval_run_p1_daily", replace_existing=True)
+        sched.add_job(scheduled_eval_p2, CronTrigger(day_of_week="mon", hour=5, minute=30),
+                      id="eval_run_p2_weekly", replace_existing=True)
+        sched.add_job(scheduled_eval_p3, CronTrigger(day=1, hour=6, minute=0),
+                      id="eval_run_p3_monthly", replace_existing=True)
+        logger.info("Eval Builder scheduled: P1 daily 05:00, P2 weekly Mon 05:30, P3 monthly 1st 06:00")
+    except Exception as e:
+        logger.warning(f"Failed to register eval schedules: {e}")
 
     yield
 
@@ -1191,6 +1260,8 @@ Browse the endpoint sections below to see what's available:
         {"name": "eia", "description": "⚡ **Energy Information Administration** - Energy production, prices, and consumption"},
         {"name": "bea", "description": "📈 **Bureau of Economic Analysis** - GDP, Personal Income, PCE, Regional economic data, and International transactions"},
         {"name": "BLS Labor Statistics", "description": "📊 **Bureau of Labor Statistics** - Employment, unemployment, CPI, PPI, JOLTS job openings and labor turnover"},
+        {"name": "AFDC — EV Infrastructure", "description": "🔌 **NREL AFDC** - EV charging station counts by state; proxy for electric vehicle fleet penetration by geography"},
+        {"name": "Investor Intelligence", "description": "🧠 **Investor Intelligence** - Generalizable report data layer: sector macro data, company context, structured report payloads, and peer comps"},
         {"name": "bts", "description": "🚚 **Bureau of Transportation Statistics** - Border crossings, freight flows (FAF5), and vehicle miles traveled"},
         {"name": "fema", "description": "🌊 **OpenFEMA** - Disaster declarations, Public Assistance grants, and Hazard Mitigation projects"},
         {"name": "fbi_crime", "description": "🚔 **FBI Crime Data** - UCR crime statistics, NIBRS incident data, hate crimes, and LEOKA"},
@@ -1391,6 +1462,12 @@ app.include_router(us_trade.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(cftc_cot.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(usda.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(bls.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(afdc.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(investor_intelligence.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(econ_snapshot.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(econ_dq.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(pe_macro.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(metro_profiles.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(fcc_broadband.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(treasury.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(usaspending.router, prefix="/api/v1", dependencies=_auth)
@@ -1478,6 +1555,7 @@ app.include_router(people_data_quality.router, prefix="/api/v1", dependencies=_a
 app.include_router(people_dedup.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(people_jobs.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(board_interlocks.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(evals.router, prefix="/api/v1", dependencies=_auth)
 
 # Job Posting Intelligence
 app.include_router(job_postings.router, prefix="/api/v1", dependencies=_auth)

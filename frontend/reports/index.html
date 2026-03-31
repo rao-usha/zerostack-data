@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexdata Report Archive</title>
+  <style>
+    :root {
+      --primary: #1a365d;
+      --primary-light: #2b6cb0;
+      --accent: #ed8936;
+      --green: #38a169;
+      --red: #e53e3e;
+      --gray-50: #f7fafc;
+      --gray-100: #edf2f7;
+      --gray-200: #e2e8f0;
+      --gray-300: #cbd5e0;
+      --gray-500: #718096;
+      --gray-700: #4a5568;
+      --gray-800: #2d3748;
+      --white: #ffffff;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--gray-50);
+      color: var(--gray-800);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .header h1 { font-size: 18px; font-weight: 700; }
+    .header .subtitle { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: 6px; font-size: 13px;
+      font-weight: 600; cursor: pointer; border: none;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-secondary {
+      background: rgba(255,255,255,0.15);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Main layout ── */
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Left panel — template folders ── */
+    .sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      background: var(--white);
+      border-right: 1px solid var(--gray-200);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar-header {
+      padding: 12px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--gray-100);
+      background: var(--gray-50);
+    }
+    .folder-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--gray-100);
+      transition: background 0.1s;
+    }
+    .folder-item:hover { background: var(--gray-50); }
+    .folder-item.active {
+      background: #ebf4ff;
+      border-left: 3px solid var(--primary-light);
+    }
+    .folder-icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .folder-icon.blue  { background: #ebf8ff; }
+    .folder-icon.green { background: #f0fff4; }
+    .folder-icon.orange { background: #fffaf0; }
+    .folder-icon.purple { background: #faf5ff; }
+    .folder-icon.teal  { background: #e6fffa; }
+    .folder-meta { flex: 1; min-width: 0; }
+    .folder-name { font-size: 13px; font-weight: 600; color: var(--gray-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .folder-desc { font-size: 11px; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .folder-count {
+      background: var(--gray-100); color: var(--gray-500);
+      font-size: 11px; font-weight: 700;
+      padding: 2px 7px; border-radius: 10px;
+    }
+    .folder-count.has-files { background: #bee3f8; color: var(--primary-light); }
+
+    /* ── Right panel — file list ── */
+    .main-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-toolbar {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--gray-200);
+      background: var(--white);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .panel-path {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; color: var(--gray-700);
+    }
+    .panel-path .crumb { font-weight: 600; color: var(--primary); }
+    .panel-path .sep { color: var(--gray-300); }
+    .toolbar-right { display: flex; gap: 8px; align-items: center; }
+    .generate-btn {
+      background: var(--primary); color: white;
+      padding: 7px 14px; border-radius: 6px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; border: none;
+      display: flex; align-items: center; gap: 6px;
+      transition: opacity 0.15s;
+    }
+    .generate-btn:hover { opacity: 0.85; }
+    .generate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .refresh-btn {
+      background: var(--gray-100); color: var(--gray-700);
+      padding: 7px 10px; border-radius: 6px;
+      font-size: 13px; cursor: pointer; border: none;
+    }
+    .refresh-btn:hover { background: var(--gray-200); }
+
+    /* ── File list ── */
+    .file-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 20px;
+    }
+    .file-list-header {
+      display: grid;
+      grid-template-columns: 1fr 140px 90px 80px 80px;
+      gap: 8px;
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      border-bottom: 1px solid var(--gray-200);
+      margin-bottom: 4px;
+    }
+    .file-row {
+      display: grid;
+      grid-template-columns: 1fr 140px 90px 80px 80px;
+      gap: 8px;
+      padding: 9px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      align-items: center;
+      transition: background 0.1s;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .file-row:hover { background: var(--gray-50); }
+    .file-row:last-child { border-bottom: none; }
+    .file-name {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 600; color: var(--primary-light);
+      min-width: 0;
+    }
+    .file-name span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-icon { font-size: 15px; flex-shrink: 0; }
+    .file-date { font-size: 12px; color: var(--gray-500); }
+    .file-size { font-size: 12px; color: var(--gray-500); }
+    .file-format {
+      font-size: 11px; font-weight: 700; padding: 2px 8px;
+      border-radius: 4px; text-transform: uppercase; width: fit-content;
+    }
+    .fmt-html { background: #bee3f8; color: #2c5282; }
+    .fmt-excel { background: #c6f6d5; color: #276749; }
+    .fmt-pdf { background: #fed7d7; color: #9b2c2c; }
+    .file-status { font-size: 12px; }
+    .status-complete { color: var(--green); font-weight: 600; }
+    .status-generating { color: var(--accent); font-weight: 600; }
+    .status-failed { color: var(--red); font-weight: 600; }
+
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; height: 100%;
+      color: var(--gray-500); text-align: center; padding: 40px;
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+    .empty-state h3 { font-size: 15px; margin-bottom: 8px; color: var(--gray-700); }
+    .empty-state p { font-size: 13px; line-height: 1.6; }
+
+    /* ── Status bar ── */
+    .status-bar {
+      padding: 6px 20px;
+      background: var(--gray-50);
+      border-top: 1px solid var(--gray-200);
+      font-size: 11px; color: var(--gray-500);
+      display: flex; justify-content: space-between; align-items: center;
+      flex-shrink: 0;
+    }
+    .status-bar .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green);
+      display: inline-block; margin-right: 5px;
+    }
+    .status-bar .dot.loading { background: var(--accent); animation: pulse 1s infinite; }
+
+    /* ── Toast ── */
+    .toast-container {
+      position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .toast {
+      padding: 12px 20px; border-radius: 8px;
+      font-size: 13px; font-weight: 600; color: white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      animation: slideIn 0.2s ease;
+      max-width: 380px;
+    }
+    .toast.success { background: var(--green); }
+    .toast.error   { background: var(--red); }
+    .toast.info    { background: var(--primary-light); }
+    @keyframes slideIn {
+      from { transform: translateX(120%); opacity: 0; }
+      to   { transform: translateX(0);   opacity: 1; }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── Generate modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 1000;
+      display: none; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white; border-radius: 12px;
+      padding: 28px; width: 420px; max-width: 95vw;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .modal h2 { font-size: 17px; color: var(--primary); margin-bottom: 4px; }
+    .modal .modal-sub { font-size: 12px; color: var(--gray-500); margin-bottom: 20px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--gray-700); margin-bottom: 5px; }
+    .form-group select, .form-group input {
+      width: 100%; padding: 9px 12px;
+      border: 1px solid var(--gray-300); border-radius: 6px;
+      font-size: 13px; color: var(--gray-800);
+    }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .btn-cancel {
+      padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600;
+      cursor: pointer; border: 1px solid var(--gray-300); background: white; color: var(--gray-700);
+    }
+    .btn-confirm {
+      padding: 8px 20px; border-radius: 6px; font-size: 13px; font-weight: 600;
+      cursor: pointer; border: none; background: var(--primary); color: white;
+    }
+    .btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div>
+    <h1>Nexdata Report Archive</h1>
+    <div class="subtitle">Generated reports — kept in perpetuity, timestamped, never overwritten</div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-secondary" onclick="refreshAll()">↻ Refresh</button>
+    <button class="btn btn-primary" onclick="openGenerateModal(null)">+ Generate Report</button>
+  </div>
+</div>
+
+<!-- Layout -->
+<div class="layout">
+
+  <!-- Left sidebar — template folders -->
+  <div class="sidebar">
+    <div class="sidebar-header">Report Templates</div>
+    <div id="folderList">
+      <div class="empty-state" style="height:auto;padding:24px">
+        <div style="font-size:12px;color:var(--gray-500)">Loading templates…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right panel — files -->
+  <div class="main-panel">
+    <div class="panel-toolbar">
+      <div class="panel-path">
+        <span>Reports</span>
+        <span class="sep">/</span>
+        <span class="crumb" id="currentTemplateName">All Reports</span>
+      </div>
+      <div class="toolbar-right">
+        <span id="fileCount" style="font-size:12px;color:var(--gray-500)"></span>
+        <button class="refresh-btn" onclick="loadFiles()" title="Refresh files">↻</button>
+        <button class="generate-btn" id="generateBtn" onclick="openGenerateModal(currentTemplate)">
+          ⚡ Generate Now
+        </button>
+      </div>
+    </div>
+
+    <div class="file-list">
+      <div class="file-list-header">
+        <div>Report</div>
+        <div>Generated</div>
+        <div>Size</div>
+        <div>Format</div>
+        <div>Status</div>
+      </div>
+      <div id="fileRows">
+        <div class="empty-state">
+          <div class="icon">📂</div>
+          <h3>Select a template</h3>
+          <p>Choose a report type from the left panel to see generated files,<br>or click Generate to create a new report.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <div><span class="dot" id="statusDot"></span><span id="statusText">Ready</span></div>
+      <div id="lastRefresh"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Generate Modal -->
+<div class="modal-overlay" id="generateModal">
+  <div class="modal">
+    <h2>Generate Report</h2>
+    <div class="modal-sub" id="modalSub">Select template and format</div>
+    <div class="form-group">
+      <label>Template</label>
+      <select id="modalTemplate" onchange="onModalTemplateChange()">
+        <option value="">Loading…</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Format</label>
+      <select id="modalFormat">
+        <option value="html">HTML (view in browser)</option>
+        <option value="excel">Excel (.xlsx)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Title (optional)</label>
+      <input type="text" id="modalTitle" placeholder="Leave blank for auto-generated title">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeGenerateModal()">Cancel</button>
+      <button class="btn-confirm" id="confirmGenerate" onclick="submitGenerate()">Generate</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toasts"></div>
+
+<script>
+const API = 'http://localhost:8001/api/v1';
+
+let templates = [];
+let currentTemplate = null;
+let allFiles = [];
+
+// ── Folder icon & color assignment ──────────────────────────────────────────
+const FOLDER_STYLES = {
+  les_schwab_av:      { icon: '🚗', color: 'blue',   label: 'Les Schwab AV Deep Dive' },
+  pe_market_brief:    { icon: '📊', color: 'green',  label: 'PE Market Brief' },
+  pe_deal_memo:       { icon: '📝', color: 'purple', label: 'PE Deal Memo' },
+  pe_fund_tearsheet:  { icon: '💼', color: 'purple', label: 'PE Fund Tearsheet' },
+  pe_portfolio:       { icon: '🗂️', color: 'purple', label: 'PE Portfolio Report' },
+  datacenter_site:    { icon: '🏗️', color: 'teal',   label: 'Datacenter Site Analysis' },
+  medspa_market:      { icon: '🏥', color: 'orange', label: 'MedSpa Market' },
+  medspa_opportunity_map: { icon: '🗺️', color: 'orange', label: 'MedSpa Opportunity Map' },
+  investor_profile:   { icon: '👤', color: 'blue',   label: 'Investor Profile' },
+  portfolio_detail:   { icon: '📈', color: 'green',  label: 'Portfolio Detail' },
+  data_quality:       { icon: '✅', color: 'teal',   label: 'Data Quality' },
+  data_quality_deep:  { icon: '🔬', color: 'teal',   label: 'Data Quality Deep Dive' },
+  jobs_monitor:       { icon: '👷', color: 'orange', label: 'Jobs Monitor' },
+};
+
+function folderStyle(name) {
+  return FOLDER_STYLES[name] || { icon: '📄', color: 'blue', label: name };
+}
+
+// ── Load templates (left panel) ──────────────────────────────────────────────
+async function loadTemplates() {
+  try {
+    const r = await fetch(`${API}/reports/templates`);
+    const data = await r.json();
+    templates = data.templates || [];
+    renderFolders();
+    populateModalTemplates();
+  } catch (e) {
+    document.getElementById('folderList').innerHTML =
+      `<div class="empty-state" style="height:auto;padding:24px">
+        <div style="font-size:12px;color:var(--red)">⚠️ Could not reach API at ${API}</div>
+      </div>`;
+  }
+}
+
+function renderFolders() {
+  const counts = {};
+  allFiles.forEach(f => { counts[f.template] = (counts[f.template] || 0) + 1; });
+
+  const allCount = allFiles.length;
+  let html = `
+    <div class="folder-item ${currentTemplate === null ? 'active' : ''}" onclick="selectTemplate(null)">
+      <div class="folder-icon blue">📁</div>
+      <div class="folder-meta">
+        <div class="folder-name">All Reports</div>
+        <div class="folder-desc">Every generated report</div>
+      </div>
+      <div class="folder-count ${allCount ? 'has-files' : ''}">${allCount}</div>
+    </div>
+  `;
+
+  for (const t of templates) {
+    const style = folderStyle(t.name);
+    const cnt = counts[t.name] || 0;
+    const active = currentTemplate === t.name ? 'active' : '';
+    html += `
+      <div class="folder-item ${active}" onclick="selectTemplate('${t.name}')">
+        <div class="folder-icon ${style.color}">${style.icon}</div>
+        <div class="folder-meta">
+          <div class="folder-name">${style.label}</div>
+          <div class="folder-desc">${(t.description || '').substring(0, 50)}…</div>
+        </div>
+        <div class="folder-count ${cnt ? 'has-files' : ''}">${cnt}</div>
+      </div>
+    `;
+  }
+
+  document.getElementById('folderList').innerHTML = html;
+}
+
+// ── Load files (right panel) ─────────────────────────────────────────────────
+async function loadFiles() {
+  setStatus('loading', 'Loading reports…');
+  try {
+    const qs = currentTemplate ? `?template=${currentTemplate}&limit=100` : '?limit=100';
+    const r = await fetch(`${API}/reports${qs}`);
+    const data = await r.json();
+    allFiles = data.reports || [];
+    renderFiles();
+    renderFolders(); // update counts
+    setStatus('ready', `${allFiles.length} report${allFiles.length !== 1 ? 's' : ''} loaded`);
+    document.getElementById('lastRefresh').textContent =
+      'Updated ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    setStatus('error', 'Failed to load reports');
+    renderEmpty('Could not reach API', `Make sure the API is running at ${API}`);
+  }
+}
+
+function renderFiles() {
+  const files = currentTemplate
+    ? allFiles.filter(f => f.template === currentTemplate)
+    : allFiles;
+
+  document.getElementById('fileCount').textContent =
+    `${files.length} file${files.length !== 1 ? 's' : ''}`;
+  document.getElementById('currentTemplateName').textContent =
+    currentTemplate ? (folderStyle(currentTemplate).label || currentTemplate) : 'All Reports';
+
+  if (!files.length) {
+    renderEmpty(
+      currentTemplate ? 'No reports yet' : 'No reports generated',
+      'Click <strong>Generate Now</strong> to create the first report for this template.'
+    );
+    return;
+  }
+
+  let html = '';
+  for (const f of files) {
+    const icon = formatIcon(f.format);
+    const size = f.file_size ? formatBytes(f.file_size) : '—';
+    const ts = f.created_at ? formatDate(f.created_at) : '—';
+    const statusHtml = statusBadge(f.status);
+    const fmtBadge = `<span class="file-format fmt-${f.format}">${f.format}</span>`;
+    const clickable = f.status === 'complete';
+    const onclick = clickable
+      ? `onclick="openReport(${f.id}, '${f.format}')"`
+      : '';
+    const style = clickable ? '' : 'style="opacity:0.7;cursor:default"';
+    html += `
+      <div class="file-row" ${onclick} ${style} title="${f.title || ''}">
+        <div class="file-name">
+          <span class="file-icon">${icon}</span>
+          <span>${f.title || `Report #${f.id}`}</span>
+        </div>
+        <div class="file-date">${ts}</div>
+        <div class="file-size">${size}</div>
+        <div>${fmtBadge}</div>
+        <div class="file-status">${statusHtml}</div>
+      </div>
+    `;
+  }
+  document.getElementById('fileRows').innerHTML = html;
+}
+
+function renderEmpty(title, msg) {
+  document.getElementById('fileRows').innerHTML = `
+    <div class="empty-state">
+      <div class="icon">📄</div>
+      <h3>${title}</h3>
+      <p>${msg}</p>
+    </div>
+  `;
+  document.getElementById('fileCount').textContent = '0 files';
+}
+
+// ── Select template ──────────────────────────────────────────────────────────
+function selectTemplate(name) {
+  currentTemplate = name;
+  loadFiles();
+  renderFolders();
+}
+
+// ── Open report ──────────────────────────────────────────────────────────────
+function openReport(id, format) {
+  const url = `${API}/reports/${id}/download`;
+  window.open(url, '_blank');
+}
+
+// ── Generate modal ───────────────────────────────────────────────────────────
+function populateModalTemplates() {
+  const sel = document.getElementById('modalTemplate');
+  sel.innerHTML = templates.map(t =>
+    `<option value="${t.name}">${folderStyle(t.name).label || t.name}</option>`
+  ).join('');
+}
+
+function openGenerateModal(templateName) {
+  const modal = document.getElementById('generateModal');
+  modal.classList.add('open');
+  if (templateName) {
+    document.getElementById('modalTemplate').value = templateName;
+  }
+  document.getElementById('modalTitle').value = '';
+  document.getElementById('confirmGenerate').disabled = false;
+  onModalTemplateChange();
+}
+
+function onModalTemplateChange() {
+  const tname = document.getElementById('modalTemplate').value;
+  const style = folderStyle(tname);
+  document.getElementById('modalSub').textContent =
+    templates.find(t => t.name === tname)?.description || '';
+  // Auto-generate title suggestion
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  document.getElementById('modalTitle').placeholder =
+    `${style.label} — ${dateStr}`;
+}
+
+function closeGenerateModal() {
+  document.getElementById('generateModal').classList.remove('open');
+}
+
+async function submitGenerate() {
+  const template = document.getElementById('modalTemplate').value;
+  const format = document.getElementById('modalFormat').value;
+  const titleInput = document.getElementById('modalTitle').value.trim();
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  const title = titleInput || `${folderStyle(template).label} — ${dateStr}`;
+
+  const btn = document.getElementById('confirmGenerate');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+
+  closeGenerateModal();
+  setStatus('loading', `Generating ${title}…`);
+  toast('info', `⚡ Generating "${title}"…`);
+
+  try {
+    const r = await fetch(`${API}/reports/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template, format, params: {}, title }),
+    });
+
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+
+    const report = await r.json();
+
+    if (report.status === 'complete') {
+      toast('success', `✅ "${report.title}" generated (${formatBytes(report.file_size || 0)})`);
+      setStatus('ready', 'Report generated successfully');
+      // Switch to the right template folder
+      if (currentTemplate !== template) selectTemplate(template);
+      else loadFiles();
+    } else if (report.status === 'failed') {
+      toast('error', `❌ Generation failed: ${report.error_message || 'Unknown error'}`);
+      setStatus('ready', 'Generation failed');
+    } else {
+      toast('info', `Report #${report.id} queued — refresh in a moment`);
+      setTimeout(loadFiles, 3000);
+    }
+  } catch (e) {
+    toast('error', `❌ Error: ${e.message}`);
+    setStatus('ready', 'Error generating report');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate';
+  }
+}
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+function formatDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso + (iso.endsWith('Z') ? '' : 'Z'));
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatBytes(b) {
+  if (!b) return '—';
+  if (b > 1048576) return `${(b / 1048576).toFixed(1)} MB`;
+  if (b > 1024) return `${(b / 1024).toFixed(0)} KB`;
+  return `${b} B`;
+}
+
+function formatIcon(fmt) {
+  return { html: '🌐', excel: '📊', pdf: '📄', pptx: '📑' }[fmt] || '📄';
+}
+
+function statusBadge(s) {
+  const map = {
+    complete: '<span class="status-complete">✓ Complete</span>',
+    generating: '<span class="status-generating">⏳ Generating</span>',
+    failed: '<span class="status-failed">✗ Failed</span>',
+    pending: '<span class="status-generating">⏳ Pending</span>',
+  };
+  return map[s] || s;
+}
+
+function setStatus(state, text) {
+  const dot = document.getElementById('statusDot');
+  dot.className = 'dot' + (state === 'loading' ? ' loading' : '');
+  document.getElementById('statusText').textContent = text;
+}
+
+function toast(type, msg) {
+  const container = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+function refreshAll() {
+  loadTemplates();
+  loadFiles();
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+(async () => {
+  await loadTemplates();
+  await loadFiles();
+
+  // Auto-refresh every 30 seconds
+  setInterval(loadFiles, 30000);
+})();
+</script>
+</body>
+</html>

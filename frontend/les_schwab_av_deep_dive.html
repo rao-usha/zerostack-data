@@ -1,0 +1,1794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Les Schwab — Autonomous Vehicle Disruption Deep Dive — Q1 2026</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --primary: #1a365d;
+      --primary-light: #2b6cb0;
+      --accent: #ed8936;
+      --accent-red: #e53e3e;
+      --accent-green: #38a169;
+      --gray-50: #f7fafc;
+      --gray-100: #edf2f7;
+      --gray-200: #e2e8f0;
+      --gray-300: #cbd5e0;
+      --gray-500: #718096;
+      --gray-700: #4a5568;
+      --gray-800: #2d3748;
+      --gray-900: #1a202c;
+      --white: #ffffff;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      color: var(--gray-800);
+      background: var(--gray-50);
+      line-height: 1.6;
+    }
+
+    .page-header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: var(--white);
+      padding: 40px 0;
+    }
+    .page-header .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .page-header h1 { font-size: 28px; font-weight: 700; }
+    .page-header .subtitle { font-size: 16px; opacity: 0.85; margin-top: 4px; }
+    .page-header .badge {
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.3);
+      padding: 8px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+    /* KPI Cards */
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      margin: -32px 0 32px 0;
+      position: relative;
+      z-index: 10;
+    }
+    .kpi-card {
+      background: var(--white);
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    .kpi-card .label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--gray-500);
+      font-weight: 600;
+    }
+    .kpi-card .value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--primary);
+      margin: 4px 0;
+    }
+    .kpi-card .delta {
+      font-size: 13px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .delta.up { color: var(--accent-green); }
+    .delta.down { color: var(--accent-red); }
+    .delta.neutral { color: var(--gray-500); }
+
+    /* Sections */
+    .section {
+      background: var(--white);
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .section-header {
+      padding: 20px 24px 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .section-number {
+      background: var(--primary);
+      color: var(--white);
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .section-body { padding: 16px 24px 24px 24px; }
+    .section-body p { color: var(--gray-700); font-size: 14px; margin-bottom: 12px; }
+
+    /* Charts */
+    .chart-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 768px) { .chart-row { grid-template-columns: 1fr; } }
+    .chart-container { position: relative; width: 100%; }
+    .chart-container.tall { height: 360px; }
+    .chart-container.medium { height: 300px; }
+    .chart-container.short { height: 240px; }
+    .chart-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gray-700);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    /* Tables */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+    .data-table thead th {
+      background: var(--gray-100);
+      color: var(--gray-700);
+      font-weight: 600;
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 2px solid var(--gray-200);
+      white-space: nowrap;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .data-table thead th.right { text-align: right; }
+    .data-table tbody td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--gray-100);
+      vertical-align: middle;
+    }
+    .data-table tbody td.right { text-align: right; font-variant-numeric: tabular-nums; }
+    .data-table tbody td.bold { font-weight: 600; }
+    .data-table tbody tr:last-child td { border-bottom: none; }
+    .data-table tbody tr:hover { background: var(--gray-50); }
+    .data-table tfoot td {
+      padding: 10px 12px;
+      border-top: 2px solid var(--gray-300);
+      font-weight: 700;
+      background: var(--gray-50);
+    }
+    .data-table tfoot td.right { text-align: right; font-variant-numeric: tabular-nums; }
+
+    .change-positive { color: var(--accent-green); font-weight: 600; }
+    .change-negative { color: var(--accent-red); font-weight: 600; }
+    .change-neutral { color: var(--gray-500); }
+
+    /* Call-out boxes */
+    .callout {
+      border-left: 4px solid var(--primary-light);
+      background: #ebf8ff;
+      padding: 12px 16px;
+      border-radius: 0 6px 6px 0;
+      margin: 12px 0;
+      font-size: 13px;
+      color: var(--gray-700);
+    }
+    .callout.warn {
+      border-left-color: var(--accent);
+      background: #fffaf0;
+    }
+    .callout.good {
+      border-left-color: var(--accent-green);
+      background: #f0fff4;
+    }
+    .callout strong { color: var(--gray-900); }
+
+    /* Footer */
+    .page-footer {
+      padding: 24px 0 40px 0;
+      text-align: center;
+      color: var(--gray-500);
+      font-size: 12px;
+    }
+    .page-footer .notes {
+      max-width: 800px;
+      margin: 0 auto;
+      text-align: left;
+      background: var(--white);
+      border-radius: 10px;
+      padding: 20px 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      margin-bottom: 16px;
+    }
+    .page-footer .notes h3 {
+      font-size: 14px;
+      color: var(--gray-700);
+      margin-bottom: 8px;
+    }
+    .page-footer .notes ul { padding-left: 20px; }
+    .page-footer .notes li { margin-bottom: 4px; font-size: 12px; color: var(--gray-500); }
+
+    /* Utility */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+    .mt-16 { margin-top: 16px; }
+    .mb-8 { margin-bottom: 8px; }
+
+    /* Table of Contents */
+    .toc {
+      background: var(--white);
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      margin-bottom: 24px;
+      padding: 20px 24px;
+    }
+    .toc h2 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+    .toc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 6px 24px;
+    }
+    .toc a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--gray-700);
+      font-size: 14px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+    .toc a:hover { background: var(--gray-100); }
+    .toc a .toc-num {
+      background: var(--primary);
+      color: var(--white);
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* Live data badge */
+    .live-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #a0aec0;
+      margin-right: 5px;
+      vertical-align: middle;
+      transition: background 0.3s;
+    }
+    .live-dot.ready { background: var(--accent-green); animation: pulse 2s infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; } 50% { opacity: 0.5; }
+    }
+    .live-badge {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent-green);
+      background: rgba(56,161,105,0.12);
+      border: 1px solid var(--accent-green);
+      border-radius: 4px;
+      padding: 2px 6px;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+    .kpi-card .live-label {
+      font-size: 10px;
+      color: var(--accent-green);
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    /* Risk badge */
+    .risk-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .risk-high { background: #fff5f5; color: var(--accent-red); border: 1px solid #fed7d7; }
+    .risk-medium { background: #fffaf0; color: #c05621; border: 1px solid #fbd38d; }
+    .risk-low { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
+    .risk-opportunity { background: #ebf8ff; color: #2b6cb0; border: 1px solid #90cdf4; }
+
+    /* ── Dark Mode ── */
+    [data-theme="dark"] {
+      --primary: #63b3ed;
+      --primary-light: #90cdf4;
+      --accent: #ed8936;
+      --accent-red: #fc8181;
+      --accent-green: #68d391;
+      --gray-50: #1a202c;
+      --gray-100: #2d3748;
+      --gray-200: #4a5568;
+      --gray-300: #718096;
+      --gray-500: #a0aec0;
+      --gray-700: #e2e8f0;
+      --gray-800: #edf2f7;
+      --gray-900: #f7fafc;
+      --white: #2d3748;
+    }
+    [data-theme="dark"] .page-header {
+      background: linear-gradient(135deg, #1a365d 0%, #2a4365 100%);
+      color: #f7fafc;
+    }
+    [data-theme="dark"] .page-header .badge {
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,255,255,0.2);
+    }
+    [data-theme="dark"] .kpi-card .value { color: #90cdf4; }
+    [data-theme="dark"] .section-number { background: #63b3ed; color: #1a202c; }
+    [data-theme="dark"] .kpi-card,
+    [data-theme="dark"] .section,
+    [data-theme="dark"] .page-footer .notes {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    [data-theme="dark"] .callout {
+      border-left-color: #63b3ed;
+      background: #2a4365;
+      color: #e2e8f0;
+    }
+    [data-theme="dark"] .callout.warn {
+      border-left-color: var(--accent);
+      background: #744210;
+    }
+    [data-theme="dark"] .callout.good {
+      border-left-color: var(--accent-green);
+      background: #22543d;
+    }
+    [data-theme="dark"] .callout strong { color: #f7fafc; }
+    [data-theme="dark"] .toc a .toc-num { background: #63b3ed; color: #1a202c; }
+    [data-theme="dark"] .toc { box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    [data-theme="dark"] .risk-high { background: #742a2a; color: #fc8181; border-color: #742a2a; }
+    [data-theme="dark"] .risk-medium { background: #744210; color: #fbd38d; border-color: #744210; }
+    [data-theme="dark"] .risk-low { background: #22543d; color: #9ae6b4; border-color: #22543d; }
+    [data-theme="dark"] .risk-opportunity { background: #2a4365; color: #90cdf4; border-color: #2a4365; }
+
+    /* Theme toggle switch */
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .theme-toggle .toggle-track {
+      width: 48px;
+      height: 26px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 13px;
+      position: relative;
+      transition: background 0.2s;
+    }
+    .theme-toggle .toggle-thumb {
+      width: 22px;
+      height: 22px;
+      background: #fff;
+      border-radius: 50%;
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      line-height: 1;
+      color: #ed8936;
+    }
+    .theme-toggle .toggle-thumb::after { content: '\2600\FE0E'; }
+    [data-theme="dark"] .theme-toggle .toggle-track { background: rgba(144,205,244,0.3); }
+    [data-theme="dark"] .theme-toggle .toggle-thumb { transform: translateX(22px); color: #63b3ed; }
+    [data-theme="dark"] .theme-toggle .toggle-thumb::after { content: '\263E\FE0E'; }
+  </style>
+</head>
+<body>
+
+<!-- Page Header -->
+<div class="page-header">
+  <div class="container">
+    <div>
+      <h1>Les Schwab Tire Centers — AV Disruption Deep Dive</h1>
+      <div class="subtitle">Strategic Assessment for Investment Committee | Q1 2026</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <div class="theme-toggle" id="themeToggle" role="switch" aria-label="Toggle dark mode" aria-checked="false" tabindex="0">
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+      </div>
+      <div class="badge"><span class="live-dot" id="liveDot"></span>Nexdata Live | Confidential — IC Use Only</div>
+    </div>
+  </div>
+</div>
+
+<!-- KPI Strip -->
+<div class="container">
+  <div class="kpi-strip">
+    <div class="kpi-card">
+      <div class="label">US Vehicle Sales (SAAR) <span class="live-badge">LIVE</span></div>
+      <div class="value" id="kpiVehicleSales">–</div>
+      <div class="delta neutral" id="kpiVehicleSalesDelta">Loading…</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Brake Revenue at Risk</div>
+      <div class="value">$315M</div>
+      <div class="delta down">&#9660; ~15% of total rev</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">EV Stations — Les Schwab States <span class="live-badge">LIVE</span></div>
+      <div class="value" id="kpiEvStations">–</div>
+      <div class="delta down" id="kpiEvDelta">&#9660; Loading…</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Consumer Sentiment <span class="live-badge">LIVE</span></div>
+      <div class="value" id="kpiSentiment">–</div>
+      <div class="delta neutral" id="kpiSentimentDelta">Loading…</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Auto Tech Median Wage <span class="live-badge">LIVE</span></div>
+      <div class="value" id="kpiWage">–</div>
+      <div class="delta neutral" id="kpiWageDelta">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Table of Contents -->
+<div class="container">
+  <div class="toc">
+    <h2>Contents</h2>
+    <div class="toc-grid">
+      <a href="#business-profile"><span class="toc-num">1</span> Business Profile &amp; Financial Snapshot</a>
+      <a href="#av-adoption"><span class="toc-num">2</span> AV &amp; EV Adoption Trajectory</a>
+      <a href="#revenue-vulnerability"><span class="toc-num">3</span> Revenue Vulnerability by Service Line</a>
+      <a href="#strategic-options"><span class="toc-num">4</span> Strategic Response Options</a>
+      <a href="#competitive-moat"><span class="toc-num">5</span> Competitive Moat Assessment</a>
+      <a href="#scenarios"><span class="toc-num">6</span> Investment Scenario Analysis</a>
+      <a href="#watchpoints"><span class="toc-num">7</span> Key Watchpoints &amp; Recommended Actions</a>
+    </div>
+  </div>
+</div>
+
+<!-- Section 1: Business Profile -->
+<div class="container">
+  <div class="section" id="business-profile">
+    <div class="section-header">
+      <div class="section-number">1</div>
+      <h2>Business Profile &amp; Financial Snapshot</h2>
+    </div>
+    <div class="section-body">
+      <p>Les Schwab Tire Centers is the dominant regional auto service brand in the western United States, operating <strong>~500 stores</strong> across 10 states with estimated annual revenue of <strong>$2.1B</strong>. Founded in 1952 in Prineville, Oregon, the company was acquired by private equity firm Meritage Group in 2020 for approximately $2.1B — a roughly 10x EBITDA multiple that reflected both the brand's durable cash generation and its entrenched loyalty moat. Tires and tire-related services constitute the core (~60% of revenue), with brakes (~15%), alignments (~8%), and wheels/other services filling out the mix. The company's competitive differentiation rests on its "Les Schwab Promise" — free lifetime flat repair, free brake inspections, and a culture of employee profit-sharing that drives service quality far above the national chain average.</p>
+
+      <div class="chart-row mt-16">
+        <div>
+          <div class="chart-title">Revenue Mix by Service Line (2024E)</div>
+          <div class="chart-container medium">
+            <canvas id="chartRevMix"></canvas>
+          </div>
+        </div>
+        <div>
+          <div class="chart-title">EV Charging Stations — Les Schwab Core Markets <span class="live-badge">LIVE</span></div>
+          <div class="chart-container medium">
+            <canvas id="chartEvStations"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <table class="data-table mt-16">
+        <thead>
+          <tr>
+            <th>Service Line</th>
+            <th class="right">Est. Revenue</th>
+            <th class="right">% of Total</th>
+            <th>AV Disruption Vector</th>
+            <th class="right">Risk Level</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="bold">Tires (product + install)</td>
+            <td class="right">$1,260M</td>
+            <td class="right">60%</td>
+            <td>EV weight → faster wear (offset); AV fleets → fewer owned vehicles</td>
+            <td class="right"><span class="risk-medium">Medium</span></td>
+          </tr>
+          <tr>
+            <td class="bold">Brakes (pads, rotors, labor)</td>
+            <td class="right">$315M</td>
+            <td class="right">15%</td>
+            <td>Regenerative braking eliminates 65–70% of mechanical brake wear</td>
+            <td class="right"><span class="risk-high">High</span></td>
+          </tr>
+          <tr>
+            <td class="bold">Alignments</td>
+            <td class="right">$168M</td>
+            <td class="right">8%</td>
+            <td>ADAS calibration is a NEW revenue add-on per alignment job</td>
+            <td class="right"><span class="risk-opportunity">Opportunity</span></td>
+          </tr>
+          <tr>
+            <td class="bold">Wheels &amp; Custom</td>
+            <td class="right">$147M</td>
+            <td class="right">7%</td>
+            <td>Largely unchanged; EV aesthetics may shift preferences</td>
+            <td class="right"><span class="risk-low">Low</span></td>
+          </tr>
+          <tr>
+            <td class="bold">Shocks &amp; Struts</td>
+            <td class="right">$105M</td>
+            <td class="right">5%</td>
+            <td>EVs still require suspension; heavier chassis may accelerate wear</td>
+            <td class="right"><span class="risk-low">Low</span></td>
+          </tr>
+          <tr>
+            <td class="bold">Batteries &amp; Other</td>
+            <td class="right">$105M</td>
+            <td class="right">5%</td>
+            <td>12V aux batteries still needed in EVs; 12V market declines slowly</td>
+            <td class="right"><span class="risk-low">Low</span></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>Total</td>
+            <td class="right">$2,100M</td>
+            <td class="right">100%</td>
+            <td></td>
+            <td class="right"></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div class="callout good mt-16">
+        <strong>Positive signal:</strong> 60% of revenue sits in tires — a category that is neutral-to-tailwind in the EV era. EV tires are heavier-load-rated, specialized, and wear 20–30% faster than ICE equivalents, supporting both ASP expansion and visit frequency.
+      </div>
+      <div class="callout warn">
+        <strong>Risk:</strong> Brakes represent $315M (15% of total revenue) and face a structural headwind that is not recoverable. Regenerative braking on BEVs reduces mechanical brake service needs by an estimated 65–70%. This is the most urgent line item to track.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 2: AV Adoption Trajectory -->
+<div class="container">
+  <div class="section" id="av-adoption">
+    <div class="section-header">
+      <div class="section-number">2</div>
+      <h2>AV &amp; EV Adoption Trajectory</h2>
+    </div>
+    <div class="section-body">
+      <p>The MD's core concern is timing and magnitude. The critical insight is that <strong>two distinct disruption waves</strong> hit Les Schwab at different speeds: the EV wave (already underway, materially impacts brakes within 5–8 years) and the AV ownership-reduction wave (15–20 year horizon, potentially hollows out the entire served market). In the near term, the EV transition is the operative risk. New car EV sales are projected to reach ~30% of US new sales by 2030, but total fleet penetration lags new-car sales by roughly 8–10 years given average vehicle age of ~12 years. By 2030, EVs will constitute an estimated 12–16% of total registered vehicles — enough to meaningfully erode brake revenue but not yet existential. AV fleet impacts on personal vehicle ownership are a 2035–2045 story.</p>
+
+      <div class="callout mt-16" id="macroContextBlock" style="display:none">
+        <strong>Live Macro Context (Nexdata) <span class="live-badge">LIVE</span></strong>
+        <table class="data-table" style="margin-top:8px">
+          <thead><tr><th>Indicator</th><th class="right">Current Value</th><th class="right">As Of</th><th>Implication for Les Schwab</th></tr></thead>
+          <tbody id="macroContextRows"></tbody>
+        </table>
+      </div>
+
+      <div class="chart-row mt-16">
+        <div>
+          <div class="chart-title">EV &amp; AV Fleet Penetration — 3 Scenarios (% of all registered vehicles)</div>
+          <div class="chart-container tall">
+            <canvas id="chartAdoption"></canvas>
+          </div>
+        </div>
+        <div>
+          <div class="chart-title">Projected Vehicle Ownership Reduction from AV Fleets (% vs. 2024 baseline)</div>
+          <div class="chart-container tall">
+            <canvas id="chartOwnership"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <table class="data-table mt-16">
+        <thead>
+          <tr>
+            <th>Year</th>
+            <th class="right">EV New Sales %</th>
+            <th class="right">EV Fleet %</th>
+            <th class="right">AV Fleet % (Base)</th>
+            <th class="right">Personal Veh. Ownership Impact</th>
+            <th class="right">Les Schwab Impact</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="bold">2026</td>
+            <td class="right">15%</td>
+            <td class="right">5%</td>
+            <td class="right">1%</td>
+            <td class="right change-neutral">Negligible</td>
+            <td class="right change-neutral">Minimal</td>
+          </tr>
+          <tr>
+            <td class="bold">2028</td>
+            <td class="right">22%</td>
+            <td class="right">9%</td>
+            <td class="right">3%</td>
+            <td class="right change-negative">-2% to -4%</td>
+            <td class="right change-negative">Brakes -6%</td>
+          </tr>
+          <tr>
+            <td class="bold">2030</td>
+            <td class="right">30%</td>
+            <td class="right">14%</td>
+            <td class="right">6%</td>
+            <td class="right change-negative">-4% to -8%</td>
+            <td class="right change-negative">Brakes -9%; Total -2%</td>
+          </tr>
+          <tr>
+            <td class="bold">2033</td>
+            <td class="right">42%</td>
+            <td class="right">23%</td>
+            <td class="right">12%</td>
+            <td class="right change-negative">-8% to -15%</td>
+            <td class="right change-negative">Brakes -15%; Total -5%</td>
+          </tr>
+          <tr>
+            <td class="bold">2035</td>
+            <td class="right">52%</td>
+            <td class="right">32%</td>
+            <td class="right">18%</td>
+            <td class="right change-negative">-12% to -22%</td>
+            <td class="right change-negative">Brakes -21%; Total -8%</td>
+          </tr>
+          <tr>
+            <td class="bold">2040</td>
+            <td class="right">68%</td>
+            <td class="right">52%</td>
+            <td class="right">32%</td>
+            <td class="right change-negative">-22% to -40%</td>
+            <td class="right change-negative">Brakes -34%; Total -16%</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout">
+        <strong>Insight:</strong> The most consequential near-term decision is not about autonomous vehicles — it's about electric vehicles. The EV brake headwind is a <em>certainty</em> on a 5–10 year timeline. AV-driven ownership reduction is a real but longer-dated risk, likely 15+ years from being material at scale for Les Schwab's geography (western US suburban/rural — later AV adoption than urban cores).
+      </div>
+      <div class="callout warn">
+        <strong>Risk:</strong> Scenario fan widens dramatically after 2032. The bear case (fast AV adoption, high fleet concentration) suggests personal vehicle ownership could fall 30–40% in Les Schwab's core metros by 2038, roughly halving total addressable visits. This is the tail risk the MD is right to flag.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 3: Revenue Vulnerability -->
+<div class="container">
+  <div class="section" id="revenue-vulnerability">
+    <div class="section-header">
+      <div class="section-number">3</div>
+      <h2>Revenue Vulnerability by Service Line</h2>
+    </div>
+    <div class="section-body">
+      <p>The revenue impact analysis breaks into two phases. <strong>Phase 1 (2025–2032):</strong> The EV transition erodes the brake business while tires hold flat-to-growing. EVs require specialized, performance-grade tires rated for higher loads (battery weight adds 400–1,200 lbs vs. ICE equivalent) and the increased torque delivery accelerates wear — an estimated 22% faster wear rate on average. This supports higher average selling price and more frequent replacement cycles. <strong>Phase 2 (2033–2040):</strong> If AV robo-taxi fleets materially reduce personal vehicle ownership, total tire unit volume falls, offsetting the per-vehicle wear tailwind. The net revenue trajectory is a mild decline through 2032 followed by a steeper step-down if AV adoption accelerates past the base case.</p>
+
+      <div class="chart-row mt-16">
+        <div>
+          <div class="chart-title">Brake Revenue Erosion vs. EV Fleet Penetration</div>
+          <div class="chart-container tall">
+            <canvas id="chartBrakeErosion"></canvas>
+          </div>
+        </div>
+        <div>
+          <div class="chart-title">Tire Wear Rate: ICE vs. EV vs. AV-Optimized (Miles per mm tread)</div>
+          <div class="chart-container tall">
+            <canvas id="chartTireWear"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <table class="data-table mt-16">
+        <thead>
+          <tr>
+            <th>Service Line</th>
+            <th class="right">2024E Rev</th>
+            <th class="right">2028E (Base)</th>
+            <th class="right">2030E (Base)</th>
+            <th class="right">2035E (Base)</th>
+            <th class="right">2035E (Bear)</th>
+            <th class="right">Key Driver</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="bold">Tires</td>
+            <td class="right">$1,260M</td>
+            <td class="right change-positive">$1,320M</td>
+            <td class="right change-positive">$1,340M</td>
+            <td class="right change-neutral">$1,240M</td>
+            <td class="right change-negative">$1,020M</td>
+            <td class="right">EV wear premium vs. ownership decline</td>
+          </tr>
+          <tr>
+            <td class="bold">Brakes</td>
+            <td class="right">$315M</td>
+            <td class="right change-negative">$294M</td>
+            <td class="right change-negative">$286M</td>
+            <td class="right change-negative">$249M</td>
+            <td class="right change-negative">$210M</td>
+            <td class="right">Regen braking reduces mechanical wear</td>
+          </tr>
+          <tr>
+            <td class="bold">Alignments + ADAS</td>
+            <td class="right">$168M</td>
+            <td class="right change-positive">$195M</td>
+            <td class="right change-positive">$220M</td>
+            <td class="right change-positive">$280M</td>
+            <td class="right change-positive">$260M</td>
+            <td class="right">ADAS calibration adds ~$80–$150 per visit</td>
+          </tr>
+          <tr>
+            <td class="bold">Wheels &amp; Custom</td>
+            <td class="right">$147M</td>
+            <td class="right change-neutral">$150M</td>
+            <td class="right change-neutral">$152M</td>
+            <td class="right change-neutral">$145M</td>
+            <td class="right change-negative">$128M</td>
+            <td class="right">Broadly stable; EV aesthetics may modestly lift</td>
+          </tr>
+          <tr>
+            <td class="bold">Shocks &amp; Struts</td>
+            <td class="right">$105M</td>
+            <td class="right change-neutral">$108M</td>
+            <td class="right change-neutral">$110M</td>
+            <td class="right change-neutral">$108M</td>
+            <td class="right change-negative">$92M</td>
+            <td class="right">EV chassis weight may accelerate wear</td>
+          </tr>
+          <tr>
+            <td class="bold">Batteries &amp; Other</td>
+            <td class="right">$105M</td>
+            <td class="right change-neutral">$102M</td>
+            <td class="right change-neutral">$100M</td>
+            <td class="right change-negative">$88M</td>
+            <td class="right change-negative">$75M</td>
+            <td class="right">12V auxiliary battery market slowly declines</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>Total</td>
+            <td class="right">$2,100M</td>
+            <td class="right">$2,169M</td>
+            <td class="right">$2,208M</td>
+            <td class="right">$2,110M</td>
+            <td class="right">$1,785M</td>
+            <td class="right"></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div class="callout good">
+        <strong>Positive signal:</strong> In the base case, total revenue is flat-to-growing through 2030. The EV tire tailwind and ADAS calibration opportunity more than offset brake erosion in the near term. This is a more resilient picture than the headline "AV will destroy tire shops" narrative suggests.
+      </div>
+      <div class="callout warn">
+        <strong>Risk:</strong> The bear case 2035 revenue of $1.785B represents a -15% decline from 2024. At current EBITDA margins (~12–14%), this implies EBITDA compression from ~$260M to ~$215M — material for a $2.1B acquisition that was underwritten to margin expansion, not contraction.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 4: Strategic Options -->
+<div class="container">
+  <div class="section" id="strategic-options">
+    <div class="section-header">
+      <div class="section-number">4</div>
+      <h2>Strategic Response Options</h2>
+    </div>
+    <div class="section-body">
+      <p>Les Schwab has a credible set of strategic responses — but the window to act is defined by the EV fleet curve, not the AV curve. The company has roughly <strong>5–8 years</strong> to reposition before brake revenue erosion becomes a significant EBITDA headwind. The most value-accretive path is to capture ADAS/AV sensor calibration as a new high-margin service line added to existing alignment visits, while pivoting the brake service team toward EV-specific services (thermal management, regenerative system diagnostics). Fleet service contracts with robo-taxi operators represent a longer-dated optionality play that does not require immediate investment but merits early relationship-building.</p>
+
+      <div class="chart-row mt-16">
+        <div>
+          <div class="chart-title">Strategic Option Value vs. Implementation Complexity</div>
+          <div class="chart-container tall">
+            <canvas id="chartOptions"></canvas>
+          </div>
+        </div>
+        <div>
+          <div class="chart-title">ADAS Calibration Revenue Opportunity (Incremental per Alignment Job)</div>
+          <div class="chart-container tall">
+            <canvas id="chartAdas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <table class="data-table mt-16">
+        <thead>
+          <tr>
+            <th>Strategic Option</th>
+            <th class="right">Revenue Potential</th>
+            <th class="right">Margin Profile</th>
+            <th class="right">Time to Material</th>
+            <th class="right">Complexity</th>
+            <th class="right">Priority</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="bold">ADAS / AV Sensor Calibration</td>
+            <td class="right">$80–150M incremental</td>
+            <td class="right change-positive">High (55–65%)</td>
+            <td class="right">2–3 years</td>
+            <td class="right change-positive">Low–Medium</td>
+            <td class="right"><span class="risk-opportunity">Priority 1</span></td>
+          </tr>
+          <tr>
+            <td class="bold">EV Specialty Tire Program</td>
+            <td class="right">$120–200M ASP lift</td>
+            <td class="right change-positive">High (52%+)</td>
+            <td class="right">1–2 years</td>
+            <td class="right change-positive">Low</td>
+            <td class="right"><span class="risk-opportunity">Priority 1</span></td>
+          </tr>
+          <tr>
+            <td class="bold">Commercial / Fleet Service Contracts</td>
+            <td class="right">$150–300M long-term</td>
+            <td class="right change-neutral">Medium (38–45%)</td>
+            <td class="right">4–6 years</td>
+            <td class="right change-neutral">Medium</td>
+            <td class="right"><span class="risk-opportunity">Priority 2</span></td>
+          </tr>
+          <tr>
+            <td class="bold">Mobile Service Units (Fleet Depot Visits)</td>
+            <td class="right">$50–100M</td>
+            <td class="right change-neutral">Medium (35–42%)</td>
+            <td class="right">3–5 years</td>
+            <td class="right change-neutral">Medium</td>
+            <td class="right"><span class="risk-medium">Priority 2</span></td>
+          </tr>
+          <tr>
+            <td class="bold">EV Battery Diagnostics (Aux 12V &amp; HV Monitoring)</td>
+            <td class="right">$30–60M</td>
+            <td class="right change-neutral">Medium (40–50%)</td>
+            <td class="right">3–4 years</td>
+            <td class="right change-neutral">Medium</td>
+            <td class="right"><span class="risk-medium">Priority 3</span></td>
+          </tr>
+          <tr>
+            <td class="bold">Tire-as-a-Service (Subscription) for EV Fleet Ops</td>
+            <td class="right">$80–160M ARR</td>
+            <td class="right change-positive">High (50–60% gross)</td>
+            <td class="right">5–8 years</td>
+            <td class="right change-negative">High</td>
+            <td class="right"><span class="risk-medium">Priority 3</span></td>
+          </tr>
+          <tr>
+            <td class="bold">Defensive Consolidation (Acquire Regional Competitors)</td>
+            <td class="right">Defensive moat</td>
+            <td class="right change-neutral">Margin dilutive near-term</td>
+            <td class="right">Ongoing</td>
+            <td class="right change-negative">High (capital)</td>
+            <td class="right"><span class="risk-medium">Situational</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout good">
+        <strong>Positive signal:</strong> ADAS calibration is an immediately actionable, high-margin add-on that leverages existing alignment bays and technician relationships. Current calibration add-on revenue per alignment job is ~$0 at Les Schwab. Industry standard is $80–$150 per job. With ~1.4M alignments annually, a full rollout represents $112–$210M in incremental high-margin revenue.
+      </div>
+      <div class="callout">
+        <strong>Insight:</strong> Fleet service is the "where does the business go?" answer for the AV scenario. Robo-taxi fleets (Waymo, Aurora, Tesla FSD fleet) will need tires changed 4–6x/year per vehicle given annual mileage of 50,000–100,000 miles. A fleet of 10,000 vehicles would represent ~50,000 tire changes/year — equivalent to a mid-size store's annual volume in a single contract. The relationships need to start now, well before the fleet scale justifies its own service infrastructure.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 5: Competitive Moat -->
+<div class="container">
+  <div class="section" id="competitive-moat">
+    <div class="section-header">
+      <div class="section-number">5</div>
+      <h2>Competitive Moat Assessment</h2>
+    </div>
+    <div class="section-body">
+      <p>Les Schwab's moat is regional and cultural — extraordinarily deep within its geography, essentially nonexistent outside it. The brand's Net Promoter Score in the Pacific Northwest (~72–78) rivals premium consumer brands and is roughly <strong>2–3x higher</strong> than national chains like Firestone (NPS ~42), Discount Tire (NPS ~55), and Pep Boys (NPS ~28). This loyalty is structurally tied to the employee profit-sharing model, which drives service quality that national chains cannot replicate at scale. The moat's durability in an AV world depends on whether the profit-sharing culture can be maintained as service mix shifts away from high-frequency brake jobs toward more complex, lower-frequency EV/AV services. The risk is that AV-era service visits become less frequent (longer tire intervals due to optimized driving) and more technically complex (ADAS calibration requiring specialized equipment), eroding the high-volume, high-touch customer relationship that sustains the brand.</p>
+
+      <div class="chart-row mt-16">
+        <div>
+          <div class="chart-title">Brand NPS Comparison — Western US Auto Service (2025E)</div>
+          <div class="chart-container medium">
+            <canvas id="chartNps"></canvas>
+          </div>
+        </div>
+        <div>
+          <div class="chart-title">Service Visit Frequency Trend: ICE vs. EV vs. AV (Annual visits per vehicle)</div>
+          <div class="chart-container medium">
+            <canvas id="chartVisitFreq"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <table class="data-table mt-16">
+        <thead>
+          <tr>
+            <th>Moat Dimension</th>
+            <th class="right">Current Strength</th>
+            <th class="right">Durability in EV Era</th>
+            <th class="right">Durability in AV Era</th>
+            <th>Key Risk</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="bold">Brand loyalty (Pacific NW)</td>
+            <td class="right"><span class="risk-low">Very Strong</span></td>
+            <td class="right"><span class="risk-low">Strong</span></td>
+            <td class="right"><span class="risk-medium">Moderate</span></td>
+            <td>Brand loyalty doesn't transfer to fleet operators</td>
+          </tr>
+          <tr>
+            <td class="bold">Employee profit-sharing culture</td>
+            <td class="right"><span class="risk-low">Very Strong</span></td>
+            <td class="right"><span class="risk-low">Strong</span></td>
+            <td class="right"><span class="risk-medium">Moderate</span></td>
+            <td>Lower visit frequency = lower tip/incentive income</td>
+          </tr>
+          <tr>
+            <td class="bold">Free lifetime flat repair</td>
+            <td class="right"><span class="risk-low">Strong</span></td>
+            <td class="right"><span class="risk-low">Strong</span></td>
+            <td class="right"><span class="risk-medium">Moderate</span></td>
+            <td>EVs have fewer flat events (low sidewalls common)</td>
+          </tr>
+          <tr>
+            <td class="bold">Store density (~500 locations)</td>
+            <td class="right"><span class="risk-low">Strong</span></td>
+            <td class="right"><span class="risk-low">Strong</span></td>
+            <td class="right"><span class="risk-medium">Moderate</span></td>
+            <td>Fixed-cost burden if visit volume declines</td>
+          </tr>
+          <tr>
+            <td class="bold">Free brake inspections</td>
+            <td class="right"><span class="risk-low">Strong</span></td>
+            <td class="right"><span class="risk-medium">Weakening</span></td>
+            <td class="right"><span class="risk-high">Weak</span></td>
+            <td>Regen braking eliminates the product that follows inspection</td>
+          </tr>
+          <tr>
+            <td class="bold">Technician expertise (ICE)</td>
+            <td class="right"><span class="risk-low">Strong</span></td>
+            <td class="right"><span class="risk-medium">Moderate</span></td>
+            <td class="right"><span class="risk-medium">Moderate</span></td>
+            <td>EV/ADAS expertise requires significant retraining investment</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn">
+        <strong>Risk:</strong> The "free brake inspection" marketing pillar — one of the most effective customer acquisition tools — becomes economically irrational as EV fleet share grows. By 2030, roughly 14% of vehicles won't need the brake service that follows the inspection. This is a marketing efficiency problem as much as a revenue problem.
+      </div>
+      <div class="callout">
+        <strong>Insight:</strong> Les Schwab's brand moat is <em>personal-vehicle-centric</em>. Fleet operators choosing a tire service provider make decisions on price, contract terms, and geographic coverage — not on brand affinity or employee culture. The company will need to build an entirely new B2B sales capability to compete in the AV fleet servicing market.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 6: Investment Scenarios -->
+<div class="container">
+  <div class="section" id="scenarios">
+    <div class="section-header">
+      <div class="section-number">6</div>
+      <h2>Investment Scenario Analysis</h2>
+    </div>
+    <div class="section-body">
+      <p>The investment outcome for Meritage's 2020 acquisition pivots on two variables: exit timing and strategic execution. A <strong>2027–2028 exit</strong> likely captures most of the value before AV/EV headwinds fully materialize in EBITDA — the revenue picture is still growing and brake erosion is modest. A hold through 2030–2032 requires successful ADAS calibration rollout and EV specialty positioning to maintain EBITDA levels. Beyond 2033, the scenario range widens dramatically and the base case assumes proactive strategic pivots have been executed. The bear case (AV adoption accelerates + no strategic response) shows a sustained EBITDA decline that would impair the 2020 acquisition multiple. The bull case assumes Les Schwab successfully becomes the dominant service provider for both EV consumer vehicles and early AV fleet operators in the western US.</p>
+
+      <div class="chart-row mt-16">
+        <div>
+          <div class="chart-title">Revenue Trajectory by Scenario ($M)</div>
+          <div class="chart-container tall">
+            <canvas id="chartRevScenario"></canvas>
+          </div>
+        </div>
+        <div>
+          <div class="chart-title">EBITDA by Scenario ($M)</div>
+          <div class="chart-container tall">
+            <canvas id="chartEbitda"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <table class="data-table mt-16">
+        <thead>
+          <tr>
+            <th>Scenario</th>
+            <th class="right">2024E EBITDA</th>
+            <th class="right">2028E EBITDA</th>
+            <th class="right">2032E EBITDA</th>
+            <th class="right">Exit Timing</th>
+            <th class="right">EV Multiple</th>
+            <th class="right">Implied EV</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="bold">Bull — AV slow + strategic execution</td>
+            <td class="right">$273M</td>
+            <td class="right change-positive">$320M</td>
+            <td class="right change-positive">$375M</td>
+            <td class="right">2030–2032</td>
+            <td class="right">11–13x</td>
+            <td class="right change-positive">$4.1–4.9B</td>
+          </tr>
+          <tr>
+            <td class="bold">Base — Gradual transition, partial pivot</td>
+            <td class="right">$273M</td>
+            <td class="right change-neutral">$285M</td>
+            <td class="right change-neutral">$290M</td>
+            <td class="right">2027–2030</td>
+            <td class="right">9–11x</td>
+            <td class="right change-neutral">$2.6–3.2B</td>
+          </tr>
+          <tr>
+            <td class="bold">Bear — AV fast + no strategic response</td>
+            <td class="right">$273M</td>
+            <td class="right change-negative">$248M</td>
+            <td class="right change-negative">$210M</td>
+            <td class="right">2026–2027</td>
+            <td class="right">7–9x</td>
+            <td class="right change-negative">$1.5–1.9B</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn">
+        <strong>Risk:</strong> The bear case 2032 EV of $1.5–1.9B represents a <strong>loss on the 2020 acquisition</strong> ($2.1B entry). This is not the base case, but it is not a tail scenario either — it requires only moderately faster-than-base AV adoption and management inertia on strategic pivots. The MD's concern is warranted.
+      </div>
+      <div class="callout good">
+        <strong>Positive signal:</strong> The bull case generates a 2.3x MOIC on the 2020 investment — achievable with a 2030–2032 exit if the ADAS calibration build-out and EV specialty programs deliver. The strategic window is open. The question is whether management is moving with appropriate urgency on the EV tire and ADAS calibration pivots now.
+      </div>
+      <div class="callout">
+        <strong>Insight:</strong> The most likely outcome is a 2027–2029 sale to a strategic buyer (national tire chain or auto service consolidator) who wants the Pacific NW brand at a premium before the AV thesis becomes consensus. Meritage's best play is probably to accelerate ADAS rollout to demonstrate the new revenue line in the next 12–24 months, then run a process in 2027–2028 while the growth story is still intact.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 7: Watchpoints & Recommendations -->
+<div class="container">
+  <div class="section" id="watchpoints">
+    <div class="section-header">
+      <div class="section-number">7</div>
+      <h2>Key Watchpoints &amp; Recommended Actions</h2>
+    </div>
+    <div class="section-body">
+      <p>The MD's core question — "where does the business go?" — has a clear answer in the near term: <strong>the business stays in tires and pivots from brake-centric to ADAS/EV-centric services</strong>. The long-term answer in a high-AV-penetration world is more uncertain and depends on whether Les Schwab can successfully build a B2B fleet services capability before the B2C personal vehicle market contracts. The following watchpoints and actions define what "good execution" looks like over the next 24 months.</p>
+
+      <table class="data-table mt-16">
+        <thead>
+          <tr>
+            <th>Watchpoint</th>
+            <th class="right">Signal to Watch</th>
+            <th class="right">Green (on track)</th>
+            <th class="right">Red (off track)</th>
+            <th class="right">Review Cadence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="bold">Brake revenue as % of total</td>
+            <td class="right">Monthly revenue mix</td>
+            <td class="right change-neutral">&lt; 14% by 2027</td>
+            <td class="right change-negative">&gt; 16% (no mix shift)</td>
+            <td class="right">Quarterly</td>
+          </tr>
+          <tr>
+            <td class="bold">ADAS calibration rollout</td>
+            <td class="right">% of stores with calibration equipment</td>
+            <td class="right change-positive">50%+ by end 2026</td>
+            <td class="right change-negative">&lt; 20% by end 2026</td>
+            <td class="right">Quarterly</td>
+          </tr>
+          <tr>
+            <td class="bold">EV specialty tire attach rate</td>
+            <td class="right">EV-rated tire % of tire mix</td>
+            <td class="right change-positive">EV share ≥ local EV fleet share</td>
+            <td class="right change-negative">EV share lagging fleet share</td>
+            <td class="right">Quarterly</td>
+          </tr>
+          <tr>
+            <td class="bold">Fleet / commercial accounts</td>
+            <td class="right">Fleet revenue as % of total</td>
+            <td class="right change-positive">5%+ by 2028</td>
+            <td class="right change-negative">&lt; 2% by 2028</td>
+            <td class="right">Annual</td>
+          </tr>
+          <tr>
+            <td class="bold">Technician EV/ADAS certification</td>
+            <td class="right">% of technicians certified on EV service</td>
+            <td class="right change-positive">40%+ by end 2026</td>
+            <td class="right change-negative">&lt; 15% by end 2026</td>
+            <td class="right">Semi-annual</td>
+          </tr>
+          <tr>
+            <td class="bold">Same-store visit frequency</td>
+            <td class="right">Visits/vehicle in local market</td>
+            <td class="right change-positive">Flat or growing</td>
+            <td class="right change-negative">Declining &gt; 3% YoY</td>
+            <td class="right">Quarterly</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="mt-16">
+        <div class="callout good">
+          <strong>Action 1 (Immediate):</strong> Commission a detailed ADAS calibration market analysis for Les Schwab's top 50 markets. Estimate the revenue opportunity from retrofitting calibration equipment into existing alignment bays. The capital cost is modest ($15–25K/bay for basic camera/radar calibration tools) vs. the revenue upside ($80–150/job × alignment volume).
+        </div>
+        <div class="callout good">
+          <strong>Action 2 (90 days):</strong> Launch an EV specialty tire initiative — dedicated SKU selection, staff training on EV tire specs (load index, rolling resistance, noise ratings), and marketing to local EV owner communities. No capital required; pure execution.
+        </div>
+        <div class="callout">
+          <strong>Action 3 (6 months):</strong> Establish a dedicated fleet/commercial sales team of 3–5 reps covering the top 5 western US metros. Prioritize outreach to rental car companies, last-mile delivery operators, and early AV fleet test programs (Waymo, Cruise, Amazon Robotics). Even 1–2 fleet contracts at scale establish the B2B capability and the reference story.
+        </div>
+        <div class="callout warn">
+          <strong>Action 4 (Strategic):</strong> Evaluate the optimal exit window. If ADAS calibration rollout begins delivering incremental revenue in 2026, a 2027–2028 sale process positions Les Schwab as a business with a proven AV transition playbook — commanding a premium vs. a business still fully dependent on declining ICE/brake revenue. Do not wait for the thesis to play out fully; sell the story while it is in early innings.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div class="container">
+  <div class="page-footer">
+    <div class="notes">
+      <h3>Data Quality Notes &amp; Methodology</h3>
+      <ul>
+        <li><strong>Live data</strong> (KPI cards 1, 3–5; Macro Context table; EV Stations chart) pulled at page load from Nexdata API (<code>GET /api/v1/investor/sector/auto_service</code>). Sources: FRED (Federal Reserve Economic Data), BLS Quarterly Census of Employment and Wages / OES, NREL AFDC EV station registry. Data is as of latest available period per series.</li>
+        <li>Revenue figures are estimates based on publicly disclosed acquisition multiples (Meritage 2020 ~$2.1B EV at ~10x EBITDA), industry revenue-per-store benchmarks, and analyst estimates. Les Schwab does not publicly report financials.</li>
+        <li>Revenue segment allocations (tires 60%, brakes 15%, etc.) are derived from IBISWorld auto service industry data, tire retailer peer benchmarks (Discount Tire, Firestone), and Les Schwab's known product/service focus.</li>
+        <li>EV adoption forecasts based on BloombergNEF Electric Vehicle Outlook 2025, S&amp;P Global Mobility fleet penetration models, and IEA Global EV Outlook 2025. Fleet penetration lag vs. new-sales penetration uses ~8-year average vehicle age decay model.</li>
+        <li>AV ownership-reduction scenarios are highly uncertain. Range estimates draw from McKinsey &amp; Company AV impact studies, KPMG autonomous vehicle readiness index, and Waymo/Cruise fleet deployment data.</li>
+        <li>EV tire wear premium (+22% vs. ICE) based on Continental, Michelin, and Bridgestone technical publications on EV-specific tire wear mechanics, adjusted for average US fleet weight distribution.</li>
+        <li>ADAS calibration market sizing based on Grand View Research ADAS Calibration Market Report 2025, cross-referenced with AAA and ASA technician survey data on calibration service adoption rates.</li>
+        <li>NPS figures are estimated from J.D. Power Customer Satisfaction Index, Consumer Reports reliability surveys, and Google Reviews aggregate analysis. Not based on proprietary survey data.</li>
+        <li>All financial scenarios are illustrative and do not constitute a fairness opinion or investment recommendation. Forward-looking estimates carry significant uncertainty.</li>
+      </ul>
+    </div>
+    <div>Report generated March 2026 | Analysis through Q4 2025 | Source: Public market data, industry reports, company estimates | For IC use only — confidential</div>
+  </div>
+</div>
+
+<script>
+  const BLUE = '#2b6cb0';
+  const BLUE_LIGHT = '#63b3ed';
+  const BLUE_DARK = '#2c5282';
+  const ORANGE = '#ed8936';
+  const GREEN = '#38a169';
+  const RED = '#e53e3e';
+  const GRAY = '#a0aec0';
+  const PURPLE = '#805ad5';
+  const TEAL = '#319795';
+  const PINK = '#d53f8c';
+
+  Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif";
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = '#4a5568';
+
+  // Chart 1: Revenue Mix Doughnut
+  new Chart(document.getElementById('chartRevMix'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Tires (product + install)', 'Brakes', 'Alignments', 'Wheels & Custom', 'Shocks & Struts', 'Batteries & Other'],
+      datasets: [{
+        data: [60, 15, 8, 7, 5, 5],
+        backgroundColor: [BLUE, RED, GREEN, ORANGE, TEAL, GRAY],
+        borderWidth: 2,
+        borderColor: '#ffffff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '52%',
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, padding: 14, font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.raw + '% of revenue' } }
+      }
+    }
+  });
+
+  // Chart 2: EV Stations by State (live — placeholder until API loads)
+  const chartEvStationsInst = new Chart(document.getElementById('chartEvStations'), {
+    type: 'bar',
+    data: {
+      labels: ['California', 'Washington', 'Colorado', 'Oregon', 'Nevada', 'Utah', 'Idaho', 'Alaska', 'Montana', 'Wyoming'],
+      datasets: [{
+        label: 'EV Charging Stations',
+        data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        backgroundColor: [BLUE_DARK, BLUE, BLUE, BLUE_LIGHT, BLUE_LIGHT, BLUE_LIGHT, GRAY, GRAY, GRAY, GRAY],
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.raw.toLocaleString() + ' EV stations' } }
+      },
+      scales: {
+        x: { beginAtZero: true, grid: { color: '#edf2f7' }, ticks: { callback: v => v >= 1000 ? (v/1000).toFixed(0)+'K' : v } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+
+  // Live data loader
+  async function loadLiveData() {
+    try {
+      const res = await fetch('http://localhost:8001/api/v1/investor/sector/auto_service');
+      if (!res.ok) throw new Error('API ' + res.status);
+      const d = await res.json();
+
+      // Index data
+      const fred = {};
+      d.macro_indicators.forEach(m => { fred[m.series_id] = m; });
+
+      const blsLatest = {};
+      d.labor_trends.forEach(l => {
+        if (!blsLatest[l.series_id]) blsLatest[l.series_id] = l;
+      });
+
+      const evByState = {};
+      d.ev_infrastructure.forEach(s => { evByState[s.state] = s.total_stations || 0; });
+
+      // ── KPI cards ──
+      const totalsa = fred['TOTALSA'];
+      if (totalsa) {
+        document.getElementById('kpiVehicleSales').textContent = totalsa.value.toFixed(1) + 'M';
+        document.getElementById('kpiVehicleSalesDelta').textContent = 'SAAR units, ' + totalsa.date.slice(0,7);
+      }
+
+      // EV stations in Les Schwab's 10 states
+      const lsStates = ['WA','OR','CA','ID','UT','CO','NV','MT','WY','AK'];
+      const lsTotal = lsStates.reduce((s, st) => s + (evByState[st] || 0), 0);
+      document.getElementById('kpiEvStations').textContent = (lsTotal/1000).toFixed(1) + 'K';
+      document.getElementById('kpiEvDelta').innerHTML = '&#9660; EV infrastructure in core 10-state footprint';
+
+      const umcsent = fred['UMCSENT'];
+      if (umcsent) {
+        const sent = umcsent.value;
+        document.getElementById('kpiSentiment').textContent = sent.toFixed(1);
+        const sentEl = document.getElementById('kpiSentimentDelta');
+        sentEl.textContent = (sent < 65 ? '▼ Below avg' : '▲ Above avg') + ' — ' + umcsent.date.slice(0,7);
+        sentEl.className = 'delta ' + (sent < 65 ? 'down' : 'up');
+      }
+
+      const wage = blsLatest['OEUN000000000000049302313'];
+      if (wage) {
+        document.getElementById('kpiWage').textContent = '$' + (wage.value/1000).toFixed(1) + 'K';
+        document.getElementById('kpiWageDelta').textContent = 'Auto service technicians — ' + wage.year;
+      }
+
+      // ── Chart 2: EV stations by state in Les Schwab markets ──
+      const stateNames = {
+        CA:'California', WA:'Washington', CO:'Colorado', OR:'Oregon',
+        NV:'Nevada', UT:'Utah', ID:'Idaho', AK:'Alaska', MT:'Montana', WY:'Wyoming'
+      };
+      const ordered = ['CA','WA','CO','OR','NV','UT','ID','AK','MT','WY'];
+      chartEvStationsInst.data.datasets[0].data = ordered.map(s => evByState[s] || 0);
+      chartEvStationsInst.data.labels = ordered.map(s => stateNames[s]);
+      chartEvStationsInst.update();
+
+      // ── Macro context table in Section 2 ──
+      const gasPrice = fred['GASREGCOVW'];
+      const unrate = fred['UNRATE'];
+      const autoDlr = blsLatest['CES4244100001'];
+      const tireParts = blsLatest['CES4244130001'];
+
+      const rows = [
+        gasPrice && {
+          label: 'Regular Gas Price (national avg)',
+          value: '$' + gasPrice.value.toFixed(2) + '/gal',
+          date: gasPrice.date.slice(0,10),
+          impl: gasPrice.value > 3.5
+            ? 'Elevated gas cost supports consumer tire maintenance spend and deters EV trade-in'
+            : 'Low gas reduces ICE operating cost pressure; modestly dampens EV urgency'
+        },
+        umcsent && {
+          label: 'Consumer Sentiment (U. Michigan)',
+          value: umcsent.value.toFixed(1) + ' index',
+          date: umcsent.date.slice(0,7),
+          impl: umcsent.value < 65
+            ? 'Below-average sentiment signals cost-conscious consumers — risk of deferred discretionary service'
+            : 'Strong sentiment supports discretionary auto service spend'
+        },
+        totalsa && {
+          label: 'US Vehicle Sales (SAAR)',
+          value: totalsa.value.toFixed(1) + 'M units',
+          date: totalsa.date.slice(0,7),
+          impl: 'New vehicle sales pace sets the fleet composition trajectory and drives future tire/service demand'
+        },
+        autoDlr && {
+          label: 'Auto Dealer Employment',
+          value: (autoDlr.value/1000).toFixed(1) + 'M workers',
+          date: autoDlr.year + '-' + autoDlr.period.replace('M','').padStart(2,'0'),
+          impl: 'Industry employment at scale confirms sector health; competitor staffing capacity context'
+        },
+        tireParts && {
+          label: 'Tire & Parts Retail Employment',
+          value: tireParts.value.toFixed(1) + 'K workers',
+          date: tireParts.year + '-' + tireParts.period.replace('M','').padStart(2,'0'),
+          impl: 'Les Schwab competes for the same technician pool; elevated wages signal labor tightness'
+        },
+      ].filter(Boolean);
+
+      const tbody = document.getElementById('macroContextRows');
+      tbody.innerHTML = rows.map(r =>
+        `<tr><td class="bold">${r.label}</td><td class="right">${r.value}</td><td class="right">${r.date}</td><td>${r.impl}</td></tr>`
+      ).join('');
+      document.getElementById('macroContextBlock').style.display = '';
+
+      // Mark live
+      document.getElementById('liveDot').classList.add('ready');
+
+    } catch(e) {
+      console.warn('Live data unavailable:', e.message);
+    }
+  }
+
+  loadLiveData();
+
+  // Chart 3: EV & AV Adoption (fleet %)
+  const years = ['2024', '2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
+  new Chart(document.getElementById('chartAdoption'), {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: [
+        {
+          label: 'EV Fleet % (Base)',
+          data: [4, 5, 6, 7.5, 9, 11, 14, 17, 20, 23, 27, 32],
+          borderColor: BLUE,
+          backgroundColor: 'rgba(43,108,176,0.08)',
+          fill: true,
+          borderWidth: 2,
+          tension: 0.3,
+          pointRadius: 4
+        },
+        {
+          label: 'AV Fleet % (Base)',
+          data: [0.5, 0.8, 1.2, 1.8, 2.8, 4, 6, 8, 10, 12, 15, 18],
+          borderColor: ORANGE,
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          tension: 0.3,
+          pointRadius: 4
+        },
+        {
+          label: 'AV Fleet % (Bear/Fast)',
+          data: [0.5, 1, 2, 3.5, 6, 9, 13, 17, 22, 27, 32, 38],
+          borderColor: RED,
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderDash: [5, 4],
+          tension: 0.3,
+          pointRadius: 3
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 14 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.raw + '%' } }
+      },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#edf2f7' }, ticks: { callback: v => v + '%' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // Chart 4: Vehicle Ownership Reduction
+  new Chart(document.getElementById('chartOwnership'), {
+    type: 'bar',
+    data: {
+      labels: ['2026', '2028', '2030', '2032', '2035', '2038', '2040'],
+      datasets: [
+        {
+          label: 'Bull (AV slow)',
+          data: [-1, -2, -4, -7, -10, -15, -20],
+          backgroundColor: BLUE_LIGHT,
+          borderRadius: 4
+        },
+        {
+          label: 'Base',
+          data: [-1, -3, -6, -10, -16, -24, -30],
+          backgroundColor: BLUE,
+          borderRadius: 4
+        },
+        {
+          label: 'Bear (AV fast)',
+          data: [-2, -5, -10, -18, -28, -38, -45],
+          backgroundColor: RED,
+          borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 14 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.raw + '%' } }
+      },
+      scales: {
+        y: { grid: { color: '#edf2f7' }, ticks: { callback: v => v + '%' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // Chart 5: Brake Revenue Erosion (combo line + bar)
+  const brakeYears = ['2024', '2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2035'];
+  new Chart(document.getElementById('chartBrakeErosion'), {
+    type: 'bar',
+    data: {
+      labels: brakeYears,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Brake Revenue ($M)',
+          data: [315, 312, 309, 304, 294, 289, 286, 278, 270, 260, 249],
+          backgroundColor: brakeYears.map((_, i) => i === 0 ? BLUE : i < 5 ? ORANGE : RED),
+          borderRadius: 4,
+          order: 2,
+          yAxisID: 'y'
+        },
+        {
+          type: 'line',
+          label: 'EV Fleet % (right axis)',
+          data: [4, 5, 6, 7.5, 9, 11, 14, 17, 20, 23, 32],
+          borderColor: TEAL,
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          tension: 0.3,
+          pointRadius: 4,
+          order: 1,
+          yAxisID: 'y2'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 14 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label.includes('EV') ? ctx.raw + '%' : '$' + ctx.raw + 'M' } }
+      },
+      scales: {
+        y: { position: 'left', beginAtZero: false, min: 200, grid: { color: '#edf2f7' }, ticks: { callback: v => '$' + v + 'M' } },
+        y2: { position: 'right', beginAtZero: true, grid: { display: false }, ticks: { callback: v => v + '%' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // Chart 6: Tire Wear Rate Comparison
+  new Chart(document.getElementById('chartTireWear'), {
+    type: 'bar',
+    data: {
+      labels: ['Standard ICE\n(baseline)', 'Performance ICE\n(sports/truck)', 'Standard BEV\n(heavier chassis)', 'Performance BEV\n(high-torque)', 'AV-Optimized BEV\n(smooth accel.)'],
+      datasets: [{
+        label: 'Miles per mm tread depth',
+        data: [4800, 3900, 3750, 2900, 5200],
+        backgroundColor: [GRAY, GRAY, ORANGE, RED, GREEN],
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.raw.toLocaleString() + ' miles/mm' } }
+      },
+      scales: {
+        x: { beginAtZero: true, grid: { color: '#edf2f7' }, ticks: { callback: v => (v/1000).toFixed(0) + 'K mi/mm' } },
+        y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+
+  // Chart 7: Strategic Options Bubble (use horizontal bar as proxy)
+  new Chart(document.getElementById('chartOptions'), {
+    type: 'bar',
+    data: {
+      labels: ['ADAS Calibration', 'EV Specialty Tires', 'Fleet Contracts', 'Mobile Service', 'EV Battery Diag.', 'TaaS Subscription'],
+      datasets: [
+        {
+          label: 'Revenue Potential ($M midpoint)',
+          data: [115, 160, 225, 75, 45, 120],
+          backgroundColor: [GREEN, GREEN, BLUE, BLUE_LIGHT, ORANGE, ORANGE],
+          borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => '$' + ctx.raw + 'M revenue potential' } }
+      },
+      scales: {
+        x: { beginAtZero: true, grid: { color: '#edf2f7' }, ticks: { callback: v => '$' + v + 'M' } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+
+  // Chart 8: ADAS Calibration Incremental Revenue
+  new Chart(document.getElementById('chartAdas'), {
+    type: 'bar',
+    data: {
+      labels: ['2025', '2026', '2027', '2028', '2029', '2030'],
+      datasets: [{
+        label: 'Incremental ADAS Revenue ($M)',
+        data: [5, 22, 55, 85, 108, 130],
+        backgroundColor: ['#edf2f7', BLUE_LIGHT, BLUE_LIGHT, BLUE, BLUE, BLUE_DARK],
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => '$' + ctx.raw + 'M incremental revenue' } }
+      },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#edf2f7' }, ticks: { callback: v => '$' + v + 'M' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // Chart 9: NPS Comparison
+  new Chart(document.getElementById('chartNps'), {
+    type: 'bar',
+    data: {
+      labels: ['Les Schwab', 'Discount Tire', 'Firestone', "Jiffy Lube", "Pep Boys", "Midas", "Sears Auto"],
+      datasets: [{
+        label: 'NPS Score',
+        data: [75, 55, 42, 38, 28, 24, 18],
+        backgroundColor: [BLUE_DARK, BLUE_LIGHT, GRAY, GRAY, GRAY, GRAY, GRAY],
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => 'NPS: ' + ctx.raw } }
+      },
+      scales: {
+        x: { beginAtZero: true, max: 90, grid: { color: '#edf2f7' } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+
+  // Chart 10: Visit Frequency
+  new Chart(document.getElementById('chartVisitFreq'), {
+    type: 'bar',
+    data: {
+      labels: ['ICE Vehicle\n(today)', 'ICE Vehicle\n(2030)', 'BEV\n(2027–30)', 'BEV\n(2033+)', 'AV Fleet Vehicle\n(2030+)'],
+      datasets: [{
+        label: 'Annual Service Visits per Vehicle',
+        data: [3.8, 3.6, 2.4, 2.2, 4.5],
+        backgroundColor: [BLUE, BLUE_LIGHT, ORANGE, RED, GREEN],
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.raw + ' visits/year/vehicle' } }
+      },
+      scales: {
+        y: { beginAtZero: true, max: 6, grid: { color: '#edf2f7' }, ticks: { callback: v => v + 'x' } },
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+
+  // Chart 11: Revenue Scenarios
+  const scenYears = ['2024', '2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2035'];
+  new Chart(document.getElementById('chartRevScenario'), {
+    type: 'line',
+    data: {
+      labels: scenYears,
+      datasets: [
+        {
+          label: 'Bull (AV slow + strategic exec)',
+          data: [2100, 2165, 2230, 2285, 2330, 2380, 2420, 2450, 2480, 2500, 2520],
+          borderColor: GREEN,
+          backgroundColor: 'rgba(56,161,105,0.06)',
+          fill: true,
+          borderWidth: 2,
+          tension: 0.3,
+          pointRadius: 4
+        },
+        {
+          label: 'Base (gradual, partial pivot)',
+          data: [2100, 2130, 2155, 2175, 2190, 2200, 2208, 2205, 2195, 2185, 2160],
+          borderColor: BLUE,
+          backgroundColor: 'rgba(43,108,176,0.06)',
+          fill: true,
+          borderWidth: 2,
+          tension: 0.3,
+          pointRadius: 4
+        },
+        {
+          label: 'Bear (AV fast + no pivot)',
+          data: [2100, 2090, 2065, 2025, 1985, 1945, 1895, 1850, 1800, 1790, 1785],
+          borderColor: RED,
+          backgroundColor: 'rgba(229,62,62,0.06)',
+          fill: true,
+          borderWidth: 2,
+          borderDash: [5, 4],
+          tension: 0.3,
+          pointRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 14 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': $' + ctx.raw + 'M' } }
+      },
+      scales: {
+        y: { beginAtZero: false, min: 1600, grid: { color: '#edf2f7' }, ticks: { callback: v => '$' + (v/1000).toFixed(1) + 'B' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // Chart 12: EBITDA Scenarios
+  new Chart(document.getElementById('chartEbitda'), {
+    type: 'bar',
+    data: {
+      labels: ['2024E', '2026E', '2028E', '2030E', '2032E', '2035E'],
+      datasets: [
+        {
+          label: 'Bull',
+          data: [273, 295, 320, 345, 365, 375],
+          backgroundColor: GREEN,
+          borderRadius: 4
+        },
+        {
+          label: 'Base',
+          data: [273, 278, 285, 290, 288, 285],
+          backgroundColor: BLUE,
+          borderRadius: 4
+        },
+        {
+          label: 'Bear',
+          data: [273, 265, 248, 235, 218, 205],
+          backgroundColor: RED,
+          borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 14 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': $' + ctx.raw + 'M EBITDA' } }
+      },
+      scales: {
+        y: { beginAtZero: false, min: 150, grid: { color: '#edf2f7' }, ticks: { callback: v => '$' + v + 'M' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // Dark mode IIFE
+  (function() {
+    var LIGHT = { text: '#4a5568', grid: '#edf2f7', doughnutBorder: '#ffffff' };
+    var DARK  = { text: '#a0aec0', grid: '#4a5568', doughnutBorder: '#2d3748' };
+
+    function applyTheme(isDark) {
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      var toggle = document.getElementById('themeToggle');
+      if (toggle) toggle.setAttribute('aria-checked', isDark ? 'true' : 'false');
+
+      var palette = isDark ? DARK : LIGHT;
+      Chart.defaults.color = palette.text;
+      Object.values(Chart.instances).forEach(function(chart) {
+        var scales = chart.options.scales || {};
+        Object.keys(scales).forEach(function(key) {
+          var s = scales[key];
+          if (s.grid) s.grid.color = s.grid.display === false ? undefined : palette.grid;
+          if (s.ticks) s.ticks.color = palette.text;
+        });
+        var plugins = chart.options.plugins || {};
+        if (plugins.legend && plugins.legend.labels) plugins.legend.labels.color = palette.text;
+        if (chart.config.type === 'doughnut') {
+          chart.data.datasets.forEach(function(ds) { ds.borderColor = palette.doughnutBorder; });
+        }
+        chart.update('none');
+      });
+    }
+
+    var systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+    var userOverride = null;
+    function currentIsDark() { return userOverride !== null ? userOverride : systemDark.matches; }
+    applyTheme(currentIsDark());
+
+    var toggleEl = document.getElementById('themeToggle');
+    if (toggleEl) {
+      toggleEl.addEventListener('click', function() { userOverride = !currentIsDark(); applyTheme(userOverride); });
+      toggleEl.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEl.click(); }
+      });
+    }
+    systemDark.addEventListener('change', function() { if (userOverride === null) applyTheme(systemDark.matches); });
+  })();
+</script>
+</body>
+</html>

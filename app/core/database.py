@@ -20,6 +20,12 @@ from app.core.models import Base
 # Import Macro Causal Graph models
 import app.core.macro_models  # noqa: F401 — registers tables with Base.metadata
 
+# Import Eval Builder models
+import app.core.eval_models  # noqa: F401 — registers eval_suites/cases/runs/results with Base.metadata
+
+# Import Economic Data Quality models
+from app.core.models import EconDataRevision  # noqa: F401 — registers econ_data_revisions with Base.metadata
+
 # Import Job Queue model for distributed workers
 import logging
 
@@ -65,6 +71,26 @@ def create_tables(engine=None):
     logger.info("Creating core tables if they don't exist...")
     Base.metadata.create_all(bind=engine)
     logger.info("Core tables ready")
+
+    # Run schema migrations for new columns (idempotent)
+    _apply_schema_migrations(engine)
+
+
+def _apply_schema_migrations(engine) -> None:
+    """
+    Apply incremental schema changes that can't be handled by create_all().
+    Each statement is idempotent — safe to run on every startup.
+    """
+    migrations = [
+        "ALTER TABLE lp_fund ADD COLUMN IF NOT EXISTS lp_tier INTEGER",
+    ]
+    with engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception as e:
+                logger.debug(f"Migration skipped: {sql[:60]}... ({e})")
 
 
 def get_session_factory():

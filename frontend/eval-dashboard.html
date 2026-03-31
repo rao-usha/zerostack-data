@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Eval Builder — Nexdata</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+    .header-left { display: flex; align-items: center; gap: 1rem; }
+    .back-link {
+      color: #94a3b8; text-decoration: none; font-size: 0.8rem;
+      display: flex; align-items: center; gap: 0.3rem;
+    }
+    .back-link:hover { color: #e2e8f0; }
+    .header-title { font-size: 1rem; font-weight: 600; color: #e2e8f0; }
+    .header-title span { color: #6366f1; }
+    .header-right { display: flex; gap: 0.5rem; align-items: center; }
+    .btn {
+      border: none; border-radius: 6px; padding: 0.4rem 1rem;
+      font-size: 0.8rem; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 0.4rem;
+    }
+    .btn-primary { background: #6366f1; color: white; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-secondary { background: #334155; color: #e2e8f0; }
+    .btn-secondary:hover { background: #475569; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Stats bar */
+    .stats-bar {
+      background: #1e293b; border-bottom: 1px solid #334155;
+      display: flex; gap: 0;
+    }
+    .stat { flex: 1; padding: 0.9rem 1.5rem; border-right: 1px solid #334155; }
+    .stat:last-child { border-right: none; }
+    .stat-value { font-size: 1.6rem; font-weight: 700; color: #e2e8f0; }
+    .stat-value.good { color: #22c55e; }
+    .stat-value.warn { color: #f59e0b; }
+    .stat-value.bad  { color: #ef4444; }
+    .stat-label { font-size: 0.7rem; color: #64748b; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* Tabs */
+    .tabs {
+      display: flex; border-bottom: 1px solid #334155;
+      background: #1e293b; padding: 0 1.5rem;
+    }
+    .tab {
+      padding: 0.75rem 1.25rem; font-size: 0.82rem; font-weight: 500;
+      color: #64748b; cursor: pointer; border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .tab:hover { color: #e2e8f0; }
+    .tab.active { color: #6366f1; border-bottom-color: #6366f1; }
+
+    /* Layout */
+    .content { display: flex; height: calc(100vh - 130px); }
+    .panel-left { width: 420px; min-width: 320px; border-right: 1px solid #334155; overflow-y: auto; flex-shrink: 0; }
+    .panel-right { flex: 1; overflow-y: auto; padding: 1.5rem; }
+
+    /* Suite list */
+    .suite-filters {
+      padding: 0.75rem 1rem; border-bottom: 1px solid #1e293b;
+      display: flex; gap: 0.5rem; align-items: center;
+    }
+    .filter-select {
+      background: #1e293b; border: 1px solid #334155; color: #e2e8f0;
+      border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.78rem; cursor: pointer;
+    }
+    .suite-item {
+      padding: 0.85rem 1rem; border-bottom: 1px solid #1e293b;
+      cursor: pointer; transition: background 0.1s;
+    }
+    .suite-item:hover { background: #1e293b; }
+    .suite-item.selected { background: #1e293b; border-left: 3px solid #6366f1; }
+    .suite-item-top {
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;
+    }
+    .suite-name { font-size: 0.82rem; font-weight: 600; color: #e2e8f0; line-height: 1.3; }
+    .suite-meta { font-size: 0.72rem; color: #64748b; margin-top: 0.2rem; display: flex; gap: 0.75rem; }
+    .score-badge {
+      font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.5rem;
+      border-radius: 4px; white-space: nowrap; flex-shrink: 0;
+    }
+    .score-green  { background: #14532d; color: #22c55e; }
+    .score-yellow { background: #451a03; color: #f59e0b; }
+    .score-red    { background: #450a0a; color: #ef4444; }
+    .score-gray   { background: #1e293b; color: #64748b; }
+    .regression-dot {
+      display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+      background: #ef4444; margin-left: 0.4rem; vertical-align: middle;
+    }
+    .priority-pill {
+      font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.4rem;
+      border-radius: 3px; text-transform: uppercase;
+    }
+    .p1 { background: #3b0764; color: #c084fc; }
+    .p2 { background: #0c2240; color: #60a5fa; }
+    .p3 { background: #1c2814; color: #86efac; }
+
+    /* Detail panel */
+    .detail-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      margin-bottom: 1.25rem; gap: 1rem;
+    }
+    .detail-title { font-size: 1rem; font-weight: 700; color: #e2e8f0; }
+    .detail-meta { font-size: 0.75rem; color: #64748b; margin-top: 0.3rem; }
+    .detail-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+
+    /* Score summary */
+    .score-summary {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .score-box {
+      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      padding: 0.75rem; text-align: center;
+    }
+    .score-box-value { font-size: 1.4rem; font-weight: 700; }
+    .score-box-label { font-size: 0.65rem; color: #64748b; margin-top: 2px; text-transform: uppercase; }
+
+    /* Run history */
+    .section-title {
+      font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase;
+      letter-spacing: 0.05em; margin-bottom: 0.6rem;
+    }
+    .run-history {
+      display: flex; gap: 3px; margin-bottom: 1.25rem; align-items: flex-end; height: 36px;
+    }
+    .run-bar {
+      flex: 1; border-radius: 2px; cursor: pointer; min-width: 6px; max-width: 20px;
+      transition: opacity 0.1s;
+    }
+    .run-bar:hover { opacity: 0.8; }
+
+    /* Cases table */
+    .cases-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .cases-table th {
+      text-align: left; padding: 0.5rem 0.75rem; color: #64748b;
+      font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+      border-bottom: 1px solid #334155; white-space: nowrap;
+    }
+    .cases-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid #1e293b; vertical-align: top; }
+    .cases-table tr:hover td { background: #1e293b; }
+    .tier-badge {
+      font-size: 0.65rem; font-weight: 700; padding: 0.15rem 0.4rem; border-radius: 3px;
+    }
+    .tier-1 { background: #1e1b4b; color: #818cf8; }
+    .tier-2 { background: #0c2240; color: #60a5fa; }
+    .tier-3 { background: #1c2814; color: #86efac; }
+    .pass-icon { color: #22c55e; font-weight: 700; }
+    .fail-icon { color: #ef4444; font-weight: 700; }
+    .skip-icon { color: #64748b; }
+    .failure-reason { font-size: 0.7rem; color: #94a3b8; margin-top: 0.2rem; }
+    .actual-val { font-size: 0.7rem; color: #64748b; margin-top: 0.15rem; font-family: monospace; }
+
+    /* Edit case panel */
+    .edit-panel {
+      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      padding: 1.25rem; margin-top: 1rem;
+    }
+    .form-group { margin-bottom: 0.75rem; }
+    .form-label { font-size: 0.72rem; color: #94a3b8; margin-bottom: 0.3rem; display: block; }
+    .form-input {
+      background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
+      border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.8rem; width: 100%;
+    }
+    .form-input:focus { outline: none; border-color: #6366f1; }
+    .form-textarea {
+      background: #0f172a; border: 1px solid #334155; color: #e2e8f0;
+      border-radius: 6px; padding: 0.5rem; font-size: 0.78rem; width: 100%;
+      font-family: monospace; resize: vertical; min-height: 80px;
+    }
+    .form-textarea:focus { outline: none; border-color: #6366f1; }
+
+    /* Empty state */
+    .empty { color: #475569; font-size: 0.85rem; padding: 2rem; text-align: center; }
+
+    /* Spinner */
+    .spinner {
+      width: 18px; height: 18px; border: 2px solid #334155;
+      border-top-color: #6366f1; border-radius: 50%;
+      animation: spin 0.7s linear infinite; display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      padding: 0.75rem 1.25rem; font-size: 0.82rem; color: #e2e8f0;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5); transition: opacity 0.3s;
+      z-index: 1000;
+    }
+    .toast.hidden { opacity: 0; pointer-events: none; }
+    .toast.success { border-color: #22c55e; }
+    .toast.error   { border-color: #ef4444; }
+
+    /* Runs tab full-width */
+    .runs-full { padding: 1.5rem; }
+    .runs-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .runs-table th {
+      text-align: left; padding: 0.5rem 0.75rem; color: #64748b;
+      font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+      border-bottom: 1px solid #334155;
+    }
+    .runs-table td { padding: 0.65rem 0.75rem; border-bottom: 1px solid #1e293b; }
+    .runs-table tr:hover td { background: #1e293b; cursor: pointer; }
+    .regression-row td { background: rgba(239,68,68,0.05); }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <a href="index.html" class="back-link">&#8592; Gallery</a>
+    <div class="header-title">Eval Builder <span>/ Agentic Pipeline QA</span></div>
+  </div>
+  <div class="header-right">
+    <select class="filter-select" id="priorityFilter" onchange="applyFilters()">
+      <option value="">All Priorities</option>
+      <option value="1">P1 Daily</option>
+      <option value="2">P2 Weekly</option>
+      <option value="3">P3 Monthly</option>
+    </select>
+    <button class="btn btn-secondary" onclick="runPriority(1)" id="runP1Btn">Run P1</button>
+    <button class="btn btn-primary" onclick="refreshAll()" id="refreshBtn">Refresh</button>
+  </div>
+</div>
+
+<div class="stats-bar" id="statsBar">
+  <div class="stat"><div class="stat-value" id="statSuites">—</div><div class="stat-label">Suites</div></div>
+  <div class="stat"><div class="stat-value" id="statRuns">—</div><div class="stat-label">Total Runs</div></div>
+  <div class="stat"><div class="stat-value" id="statRegressions">—</div><div class="stat-label">Regressions</div></div>
+  <div class="stat"><div class="stat-value" id="statAvgScore">—</div><div class="stat-label">Avg Score</div></div>
+  <div class="stat"><div class="stat-value" id="statCases">—</div><div class="stat-label">Total Cases</div></div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('suites', this)">Suites</div>
+  <div class="tab" onclick="switchTab('runs', this)">Recent Runs</div>
+</div>
+
+<!-- SUITES TAB -->
+<div id="tab-suites" class="content">
+  <div class="panel-left">
+    <div class="suite-filters">
+      <select class="filter-select" id="domainFilter" onchange="applyFilters()">
+        <option value="">All Domains</option>
+      </select>
+      <select class="filter-select" id="priorityFilter2" onchange="applyFilters()">
+        <option value="">All Priorities</option>
+        <option value="1">P1</option>
+        <option value="2">P2</option>
+        <option value="3">P3</option>
+      </select>
+    </div>
+    <div id="suiteList"><div class="empty">Loading suites...</div></div>
+  </div>
+  <div class="panel-right" id="detailPanel">
+    <div class="empty" style="margin-top:3rem;">Select a suite to view details</div>
+  </div>
+</div>
+
+<!-- RUNS TAB -->
+<div id="tab-runs" style="display:none;" class="runs-full">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+    <div style="font-size:0.9rem; font-weight:600;">Recent Eval Runs</div>
+    <label style="font-size:0.78rem; color:#94a3b8; display:flex; align-items:center; gap:0.4rem;">
+      <input type="checkbox" id="regressionOnly" onchange="loadRuns()"> Regressions only
+    </label>
+  </div>
+  <div id="runsTableContainer"><div class="empty">Loading runs...</div></div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script>
+const API = 'http://localhost:8001/api/v1';
+
+let suites = [];
+let runsCache = {};        // run_id → run detail
+let selectedSuiteId = null;
+let selectedRunId = null;
+let editingCaseId = null;
+
+// ─── Init ───────────────────────────────────────────────────────────────────
+
+async function init() {
+  await Promise.all([loadSuites(), loadStats()]);
+}
+
+async function refreshAll() {
+  runsCache = {};
+  await init();
+  if (selectedSuiteId) await loadSuiteDetail(selectedSuiteId);
+  showToast('Refreshed', 'success');
+}
+
+// ─── Stats ──────────────────────────────────────────────────────────────────
+
+async function loadStats() {
+  try {
+    const [suitesData, runsData] = await Promise.all([
+      fetch(`${API}/evals/suites?active_only=true`).then(r => r.json()),
+      fetch(`${API}/evals/runs?limit=200`).then(r => r.json()),
+    ]);
+
+    const totalCases = suitesData.reduce((s, x) => s + (x.case_count || 0), 0);
+    const regressions = runsData.filter(r => r.is_regression).length;
+    const scored = runsData.filter(r => r.composite_score !== null);
+    const avgScore = scored.length
+      ? Math.round(scored.reduce((s, r) => s + r.composite_score, 0) / scored.length)
+      : null;
+
+    document.getElementById('statSuites').textContent = suitesData.length;
+    document.getElementById('statRuns').textContent = runsData.length;
+    const regEl = document.getElementById('statRegressions');
+    regEl.textContent = regressions;
+    regEl.className = 'stat-value' + (regressions > 0 ? ' bad' : ' good');
+    const scoreEl = document.getElementById('statAvgScore');
+    scoreEl.textContent = avgScore !== null ? avgScore + '%' : '—';
+    scoreEl.className = 'stat-value' + (avgScore >= 80 ? ' good' : avgScore >= 60 ? ' warn' : ' bad');
+    document.getElementById('statCases').textContent = totalCases;
+  } catch(e) {
+    console.error('Stats load failed:', e);
+  }
+}
+
+// ─── Suites ─────────────────────────────────────────────────────────────────
+
+async function loadSuites() {
+  try {
+    suites = await fetch(`${API}/evals/suites?active_only=true`).then(r => r.json());
+    populateDomainFilter();
+    renderSuiteList(suites);
+  } catch(e) {
+    document.getElementById('suiteList').innerHTML = '<div class="empty">Failed to load suites</div>';
+  }
+}
+
+function populateDomainFilter() {
+  const domains = [...new Set(suites.map(s => s.domain).filter(Boolean))].sort();
+  const sel = document.getElementById('domainFilter');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All Domains</option>' +
+    domains.map(d => `<option value="${d}">${d}</option>`).join('');
+  sel.value = cur;
+}
+
+function applyFilters() {
+  const domain = document.getElementById('domainFilter').value;
+  const priority = document.getElementById('priorityFilter2').value ||
+                   document.getElementById('priorityFilter').value;
+  let filtered = suites;
+  if (domain) filtered = filtered.filter(s => s.domain === domain);
+  if (priority) filtered = filtered.filter(s => s.priority === parseInt(priority));
+  renderSuiteList(filtered);
+}
+
+function renderSuiteList(list) {
+  const el = document.getElementById('suiteList');
+  if (!list.length) { el.innerHTML = '<div class="empty">No suites match</div>'; return; }
+  el.innerHTML = list.map(s => {
+    const score = s.last_run_score;
+    const badge = score === null ? `<span class="score-badge score-gray">No runs</span>`
+      : score >= 80 ? `<span class="score-badge score-green">${Math.round(score)}%</span>`
+      : score >= 50 ? `<span class="score-badge score-yellow">${Math.round(score)}%</span>`
+      : `<span class="score-badge score-red">${Math.round(score)}%</span>`;
+    const regDot = s.last_run_regression ? '<span class="regression-dot" title="Regression detected"></span>' : '';
+    const pClass = s.priority === 1 ? 'p1' : s.priority === 2 ? 'p2' : 'p3';
+    const pLabel = s.priority === 1 ? 'P1' : s.priority === 2 ? 'P2' : 'P3';
+    return `<div class="suite-item${selectedSuiteId === s.id ? ' selected' : ''}" onclick="selectSuite(${s.id})">
+      <div class="suite-item-top">
+        <div>
+          <div class="suite-name">${esc(s.name)}${regDot}</div>
+          <div class="suite-meta">
+            <span class="priority-pill ${pClass}">${pLabel}</span>
+            <span>${s.case_count} cases</span>
+            ${s.domain ? `<span>${s.domain}</span>` : ''}
+          </div>
+        </div>
+        ${badge}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function selectSuite(id) {
+  selectedSuiteId = id;
+  editingCaseId = null;
+  renderSuiteList(suites.filter(s => {
+    const dom = document.getElementById('domainFilter').value;
+    const pri = document.getElementById('priorityFilter2').value;
+    return (!dom || s.domain === dom) && (!pri || s.priority === parseInt(pri));
+  }));
+  await loadSuiteDetail(id);
+}
+
+async function loadSuiteDetail(id) {
+  const panel = document.getElementById('detailPanel');
+  panel.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+  try {
+    const [suite, runs] = await Promise.all([
+      fetch(`${API}/evals/suites/${id}`).then(r => r.json()),
+      fetch(`${API}/evals/runs?suite_id=${id}&limit=20`).then(r => r.json()),
+    ]);
+    renderDetail(suite, runs);
+  } catch(e) {
+    panel.innerHTML = '<div class="empty">Failed to load suite details</div>';
+  }
+}
+
+function renderDetail(suite, runs) {
+  const panel = document.getElementById('detailPanel');
+  const lastRun = runs[0];
+  const score = lastRun?.composite_score;
+  const scoreColor = score === null ? '#64748b' : score >= 80 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
+
+  // Run history sparkbars
+  const runBars = runs.slice(0, 30).reverse().map(r => {
+    const s = r.composite_score ?? 0;
+    const h = Math.max(4, Math.round((s / 100) * 36));
+    const c = s >= 80 ? '#22c55e' : s >= 50 ? '#f59e0b' : '#ef4444';
+    return `<div class="run-bar" style="height:${h}px;background:${c};${r.is_regression ? 'outline:1px solid #ef4444;' : ''}"
+              title="Run ${r.id}: ${Math.round(s)}%${r.is_regression ? ' ⚠ regression' : ''}"
+              onclick="showRunDetail(${r.id})"></div>`;
+  }).join('');
+
+  // Last run results table
+  let resultsHtml = '';
+  if (lastRun?.results?.length) {
+    resultsHtml = `
+      <div class="section-title" style="margin-top:1.25rem;">Last Run — Case Results</div>
+      <table class="cases-table">
+        <thead><tr>
+          <th>Case</th><th>Type</th><th>Tier</th><th>Result</th><th>Score</th>
+        </tr></thead>
+        <tbody>
+          ${lastRun.results.map(r => {
+            const icon = r.passed ? '<span class="pass-icon">&#10003;</span>' : '<span class="fail-icon">&#10007;</span>';
+            const actual = r.actual_value ? `<div class="actual-val">${JSON.stringify(r.actual_value).substring(0, 80)}</div>` : '';
+            const reason = r.failure_reason ? `<div class="failure-reason">${esc(r.failure_reason)}</div>` : '';
+            return `<tr>
+              <td>
+                ${esc(r.case_name || '—')}
+                ${reason}
+                ${actual}
+              </td>
+              <td style="color:#94a3b8;font-size:0.72rem;">${esc(r.assertion_type || '')}</td>
+              <td><span class="tier-badge tier-${r.tier}">T${r.tier}</span></td>
+              <td>${icon}${r.partial_credit ? ' <span style="color:#f59e0b;font-size:0.7rem;">partial</span>' : ''}</td>
+              <td style="font-weight:600;color:${r.score >= 80 ? '#22c55e' : r.score >= 50 ? '#f59e0b' : '#ef4444'}">${r.score !== null ? Math.round(r.score) + '%' : '—'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  // Cases management table
+  const casesHtml = `
+    <div class="section-title" style="margin-top:1.25rem;">Cases <button class="btn btn-secondary" style="font-size:0.65rem;padding:0.15rem 0.5rem;margin-left:0.5rem;" onclick="seedFromDB(${suite.id})">Seed from DB</button></div>
+    <table class="cases-table">
+      <thead><tr><th>Name</th><th>Entity</th><th>Assertion</th><th>Tier</th><th>Edit</th></tr></thead>
+      <tbody>
+        ${suite.cases.map(c => `<tr>
+          <td>${esc(c.name)}</td>
+          <td style="color:#64748b;font-size:0.72rem;">${c.entity_name || c.entity_type || '—'}</td>
+          <td style="color:#94a3b8;font-size:0.72rem;font-family:monospace;">${esc(c.assertion_type)}</td>
+          <td><span class="tier-badge tier-${c.tier}">T${c.tier}</span></td>
+          <td><button class="btn btn-secondary" style="font-size:0.65rem;padding:0.15rem 0.5rem;" onclick="openEditCase(${suite.id},${c.id},'${esc(c.name)}','${c.assertion_type}',${c.tier})">Edit</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  const pClass = suite.priority === 1 ? 'p1' : suite.priority === 2 ? 'p2' : 'p3';
+  const pLabel = ['', 'Daily P1', 'Weekly P2', 'Monthly P3'][suite.priority];
+
+  panel.innerHTML = `
+    <div class="detail-header">
+      <div>
+        <div class="detail-title">${esc(suite.name)}</div>
+        <div class="detail-meta">
+          <span class="priority-pill ${pClass}">${pLabel}</span>
+          &nbsp;${esc(suite.eval_mode)} &middot; ${esc(suite.binding_type)}
+          ${suite.schedule_cron ? ` &middot; cron: ${esc(suite.schedule_cron)}` : ''}
+        </div>
+      </div>
+      <div class="detail-actions">
+        <button class="btn btn-secondary" onclick="dryRun(${suite.id})" title="Capture output only">Dry Run</button>
+        <button class="btn btn-primary" onclick="triggerRun(${suite.id})" id="runBtn-${suite.id}">Run Now</button>
+      </div>
+    </div>
+
+    <div class="score-summary">
+      <div class="score-box">
+        <div class="score-box-value" style="color:${scoreColor}">${score !== null ? Math.round(score) + '%' : '—'}</div>
+        <div class="score-box-label">Composite</div>
+      </div>
+      <div class="score-box">
+        <div class="score-box-value" style="color:${lastRun?.tier1_pass_rate >= 100 ? '#22c55e' : '#ef4444'}">${lastRun?.tier1_pass_rate !== null ? Math.round(lastRun.tier1_pass_rate) + '%' : '—'}</div>
+        <div class="score-box-label">T1 Pass Rate</div>
+      </div>
+      <div class="score-box">
+        <div class="score-box-value">${lastRun?.cases_passed ?? '—'}</div>
+        <div class="score-box-label">Passed</div>
+      </div>
+      <div class="score-box">
+        <div class="score-box-value" style="color:${(lastRun?.cases_failed ?? 0) > 0 ? '#ef4444' : '#22c55e'}">${lastRun?.cases_failed ?? '—'}</div>
+        <div class="score-box-label">Failed</div>
+      </div>
+    </div>
+
+    ${runs.length ? `
+      <div class="section-title">Run History (last ${runs.length})</div>
+      <div class="run-history">${runBars || '<span style="color:#475569;font-size:0.75rem;">No runs yet</span>'}</div>
+    ` : ''}
+
+    ${resultsHtml}
+    ${casesHtml}
+    <div id="editCasePanel"></div>
+  `;
+}
+
+// ─── Edit Case ───────────────────────────────────────────────────────────────
+
+function openEditCase(suiteId, caseId, name, assertionType, tier) {
+  editingCaseId = caseId;
+  const panel = document.getElementById('editCasePanel');
+  // Fetch case params
+  fetch(`${API}/evals/suites/${suiteId}/cases`)
+    .then(r => r.json())
+    .then(cases => {
+      const c = cases.find(x => x.id === caseId);
+      if (!c) return;
+      panel.innerHTML = `
+        <div class="edit-panel">
+          <div style="font-size:0.8rem;font-weight:700;margin-bottom:0.75rem;color:#e2e8f0;">Edit Case: ${esc(c.name)}</div>
+          <div class="form-group">
+            <label class="form-label">Assertion Params (JSON)</label>
+            <textarea class="form-textarea" id="editParams">${JSON.stringify(c.assertion_params, null, 2)}</textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tier (1=hard, 2=soft, 3=LLM judge)</label>
+            <select class="form-input" id="editTier">
+              <option value="1" ${c.tier===1?'selected':''}>1 — Hard (must pass)</option>
+              <option value="2" ${c.tier===2?'selected':''}>2 — Soft (partial credit)</option>
+              <option value="3" ${c.tier===3?'selected':''}>3 — LLM Judge</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Edit Reason (optional)</label>
+            <input class="form-input" id="editReason" placeholder="Why are you changing this?" />
+          </div>
+          <div style="display:flex;gap:0.5rem;">
+            <button class="btn btn-primary" onclick="saveCase(${suiteId},${caseId})">Save</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('editCasePanel').innerHTML=''">Cancel</button>
+          </div>
+        </div>`;
+    });
+}
+
+async function saveCase(suiteId, caseId) {
+  let params;
+  try {
+    params = JSON.parse(document.getElementById('editParams').value);
+  } catch(e) {
+    showToast('Invalid JSON in assertion params', 'error'); return;
+  }
+  const tier = parseInt(document.getElementById('editTier').value);
+  const reason = document.getElementById('editReason').value;
+  try {
+    const resp = await fetch(`${API}/evals/suites/${suiteId}/cases/${caseId}`, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ assertion_params: params, tier, edit_reason: reason || null }),
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    showToast('Case updated', 'success');
+    document.getElementById('editCasePanel').innerHTML = '';
+    await loadSuiteDetail(suiteId);
+  } catch(e) {
+    showToast('Save failed: ' + e.message, 'error');
+  }
+}
+
+// ─── Run actions ─────────────────────────────────────────────────────────────
+
+async function triggerRun(suiteId) {
+  const btn = document.getElementById(`runBtn-${suiteId}`);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Running...'; }
+  try {
+    const resp = await fetch(`${API}/evals/suites/${suiteId}/run?triggered_by=dashboard`, { method: 'POST' });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || resp.statusText);
+    showToast(`Run started (ID: ${data.run_id})`, 'success');
+    // Poll for completion
+    setTimeout(() => pollRun(data.run_id, suiteId, btn), 2000);
+  } catch(e) {
+    showToast('Run failed: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Now'; }
+  }
+}
+
+async function pollRun(runId, suiteId, btn) {
+  try {
+    const run = await fetch(`${API}/evals/runs/${runId}`).then(r => r.json());
+    if (run.status === 'running') {
+      setTimeout(() => pollRun(runId, suiteId, btn), 2000);
+      return;
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Now'; }
+    await loadStats();
+    await loadSuiteDetail(suiteId);
+    if (run.is_regression) {
+      showToast(`Run complete — REGRESSION detected! Score: ${Math.round(run.composite_score)}%`, 'error');
+    } else {
+      showToast(`Run complete — Score: ${run.composite_score !== null ? Math.round(run.composite_score) : '?'}%`, 'success');
+    }
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Run Now'; }
+  }
+}
+
+async function dryRun(suiteId) {
+  showToast('Running dry-run capture...', '');
+  try {
+    const resp = await fetch(`${API}/evals/dry-run/${suiteId}`, { method: 'POST' });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || resp.statusText);
+    showToast(`Dry run OK — mode: ${data.eval_mode}, keys: ${(data.raw_keys||[]).join(', ') || data.raw_preview || '(see console)'}`, 'success');
+    console.log('Dry run result:', data);
+  } catch(e) {
+    showToast('Dry run failed: ' + e.message, 'error');
+  }
+}
+
+async function runPriority(p) {
+  const btn = document.getElementById('runP1Btn');
+  btn.disabled = true; btn.textContent = 'Running P1...';
+  try {
+    const resp = await fetch(`${API}/evals/run-priority`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ priority: p }),
+    });
+    const data = await resp.json();
+    showToast(`Started ${data.started} P${p} suite(s)`, 'success');
+    setTimeout(refreshAll, 5000);
+  } catch(e) {
+    showToast('Run priority failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Run P1';
+  }
+}
+
+async function seedFromDB(suiteId) {
+  try {
+    const resp = await fetch(`${API}/evals/suites/${suiteId}/seed-from-db`, { method: 'POST' });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || resp.statusText);
+    showToast(`Seeded ${data.cases_created} case(s)`, 'success');
+    await loadSuiteDetail(suiteId);
+  } catch(e) {
+    showToast('Seed failed: ' + e.message, 'error');
+  }
+}
+
+// ─── Runs tab ────────────────────────────────────────────────────────────────
+
+async function loadRuns() {
+  const regrOnly = document.getElementById('regressionOnly').checked;
+  const url = `${API}/evals/runs?limit=100${regrOnly ? '&regression_only=true' : ''}`;
+  try {
+    const runs = await fetch(url).then(r => r.json());
+    renderRunsTable(runs);
+  } catch(e) {
+    document.getElementById('runsTableContainer').innerHTML = '<div class="empty">Failed to load runs</div>';
+  }
+}
+
+function renderRunsTable(runs) {
+  if (!runs.length) {
+    document.getElementById('runsTableContainer').innerHTML = '<div class="empty">No runs found</div>';
+    return;
+  }
+  document.getElementById('runsTableContainer').innerHTML = `
+    <table class="runs-table">
+      <thead><tr>
+        <th>Suite</th><th>Score</th><th>T1 Pass</th><th>Passed</th><th>Failed</th>
+        <th>Regression</th><th>Triggered</th><th>Completed</th>
+      </tr></thead>
+      <tbody>
+        ${runs.map(r => {
+          const score = r.composite_score;
+          const scoreColor = score === null ? '#64748b' : score >= 80 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
+          return `<tr class="${r.is_regression ? 'regression-row' : ''}" onclick="showRunDetail(${r.id})">
+            <td>${esc(r.suite_name || `Suite ${r.suite_id}`)}</td>
+            <td style="font-weight:700;color:${scoreColor}">${score !== null ? Math.round(score)+'%' : '—'}</td>
+            <td>${r.tier1_pass_rate !== null ? Math.round(r.tier1_pass_rate)+'%' : '—'}</td>
+            <td style="color:#22c55e">${r.cases_passed ?? '—'}</td>
+            <td style="color:${(r.cases_failed??0)>0?'#ef4444':'#22c55e'}">${r.cases_failed ?? '—'}</td>
+            <td>${r.is_regression ? '<span style="color:#ef4444;font-weight:700;">REGRESSION</span>' : '<span style="color:#22c55e">OK</span>'}</td>
+            <td style="color:#64748b;font-size:0.75rem;">${formatTime(r.triggered_at)}</td>
+            <td style="color:#64748b;font-size:0.75rem;">${formatTime(r.completed_at)}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function showRunDetail(runId) {
+  // Switch to Suites tab and show detail
+  switchTab('suites', document.querySelector('.tab'));
+  const run = await fetch(`${API}/evals/runs/${runId}`).then(r => r.json());
+  // Find suite and render
+  const suite = await fetch(`${API}/evals/suites/${run.suite_id}`).then(r => r.json());
+  selectedSuiteId = run.suite_id;
+  renderDetail(suite, [run]);
+}
+
+// ─── Tab switching ────────────────────────────────────────────────────────────
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-suites').style.display = name === 'suites' ? 'flex' : 'none';
+  document.getElementById('tab-runs').style.display = name === 'runs' ? 'block' : 'none';
+  if (name === 'runs') loadRuns();
+}
+
+// ─── Utilities ───────────────────────────────────────────────────────────────
+
+function showToast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast ${type}`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.add('hidden'), 4000);
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+init();
+</script>
+</body>
+</html>

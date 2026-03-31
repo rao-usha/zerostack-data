@@ -242,4 +242,10 @@ COMMON_SERIES = {
         "wti_crude_oil": "DCOILWTICO",  # Crude Oil Prices: West Texas Intermediate (WTI)
         "henry_hub_natural_gas": "DHHNGSP",  # Henry Hub Natural Gas Spot Price
     },
+    "auto_sector": {
+        "vehicle_sales_total": "TOTALSA",          # Total Vehicle Sales (millions, SAAR)
+        "auto_dealer_retail_sales": "RSAFS4441CN", # Retail Sales: Motor Vehicle & Parts Dealers
+        "gas_price_regular": "GASREGCOVW",         # US Regular Conventional Gas Price (cents/gallon)
+        "personal_consumption_vehicles": "DPCERC1", # PCE: Motor Vehicles & Parts (chain-type index)
+    },
 }

@@ -284,6 +284,7 @@
             </div>
         </div>
         <div class="header-right">
+            <select id="co-select" style="display:none;padding:0.4rem 0.75rem;background:#334155;border:1px solid #334155;border-radius:8px;color:#f1f5f9;font-size:0.875rem;cursor:pointer;outline:none;"></select>
             <div class="search-container">
                 <span class="search-icon">&#128269;</span>
                 <input type="text" class="search-input" id="search" placeholder="Search by name or title...">
@@ -326,8 +327,8 @@
     <div class="tooltip" id="tooltip"></div>
 
 <script>
-// === Demo Data: Acme Industrial Corp org chart ===
-const orgData = {
+// === Demo Data: Acme Industrial Corp org chart (static fallback) ===
+let orgData = {
     name: "Robert Chen", title: "Chief Executive Officer", dept: "Executive", tenure: 12,
     children: [
         {
@@ -410,7 +411,8 @@ const deptColors = {
     Finance: "#22c55e",
     Technology: "#06b6d4",
     Marketing: "#f97316",
-    HR: "#a855f7"
+    HR: "#a855f7",
+    Board: "#7c3aed",
 };
 
 // === Dimensions ===
@@ -514,7 +516,7 @@ function update(source) {
             return linkPath({ source: o, target: o });
         })
         .attr("stroke", d => {
-            const dept = d.target.data.dept.toLowerCase();
+            const dept = (d.target.data.dept || "executive").toLowerCase();
             return `url(#link-grad-${dept})`;
         });
 
@@ -522,7 +524,7 @@ function update(source) {
         .transition().duration(duration)
         .attr("d", d => linkPath(d))
         .attr("stroke", d => {
-            const dept = d.target.data.dept.toLowerCase();
+            const dept = (d.target.data.dept || "executive").toLowerCase();
             return `url(#link-grad-${dept})`;
         });
 
@@ -655,7 +657,7 @@ function update(source) {
 
     // Update link gradients y-coordinates
     links.forEach(d => {
-        const dept = d.target.data.dept.toLowerCase();
+        const dept = (d.target.data.dept || "executive").toLowerCase();
         const gradId = `link-grad-${dept}`;
         const grad = defs.select(`#${gradId}`);
         if (!grad.empty()) {
@@ -877,11 +879,149 @@ function fitToView() {
     }, 100);
 }
 
+// === API loading ===
+function transformOrgNode(node) {
+    const dept = node.is_board_member
+        ? "Board"
+        : (node.dept || node.department || node.division || "Executive");
+    return {
+        name: node.name || "Unknown",
+        title: node.title || "",
+        dept,
+        tenure: node.tenure || 0,
+        is_board_member: !!node.is_board_member,
+        is_virtual: !!node.is_virtual,
+        children: (node.children || []).map(transformOrgNode),
+    };
+}
+
+/**
+ * Restructure the API chart root so board members appear above the CEO.
+ * The virtual "Organization" wrapper is replaced with:
+ *   Board of Directors (virtual)
+ *   ├── [board member leaves]
+ *   └── CEO → their normal org tree
+ */
+function restructureForDisplay(root) {
+    // Collect top-level children — handle both virtual "Organization" wrapper
+    // and single-root responses
+    const topChildren = (root.name === "Organization" || root.management_level === 0)
+        ? (root.children || [])
+        : [root];
+
+    const boardMembers = topChildren.filter(c => c.is_board_member);
+    const execChildren = topChildren.filter(c => !c.is_board_member);
+
+    // Find the primary CEO / most senior executive
+    const ceo = execChildren.find(c => c.management_level === 1)
+        || execChildren.sort((a, b) => (a.management_level || 9) - (b.management_level || 9))[0];
+
+    if (!ceo) return root; // fallback — nothing to restructure
+
+    // Any other non-board orphan roots become CEO direct reports
+    for (const other of execChildren) {
+        if (other !== ceo) {
+            ceo.children = [...(ceo.children || []), other];
+        }
+    }
+
+    // Board members are leaves (they sit on the board, not in the exec tree)
+    const boardLeaves = boardMembers.map(b => ({ ...b, children: [] }));
+
+    return {
+        name: "Board of Directors",
+        title: "Governance",
+        division: "Board",
+        is_board_member: false,
+        is_virtual: true,
+        management_level: 0,
+        children: [...boardLeaves, ceo],
+    };
+}
+
+function rebuildTree(newOrgData, companyName) {
+    // Update title
+    document.querySelector(".title-group h1").textContent =
+        "Organization Chart \u2014 " + (companyName || "Unknown");
+    document.title = "Organization Chart \u2014 " + (companyName || "Unknown");
+
+    // Clear existing vis
+    linkGroup.selectAll("*").remove();
+    nodeGroup.selectAll("*").remove();
+
+    // Rebuild hierarchy
+    root = d3.hierarchy(newOrgData);
+    root.descendants().forEach(d => {
+        d._children = d.children;
+        d.data._id = (d.data.name || "").replace(/\s/g, "_");
+    });
+    root.x0 = 0;
+    root.y0 = 0;
+    update(root);
+    fitToView();
+}
+
+async function loadCompany(id) {
+    try {
+        const resp = await fetch(`/api/v1/people-analytics/companies/${id}/org-chart`);
+        if (!resp.ok) throw new Error("API " + resp.status);
+        const data = await resp.json();
+        const chartRoot = data.chart_data?.root || data.chart_data;
+        if (!chartRoot) throw new Error("No chart_data.root");
+        const restructured = restructureForDisplay(chartRoot);
+        const transformed = transformOrgNode(restructured);
+        rebuildTree(transformed, data.company_name);
+    } catch (e) {
+        console.warn("Org chart API error, using static data:", e.message);
+        rebuildTree(orgData, "Acme Industrial Corp");
+    }
+}
+
+async function populateSelector() {
+    try {
+        const resp = await fetch("/api/v1/people-analytics/companies-with-org-charts");
+        if (!resp.ok) throw new Error("API " + resp.status);
+        const companies = await resp.json();
+        if (!companies.length) return;
+
+        const sel = document.getElementById("co-select");
+        sel.innerHTML = companies.map(c =>
+            `<option value="${c.id}">${c.name}${c.total_people ? " (" + c.total_people + ")" : ""}</option>`
+        ).join("");
+        sel.style.display = "inline-block";
+        sel.addEventListener("change", () => loadCompany(sel.value));
+        return companies[0].id;
+    } catch (e) {
+        console.warn("Could not load company list:", e.message);
+        return null;
+    }
+}
+
 // === Initial render ===
-root.x0 = 0;
-root.y0 = 0;
-update(root);
-fitToView();
+(async () => {
+    const params = new URLSearchParams(window.location.search);
+    const urlId = params.get("company_id");
+
+    const firstId = await populateSelector();
+    const targetId = urlId || firstId;
+
+    if (targetId) {
+        const sel = document.getElementById("co-select");
+        if (sel) sel.value = targetId;
+        await loadCompany(targetId);
+    } else {
+        // Fallback to static demo data
+        root = d3.hierarchy(orgData);
+        root.descendants().forEach(d => {
+            d._children = d.children;
+            d.data._id = d.data.name.replace(/\s/g, "_");
+        });
+        root.x0 = 0;
+        root.y0 = 0;
+        update(root);
+        fitToView();
+    }
+})();
 </script>
 </body>
 </html>

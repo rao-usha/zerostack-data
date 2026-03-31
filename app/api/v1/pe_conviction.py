@@ -279,5 +279,147 @@ async def trigger_lp_collection(
     return {
         "status": "started",
         "message": "LP commitment collection started in background",
-        "sources": sources or ["pension_ir", "form_d", "form_990"],
+        "sources": sources or ["cafr", "form_990", "form_d"],
+    }
+
+
+@router.post("/seed-public")
+async def seed_public_lp_data(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Seed LP commitment data from public sources (Path B: hardcoded annual report data + Path C: HTML portals)."""
+    from app.agents.fund_lp_tracker_agent import FundLPTrackerAgent
+    import asyncio
+
+    def run_seed():
+        agent = FundLPTrackerAgent(db)
+        asyncio.run(agent.run(sources=["public_seed", "html_portal"]))
+        logger.info("Public LP seed complete")
+
+    background_tasks.add_task(run_seed)
+
+    return {
+        "status": "started",
+        "message": "Seeding LP commitments from public annual reports + HTML portals",
+        "sources": ["public_seed", "html_portal"],
+    }
+
+
+@router.post("/classify-lps")
+async def classify_lps(db: Session = Depends(get_db)):
+    """Run LP tier classification on all lp_fund rows with null lp_tier."""
+    try:
+        from app.sources.lp_collection.lp_tier_classifier import classify_all_lps
+        updated = classify_all_lps(db)
+        return {"status": "ok", "lps_classified": updated}
+    except Exception as e:
+        logger.error(f"LP classification failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/lp-commitments")
+async def list_lp_commitments(
+    lp_id: Optional[int] = None,
+    gp_name: Optional[str] = None,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
+    """Browse raw LpGpCommitment records, filtered by LP or GP."""
+    from app.core.models import LpGpCommitment, LpFund
+    from sqlalchemy import select
+
+    stmt = select(LpGpCommitment)
+    if lp_id:
+        stmt = stmt.where(LpGpCommitment.lp_id == lp_id)
+    if gp_name:
+        stmt = stmt.where(LpGpCommitment.gp_name.ilike(f"%{gp_name}%"))
+    stmt = stmt.order_by(desc(LpGpCommitment.as_of_date)).limit(limit)
+
+    commitments = db.execute(stmt).scalars().all()
+
+    return {
+        "total": len(commitments),
+        "commitments": [
+            {
+                "id": c.id,
+                "lp_id": c.lp_id,
+                "gp_name": c.gp_name,
+                "fund_name": c.fund_name,
+                "fund_vintage": c.fund_vintage,
+                "commitment_amount_usd": float(c.commitment_amount_usd) if c.commitment_amount_usd else None,
+                "status": c.status,
+                "data_source": c.data_source,
+                "as_of_date": c.as_of_date.isoformat() if c.as_of_date else None,
+            }
+            for c in commitments
+        ],
+    }
+
+
+@router.get("/coverage")
+async def get_coverage(db: Session = Depends(get_db)):
+    """Show data coverage stats: LPs with data, vintages covered, sources."""
+    from app.core.models import LpGpCommitment, LpFund
+    from sqlalchemy import select, func, distinct
+
+    # Aggregate stats
+    total_stmt = select(func.count(LpGpCommitment.id))
+    total = db.execute(total_stmt).scalar() or 0
+
+    unique_gps_stmt = select(func.count(distinct(LpGpCommitment.gp_name)))
+    unique_gps = db.execute(unique_gps_stmt).scalar() or 0
+
+    unique_lps_stmt = select(func.count(distinct(LpGpCommitment.lp_id)))
+    unique_lps = db.execute(unique_lps_stmt).scalar() or 0
+
+    vintage_stmt = select(
+        func.min(LpGpCommitment.fund_vintage),
+        func.max(LpGpCommitment.fund_vintage),
+    )
+    vintage_row = db.execute(vintage_stmt).one_or_none()
+    vintages = (
+        f"{vintage_row[0]}-{vintage_row[1]}"
+        if vintage_row and vintage_row[0]
+        else "none"
+    )
+
+    # By source breakdown
+    source_stmt = select(
+        LpGpCommitment.data_source,
+        func.count(LpGpCommitment.id).label("count"),
+    ).group_by(LpGpCommitment.data_source)
+    source_rows = db.execute(source_stmt).all()
+    by_source = {row.data_source: row.count for row in source_rows}
+
+    # Per-LP detail
+    lp_detail_stmt = (
+        select(
+            LpFund.name,
+            func.count(LpGpCommitment.id).label("commitment_count"),
+            func.min(LpGpCommitment.fund_vintage).label("earliest_vintage"),
+            func.max(LpGpCommitment.fund_vintage).label("latest_vintage"),
+        )
+        .join(LpGpCommitment, LpFund.id == LpGpCommitment.lp_id)
+        .group_by(LpFund.id, LpFund.name)
+        .order_by(func.count(LpGpCommitment.id).desc())
+    )
+    lp_rows = db.execute(lp_detail_stmt).all()
+    lps_with_data = [
+        {
+            "name": row.name,
+            "commitment_count": row.commitment_count,
+            "earliest_vintage": row.earliest_vintage,
+            "latest_vintage": row.latest_vintage,
+        }
+        for row in lp_rows
+    ]
+
+    return {
+        "total_lp_commitments": total,
+        "unique_gps": unique_gps,
+        "unique_lps": unique_lps,
+        "vintages_covered": vintages,
+        "by_source": by_source,
+        "lps_with_data": lps_with_data,
     }

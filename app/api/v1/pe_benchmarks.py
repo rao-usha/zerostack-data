@@ -2917,3 +2917,110 @@ async def deal_sourcing_candidates(firm_id: int, db: Session = Depends(get_db)):
 
     results.sort(key=lambda x: x["score"], reverse=True)
     return {"candidates": results, "total": len(results)}
+
+
+# =============================================================================
+# D3 Visualization Data Endpoints
+# =============================================================================
+
+
+@router.get("/companies-with-financials")
+async def list_companies_with_financials(db: Session = Depends(get_db)):
+    """List all portfolio companies that have financial data for the radar chart selector."""
+    rows = (
+        db.execute(
+            select(
+                PEPortfolioCompany.id,
+                PEPortfolioCompany.name,
+                PEPortfolioCompany.industry,
+            )
+            .join(PECompanyFinancials, PECompanyFinancials.company_id == PEPortfolioCompany.id)
+            .distinct()
+            .order_by(PEPortfolioCompany.name)
+        ).all()
+    )
+    return [{"id": r[0], "name": r[1], "industry": r[2]} for r in rows]
+
+
+@router.get("/network-graph")
+async def get_pe_network_graph(
+    limit: int = Query(20, ge=5, le=50, description="Max PE firms to include"),
+    max_per_firm: int = Query(5, ge=1, le=20, description="Max portfolio companies per firm"),
+    db: Session = Depends(get_db),
+):
+    """
+    Build a PE firm + portfolio company network graph for D3 force simulation.
+
+    Returns top firms by AUM as PE nodes, portfolio companies as company nodes,
+    and investment links between them. max_per_firm caps companies per firm to
+    keep the graph manageable (default: 5 per firm → max ~120 total nodes).
+    """
+    # Top PE firms by AUM
+    firms = (
+        db.execute(
+            select(PEFirm.id, PEFirm.name, PEFirm.aum_usd_millions, PEFirm.primary_strategy)
+            .where(PEFirm.aum_usd_millions.isnot(None))
+            .order_by(PEFirm.aum_usd_millions.desc())
+            .limit(limit)
+        ).all()
+    )
+
+    nodes = []
+    firm_id_set = set()
+    for f in firms:
+        nodes.append({
+            "id": f"pf_{f[0]}",
+            "label": f[1],
+            "type": "pe",
+            "aum": float(f[2]) if f[2] else None,
+            "strategy": f[3],
+        })
+        firm_id_set.add(f[0])
+
+    # Portfolio companies linked to these firms via fund investments.
+    # Query per firm to enforce max_per_firm cap — a single DISTINCT query
+    # across all firms would return unbounded rows.
+    co_id_set = set()
+    links = []
+
+    for firm_id in firm_id_set:
+        firm_investments = (
+            db.execute(
+                select(
+                    PEPortfolioCompany.id.label("co_id"),
+                    PEPortfolioCompany.name.label("co_name"),
+                    PEPortfolioCompany.industry,
+                )
+                .join(PEFundInvestment, PEFundInvestment.company_id == PEPortfolioCompany.id)
+                .join(PEFund, PEFund.id == PEFundInvestment.fund_id)
+                .where(PEFund.firm_id == firm_id)
+                .distinct()
+                .limit(max_per_firm)
+            ).all()
+        )
+        firm_node_id = f"pf_{firm_id}"
+        for inv in firm_investments:
+            co_node_id = f"co_{inv[0]}"
+            if inv[0] not in co_id_set:
+                nodes.append({
+                    "id": co_node_id,
+                    "label": inv[1],
+                    "type": "company",
+                    "sector": inv[2],
+                })
+                co_id_set.add(inv[0])
+            links.append({
+                "source": firm_node_id,
+                "target": co_node_id,
+                "type": "ownership",
+            })
+
+    return {
+        "nodes": nodes,
+        "links": links,
+        "stats": {
+            "pe_firms": len(firm_id_set),
+            "portfolio_companies": len(co_id_set),
+            "total_links": len(links),
+        },
+    }

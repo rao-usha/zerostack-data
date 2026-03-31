@@ -386,6 +386,49 @@ OES_SERIES = {
 }
 
 
+# Auto & Tire Service Industry (NAICS 441, 4413 / SOC 49-3023)
+AUTO_SECTOR_SERIES = {
+    # CES industry employment — Motor Vehicle & Parts Dealers (NAICS 441)
+    "auto_dealer_employment": "CES4244100001",       # Motor Vehicle & Parts Dealers: Employment
+    "auto_parts_tire_employment": "CES4244130001",   # Auto Parts, Accessories & Tire Stores: Employment
+    # OES occupation — Automotive Service Technicians & Mechanics (SOC 49-3023)
+    "auto_tech_employment": "OEUN000000000000049302301",       # Auto Service Techs: Employment
+    "auto_tech_annual_mean_wage": "OEUN000000000000049302304", # Auto Service Techs: Annual Mean Wage
+    "auto_tech_annual_median_wage": "OEUN000000000000049302313", # Auto Service Techs: Annual Median Wage
+    # OES occupation — Tire Repairers & Changers (SOC 49-3093)
+    "tire_tech_employment": "OEUN000000000000049309301",       # Tire Repairers: Employment
+    "tire_tech_annual_mean_wage": "OEUN000000000000049309304", # Tire Repairers: Annual Mean Wage
+}
+
+# =============================================================================
+# LAUS (Local Area Unemployment Statistics) — state-level unemployment
+# =============================================================================
+
+LAUS_STATE_FIPS = {
+    "01": "Alabama", "02": "Alaska", "04": "Arizona", "05": "Arkansas",
+    "06": "California", "08": "Colorado", "09": "Connecticut", "10": "Delaware",
+    "11": "District of Columbia", "12": "Florida", "13": "Georgia", "15": "Hawaii",
+    "16": "Idaho", "17": "Illinois", "18": "Indiana", "19": "Iowa",
+    "20": "Kansas", "21": "Kentucky", "22": "Louisiana", "23": "Maine",
+    "24": "Maryland", "25": "Massachusetts", "26": "Michigan", "27": "Minnesota",
+    "28": "Mississippi", "29": "Missouri", "30": "Montana", "31": "Nebraska",
+    "32": "Nevada", "33": "New Hampshire", "34": "New Jersey", "35": "New Mexico",
+    "36": "New York", "37": "North Carolina", "38": "North Dakota", "39": "Ohio",
+    "40": "Oklahoma", "41": "Oregon", "42": "Pennsylvania", "44": "Rhode Island",
+    "45": "South Carolina", "46": "South Dakota", "47": "Tennessee", "48": "Texas",
+    "49": "Utah", "50": "Vermont", "51": "Virginia", "53": "Washington",
+    "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming",
+}
+
+
+def get_laus_series_ids() -> List[str]:
+    """Generate LAUS unemployment rate series IDs for all 50 states + DC.
+
+    Pattern: LASST{FIPS}0000000000003 = unemployment rate
+    """
+    return [f"LASST{fips}0000000000003" for fips in LAUS_STATE_FIPS.keys()]
+
+
 # All series organized by dataset
 COMMON_SERIES = {
     "cps": CPS_SERIES,
@@ -394,6 +437,7 @@ COMMON_SERIES = {
     "cpi": CPI_SERIES,
     "ppi": PPI_SERIES,
     "oes": OES_SERIES,
+    "auto_sector": AUTO_SECTOR_SERIES,
 }
 
 

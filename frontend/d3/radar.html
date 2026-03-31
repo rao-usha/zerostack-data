@@ -239,6 +239,7 @@
   <a href="index.html" style="color:#94a3b8;text-decoration:none;font-size:0.85rem;margin-right:auto;" onmouseover="this.style.color='#f1f5f9'" onmouseout="this.style.color='#94a3b8'">&larr; Gallery</a>
   <h1><span>Deal Scoring</span> — Multi-Axis Assessment</h1>
   <div class="controls">
+    <select id="co-select" style="display:none;background:#1e293b;color:#f1f5f9;border:1px solid #334155;padding:6px 12px;border-radius:6px;font-size:13px;cursor:pointer;outline:none;"></select>
     <label for="mode-select">Compare against:</label>
     <select id="mode-select">
       <option value="peer">vs Peer Median</option>
@@ -268,35 +269,30 @@
 <div class="tooltip-radar" id="tooltip"></div>
 
 <script>
-const axes = [
-  "Financial Health", "Growth Trajectory", "Market Position", "Management Quality",
-  "Data Coverage", "Location Score", "Labor Arbitrage", "Risk Score"
+// Axis → API metric mapping (5 real benchmark metrics)
+const AXIS_METRIC_MAP = [
+  { label: "Revenue Growth",  metric: "revenue_growth_pct" },
+  { label: "EBITDA Margin",   metric: "ebitda_margin_pct" },
+  { label: "Gross Margin",    metric: "gross_margin_pct" },
+  { label: "Leverage",        metric: "debt_to_ebitda" },
+  { label: "Free Cash Flow",  metric: "free_cash_flow_usd" },
 ];
 
-const companies = [
-  {
-    name: "Acme Industrial",
-    scores: [85, 72, 68, 91, 78, 65, 82, 70],
-    color: "#6366f1",
-    visible: true
-  },
-  {
-    name: "Precision Manufacturing",
-    scores: [62, 88, 75, 55, 90, 80, 45, 85],
-    color: "#06b6d4",
-    visible: true
-  },
-  {
-    name: "National Logistics",
-    scores: [78, 65, 82, 70, 55, 92, 88, 60],
-    color: "#f97316",
-    visible: true
-  }
+const COMPANY_COLORS = ["#6366f1", "#06b6d4", "#f97316", "#22c55e", "#a855f7"];
+
+let axes = [
+  "Revenue Growth", "EBITDA Margin", "Gross Margin", "Leverage", "Free Cash Flow"
 ];
 
-const benchmarks = {
-  peer:      [72, 70, 74, 68, 65, 72, 66, 72],
-  portfolio: [75, 75, 75, 72, 74, 79, 72, 72]
+let companies = [
+  { name: "Acme Industrial",        scores: [85, 72, 68, 60, 78], color: "#6366f1", visible: true },
+  { name: "Precision Manufacturing", scores: [62, 88, 75, 45, 90], color: "#06b6d4", visible: true },
+  { name: "National Logistics",     scores: [78, 65, 82, 55, 92], color: "#f97316", visible: true }
+];
+
+let benchmarks = {
+  peer:      [50, 50, 50, 50, 50],
+  portfolio: [55, 55, 55, 55, 55]
 };
 
 let selectedCompany = 0;
@@ -598,8 +594,78 @@ document.getElementById("mode-select").addEventListener("change", function() {
 // Handle resize
 window.addEventListener("resize", render);
 
-// Initial render
-render();
+// === API loading ===
+async function loadCompany(id) {
+  try {
+    const resp = await fetch(`/api/v1/pe/benchmarks/${id}`);
+    if (!resp.ok) throw new Error("API " + resp.status);
+    const data = await resp.json();
+
+    const metricMap = {};
+    (data.metrics || []).forEach(m => { metricMap[m.metric] = m.percentile; });
+
+    const scores = AXIS_METRIC_MAP.map(ax => metricMap[ax.metric] ?? 50);
+
+    // Single company from API
+    companies = [{
+      name: data.company_name,
+      scores,
+      color: COMPANY_COLORS[0],
+      visible: true,
+    }];
+
+    // Peer median is always 50th percentile by definition
+    benchmarks.peer = axes.map(() => 50);
+
+    // Portfolio avg from each metric's portfolio_avg (convert to percentile approx)
+    const portScores = AXIS_METRIC_MAP.map(ax => {
+      const m = (data.metrics || []).find(me => me.metric === ax.metric);
+      return m?.percentile != null ? Math.max(0, Math.min(100, m.percentile)) : 50;
+    });
+    benchmarks.portfolio = portScores;
+
+    selectedCompany = 0;
+    render();
+  } catch (e) {
+    console.warn("Radar API error, using static data:", e.message);
+    render();
+  }
+}
+
+async function populateRadarSelector() {
+  try {
+    const resp = await fetch("/api/v1/pe/companies-with-financials");
+    if (!resp.ok) throw new Error("API " + resp.status);
+    const list = await resp.json();
+    if (!list.length) return null;
+
+    const sel = document.getElementById("co-select");
+    sel.innerHTML = list.map(c =>
+      `<option value="${c.id}">${c.name}${c.industry ? " (" + c.industry + ")" : ""}</option>`
+    ).join("");
+    sel.style.display = "inline-block";
+    sel.addEventListener("change", () => loadCompany(sel.value));
+    return list[0].id;
+  } catch (e) {
+    console.warn("Could not load financials list:", e.message);
+    return null;
+  }
+}
+
+(async () => {
+  const params = new URLSearchParams(window.location.search);
+  const urlId = params.get("company_id");
+  const firstId = await populateRadarSelector();
+  const targetId = urlId || firstId;
+
+  if (targetId) {
+    const sel = document.getElementById("co-select");
+    if (sel) sel.value = targetId;
+    await loadCompany(targetId);
+  } else {
+    render();
+  }
+})();
 </script>
 </body>
 </html>

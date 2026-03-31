@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>US Economic Intelligence — Nexdata</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1f2e;
+      --border: #2d3748;
+      --text: #e2e8f0;
+      --muted: #718096;
+      --green: #68d391;
+      --amber: #f6ad55;
+      --red: #fc8181;
+      --blue: #63b3ed;
+      --purple: #b794f4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; }
+    .container { max-width: 1280px; margin: 0 auto; padding: 0 1.5rem; }
+    .page-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1rem 0; }
+    .page-header h1 { font-size: 1.25rem; font-weight: 700; }
+    .page-header .subtitle { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+    .section { padding: 2rem 0; border-bottom: 1px solid var(--border); }
+    .section-title { font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .section-subtitle { font-size: 0.75rem; color: var(--muted); margin-bottom: 1.5rem; }
+    .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; }
+    .kpi-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .kpi-value { font-size: 1.75rem; font-weight: 700; margin: 0.25rem 0; }
+    .kpi-delta { font-size: 0.75rem; }
+    .kpi-delta.up { color: var(--green); }
+    .kpi-delta.down { color: var(--red); }
+    .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+    .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; }
+    .chart-title { font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .pe-insight { background: rgba(99, 179, 237, 0.08); border: 1px solid rgba(99, 179, 237, 0.2); border-left: 3px solid var(--blue); border-radius: 8px; padding: 1rem 1.25rem; margin-top: 1.25rem; font-size: 0.82rem; line-height: 1.6; }
+    .pe-insight strong { color: var(--blue); }
+    .key-signals { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; margin: 1rem 0 1.5rem; }
+    .key-signals h3 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.75rem; }
+    .signal-row { display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem; font-size: 0.82rem; line-height: 1.5; }
+    .signal-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+    .signal-dot.green { background: var(--green); }
+    .signal-dot.amber { background: var(--amber); }
+    .signal-dot.red { background: var(--red); }
+    .state-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .state-table th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); color: var(--muted); font-weight: 600; font-size: 0.7rem; text-transform: uppercase; cursor: pointer; }
+    .state-table th:hover { color: var(--text); }
+    .state-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid rgba(45,55,72,0.5); }
+    .state-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .chip { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; }
+    .chip.green { background: rgba(104,211,145,0.15); color: var(--green); }
+    .chip.amber { background: rgba(246,173,85,0.15); color: var(--amber); }
+    .chip.red { background: rgba(252,129,129,0.15); color: var(--red); }
+    .chip.grey { background: rgba(113,128,150,0.15); color: var(--muted); }
+    .synthesis-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem; }
+    .synthesis-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; }
+    .synthesis-card-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 1rem; }
+    .score-big { font-size: 3rem; font-weight: 800; line-height: 1; }
+    .score-grade { font-size: 1rem; font-weight: 700; margin-left: 0.5rem; }
+    .driver-row { display: flex; justify-content: space-between; align-items: center; padding: 0.375rem 0; border-bottom: 1px solid rgba(45,55,72,0.4); font-size: 0.78rem; }
+    .provenance-footer { background: var(--surface); border-top: 1px solid var(--border); padding: 1rem 0; margin-top: 2rem; }
+    .prov-sources { display: flex; gap: 2rem; flex-wrap: wrap; }
+    .prov-source { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--muted); }
+    .prov-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .loading-state { color: var(--muted); font-size: 0.85rem; padding: 2rem 0; text-align: center; }
+    .not-ingested { background: rgba(246,173,85,0.06); border: 1px solid rgba(246,173,85,0.2); border-radius: 8px; padding: 1rem; font-size: 0.82rem; color: var(--amber); }
+    .not-ingested code { background: rgba(0,0,0,0.3); padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.78rem; }
+    .refresh-btn { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+    .refresh-btn:hover { border-color: var(--blue); color: var(--blue); }
+    .stat-row { display: flex; gap: 2rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+    .stat-item { display: flex; flex-direction: column; gap: 0.2rem; }
+    .stat-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat-value { font-size: 1.1rem; font-weight: 700; }
+    .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+    .geo-rank-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid rgba(45,55,72,0.4); font-size: 0.82rem; }
+    .rank-num { width: 24px; font-size: 0.78rem; color: var(--muted); text-align: right; }
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (max-width: 900px) {
+      .kpi-row { grid-template-columns: repeat(2, 1fr); }
+      .chart-row { grid-template-columns: 1fr; }
+      .synthesis-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Page Header -->
+<div class="page-header">
+  <div class="container" style="display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <h1>US Economic Intelligence</h1>
+      <div class="subtitle">Live macro signals for private markets &middot; FRED &middot; BLS &middot; BEA &middot; Census &middot; <span id="as-of-date" style="color:var(--text)">—</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+      <a href="/" style="color:var(--muted);font-size:0.8rem;text-decoration:none;">← Dashboard</a>
+      <button class="refresh-btn" id="refresh-btn" onclick="refreshAll()">↻ Refresh Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- Key Signals Summary -->
+<div class="container" style="margin-top:1.25rem;">
+  <div class="key-signals" id="key-signals" style="display:none;">
+    <h3>Key Signals</h3>
+    <div id="key-signals-content"></div>
+  </div>
+</div>
+
+<!-- Section 1: Rate & Credit Environment -->
+<div class="section" id="section-macro">
+  <div class="container">
+    <div class="section-title">Rate &amp; Credit Environment</div>
+    <div class="section-subtitle">Is now a good time to deploy capital?</div>
+
+    <div id="macro-content">
+      <div class="loading-state"><span class="spinner"></span>&nbsp; Loading macro data...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 2: Labor Market -->
+<div class="section" id="section-labor">
+  <div class="container">
+    <div class="section-title">Labor Market — Sector Momentum</div>
+    <div class="section-subtitle">Which industries are expanding vs. contracting?</div>
+
+    <div id="labor-content">
+      <div class="loading-state"><span class="spinner"></span>&nbsp; Loading labor data...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 3: Geographic Divergence -->
+<div class="section" id="section-regional">
+  <div class="container">
+    <div class="section-title">Geographic Divergence</div>
+    <div class="section-subtitle">Where is economic activity concentrating?</div>
+
+    <div id="regional-content">
+      <div class="loading-state"><span class="spinner"></span>&nbsp; Loading regional data...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 4: Census Demographics -->
+<div class="section" id="section-census">
+  <div class="container">
+    <div class="section-title">Census Demographics Snapshot</div>
+    <div class="section-subtitle">Population and income by state — sizing the addressable market</div>
+
+    <div id="census-content">
+      <div class="loading-state"><span class="spinner"></span>&nbsp; Loading census data...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 5: PE Synthesis Panel -->
+<div class="section" id="section-pe" style="border-bottom:none;">
+  <div class="container">
+    <div class="section-title">PE Synthesis Panel</div>
+    <div class="section-subtitle">What does this mean for deploying capital right now?</div>
+
+    <div id="pe-content">
+      <div class="loading-state"><span class="spinner"></span>&nbsp; Computing PE signals...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Provenance Footer -->
+<div class="provenance-footer">
+  <div class="container">
+    <div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.06em;">Data Sources</div>
+    <div class="prov-sources" id="prov-sources">
+      <div class="prov-source"><span class="prov-dot" style="background:var(--muted);"></span>Loading...</div>
+    </div>
+    <div style="margin-top:0.75rem;font-size:0.72rem;color:var(--muted);">Signals computed from live FRED/BLS/BEA data. Full macro → portfolio sensitivity in the PE Intelligence module.</div>
+  </div>
+</div>
+
+<script>
+  const API = 'http://localhost:8001/api/v1';
+
+  // Chart.js dark theme defaults
+  Chart.defaults.color = '#718096';
+  Chart.defaults.borderColor = '#2d3748';
+  Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+  // Chart registry to avoid re-init issues
+  const charts = {};
+
+  function destroyChart(id) {
+    if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+  }
+
+  function fmt(v, dec=2) {
+    if (v == null || v === undefined) return '—';
+    return Number(v).toFixed(dec);
+  }
+  function fmtPct(v, dec=1) {
+    if (v == null || v === undefined) return '—';
+    return Number(v).toFixed(dec) + '%';
+  }
+  function fmtNum(v) {
+    if (v == null || v === undefined) return '—';
+    if (Math.abs(v) >= 1e6) return (v/1e6).toFixed(1) + 'M';
+    if (Math.abs(v) >= 1e3) return (v/1e3).toFixed(1) + 'K';
+    return String(v);
+  }
+  function fmtDollar(v) {
+    if (v == null || v === undefined) return '—';
+    if (v >= 1e6) return '$' + (v/1e6).toFixed(1) + 'M';
+    if (v >= 1e3) return '$' + (v/1e3).toFixed(0) + 'K';
+    return '$' + v;
+  }
+
+  async function loadAll() {
+    const [statusRes, macroRes, laborRes, regionalRes, peRes] = await Promise.allSettled([
+      fetch(`${API}/econ-snapshot/ingest-status`).then(r => r.json()),
+      fetch(`${API}/econ-snapshot/macro`).then(r => r.json()),
+      fetch(`${API}/econ-snapshot/labor`).then(r => r.json()),
+      fetch(`${API}/econ-snapshot/regional`).then(r => r.json()),
+      fetch(`${API}/econ-snapshot/pe-signals`).then(r => r.json()),
+    ]);
+
+    const status = statusRes.status === 'fulfilled' ? statusRes.value : null;
+    const macro  = macroRes.status  === 'fulfilled' ? macroRes.value  : { status: 'error' };
+    const labor  = laborRes.status  === 'fulfilled' ? laborRes.value  : { status: 'error' };
+    const regional = regionalRes.status === 'fulfilled' ? regionalRes.value : { status: 'error' };
+    const pe     = peRes.status     === 'fulfilled' ? peRes.value     : { status: 'error' };
+
+    renderMacro(macro);
+    renderLabor(labor);
+    renderRegional(regional);
+    renderCensus(regional);
+    renderPE(pe);
+
+    if (macro.as_of) {
+      document.getElementById('as-of-date').textContent = 'as of ' + macro.as_of;
+    }
+
+    buildKeySignals(macro, labor);
+    renderProvenance(status);
+  }
+
+  function renderNotIngested(containerId, hints) {
+    document.getElementById(containerId).innerHTML = `
+      <div class="not-ingested">
+        Data not yet ingested. Run: ${(hints||[]).map(h => `<code>${h}</code>`).join(', ')}
+        or click <strong>↻ Refresh Data</strong> above.
+      </div>`;
+  }
+
+  // ── Section 1: Macro ─────────────────────────────────────────────────────────
+
+  function renderMacro(data) {
+    if (!data || data.status === 'not_ingested' || data.status === 'error') {
+      renderNotIngested('macro-content', ["POST /fred/ingest {category:'interest_rates'}", "POST /fred/ingest {category:'economic_indicators'}"]);
+      return;
+    }
+
+    const k = data.kpis || {};
+    const hist = data.history || {};
+
+    const ffr    = k.fed_funds_rate || {};
+    const dgs10  = k.ten_year_yield || {};
+    const spread = k.yield_spread_10_2 || {};
+    const unrate = k.unemployment_rate || {};
+    const cpi    = k.cpi_yoy_pct || {};
+
+    const spreadColor = spread.inverted ? 'var(--red)' : 'var(--green)';
+    const spreadLabel = spread.inverted
+      ? `Inverted ${spread.inverted_months || ''}mo`
+      : 'Normal';
+    const unrateColor = (unrate.value||0) > 5 ? 'var(--red)' : (unrate.value||0) > 4.5 ? 'var(--amber)' : 'var(--text)';
+    const cpiColor    = (cpi.value||0) > 4 ? 'var(--red)' : (cpi.value||0) > 2.5 ? 'var(--amber)' : 'var(--green)';
+    const ffrColor    = (ffr.value||0) > 5 ? 'var(--red)' : (ffr.value||0) > 4 ? 'var(--amber)' : 'var(--text)';
+
+    let html = `<div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">Fed Funds Rate</div>
+        <div class="kpi-value" style="color:${ffrColor}">${fmtPct(ffr.value, 2)}</div>
+        <div class="kpi-delta ${(ffr.delta||0) < 0 ? 'down' : 'up'}">${(ffr.delta||0) >= 0 ? '▲' : '▼'} ${fmtPct(Math.abs(ffr.delta||0), 2)} vs 12m ago</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">10Y Treasury Yield</div>
+        <div class="kpi-value">${fmtPct(dgs10.value, 2)}</div>
+        <div class="kpi-delta ${(dgs10.delta||0) < 0 ? 'down' : 'up'}">${(dgs10.delta||0) >= 0 ? '▲' : '▼'} ${fmtPct(Math.abs(dgs10.delta||0), 2)} vs 12m ago</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Yield Curve (10Y–2Y)</div>
+        <div class="kpi-value" style="color:${spreadColor}">${fmtPct(spread.value, 2)}</div>
+        <div class="kpi-delta" style="color:${spreadColor}">${spreadLabel}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Unemployment Rate</div>
+        <div class="kpi-value" style="color:${unrateColor}">${fmtPct(unrate.value, 1)}</div>
+        <div class="kpi-delta ${(unrate.delta||0) > 0 ? 'down' : 'up'}">${(unrate.delta||0) >= 0 ? '▲' : '▼'} ${fmtPct(Math.abs(unrate.delta||0), 1)} vs 12m ago</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">CPI YoY %</div>
+        <div class="kpi-value" style="color:${cpiColor}">${fmtPct(cpi.value, 1)}</div>
+        <div class="kpi-delta" style="color:${cpiColor}">${cpi.trend || '—'}</div>
+      </div>
+    </div>`;
+
+    // Charts
+    html += `<div class="chart-row">
+      <div class="chart-card">
+        <div class="chart-title">Rate Timeline (36 months) — DFF / 10Y / 2Y</div>
+        <canvas id="chart-rates" height="220"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Yield Spread (10Y–2Y)</div>
+        <canvas id="chart-spread" height="220"></canvas>
+      </div>
+    </div>`;
+
+    // PE Insight
+    let insightText = '';
+    const ffrVal = ffr.value || 0;
+    if (spread.inverted && ffrVal > 4) {
+      insightText = `<strong>PE Signal:</strong> LBO financing costs remain elevated with FFR at ${fmtPct(ffrVal, 2)}. The yield curve has been inverted for ${spread.inverted_months || 'several'} months — a leading indicator of credit tightening. Favor lower-leverage deals, seller financing, and equity-light business models. Hold period extensions likely for current portfolio.`;
+    } else if (spread.inverted) {
+      insightText = `<strong>PE Signal:</strong> Yield curve inversion persists despite moderating rates. Credit conditions tightening. Watch for spread normalization before increasing deployment pace.`;
+    } else if (ffrVal > 4) {
+      insightText = `<strong>PE Signal:</strong> Rates remain elevated but yield curve has normalized — credit markets stabilizing. Conservative leverage structures still prudent; acquisition financing costs have peaked.`;
+    } else {
+      insightText = `<strong>PE Signal:</strong> Favorable rate environment. Yield curve normal. Credit conditions supportive of leveraged acquisitions. Window for deploying capital at attractive financing costs.`;
+    }
+    html += `<div class="pe-insight">${insightText}</div>`;
+
+    document.getElementById('macro-content').innerHTML = html;
+
+    // Render charts after DOM update
+    setTimeout(() => {
+      renderRateChart(hist);
+      renderSpreadChart(hist);
+    }, 50);
+  }
+
+  function renderRateChart(hist) {
+    destroyChart('chart-rates');
+    const dff   = hist.DFF   || [];
+    const dgs10 = hist.DGS10 || [];
+    const dgs2  = hist.DGS2  || [];
+
+    // Use DFF dates as base
+    const labels = dff.map(d => d.date);
+    const dffVals   = dff.map(d => d.value);
+    const dgs10Vals = dgs10.map(d => d.value);
+    const dgs2Vals  = dgs2.map(d => d.value);
+
+    const el = document.getElementById('chart-rates');
+    if (!el) return;
+    charts['chart-rates'] = new Chart(el, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Fed Funds Rate', data: dffVals, borderColor: '#fc8181', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+          { label: '10Y Treasury',   data: dgs10Vals, borderColor: '#63b3ed', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+          { label: '2Y Treasury',    data: dgs2Vals, borderColor: '#68d391', backgroundColor: 'transparent', borderWidth: 1.5, borderDash: [4,3], pointRadius: 0, tension: 0.3 },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: true, labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } },
+        scales: {
+          x: { grid: { color: '#2d3748' }, ticks: { maxTicksLimit: 8, font: { size: 10 } } },
+          y: { grid: { color: '#2d3748' }, ticks: { font: { size: 10 }, callback: v => v + '%' } }
+        }
+      }
+    });
+  }
+
+  function renderSpreadChart(hist) {
+    destroyChart('chart-spread');
+    const dgs10 = hist.DGS10 || [];
+    const dgs2  = hist.DGS2  || [];
+
+    const len = Math.min(dgs10.length, dgs2.length);
+    const labels = dgs10.slice(0, len).map(d => d.date);
+    const spreadVals = dgs10.slice(0, len).map((d, i) => {
+      const v2 = dgs2[i]?.value;
+      return (d.value != null && v2 != null) ? +(d.value - v2).toFixed(3) : null;
+    });
+
+    const el = document.getElementById('chart-spread');
+    if (!el) return;
+    charts['chart-spread'] = new Chart(el, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: '10Y–2Y Spread',
+          data: spreadVals,
+          borderColor: '#b794f4',
+          backgroundColor: ctx => {
+            const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 200);
+            g.addColorStop(0, 'rgba(183,148,244,0.15)');
+            g.addColorStop(1, 'rgba(183,148,244,0)');
+            return g;
+          },
+          fill: true,
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { label: ctx => `Spread: ${ctx.parsed.y?.toFixed(2)}%` } } },
+        scales: {
+          x: { grid: { color: '#2d3748' }, ticks: { maxTicksLimit: 8, font: { size: 10 } } },
+          y: {
+            grid: { color: '#2d3748' },
+            ticks: { font: { size: 10 }, callback: v => v + '%' },
+            afterDataLimits: (axis) => {
+              // ensure zero line visible
+              if (axis.min > 0) axis.min = -0.1;
+              if (axis.max < 0) axis.max = 0.1;
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // ── Section 2: Labor ─────────────────────────────────────────────────────────
+
+  function renderLabor(data) {
+    if (!data || data.status === 'not_ingested' || data.status === 'error') {
+      renderNotIngested('labor-content', ["POST /bls/ingest/jolts", "POST /bls/ingest/ces"]);
+      return;
+    }
+
+    const sectors = data.sector_employment_12m || [];
+    const jolts   = data.jolts || {};
+
+    // Stat row
+    const nonfarmDelta = data.total_nonfarm_12m_delta;
+    const joltsOpenings = jolts.openings_rate;
+    const aheYoy = data.avg_hourly_earnings_yoy_pct;
+
+    let html = `<div class="stat-row">
+      <div class="stat-item">
+        <div class="stat-label">Nonfarm Payrolls (12m delta)</div>
+        <div class="stat-value" style="color:${(nonfarmDelta||0) > 0 ? 'var(--green)' : 'var(--red)'}">
+          ${nonfarmDelta != null ? ((nonfarmDelta > 0 ? '+' : '') + fmtNum(nonfarmDelta)) : '—'}
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">JOLTS Openings Rate</div>
+        <div class="stat-value">${joltsOpenings != null ? fmtPct(joltsOpenings, 1) : '—'}</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Avg Hourly Earnings YoY</div>
+        <div class="stat-value" style="color:${(aheYoy||0) > 5 ? 'var(--red)' : (aheYoy||0) > 3.5 ? 'var(--amber)' : 'var(--green)'}">
+          ${aheYoy != null ? '+' + fmtPct(aheYoy, 1) : '—'}
+        </div>
+      </div>
+    </div>`;
+
+    html += `<div class="chart-row">
+      <div class="chart-card">
+        <div class="chart-title">Employment Change by Sector (12-month net)</div>
+        <canvas id="chart-sectors" height="280"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">JOLTS Signal — Openings / Hires / Quits (24 months)</div>
+        <canvas id="chart-jolts" height="280"></canvas>
+      </div>
+    </div>`;
+
+    // PE Insight
+    const quits = jolts.quits_rate || 0;
+    let laborInsight = '';
+    if (quits > 2.5) {
+      laborInsight = `<strong>PE Signal:</strong> Quits rate at ${fmtPct(quits, 1)} signals a tight labor market — workers remain confident. Labor-intensive portfolio companies face EBITDA compression. Factor 5–8% wage inflation into deal models. Healthcare, logistics, and consumer services sectors most exposed.`;
+    } else if (quits > 1.8) {
+      laborInsight = `<strong>PE Signal:</strong> Labor market normalizing — quits rate ${fmtPct(quits, 1)} down from cycle highs. Wage pressure moderating. Operational improvements in portfolio companies more achievable; hiring freezes being lifted across mid-market.`;
+    } else {
+      laborInsight = `<strong>PE Signal:</strong> Labor market loosening — quits rate ${fmtPct(quits, 1)} at multi-year low. Talent availability improving. Favorable for buy-and-build strategies where workforce scaling has been a constraint.`;
+    }
+    html += `<div class="pe-insight">${laborInsight}</div>`;
+
+    document.getElementById('labor-content').innerHTML = html;
+
+    setTimeout(() => {
+      renderSectorChart(sectors);
+      renderJoltsChart(jolts);
+    }, 50);
+  }
+
+  function renderSectorChart(sectors) {
+    destroyChart('chart-sectors');
+    if (!sectors.length) return;
+
+    const sorted = [...sectors].sort((a, b) => (b.delta_pct||0) - (a.delta_pct||0));
+    const labels = sorted.map(s => s.sector);
+    const vals   = sorted.map(s => s.delta_pct || 0);
+    const colors = vals.map(v => v >= 0 ? 'rgba(104,211,145,0.7)' : 'rgba(252,129,129,0.7)');
+    const borders = vals.map(v => v >= 0 ? '#68d391' : '#fc8181');
+
+    const el = document.getElementById('chart-sectors');
+    if (!el) return;
+    charts['chart-sectors'] = new Chart(el, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{ label: '12m % change', data: vals, backgroundColor: colors, borderColor: borders, borderWidth: 1 }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.parsed.x >= 0 ? '+' : ''}${ctx.parsed.x.toFixed(1)}%` } } },
+        scales: {
+          x: { grid: { color: '#2d3748' }, ticks: { font: { size: 10 }, callback: v => v + '%' } },
+          y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  function renderJoltsChart(jolts) {
+    destroyChart('chart-jolts');
+    const hist = jolts.history || [];
+    if (!hist.length) return;
+
+    const labels    = hist.map(d => d.date);
+    const openings  = hist.map(d => d.openings);
+    const hires     = hist.map(d => d.hires);
+    const quits     = hist.map(d => d.quits);
+
+    const el = document.getElementById('chart-jolts');
+    if (!el) return;
+    charts['chart-jolts'] = new Chart(el, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Openings Rate', data: openings, borderColor: '#63b3ed', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+          { label: 'Hires Rate',    data: hires,    borderColor: '#68d391', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+          { label: 'Quits Rate',    data: quits,    borderColor: '#f6ad55', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.3 },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: true, labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } },
+        scales: {
+          x: { grid: { color: '#2d3748' }, ticks: { maxTicksLimit: 8, font: { size: 10 } } },
+          y: { grid: { color: '#2d3748' }, ticks: { font: { size: 10 }, callback: v => v + '%' } }
+        }
+      }
+    });
+  }
+
+  // ── Section 3: Regional ───────────────────────────────────────────────────────
+
+  let stateData = [];
+  let stateSortCol = 'gdp_growth_yoy_pct';
+  let stateSortDir = -1;
+
+  function renderRegional(data) {
+    if (!data || data.status === 'not_ingested' || data.status === 'error') {
+      renderNotIngested('regional-content', ["POST /bea/regional/ingest {table_name:'SAGDP2N'}", "POST /bea/regional/ingest {table_name:'SAINC1'}"]);
+      return;
+    }
+
+    stateData = data.states || [];
+    buildRegionalHTML();
+  }
+
+  function buildRegionalHTML() {
+    const sorted = [...stateData].sort((a, b) => {
+      const av = a[stateSortCol] ?? -Infinity;
+      const bv = b[stateSortCol] ?? -Infinity;
+      return stateSortDir * (bv - av);
+    });
+
+    // Top/Bottom 10 for chart
+    const byIncome = [...stateData]
+      .filter(s => s.personal_income_growth_pct != null)
+      .sort((a, b) => b.personal_income_growth_pct - a.personal_income_growth_pct);
+    const top10    = byIncome.slice(0, 10);
+    const bottom10 = byIncome.slice(-10).reverse();
+    const chartStates = [...top10, ...bottom10];
+
+    let html = `<div class="chart-row">
+      <div class="chart-card" style="grid-column:1/-1;">
+        <div class="chart-title">Top 10 / Bottom 10 States — Personal Income Growth YoY</div>
+        <canvas id="chart-geo-bar" height="260"></canvas>
+      </div>
+    </div>`;
+
+    // Table
+    html += `<div class="table-wrap" style="margin-bottom:1.25rem;">
+      <table class="state-table">
+        <thead>
+          <tr>
+            <th onclick="sortStates('name')">State</th>
+            <th onclick="sortStates('gdp_growth_yoy_pct')">GDP Growth YoY</th>
+            <th onclick="sortStates('personal_income_growth_pct')">Personal Income Growth</th>
+            <th onclick="sortStates('per_capita_income')">Per Capita Income</th>
+            <th onclick="sortStates('population')">Population</th>
+            <th>Signal</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    sorted.forEach(s => {
+      const sig = s.signal || 'grey';
+      const sigLabel = sig === 'green' ? 'Strong' : sig === 'yellow' ? 'Neutral' : sig === 'red' ? 'Weak' : '—';
+      html += `<tr>
+        <td style="font-weight:600;">${s.name || s.fips}</td>
+        <td>${s.gdp_growth_yoy_pct != null ? fmtPct(s.gdp_growth_yoy_pct, 1) : '—'}</td>
+        <td>${s.personal_income_growth_pct != null ? fmtPct(s.personal_income_growth_pct, 1) : '—'}</td>
+        <td>${s.per_capita_income != null ? fmtDollar(s.per_capita_income) : '—'}</td>
+        <td>${s.population != null ? fmtNum(s.population) : '—'}</td>
+        <td><span class="chip ${sig}">${sigLabel}</span></td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+
+    // PE Insight
+    const top3 = byIncome.slice(0, 3).map(s => s.name || s.fips).filter(Boolean);
+    const insightText = top3.length
+      ? `<strong>PE Signal:</strong> Fastest-growing markets: ${top3.join(', ')}. Deal sourcing in Sun Belt industrials and consumer services offers valuation discounts vs. coastal comps. Regional economic divergence creating sector-specific arbitrage opportunities.`
+      : `<strong>PE Signal:</strong> Regional data loaded — computing geographic opportunity scores.`;
+    html += `<div class="pe-insight">${insightText}</div>`;
+
+    document.getElementById('regional-content').innerHTML = html;
+
+    setTimeout(() => {
+      renderGeoBarChart(chartStates);
+    }, 50);
+  }
+
+  function sortStates(col) {
+    if (stateSortCol === col) { stateSortDir *= -1; } else { stateSortCol = col; stateSortDir = -1; }
+    buildRegionalHTML();
+  }
+
+  function renderGeoBarChart(states) {
+    destroyChart('chart-geo-bar');
+    const labels = states.map(s => s.name || s.fips);
+    const vals   = states.map(s => s.personal_income_growth_pct ?? null);
+    const colors = vals.map(v => v == null ? 'var(--muted)' : v >= 0 ? 'rgba(104,211,145,0.7)' : 'rgba(252,129,129,0.7)');
+    const borders = vals.map(v => v == null ? 'var(--border)' : v >= 0 ? '#68d391' : '#fc8181');
+
+    const el = document.getElementById('chart-geo-bar');
+    if (!el) return;
+    charts['chart-geo-bar'] = new Chart(el, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{ label: 'Personal Income Growth %', data: vals, backgroundColor: colors, borderColor: borders, borderWidth: 1 }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => (ctx.parsed.x != null ? (ctx.parsed.x >= 0 ? '+' : '') + ctx.parsed.x.toFixed(1) + '%' : '—') } } },
+        scales: {
+          x: { grid: { color: '#2d3748' }, ticks: { font: { size: 10 }, callback: v => v + '%' } },
+          y: { grid: { display: false }, ticks: { font: { size: 9 } } }
+        }
+      }
+    });
+  }
+
+  // ── Section 4: Census ────────────────────────────────────────────────────────
+
+  function renderCensus(data) {
+    if (!data || data.status === 'not_ingested' || data.status === 'error') {
+      renderNotIngested('census-content', ["POST /census/state {survey:'acs5',year:2023,table_id:'B01003'}", "POST /census/state {table_id:'B19013'}"]);
+      return;
+    }
+
+    const states = (data.states || []).filter(s => s.population != null || s.median_hh_income != null);
+    if (!states.length) {
+      renderNotIngested('census-content', ["POST /census/state {survey:'acs5',year:2023,table_id:'B01003'}"]);
+      return;
+    }
+
+    // Top 15 by population
+    const byPop = [...states].filter(s => s.population != null).sort((a, b) => b.population - a.population).slice(0, 15);
+
+    // By income
+    const byIncome = [...states].filter(s => s.median_hh_income != null).sort((a, b) => b.median_hh_income - a.median_hh_income);
+    const allIncomes = byIncome.map(s => s.median_hh_income).filter(Boolean);
+    const natMedian = allIncomes.length ? allIncomes[Math.floor(allIncomes.length / 2)] : null;
+    const highest = byIncome[0];
+    const lowest  = byIncome[byIncome.length - 1];
+
+    let html = `<div class="stat-row" style="margin-bottom:1.5rem;">
+      <div class="stat-item">
+        <div class="stat-label">Highest Median HH Income</div>
+        <div class="stat-value" style="color:var(--green)">${highest ? `${highest.name || highest.fips} — ${fmtDollar(highest.median_hh_income)}` : '—'}</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Lowest Median HH Income</div>
+        <div class="stat-value" style="color:var(--red)">${lowest ? `${lowest.name || lowest.fips} — ${fmtDollar(lowest.median_hh_income)}` : '—'}</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">National Median (approx)</div>
+        <div class="stat-value">${natMedian ? fmtDollar(natMedian) : '—'}</div>
+      </div>
+    </div>`;
+
+    html += `<div class="chart-row">
+      <div class="chart-card">
+        <div class="chart-title">Population — Top 15 States</div>
+        <canvas id="chart-pop" height="280"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Median Household Income by State (top 20)</div>
+        <canvas id="chart-income" height="280"></canvas>
+      </div>
+    </div>`;
+
+    document.getElementById('census-content').innerHTML = html;
+
+    setTimeout(() => {
+      renderPopChart(byPop);
+      renderIncomeChart(byIncome.slice(0, 20));
+    }, 50);
+  }
+
+  function renderPopChart(states) {
+    destroyChart('chart-pop');
+    const el = document.getElementById('chart-pop');
+    if (!el) return;
+    charts['chart-pop'] = new Chart(el, {
+      type: 'bar',
+      data: {
+        labels: states.map(s => s.name || s.fips),
+        datasets: [{ label: 'Population', data: states.map(s => s.population), backgroundColor: 'rgba(99,179,237,0.5)', borderColor: '#63b3ed', borderWidth: 1 }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmtNum(ctx.parsed.x) } } },
+        scales: {
+          x: { grid: { color: '#2d3748' }, ticks: { font: { size: 10 }, callback: v => fmtNum(v) } },
+          y: { grid: { display: false }, ticks: { font: { size: 9 } } }
+        }
+      }
+    });
+  }
+
+  function renderIncomeChart(states) {
+    destroyChart('chart-income');
+    const el = document.getElementById('chart-income');
+    if (!el) return;
+    charts['chart-income'] = new Chart(el, {
+      type: 'bar',
+      data: {
+        labels: states.map(s => s.name || s.fips),
+        datasets: [{ label: 'Median HH Income', data: states.map(s => s.median_hh_income), backgroundColor: 'rgba(183,148,244,0.5)', borderColor: '#b794f4', borderWidth: 1 }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmtDollar(ctx.parsed.x) } } },
+        scales: {
+          x: { grid: { color: '#2d3748' }, ticks: { font: { size: 10 }, callback: v => fmtDollar(v) } },
+          y: { grid: { display: false }, ticks: { font: { size: 9 } } }
+        }
+      }
+    });
+  }
+
+  // ── Section 5: PE Synthesis ──────────────────────────────────────────────────
+
+  function renderPE(data) {
+    if (!data || data.status === 'not_ingested' || data.status === 'error') {
+      renderNotIngested('pe-content', ["Requires macro + labor + regional data to be ingested first"]);
+      return;
+    }
+
+    const env  = data.deal_environment || {};
+    const sectors = data.sector_momentum || [];
+    const geo  = data.geographic_opportunity || [];
+
+    const score    = env.score ?? null;
+    const signal   = env.signal || 'grey';
+    const drivers  = env.drivers || [];
+
+    const scoreColor = score == null ? 'var(--muted)' : score >= 60 ? 'var(--green)' : score >= 40 ? 'var(--amber)' : 'var(--red)';
+    const gradeMap = { green: 'B+', yellow: 'C', red: 'D', grey: '—' };
+    const grade = score == null ? '—' : score >= 75 ? 'A' : score >= 60 ? 'B' : score >= 45 ? 'C' : 'D';
+
+    let html = `<div class="synthesis-grid">
+
+      <!-- Deal Environment -->
+      <div class="synthesis-card">
+        <div class="synthesis-card-title">Deal Environment Score</div>
+        <div style="display:flex;align-items:baseline;margin-bottom:1rem;">
+          <span class="score-big" style="color:${scoreColor}">${score ?? '—'}</span>
+          <span class="score-grade" style="color:${scoreColor}">/100 &nbsp; ${grade}</span>
+        </div>
+        ${drivers.map(d => {
+          const impactColor = d.impact === 'positive' ? 'var(--green)' : d.impact === 'negative' ? 'var(--red)' : 'var(--muted)';
+          const impactArrow = d.impact === 'positive' ? '↑' : d.impact === 'negative' ? '↓' : '→';
+          return `<div class="driver-row">
+            <div>
+              <div style="font-weight:600;font-size:0.78rem;">${d.factor}</div>
+              <div style="font-size:0.72rem;color:var(--muted);">${d.reading}</div>
+            </div>
+            <div style="color:${impactColor};font-size:0.88rem;font-weight:700;">${impactArrow}</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- Sector Momentum -->
+      <div class="synthesis-card">
+        <div class="synthesis-card-title">Sector Momentum</div>
+        ${sectors.length ? '' : '<div style="color:var(--muted);font-size:0.82rem;">No sector data</div>'}
+        <canvas id="chart-sector-momentum" style="max-height:260px;"></canvas>
+      </div>
+
+      <!-- Geographic Opportunity -->
+      <div class="synthesis-card">
+        <div class="synthesis-card-title">Geographic Opportunity</div>
+        ${geo.slice(0, 7).map((g, i) => {
+          const sigColor = g.signal === 'green' ? 'var(--green)' : g.signal === 'yellow' ? 'var(--amber)' : 'var(--red)';
+          const chipClass = g.signal === 'green' ? 'green' : g.signal === 'yellow' ? 'amber' : 'red';
+          return `<div class="geo-rank-row">
+            <div class="rank-num">${i+1}</div>
+            <div style="flex:1;font-weight:600;font-size:0.82rem;">${g.state}</div>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <div style="width:60px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+                <div style="width:${g.opportunity_score || 0}%;height:100%;background:${sigColor};border-radius:3px;"></div>
+              </div>
+              <span style="font-size:0.75rem;color:${sigColor};font-weight:700;">${g.opportunity_score ?? '—'}</span>
+              <span class="chip ${chipClass}" style="font-size:0.65rem;">${g.signal || '—'}</span>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+    document.getElementById('pe-content').innerHTML = html;
+
+    if (sectors.length) {
+      setTimeout(() => renderSectorMomentumChart(sectors), 50);
+    }
+  }
+
+  function renderSectorMomentumChart(sectors) {
+    destroyChart('chart-sector-momentum');
+    const sorted = [...sectors].sort((a, b) => (b.momentum_score||0) - (a.momentum_score||0));
+    const labels = sorted.map(s => s.sector);
+    const vals   = sorted.map(s => s.momentum_score || 0);
+    const colors = sorted.map(s => s.signal === 'green' ? 'rgba(104,211,145,0.6)' : s.signal === 'yellow' ? 'rgba(246,173,85,0.6)' : 'rgba(252,129,129,0.6)');
+    const borders = sorted.map(s => s.signal === 'green' ? '#68d391' : s.signal === 'yellow' ? '#f6ad55' : '#fc8181');
+
+    const el = document.getElementById('chart-sector-momentum');
+    if (!el) return;
+    charts['chart-sector-momentum'] = new Chart(el, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{ label: 'Momentum Score', data: vals, backgroundColor: colors, borderColor: borders, borderWidth: 1 }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `Score: ${ctx.parsed.x}` } } },
+        scales: {
+          x: { grid: { color: '#2d3748' }, min: 0, max: 100, ticks: { font: { size: 10 } } },
+          y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+        }
+      }
+    });
+  }
+
+  // ── Key Signals ──────────────────────────────────────────────────────────────
+
+  function buildKeySignals(macro, labor) {
+    const signals = [];
+
+    if (macro && macro.kpis) {
+      const ffr    = macro.kpis.fed_funds_rate    || {};
+      const spread = macro.kpis.yield_spread_10_2 || {};
+      const cpi    = macro.kpis.cpi_yoy_pct       || {};
+
+      const rateColor = (ffr.value||0) > 5 ? 'red' : (ffr.value||0) > 4 ? 'amber' : 'green';
+      signals.push({
+        color: rateColor,
+        text: `Rate environment: FFR ${fmtPct(ffr.value, 2)} — ${ffr.signal || 'stable'}. ${spread.inverted ? `Yield curve inverted ${spread.inverted_months || ''}mo.` : 'Yield curve normal.'}`
+      });
+
+      if (cpi.value != null) {
+        const cpiColor = (cpi.value||0) > 4 ? 'red' : (cpi.value||0) > 2.5 ? 'amber' : 'green';
+        signals.push({ color: cpiColor, text: `Inflation: CPI YoY ${fmtPct(cpi.value, 1)} — ${cpi.trend || 'stable'}.` });
+      }
+    }
+
+    if (labor && labor.jolts) {
+      const quits = labor.jolts.quits_rate || 0;
+      const laborColor = quits > 2.5 ? 'amber' : quits > 1.8 ? 'green' : 'red';
+      signals.push({
+        color: laborColor,
+        text: `Labor market: Quits rate ${fmtPct(quits, 1)} — ${quits > 2.5 ? 'workers confident, wage pressure building' : quits < 1.8 ? 'labor market loosening' : 'normalizing'}.`
+      });
+    }
+
+    if (!signals.length) return;
+
+    const el = document.getElementById('key-signals-content');
+    el.innerHTML = signals.map(s =>
+      `<div class="signal-row"><div class="signal-dot ${s.color}"></div><div>${s.text}</div></div>`
+    ).join('');
+    document.getElementById('key-signals').style.display = 'block';
+  }
+
+  // ── Provenance Footer ────────────────────────────────────────────────────────
+
+  function renderProvenance(status) {
+    const sources = [
+      { key: 'fred',   label: 'FRED (Federal Reserve)',       color: '#63b3ed' },
+      { key: 'bls',    label: 'BLS (Bureau of Labor Stats)',  color: '#68d391' },
+      { key: 'bea',    label: 'BEA (Bureau of Economic Analysis)', color: '#b794f4' },
+      { key: 'census', label: 'Census ACS (2023)',            color: '#f6ad55' },
+    ];
+
+    const el = document.getElementById('prov-sources');
+    if (!el) return;
+
+    if (!status || !status.sources) {
+      el.innerHTML = sources.map(s =>
+        `<div class="prov-source"><span class="prov-dot" style="background:${s.color};opacity:0.4;"></span>${s.label}</div>`
+      ).join('');
+      return;
+    }
+
+    el.innerHTML = sources.map(s => {
+      const info = (status.sources || []).find(x => x.key === s.key);
+      const active = info && (info.row_count || 0) > 0;
+      const opacity = active ? '1' : '0.3';
+      const rowLabel = active ? ` &middot; ${fmtNum(info.row_count)} rows` : ' (not ingested)';
+      return `<div class="prov-source"><span class="prov-dot" style="background:${s.color};opacity:${opacity};"></span>${s.label}${rowLabel}</div>`;
+    }).join('');
+  }
+
+  // ── Refresh ───────────────────────────────────────────────────────────────────
+
+  async function refreshAll() {
+    const btn = document.getElementById('refresh-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>&nbsp; Triggering...'; }
+
+    const ingestCalls = [
+      { url: `${API}/fred/ingest`,  body: { category: 'interest_rates' } },
+      { url: `${API}/fred/ingest`,  body: { category: 'economic_indicators' } },
+    ];
+
+    for (const c of ingestCalls) {
+      try {
+        await fetch(c.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c.body) });
+      } catch (e) { /* ignore */ }
+    }
+
+    if (btn) { btn.innerHTML = 'Reloading...'; }
+    setTimeout(() => {
+      if (btn) { btn.disabled = false; btn.innerHTML = '↻ Refresh Data'; }
+      loadAll();
+    }, 2000);
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', loadAll);
+</script>
+</body>
+</html>

@@ -23,6 +23,8 @@ from app.reports.templates.pe_portfolio_report import PEPortfolioReportTemplate
 from app.reports.templates.pe_fund_tearsheet import PEFundTearsheetTemplate
 from app.reports.templates.pe_deal_memo import PEDealMemoTemplate
 from app.reports.templates.pe_market_brief import PEMarketBriefTemplate
+from app.reports.templates.les_schwab_av import LesSchwabAVTemplate
+from app.reports.templates.macro_sector_brief import MacroSectorBriefTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +54,8 @@ class ReportBuilder:
             "pe_fund_tearsheet": PEFundTearsheetTemplate(),
             "pe_deal_memo": PEDealMemoTemplate(),
             "pe_market_brief": PEMarketBriefTemplate(),
+            "les_schwab_av": LesSchwabAVTemplate(),
+            "macro_sector_brief": MacroSectorBriefTemplate(),
         }
         self._ensure_table()
 
@@ -135,7 +139,7 @@ class ReportBuilder:
             insert_sql,
             {
                 "template": template_name,
-                "title": title or f"{template_name} Report",
+                "title": title or getattr(template, "display_name", None) or f"{template_name} Report",
                 "format": format,
                 "params": json.dumps(params),
                 "created_at": datetime.utcnow(),
@@ -147,7 +151,7 @@ class ReportBuilder:
         try:
             # Gather data
             data = template.gather_data(self.db, params)
-            data["report_title"] = title or f"{template_name} Report"
+            data["report_title"] = title or getattr(template, "display_name", None) or f"{template_name} Report"
 
             # Generate file
             if format == "html":

@@ -52,6 +52,7 @@ class BLSDataset(str, Enum):
     CPI = "cpi"  # Consumer Price Index
     PPI = "ppi"  # Producer Price Index
     OES = "oes"  # Occupational Employment Statistics
+    AUTO_SECTOR = "auto_sector"  # Auto & Tire Service Industry (NAICS 441/4413, SOC 49-3023)
 
 
 class BLSDatasetIngestRequest(BaseModel):
@@ -311,6 +312,109 @@ async def ingest_all_datasets(
     except Exception as e:
         logger.error(f"Failed to create BLS batch jobs: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# LAUS (Local Area Unemployment Statistics) ENDPOINTS
+# =============================================================================
+
+
+@router.post("/ingest/laus")
+async def ingest_laus(
+    background_tasks: BackgroundTasks,
+    start_year: Optional[int] = None,
+    end_year: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Ingest BLS Local Area Unemployment Statistics for all 50 states + DC.
+
+    Fetches monthly unemployment rate series (LASST{FIPS}0000000000003) for
+    all 51 LAUS geographies and stores them in `bls_laus_state`.
+
+    **Series count:** 51 (one per state + DC)
+    **Update frequency:** Monthly (released with Employment Situation, ~10 days lag)
+    """
+    try:
+        from app.sources.bls.client import get_laus_series_ids
+        from app.core.config import get_settings
+
+        settings = get_settings()
+        api_key_present = settings.get_bls_api_key() is not None
+
+        if start_year is None or end_year is None:
+            default_start, default_end = get_default_date_range(api_key_present)
+            start_year = start_year or default_start
+            end_year = end_year or default_end
+
+        series_ids = get_laus_series_ids()
+
+        return create_and_dispatch_job(
+            db,
+            background_tasks,
+            source="bls",
+            config={
+                "dataset": "laus",
+                "start_year": start_year,
+                "end_year": end_year,
+                "series_ids": series_ids,
+                "series_count": len(series_ids),
+                "api_key_configured": api_key_present,
+            },
+            message="BLS LAUS state unemployment ingestion job created",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to create BLS LAUS job: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/laus/latest")
+def get_laus_latest(db: Session = Depends(get_db)):
+    """
+    Get the latest unemployment rate for each state from `bls_laus_state`.
+
+    Returns one row per state with the most recent year/period available.
+    Triggers ingestion via `POST /bls/ingest/laus` if the table is empty.
+    """
+    from sqlalchemy import text
+    from app.sources.bls.client import LAUS_STATE_FIPS
+
+    try:
+        result = db.execute(text("""
+            SELECT DISTINCT ON (series_id)
+                   series_id, year, period, value
+            FROM bls_laus_state
+            ORDER BY series_id, year DESC, period DESC
+        """))
+        rows = result.fetchall()
+    except Exception:
+        db.rollback()
+        return {"status": "not_ingested", "data": []}
+
+    if not rows:
+        return {"status": "not_ingested", "data": []}
+
+    data = []
+    for r in rows:
+        # LASST{FF}0000000000003 — FIPS is chars at index 5-6 (0-based)
+        fips = r.series_id[5:7] if len(r.series_id) >= 7 else ""
+        state_name = LAUS_STATE_FIPS.get(fips, "Unknown")
+        data.append({
+            "series_id": r.series_id,
+            "fips": fips,
+            "state": state_name,
+            "year": r.year,
+            "period": r.period,
+            "unemployment_rate": float(r.value) if r.value is not None else None,
+        })
+
+    # Sort by state name for readability
+    data.sort(key=lambda x: x["state"])
+    return {"status": "ok", "count": len(data), "data": data}
 
 
 # =============================================================================

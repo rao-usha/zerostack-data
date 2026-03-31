@@ -144,6 +144,9 @@ function pipelineColor(i, total) {
   return d3.interpolateRgb(C.primary, C.accent)(i / (total - 1));
 }
 
+// ─── API data store ─────────────────────────────────────────────────
+let apiPipelineData = null;
+
 // ─── Build Sankey Data ──────────────────────────────────────────────
 function buildData(sector) {
   const s = SECTOR_DATA[sector];
@@ -180,7 +183,7 @@ let activeSector = 'All';
 
 function render(sector) {
   activeSector = sector;
-  const data = buildData(sector);
+  const data = (apiPipelineData ? buildDataFromApi(sector) : null) || buildData(sector);
   const container = document.getElementById('chart-container');
   const tooltip = document.getElementById('tooltip');
   const rect = container.getBoundingClientRect();
@@ -416,6 +419,7 @@ function nodeColor(d) {
 
 // ─── Stats Bar ──────────────────────────────────────────────────────
 function renderStats(sector) {
+  if (apiPipelineData) { renderStatsFromApi(apiPipelineData.summary); return; }
   const s = SECTOR_DATA[sector];
   const winRate = ((s.closed / s.sourced) * 100).toFixed(1);
   const bar = document.getElementById('stats-bar');
@@ -467,9 +471,103 @@ window.addEventListener('resize', () => {
   resizeTimer = setTimeout(() => render(activeSector), 200);
 });
 
+// ─── API helpers ────────────────────────────────────────────────────
+function buildDataFromApi(dealType) {
+  if (!apiPipelineData) return null;
+  const { nodes, links } = apiPipelineData;
+  const isAll = dealType === 'All';
+
+  let filteredLinks = links;
+  let filteredNodeIds = new Set(nodes.map(n => n.id));
+
+  if (!isAll) {
+    const typeNodeId = `type_${dealType}`;
+    const subLinks = links.filter(l => l.source === typeNodeId);
+    const subIds = new Set(subLinks.map(l => l.target));
+    const statusLinks = links.filter(l => subIds.has(l.source));
+    filteredLinks = [...subLinks, ...statusLinks];
+    filteredNodeIds = new Set([typeNodeId, ...subIds, ...statusLinks.map(l => l.target)]);
+  }
+
+  const filteredNodes = nodes
+    .filter(n => filteredNodeIds.has(n.id))
+    .map(n => {
+      const outVal = filteredLinks.filter(l => l.source === n.id).reduce((s, l) => s + l.value, 0);
+      const inVal  = filteredLinks.filter(l => l.target === n.id).reduce((s, l) => s + l.value, 0);
+      return {
+        id: n.id,
+        label: n.label,
+        value: outVal || inVal,
+        type: 'pipeline',
+        stageIdx: n.category === 'type' ? 0 : n.category === 'sub_type' ? Math.floor(STAGES.length / 2) : STAGES.length - 1,
+      };
+    });
+
+  return { nodes: filteredNodes, links: filteredLinks };
+}
+
+function renderFiltersFromApi(dealTypes) {
+  const container = document.getElementById('filters');
+  container.innerHTML = '';
+  const total = Object.values(dealTypes).reduce((a, b) => a + b, 0);
+  [['All', total], ...Object.entries(dealTypes)].forEach(([dt, count]) => {
+    const btn = document.createElement('button');
+    btn.textContent = `${dt} (${count})`;
+    btn.className = dt === 'All' ? 'active' : '';
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filters button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      render(dt);
+    });
+    container.appendChild(btn);
+  });
+}
+
+function renderStatsFromApi(summary) {
+  const bar = document.getElementById('stats-bar');
+  const topType = summary.top_deal_type || 'N/A';
+  const total = summary.total_deals || 0;
+  const typeCount = Object.keys(summary.deal_types || {}).length;
+  bar.innerHTML = `
+    <div class="stat-card">
+      <div class="label">Total Deals</div>
+      <div class="value">${total}</div>
+      <div class="sub">real transactions</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Top Deal Type</div>
+      <div class="value" style="color:${C.accent}">${topType}</div>
+      <div class="sub">${(summary.deal_types || {})[topType] || 0} deals</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Deal Types</div>
+      <div class="value">${typeCount}</div>
+      <div class="sub">distinct categories</div>
+    </div>
+  `;
+}
+
+async function loadPipelineData() {
+  try {
+    const resp = await fetch('/api/v1/pe/deals/pipeline-summary');
+    if (!resp.ok) throw new Error('API ' + resp.status);
+    const data = await resp.json();
+    if (!data.nodes?.length) return;
+
+    apiPipelineData = data;
+    renderFiltersFromApi(data.summary.deal_types || {});
+    render('All');
+  } catch(e) {
+    console.warn('Pipeline API error, using static data:', e.message);
+  }
+}
+
 // ─── Init ───────────────────────────────────────────────────────────
-renderFilters();
-render('All');
+(async () => {
+  renderFilters();
+  render('All');
+  await loadPipelineData();
+})();
 </script>
 </body>
 </html>

@@ -1,8 +1,13 @@
 """
-Data Quality Service for People Intelligence Platform.
+Backward-compatibility re-export shim.
 
-Provides data quality scoring, deduplication, and enrichment tracking.
+New code should import PeopleDQService from app.services.people_dq_service.
+This module re-exports DataQualityService as an alias so existing callers
+in app/api/v1/people_data_quality.py continue to work unchanged.
 """
+from app.services.people_dq_service import PeopleDQService as DataQualityService  # noqa: F401
+
+__all__ = ["DataQualityService"]
 
 from typing import List, Dict, Any
 from datetime import date, timedelta

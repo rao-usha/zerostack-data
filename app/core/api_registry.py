@@ -149,6 +149,20 @@ API_REGISTRY: Dict[str, APIConfig] = {
         notes="No key required. 10 req/sec max. Must set User-Agent.",
     ),
     # -------------------------------------------------------------------------
+    # ENERGY / EV DATA
+    # -------------------------------------------------------------------------
+    "afdc": APIConfig(
+        source_name="afdc",
+        base_url="https://developer.nrel.gov/api/alt-fuel-stations/v1",
+        api_key_requirement=APIKeyRequirement.RECOMMENDED,
+        config_key="data_gov_api",  # NREL accepts api.data.gov key
+        signup_url="https://developer.nrel.gov/signup/",
+        max_concurrency=2,
+        rate_limit_per_minute=300,
+        timeout_seconds=30.0,
+        notes="NREL AFDC API. Accepts DATA_GOV_API key or DEMO_KEY for testing.",
+    ),
+    # -------------------------------------------------------------------------
     # TRANSPORTATION
     # -------------------------------------------------------------------------
     "bts": APIConfig(

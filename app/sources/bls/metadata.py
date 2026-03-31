@@ -26,6 +26,8 @@ DATASET_TABLES = {
     "cpi": "bls_cpi",
     "ppi": "bls_ppi",
     "oes": "bls_oes",
+    "auto_sector": "bls_auto_sector",
+    "laus": "bls_laus_state",
 }
 
 
@@ -287,6 +289,7 @@ def get_dataset_display_name(dataset: str) -> str:
         "cpi": "Consumer Price Index (CPI)",
         "ppi": "Producer Price Index (PPI)",
         "oes": "Occupational Employment Statistics (OES)",
+        "laus": "Local Area Unemployment Statistics (LAUS)",
     }
 
     return display_names.get(dataset.lower(), dataset.upper())
@@ -333,6 +336,11 @@ def get_dataset_description(dataset: str) -> str:
         ),
     }
 
+    descriptions["laus"] = (
+        "Local Area Unemployment Statistics providing monthly unemployment rates "
+        "for all 50 states and the District of Columbia. "
+        "Series pattern: LASST{FIPS}0000000000003 = unemployment rate."
+    )
     return descriptions.get(
         dataset.lower(), f"Bureau of Labor Statistics {dataset.upper()} data series"
     )

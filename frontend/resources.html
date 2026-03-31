@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexdata — Dev Resources</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --primary: #6366f1;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #22c55e;
+            --accent: #06b6d4;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+        }
+        .logo { display: flex; align-items: center; gap: 0.75rem; text-decoration: none; }
+        .logo h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.6rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            color: var(--text-muted);
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        .container {
+            max-width: 900px;
+            margin: 3rem auto;
+            padding: 0 2rem;
+        }
+        .page-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.4rem;
+        }
+        .page-subtitle {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 2.5rem;
+        }
+        .section-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2.5rem;
+        }
+        .card {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.1rem 1.25rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            text-decoration: none;
+            color: var(--text);
+            transition: border-color 0.15s, background 0.15s;
+            cursor: pointer;
+        }
+        .card:hover {
+            border-color: var(--primary);
+            background: #263047;
+        }
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+        .card-body { min-width: 0; }
+        .card-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .card-desc {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 0.15rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .card-arrow {
+            margin-left: auto;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+        /* Icon background tints */
+        .icon-cf  { background: rgba(249, 115, 22, 0.15); }
+        .icon-gcp { background: rgba(66, 133, 244, 0.15); }
+        .icon-pg  { background: rgba(51, 103, 214, 0.15); }
+        .icon-api { background: rgba(99, 102, 241, 0.15); }
+        .icon-gh  { background: rgba(148, 163, 184, 0.15); }
+        .icon-docs { background: rgba(6, 182, 212, 0.15); }
+        .icon-logs { background: rgba(34, 197, 94, 0.15); }
+        .icon-local { background: rgba(245, 158, 11, 0.15); }
+
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 2rem 0;
+        }
+
+        footer {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            padding: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <a href="/" class="logo">
+            <h1>Nexdata</h1>
+        </a>
+        <span class="badge">Dev Resources</span>
+    </header>
+
+    <div class="container">
+        <div class="page-title">Resources</div>
+        <div class="page-subtitle">Quick links to infrastructure, accounts, and internal tools.</div>
+
+        <!-- Cloud Accounts -->
+        <div class="section-label">Cloud Accounts</div>
+        <div class="grid">
+            <a class="card" href="https://dash.cloudflare.com" target="_blank" rel="noopener">
+                <div class="card-icon icon-cf">☁️</div>
+                <div class="card-body">
+                    <div class="card-title">Cloudflare</div>
+                    <div class="card-desc">DNS, CDN, Workers, R2</div>
+                </div>
+                <div class="card-arrow">↗</div>
+            </a>
+            <a class="card" href="https://console.cloud.google.com" target="_blank" rel="noopener">
+                <div class="card-icon icon-gcp">🔵</div>
+                <div class="card-body">
+                    <div class="card-title">Google Cloud Console</div>
+                    <div class="card-desc">GKE, Cloud SQL, Storage, IAM</div>
+                </div>
+                <div class="card-arrow">↗</div>
+            </a>
+        </div>
+
+        <!-- Local Dev -->
+        <div class="section-label">Local Services</div>
+        <div class="grid">
+            <a class="card" href="http://localhost:8001/docs" target="_blank" rel="noopener">
+                <div class="card-icon icon-api">⚡</div>
+                <div class="card-body">
+                    <div class="card-title">API Swagger UI</div>
+                    <div class="card-desc">localhost:8001/docs</div>
+                </div>
+                <div class="card-arrow">↗</div>
+            </a>
+            <a class="card" href="http://localhost:8001/api/v1/jobs/list" target="_blank" rel="noopener">
+                <div class="card-icon icon-logs">📋</div>
+                <div class="card-body">
+                    <div class="card-title">Job Queue</div>
+                    <div class="card-desc">Ingestion job status</div>
+                </div>
+                <div class="card-arrow">↗</div>
+            </a>
+            <a class="card" href="http://localhost:8001/api/v1/export/tables" target="_blank" rel="noopener">
+                <div class="card-icon icon-pg">🗄️</div>
+                <div class="card-body">
+                    <div class="card-title">Table Coverage</div>
+                    <div class="card-desc">All tables + row counts</div>
+                </div>
+                <div class="card-arrow">↗</div>
+            </a>
+            <a class="card" href="http://localhost:8001/health" target="_blank" rel="noopener">
+                <div class="card-icon icon-local">💚</div>
+                <div class="card-body">
+                    <div class="card-title">Health Check</div>
+                    <div class="card-desc">API + DB + worker status</div>
+                </div>
+                <div class="card-arrow">↗</div>
+            </a>
+        </div>
+
+        <!-- App Pages -->
+        <div class="section-label">App Pages</div>
+        <div class="grid">
+            <a class="card" href="/" >
+                <div class="card-icon icon-api">🏠</div>
+                <div class="card-body">
+                    <div class="card-title">Dashboard</div>
+                    <div class="card-desc">Main Nexdata app</div>
+                </div>
+                <div class="card-arrow">→</div>
+            </a>
+            <a class="card" href="/pe-demo.html">
+                <div class="card-icon icon-docs">📊</div>
+                <div class="card-body">
+                    <div class="card-title">PE Demo</div>
+                    <div class="card-desc">Acquisition + exit stories</div>
+                </div>
+                <div class="card-arrow">→</div>
+            </a>
+            <a class="card" href="/dc-demo.html">
+                <div class="card-icon icon-docs">🏗️</div>
+                <div class="card-body">
+                    <div class="card-title">Datacenter Demo</div>
+                    <div class="card-desc">4-step site selection</div>
+                </div>
+                <div class="card-arrow">→</div>
+            </a>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section-label">Quick Commands</div>
+        <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; font-size: 0.82rem; font-family: monospace; color: var(--text-muted); line-height: 1.9;">
+            <div><span style="color:#6366f1">docker-compose restart api</span>  &nbsp;# restart after code changes</div>
+            <div><span style="color:#6366f1">docker-compose logs api -f</span>   &nbsp;# follow API logs</div>
+            <div><span style="color:#6366f1">docker-compose ps</span>            &nbsp;# check all container status</div>
+            <div><span style="color:#06b6d4">curl -s http://localhost:8001/api/v1/export/tables | python -m json.tool</span></div>
+        </div>
+    </div>
+
+    <footer>Nexdata internal dev resources — not for external sharing</footer>
+</body>
+</html>

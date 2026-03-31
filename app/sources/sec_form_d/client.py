@@ -134,20 +134,18 @@ class FormDClient:
         # If primary document is provided, try it first
         if primary_document:
             urls_to_try.append(
-                f"{self.BASE_URL}/Archives/edgar/data/{cik_padded}/{accession_clean}/{primary_document}"
+                f"https://www.sec.gov/Archives/edgar/data/{cik_padded}/{accession_clean}/{primary_document}"
             )
 
         # Standard Form D document names
         urls_to_try.extend(
             [
-                f"{self.BASE_URL}/Archives/edgar/data/{cik_padded}/{accession_clean}/primary_doc.xml",
                 f"https://www.sec.gov/Archives/edgar/data/{cik_padded}/{accession_clean}/primary_doc.xml",
-                f"{self.BASE_URL}/Archives/edgar/data/{cik_padded}/{accession_clean}/form-d.xml",
                 f"https://www.sec.gov/Archives/edgar/data/{cik_padded}/{accession_clean}/form-d.xml",
             ]
         )
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
             for url in urls_to_try:
                 try:
                     response = await client.get(
@@ -174,7 +172,7 @@ class FormDClient:
                     for item in items:
                         name = item.get("name", "")
                         if name.endswith(".xml") and "form" in name.lower():
-                            url = f"{self.BASE_URL}/Archives/edgar/data/{cik_padded}/{accession_clean}/{name}"
+                            url = f"https://www.sec.gov/Archives/edgar/data/{cik_padded}/{accession_clean}/{name}"
                             response = await client.get(
                                 url, headers=self._get_headers(), timeout=30
                             )
@@ -202,9 +200,9 @@ class FormDClient:
         cik_padded = str(cik).zfill(10)
         accession_clean = accession_number.replace("-", "")
 
-        url = f"{self.BASE_URL}/Archives/edgar/data/{cik_padded}/{accession_clean}/index.json"
+        url = f"https://www.sec.gov/Archives/edgar/data/{cik_padded}/{accession_clean}/index.json"
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
             try:
                 response = await client.get(
                     url, headers=self._get_headers(), timeout=30
@@ -234,9 +232,9 @@ class FormDClient:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
 
-        # Use the SEC EDGAR search endpoint
+        # Use the SEC EDGAR full-text search endpoint
         params = {
-            "q": "formType:D",
+            "forms": "D,D/A",
             "dateRange": "custom",
             "startdt": start_date.strftime("%Y-%m-%d"),
             "enddt": end_date.strftime("%Y-%m-%d"),
@@ -257,6 +255,89 @@ class FormDClient:
                 logger.warning(f"Full-text search failed: {e}")
 
         return []
+
+    async def search_recent_form_d_filings(
+        self,
+        start_date: str = None,
+        end_date: str = None,
+        limit: int = 200,
+    ) -> List[Dict]:
+        """
+        Discover recent Form D filers via EDGAR EFTS full-text search.
+
+        Returns list of {cik, accession_number, entity_name, file_date} dicts
+        ready for XML ingestion.
+
+        Args:
+            start_date: ISO date string (default: 90 days ago)
+            end_date: ISO date string (default: today)
+            limit: max filings to return (default 200)
+        """
+        await self._rate_limit()
+
+        if not end_date:
+            end_date = datetime.now().strftime("%Y-%m-%d")
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+
+        params = {
+            "forms": "D,D/A",
+            "dateRange": "custom",
+            "startdt": start_date,
+            "enddt": end_date,
+            "hits.hits._source": "period_of_report,entity_name,file_date,form_type",
+            "hits.hits.total.value": "true",
+            "_source": "period_of_report,entity_name,file_date,form_type",
+            "from": 0,
+            "size": min(limit, 200),
+        }
+
+        results = []
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    self.EFTS_URL,
+                    params=params,
+                    headers=self._get_headers(),
+                    timeout=30,
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    hits = data.get("hits", {}).get("hits", [])
+                    seen_accessions = set()
+                    for hit in hits:
+                        source = hit.get("_source", {})
+                        # _id format: "0002076112-26-000001:primary_doc.xml"
+                        hit_id = hit.get("_id", "")
+                        accession = source.get("adsh") or hit_id.split(":")[0]
+                        if accession in seen_accessions:
+                            continue
+                        seen_accessions.add(accession)
+
+                        # CIK is in source.ciks array
+                        ciks_list = source.get("ciks", [])
+                        cik = ciks_list[0] if ciks_list else accession.split("-")[0]
+
+                        # Entity name from display_names
+                        display_names = source.get("display_names", [])
+                        if display_names:
+                            entity_name = display_names[0].split("(CIK")[0].strip()
+                        else:
+                            entity_name = source.get("entity_name", "")
+
+                        results.append({
+                            "cik": cik,
+                            "accession_number": accession,
+                            "entity_name": entity_name,
+                            "file_date": source.get("file_date", ""),
+                        })
+                else:
+                    logger.warning(f"EFTS search returned {response.status_code}")
+            except Exception as e:
+                logger.warning(f"EFTS search_recent_form_d_filings failed: {e}")
+
+        logger.info(f"EFTS search found {len(results)} Form D filings ({start_date} to {end_date})")
+        return results
 
     async def get_recent_form_d_rss(self) -> List[Dict]:
         """

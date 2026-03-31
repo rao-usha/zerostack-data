@@ -297,14 +297,36 @@
       </div>
     </div>
     <div class="card">
+      <h3>How to Read This Map</h3>
+      <p style="font-size:12px;color:#94a3b8;margin:0 0 10px;line-height:1.5;">
+        Each state is scored 0–100 for <strong style="color:#e2e8f0;">datacenter suitability</strong>. Higher scores indicate better conditions for developing or acquiring a hyperscale or edge datacenter facility.
+      </p>
+      <div style="font-size:11px;color:#94a3b8;line-height:1.8;">
+        <div>⚡ <strong style="color:#e2e8f0;">Power cost</strong> — avg $/kWh (35%)</div>
+        <div>👷 <strong style="color:#e2e8f0;">Labor market</strong> — tech workforce depth &amp; cost (25%)</div>
+        <div>🏛 <strong style="color:#e2e8f0;">State incentives</strong> — tax credits, grants (20%)</div>
+        <div>🌐 <strong style="color:#e2e8f0;">Fiber density</strong> — backbone infrastructure (20%)</div>
+      </div>
+    </div>
+    <div class="card">
       <h3>Score Legend</h3>
+      <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;display:flex;justify-content:space-between;">
+        <span style="color:#6b8cba;">▌ Low suitability</span>
+        <span style="color:#2ecc71;">▌ High suitability</span>
+      </div>
       <div class="legend-bar">
         <div class="legend-gradient" id="legend-gradient"></div>
         <div class="legend-labels">
-          <span>0 — Low</span>
+          <span>0</span>
           <span>50</span>
-          <span>100 — High</span>
+          <span>100</span>
         </div>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:#94a3b8;line-height:1.8;">
+        <div><span style="color:#2ecc71;">●</span> 80–100 &nbsp;Top tier market</div>
+        <div><span style="color:#148f77;">●</span> 60–79 &nbsp;&nbsp;Strong market</div>
+        <div><span style="color:#2471a3;">●</span> 40–59 &nbsp;&nbsp;Emerging market</div>
+        <div><span style="color:#1e3a5f;">●</span> &lt;40 &nbsp;&nbsp;&nbsp;&nbsp;Developing market</div>
       </div>
     </div>
     <div class="card state-info" id="state-info">
@@ -315,8 +337,18 @@
 </div>
 
 <script>
-// State scores (FIPS -> score) — industrial states score higher
-const stateScores = {
+// FIPS lookup for state abbreviations returned by API
+const STATE_ABBR_TO_FIPS = {
+  AL:"01",AK:"02",AZ:"04",AR:"05",CA:"06",CO:"08",CT:"09",DE:"10",FL:"12",
+  GA:"13",HI:"15",ID:"16",IL:"17",IN:"18",IA:"19",KS:"20",KY:"21",LA:"22",
+  ME:"23",MD:"24",MA:"25",MI:"26",MN:"27",MS:"28",MO:"29",MT:"30",NE:"31",
+  NV:"32",NH:"33",NJ:"34",NM:"35",NY:"36",NC:"37",ND:"38",OH:"39",OK:"40",
+  OR:"41",PA:"42",RI:"44",SC:"45",SD:"46",TN:"47",TX:"48",UT:"49",VT:"50",
+  VA:"51",WA:"53",WV:"54",WI:"55",WY:"56"
+};
+
+// State scores (FIPS -> score) — static fallback, overwritten by API
+let stateScores = {
   "01": 70, // Alabama
   "02": 38, // Alaska
   "04": 58, // Arizona
@@ -546,9 +578,16 @@ function render() {
         const name = stateNames[fips] || "Unknown";
         const score = stateScores[fips] || "N/A";
         const metrics = getMetrics(fips);
+        const scoreTier = typeof score === "number"
+          ? score >= 80 ? "Top tier market"
+          : score >= 60 ? "Strong market"
+          : score >= 40 ? "Emerging market"
+          : "Developing market"
+          : "";
         tooltip.innerHTML = `
           <div class="tt-name">${name}</div>
-          <div class="tt-score">${score}</div>
+          <div class="tt-score">${score}<span style="font-size:12px;color:#94a3b8;font-weight:400;margin-left:6px;">/100</span></div>
+          ${scoreTier ? `<div style="font-size:11px;color:#6366f1;margin-bottom:8px;">${scoreTier}</div>` : ""}
           <div class="tt-metric"><span class="tt-metric-label">Avg Utility Rate</span><span>${metrics.utility}</span></div>
           <div class="tt-metric"><span class="tt-metric-label">Avg Labor Cost</span><span>${metrics.labor}</span></div>
           <div class="tt-metric"><span class="tt-metric-label">Incentive Level</span><span>${metrics.incentive}</span></div>
@@ -715,7 +754,39 @@ document.querySelectorAll(".toggle-row").forEach(row => {
 });
 
 window.addEventListener("resize", render);
-render();
+
+// === API: load real datacenter state scores ===
+async function loadStateScores() {
+  try {
+    const resp = await fetch("/api/v1/datacenter-sites/top-states");
+    if (!resp.ok) throw new Error("API " + resp.status);
+    const data = await resp.json();
+    const states = data.states || data;
+    if (!states.length) return;
+
+    // Overwrite stateScores with real API data (FIPS keyed)
+    states.forEach(s => {
+      const fips = STATE_ABBR_TO_FIPS[s.state];
+      if (fips && s.avg_score != null) {
+        stateScores[fips] = Math.round(s.avg_score);
+      }
+    });
+  } catch (e) {
+    console.warn("Datacenter API error, using static scores:", e.message);
+  }
+}
+
+function updateAvgStat() {
+  const scoreValues = Object.values(stateScores);
+  const avgScore = Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length);
+  document.getElementById("avg-score-stat").textContent = avgScore;
+}
+
+(async () => {
+  await loadStateScores();
+  updateAvgStat();
+  render();
+})();
 </script>
 </body>
 </html>

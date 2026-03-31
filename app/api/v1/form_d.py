@@ -311,21 +311,29 @@ async def ingest_filings(
     db: Session = Depends(get_db),
 ):
     """Ingest Form D filings for specified CIKs."""
+    from app.sources.sec_form_d.client import FormDClient
+
     service = FormDIngestionService(db)
 
-    # If no CIKs provided, use sample known Form D filers
+    # If no CIKs provided, discover real Form D filers via EDGAR EFTS search
     if not ciks:
-        # Sample CIKs of known VC/PE funds and startups
-        ciks = [
-            "0001326801",  # Meta/Facebook
-            "0001318605",  # Tesla
-            "0001652044",  # Alphabet
-            "0001800",  # Abbott
-            "0001467373",  # Airbnb
-        ]
+        client = FormDClient()
+        discovered = await client.search_recent_form_d_filings(limit=200)
+        # Deduplicate and extract CIKs (filter out empty ones)
+        ciks = list({
+            d["cik"] for d in discovered
+            if d.get("cik") and len(d["cik"]) > 4
+        })[:50]  # cap at 50 unique issuers
+
+    if not ciks:
+        return {
+            "status": "completed",
+            "message": "No CIKs discovered — EFTS search returned no results",
+            "results": [],
+        }
 
     results = []
-    for cik in ciks[:10]:  # Limit to 10 CIKs per request
+    for cik in ciks[:50]:
         try:
             result = await service.ingest_company_filings(cik)
             results.append(result)

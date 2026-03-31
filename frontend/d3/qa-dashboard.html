@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>People Data QA — Nexdata</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+    .header-left { display: flex; align-items: center; gap: 1rem; }
+    .back-link {
+      color: #94a3b8;
+      text-decoration: none;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .back-link:hover { color: #e2e8f0; }
+    .header-title { font-size: 1rem; font-weight: 600; color: #e2e8f0; }
+    .header-title span { color: #6366f1; }
+    .btn-run {
+      background: #6366f1;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 0.4rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .btn-run:hover { background: #4f46e5; }
+    .btn-run:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      gap: 0;
+    }
+    .stat {
+      flex: 1;
+      padding: 1rem 1.5rem;
+      border-right: 1px solid #334155;
+    }
+    .stat:last-child { border-right: none; }
+    .stat-value { font-size: 1.75rem; font-weight: 700; color: #e2e8f0; }
+    .stat-label { font-size: 0.72rem; color: #64748b; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid #334155;
+      background: #1e293b;
+      padding: 0 1.5rem;
+    }
+    .tab {
+      padding: 0.75rem 1.25rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #64748b;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab.active { color: #6366f1; border-bottom-color: #6366f1; }
+    .tab:hover:not(.active) { color: #94a3b8; }
+
+    /* ── Content ── */
+    .content { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Company health table ── */
+    .health-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    .health-table th {
+      text-align: left;
+      padding: 0.6rem 1rem;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #64748b;
+      border-bottom: 1px solid #334155;
+    }
+    .health-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #1e293b;
+      vertical-align: middle;
+    }
+    .health-table tr.company-row {
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .health-table tr.company-row:hover { background: #1e293b; }
+    .health-table tr.issues-row td { padding: 0; }
+    .health-table tr.issues-row { display: none; }
+    .health-table tr.issues-row.open { display: table-row; }
+
+    /* Score badge */
+    .score-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .score-bar {
+      width: 80px;
+      height: 6px;
+      background: #334155;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .score-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s;
+    }
+    .score-num { font-weight: 700; min-width: 2.5rem; }
+
+    /* Severity dots */
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+    .dot-error { background: #ef4444; }
+    .dot-warning { background: #f59e0b; }
+    .dot-info { background: #3b82f6; }
+
+    /* Issue list inside expanded row */
+    .issue-list {
+      padding: 0.75rem 1rem 0.75rem 3rem;
+      background: #0f172a;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .issue-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      font-size: 0.8rem;
+    }
+    .issue-tag {
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .tag-error { background: #450a0a; color: #fca5a5; }
+    .tag-warning { background: #451a03; color: #fcd34d; }
+    .tag-info { background: #172554; color: #93c5fd; }
+    .issue-msg { color: #94a3b8; line-height: 1.4; }
+    .no-issues { color: #22c55e; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem; }
+
+    /* Empty / loading states */
+    .state-msg {
+      text-align: center;
+      padding: 3rem;
+      color: #64748b;
+      font-size: 0.875rem;
+    }
+
+    /* ── Merge candidates ── */
+    .merge-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .merge-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .merge-card-header {
+      padding: 0.75rem 1.25rem;
+      background: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: #64748b;
+      border-bottom: 1px solid #334155;
+    }
+    .merge-similarity {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .sim-score {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #f59e0b;
+    }
+    .match-type-badge {
+      background: #1e3a5f;
+      color: #93c5fd;
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+    }
+    .merge-persons {
+      display: grid;
+      grid-template-columns: 1fr 40px 1fr;
+      gap: 0;
+      align-items: center;
+    }
+    .person-card {
+      padding: 1.25rem;
+    }
+    .person-name { font-size: 1rem; font-weight: 600; color: #e2e8f0; margin-bottom: 0.25rem; }
+    .person-title { font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.5rem; }
+    .person-meta { font-size: 0.72rem; color: #64748b; display: flex; flex-direction: column; gap: 0.2rem; }
+    .person-meta span { display: flex; gap: 0.3rem; align-items: center; }
+    .vs-divider {
+      text-align: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #475569;
+      border-left: 1px solid #334155;
+      border-right: 1px solid #334155;
+      padding: 1rem 0;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .merge-actions {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.75rem 1.25rem;
+      border-top: 1px solid #334155;
+      justify-content: flex-end;
+    }
+    .btn-approve {
+      background: #052e16;
+      color: #4ade80;
+      border: 1px solid #166534;
+      border-radius: 6px;
+      padding: 0.45rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-approve:hover { background: #14532d; }
+    .btn-reject {
+      background: #1c1917;
+      color: #94a3b8;
+      border: 1px solid #44403c;
+      border-radius: 6px;
+      padding: 0.45rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-reject:hover { background: #292524; }
+    .resolved-badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.25rem 0.75rem;
+      border-radius: 6px;
+    }
+    .resolved-approved { background: #052e16; color: #4ade80; }
+    .resolved-rejected { background: #1c1917; color: #64748b; }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid #334155;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <a href="/index.html" class="back-link">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      Gallery
+    </a>
+    <div class="header-title">People Data <span>QA</span></div>
+  </div>
+  <button class="btn-run" id="btn-run" onclick="runQA()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+    Refresh QA
+  </button>
+</div>
+
+<div class="stats-bar">
+  <div class="stat">
+    <div class="stat-value" id="stat-companies">—</div>
+    <div class="stat-label">Companies Scored</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="stat-issues">—</div>
+    <div class="stat-label">Open Issues</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="stat-errors">—</div>
+    <div class="stat-label">Errors</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="stat-merges">—</div>
+    <div class="stat-label">Pending Merges</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="stat-avg-health">—</div>
+    <div class="stat-label">Avg Health Score</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('health')">Health Report</div>
+  <div class="tab" onclick="switchTab('merges')">Merge Review <span id="merge-badge" style="background:#6366f1;color:white;border-radius:9px;padding:0 6px;font-size:0.68rem;margin-left:4px;display:none;"></span></div>
+</div>
+
+<div class="content">
+
+  <!-- Health Report Tab -->
+  <div class="tab-panel active" id="panel-health">
+    <div id="health-loading" class="state-msg"><div class="spinner"></div><br>Running QA checks…</div>
+    <div id="health-empty" class="state-msg" style="display:none;">No company data found.</div>
+    <table class="health-table" id="health-table" style="display:none;">
+      <thead>
+        <tr>
+          <th>Company</th>
+          <th>Health Score</th>
+          <th>People</th>
+          <th>Errors</th>
+          <th>Warnings</th>
+          <th>Info</th>
+          <th>Last Snapshot</th>
+        </tr>
+      </thead>
+      <tbody id="health-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Merge Review Tab -->
+  <div class="tab-panel" id="panel-merges">
+    <div id="merge-loading" class="state-msg"><div class="spinner"></div><br>Loading merge candidates…</div>
+    <div id="merge-empty" class="state-msg" style="display:none;">No pending merge candidates. 🎉</div>
+    <div class="merge-grid" id="merge-grid" style="display:none;"></div>
+  </div>
+
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────
+  let qaData = [];
+  let mergeData = [];
+
+  // ── Tab switching ──────────────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      t.classList.toggle('active', ['health','merges'][i] === name);
+    });
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(`panel-${name}`).classList.add('active');
+    if (name === 'merges') {
+      if (mergeData.length === 0) loadMerges();
+      else renderMergeCards();
+    }
+  }
+
+  // ── QA Report ─────────────────────────────────────────────────────────
+  async function loadQA() {
+    document.getElementById('health-loading').style.display = '';
+    document.getElementById('health-table').style.display = 'none';
+    document.getElementById('health-empty').style.display = 'none';
+
+    try {
+      const resp = await fetch('/api/v1/people-analytics/qa-report?limit=100');
+      if (!resp.ok) throw new Error('API ' + resp.status);
+      qaData = await resp.json();
+      renderHealthTable();
+      updateStats();
+    } catch(e) {
+      document.getElementById('health-loading').textContent = `Error: ${e.message}`;
+    }
+  }
+
+  function renderHealthTable() {
+    const tbody = document.getElementById('health-tbody');
+    tbody.innerHTML = '';
+
+    if (!qaData.length) {
+      document.getElementById('health-loading').style.display = 'none';
+      document.getElementById('health-empty').style.display = '';
+      return;
+    }
+
+    document.getElementById('health-loading').style.display = 'none';
+    document.getElementById('health-table').style.display = '';
+
+    qaData.forEach((co, idx) => {
+      const errors = co.issues.filter(i => i.severity === 'ERROR').length;
+      const warnings = co.issues.filter(i => i.severity === 'WARNING').length;
+      const infos = co.issues.filter(i => i.severity === 'INFO').length;
+      const score = co.health_score;
+      const fillColor = score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444';
+      const dotHtml = errors
+        ? `<span class="dot dot-error"></span>${errors}`
+        : `<span style="color:#64748b;">—</span>`;
+
+      const tr = document.createElement('tr');
+      tr.className = 'company-row';
+      tr.innerHTML = `
+        <td style="font-weight:600;">${co.company_name}</td>
+        <td>
+          <div class="score-badge">
+            <div class="score-bar"><div class="score-fill" style="width:${score}%;background:${fillColor};"></div></div>
+            <span class="score-num" style="color:${fillColor};">${score}</span>
+          </div>
+        </td>
+        <td>${co.total_people || '—'}</td>
+        <td>${errors ? `<span style="color:#ef4444;font-weight:600;">${errors}</span>` : '—'}</td>
+        <td>${warnings ? `<span style="color:#f59e0b;">${warnings}</span>` : '—'}</td>
+        <td>${infos ? `<span style="color:#3b82f6;">${infos}</span>` : '—'}</td>
+        <td style="color:#64748b;font-size:0.8rem;">${co.snapshot_date || 'Never'}</td>
+      `;
+      tr.onclick = () => toggleIssues(idx);
+      tbody.appendChild(tr);
+
+      // Issues expansion row
+      const issueRow = document.createElement('tr');
+      issueRow.className = 'issues-row';
+      issueRow.id = `issues-${idx}`;
+      const issueCell = document.createElement('td');
+      issueCell.colSpan = 7;
+
+      if (!co.issues.length) {
+        issueCell.innerHTML = `<div class="issue-list"><div class="no-issues"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> All checks passed</div></div>`;
+      } else {
+        issueCell.innerHTML = `<div class="issue-list">${co.issues.map(issue => `
+          <div class="issue-item">
+            <span class="issue-tag tag-${issue.severity.toLowerCase()}">${issue.severity}</span>
+            <span class="issue-tag" style="background:#1e293b;color:#94a3b8;">${issue.check}</span>
+            <span class="issue-msg">${issue.message}</span>
+          </div>
+        `).join('')}</div>`;
+      }
+      issueRow.appendChild(issueCell);
+      tbody.appendChild(issueRow);
+    });
+  }
+
+  function toggleIssues(idx) {
+    const row = document.getElementById(`issues-${idx}`);
+    row.classList.toggle('open');
+  }
+
+  function updateStats() {
+    const totalIssues = qaData.reduce((s, c) => s + c.issues.length, 0);
+    const totalErrors = qaData.reduce((s, c) => s + c.issues.filter(i => i.severity === 'ERROR').length, 0);
+    const avgHealth = qaData.length
+      ? Math.round(qaData.reduce((s, c) => s + c.health_score, 0) / qaData.length)
+      : 0;
+
+    document.getElementById('stat-companies').textContent = qaData.length;
+    document.getElementById('stat-issues').textContent = totalIssues;
+    document.getElementById('stat-errors').textContent = totalErrors;
+    document.getElementById('stat-avg-health').textContent = avgHealth + '%';
+  }
+
+  async function runQA() {
+    const btn = document.getElementById('btn-run');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Running…';
+    await loadQA();
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Refresh QA`;
+  }
+
+  // ── Merge Candidates ───────────────────────────────────────────────────
+  async function loadMerges() {
+    document.getElementById('merge-loading').style.display = '';
+    document.getElementById('merge-grid').style.display = 'none';
+    document.getElementById('merge-empty').style.display = 'none';
+
+    try {
+      const resp = await fetch('/api/v1/people-analytics/qa/merge-candidates?status=pending&limit=50');
+      if (!resp.ok) throw new Error('API ' + resp.status);
+      mergeData = await resp.json();
+
+      document.getElementById('stat-merges').textContent = mergeData.length;
+      const badge = document.getElementById('merge-badge');
+      if (mergeData.length > 0) {
+        badge.textContent = mergeData.length;
+        badge.style.display = 'inline';
+      }
+
+      renderMergeCards();
+    } catch(e) {
+      document.getElementById('merge-loading').textContent = `Error: ${e.message}`;
+    }
+  }
+
+  function renderMergeCards() {
+    document.getElementById('merge-loading').style.display = 'none';
+    const grid = document.getElementById('merge-grid');
+
+    if (!mergeData.length) {
+      document.getElementById('merge-empty').style.display = '';
+      return;
+    }
+
+    grid.innerHTML = '';
+    grid.style.display = 'flex';
+
+    mergeData.forEach(candidate => {
+      const card = document.createElement('div');
+      card.className = 'merge-card';
+      card.id = `merge-${candidate.id}`;
+
+      const simPct = Math.round((candidate.similarity_score || 0) * 100);
+      const simColor = simPct >= 95 ? '#22c55e' : simPct >= 85 ? '#f59e0b' : '#ef4444';
+
+      card.innerHTML = `
+        <div class="merge-card-header">
+          <div class="merge-similarity">
+            <span class="sim-score" style="color:${simColor};">${simPct}%</span>
+            <span style="color:#64748b;">similarity</span>
+            <span class="match-type-badge">${candidate.match_type || 'name_fuzzy'}</span>
+          </div>
+          <span style="color:#475569;">ID #${candidate.id}</span>
+        </div>
+        <div class="merge-persons">
+          ${renderPersonCard(candidate.person_a)}
+          <div class="vs-divider">VS</div>
+          ${renderPersonCard(candidate.person_b)}
+        </div>
+        ${candidate.evidence_notes ? `<div style="padding:0.5rem 1.25rem;font-size:0.75rem;color:#64748b;border-top:1px solid #334155;">${candidate.evidence_notes}</div>` : ''}
+        <div class="merge-actions" id="actions-${candidate.id}">
+          <button class="btn-reject" onclick="resolve(${candidate.id}, 'reject')">✗ Reject — Different People</button>
+          <button class="btn-approve" onclick="resolve(${candidate.id}, 'approve')">✓ Approve — Same Person</button>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  function renderPersonCard(person) {
+    if (!person) return '<div class="person-card"><div class="person-name">Unknown</div></div>';
+    return `
+      <div class="person-card">
+        <div class="person-name">${person.name || 'Unknown'}</div>
+        <div class="person-title">${person.title || '—'}</div>
+        <div class="person-meta">
+          <span>🏢 ${person.company || '—'}</span>
+          <span>📁 ${(person.data_sources || []).join(', ') || person.source || '—'}</span>
+          ${person.confidence ? `<span>⚡ Confidence: <strong style="color:#e2e8f0;">${person.confidence}</strong></span>` : ''}
+          ${person.confidence_score != null ? `<span>🎯 Score: <strong style="color:#e2e8f0;">${(person.confidence_score * 100).toFixed(0)}%</strong></span>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  async function resolve(id, action) {
+    const actionsEl = document.getElementById(`actions-${id}`);
+    actionsEl.innerHTML = '<div class="spinner"></div>';
+
+    try {
+      const resp = await fetch(`/api/v1/people-analytics/qa/merge-candidates/${id}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      if (!resp.ok) throw new Error('API ' + resp.status);
+
+      const label = action === 'approve' ? 'Approved — Merged' : 'Rejected';
+      const cls = action === 'approve' ? 'resolved-approved' : 'resolved-rejected';
+      actionsEl.innerHTML = `<span class="resolved-badge ${cls}">${label}</span>`;
+
+      // Update pending count
+      const remaining = document.querySelectorAll('.btn-approve').length - 1;
+      document.getElementById('stat-merges').textContent = remaining;
+      const badge = document.getElementById('merge-badge');
+      badge.textContent = remaining;
+      if (remaining === 0) badge.style.display = 'none';
+
+    } catch(e) {
+      actionsEl.innerHTML = `<span style="color:#ef4444;font-size:0.8rem;">Error: ${e.message}</span>`;
+    }
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────
+  (async () => {
+    await loadQA();
+    // Pre-fetch merge count for badge without full render
+    try {
+      const r = await fetch('/api/v1/people-analytics/qa/merge-candidates?status=pending&limit=200');
+      if (r.ok) {
+        const data = await r.json();
+        mergeData = data;
+        document.getElementById('stat-merges').textContent = data.length;
+        const badge = document.getElementById('merge-badge');
+        if (data.length > 0) { badge.textContent = data.length; badge.style.display = 'inline'; }
+      }
+    } catch(_) {}
+  })();
+</script>
+</body>
+</html>

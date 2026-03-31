@@ -101,7 +101,7 @@ class FormDParser:
         # Try with various path variations
         path_variants = [
             path,
-            path.replace("./", ""),
+            path.lstrip("./"),  # strip leading ./ without creating absolute path
             f".//{path.split('/')[-1]}",
         ]
 

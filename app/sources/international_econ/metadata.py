@@ -553,6 +553,15 @@ def parse_bis_data(data: List[Dict[str, Any]], dataset: str) -> List[Dict[str, A
     """
     records = []
 
+    def _safe_float(v):
+        """Convert to float, returning None for non-numeric BIS sentinels like 'N'."""
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return None
+
     for item in data:
         if not item:
             continue
@@ -567,9 +576,7 @@ def parse_bis_data(data: List[Dict[str, Any]], dataset: str) -> List[Dict[str, A
                     "basket": item.get("eer_basket"),
                     "period": item.get("period"),
                     "frequency": item.get("freq"),
-                    "value": float(item.get("value"))
-                    if item.get("value") is not None
-                    else None,
+                    "value": _safe_float(item.get("value")),
                 }
             elif dataset.lower() in ["property", "ws_spp"]:
                 record = {
@@ -579,18 +586,14 @@ def parse_bis_data(data: List[Dict[str, Any]], dataset: str) -> List[Dict[str, A
                     "unit_measure": item.get("unit_measure"),
                     "period": item.get("period"),
                     "frequency": item.get("freq"),
-                    "value": float(item.get("value"))
-                    if item.get("value") is not None
-                    else None,
+                    "value": _safe_float(item.get("value")),
                 }
             else:
                 record = {
                     "country_code": item.get("ref_area"),
                     "period": item.get("period"),
                     "frequency": item.get("freq"),
-                    "value": float(item.get("value"))
-                    if item.get("value") is not None
-                    else None,
+                    "value": _safe_float(item.get("value")),
                 }
 
             records.append(record)

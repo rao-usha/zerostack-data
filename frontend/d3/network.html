@@ -80,10 +80,17 @@
     <h1>Investment Network</h1>
     <p>Co-Investment &amp; Executive Relationships</p>
   </div>
-  <div class="search-box">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input type="text" id="search-input" placeholder="Search entities..." autocomplete="off">
-    <div class="search-results" id="search-results"></div>
+  <div style="display:flex;align-items:center;gap:0.75rem;">
+    <select id="firm-limit" style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:0.35rem 0.6rem;font-size:0.8rem;cursor:pointer;" title="Number of PE firms to display">
+      <option value="10">Top 10 firms</option>
+      <option value="20" selected>Top 20 firms</option>
+      <option value="30">Top 30 firms</option>
+    </select>
+    <div class="search-box">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="search-input" placeholder="Search entities..." autocomplete="off">
+      <div class="search-results" id="search-results"></div>
+    </div>
   </div>
 </div>
 
@@ -129,9 +136,9 @@
 
 <script>
 // ─────────────────────────────────────────────
-// DATA
+// DATA (static fallback)
 // ─────────────────────────────────────────────
-const nodes = [
+let nodes = [
   // PE Firms (14)
   { id: "blackstone",       label: "Blackstone",        type: "pe",      aum: "$991B", founded: 1985, hq: "New York", sector: "Diversified" },
   { id: "kkr",              label: "KKR",               type: "pe",      aum: "$553B", founded: 1976, hq: "New York", sector: "Diversified" },
@@ -171,7 +178,7 @@ const nodes = [
   { id: "egon",             label: "Egon Durban",       type: "person",  role: "Co-CEO",         firm: "Silver Lake", since: 1999 }
 ];
 
-const links = [
+let links = [
   // Ownership links (PE → Portfolio Company)
   { source: "blackstone",  target: "refinitiv",   type: "ownership", value: "55% stake, $20B deal (2018)" },
   { source: "blackstone",  target: "medline",     type: "ownership", value: "Co-led $34B buyout (2021)" },
@@ -334,7 +341,7 @@ function linkDash(d) {
 
 // Draw links
 const linkGroup = g.append("g").attr("class", "links");
-const link = linkGroup.selectAll("line")
+let link = linkGroup.selectAll("line")
   .data(links)
   .join("line")
   .attr("stroke", d => linkColor(d))
@@ -345,7 +352,7 @@ const link = linkGroup.selectAll("line")
 
 // Draw nodes
 const nodeGroup = g.append("g").attr("class", "nodes");
-const node = nodeGroup.selectAll("g")
+let node = nodeGroup.selectAll("g")
   .data(nodes)
   .join("g")
   .attr("class", "node")
@@ -389,7 +396,7 @@ node.append("text")
   });
 
 // Node labels
-const label = nodeGroup.selectAll("text.node-label")
+let label = nodeGroup.selectAll("text.node-label")
   .data(nodes)
   .join("text")
   .attr("class", "node-label")
@@ -744,6 +751,146 @@ window.addEventListener("resize", () => {
   simulation.force("y", d3.forceY(h / 2).strength(0.03));
   simulation.alpha(0.3).restart();
 });
+
+// ─────────────────────────────────────────────
+// REBUILD + API LOAD
+// ─────────────────────────────────────────────
+function rebuildGraphElements() {
+  linkGroup.selectAll("*").remove();
+  nodeGroup.selectAll("*").remove();
+
+  link = linkGroup.selectAll("line")
+    .data(links)
+    .join("line")
+    .attr("stroke", d => linkColor(d))
+    .attr("stroke-width", d => linkStroke(d))
+    .attr("stroke-dasharray", d => linkDash(d))
+    .attr("stroke-opacity", 0.5)
+    .attr("marker-end", d => d.type === "ownership" ? `url(#arrow-${d.type})` : null);
+
+  node = nodeGroup.selectAll("g.node")
+    .data(nodes)
+    .join("g")
+    .attr("class", "node")
+    .call(d3.drag()
+      .on("start", dragStarted)
+      .on("drag", dragged)
+      .on("end", dragEnded));
+
+  node.append("circle")
+    .attr("r", d => nodeRadius(d))
+    .attr("fill", d => nodeColor(d))
+    .attr("stroke", d => d3.color(nodeColor(d)).brighter(0.5))
+    .attr("stroke-width", 2)
+    .attr("opacity", 0.9)
+    .style("cursor", "pointer");
+
+  node.append("text")
+    .attr("text-anchor", "middle")
+    .attr("dominant-baseline", "central")
+    .attr("font-size", d => d.type === "pe" ? 11 : d.type === "company" ? 8 : 7)
+    .attr("font-weight", 700)
+    .attr("fill", "#0f172a")
+    .attr("pointer-events", "none")
+    .text(d => {
+      if (d.type === "pe") return d.label.substring(0, 2).toUpperCase();
+      if (d.type === "company") return d.label.substring(0, 1).toUpperCase();
+      return "";
+    });
+
+  label = nodeGroup.selectAll("text.node-label")
+    .data(nodes)
+    .join("text")
+    .attr("class", "node-label")
+    .attr("dy", d => nodeRadius(d) + 14)
+    .text(d => d.label);
+
+  node
+    .on("mouseover", function(event, d) {
+      const connected = getConnected(d.id);
+      node.selectAll("circle").transition().duration(150)
+        .attr("opacity", n => connected.has(n.id) ? 1 : 0.15);
+      label.transition().duration(150)
+        .attr("opacity", n => connected.has(n.id) ? 1 : 0.1)
+        .attr("class", n => connected.has(n.id) ? "node-label highlighted" : "node-label");
+      link.transition().duration(150)
+        .attr("stroke-opacity", l => {
+          const s = typeof l.source === "object" ? l.source.id : l.source;
+          const t = typeof l.target === "object" ? l.target.id : l.target;
+          return (s === d.id || t === d.id) ? 0.85 : 0.05;
+        });
+      d3.select(this).select("circle").attr("filter", "url(#glow)");
+      showTooltip(event, d);
+    })
+    .on("mousemove", (event, d) => showTooltip(event, d))
+    .on("mouseout", function() {
+      node.selectAll("circle").transition().duration(300)
+        .attr("opacity", 0.9).attr("filter", null);
+      label.transition().duration(300).attr("opacity", 1).attr("class", "node-label");
+      link.transition().duration(300).attr("stroke-opacity", 0.5);
+      hideTooltip();
+    })
+    .on("click", function(event, d) {
+      event.stopPropagation();
+      if (selectedNode === d.id) { selectedNode = null; resetHighlight(); return; }
+      selectedNode = d.id;
+      const connected = getConnected(d.id);
+      d3.select(this).select("circle")
+        .transition().duration(200).attr("r", nodeRadius(d) * 1.5).attr("filter", "url(#glow)")
+        .transition().duration(300).attr("r", nodeRadius(d) * 1.2);
+      node.selectAll("circle").transition().duration(300)
+        .attr("opacity", n => connected.has(n.id) ? 1 : 0.1)
+        .attr("r", n => n.id === d.id ? nodeRadius(n) * 1.2 : connected.has(n.id) ? nodeRadius(n) * 1.1 : nodeRadius(n) * 0.8);
+      label.transition().duration(300)
+        .attr("opacity", n => connected.has(n.id) ? 1 : 0.05)
+        .attr("class", n => connected.has(n.id) ? "node-label highlighted" : "node-label");
+      link.transition().duration(300)
+        .attr("stroke-opacity", l => {
+          const s = typeof l.source === "object" ? l.source.id : l.source;
+          const t = typeof l.target === "object" ? l.target.id : l.target;
+          return (s === d.id || t === d.id) ? 0.9 : 0.03;
+        })
+        .attr("stroke-width", l => {
+          const s = typeof l.source === "object" ? l.source.id : l.source;
+          const t = typeof l.target === "object" ? l.target.id : l.target;
+          if (s === d.id || t === d.id) return l.type === "ownership" ? "4px" : "3px";
+          return linkStroke(l);
+        });
+    });
+}
+
+async function loadNetworkData() {
+  const limitSel = document.getElementById("firm-limit");
+  const limit = limitSel ? limitSel.value : 20;
+  try {
+    const resp = await fetch(`/api/v1/pe/network-graph?limit=${limit}&max_per_firm=5`);
+    if (!resp.ok) throw new Error("API " + resp.status);
+    const data = await resp.json();
+    if (!data.nodes?.length) return;
+
+    // Replace static fallback with real data
+    nodes.splice(0); data.nodes.forEach(n => nodes.push(n));
+    links.splice(0); data.links.forEach(l => links.push(l));
+
+    simulation.nodes(nodes);
+    simulation.force("link").links(links);
+    rebuildGraphElements();
+    computeStats();
+    simulation.alpha(1).restart();
+
+    // Show node/link summary
+    if (data.stats) {
+      const { pe_firms, portfolio_companies, total_links } = data.stats;
+      const sub = document.querySelector(".header-title p");
+      if (sub) sub.textContent = `${pe_firms} firms · ${portfolio_companies} portfolio companies · ${total_links} connections`;
+    }
+  } catch(e) {
+    console.warn("Network API error, using static data:", e.message);
+  }
+}
+
+document.getElementById("firm-limit")?.addEventListener("change", () => loadNetworkData());
+(async () => { await loadNetworkData(); })();
 </script>
 </body>
 </html>
