@@ -176,6 +176,9 @@ from app.api.v1 import econ_snapshot, econ_dq, pe_macro
 # Metro Development Profiles (PLAN_051)
 from app.api.v1 import metro_profiles
 
+# Synthetic Data API (PLAN_052 Phase A / SPEC_042)
+from app.api.v1 import synthetic as synthetic_router
+
 # Collection Management
 from app.api.v1 import source_configs, audit, source_health
 
@@ -1538,6 +1541,7 @@ app.include_router(pe_benchmarks.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_import.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_conviction.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(macro_cascade.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(synthetic_router.router, prefix="/api/v1", dependencies=_auth)
 
 # 13F Quarterly Analysis
 app.include_router(quarterly_diff.router, prefix="/api/v1", dependencies=_auth)
