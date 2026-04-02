@@ -1,0 +1,1984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexdata — Signal Chain Intelligence</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f172a;
+      --bg-card: #1e293b;
+      --bg-input: #334155;
+      --border: #334155;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --accent: #06b6d4;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --error: #ef4444;
+    }
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* ─── Header ─── */
+    .header {
+      display: flex; align-items: center; gap: 16px; padding: 12px 24px;
+      background: var(--bg-card); border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .back-link { color: var(--text-muted); text-decoration: none; font-size: 0.82rem; }
+    .back-link:hover { color: var(--text); }
+    .header-brand { display: flex; flex-direction: column; }
+    .header-brand h1 {
+      font-size: 1.15rem; font-weight: 700; letter-spacing: -0.3px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .header-brand p { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    .header-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .refresh-btn {
+      background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+      padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 0.78rem;
+      transition: all 0.15s;
+    }
+    .refresh-btn:hover { border-color: var(--primary); color: var(--text); }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+
+    /* ─── Stats Bar ─── */
+    .stats-bar {
+      display: flex; gap: 0; padding: 0; background: var(--bg-card);
+      border-bottom: 1px solid var(--border); flex-shrink: 0; overflow-x: auto;
+    }
+    .stat-item {
+      flex: 1; min-width: 120px; padding: 10px 20px;
+      border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px;
+    }
+    .stat-item:last-child { border-right: none; }
+    .stat-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .stat-value { font-size: 1.1rem; font-weight: 700; }
+    .stat-value.good { color: var(--success); }
+    .stat-value.warn { color: var(--warning); }
+    .stat-value.bad { color: var(--error); }
+
+    /* ─── Tab Bar ─── */
+    .tab-bar {
+      display: flex; gap: 6px; padding: 10px 24px; background: var(--bg);
+      border-bottom: 1px solid var(--border); flex-shrink: 0; overflow-x: auto;
+      flex-wrap: nowrap;
+    }
+    .tab-pill {
+      padding: 6px 16px; border-radius: 20px; border: 1px solid var(--border);
+      background: transparent; color: var(--text-muted); font-size: 0.75rem;
+      font-weight: 500; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    }
+    .tab-pill:hover { border-color: var(--primary); color: var(--text); }
+    .tab-pill.active {
+      background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600;
+    }
+
+    /* ─── Content Area ─── */
+    .content { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 24px; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* ─── Cards ─── */
+    .card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.5rem;
+    }
+    .card-title {
+      font-size: 0.72rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 1rem;
+    }
+    .card-grid { display: grid; gap: 16px; }
+    .card-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+    .card-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+    /* ─── Shared D3 ─── */
+    .svg-container { width: 100%; }
+    .svg-container svg { width: 100%; display: block; }
+
+    /* ─── Tooltip ─── */
+    .tooltip {
+      position: fixed; background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 16px; pointer-events: none; z-index: 1000;
+      max-width: 320px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); font-size: 0.78rem;
+      opacity: 0; transition: opacity 0.12s;
+    }
+    .tooltip.show { opacity: 1; }
+    .tooltip h4 { font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; }
+    .tooltip .row { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 3px; }
+    .tooltip .label { color: var(--text-muted); }
+    .tooltip .value { font-weight: 600; }
+
+    /* ─── Table ─── */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .data-table th {
+      text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border);
+      color: var(--text-muted); font-weight: 600; font-size: 0.7rem;
+      text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer;
+    }
+    .data-table th:hover { color: var(--text); }
+    .data-table td { padding: 8px 12px; border-bottom: 1px solid rgba(51,65,85,0.4); }
+    .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* ─── Score bar ─── */
+    .score-bar { height: 6px; border-radius: 3px; background: var(--bg-input); overflow: hidden; min-width: 60px; }
+    .score-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+
+    /* ─── Badge / Chip ─── */
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 0.68rem; font-weight: 600;
+    }
+    .badge.green { background: rgba(34,197,94,0.15); color: var(--success); }
+    .badge.yellow { background: rgba(245,158,11,0.15); color: var(--warning); }
+    .badge.red { background: rgba(239,68,68,0.15); color: var(--error); }
+    .badge.blue { background: rgba(99,102,241,0.15); color: var(--primary); }
+    .badge.cyan { background: rgba(6,182,212,0.15); color: var(--accent); }
+
+    /* ─── Form controls ─── */
+    .input {
+      background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+      padding: 8px 14px; color: var(--text); font-size: 0.82rem; width: 100%;
+      outline: none; transition: border-color 0.15s;
+    }
+    .input:focus { border-color: var(--primary); }
+    .input::placeholder { color: var(--text-muted); }
+    .btn {
+      padding: 8px 18px; border: none; border-radius: 8px; cursor: pointer;
+      font-size: 0.82rem; font-weight: 600; transition: all 0.15s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-accent { background: var(--accent); color: #fff; }
+    .btn-accent:hover { filter: brightness(1.1); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    select.input { appearance: none; cursor: pointer; }
+
+    /* ─── Loading / Empty ─── */
+    .loading-state, .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 3rem 1rem; text-align: center; color: var(--text-muted);
+    }
+    .loading-state .spinner {
+      width: 32px; height: 32px; border: 3px solid var(--border);
+      border-top-color: var(--primary); border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty-state .icon { font-size: 2.5rem; margin-bottom: 10px; }
+    .empty-state p { font-size: 0.82rem; max-width: 340px; line-height: 1.6; margin-top: 6px; }
+
+    /* ─── Pulse animation for red flags ─── */
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .pulse-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--error);
+      animation: pulse 1.5s ease-in-out infinite; display: inline-block; margin-right: 6px;
+    }
+
+    /* ─── Slide-in Panel ─── */
+    .slide-panel {
+      position: fixed; top: 0; right: -420px; width: 400px; height: 100vh;
+      background: var(--bg-card); border-left: 1px solid var(--border);
+      z-index: 500; transition: right 0.3s ease; overflow-y: auto;
+      box-shadow: -8px 0 32px rgba(0,0,0,0.3); padding: 24px;
+    }
+    .slide-panel.open { right: 0; }
+    .slide-panel .close-btn {
+      position: absolute; top: 16px; right: 16px; background: none; border: none;
+      color: var(--text-muted); font-size: 1.2rem; cursor: pointer;
+    }
+    .slide-panel .close-btn:hover { color: var(--text); }
+
+    /* ─── Controls row ─── */
+    .controls-row { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+
+    /* ─── Gauge ─── */
+    .gauge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .gauge-item { text-align: center; }
+    .gauge-item .gauge-label { font-size: 0.72rem; color: var(--text-muted); margin-top: 6px; }
+    .gauge-item .gauge-value { font-size: 1.25rem; font-weight: 700; }
+
+    /* ─── Map ─── */
+    .map-container { position: relative; }
+    .map-score-card {
+      position: absolute; top: 16px; right: 16px; width: 280px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px; z-index: 10;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .map-score-card h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 10px; }
+    .factor-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.75rem; }
+    .factor-bar-label { width: 90px; color: var(--text-muted); flex-shrink: 0; }
+    .factor-bar-track { flex: 1; height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; }
+    .factor-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+    .factor-bar-val { width: 30px; text-align: right; font-weight: 600; }
+
+    /* ─── Use-case toggles ─── */
+    .use-case-toggles { display: flex; gap: 6px; }
+    .use-case-btn {
+      padding: 5px 12px; border: 1px solid var(--border); border-radius: 16px;
+      background: transparent; color: var(--text-muted); font-size: 0.72rem;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .use-case-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* ─── Quadrant labels ─── */
+    .quadrant-label {
+      font-size: 0.68rem; fill: var(--text-muted); opacity: 0.6;
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+
+    /* ─── Pinned locations ─── */
+    .pinned-list { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .pinned-chip {
+      display: flex; align-items: center; gap: 4px; padding: 3px 10px;
+      background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.3);
+      border-radius: 12px; font-size: 0.7rem; color: var(--accent);
+    }
+    .pinned-chip .remove { cursor: pointer; opacity: 0.7; }
+    .pinned-chip .remove:hover { opacity: 1; }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 900px) {
+      .card-grid.cols-2, .card-grid.cols-3 { grid-template-columns: 1fr; }
+      .gauge-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .header { padding: 10px 14px; gap: 10px; }
+      .content { padding: 14px; }
+      .tab-bar { padding: 8px 14px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ HEADER ═══════════════════════════ -->
+<div class="header">
+  <a href="index.html" class="back-link">&#8592; Dashboard</a>
+  <div class="header-brand">
+    <h1>Signal Chain Intelligence</h1>
+    <p>8 chains &middot; Real-time PE signal analytics</p>
+  </div>
+  <div class="header-actions">
+    <div class="status-dot" id="healthDot"></div>
+    <button class="refresh-btn" onclick="refreshCurrentPanel()">&#8635; Refresh</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ STATS BAR ═══════════════════════════ -->
+<div class="stats-bar" id="statsBar">
+  <div class="stat-item"><span class="stat-label">Chains Active</span><span class="stat-value" id="statChains">--</span></div>
+  <div class="stat-item"><span class="stat-label">Avg Score</span><span class="stat-value" id="statAvgScore">--</span></div>
+  <div class="stat-item"><span class="stat-label">Red Flags</span><span class="stat-value" id="statFlags">--</span></div>
+  <div class="stat-item"><span class="stat-label">Last Updated</span><span class="stat-value" id="statUpdated">--</span></div>
+</div>
+
+<!-- ═══════════════════════════ TAB BAR ═══════════════════════════ -->
+<div class="tab-bar" id="tabBar"></div>
+
+<!-- ═══════════════════════════ CONTENT AREA ═══════════════════════════ -->
+<div class="content" id="contentArea">
+  <div class="panel" id="panel-overview"></div>
+  <div class="panel" id="panel-macro"></div>
+  <div class="panel" id="panel-diligence"></div>
+  <div class="panel" id="panel-lpgp"></div>
+  <div class="panel" id="panel-exec"></div>
+  <div class="panel" id="panel-site"></div>
+  <div class="panel" id="panel-stress"></div>
+  <div class="panel" id="panel-healthcare"></div>
+  <div class="panel" id="panel-rollup"></div>
+</div>
+
+<!-- ═══════════════════════════ TOOLTIP ═══════════════════════════ -->
+<div class="tooltip" id="tooltip"></div>
+
+<!-- ═══════════════════════════ SLIDE PANEL ═══════════════════════════ -->
+<div class="slide-panel" id="slidePanel">
+  <button class="close-btn" onclick="closeSlidePanel()">&times;</button>
+  <div id="slidePanelContent"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// GLOBAL STATE
+// ═══════════════════════════════════════════════════════════════════
+const API = '/api/v1';
+let currentPanel = null;
+let forceSimulation = null;  // LP-GP force ref
+const panelLoaded = {};      // track which panels have loaded data
+
+const TABS = [
+  { id: 'overview',   label: 'Overview' },
+  { id: 'macro',      label: 'Macro' },
+  { id: 'diligence',  label: 'Diligence' },
+  { id: 'lpgp',       label: 'LP-GP' },
+  { id: 'exec',       label: 'Exec' },
+  { id: 'site',       label: 'Site' },
+  { id: 'stress',     label: 'Stress' },
+  { id: 'healthcare', label: 'Healthcare' },
+  { id: 'rollup',     label: 'Roll-Up' },
+];
+
+const tooltip = document.getElementById('tooltip');
+
+// ═══════════════════════════════════════════════════════════════════
+// UTILITY FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════
+function fmt(n, d=0) { return n == null ? '--' : Number(n).toFixed(d); }
+function fmtPct(n) { return n == null ? '--' : Number(n).toFixed(1) + '%'; }
+function fmtUsd(n) {
+  if (n == null) return '--';
+  if (n >= 1e9) return '$' + (n/1e9).toFixed(1) + 'B';
+  if (n >= 1e6) return '$' + (n/1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return '$' + (n/1e3).toFixed(0) + 'K';
+  return '$' + Number(n).toFixed(0);
+}
+function scoreColor(score) {
+  if (score >= 70) return 'var(--success)';
+  if (score >= 40) return 'var(--warning)';
+  return 'var(--error)';
+}
+function gradeClass(grade) {
+  if (!grade) return '';
+  const g = grade.charAt(0).toUpperCase();
+  if (g === 'A') return 'green';
+  if (g === 'B') return 'cyan';
+  if (g === 'C') return 'yellow';
+  return 'red';
+}
+function showTooltip(evt, html) {
+  tooltip.innerHTML = html;
+  tooltip.classList.add('show');
+  const x = Math.min(evt.clientX + 14, window.innerWidth - 340);
+  const y = Math.min(evt.clientY + 14, window.innerHeight - 200);
+  tooltip.style.left = x + 'px';
+  tooltip.style.top = y + 'px';
+}
+function hideTooltip() { tooltip.classList.remove('show'); }
+function showLoading(el) { el.innerHTML = '<div class="loading-state"><div class="spinner"></div>Loading...</div>'; }
+function showEmpty(el, msg) { el.innerHTML = `<div class="empty-state"><div class="icon">&#9633;</div><p>${msg}</p></div>`; }
+
+async function apiFetch(url, opts = {}) {
+  try {
+    const res = await fetch(API + url, {
+      headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+      ...opts,
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
+}
+
+function closeSlidePanel() {
+  document.getElementById('slidePanel').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TAB SYSTEM
+// ═══════════════════════════════════════════════════════════════════
+function buildTabs() {
+  const bar = document.getElementById('tabBar');
+  bar.innerHTML = TABS.map(t =>
+    `<button class="tab-pill${t.id === 'overview' ? ' active' : ''}" data-tab="${t.id}">${t.label}</button>`
+  ).join('');
+  bar.querySelectorAll('.tab-pill').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+}
+
+function switchTab(tabId) {
+  // Stop force simulation if leaving LP-GP
+  if (currentPanel === 'lpgp' && forceSimulation) {
+    forceSimulation.stop();
+  }
+  currentPanel = tabId;
+  // Update tab pills
+  document.querySelectorAll('.tab-pill').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+  // Show/hide panels
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tabId}`));
+  // Load panel data (lazy)
+  loadPanel(tabId);
+}
+
+function loadPanel(tabId, force = false) {
+  if (panelLoaded[tabId] && !force) return;
+  panelLoaded[tabId] = true;
+  const loaders = {
+    overview: loadOverview,
+    macro: loadMacro,
+    diligence: loadDiligence,
+    lpgp: loadLPGP,
+    exec: loadExec,
+    site: loadSite,
+    stress: loadStress,
+    healthcare: loadHealthcare,
+    rollup: loadRollup,
+  };
+  if (loaders[tabId]) loaders[tabId]();
+}
+
+function refreshCurrentPanel() {
+  if (currentPanel) {
+    panelLoaded[currentPanel] = false;
+    loadPanel(currentPanel, true);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PANEL 0: OVERVIEW — Signal Summary Matrix
+// ═══════════════════════════════════════════════════════════════════
+async function loadOverview() {
+  const panel = document.getElementById('panel-overview');
+  showLoading(panel);
+
+  // Fetch all 8 chains in parallel
+  const [macro, diligence, lpgp, exec, site, stress, healthcare, rollup] = await Promise.all([
+    apiFetch('/pe/macro/deal-scores'),
+    apiFetch('/diligence/score', { method: 'POST', body: JSON.stringify({ company_name: 'Blackstone' }) }),
+    apiFetch('/pe/gp-pipeline/scores?limit=3'),
+    apiFetch('/exec-signals/scan?limit=3'),
+    apiFetch('/site-intel/sites/unified-score', { method: 'POST', body: JSON.stringify({ lat: 39.04, lng: -77.49, use_case: 'datacenter' }) }),
+    apiFetch('/pe/stress/1'),
+    apiFetch('/healthcare/profiles?limit=3'),
+    apiFetch('/rollup-intel/methodology'),
+  ]);
+
+  const chains = [
+    {
+      name: 'Macro Environment', tab: 'macro',
+      score: macro?.scores?.[0]?.score ?? null,
+      metric: macro?.scores ? `${macro.scores.length} sectors` : 'N/A',
+      status: macro?.status === 'ok' ? 'active' : 'offline',
+    },
+    {
+      name: 'Company Diligence', tab: 'diligence',
+      score: diligence?.score ?? null,
+      metric: diligence?.grade || 'N/A',
+      status: diligence?.status === 'ok' ? 'active' : 'offline',
+    },
+    {
+      name: 'LP-GP Pipeline', tab: 'lpgp',
+      score: lpgp?.scores?.[0]?.score ?? null,
+      metric: lpgp?.total ? `${lpgp.total} GPs` : 'N/A',
+      status: lpgp?.status === 'ok' ? 'active' : 'offline',
+    },
+    {
+      name: 'Executive Signals', tab: 'exec',
+      score: exec?.companies?.[0]?.transition_score ?? null,
+      metric: exec?.total ? `${exec.total} companies` : 'N/A',
+      status: exec?.status === 'ok' ? 'active' : 'offline',
+    },
+    {
+      name: 'Site Intelligence', tab: 'site',
+      score: site?.score ?? null,
+      metric: site?.grade || 'N/A',
+      status: site?.status === 'ok' ? 'active' : 'offline',
+    },
+    {
+      name: 'Portfolio Stress', tab: 'stress',
+      score: stress?.portfolio_stress ?? null,
+      metric: stress?.holdings_scored ? `${stress.holdings_scored} holdings` : 'N/A',
+      status: stress?.status === 'ok' ? 'active' : 'offline',
+    },
+    {
+      name: 'Healthcare', tab: 'healthcare',
+      score: healthcare?.results?.[0]?.acquisition_score ?? null,
+      metric: healthcare?.total ? `${healthcare.total} practices` : 'N/A',
+      status: healthcare?.status === 'ok' ? 'active' : 'offline',
+    },
+    {
+      name: 'Roll-Up Intel', tab: 'rollup',
+      score: null,
+      metric: rollup?.sub_scores ? `${Object.keys(rollup.sub_scores).length} factors` : 'N/A',
+      status: rollup ? 'active' : 'offline',
+    },
+  ];
+
+  // Update stats bar
+  const activeCount = chains.filter(c => c.status === 'active').length;
+  const scores = chains.map(c => c.score).filter(s => s != null);
+  const avgScore = scores.length ? (scores.reduce((a,b) => a+b, 0) / scores.length) : null;
+  document.getElementById('statChains').textContent = `${activeCount}/8`;
+  document.getElementById('statAvgScore').textContent = avgScore != null ? fmt(avgScore, 1) : '--';
+  document.getElementById('statAvgScore').className = 'stat-value ' + (avgScore >= 60 ? 'good' : avgScore >= 40 ? 'warn' : 'bad');
+  document.getElementById('statFlags').textContent = chains.filter(c => c.status === 'offline').length;
+  document.getElementById('statUpdated').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // Build D3 matrix
+  panel.innerHTML = '<div class="card"><div class="card-title">Signal Chain Summary</div><div id="overviewMatrix" class="svg-container"></div></div>';
+  renderOverviewMatrix(chains);
+}
+
+function renderOverviewMatrix(chains) {
+  const container = document.getElementById('overviewMatrix');
+  const W = container.clientWidth || 800;
+  const rowH = 48;
+  const H = (chains.length + 1) * rowH + 20;
+  const cols = [
+    { label: 'Chain', x: 20, w: 200 },
+    { label: 'Score', x: 240, w: 120 },
+    { label: 'Key Metric', x: 380, w: 160 },
+    { label: 'Status', x: 560, w: 100 },
+  ];
+
+  const svg = d3.select(container).append('svg')
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMinYMin meet');
+
+  const colorScale = d3.scaleSequential(d3.interpolateRdYlGn).domain([0, 100]);
+
+  // Header row
+  const headerG = svg.append('g').attr('transform', `translate(0, 10)`);
+  cols.forEach(c => {
+    headerG.append('text')
+      .attr('x', c.x).attr('y', 20)
+      .attr('fill', '#94a3b8').attr('font-size', '11px')
+      .attr('font-weight', '600').attr('text-transform', 'uppercase')
+      .text(c.label);
+  });
+  headerG.append('line')
+    .attr('x1', 10).attr('x2', W - 10).attr('y1', 32).attr('y2', 32)
+    .attr('stroke', '#334155').attr('stroke-width', 1);
+
+  // Data rows
+  chains.forEach((chain, i) => {
+    const y = (i + 1) * rowH + 20;
+    const row = svg.append('g')
+      .attr('transform', `translate(0, ${y})`)
+      .style('cursor', 'pointer')
+      .on('click', () => switchTab(chain.tab));
+
+    // Hover bg
+    row.append('rect')
+      .attr('x', 5).attr('y', -6).attr('width', W - 10).attr('height', rowH - 4)
+      .attr('rx', 6).attr('fill', 'transparent')
+      .on('mouseenter', function() { d3.select(this).attr('fill', 'rgba(255,255,255,0.03)'); })
+      .on('mouseleave', function() { d3.select(this).attr('fill', 'transparent'); });
+
+    // Chain name
+    row.append('text')
+      .attr('x', cols[0].x).attr('y', 18)
+      .attr('fill', '#f1f5f9').attr('font-size', '13px').attr('font-weight', '500')
+      .text(chain.name);
+
+    // Score with color cell
+    if (chain.score != null) {
+      row.append('rect')
+        .attr('x', cols[1].x).attr('y', 4).attr('width', 56).attr('height', 26)
+        .attr('rx', 6).attr('fill', colorScale(chain.score)).attr('opacity', 0.2);
+      row.append('text')
+        .attr('x', cols[1].x + 28).attr('y', 22).attr('text-anchor', 'middle')
+        .attr('fill', colorScale(chain.score)).attr('font-size', '14px').attr('font-weight', '700')
+        .text(fmt(chain.score, 0));
+    } else {
+      row.append('text')
+        .attr('x', cols[1].x + 28).attr('y', 22).attr('text-anchor', 'middle')
+        .attr('fill', '#64748b').attr('font-size', '13px')
+        .text('--');
+    }
+
+    // Key metric
+    row.append('text')
+      .attr('x', cols[2].x).attr('y', 18)
+      .attr('fill', '#94a3b8').attr('font-size', '12px')
+      .text(chain.metric);
+
+    // Status dot
+    const statusColor = chain.status === 'active' ? '#22c55e' : '#ef4444';
+    row.append('circle')
+      .attr('cx', cols[3].x + 8).attr('cy', 14).attr('r', 5)
+      .attr('fill', statusColor);
+    row.append('text')
+      .attr('x', cols[3].x + 20).attr('y', 18)
+      .attr('fill', statusColor).attr('font-size', '12px')
+      .text(chain.status);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PANEL 1: MACRO — Sector Radar + Factor Heatmap
+// ═══════════════════════════════════════════════════════════════════
+async function loadMacro() {
+  const panel = document.getElementById('panel-macro');
+  showLoading(panel);
+
+  const data = await apiFetch('/pe/macro/deal-scores');
+  if (!data?.scores?.length) { showEmpty(panel, 'No macro data available. Ingest FRED & BLS data first.'); return; }
+
+  const scores = data.scores;
+  panel.innerHTML = `
+    <div class="card-grid cols-2">
+      <div class="card">
+        <div class="card-title">Sector Radar Chart</div>
+        <div id="macroRadar" class="svg-container"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Factor Heatmap (Sector x Factor)</div>
+        <div id="macroHeatmap" class="svg-container"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <div class="card-title">Macro Ticker</div>
+      <div id="macroTicker" style="display:flex;gap:16px;overflow-x:auto;"></div>
+    </div>
+  `;
+
+  renderRadarChart(scores);
+  renderHeatmap(scores);
+  renderMacroTicker(scores);
+}
+
+function renderRadarChart(scores) {
+  const container = document.getElementById('macroRadar');
+  const W = 440, H = 400;
+  const cx = W / 2, cy = H / 2, R = 150;
+
+  // Collect all unique factor names
+  const allFactors = [];
+  const factorSet = new Set();
+  scores.forEach(s => s.factors.forEach(f => {
+    if (!factorSet.has(f.factor)) { factorSet.add(f.factor); allFactors.push(f.factor); }
+  }));
+  const axes = allFactors.slice(0, 7);
+  const n = axes.length;
+  if (n < 3) return;
+
+  const angleSlice = (2 * Math.PI) / n;
+  const rScale = d3.scaleLinear().domain([0, 30]).range([0, R]);
+  const sectorColors = d3.scaleOrdinal(d3.schemeTableau10);
+
+  const svg = d3.select(container).append('svg')
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet');
+
+  const g = svg.append('g').attr('transform', `translate(${cx},${cy})`);
+
+  // Grid circles
+  [5, 10, 15, 20, 25, 30].forEach(lev => {
+    g.append('circle')
+      .attr('r', rScale(lev))
+      .attr('fill', 'none').attr('stroke', '#334155').attr('stroke-width', 0.5)
+      .attr('stroke-dasharray', lev === 15 ? 'none' : '2,2');
+  });
+
+  // Axis lines + labels
+  axes.forEach((axis, i) => {
+    const angle = angleSlice * i - Math.PI / 2;
+    const lx = R * 1.18 * Math.cos(angle);
+    const ly = R * 1.18 * Math.sin(angle);
+    g.append('line')
+      .attr('x1', 0).attr('y1', 0)
+      .attr('x2', R * Math.cos(angle)).attr('y2', R * Math.sin(angle))
+      .attr('stroke', '#334155').attr('stroke-width', 0.5);
+    g.append('text')
+      .attr('x', lx).attr('y', ly)
+      .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+      .attr('fill', '#94a3b8').attr('font-size', '9px')
+      .text(axis.length > 14 ? axis.slice(0, 12) + '..' : axis);
+  });
+
+  // Radar polygons for each sector
+  const radarLine = d3.lineRadial()
+    .angle((d, i) => angleSlice * i)
+    .radius(d => rScale(Math.min(d, 30)))
+    .curve(d3.curveLinearClosed);
+
+  scores.forEach((sector, si) => {
+    const vals = axes.map(ax => {
+      const f = sector.factors.find(ff => ff.factor === ax);
+      return f ? Math.abs(f.score_contribution) : 0;
+    });
+
+    const path = g.append('path')
+      .datum(vals)
+      .attr('d', radarLine)
+      .attr('fill', sectorColors(si)).attr('fill-opacity', 0.08)
+      .attr('stroke', sectorColors(si)).attr('stroke-width', 1.5).attr('stroke-opacity', 0.3);
+
+    path.on('mouseenter', function(evt) {
+        g.selectAll('path').attr('fill-opacity', 0.03).attr('stroke-opacity', 0.1);
+        d3.select(this).attr('fill-opacity', 0.2).attr('stroke-opacity', 0.8).attr('stroke-width', 2.5);
+        showTooltip(evt, `<h4>${sector.sector_label}</h4><div class="row"><span class="label">Score</span><span class="value" style="color:${scoreColor(sector.score)}">${fmt(sector.score,0)}</span></div><div class="row"><span class="label">Signal</span><span class="value">${sector.signal || '--'}</span></div>`);
+      })
+      .on('mousemove', evt => {
+        tooltip.style.left = Math.min(evt.clientX + 14, window.innerWidth - 340) + 'px';
+        tooltip.style.top = Math.min(evt.clientY + 14, window.innerHeight - 200) + 'px';
+      })
+      .on('mouseleave', function() {
+        g.selectAll('path').attr('fill-opacity', 0.08).attr('stroke-opacity', 0.3).attr('stroke-width', 1.5);
+        hideTooltip();
+      });
+  });
+
+  // Legend
+  const leg = svg.append('g').attr('transform', `translate(10, ${H - 10 - scores.length * 14})`);
+  scores.forEach((s, i) => {
+    const ly = i * 14;
+    leg.append('rect').attr('x', 0).attr('y', ly).attr('width', 8).attr('height', 8).attr('rx', 2).attr('fill', sectorColors(i));
+    leg.append('text').attr('x', 12).attr('y', ly + 8).attr('fill', '#94a3b8').attr('font-size', '9px').text(s.sector_label || s.sector);
+  });
+}
+
+function renderHeatmap(scores) {
+  const container = document.getElementById('macroHeatmap');
+  const allFactors = [];
+  const factorSet = new Set();
+  scores.forEach(s => s.factors.forEach(f => {
+    if (!factorSet.has(f.factor)) { factorSet.add(f.factor); allFactors.push(f.factor); }
+  }));
+  const factors = allFactors.slice(0, 7);
+  const sectors = scores.map(s => s.sector_label || s.sector);
+
+  const cellW = 52, cellH = 34;
+  const marginL = 120, marginT = 80;
+  const W = marginL + factors.length * cellW + 20;
+  const H = marginT + sectors.length * cellH + 20;
+
+  const colorScale = d3.scaleSequential(d3.interpolateRdYlGn).domain([-15, 15]);
+
+  const svg = d3.select(container).append('svg')
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet');
+
+  // Factor labels (top, rotated)
+  factors.forEach((f, fi) => {
+    svg.append('text')
+      .attr('x', marginL + fi * cellW + cellW / 2)
+      .attr('y', marginT - 8)
+      .attr('text-anchor', 'end')
+      .attr('transform', `rotate(-40, ${marginL + fi * cellW + cellW / 2}, ${marginT - 8})`)
+      .attr('fill', '#94a3b8').attr('font-size', '9px')
+      .text(f.length > 12 ? f.slice(0, 10) + '..' : f);
+  });
+
+  // Sector labels (left)
+  sectors.forEach((s, si) => {
+    svg.append('text')
+      .attr('x', marginL - 8)
+      .attr('y', marginT + si * cellH + cellH / 2 + 4)
+      .attr('text-anchor', 'end')
+      .attr('fill', '#94a3b8').attr('font-size', '10px')
+      .text(s.length > 16 ? s.slice(0, 14) + '..' : s);
+  });
+
+  // Cells
+  scores.forEach((sector, si) => {
+    factors.forEach((fName, fi) => {
+      const fObj = sector.factors.find(ff => ff.factor === fName);
+      const val = fObj ? fObj.score_contribution : 0;
+      const x = marginL + fi * cellW;
+      const y = marginT + si * cellH;
+
+      svg.append('rect')
+        .attr('x', x + 1).attr('y', y + 1)
+        .attr('width', cellW - 2).attr('height', cellH - 2)
+        .attr('rx', 4).attr('fill', colorScale(val))
+        .attr('opacity', 0.85)
+        .style('cursor', 'pointer')
+        .on('mouseenter', function(evt) {
+          d3.select(this).attr('opacity', 1).attr('stroke', '#fff').attr('stroke-width', 1.5);
+          showTooltip(evt, `<h4>${sector.sector_label} / ${fName}</h4><div class="row"><span class="label">Contribution</span><span class="value">${fmt(val, 1)}</span></div><div class="row"><span class="label">Impact</span><span class="value">${fObj?.impact || '--'}</span></div>`);
+        })
+        .on('mousemove', evt => {
+          tooltip.style.left = Math.min(evt.clientX + 14, window.innerWidth - 340) + 'px';
+          tooltip.style.top = Math.min(evt.clientY + 14, window.innerHeight - 200) + 'px';
+        })
+        .on('mouseleave', function() {
+          d3.select(this).attr('opacity', 0.85).attr('stroke', 'none');
+          hideTooltip();
+        });
+
+      svg.append('text')
+        .attr('x', x + cellW / 2).attr('y', y + cellH / 2 + 4)
+        .attr('text-anchor', 'middle').attr('fill', Math.abs(val) > 8 ? '#fff' : '#cbd5e1')
+        .attr('font-size', '10px').attr('font-weight', '600')
+        .attr('pointer-events', 'none')
+        .text(fmt(val, 1));
+    });
+  });
+}
+
+function renderMacroTicker(scores) {
+  const ticker = document.getElementById('macroTicker');
+  scores.forEach(s => {
+    const bgClass = s.score >= 60 ? 'good' : s.score >= 40 ? 'warn' : 'bad';
+    ticker.innerHTML += `
+      <div style="flex-shrink:0;padding:8px 16px;background:var(--bg-input);border-radius:8px;min-width:120px;">
+        <div style="font-size:0.68rem;color:var(--text-muted);">${s.sector_label || s.sector}</div>
+        <div style="font-size:1.1rem;font-weight:700;color:${scoreColor(s.score)}">${fmt(s.score, 0)}</div>
+        <div style="font-size:0.65rem;color:var(--text-muted);">${s.signal || '--'}</div>
+      </div>
+    `;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PANEL 2: DILIGENCE — Search + Gauge Scorecard
+// ═══════════════════════════════════════════════════════════════════
+async function loadDiligence() {
+  const panel = document.getElementById('panel-diligence');
+  panel.innerHTML = `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">Company Diligence Search</div>
+      <form id="diligenceForm" class="controls-row">
+        <input type="text" class="input" id="diligenceInput" placeholder="Enter company name..." style="max-width:360px;" value="Blackstone">
+        <button type="submit" class="btn btn-primary">Score</button>
+      </form>
+    </div>
+    <div id="diligenceResults"></div>
+  `;
+  document.getElementById('diligenceForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('diligenceInput').value.trim();
+    if (!name) return;
+    await runDiligenceScore(name);
+  });
+  await runDiligenceScore('Blackstone');
+}
+
+async function runDiligenceScore(name) {
+  const results = document.getElementById('diligenceResults');
+  showLoading(results);
+  const data = await apiFetch('/diligence/score', { method: 'POST', body: JSON.stringify({ company_name: name }) });
+  if (!data || data.status !== 'ok') { showEmpty(results, `No diligence data found for "${name}".`); return; }
+
+  results.innerHTML = `
+    <div class="card-grid cols-2">
+      <div class="card">
+        <div class="card-title">Factor Gauges &mdash; ${data.company_name}</div>
+        <div style="text-align:center;margin-bottom:16px;">
+          <span style="font-size:2.5rem;font-weight:800;color:${scoreColor(data.score)}">${fmt(data.score, 0)}</span>
+          <span class="badge ${gradeClass(data.grade)}" style="font-size:0.85rem;margin-left:8px;">${data.grade}</span>
+        </div>
+        <div class="gauge-grid" id="diligenceGauges"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Analysis</div>
+        <div style="margin-bottom:16px;">
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">Signal</div>
+          <div style="font-size:0.85rem;">${data.signal || '--'}</div>
+        </div>
+        <div style="margin-bottom:16px;">
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">Recommendation</div>
+          <div style="font-size:0.85rem;">${data.recommendation || '--'}</div>
+        </div>
+        <div style="margin-bottom:16px;">
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">Confidence</div>
+          <div class="score-bar" style="height:10px;">
+            <div class="score-bar-fill" style="width:${(data.confidence || 0) * 100}%;background:var(--accent);"></div>
+          </div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">${fmtPct((data.confidence || 0) * 100)} confidence</div>
+        </div>
+        <div style="margin-bottom:16px;">
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Sources Matched</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;">
+            ${(data.sources_matched || []).map(s => `<span class="badge cyan">${s}</span>`).join('')}
+          </div>
+        </div>
+        ${data.red_flags?.length ? `
+        <div>
+          <div style="font-size:0.75rem;color:var(--error);margin-bottom:6px;">Red Flags</div>
+          ${data.red_flags.map(f => `<div style="display:flex;align-items:center;margin-bottom:4px;font-size:0.78rem;"><span class="pulse-dot"></span>${f}</div>`).join('')}
+        </div>` : '<div style="font-size:0.78rem;color:var(--success);">No red flags detected</div>'}
+      </div>
+    </div>
+  `;
+
+  // Render arc gauges
+  renderDiligenceGauges(data.factors || []);
+}
+
+function renderDiligenceGauges(factors) {
+  const container = document.getElementById('diligenceGauges');
+  factors.forEach((f, i) => {
+    const div = document.createElement('div');
+    div.className = 'gauge-item';
+    div.innerHTML = `<div id="gauge-${i}" class="svg-container"></div><div class="gauge-label">${f.factor}</div>`;
+    container.appendChild(div);
+
+    const size = 110, r = 42, tau = 2 * Math.PI;
+    const arcGen = d3.arc().innerRadius(r - 8).outerRadius(r).startAngle(0).cornerRadius(4);
+    const score = f.score || 0;
+
+    const svg = d3.select(`#gauge-${i}`).append('svg')
+      .attr('viewBox', `0 0 ${size} ${size}`)
+      .append('g').attr('transform', `translate(${size/2},${size/2})`);
+
+    // Background arc
+    svg.append('path')
+      .datum({ endAngle: tau * 0.75 })
+      .attr('d', arcGen).attr('fill', '#334155')
+      .attr('transform', 'rotate(-135)');
+
+    // Foreground arc
+    const frac = (score / 100) * 0.75;
+    svg.append('path')
+      .datum({ endAngle: 0 })
+      .attr('d', arcGen)
+      .attr('fill', scoreColor(score))
+      .attr('transform', 'rotate(-135)')
+      .transition().duration(800).ease(d3.easeCubicOut)
+      .attrTween('d', function() {
+        const interp = d3.interpolate(0, tau * frac);
+        return t => arcGen({ endAngle: interp(t) });
+      });
+
+    // Center text
+    svg.append('text')
+      .attr('y', 5).attr('text-anchor', 'middle')
+      .attr('fill', scoreColor(score)).attr('font-size', '16px').attr('font-weight', '700')
+      .text(fmt(score, 0));
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PANEL 3: LP-GP NETWORK — Force-Directed Graph (SHOWPIECE)
+// ═══════════════════════════════════════════════════════════════════
+async function loadLPGP() {
+  const panel = document.getElementById('panel-lpgp');
+  showLoading(panel);
+
+  const data = await apiFetch('/pe/gp-pipeline/graph?min_strength=0');
+  if (!data?.edges?.length) { showEmpty(panel, 'No LP-GP relationship data. Seed PE data first.'); return; }
+
+  panel.innerHTML = `
+    <div class="controls-row">
+      <label style="font-size:0.75rem;color:var(--text-muted);">Min Strength:</label>
+      <input type="range" id="lpgpStrength" min="0" max="100" value="0" style="width:160px;">
+      <span id="lpgpStrengthVal" style="font-size:0.75rem;width:30px;">0</span>
+      <input type="text" class="input" id="lpgpSearch" placeholder="Search node..." style="max-width:200px;">
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;position:relative;">
+      <div id="lpgpGraph" style="width:100%;height:560px;"></div>
+    </div>
+  `;
+
+  renderLPGPGraph(data.edges);
+
+  // Strength filter
+  const slider = document.getElementById('lpgpStrength');
+  const valSpan = document.getElementById('lpgpStrengthVal');
+  slider.addEventListener('input', () => {
+    valSpan.textContent = slider.value;
+    const minStr = parseInt(slider.value);
+    const filtered = data.edges.filter(e => e.relationship_strength >= minStr);
+    document.getElementById('lpgpGraph').innerHTML = '';
+    if (forceSimulation) forceSimulation.stop();
+    renderLPGPGraph(filtered);
+  });
+
+  // Search
+  document.getElementById('lpgpSearch').addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    d3.selectAll('.lpgp-node').attr('opacity', d => {
+      if (!q) return 1;
+      return (d.name || '').toLowerCase().includes(q) ? 1 : 0.15;
+    });
+    d3.selectAll('.lpgp-link').attr('opacity', q ? 0.08 : 0.4);
+  });
+}
+
+function renderLPGPGraph(edges) {
+  const container = document.getElementById('lpgpGraph');
+  const W = container.clientWidth || 900;
+  const H = 560;
+
+  // Build nodes and links
+  const nodesMap = new Map();
+  const links = [];
+
+  edges.forEach(e => {
+    const lpKey = `lp-${e.lp_id}`;
+    const gpKey = `gp-${e.gp_firm_id}`;
+    if (!nodesMap.has(lpKey)) {
+      nodesMap.set(lpKey, {
+        id: lpKey, name: e.lp_name, type: 'LP', lpType: e.lp_type,
+        total_committed: 0, tier1: false,
+      });
+    }
+    if (!nodesMap.has(gpKey)) {
+      nodesMap.set(gpKey, {
+        id: gpKey, name: e.gp_name, type: 'GP', firmId: e.gp_firm_id,
+        total_committed: 0,
+      });
+    }
+    const lp = nodesMap.get(lpKey);
+    lp.total_committed += (e.total_commitment_usd || 0);
+    const gp = nodesMap.get(gpKey);
+    gp.total_committed += (e.total_commitment_usd || 0);
+
+    links.push({
+      source: lpKey, target: gpKey,
+      strength: e.relationship_strength,
+      trend: e.commitment_trend,
+      commitment: e.total_commitment_usd,
+    });
+  });
+
+  const nodes = Array.from(nodesMap.values());
+  // Mark tier1 LPs (top quartile by commitment)
+  const lpNodes = nodes.filter(n => n.type === 'LP');
+  const sorted = lpNodes.slice().sort((a, b) => b.total_committed - a.total_committed);
+  const tier1Threshold = sorted[Math.floor(sorted.length * 0.25)]?.total_committed || 0;
+  lpNodes.forEach(n => { n.tier1 = n.total_committed >= tier1Threshold && n.total_committed > 0; });
+
+  const sizeScale = d3.scaleSqrt()
+    .domain([0, d3.max(nodes, d => d.total_committed) || 1])
+    .range([4, 24]);
+
+  const trendColor = t => {
+    if (t === 'increasing') return 'var(--success)';
+    if (t === 'decreasing') return 'var(--error)';
+    return '#64748b';
+  };
+
+  const svg = d3.select(container).append('svg')
+    .attr('width', W).attr('height', H)
+    .attr('viewBox', `0 0 ${W} ${H}`);
+
+  // Zoom
+  const gAll = svg.append('g');
+  svg.call(d3.zoom().scaleExtent([0.3, 4]).on('zoom', (evt) => {
+    gAll.attr('transform', evt.transform);
+  }));
+
+  // Force simulation
+  forceSimulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(80).strength(d => d.strength / 200))
+    .force('charge', d3.forceManyBody().strength(-60))
+    .force('center', d3.forceCenter(W / 2, H / 2))
+    .force('x', d3.forceX().x(d => d.type === 'LP' ? W * 0.3 : W * 0.7).strength(0.12))
+    .force('y', d3.forceY(H / 2).strength(0.05))
+    .force('collide', d3.forceCollide().radius(d => sizeScale(d.total_committed) + 3));
+
+  // Links
+  const link = gAll.append('g').selectAll('line')
+    .data(links).enter().append('line')
+    .attr('class', 'lpgp-link')
+    .attr('stroke', d => trendColor(d.trend))
+    .attr('stroke-width', d => Math.max(0.5, (d.strength || 0) / 25))
+    .attr('stroke-opacity', 0.4);
+
+  // Nodes
+  const node = gAll.append('g').selectAll('g')
+    .data(nodes).enter().append('g')
+    .attr('class', 'lpgp-node')
+    .call(d3.drag()
+      .on('start', (evt, d) => { if (!evt.active) forceSimulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (evt, d) => { d.fx = evt.x; d.fy = evt.y; })
+      .on('end', (evt, d) => { if (!evt.active) forceSimulation.alphaTarget(0); d.fx = null; d.fy = null; })
+    );
+
+  // Tier-1 gold ring
+  node.filter(d => d.tier1).append('circle')
+    .attr('r', d => sizeScale(d.total_committed) + 3)
+    .attr('fill', 'none').attr('stroke', '#f59e0b').attr('stroke-width', 2)
+    .attr('stroke-dasharray', '3,2');
+
+  // Main circle
+  node.append('circle')
+    .attr('r', d => sizeScale(d.total_committed))
+    .attr('fill', d => d.type === 'LP' ? 'var(--accent)' : 'var(--primary)')
+    .attr('stroke', '#0f172a').attr('stroke-width', 1);
+
+  // Labels for larger nodes
+  node.filter(d => sizeScale(d.total_committed) > 8).append('text')
+    .attr('dy', d => sizeScale(d.total_committed) + 12)
+    .attr('text-anchor', 'middle')
+    .attr('fill', '#94a3b8').attr('font-size', '8px')
+    .text(d => d.name?.length > 18 ? d.name.slice(0, 16) + '..' : d.name);
+
+  // Hover interactions
+  node.on('mouseenter', function(evt, d) {
+    // Highlight connected
+    const connected = new Set();
+    links.forEach(l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      if (sid === d.id) connected.add(tid);
+      if (tid === d.id) connected.add(sid);
+    });
+    connected.add(d.id);
+    d3.selectAll('.lpgp-node').attr('opacity', n => connected.has(n.id) ? 1 : 0.15);
+    link.attr('stroke-opacity', l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      return (sid === d.id || tid === d.id) ? 0.8 : 0.05;
+    });
+
+    let html = `<h4>${d.name}</h4>`;
+    html += `<div class="row"><span class="label">Type</span><span class="value">${d.type}${d.lpType ? ' (' + d.lpType + ')' : ''}</span></div>`;
+    html += `<div class="row"><span class="label">Total Committed</span><span class="value">${fmtUsd(d.total_committed)}</span></div>`;
+    if (d.tier1) html += `<div class="row"><span class="label">Status</span><span class="value" style="color:var(--warning);">Tier-1</span></div>`;
+    showTooltip(evt, html);
+  })
+  .on('mousemove', evt => {
+    tooltip.style.left = Math.min(evt.clientX + 14, window.innerWidth - 340) + 'px';
+    tooltip.style.top = Math.min(evt.clientY + 14, window.innerHeight - 200) + 'px';
+  })
+  .on('mouseleave', () => {
+    d3.selectAll('.lpgp-node').attr('opacity', 1);
+    link.attr('stroke-opacity', 0.4);
+    hideTooltip();
+  });
+
+  // Click GP node → slide panel
+  node.filter(d => d.type === 'GP').style('cursor', 'pointer')
+    .on('click', async (evt, d) => {
+      evt.stopPropagation();
+      const detail = await apiFetch(`/pe/gp-pipeline/scores/${d.firmId}`);
+      if (!detail) return;
+      const sp = document.getElementById('slidePanelContent');
+      sp.innerHTML = `
+        <h3 style="margin-bottom:16px;">${detail.firm_name}</h3>
+        <div style="display:flex;gap:12px;margin-bottom:16px;">
+          <div><span style="font-size:2rem;font-weight:800;color:${scoreColor(detail.score)}">${fmt(detail.score,0)}</span></div>
+          <div><span class="badge ${gradeClass(detail.grade)}">${detail.grade}</span><br><span style="font-size:0.72rem;color:var(--text-muted);">${detail.signal || ''}</span></div>
+        </div>
+        <div style="font-size:0.78rem;margin-bottom:12px;">${detail.recommendation || ''}</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">LP COUNT: ${detail.lp_count || 0} &middot; TIER-1: ${detail.tier1_count || 0} &middot; COMMITTED: ${fmtUsd(detail.total_committed_usd)}</div>
+        ${(detail.signals || []).map(s => `
+          <div style="margin-bottom:8px;padding:8px;background:var(--bg-input);border-radius:8px;">
+            <div style="display:flex;justify-content:space-between;font-size:0.75rem;">
+              <span>${s.signal}</span><span style="font-weight:700;color:${scoreColor(s.score)}">${fmt(s.score,0)}</span>
+            </div>
+            <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;">${s.reading || ''}</div>
+          </div>
+        `).join('')}
+      `;
+      document.getElementById('slidePanel').classList.add('open');
+    });
+
+  // Tick
+  forceSimulation.on('tick', () => {
+    link
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    node.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PANEL 4: EXEC SIGNALS — Leaderboard + Treemap
+// ═══════════════════════════════════════════════════════════════════
+async function loadExec() {
+  const panel = document.getElementById('panel-exec');
+  showLoading(panel);
+
+  const data = await apiFetch('/exec-signals/scan?limit=30');
+  if (!data?.companies?.length) { showEmpty(panel, 'No executive signal data available.'); return; }
+
+  panel.innerHTML = `
+    <div class="card-grid cols-2">
+      <div class="card" style="overflow:auto;max-height:580px;">
+        <div class="card-title">Executive Transition Leaderboard</div>
+        <table class="data-table" id="execTable">
+          <thead><tr>
+            <th data-sort="company_name">Company</th>
+            <th data-sort="transition_score">Score</th>
+            <th>Flags</th>
+          </tr></thead>
+          <tbody id="execTableBody"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-title">Signal Treemap &mdash; Companies by Open Positions</div>
+        <div id="execTreemap" class="svg-container"></div>
+      </div>
+    </div>
+  `;
+
+  const companies = data.companies;
+
+  // Sortable table
+  let sortCol = 'transition_score', sortDir = -1;
+  function renderExecTable() {
+    const sorted = [...companies].sort((a, b) => {
+      const av = a[sortCol], bv = b[sortCol];
+      if (typeof av === 'string') return sortDir * av.localeCompare(bv);
+      return sortDir * ((av || 0) - (bv || 0));
+    });
+    const tbody = document.getElementById('execTableBody');
+    tbody.innerHTML = sorted.map(c => {
+      const flags = (c.flags || []);
+      return `<tr>
+        <td style="font-weight:500;">${c.company_name || 'Unknown'}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="score-bar" style="width:60px;"><div class="score-bar-fill" style="width:${c.transition_score}%;background:${scoreColor(c.transition_score)};"></div></div>
+            <span style="font-weight:600;color:${scoreColor(c.transition_score)}">${fmt(c.transition_score, 0)}</span>
+          </div>
+        </td>
+        <td>${flags.map(f => `<span class="badge red" style="margin-right:3px;">${f}</span>`).join('') || '--'}</td>
+      </tr>`;
+    }).join('');
+  }
+  renderExecTable();
+
+  document.querySelectorAll('#execTable th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = -1; }
+      renderExecTable();
+    });
+  });
+
+  // Treemap
+  renderExecTreemap(companies);
+}
+
+function renderExecTreemap(companies) {
+  const container = document.getElementById('execTreemap');
+  const W = container.clientWidth || 500;
+  const H = 400;
+
+  // Build hierarchy data
+  const treeData = {
+    name: 'root',
+    children: companies.map(c => ({
+      name: c.company_name || 'Unknown',
+      value: Math.max(1, (c.details?.total_open_positions || c.details?.total_open || c.signals?.length || 1)),
+      score: c.transition_score || 0,
+      flags: c.flags || [],
+    })),
+  };
+
+  const root = d3.hierarchy(treeData).sum(d => d.value).sort((a, b) => b.value - a.value);
+  d3.treemap().size([W, H]).padding(2).round(true)(root);
+
+  const colorScale = d3.scaleSequential(d3.interpolateYlOrRd).domain([0, 100]);
+
+  const svg = d3.select(container).append('svg')
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet');
+
+  const leaves = root.leaves();
+
+  const cell = svg.selectAll('g').data(leaves).enter().append('g')
+    .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+  cell.append('rect')
+    .attr('width', d => Math.max(0, d.x1 - d.x0))
+    .attr('height', d => Math.max(0, d.y1 - d.y0))
+    .attr('rx', 3)
+    .attr('fill', d => colorScale(d.data.score))
+    .attr('fill-opacity', 0.75)
+    .attr('stroke', '#0f172a').attr('stroke-width', 1)
+    .on('mouseenter', function(evt, d) {
+      d3.select(this).attr('fill-opacity', 1).attr('stroke', '#fff').attr('stroke-width', 1.5);
+      showTooltip(evt, `<h4>${d.data.name}</h4><div class="row"><span class="label">Transition Score</span><span class="value" style="color:${scoreColor(d.data.score)}">${fmt(d.data.score, 0)}</span></div><div class="row"><span class="label">Signals</span><span class="value">${d.data.value}</span></div>${d.data.flags.length ? '<div style="margin-top:4px;">' + d.data.flags.map(f => '<span class="badge red" style="margin-right:3px;">' + f + '</span>').join('') + '</div>' : ''}`);
+    })
+    .on('mousemove', evt => {
+      tooltip.style.left = Math.min(evt.clientX + 14, window.innerWidth - 340) + 'px';
+      tooltip.style.top = Math.min(evt.clientY + 14, window.innerHeight - 200) + 'px';
+    })
+    .on('mouseleave', function() {
+      d3.select(this).attr('fill-opacity', 0.75).attr('stroke', '#0f172a').attr('stroke-width', 1);
+      hideTooltip();
+    });
+
+  // Labels for cells large enough
+  cell.filter(d => (d.x1 - d.x0) > 50 && (d.y1 - d.y0) > 24).append('text')
+    .attr('x', 6).attr('y', 16)
+    .attr('fill', '#fff').attr('font-size', '10px').attr('font-weight', '600')
+    .text(d => {
+      const maxLen = Math.floor((d.x1 - d.x0) / 7);
+      return d.data.name.length > maxLen ? d.data.name.slice(0, maxLen - 1) + '..' : d.data.name;
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PANEL 5: SITE SCORE — Interactive US Map
+// ═══════════════════════════════════════════════════════════════════
+let siteUseCase = 'general';
+let sitePins = [];
+let siteProjection = null;
+
+async function loadSite() {
+  const panel = document.getElementById('panel-site');
+  panel.innerHTML = `
+    <div class="controls-row" style="margin-bottom:0;">
+      <div class="use-case-toggles">
+        <button class="use-case-btn active" data-uc="general">General</button>
+        <button class="use-case-btn" data-uc="datacenter">Datacenter</button>
+        <button class="use-case-btn" data-uc="manufacturing">Manufacturing</button>
+        <button class="use-case-btn" data-uc="warehouse">Warehouse</button>
+      </div>
+      <span style="font-size:0.72rem;color:var(--text-muted);margin-left:auto;">Click map to score a location</span>
+    </div>
+    <div class="card map-container" style="padding:0;overflow:hidden;margin-top:12px;position:relative;">
+      <div id="siteMap" style="width:100%;min-height:480px;"></div>
+      <div class="map-score-card" id="siteScoreCard" style="display:none;"></div>
+    </div>
+    <div style="margin-top:10px;">
+      <div class="pinned-list" id="sitePinList"></div>
+    </div>
+  `;
+
+  // Use case toggles
+  panel.querySelectorAll('.use-case-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      panel.querySelectorAll('.use-case-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      siteUseCase = btn.dataset.uc;
+    });
+  });
+
+  await renderUSMap();
+}
+
+async function renderUSMap() {
+  const container = document.getElementById('siteMap');
+  const W = container.clientWidth || 900;
+  const H = 480;
+
+  showLoading(container);
+
+  let us;
+  try {
+    us = await d3.json('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json');
+  } catch {
+    showEmpty(container, 'Failed to load US map data.');
+    return;
+  }
+
+  container.innerHTML = '';
+  const svg = d3.select(container).append('svg')
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet')
+    .style('cursor', 'crosshair');
+
+  siteProjection = d3.geoAlbersUsa().fitSize([W - 40, H - 40], topojson.feature(us, us.objects.states));
+  siteProjection.translate([W / 2, H / 2]);
+  const path = d3.geoPath().projection(siteProjection);
+
+  const states = topojson.feature(us, us.objects.states).features;
+
+  // Base color by state index
+  const stateColor = d3.scaleSequential(d3.interpolateBlues).domain([0, states.length]);
+
+  svg.append('g').selectAll('path')
+    .data(states).enter().append('path')
+    .attr('d', path)
+    .attr('fill', (d, i) => stateColor(i * 0.6))
+    .attr('stroke', '#334155').attr('stroke-width', 0.5)
+    .attr('opacity', 0.7)
+    .on('mouseenter', function() { d3.select(this).attr('opacity', 1).attr('stroke', '#94a3b8').attr('stroke-width', 1); })
+    .on('mouseleave', function() { d3.select(this).attr('opacity', 0.7).attr('stroke', '#334155').attr('stroke-width', 0.5); });
+
+  // State borders
+  svg.append('path')
+    .datum(topojson.mesh(us, us.objects.states, (a, b) => a !== b))
+    .attr('d', path)
+    .attr('fill', 'none').attr('stroke', '#334155').attr('stroke-width', 0.5);
+
+  // Pins group
+  const pinsG = svg.append('g').attr('class', 'pins-group');
+
+  // Click handler
+  svg.on('click', async function(evt) {
+    const [mx, my] = d3.pointer(evt);
+    const coords = siteProjection.invert([mx, my]);
+    if (!coords) return;
+    const [lng, lat] = coords;
+    if (lat < 24 || lat > 50 || lng < -130 || lng > -65) return;
+
+    await scoreSiteLocation(lat, lng, pinsG);
+  });
+
+  // Re-render existing pins
+  renderSitePins(pinsG);
+}
+
+async function scoreSiteLocation(lat, lng, pinsG) {
+  const card = document.getElementById('siteScoreCard');
+  card.style.display = 'block';
+  card.innerHTML = '<div class="loading-state"><div class="spinner"></div>Scoring...</div>';
+
+  const data = await apiFetch('/site-intel/sites/unified-score', {
+    method: 'POST',
+    body: JSON.stringify({ lat, lng, use_case: siteUseCase }),
+  });
+
+  if (!data || data.status !== 'ok') {
+    card.innerHTML = '<div style="font-size:0.78rem;color:var(--error);">Scoring failed. Try another location.</div>';
+    return;
+  }
+
+  // Add pin (max 4)
+  if (sitePins.length >= 4) sitePins.shift();
+  sitePins.push({ lat, lng, score: data.score, grade: data.grade, factors: data.factors });
+  renderSitePins(pinsG);
+  renderSitePinList();
+
+  // Score card
+  card.innerHTML = `
+    <h3 style="display:flex;justify-content:space-between;align-items:center;">
+      <span>Site Score</span>
+      <span style="font-size:1.5rem;font-weight:800;color:${scoreColor(data.score)}">${fmt(data.score, 0)}</span>
+    </h3>
+    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:12px;">
+      ${fmt(lat, 2)}, ${fmt(lng, 2)} &middot; ${data.grade} &middot; ${siteUseCase}
+    </div>
+    ${(data.factors || []).map(f => `
+      <div class="factor-bar-row">
+        <span class="factor-bar-label">${f.factor}</span>
+        <div class="factor-bar-track"><div class="factor-bar-fill" style="width:${f.score}%;background:${scoreColor(f.score)};"></div></div>
+        <span class="factor-bar-val" style="color:${scoreColor(f.score)}">${fmt(f.score, 0)}</span>
+      </div>
+    `).join('')}
+  `;
+}
+
+function renderSitePins(pinsG) {
+  if (!pinsG || !siteProjection) return;
+  pinsG.selectAll('*').remove();
+  sitePins.forEach((pin, i) => {
+    const pos = siteProjection([pin.lng, pin.lat]);
+    if (!pos) return;
+    pinsG.append('circle')
+      .attr('cx', pos[0]).attr('cy', pos[1]).attr('r', 8)
+      .attr('fill', scoreColor(pin.score)).attr('fill-opacity', 0.8)
+      .attr('stroke', '#fff').attr('stroke-width', 2);
+    pinsG.append('text')
+      .attr('x', pos[0]).attr('y', pos[1] + 4)
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#fff').attr('font-size', '8px').attr('font-weight', '700')
+      .text(fmt(pin.score, 0));
+  });
+}
+
+function renderSitePinList() {
+  const list = document.getElementById('sitePinList');
+  list.innerHTML = sitePins.map((p, i) => `
+    <div class="pinned-chip">
+      <span style="color:${scoreColor(p.score)};font-weight:700;">${fmt(p.score,0)}</span>
+      ${fmt(p.lat,2)}, ${fmt(p.lng,2)}
+      <span class="remove" onclick="removeSitePin(${i})">&times;</span>
+    </div>
+  `).join('');
+}
+
+function removeSitePin(idx) {
+  sitePins.splice(idx, 1);
+  renderSitePinList();
+  const pinsG = d3.select('.pins-group');
+  if (!pinsG.empty()) renderSitePins(pinsG);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PANEL 6: PORTFOLIO STRESS — Bubble Chart
+// ═══════════════════════════════════════════════════════════════════
+async function loadStress() {
+  const panel = document.getElementById('panel-stress');
+  panel.innerHTML = `
+    <div class="controls-row">
+      <label style="font-size:0.75rem;color:var(--text-muted);">PE Firm:</label>
+      <select class="input" id="stressFirmSelect" style="max-width:240px;">
+        <option value="1">Firm 1</option>
+        <option value="2">Firm 2</option>
+        <option value="3">Firm 3</option>
+        <option value="4">Firm 4</option>
+        <option value="5">Firm 5</option>
+        <option value="6">Firm 6</option>
+        <option value="7">Firm 7</option>
+        <option value="8">Firm 8</option>
+        <option value="9">Firm 9</option>
+        <option value="10">Firm 10</option>
+      </select>
+      <button class="btn btn-primary" id="stressLoadBtn">Load</button>
+    </div>
+    <div class="card-grid cols-2" style="margin-top:12px;">
+      <div class="card" style="min-width:0;">
+        <div class="card-title">Portfolio Stress Summary</div>
+        <div id="stressSidebar"></div>
+      </div>
+      <div class="card" style="min-width:0;">
+        <div class="card-title">Holdings Stress Bubble Chart</div>
+        <div id="stressBubble" class="svg-container"></div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('stressLoadBtn').addEventListener('click', () => {
+    loadStressData(document.getElementById('stressFirmSelect').value);
+  });
+  document.getElementById('stressFirmSelect').addEventListener('change', () => {
+    loadStressData(document.getElementById('stressFirmSelect').value);
+  });
+
+  await loadStressData(1);
+}
+
+async function loadStressData(firmId) {
+  const sidebar = document.getElementById('stressSidebar');
+  const bubble = document.getElementById('stressBubble');
+  showLoading(sidebar); bubble.innerHTML = '';
+
+  const data = await apiFetch(`/pe/stress/${firmId}`);
+  if (!data || data.status !== 'ok') {
+    showEmpty(sidebar, 'No stress data for this firm.');
+    showEmpty(bubble, 'Select a firm with portfolio data.');
+    return;
+  }
+
+  // Update firm selector label
+  const sel = document.getElementById('stressFirmSelect');
+  if (data.firm_name) {
+    const opt = sel.querySelector(`option[value="${firmId}"]`);
+    if (opt) opt.textContent = data.firm_name;
+  }
+
+  // Sidebar
+  const dist = data.distribution || {};
+  sidebar.innerHTML = `
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-size:2.5rem;font-weight:800;color:${scoreColor(100 - (data.portfolio_stress || 0))}">${fmt(data.portfolio_stress, 0)}</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);">Portfolio Stress Score</div>
+    </div>
+    <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Distribution</div>
+    ${['critical', 'elevated', 'moderate', 'low'].map(level => {
+      const count = dist[level] || 0;
+      const total = data.holdings_scored || 1;
+      const colors = { critical: 'var(--error)', elevated: 'var(--warning)', moderate: 'var(--accent)', low: 'var(--success)' };
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="width:60px;font-size:0.72rem;color:${colors[level]};text-transform:capitalize;">${level}</span>
+        <div class="score-bar" style="flex:1;"><div class="score-bar-fill" style="width:${(count/total)*100}%;background:${colors[level]};"></div></div>
+        <span style="width:20px;text-align:right;font-size:0.72rem;font-weight:600;">${count}</span>
+      </div>`;
+    }).join('')}
+    <div style="margin-top:16px;font-size:0.72rem;color:var(--text-muted);">Holdings Scored: ${data.holdings_scored || 0}</div>
+    ${data.macro_summary ? `<div style="margin-top:12px;font-size:0.72rem;color:var(--text-muted);line-height:1.5;">${data.macro_summary}</div>` : ''}
+  `;
+
+  // Bubble chart
+  renderStressBubble(data.holdings || []);
+}
+
+function renderStressBubble(holdings) {
+  const container = document.getElementById('stressBubble');
+  container.innerHTML = '';
+  if (!holdings.length) { showEmpty(container, 'No holdings data.'); return; }
+
+  const W = container.clientWidth || 500;
+  const H = 420;
+  const margin = { top: 30, right: 30, bottom: 40, left: 50 };
+  const iW = W - margin.left - margin.right;
+  const iH = H - margin.top - margin.bottom;
+
+  const svg = d3.select(container).append('svg')
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet');
+
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  // Extract stress components
+  const holdingsData = holdings.map(h => {
+    const c0 = h.components?.[0] || {};
+    const c1 = h.components?.[1] || {};
+    return {
+      name: h.company_name,
+      industry: h.industry,
+      sector: h.sector,
+      stress: h.stress_score,
+      grade: h.stress_grade,
+      rateStress: c0.stress || 0,
+      marginStress: c1.stress || 0,
+      hasFinancials: !!h.financials,
+      components: h.components || [],
+    };
+  });
+
+  const xScale = d3.scaleLinear().domain([0, 100]).range([0, iW]);
+  const yScale = d3.scaleLinear().domain([0, 100]).range([iH, 0]);
+  const colorScale = d3.scaleOrdinal(d3.schemeTableau10);
+
+  // Axes
+  g.append('g').attr('transform', `translate(0,${iH})`).call(d3.axisBottom(xScale).ticks(5))
+    .selectAll('text').attr('fill', '#94a3b8').attr('font-size', '10px');
+  g.append('g').call(d3.axisLeft(yScale).ticks(5))
+    .selectAll('text').attr('fill', '#94a3b8').attr('font-size', '10px');
+
+  // Style axis lines
+  g.selectAll('.domain').attr('stroke', '#334155');
+  g.selectAll('.tick line').attr('stroke', '#334155');
+
+  // Axis labels
+  g.append('text').attr('x', iW / 2).attr('y', iH + 35).attr('text-anchor', 'middle')
+    .attr('fill', '#94a3b8').attr('font-size', '11px').text('Rate Stress');
+  g.append('text').attr('x', -iH / 2).attr('y', -38).attr('text-anchor', 'middle')
+    .attr('transform', 'rotate(-90)')
+    .attr('fill', '#94a3b8').attr('font-size', '11px').text('Margin Stress');
+
+  // Quadrant dividers
+  g.append('line').attr('x1', xScale(50)).attr('x2', xScale(50)).attr('y1', 0).attr('y2', iH)
+    .attr('stroke', '#475569').attr('stroke-dasharray', '4,3').attr('stroke-width', 1);
+  g.append('line').attr('x1', 0).attr('x2', iW).attr('y1', yScale(50)).attr('y2', yScale(50))
+    .attr('stroke', '#475569').attr('stroke-dasharray', '4,3').attr('stroke-width', 1);
+
+  // Quadrant labels
+  const qlabels = [
+    { x: iW * 0.25, y: 16, text: 'Safe Harbor' },
+    { x: iW * 0.75, y: 16, text: 'Rate Exposed' },
+    { x: iW * 0.25, y: iH - 8, text: 'Margin Squeeze' },
+    { x: iW * 0.75, y: iH - 8, text: 'Critical' },
+  ];
+  qlabels.forEach(q => {
+    g.append('text').attr('x', q.x).attr('y', q.y).attr('text-anchor', 'middle')
+      .attr('class', 'quadrant-label').text(q.text);
+  });
+
+  // Bubbles
+  g.selectAll('circle.holding')
+    .data(holdingsData).enter().append('circle')
+    .attr('class', 'holding')
+    .attr('cx', d => xScale(d.rateStress))
+    .attr('cy', d => yScale(d.marginStress))
+    .attr('r', d => d.hasFinancials ? 10 : 6)
+    .attr('fill', d => colorScale(d.sector || d.industry || 'Unknown'))
+    .attr('fill-opacity', 0.7)
+    .attr('stroke', '#0f172a').attr('stroke-width', 1)
+    .on('mouseenter', function(evt, d) {
+      d3.select(this).attr('fill-opacity', 1).attr('stroke', '#fff').attr('stroke-width', 2).attr('r', d.hasFinancials ? 13 : 9);
+      let html = `<h4>${d.name}</h4>`;
+      html += `<div class="row"><span class="label">Overall Stress</span><span class="value">${fmt(d.stress, 0)}</span></div>`;
+      d.components.forEach(c => {
+        html += `<div class="row"><span class="label">${c.component}</span><span class="value">${fmt(c.stress, 0)}</span></div>`;
+      });
+      html += `<div class="row"><span class="label">Sector</span><span class="value">${d.sector || d.industry || '--'}</span></div>`;
+      showTooltip(evt, html);
+    })
+    .on('mousemove', evt => {
+      tooltip.style.left = Math.min(evt.clientX + 14, window.innerWidth - 340) + 'px';
+      tooltip.style.top = Math.min(evt.clientY + 14, window.innerHeight - 200) + 'px';
+    })
+    .on('mouseleave', function(evt, d) {
+      d3.select(this).attr('fill-opacity', 0.7).attr('stroke', '#0f172a').attr('stroke-width', 1).attr('r', d.hasFinancials ? 10 : 6);
+      hideTooltip();
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PANEL 7: HEALTHCARE — Scatter Plot + Filters
+// ═══════════════════════════════════════════════════════════════════
+let healthcareData = [];
+
+async function loadHealthcare() {
+  const panel = document.getElementById('panel-healthcare');
+  showLoading(panel);
+
+  const data = await apiFetch('/healthcare/profiles?limit=200');
+  if (!data?.results?.length) { showEmpty(panel, 'No healthcare practice data. Run healthcare collection first.'); return; }
+
+  healthcareData = data.results;
+
+  // Extract unique states
+  const states = [...new Set(healthcareData.map(r => r.state).filter(Boolean))].sort();
+
+  panel.innerHTML = `
+    <div class="card-grid cols-2">
+      <div class="card" style="max-width:220px;min-width:180px;">
+        <div class="card-title">Filters</div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:0.72rem;color:var(--text-muted);">State</label>
+          <select class="input" id="hcStateFilter" style="margin-top:4px;">
+            <option value="">All States</option>
+            ${states.map(s => `<option value="${s}">${s}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:0.72rem;color:var(--text-muted);">Min Score: <span id="hcMinScoreVal">0</span></label>
+          <input type="range" id="hcMinScore" min="0" max="100" value="0" style="width:100%;margin-top:4px;">
+        </div>
+        <div style="margin-top:16px;font-size:0.72rem;color:var(--text-muted);">
+          Showing <strong id="hcCount">${healthcareData.length}</strong> practices
+        </div>
+      </div>
+      <div class="card" style="flex:1;min-width:0;">
+        <div class="card-title">Acquisition Score vs. Revenue Estimate</div>
+        <div id="hcScatter" class="svg-container"></div>
+      </div>
+    </div>
+  `;
+
+  function refilter() {
+    const state = document.getElementById('hcStateFilter').value;
+    const minScore = parseInt(document.getElementById('hcMinScore').value);
+    document.getElementById('hcMinScoreVal').textContent = minScore;
+    const filtered = healthcareData.filter(r =>
+      (!state || r.state === state) && (r.acquisition_score || 0) >= minScore
+    );
+    document.getElementById('hcCount').textContent = filtered.length;
+    renderHealthcareScatter(filtered);
+  }
+
+  document.getElementById('hcStateFilter').addEventListener('change', refilter);
+  document.getElementById('hcMinScore').addEventListener('input', refilter);
+
+  renderHealthcareScatter(healthcareData);
+}
+
+function renderHealthcareScatter(practices) {
+  const container = document.getElementById('hcScatter');
+  container.innerHTML = '';
+  if (!practices.length) { showEmpty(container, 'No practices match filters.'); return; }
+
+  const W = container.clientWidth || 600;
+  const H = 400;
+  const margin = { top: 20, right: 30, bottom: 40, left: 50 };
+  const iW = W - margin.left - margin.right;
+  const iH = H - margin.top - margin.bottom;
+
+  const svg = d3.select(container).append('svg')
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet');
+
+  const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  // Estimate revenue from details or use index
+  const revenueEst = (r, i) => {
+    if (r.details?.estimated_revenue) return r.details.estimated_revenue;
+    if (r.details?.review_count) return r.details.review_count * 5000; // proxy
+    return (i + 1) * 50000;
+  };
+
+  const data = practices.map((r, i) => ({
+    ...r,
+    revenue: revenueEst(r, i),
+    reviewCount: r.details?.review_count || 5,
+  }));
+
+  const maxRev = d3.max(data, d => d.revenue) || 1e6;
+  const xScale = d3.scaleLog().domain([Math.max(1e4, d3.min(data, d => d.revenue) * 0.5), maxRev * 1.2]).range([0, iW]).clamp(true);
+  const yScale = d3.scaleLinear().domain([0, 100]).range([iH, 0]);
+  const sizeScale = d3.scaleSqrt().domain([0, d3.max(data, d => d.reviewCount) || 50]).range([3, 14]);
+
+  const gradeColors = { A: 'var(--success)', B: 'var(--accent)', C: 'var(--warning)', D: 'var(--error)', F: '#ef4444' };
+
+  // Axes
+  g.append('g').attr('transform', `translate(0,${iH})`).call(d3.axisBottom(xScale).ticks(5, '$.2s'))
+    .selectAll('text').attr('fill', '#94a3b8').attr('font-size', '10px');
+  g.append('g').call(d3.axisLeft(yScale).ticks(5))
+    .selectAll('text').attr('fill', '#94a3b8').attr('font-size', '10px');
+  g.selectAll('.domain').attr('stroke', '#334155');
+  g.selectAll('.tick line').attr('stroke', '#334155');
+
+  g.append('text').attr('x', iW / 2).attr('y', iH + 35).attr('text-anchor', 'middle')
+    .attr('fill', '#94a3b8').attr('font-size', '11px').text('Estimated Revenue (log)');
+  g.append('text').attr('x', -iH / 2).attr('y', -38).attr('text-anchor', 'middle')
+    .attr('transform', 'rotate(-90)')
+    .attr('fill', '#94a3b8').attr('font-size', '11px').text('Acquisition Score');
+
+  // Dots
+  g.selectAll('circle')
+    .data(data).enter().append('circle')
+    .attr('cx', d => xScale(d.revenue))
+    .attr('cy', d => yScale(d.acquisition_score || 0))
+    .attr('r', d => sizeScale(d.reviewCount))
+    .attr('fill', d => gradeColors[d.grade?.charAt(0)] || '#64748b')
+    .attr('fill-opacity', 0.65)
+    .attr('stroke', '#0f172a').attr('stroke-width', 0.5)
+    .on('mouseenter', function(evt, d) {
+      d3.select(this).attr('fill-opacity', 1).attr('stroke', '#fff').attr('stroke-width', 1.5).attr('r', sizeScale(d.reviewCount) + 3);
+      let html = `<h4>${d.name || 'Practice'}</h4>`;
+      html += `<div class="row"><span class="label">City</span><span class="value">${d.city || '--'}, ${d.state || ''}</span></div>`;
+      html += `<div class="row"><span class="label">Score</span><span class="value" style="color:${scoreColor(d.acquisition_score)}">${fmt(d.acquisition_score, 0)} (${d.grade})</span></div>`;
+      (d.factors || []).forEach(f => {
+        html += `<div class="row"><span class="label">${f.factor}</span><span class="value">${fmt(f.score, 0)}</span></div>`;
+      });
+      showTooltip(evt, html);
+    })
+    .on('mousemove', evt => {
+      tooltip.style.left = Math.min(evt.clientX + 14, window.innerWidth - 340) + 'px';
+      tooltip.style.top = Math.min(evt.clientY + 14, window.innerHeight - 200) + 'px';
+    })
+    .on('mouseleave', function(evt, d) {
+      d3.select(this).attr('fill-opacity', 0.65).attr('stroke', '#0f172a').attr('stroke-width', 0.5).attr('r', sizeScale(d.reviewCount));
+      hideTooltip();
+    });
+
+  // Grade legend
+  const leg = svg.append('g').attr('transform', `translate(${W - 120}, ${margin.top})`);
+  Object.entries(gradeColors).forEach(([grade, color], i) => {
+    leg.append('circle').attr('cx', 0).attr('cy', i * 16).attr('r', 5).attr('fill', color);
+    leg.append('text').attr('x', 10).attr('y', i * 16 + 4).attr('fill', '#94a3b8').attr('font-size', '10px').text(`Grade ${grade}`);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PANEL 8: ROLL-UP — NAICS Selector + Methodology
+// ═══════════════════════════════════════════════════════════════════
+async function loadRollup() {
+  const panel = document.getElementById('panel-rollup');
+  showLoading(panel);
+
+  const methodology = await apiFetch('/rollup-intel/methodology');
+
+  const commonNAICS = [
+    { code: '621111', label: 'Physician Offices' },
+    { code: '621210', label: 'Dental Offices' },
+    { code: '722511', label: 'Full-Service Restaurants' },
+    { code: '238220', label: 'Plumbing & HVAC' },
+    { code: '811111', label: 'Auto Repair' },
+    { code: '541110', label: 'Law Offices' },
+    { code: '531210', label: 'Real Estate Offices' },
+    { code: '812111', label: 'Barber Shops' },
+  ];
+
+  panel.innerHTML = `
+    <div class="card-grid cols-2">
+      <div class="card">
+        <div class="card-title">NAICS Market Selector</div>
+        <form id="rollupForm" class="controls-row" style="margin-bottom:12px;">
+          <input type="text" class="input" id="rollupNaics" placeholder="Enter NAICS code..." style="max-width:200px;" value="621111">
+          <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">Common Industries</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${commonNAICS.map(n => `<button class="tab-pill" style="font-size:0.7rem;" onclick="document.getElementById('rollupNaics').value='${n.code}';document.getElementById('rollupForm').dispatchEvent(new Event('submit'));">${n.label}</button>`).join('')}
+        </div>
+        <div id="rollupResults" style="margin-top:16px;"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Scoring Methodology</div>
+        <div id="rollupMethodology"></div>
+      </div>
+    </div>
+  `;
+
+  // Methodology display
+  if (methodology) {
+    renderMethodology(methodology);
+  } else {
+    document.getElementById('rollupMethodology').innerHTML = '<div class="empty-state"><p>Methodology not available.</p></div>';
+  }
+
+  document.getElementById('rollupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const naics = document.getElementById('rollupNaics').value.trim();
+    if (!naics) return;
+    await loadRollupRankings(naics);
+  });
+
+  await loadRollupRankings('621111');
+}
+
+function renderMethodology(meth) {
+  const container = document.getElementById('rollupMethodology');
+  // Methodology can have various structures; handle flexibly
+  const subScores = meth.sub_scores || meth.weights || meth.factors || {};
+  const entries = Object.entries(subScores);
+
+  if (!entries.length) {
+    // Try to render as general info
+    container.innerHTML = `<pre style="font-size:0.72rem;color:var(--text-muted);white-space:pre-wrap;">${JSON.stringify(meth, null, 2)}</pre>`;
+    return;
+  }
+
+  container.innerHTML = entries.map(([key, val]) => {
+    const weight = typeof val === 'object' ? (val.weight || val.w || 0) : val;
+    const desc = typeof val === 'object' ? (val.description || val.desc || '') : '';
+    const pct = (weight * 100);
+    return `
+      <div style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:4px;">
+          <span style="font-weight:500;">${key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
+          <span style="color:var(--accent);font-weight:600;">${fmtPct(pct)}</span>
+        </div>
+        <div class="score-bar" style="height:8px;">
+          <div class="score-bar-fill" style="width:${pct}%;background:var(--accent);"></div>
+        </div>
+        ${desc ? `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;">${desc}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+async function loadRollupRankings(naics) {
+  const results = document.getElementById('rollupResults');
+  showLoading(results);
+
+  const data = await apiFetch(`/rollup-intel/rankings/${naics}?limit=20`);
+
+  if (!data || data.status === 'error' || (!data.rankings?.length && !data.results?.length && !data.markets?.length)) {
+    results.innerHTML = `
+      <div class="empty-state" style="padding:1.5rem;">
+        <p>No rankings for NAICS ${naics} yet.</p>
+        <button class="btn btn-accent" style="margin-top:12px;" onclick="screenRollupMarket('${naics}')">Screen This Market</button>
+      </div>
+    `;
+    return;
+  }
+
+  const rankings = data.rankings || data.results || data.markets || [];
+  results.innerHTML = `
+    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">${rankings.length} markets ranked for NAICS ${naics}</div>
+    <div style="max-height:380px;overflow-y:auto;">
+      <table class="data-table">
+        <thead><tr><th>#</th><th>Market</th><th>Score</th><th>Grade</th></tr></thead>
+        <tbody>
+          ${rankings.slice(0, 20).map((r, i) => {
+            const score = r.score || r.total_score || 0;
+            const name = r.county_name || r.market_name || r.name || `Market ${i+1}`;
+            const grade = r.grade || '--';
+            return `<tr>
+              <td style="color:var(--text-muted);">${i + 1}</td>
+              <td style="font-weight:500;">${name}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <div class="score-bar" style="width:50px;"><div class="score-bar-fill" style="width:${score}%;background:${scoreColor(score)};"></div></div>
+                  <span style="font-weight:600;color:${scoreColor(score)}">${fmt(score, 0)}</span>
+                </div>
+              </td>
+              <td><span class="badge ${gradeClass(grade)}">${grade}</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function screenRollupMarket(naics) {
+  const results = document.getElementById('rollupResults');
+  showLoading(results);
+  const data = await apiFetch(`/rollup-intel/screen?naics_code=${naics}`, { method: 'POST' });
+  if (data) {
+    results.innerHTML = `
+      <div style="padding:1rem;background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.2);border-radius:8px;font-size:0.78rem;">
+        <strong style="color:var(--accent);">Screening started!</strong><br>
+        ${data.message || 'Results will appear shortly. Refresh in a few moments.'}
+      </div>
+      <button class="btn btn-primary" style="margin-top:12px;" onclick="loadRollupRankings('${naics}')">Check Results</button>
+    `;
+  } else {
+    showEmpty(results, 'Failed to start screening.');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+buildTabs();
+switchTab('overview');
+
+// Health check
+(async () => {
+  try {
+    const res = await fetch('/health');
+    if (res.ok) document.getElementById('healthDot').classList.add('healthy');
+  } catch {}
+})();
+</script>
+</body>
+</html>
