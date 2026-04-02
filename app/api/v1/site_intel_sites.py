@@ -732,6 +732,107 @@ async def compare_sites(
     }
 
 
+# =============================================================================
+# UNIFIED SITE SCORE (Chain 5 — PLAN_052)
+# =============================================================================
+
+
+class UnifiedScoreRequest(BaseModel):
+    lat: float = Field(..., ge=-90, le=90)
+    lng: float = Field(..., ge=-180, le=180)
+    radius_miles: float = Field(50, ge=5, le=200)
+    use_case: str = Field("general", description="general, datacenter, manufacturing, warehouse")
+
+
+class UnifiedCompareRequest(BaseModel):
+    locations: List[Dict[str, Any]] = Field(..., description='[{"name": "NYC", "lat": 40.71, "lng": -74.0}, ...]')
+    radius_miles: float = Field(50, ge=5, le=200)
+    use_case: str = Field("general")
+
+
+@router.post("/unified-score")
+def unified_score(request: UnifiedScoreRequest, db: Session = Depends(get_db)):
+    """
+    **Chain 5 Unified Site Score** — 5-factor composite (0-100) for any lat/lng.
+
+    Factors: Power Access, Climate Risk, Workforce, Connectivity, Regulatory/Incentives.
+    Weights configurable by use_case (general, datacenter, manufacturing, warehouse).
+    """
+    from app.services.unified_site_scorer import UnifiedSiteScorer
+
+    scorer = UnifiedSiteScorer(db)
+    result = scorer.score_location(
+        lat=request.lat, lng=request.lng,
+        radius_miles=request.radius_miles, use_case=request.use_case,
+    )
+    return {
+        "status": "ok",
+        "latitude": result.latitude,
+        "longitude": result.longitude,
+        "score": result.score,
+        "grade": result.grade,
+        "signal": result.signal,
+        "use_case": result.use_case,
+        "coverage": result.coverage,
+        "factors": [
+            {
+                "factor": f.factor,
+                "score": f.score,
+                "weight": f.weight,
+                "reading": f.reading,
+                "impact": f.impact,
+                "details": f.details,
+            }
+            for f in result.factors
+        ],
+        "raw_metrics": result.raw_metrics,
+    }
+
+
+@router.post("/unified-compare")
+def unified_compare(request: UnifiedCompareRequest, db: Session = Depends(get_db)):
+    """
+    Compare multiple locations using the Chain 5 unified scorer.
+    Returns ranked results with per-factor breakdown.
+    """
+    from app.services.unified_site_scorer import UnifiedSiteScorer
+
+    if len(request.locations) < 2:
+        raise HTTPException(status_code=400, detail="Need at least 2 locations")
+    if len(request.locations) > 10:
+        raise HTTPException(status_code=400, detail="Maximum 10 locations")
+
+    scorer = UnifiedSiteScorer(db)
+    results = scorer.compare_locations(
+        locations=request.locations,
+        radius_miles=request.radius_miles,
+        use_case=request.use_case,
+    )
+
+    return {
+        "status": "ok",
+        "use_case": request.use_case,
+        "location_count": len(results),
+        "best_overall": {
+            "lat": results[0].latitude,
+            "lng": results[0].longitude,
+            "score": results[0].score,
+            "grade": results[0].grade,
+        } if results else None,
+        "results": [
+            {
+                "name": next((l.get("name", f"{r.latitude},{r.longitude}") for l in request.locations if abs(l["lat"] - r.latitude) < 0.01 and abs(l["lng"] - r.longitude) < 0.01), f"{r.latitude},{r.longitude}"),
+                "latitude": r.latitude,
+                "longitude": r.longitude,
+                "score": r.score,
+                "grade": r.grade,
+                "factors": {f.factor: f.score for f in r.factors},
+            }
+            for r in results
+        ],
+    }
+
+
 @router.post("/search")
 async def search_sites(
     request: SiteSearchRequest,

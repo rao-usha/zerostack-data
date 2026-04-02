@@ -49,56 +49,73 @@ SECTOR_CONFIGS = {
         "label": "Industrials",
         "fred_series": ["INDPRO", "TCU"],       # Industrial production, capacity util
         "bls_series": ["CES3000000001"],          # Manufacturing employment
-        "sensitivity": {"rates": "medium", "labor": "high", "consumer": "low"},
+        "sensitivity": {"rates": "medium", "labor": "high", "consumer": "low", "energy": "high", "fx_export": "medium"},
     },
     "consumer": {
         "label": "Consumer",
         "fred_series": ["UMCSENT", "RSXFS"],     # Consumer sentiment, retail sales
         "bls_series": ["CES4200000001"],          # Retail employment
-        "sensitivity": {"rates": "medium", "labor": "medium", "consumer": "high"},
+        "sensitivity": {"rates": "medium", "labor": "medium", "consumer": "high", "energy": "low", "fx_export": "low"},
     },
     "healthcare": {
         "label": "Healthcare",
         "fred_series": ["UNRATE"],
         "bls_series": ["CES6500000001"],          # Education & health employment
-        "sensitivity": {"rates": "low", "labor": "high", "consumer": "low"},
+        "sensitivity": {"rates": "low", "labor": "high", "consumer": "low", "energy": "low", "fx_export": "low"},
     },
     "technology": {
         "label": "Technology",
         "fred_series": ["DGS10", "DFF"],
         "bls_series": ["CES6000000001"],          # Professional services
-        "sensitivity": {"rates": "high", "labor": "high", "consumer": "low"},
+        "sensitivity": {"rates": "high", "labor": "high", "consumer": "low", "energy": "low", "fx_export": "medium"},
     },
     "real_estate": {
         "label": "Real Estate",
         "fred_series": ["MORTGAGE30US", "HOUST", "CSUSHPINSA"],
         "bls_series": ["CES2000000001"],          # Construction
-        "sensitivity": {"rates": "very_high", "labor": "medium", "consumer": "low"},
+        "sensitivity": {"rates": "very_high", "labor": "medium", "consumer": "low", "energy": "low", "fx_export": "low"},
     },
     "energy": {
         "label": "Energy",
         "fred_series": ["DCOILWTICO", "DHHNGSP"],
         "bls_series": [],
-        "sensitivity": {"rates": "medium", "labor": "low", "consumer": "low"},
+        "sensitivity": {"rates": "medium", "labor": "low", "consumer": "low", "energy": "very_high", "fx_export": "high"},
     },
     "financial": {
         "label": "Financial Services",
         "fred_series": ["DFF", "DGS10", "DGS2"],
         "bls_series": ["CES5500000001"],
-        "sensitivity": {"rates": "very_high", "labor": "low", "consumer": "medium"},
+        "sensitivity": {"rates": "very_high", "labor": "low", "consumer": "medium", "energy": "low", "fx_export": "low"},
     },
     "auto_service": {
         "label": "Auto Service",
         "fred_series": ["TOTALSA", "UMCSENT"],
         "bls_series": [],
-        "sensitivity": {"rates": "medium", "labor": "medium", "consumer": "high"},
+        "sensitivity": {"rates": "medium", "labor": "medium", "consumer": "high", "energy": "medium", "fx_export": "low"},
     },
     "logistics": {
         "label": "Logistics & Transportation",
         "fred_series": ["INDPRO", "DCOILWTICO"],
         "bls_series": ["CES4300000001"],
-        "sensitivity": {"rates": "medium", "labor": "high", "consumer": "medium"},
+        "sensitivity": {"rates": "medium", "labor": "high", "consumer": "medium", "energy": "very_high", "fx_export": "medium"},
     },
+}
+
+# ---------------------------------------------------------------------------
+# BEA GDP by Industry → PE sector mapping
+# BEA Table 1 (Value Added) industry_id codes
+# ---------------------------------------------------------------------------
+
+SECTOR_BEA_INDUSTRY_MAP = {
+    "industrials": "31G",       # Manufacturing
+    "consumer": "44RT",         # Retail trade
+    "healthcare": "62",         # Health care and social assistance
+    "technology": "51",         # Information
+    "real_estate": "53",        # Real estate and rental and leasing
+    "energy": "21",             # Mining (includes oil & gas extraction)
+    "financial": "52",          # Finance and insurance
+    "logistics": "48TW",       # Transportation and warehousing
+    "auto_service": "3361MV",   # Motor vehicles, bodies and trailers, and parts
 }
 
 GRADE_THRESHOLDS = [(80, "A"), (65, "B"), (50, "C"), (0, "D")]
@@ -159,6 +176,69 @@ def _get_fred_latest(db: Session, series_id: str) -> Tuple[Optional[float], Opti
         prev = float(rows_sorted[11][1]) if rows_sorted[11][1] is not None else None
 
     return latest, prev
+
+
+def _get_fred_commodity_latest(db: Session, series_id: str) -> Tuple[Optional[float], Optional[float]]:
+    """Return (latest_value, value_12m_ago) for a FRED commodity series.
+
+    Separate from _get_fred_latest() to avoid breaking the main UNION ALL
+    if fred_commodities table doesn't exist.
+    """
+    rows = _safe_query(db, """
+        SELECT date, value FROM fred_commodities
+        WHERE series_id = :sid ORDER BY date DESC LIMIT 14
+    """, {"sid": series_id})
+
+    if not rows:
+        return None, None
+
+    rows_sorted = sorted(rows, key=lambda r: r[0], reverse=True)
+    latest = float(rows_sorted[0][1]) if rows_sorted[0][1] is not None else None
+    prev = None
+    if len(rows_sorted) >= 12:
+        prev = float(rows_sorted[11][1]) if rows_sorted[11][1] is not None else None
+    return latest, prev
+
+
+def _get_bea_gdp_growth(db: Session, industry_id: str) -> Optional[float]:
+    """Return YoY GDP growth % for a BEA industry, or None if unavailable.
+
+    Queries bea_gdp_industry (Table 1 = Value Added, quarterly) for the latest
+    two same-quarter values and computes percentage change.
+    """
+    rows = _safe_query(db, """
+        SELECT time_period, data_value
+        FROM bea_gdp_industry
+        WHERE table_id = '1'
+          AND industry_id = :iid
+          AND frequency = 'Q'
+          AND data_value IS NOT NULL
+        ORDER BY time_period DESC
+        LIMIT 8
+    """, {"iid": industry_id})
+
+    if len(rows) < 2:
+        return None
+
+    # rows are (time_period, data_value) sorted desc, e.g. ("2025Q3", 1234.5)
+    # Find latest quarter and same quarter from prior year
+    latest_period = str(rows[0][0])
+    latest_val = float(rows[0][1])
+
+    # Derive the year-ago quarter (e.g. "2025Q3" -> "2024Q3")
+    try:
+        yr = int(latest_period[:4])
+        q_suffix = latest_period[4:]  # e.g. "Q3"
+        target = f"{yr - 1}{q_suffix}"
+    except (ValueError, IndexError):
+        return None
+
+    for r in rows:
+        if str(r[0]) == target and r[1] is not None:
+            prev_val = float(r[1])
+            if prev_val > 0:
+                return ((latest_val - prev_val) / prev_val) * 100
+    return None
 
 
 def _get_bls_latest(db: Session, series_id: str) -> Tuple[Optional[float], Optional[float]]:
@@ -353,6 +433,87 @@ class DealEnvironmentScorer:
                 reading = f"CPI YoY {cpi_yoy:.1f}% — inflation normalizing"
                 factors.append(ScoreFactor("Input costs (CPI)", reading, 0, "neutral", "BLS CPIAUCSL"))
 
+        # --- Factor 6: Energy input cost pressure (10% weight) ---
+        energy_sensitivity = config["sensitivity"].get("energy", "low")
+        energy_mult = {"very_high": 1.5, "high": 1.25, "medium": 1.0, "low": 0.5}.get(energy_sensitivity, 0.5)
+        energy_yoy = self._macro_cache.get("ENERGY_COST_YOY")
+
+        if energy_yoy is not None:
+            if energy_yoy > 30:
+                penalty = int(10 * energy_mult)
+                reading = f"Energy costs +{energy_yoy:.0f}% YoY — severe input cost pressure"
+                impact = "negative"
+            elif energy_yoy > 15:
+                penalty = int(6 * energy_mult)
+                reading = f"Energy costs +{energy_yoy:.0f}% YoY — elevated input costs"
+                impact = "negative"
+            elif energy_yoy > 0:
+                penalty = int(2 * energy_mult)
+                reading = f"Energy costs +{energy_yoy:.0f}% YoY — moderate headwind"
+                impact = "neutral"
+            elif energy_yoy > -15:
+                penalty = 0
+                reading = f"Energy costs {energy_yoy:.0f}% YoY — stable to declining"
+                impact = "neutral"
+            else:
+                penalty = -int(5 * energy_mult)
+                reading = f"Energy costs {energy_yoy:.0f}% YoY — significant input cost relief"
+                impact = "positive"
+            base_score -= penalty
+            factors.append(ScoreFactor("Energy input costs", reading, -penalty, impact, "FRED DCOILWTICO/DHHNGSP"))
+
+        # --- Factor 7: Sector GDP growth (12% weight) ---
+        gdp_growth = self._macro_cache.get(f"GDP_GROWTH_{sector_slug}")
+        if gdp_growth is not None:
+            bea_id = SECTOR_BEA_INDUSTRY_MAP.get(sector_slug, "?")
+            if gdp_growth > 4.0:
+                bonus = 12
+                reading = f"Sector GDP +{gdp_growth:.1f}% YoY — strong expansion"
+                impact = "positive"
+            elif gdp_growth > 2.0:
+                bonus = 6
+                reading = f"Sector GDP +{gdp_growth:.1f}% YoY — healthy growth"
+                impact = "positive"
+            elif gdp_growth > 0:
+                bonus = 2
+                reading = f"Sector GDP +{gdp_growth:.1f}% YoY — modest growth"
+                impact = "neutral"
+            elif gdp_growth > -2.0:
+                bonus = -5
+                reading = f"Sector GDP {gdp_growth:+.1f}% YoY — contraction signal"
+                impact = "negative"
+            else:
+                bonus = -12
+                reading = f"Sector GDP {gdp_growth:+.1f}% YoY — recessionary"
+                impact = "negative"
+            base_score += bonus
+            factors.append(ScoreFactor("Sector GDP growth", reading, bonus, impact, f"BEA GDPbyIndustry {bea_id}"))
+
+        # --- Factor 8: Dollar strength / FX risk (5% weight, optional) ---
+        usd_chg = self._macro_cache.get("DTWEXBGS_3M_CHG")
+        if usd_chg is not None:
+            fx_sensitivity = config["sensitivity"].get("fx_export", "low")
+            fx_mult = {"high": 1.25, "medium": 1.0, "low": 0.5}.get(fx_sensitivity, 0.5)
+
+            if usd_chg > 5.0:
+                penalty = int(8 * fx_mult)
+                reading = f"USD +{usd_chg:.1f}% (3m) — strong dollar headwind for exporters"
+                impact = "negative"
+            elif usd_chg > 2.0:
+                penalty = int(3 * fx_mult)
+                reading = f"USD +{usd_chg:.1f}% (3m) — moderate dollar strength"
+                impact = "neutral"
+            elif usd_chg > -2.0:
+                penalty = 0
+                reading = f"USD {usd_chg:+.1f}% (3m) — stable"
+                impact = "neutral"
+            else:
+                penalty = -int(4 * fx_mult)
+                reading = f"USD {usd_chg:.1f}% (3m) — weak dollar supports export competitiveness"
+                impact = "positive"
+            base_score -= penalty
+            factors.append(ScoreFactor("Dollar strength", reading, -penalty, impact, "FRED DTWEXBGS"))
+
         # Clamp
         score = max(0, min(100, base_score))
 
@@ -378,6 +539,11 @@ class DealEnvironmentScorer:
                 ),
                 "consumer_sentiment": self._macro_cache.get("UMCSENT"),
                 "cpi_yoy_pct": self._macro_cache.get("CPIAUCSL_YOY"),
+                "oil_price": self._macro_cache.get("DCOILWTICO"),
+                "natgas_price": self._macro_cache.get("DHHNGSP"),
+                "energy_cost_yoy_pct": self._macro_cache.get("ENERGY_COST_YOY"),
+                "sector_gdp_growth_pct": self._macro_cache.get(f"GDP_GROWTH_{sector_slug}"),
+                "usd_3m_change_pct": self._macro_cache.get("DTWEXBGS_3M_CHG"),
             },
         )
 
@@ -392,3 +558,34 @@ class DealEnvironmentScorer:
             self._macro_cache[sid] = latest
             if sid == "CPIAUCSL" and latest is not None and prev is not None and prev > 0:
                 self._macro_cache["CPIAUCSL_YOY"] = ((latest - prev) / prev) * 100
+
+        # --- Energy cost data (FRED commodities — separate table) ---
+        for sid in ["DCOILWTICO", "DHHNGSP"]:
+            latest, prev = _get_fred_commodity_latest(self.db, sid)
+            self._macro_cache[sid] = latest
+            if latest is not None and prev is not None and prev > 0:
+                self._macro_cache[f"{sid}_YOY"] = ((latest - prev) / prev) * 100
+
+        # Blended energy cost YoY (average of oil + gas if both available)
+        oil_yoy = self._macro_cache.get("DCOILWTICO_YOY")
+        gas_yoy = self._macro_cache.get("DHHNGSP_YOY")
+        if oil_yoy is not None and gas_yoy is not None:
+            self._macro_cache["ENERGY_COST_YOY"] = (oil_yoy + gas_yoy) / 2
+        elif oil_yoy is not None:
+            self._macro_cache["ENERGY_COST_YOY"] = oil_yoy
+        elif gas_yoy is not None:
+            self._macro_cache["ENERGY_COST_YOY"] = gas_yoy
+
+        # --- BEA GDP growth by sector ---
+        for sector_slug, bea_id in SECTOR_BEA_INDUSTRY_MAP.items():
+            growth = _get_bea_gdp_growth(self.db, bea_id)
+            if growth is not None:
+                self._macro_cache[f"GDP_GROWTH_{sector_slug}"] = growth
+
+        # --- Dollar strength (optional — only if DTWEXBGS ingested) ---
+        dtwex_latest, dtwex_prev = _get_fred_commodity_latest(self.db, "DTWEXBGS")
+        if dtwex_latest is None:
+            dtwex_latest, dtwex_prev = _get_fred_latest(self.db, "DTWEXBGS")
+        self._macro_cache["DTWEXBGS"] = dtwex_latest
+        if dtwex_latest is not None and dtwex_prev is not None and dtwex_prev > 0:
+            self._macro_cache["DTWEXBGS_3M_CHG"] = ((dtwex_latest - dtwex_prev) / dtwex_prev) * 100

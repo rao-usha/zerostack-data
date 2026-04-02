@@ -3024,3 +3024,95 @@ async def get_pe_network_graph(
             "total_links": len(links),
         },
     }
+
+
+# =============================================================================
+# PORTFOLIO MACRO STRESS (Chain 6 — PLAN_052)
+# =============================================================================
+
+
+@router.get("/stress/{firm_id}")
+def get_portfolio_stress(
+    firm_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    **Chain 6 — Portfolio Macro Stress Report.**
+
+    Scores each active holding against current macro conditions (FRED rates,
+    CPI, energy prices, BEA GDP, BLS employment). Returns per-holding stress
+    scores with 3-component breakdown: Rate Stress, Margin Stress, Sector Headwind.
+    """
+    from app.services.portfolio_stress_scorer import PortfolioStressScorer
+
+    scorer = PortfolioStressScorer(db)
+    report = scorer.score_portfolio(firm_id)
+    return {
+        "status": "ok",
+        "firm_id": report.firm_id,
+        "firm_name": report.firm_name,
+        "portfolio_stress": report.portfolio_stress,
+        "holdings_scored": report.holdings_scored,
+        "distribution": {
+            "critical": report.holdings_critical,
+            "elevated": report.holdings_elevated,
+            "moderate": report.holdings_moderate,
+            "low": report.holdings_low,
+        },
+        "macro_summary": report.macro_summary,
+        "holdings": [
+            {
+                "company_id": h.company_id,
+                "company_name": h.company_name,
+                "industry": h.industry,
+                "sector": h.sector_slug,
+                "stress_score": h.stress_score,
+                "stress_grade": h.stress_grade,
+                "components": [
+                    {
+                        "component": c.component,
+                        "stress": c.stress,
+                        "weight": c.weight,
+                        "reading": c.reading,
+                        "driver": c.driver,
+                    }
+                    for c in h.components
+                ],
+                "financials": h.financials,
+            }
+            for h in report.holdings
+        ],
+    }
+
+
+@router.get("/stress/holding/{company_id}")
+def get_holding_stress(
+    company_id: int,
+    db: Session = Depends(get_db),
+):
+    """Single holding macro stress deep dive with full component breakdown."""
+    from app.services.portfolio_stress_scorer import PortfolioStressScorer
+
+    scorer = PortfolioStressScorer(db)
+    h = scorer.score_holding(company_id)
+    return {
+        "status": "ok",
+        "company_id": h.company_id,
+        "company_name": h.company_name,
+        "industry": h.industry,
+        "sector": h.sector_slug,
+        "stress_score": h.stress_score,
+        "stress_grade": h.stress_grade,
+        "components": [
+            {
+                "component": c.component,
+                "stress": c.stress,
+                "weight": c.weight,
+                "reading": c.reading,
+                "driver": c.driver,
+            }
+            for c in h.components
+        ],
+        "financials": h.financials,
+        "macro_context": h.macro_context,
+    }

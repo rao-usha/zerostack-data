@@ -179,6 +179,18 @@ from app.api.v1 import metro_profiles
 # Synthetic Data API (PLAN_052 Phase A / SPEC_042)
 from app.api.v1 import synthetic as synthetic_router
 
+# Company Diligence Composite (PLAN_052 Chain 2)
+from app.api.v1 import diligence_composite
+
+# GP Pipeline + LP→GP Graph (PLAN_052 Chain 3)
+from app.api.v1 import gp_pipeline
+
+# Executive Signals (PLAN_052 Chain 4)
+from app.api.v1 import exec_signals
+
+# Healthcare Intelligence (PLAN_052 Chain 7)
+from app.api.v1 import healthcare_intel
+
 # Collection Management
 from app.api.v1 import source_configs, audit, source_health
 
@@ -1542,6 +1554,10 @@ app.include_router(pe_import.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_conviction.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(macro_cascade.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(synthetic_router.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(diligence_composite.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(gp_pipeline.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(exec_signals.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(healthcare_intel.router, prefix="/api/v1", dependencies=_auth)
 
 # 13F Quarterly Analysis
 app.include_router(quarterly_diff.router, prefix="/api/v1", dependencies=_auth)

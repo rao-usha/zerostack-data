@@ -319,10 +319,10 @@ def parse_gdp_industry_response(
             logger.warning("No results in BEA GDP by Industry response")
             return []
 
-        # Results can be a list or dict depending on the response
+        # Results can be a list (GDP by Industry) or dict (other datasets)
         if isinstance(results, list):
-            # If results is a list, it might be the data directly
-            data = results
+            # GDP by Industry: Results is [{"Data": [...], "Dimensions": [...], ...}]
+            data = results[0].get("Data", []) if results else []
         else:
             data = results.get("Data", [])
 
@@ -330,9 +330,20 @@ def parse_gdp_industry_response(
             logger.warning("No data in BEA GDP by Industry response")
             return []
 
+        # Quarter numeral → Qn mapping
+        _q_map = {"I": "Q1", "II": "Q2", "III": "Q3", "IV": "Q4"}
+
         for record in data:
             try:
                 # Handle different field names in GDP by Industry API
+                year = record.get("Year") or record.get("TimePeriod")
+                quarter = record.get("Quarter")
+                # Build time_period: "2024Q1" for quarterly, "2024" for annual
+                if quarter and year:
+                    time_period = f"{year}{_q_map.get(quarter, quarter)}"
+                else:
+                    time_period = year
+
                 parsed = {
                     "table_id": record.get("TableID") or table_id_param,
                     "industry_id": record.get("Industry") or record.get("IndustrYId"),
@@ -343,7 +354,7 @@ def parse_gdp_industry_response(
                         or ""
                     ),
                     "frequency": record.get("Frequency") or "A",
-                    "time_period": record.get("Year") or record.get("TimePeriod"),
+                    "time_period": time_period,
                     "data_value": _safe_float(record.get("DataValue")),
                     "notes": record.get("NoteRef") or record.get("Notes"),
                 }
