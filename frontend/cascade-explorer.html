@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexdata — Cascade Explorer</title>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f172a; --bg-card: #1e293b; --bg-input: #334155;
+      --border: #334155; --text: #f1f5f9; --text-muted: #94a3b8;
+      --primary: #6366f1; --accent: #06b6d4;
+      --success: #22c55e; --warning: #f59e0b; --error: #ef4444;
+      --housing: #3b82f6; --credit: #f59e0b; --energy: #ef4444;
+      --consumer: #10b981; --labor: #10b981; --industrial: #8b5cf6;
+      --monetary: #6366f1;
+    }
+    html, body {
+      height: 100%; overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      background: var(--bg); color: var(--text);
+    }
+    body { display: flex; flex-direction: column; }
+
+    /* ── Header ── */
+    .header {
+      padding: 12px 24px; display: flex; align-items: center; gap: 16px;
+      background: var(--bg-card); border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .back-link { color: var(--text-muted); text-decoration: none; font-size: 0.82rem; flex-shrink: 0; }
+    .back-link:hover { color: var(--text); }
+    .header-brand { display: flex; flex-direction: column; }
+    .header-brand h1 {
+      font-size: 1.15rem; font-weight: 700; letter-spacing: -0.3px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .header-brand p { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    .ffr-badge {
+      background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3);
+      border-radius: 8px; padding: 6px 14px; font-size: 0.82rem; font-weight: 600;
+      color: var(--warning); white-space: nowrap;
+    }
+    .ffr-badge span { font-weight: 400; color: var(--text-muted); font-size: 0.72rem; }
+
+    /* ── Slider Section ── */
+    .slider-section {
+      padding: 14px 24px; background: var(--bg-card); border-bottom: 1px solid var(--border);
+      flex-shrink: 0; display: flex; flex-direction: column; gap: 10px;
+    }
+    .presets { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .preset-btn {
+      padding: 5px 14px; border: 1px solid var(--border); border-radius: 20px;
+      background: transparent; color: var(--text-muted); font-size: 0.72rem;
+      cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    }
+    .preset-btn:hover { border-color: var(--primary); color: var(--text); }
+    .preset-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .preset-btn.reset { border-color: rgba(148,163,184,0.3); }
+    .preset-btn.reset:hover { border-color: var(--text-muted); color: var(--text); }
+
+    .slider-row { display: flex; align-items: center; gap: 14px; }
+    .slider-label { font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; min-width: 140px; }
+    .slider-label strong { color: var(--text); font-size: 0.88rem; }
+    .range-wrap { flex: 1; position: relative; }
+    input[type=range] {
+      -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
+      background: var(--bg-input); border-radius: 3px; outline: none; cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+      background: var(--primary); border: 2px solid #fff; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: transform 0.1s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+    input[type=range]::-moz-range-thumb {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--primary); border: 2px solid #fff; cursor: pointer;
+    }
+    .range-ticks { display: flex; justify-content: space-between; margin-top: 3px; padding: 0 2px; }
+    .range-ticks span { font-size: 0.6rem; color: var(--text-muted); }
+    .slider-val {
+      font-size: 1.1rem; font-weight: 700; min-width: 80px; text-align: right;
+      font-variant-numeric: tabular-nums; transition: color 0.2s;
+    }
+    .slider-val.positive { color: var(--error); }
+    .slider-val.negative { color: var(--success); }
+    .slider-val.zero { color: var(--text-muted); }
+    .current-rate { font-size: 0.72rem; color: var(--text-muted); text-align: right; min-width: 80px; }
+
+    /* ── Main area ── */
+    .main-area { flex: 1; display: flex; overflow: hidden; position: relative; }
+
+    /* ── Graph ── */
+    .graph-panel { flex: 1; position: relative; overflow: hidden; }
+    .graph-svg { width: 100%; height: 100%; display: block; }
+    .graph-controls {
+      position: absolute; top: 14px; right: 14px; display: flex;
+      flex-direction: column; gap: 5px; z-index: 10;
+    }
+    .ctrl-btn {
+      background: rgba(30,41,59,0.92); border: 1px solid var(--border); border-radius: 8px;
+      width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: var(--text-muted); font-size: 14px; transition: all 0.15s;
+      backdrop-filter: blur(4px);
+    }
+    .ctrl-btn:hover { border-color: var(--primary); color: var(--text); }
+
+    /* Loading */
+    .loading-overlay {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 12px;
+      background: rgba(15,23,42,0.75); z-index: 20; opacity: 0;
+      transition: opacity 0.25s; pointer-events: none;
+    }
+    .loading-overlay.visible { opacity: 1; pointer-events: auto; }
+    .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-overlay p { color: var(--text-muted); font-size: 0.82rem; }
+
+    /* Legend */
+    .graph-legend {
+      position: absolute; bottom: 14px; left: 14px;
+      background: rgba(30,41,59,0.92); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 16px; font-size: 0.68rem; z-index: 10; backdrop-filter: blur(8px);
+    }
+    .graph-legend h4 {
+      font-size: 0.68rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; color: var(--text-muted); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .legend-diamond { width: 9px; height: 9px; transform: rotate(45deg); border-radius: 1px; flex-shrink: 0; }
+    .legend-rect { width: 14px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+    .legend-line { width: 18px; height: 2px; border-radius: 1px; flex-shrink: 0; }
+
+    /* Tooltip */
+    .d3-tooltip {
+      position: fixed; pointer-events: none; z-index: 500;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 16px; font-size: 0.78rem; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      max-width: 280px; opacity: 0; transition: opacity 0.12s;
+    }
+    .d3-tooltip h4 { font-size: 0.85rem; font-weight: 600; margin-bottom: 3px; }
+    .d3-tooltip .type-tag { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+    .d3-tooltip .rows { font-size: 0.72rem; color: var(--text-muted); line-height: 1.7; }
+    .d3-tooltip .rows strong { color: var(--text); }
+
+    /* ── Impact Table (below graph) ── */
+    .impact-section {
+      flex-shrink: 0; max-height: 32vh; overflow: hidden; display: flex; flex-direction: column;
+      border-top: 1px solid var(--border); background: var(--bg-card);
+    }
+    .impact-header {
+      padding: 10px 24px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .impact-header h3 { font-size: 0.88rem; font-weight: 600; }
+    .impact-count { font-size: 0.72rem; color: var(--text-muted); }
+    .impact-empty {
+      padding: 28px 24px; text-align: center; color: var(--text-muted); font-size: 0.82rem;
+    }
+    .impact-table-wrap { flex: 1; overflow-y: auto; }
+    .impact-table-wrap::-webkit-scrollbar { width: 4px; }
+    .impact-table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .impact-table {
+      width: 100%; border-collapse: collapse; font-size: 0.78rem;
+    }
+    .impact-table thead { position: sticky; top: 0; z-index: 2; }
+    .impact-table th {
+      text-align: left; padding: 8px 14px; font-size: 0.65rem; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.04em; background: var(--bg-card);
+      border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    .impact-table td {
+      padding: 8px 14px; border-bottom: 1px solid rgba(51,65,85,0.3); vertical-align: middle;
+    }
+    .impact-table tbody tr { transition: background 0.15s; }
+    .impact-table tbody tr:hover td { background: rgba(99,102,241,0.06); }
+    .impact-val { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .impact-val.pos { color: var(--success); }
+    .impact-val.neg { color: var(--error); }
+    .impact-bar-wrap { width: 80px; height: 6px; background: var(--bg-input); border-radius: 3px; display: inline-block; vertical-align: middle; margin-right: 8px; overflow: hidden; position: relative; }
+    .impact-bar { height: 100%; border-radius: 3px; position: absolute; top: 0; transition: width 0.5s ease; }
+    .impact-bar.pos { background: var(--success); left: 50%; }
+    .impact-bar.neg { background: var(--error); right: 50%; left: auto; }
+    .conf-bar { width: 40px; height: 5px; background: var(--bg-input); border-radius: 3px; display: inline-block; vertical-align: middle; overflow: hidden; }
+    .conf-bar-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.4s; }
+    .path-chain { font-size: 0.65rem; color: var(--text-muted); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .path-chain .arrow { color: rgba(148,163,184,0.5); margin: 0 2px; }
+    .sector-tag {
+      font-size: 0.62rem; padding: 2px 7px; border-radius: 10px; font-weight: 600;
+      display: inline-block; white-space: nowrap;
+    }
+    .sector-housing  { background: rgba(59,130,246,0.15); color: #60a5fa; }
+    .sector-credit   { background: rgba(245,158,11,0.15); color: #fbbf24; }
+    .sector-energy   { background: rgba(239,68,68,0.15);  color: #f87171; }
+    .sector-consumer { background: rgba(16,185,129,0.15); color: #34d399; }
+    .sector-labor    { background: rgba(16,185,129,0.15); color: #34d399; }
+    .sector-industrial { background: rgba(139,92,246,0.15); color: #a78bfa; }
+    .sector-monetary { background: rgba(99,102,241,0.15); color: #818cf8; }
+
+    /* ── Slide-in Node Panel ── */
+    .node-panel {
+      position: absolute; top: 0; right: 0; bottom: 0; width: 340px;
+      background: var(--bg-card); border-left: 1px solid var(--border);
+      transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+      z-index: 15; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .node-panel.open { transform: translateX(0); }
+    .node-panel-header {
+      padding: 14px 18px; display: flex; align-items: flex-start; justify-content: space-between;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .node-panel-header h3 { font-size: 0.95rem; font-weight: 600; line-height: 1.3; }
+    .node-panel-header .type-badge {
+      font-size: 0.62rem; padding: 2px 8px; border-radius: 10px; font-weight: 600;
+      margin-top: 4px; display: inline-block;
+    }
+    .close-panel {
+      background: transparent; border: 1px solid var(--border); border-radius: 6px;
+      width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: var(--text-muted); font-size: 13px; flex-shrink: 0; transition: all 0.15s;
+    }
+    .close-panel:hover { border-color: var(--primary); color: var(--text); }
+    .node-panel-body { flex: 1; overflow-y: auto; padding: 14px 18px; }
+    .node-panel-body::-webkit-scrollbar { width: 4px; }
+    .node-panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .np-section { margin-bottom: 16px; }
+    .np-section-title {
+      font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 600;
+    }
+    .np-kv { display: flex; justify-content: space-between; padding: 5px 0; font-size: 0.78rem; border-bottom: 1px solid rgba(51,65,85,0.3); }
+    .np-kv .k { color: var(--text-muted); }
+    .np-kv .v { font-weight: 500; text-align: right; }
+    .np-list { list-style: none; }
+    .np-list li {
+      padding: 6px 10px; margin-bottom: 4px; border-radius: 6px; font-size: 0.78rem;
+      background: var(--bg); border: 1px solid rgba(51,65,85,0.4); cursor: default;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .np-list li .rel-dir { font-size: 0.65rem; padding: 1px 6px; border-radius: 8px; font-weight: 600; }
+    .np-list li .rel-dir.pos { background: rgba(34,197,94,0.12); color: var(--success); }
+    .np-list li .rel-dir.neg { background: rgba(239,68,68,0.12); color: var(--error); }
+    .np-narrative {
+      font-size: 0.78rem; color: var(--text-muted); line-height: 1.65;
+      background: var(--bg); border-radius: 8px; padding: 10px 12px;
+      border: 1px solid rgba(51,65,85,0.4);
+    }
+
+    /* ── Row animation ── */
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .impact-table tbody tr { animation: fadeSlideIn 0.35s ease both; }
+
+    /* ── Node label ── */
+    .node-label {
+      font-size: 9px; fill: var(--text-muted); pointer-events: none;
+      text-anchor: middle; dominant-baseline: central;
+    }
+    .node-label.highlighted { fill: var(--text); font-weight: 600; font-size: 10px; }
+
+    /* ── Impact label next to node ── */
+    .impact-label {
+      font-size: 10px; font-weight: 700; pointer-events: none;
+      text-anchor: start; dominant-baseline: central;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .node-panel { width: 100%; }
+      .slider-row { flex-wrap: wrap; }
+      .presets { gap: 4px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <a href="index.html" class="back-link">&#8592; Dashboard</a>
+  <div class="header-brand">
+    <h1>Macro Cascade Explorer</h1>
+    <p>Drag the slider to see how rate changes cascade through the economy to portfolio companies</p>
+  </div>
+  <div class="header-right">
+    <div class="ffr-badge" id="ffr-badge">
+      <span>FFR</span> <span id="ffr-current-val">--</span>
+    </div>
+  </div>
+</div>
+
+<!-- Slider Section -->
+<div class="slider-section">
+  <div class="presets">
+    <button class="preset-btn" data-val="1.0" onclick="applyPreset(this, 1.0)">Rate Hike +1%</button>
+    <button class="preset-btn" data-val="2.0" onclick="applyPreset(this, 2.0)">Rate Hike +2%</button>
+    <button class="preset-btn" data-val="-1.0" onclick="applyPreset(this, -1.0)">Rate Cut -1%</button>
+    <button class="preset-btn" data-val="3.0" onclick="applyPreset(this, 3.0)">Stagflation +3%</button>
+    <button class="preset-btn reset" onclick="resetSlider()">Reset</button>
+  </div>
+  <div class="slider-row">
+    <div class="slider-label">Federal Funds Rate: <strong id="slider-label-val">+0.00%</strong></div>
+    <div class="range-wrap">
+      <input type="range" id="rate-slider" min="-3" max="5" step="0.25" value="0">
+      <div class="range-ticks">
+        <span>-3.0</span><span>-1.5</span><span>0</span><span>+2.5</span><span>+5.0</span>
+      </div>
+    </div>
+    <div class="slider-val zero" id="slider-display">+0.00%</div>
+    <div class="current-rate" id="current-rate-label"></div>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="main-area" id="main-area">
+
+  <!-- D3 Graph -->
+  <div class="graph-panel" id="graph-panel">
+    <svg class="graph-svg" id="graph-svg"></svg>
+
+    <div class="graph-controls">
+      <div class="ctrl-btn" id="zoom-in" title="Zoom In">+</div>
+      <div class="ctrl-btn" id="zoom-out" title="Zoom Out">&#8722;</div>
+      <div class="ctrl-btn" id="zoom-reset" title="Reset View">&#8634;</div>
+    </div>
+
+    <div class="graph-legend">
+      <h4>Node Types</h4>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--warning);border:2px solid var(--warning)"></div> Fed Funds Rate (Input)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(100,116,139,0.3);border:2px solid #64748b"></div> FRED / BLS Series</div>
+      <div class="legend-item"><div class="legend-diamond" style="background:rgba(99,102,241,0.3);border:1px solid var(--primary)"></div> Company</div>
+      <div class="legend-item"><div class="legend-rect" style="background:rgba(6,182,212,0.3);border:1px solid var(--accent)"></div> Custom / PE</div>
+      <div style="margin-top:8px"></div>
+      <h4>Impact</h4>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--success)"></div> Positive Impact</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--error)"></div> Negative Impact</div>
+      <div class="legend-item"><div class="legend-line" style="background:var(--primary);height:3px;box-shadow:0 0 6px var(--primary)"></div> Active Cascade Path</div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loading">
+      <div class="spinner"></div>
+      <p id="loading-msg">Loading graph...</p>
+    </div>
+
+    <!-- Node detail panel (slide-in) -->
+    <div class="node-panel" id="node-panel">
+      <div class="node-panel-header">
+        <div>
+          <h3 id="np-name">--</h3>
+          <div class="type-badge" id="np-type-badge" style="background:rgba(99,102,241,0.15);color:#818cf8">--</div>
+        </div>
+        <button class="close-panel" onclick="closeNodePanel()" title="Close">&times;</button>
+      </div>
+      <div class="node-panel-body">
+        <div class="np-section">
+          <div class="np-section-title">Details</div>
+          <div id="np-details"></div>
+        </div>
+        <div class="np-section">
+          <div class="np-section-title">Upstream Drivers</div>
+          <ul class="np-list" id="np-upstream"><li style="color:var(--text-muted)">Loading...</li></ul>
+        </div>
+        <div class="np-section">
+          <div class="np-section-title">Downstream Effects</div>
+          <ul class="np-list" id="np-downstream"><li style="color:var(--text-muted)">Loading...</li></ul>
+        </div>
+        <div class="np-section" id="np-narrative-section" style="display:none">
+          <div class="np-section-title">Causal Path Narrative</div>
+          <div class="np-narrative" id="np-narrative"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Impact Table Section -->
+<div class="impact-section" id="impact-section">
+  <div class="impact-header">
+    <h3>Cascade Impact</h3>
+    <span class="impact-count" id="impact-count"></span>
+  </div>
+  <div class="impact-empty" id="impact-empty">
+    Drag the slider above to simulate a Federal Funds Rate change and see downstream effects.
+  </div>
+  <div class="impact-table-wrap" id="impact-table-wrap" style="display:none">
+    <table class="impact-table">
+      <thead>
+        <tr>
+          <th>Node</th>
+          <th>Sector</th>
+          <th>Impact</th>
+          <th style="min-width:90px">Magnitude</th>
+          <th>Direction</th>
+          <th>Peak Month</th>
+          <th>Confidence</th>
+          <th>Path</th>
+        </tr>
+      </thead>
+      <tbody id="impact-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Tooltip -->
+<div class="d3-tooltip" id="d3-tooltip"></div>
+
+<script>
+// ====================================================================
+// CONFIG & STATE
+// ====================================================================
+const API = '/api/v1';
+const FFR_NODE_ID = 1;
+
+const SECTOR_COLORS = {
+  housing: '#3b82f6', credit: '#f59e0b', energy: '#ef4444',
+  consumer: '#10b981', labor: '#10b981', industrial: '#8b5cf6', monetary: '#6366f1',
+};
+
+let graphNodes = [];
+let graphEdges = [];
+let simulation = null;
+let cascadeResults = [];
+let cascadeMap = {};       // node_id -> result object
+let ffrCurrentValue = null;
+let selectedNodeId = null;
+
+// D3 handles
+let svgSel, gSel, zoomBehavior;
+let linkSel, nodeSel, labelSel, impactLabelSel;
+
+// Debounce timer
+let simTimer = null;
+
+// ====================================================================
+// INIT
+// ====================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  initSvg();
+  initSlider();
+  loadGraph();
+});
+
+// ====================================================================
+// SVG SETUP
+// ====================================================================
+function initSvg() {
+  svgSel = d3.select('#graph-svg');
+  zoomBehavior = d3.zoom()
+    .scaleExtent([0.15, 6])
+    .on('zoom', ({ transform }) => gSel && gSel.attr('transform', transform));
+  svgSel.call(zoomBehavior);
+  gSel = svgSel.append('g').attr('id', 'main-g');
+
+  // Defs: arrow markers
+  const defs = svgSel.append('defs');
+
+  // Default arrow (muted)
+  addArrowMarker(defs, 'arrow-default', '#475569');
+  // Positive cascade arrow
+  addArrowMarker(defs, 'arrow-pos', '#22c55e');
+  // Negative cascade arrow
+  addArrowMarker(defs, 'arrow-neg', '#ef4444');
+  // Active path arrow
+  addArrowMarker(defs, 'arrow-active', '#6366f1');
+
+  // Glow filter for active edges
+  const glow = defs.append('filter').attr('id', 'edge-glow')
+    .attr('x', '-50%').attr('y', '-50%').attr('width', '200%').attr('height', '200%');
+  glow.append('feGaussianBlur').attr('stdDeviation', '3').attr('result', 'blur');
+  const merge = glow.append('feMerge');
+  merge.append('feMergeNode').attr('in', 'blur');
+  merge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+  // Node glow filter
+  const nodeGlow = defs.append('filter').attr('id', 'node-glow')
+    .attr('x', '-50%').attr('y', '-50%').attr('width', '200%').attr('height', '200%');
+  nodeGlow.append('feGaussianBlur').attr('stdDeviation', '4').attr('result', 'blur');
+  const mg2 = nodeGlow.append('feMerge');
+  mg2.append('feMergeNode').attr('in', 'blur');
+  mg2.append('feMergeNode').attr('in', 'SourceGraphic');
+
+  // Zoom controls
+  document.getElementById('zoom-in').onclick = () => svgSel.transition().duration(300).call(zoomBehavior.scaleBy, 1.4);
+  document.getElementById('zoom-out').onclick = () => svgSel.transition().duration(300).call(zoomBehavior.scaleBy, 0.7);
+  document.getElementById('zoom-reset').onclick = resetZoom;
+
+  // Click background to close panel
+  svgSel.on('click', (e) => {
+    if (e.target === svgSel.node() || e.target.tagName === 'svg') closeNodePanel();
+  });
+}
+
+function addArrowMarker(defs, id, fill) {
+  defs.append('marker')
+    .attr('id', id)
+    .attr('viewBox', '0 0 10 10')
+    .attr('refX', 25).attr('refY', 5)
+    .attr('markerWidth', 8).attr('markerHeight', 8)
+    .attr('orient', 'auto-start-reverse')
+    .append('path')
+    .attr('d', 'M 0 0 L 10 5 L 0 10 z')
+    .attr('fill', fill);
+}
+
+function resetZoom() {
+  const panel = document.getElementById('graph-panel');
+  svgSel.transition().duration(600).call(
+    zoomBehavior.transform,
+    d3.zoomIdentity.translate(panel.clientWidth / 2, panel.clientHeight / 2).scale(0.8)
+  );
+}
+
+// ====================================================================
+// SLIDER
+// ====================================================================
+function initSlider() {
+  const slider = document.getElementById('rate-slider');
+  slider.oninput = function() {
+    const val = parseFloat(this.value);
+    updateSliderDisplay(val);
+    clearPresetHighlights();
+    // Debounced simulation
+    clearTimeout(simTimer);
+    if (val === 0) {
+      clearCascade();
+    } else {
+      simTimer = setTimeout(() => runSimulation(val), 300);
+    }
+  };
+}
+
+function updateSliderDisplay(val) {
+  const sign = val >= 0 ? '+' : '';
+  const text = sign + val.toFixed(2) + '%';
+  document.getElementById('slider-label-val').textContent = text;
+  const disp = document.getElementById('slider-display');
+  disp.textContent = text;
+  disp.className = 'slider-val ' + (val > 0.01 ? 'positive' : val < -0.01 ? 'negative' : 'zero');
+}
+
+function applyPreset(btn, val) {
+  clearPresetHighlights();
+  btn.classList.add('active');
+  const slider = document.getElementById('rate-slider');
+  slider.value = val;
+  updateSliderDisplay(val);
+  clearTimeout(simTimer);
+  runSimulation(val);
+}
+
+function clearPresetHighlights() {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+}
+
+function resetSlider() {
+  clearPresetHighlights();
+  const slider = document.getElementById('rate-slider');
+  slider.value = 0;
+  updateSliderDisplay(0);
+  clearTimeout(simTimer);
+  clearCascade();
+}
+
+// ====================================================================
+// DATA LOADING
+// ====================================================================
+async function loadGraph() {
+  showLoading('Loading causal graph...');
+  try {
+    const resp = await fetch(`${API}/macro/graph`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    graphNodes = (data.nodes || []).map(n => ({ ...n }));
+    graphEdges = (data.edges || []).map(e => ({ ...e }));
+
+    // Find FFR node to get current value
+    const ffrNode = graphNodes.find(n => n.id === FFR_NODE_ID);
+    if (ffrNode && ffrNode.current_value != null) {
+      ffrCurrentValue = ffrNode.current_value;
+      document.getElementById('ffr-current-val').textContent = ffrCurrentValue.toFixed(2) + '%';
+      document.getElementById('current-rate-label').textContent = 'Current: ' + ffrCurrentValue.toFixed(2) + '%';
+    }
+
+    if (graphNodes.length === 0) {
+      hideLoading();
+      return;
+    }
+    renderGraph();
+  } catch (err) {
+    hideLoading();
+    console.error('Failed to load graph:', err);
+  }
+}
+
+// ====================================================================
+// D3 GRAPH RENDERING
+// ====================================================================
+function renderGraph() {
+  hideLoading();
+  gSel.selectAll('*').remove();
+  cascadeMap = {};
+
+  const panel = document.getElementById('graph-panel');
+  const W = panel.clientWidth;
+  const H = panel.clientHeight;
+
+  // Build edge copies for D3 force (it mutates source/target)
+  const nodeIds = new Set(graphNodes.map(n => n.id));
+  const edges = graphEdges
+    .filter(e => nodeIds.has(e.source) && nodeIds.has(e.target))
+    .map(e => ({ ...e }));
+
+  if (simulation) simulation.stop();
+
+  simulation = d3.forceSimulation(graphNodes)
+    .force('link', d3.forceLink(edges)
+      .id(d => d.id)
+      .distance(d => 100 + (d.typical_lag_months || 3) * 10)
+      .strength(0.4))
+    .force('charge', d3.forceManyBody().strength(-500).distanceMax(400))
+    .force('center', d3.forceCenter(W / 2, H / 2))
+    .force('collision', d3.forceCollide().radius(d => getNodeRadius(d) + 15))
+    .force('x', d3.forceX(W / 2).strength(0.04))
+    .force('y', d3.forceY(H / 2).strength(0.04));
+
+  // Edge layer
+  const linkGroup = gSel.append('g').attr('class', 'link-layer');
+  linkSel = linkGroup.selectAll('line')
+    .data(edges)
+    .join('line')
+    .attr('stroke', '#475569')
+    .attr('stroke-opacity', d => 0.3 + (d.confidence || 0.5) * 0.3)
+    .attr('stroke-width', 1.2)
+    .attr('marker-end', 'url(#arrow-default)');
+
+  // Node layer
+  const nodeGroup = gSel.append('g').attr('class', 'node-layer');
+  nodeSel = nodeGroup.selectAll('g.node-g')
+    .data(graphNodes, d => d.id)
+    .join('g')
+    .attr('class', 'node-g')
+    .style('cursor', 'pointer')
+    .call(d3.drag()
+      .on('start', (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag',  (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on('end',   (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }))
+    .on('mouseover', showTooltip)
+    .on('mousemove', moveTooltip)
+    .on('mouseout',  hideTooltip)
+    .on('click', (e, d) => { e.stopPropagation(); onNodeClick(d); });
+
+  // Draw shapes
+  nodeSel.each(function(d) {
+    const g = d3.select(this);
+    const r = getNodeRadius(d);
+    const isFFR = d.id === FFR_NODE_ID;
+    const fill = isFFR ? 'rgba(245,158,11,0.2)' : getNodeFill(d);
+    const stroke = isFFR ? '#f59e0b' : getNodeStroke(d);
+
+    if (d.node_type === 'company') {
+      const s = r * 1.4;
+      g.append('rect')
+        .attr('class', 'node-shape')
+        .attr('x', -s / 2).attr('y', -s / 2)
+        .attr('width', s).attr('height', s)
+        .attr('rx', 3)
+        .attr('transform', 'rotate(45)')
+        .attr('fill', fill)
+        .attr('stroke', stroke)
+        .attr('stroke-width', isFFR ? 3 : 2);
+    } else if (d.node_type === 'custom' || d.node_type === 'sector') {
+      g.append('rect')
+        .attr('class', 'node-shape')
+        .attr('x', -r * 1.1).attr('y', -r * 0.6)
+        .attr('width', r * 2.2).attr('height', r * 1.2)
+        .attr('rx', 8)
+        .attr('fill', fill)
+        .attr('stroke', stroke)
+        .attr('stroke-width', isFFR ? 3 : 2);
+    } else {
+      g.append('circle')
+        .attr('class', 'node-shape')
+        .attr('r', r)
+        .attr('fill', fill)
+        .attr('stroke', stroke)
+        .attr('stroke-width', isFFR ? 3 : 1.8);
+    }
+
+    // Label
+    g.append('text')
+      .attr('class', 'node-label' + (isFFR ? ' highlighted' : ''))
+      .attr('y', r + 14)
+      .text(shortLabel(d.name));
+  });
+
+  // Impact labels layer (empty initially, populated on simulation)
+  gSel.append('g').attr('class', 'impact-label-layer');
+
+  // Tick
+  simulation.on('tick', () => {
+    linkSel
+      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    nodeSel.attr('transform', d => `translate(${d.x},${d.y})`);
+    // Update impact labels position
+    gSel.selectAll('.impact-label-g')
+      .attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+
+  simulation.on('end', () => resetZoom());
+}
+
+function getNodeRadius(d) {
+  if (d.id === FFR_NODE_ID) return 28;
+  // Scale up with cascade impact
+  const impact = cascadeMap[d.id];
+  if (impact) {
+    const base = d.node_type === 'company' ? 16 : 18;
+    return base + Math.min(Math.abs(impact.estimated_impact_pct) * 2, 14);
+  }
+  if (d.node_type === 'company') return 14;
+  return 18;
+}
+
+function getNodeFill(d) {
+  const impact = cascadeMap[d.id];
+  if (impact) return impactColor(impact.estimated_impact_pct, 0.2);
+  const color = sectorColor(d.sector_tag);
+  return d3.color(color).copy({ opacity: 0.15 }).toString();
+}
+
+function getNodeStroke(d) {
+  const impact = cascadeMap[d.id];
+  if (impact) return impactColor(impact.estimated_impact_pct, 1);
+  return sectorColor(d.sector_tag);
+}
+
+function sectorColor(tag) {
+  return SECTOR_COLORS[tag] || '#64748b';
+}
+
+function impactColor(pct, alpha) {
+  if (alpha === undefined) alpha = 1;
+  if (pct < -0.1) {
+    const t = Math.min(Math.abs(pct) / 3, 1);
+    const r = Math.round(239 * (0.3 + 0.7 * t));
+    const g = Math.round(68 * (1 - t * 0.5));
+    const b = Math.round(68 * (1 - t * 0.5));
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  if (pct > 0.1) {
+    const t = Math.min(pct / 3, 1);
+    const r = Math.round(34 * (1 - t * 0.3));
+    const g = Math.round(197 * (0.3 + 0.7 * t));
+    const b = Math.round(94 * (0.3 + 0.7 * t));
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  return `rgba(100,116,139,${alpha})`;
+}
+
+function shortLabel(name) {
+  if (!name) return '';
+  return name.length <= 20 ? name : name.substring(0, 18) + '...';
+}
+
+// ====================================================================
+// SIMULATION
+// ====================================================================
+async function runSimulation(changePct) {
+  showLoading('Simulating cascade...');
+  try {
+    const body = { node_id: FFR_NODE_ID, change_pct: changePct, horizon_months: 24 };
+    const resp = await fetch(`${API}/macro/simulate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    hideLoading();
+    cascadeResults = data.results || [];
+    applyCascade(cascadeResults);
+    renderImpactTable(cascadeResults);
+  } catch (err) {
+    hideLoading();
+    console.error('Simulation error:', err);
+  }
+}
+
+function applyCascade(results) {
+  // Build lookup
+  cascadeMap = {};
+  results.forEach(r => { cascadeMap[r.node_id] = r; });
+
+  // Collect impacted node IDs for edge highlighting
+  const impactedIds = new Set(results.map(r => r.node_id));
+  impactedIds.add(FFR_NODE_ID);
+
+  // Build set of active path node names for edge highlighting
+  const activePathNames = new Set();
+  results.forEach(r => {
+    if (r.impact_path && Array.isArray(r.impact_path)) {
+      r.impact_path.forEach(name => activePathNames.add(name));
+    }
+  });
+
+  // Transition nodes
+  if (nodeSel) {
+    nodeSel.each(function(d) {
+      const g = d3.select(this);
+      const r = getNodeRadius(d);
+      const isFFR = d.id === FFR_NODE_ID;
+      const fill = isFFR ? 'rgba(245,158,11,0.25)' : getNodeFill(d);
+      const stroke = isFFR ? '#f59e0b' : getNodeStroke(d);
+      const impact = cascadeMap[d.id];
+      const hasImpact = impact != null;
+
+      const shape = g.select('.node-shape');
+      const t = shape.transition().duration(600).ease(d3.easeCubicOut);
+
+      if (d.node_type === 'company') {
+        const s = r * 1.4;
+        t.attr('x', -s / 2).attr('y', -s / 2).attr('width', s).attr('height', s)
+          .attr('fill', fill).attr('stroke', stroke)
+          .attr('stroke-width', hasImpact ? 2.5 : 2);
+      } else if (d.node_type === 'custom' || d.node_type === 'sector') {
+        t.attr('x', -r * 1.1).attr('y', -r * 0.6)
+          .attr('width', r * 2.2).attr('height', r * 1.2)
+          .attr('fill', fill).attr('stroke', stroke)
+          .attr('stroke-width', hasImpact ? 2.5 : 2);
+      } else {
+        t.attr('r', r).attr('fill', fill).attr('stroke', stroke)
+          .attr('stroke-width', isFFR ? 3 : hasImpact ? 2.5 : 1.8);
+      }
+
+      // Add glow on impacted nodes
+      if (hasImpact && !isFFR) {
+        shape.attr('filter', 'url(#node-glow)');
+      } else if (!isFFR) {
+        shape.attr('filter', null);
+      }
+
+      // Update label highlight
+      g.select('.node-label')
+        .classed('highlighted', hasImpact || isFFR);
+    });
+  }
+
+  // Transition edges
+  if (linkSel) {
+    linkSel.each(function(e) {
+      const line = d3.select(this);
+      const srcId = typeof e.source === 'object' ? e.source.id : e.source;
+      const tgtId = typeof e.target === 'object' ? e.target.id : e.target;
+      const onPath = impactedIds.has(srcId) && impactedIds.has(tgtId);
+
+      const t = line.transition().duration(600).ease(d3.easeCubicOut);
+      if (onPath) {
+        const dir = e.relationship_direction || 'positive';
+        t.attr('stroke', dir === 'positive' ? '#22c55e' : dir === 'negative' ? '#ef4444' : '#6366f1')
+          .attr('stroke-opacity', 0.8)
+          .attr('stroke-width', 3)
+          .attr('marker-end', dir === 'positive' ? 'url(#arrow-pos)' : dir === 'negative' ? 'url(#arrow-neg)' : 'url(#arrow-active)');
+        line.attr('filter', 'url(#edge-glow)');
+      } else {
+        t.attr('stroke', '#475569')
+          .attr('stroke-opacity', 0.2)
+          .attr('stroke-width', 1)
+          .attr('marker-end', 'url(#arrow-default)');
+        line.attr('filter', null);
+      }
+    });
+  }
+
+  // Add impact % labels
+  renderImpactLabels(results);
+}
+
+function renderImpactLabels(results) {
+  const layer = gSel.select('.impact-label-layer');
+  layer.selectAll('*').remove();
+
+  const labelData = results
+    .filter(r => Math.abs(r.estimated_impact_pct) > 0.05)
+    .map(r => {
+      const node = graphNodes.find(n => n.id === r.node_id);
+      return node ? { ...r, x: node.x, y: node.y, _radius: getNodeRadius(node) } : null;
+    })
+    .filter(Boolean);
+
+  const labels = layer.selectAll('g.impact-label-g')
+    .data(labelData, d => d.node_id)
+    .join('g')
+    .attr('class', 'impact-label-g')
+    .attr('transform', d => `translate(${d.x},${d.y})`);
+
+  labels.append('text')
+    .attr('class', 'impact-label')
+    .attr('x', d => d._radius + 6)
+    .attr('y', -4)
+    .attr('fill', d => d.estimated_impact_pct > 0 ? '#22c55e' : '#ef4444')
+    .attr('opacity', 0)
+    .text(d => {
+      const pct = d.estimated_impact_pct;
+      return (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+    })
+    .transition().duration(500).delay((_, i) => i * 30)
+    .attr('opacity', 1);
+}
+
+function clearCascade() {
+  cascadeResults = [];
+  cascadeMap = {};
+
+  // Reset nodes
+  if (nodeSel) {
+    nodeSel.each(function(d) {
+      const g = d3.select(this);
+      const r = d.id === FFR_NODE_ID ? 28 : (d.node_type === 'company' ? 14 : 18);
+      const isFFR = d.id === FFR_NODE_ID;
+      const fill = isFFR ? 'rgba(245,158,11,0.2)' : d3.color(sectorColor(d.sector_tag)).copy({ opacity: 0.15 }).toString();
+      const stroke = isFFR ? '#f59e0b' : sectorColor(d.sector_tag);
+      const shape = g.select('.node-shape');
+      const t = shape.transition().duration(500);
+
+      if (d.node_type === 'company') {
+        const s = r * 1.4;
+        t.attr('x', -s / 2).attr('y', -s / 2).attr('width', s).attr('height', s)
+          .attr('fill', fill).attr('stroke', stroke).attr('stroke-width', 2);
+      } else if (d.node_type === 'custom' || d.node_type === 'sector') {
+        t.attr('x', -r * 1.1).attr('y', -r * 0.6).attr('width', r * 2.2).attr('height', r * 1.2)
+          .attr('fill', fill).attr('stroke', stroke).attr('stroke-width', 2);
+      } else {
+        t.attr('r', r).attr('fill', fill).attr('stroke', stroke)
+          .attr('stroke-width', isFFR ? 3 : 1.8);
+      }
+      shape.attr('filter', null);
+      g.select('.node-label').classed('highlighted', isFFR);
+    });
+  }
+
+  // Reset edges
+  if (linkSel) {
+    linkSel.transition().duration(500)
+      .attr('stroke', '#475569')
+      .attr('stroke-opacity', d => 0.3 + (d.confidence || 0.5) * 0.3)
+      .attr('stroke-width', 1.2)
+      .attr('marker-end', 'url(#arrow-default)');
+    linkSel.attr('filter', null);
+  }
+
+  // Remove impact labels
+  gSel.select('.impact-label-layer').selectAll('*').remove();
+
+  // Clear table
+  document.getElementById('impact-empty').style.display = 'block';
+  document.getElementById('impact-table-wrap').style.display = 'none';
+  document.getElementById('impact-count').textContent = '';
+  document.getElementById('impact-body').innerHTML = '';
+}
+
+// ====================================================================
+// IMPACT TABLE
+// ====================================================================
+function renderImpactTable(results) {
+  const sorted = [...results].sort((a, b) => Math.abs(b.estimated_impact_pct) - Math.abs(a.estimated_impact_pct));
+  const tbody = document.getElementById('impact-body');
+
+  document.getElementById('impact-empty').style.display = 'none';
+  document.getElementById('impact-table-wrap').style.display = 'block';
+  document.getElementById('impact-count').textContent = sorted.length + ' nodes impacted';
+
+  const maxAbs = sorted.length > 0 ? Math.abs(sorted[0].estimated_impact_pct) : 1;
+
+  tbody.innerHTML = sorted.map((r, i) => {
+    const pct = r.estimated_impact_pct;
+    const cls = pct > 0 ? 'pos' : 'neg';
+    const dir = pct > 0 ? 'Positive' : pct < 0 ? 'Negative' : 'Neutral';
+    const barWidth = Math.round((Math.abs(pct) / Math.max(maxAbs, 0.1)) * 40);
+    const conf = r.confidence != null ? r.confidence : 0;
+    const confW = Math.round(conf * 40);
+    const sector = r.sector_tag || '';
+    const pathArr = Array.isArray(r.impact_path) ? r.impact_path : [];
+    const pathHtml = pathArr.length > 0
+      ? pathArr.map(esc).join('<span class="arrow">&#8594;</span>')
+      : '&#8212;';
+
+    return `<tr style="animation-delay:${i * 40}ms">
+      <td style="font-weight:500;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${esc(r.node_name)}">${esc(r.node_name)}</td>
+      <td><span class="sector-tag sector-${sector}">${sector || '&#8212;'}</span></td>
+      <td><span class="impact-val ${cls}">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</span></td>
+      <td>
+        <div class="impact-bar-wrap">
+          <div class="impact-bar ${cls}" style="width:${barWidth}px"></div>
+        </div>
+      </td>
+      <td style="font-size:0.72rem;color:${pct > 0 ? 'var(--success)' : pct < 0 ? 'var(--error)' : 'var(--text-muted)'}">${dir}</td>
+      <td style="color:var(--text-muted);font-variant-numeric:tabular-nums">${r.peak_impact_month != null ? r.peak_impact_month + ' mo' : '&#8212;'}</td>
+      <td><div class="conf-bar"><div class="conf-bar-fill" style="width:${confW}px"></div></div></td>
+      <td><div class="path-chain" title="${esc(pathArr.join(' -> '))}">${pathHtml}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ====================================================================
+// NODE PANEL (slide-in)
+// ====================================================================
+function onNodeClick(d) {
+  selectedNodeId = d.id;
+  const panel = document.getElementById('node-panel');
+  panel.classList.add('open');
+
+  // Populate header
+  document.getElementById('np-name').textContent = d.name || 'Unknown';
+  const badge = document.getElementById('np-type-badge');
+  badge.textContent = (d.node_type || 'unknown').toUpperCase();
+  const bgColor = d.node_type === 'company' ? 'rgba(99,102,241,0.15)' : d.node_type === 'custom' ? 'rgba(6,182,212,0.15)' : 'rgba(100,116,139,0.15)';
+  const txtColor = d.node_type === 'company' ? '#818cf8' : d.node_type === 'custom' ? '#22d3ee' : '#94a3b8';
+  badge.style.background = bgColor;
+  badge.style.color = txtColor;
+
+  // Details
+  const details = document.getElementById('np-details');
+  const kvs = [
+    ['Sector', d.sector_tag || '--'],
+    ['Series ID', d.series_id || '--'],
+    ['Ticker', d.ticker || '--'],
+    ['Current Value', d.current_value != null ? d.current_value.toFixed(2) : '--'],
+  ];
+  // If impacted, show impact
+  const impact = cascadeMap[d.id];
+  if (impact) {
+    kvs.push(['Cascade Impact', (impact.estimated_impact_pct >= 0 ? '+' : '') + impact.estimated_impact_pct.toFixed(2) + '%']);
+    kvs.push(['Peak Month', impact.peak_impact_month != null ? impact.peak_impact_month + ' mo' : '--']);
+    kvs.push(['Confidence', impact.confidence != null ? (impact.confidence * 100).toFixed(0) + '%' : '--']);
+  }
+  details.innerHTML = kvs.map(([k, v]) =>
+    `<div class="np-kv"><span class="k">${esc(k)}</span><span class="v">${esc(String(v))}</span></div>`
+  ).join('');
+
+  // Load upstream/downstream
+  loadUpstream(d.id);
+  loadDownstream(d.id);
+
+  // Narrative
+  const narrativeSection = document.getElementById('np-narrative-section');
+  const narrativeDiv = document.getElementById('np-narrative');
+  if (impact && impact.impact_path && impact.impact_path.length > 1) {
+    narrativeSection.style.display = 'block';
+    const chain = impact.impact_path.join(' -> ');
+    const direction = impact.estimated_impact_pct > 0 ? 'increases' : 'decreases';
+    narrativeDiv.textContent = `A change in Federal Funds Rate cascades through ${impact.impact_path.length} nodes (${chain}), ultimately causing ${d.name} to see an estimated ${Math.abs(impact.estimated_impact_pct).toFixed(2)}% ${direction} peaking at month ${impact.peak_impact_month || '?'}.`;
+  } else {
+    narrativeSection.style.display = 'none';
+  }
+
+  // Highlight selected node
+  if (nodeSel) {
+    nodeSel.select('.selected-ring').remove();
+    nodeSel.filter(n => n.id === d.id)
+      .append('circle')
+      .attr('class', 'selected-ring')
+      .attr('r', getNodeRadius(d) + 6)
+      .attr('fill', 'none')
+      .attr('stroke', '#fbbf24')
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', '4 3')
+      .attr('pointer-events', 'none')
+      .attr('opacity', 0)
+      .transition().duration(300)
+      .attr('opacity', 1);
+  }
+}
+
+function closeNodePanel() {
+  document.getElementById('node-panel').classList.remove('open');
+  selectedNodeId = null;
+  if (nodeSel) nodeSel.selectAll('.selected-ring').remove();
+}
+
+async function loadUpstream(nodeId) {
+  const ul = document.getElementById('np-upstream');
+  ul.innerHTML = '<li style="color:var(--text-muted);font-size:0.75rem">Loading...</li>';
+  try {
+    const resp = await fetch(`${API}/macro/nodes/${nodeId}/upstream`);
+    if (!resp.ok) throw new Error();
+    const data = await resp.json();
+    const items = data.upstream || data.parents || data || [];
+    if (Array.isArray(items) && items.length > 0) {
+      ul.innerHTML = items.map(item => {
+        const name = item.name || item.node_name || 'Unknown';
+        const dir = item.relationship_direction || item.direction || '';
+        const dirCls = dir === 'positive' ? 'pos' : dir === 'negative' ? 'neg' : '';
+        const dirLabel = dir === 'positive' ? '+' : dir === 'negative' ? '-' : '~';
+        return `<li>${esc(name)} <span class="rel-dir ${dirCls}">${dirLabel}</span></li>`;
+      }).join('');
+    } else {
+      ul.innerHTML = '<li style="color:var(--text-muted);font-size:0.75rem">No upstream drivers</li>';
+    }
+  } catch {
+    ul.innerHTML = '<li style="color:var(--text-muted);font-size:0.75rem">Could not load</li>';
+  }
+}
+
+async function loadDownstream(nodeId) {
+  const ul = document.getElementById('np-downstream');
+  ul.innerHTML = '<li style="color:var(--text-muted);font-size:0.75rem">Loading...</li>';
+  try {
+    const resp = await fetch(`${API}/macro/nodes/${nodeId}/downstream`);
+    if (!resp.ok) throw new Error();
+    const data = await resp.json();
+    const items = data.downstream || data.children || data || [];
+    if (Array.isArray(items) && items.length > 0) {
+      ul.innerHTML = items.map(item => {
+        const name = item.name || item.node_name || 'Unknown';
+        const dir = item.relationship_direction || item.direction || '';
+        const dirCls = dir === 'positive' ? 'pos' : dir === 'negative' ? 'neg' : '';
+        const dirLabel = dir === 'positive' ? '+' : dir === 'negative' ? '-' : '~';
+        return `<li>${esc(name)} <span class="rel-dir ${dirCls}">${dirLabel}</span></li>`;
+      }).join('');
+    } else {
+      ul.innerHTML = '<li style="color:var(--text-muted);font-size:0.75rem">No downstream effects</li>';
+    }
+  } catch {
+    ul.innerHTML = '<li style="color:var(--text-muted);font-size:0.75rem">Could not load</li>';
+  }
+}
+
+// ====================================================================
+// TOOLTIP
+// ====================================================================
+function showTooltip(event, d) {
+  const tip = document.getElementById('d3-tooltip');
+  const impact = cascadeMap[d.id];
+  let impactHtml = '';
+  if (impact) {
+    const pct = impact.estimated_impact_pct;
+    const color = pct > 0 ? 'var(--success)' : pct < 0 ? 'var(--error)' : 'var(--text-muted)';
+    impactHtml = `<br><strong style="color:${color}">Impact: ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</strong>`;
+    if (impact.peak_impact_month != null) impactHtml += `<br>Peak: month ${impact.peak_impact_month}`;
+  }
+  tip.innerHTML = `
+    <h4>${esc(d.name)}</h4>
+    <div class="type-tag">${esc(d.node_type || '')} ${d.sector_tag ? '/ ' + esc(d.sector_tag) : ''}</div>
+    <div class="rows">
+      ${d.series_id ? '<strong>Series:</strong> ' + esc(d.series_id) + '<br>' : ''}
+      ${d.ticker ? '<strong>Ticker:</strong> ' + esc(d.ticker) + '<br>' : ''}
+      ${d.current_value != null ? '<strong>Value:</strong> ' + d.current_value.toFixed(2) + '<br>' : ''}
+      ${impactHtml}
+    </div>`;
+  tip.style.opacity = '1';
+  positionTooltip(event);
+}
+
+function moveTooltip(event) {
+  positionTooltip(event);
+}
+
+function hideTooltip() {
+  document.getElementById('d3-tooltip').style.opacity = '0';
+}
+
+function positionTooltip(event) {
+  const tip = document.getElementById('d3-tooltip');
+  const x = event.clientX + 14;
+  const y = event.clientY - 10;
+  const maxX = window.innerWidth - 290;
+  const maxY = window.innerHeight - 120;
+  tip.style.left = Math.min(x, maxX) + 'px';
+  tip.style.top = Math.min(y, maxY) + 'px';
+}
+
+// ====================================================================
+// LOADING
+// ====================================================================
+function showLoading(msg) {
+  const el = document.getElementById('loading');
+  document.getElementById('loading-msg').textContent = msg || 'Loading...';
+  el.classList.add('visible');
+}
+function hideLoading() {
+  document.getElementById('loading').classList.remove('visible');
+}
+
+// ====================================================================
+// UTIL
+// ====================================================================
+function esc(s) {
+  if (s == null) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>
