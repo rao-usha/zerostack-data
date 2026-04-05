@@ -20,7 +20,7 @@ import logging
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
@@ -738,3 +738,54 @@ async def seed_causal_relationships(db: Session = Depends(get_db)):
             f"({result['nodes_created']} new, {result['edges_created']} new edges)."
         ),
     }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# DYNAMIC COMPANY MANAGEMENT (PLAN_058 Phase 1)
+# ═══════════════════════════════════════════════════════════════════
+
+
+class AddCompanyRequest(BaseModel):
+    name: str
+    ticker: Optional[str] = None
+    industry: Optional[str] = None
+
+
+@router.post("/companies/add")
+def add_company_to_graph(req: AddCompanyRequest, db: Session = Depends(get_db)):
+    """
+    Add a company to the macro causal graph with auto-detected linkages.
+
+    Creates a company MacroNode and CausalEdges from relevant macro series
+    based on the company's sector/industry. Idempotent — returns existing node
+    if ticker already in graph.
+    """
+    from app.services.cascade_company_manager import CascadeCompanyManager
+    mgr = CascadeCompanyManager(db)
+    return mgr.add_company(
+        name=req.name, ticker=req.ticker, industry=req.industry,
+    )
+
+
+@router.delete("/companies/{node_id}")
+def remove_company_from_graph(node_id: int, db: Session = Depends(get_db)):
+    """Remove a company from the macro causal graph (soft-delete)."""
+    from app.services.cascade_company_manager import CascadeCompanyManager
+    mgr = CascadeCompanyManager(db)
+    return mgr.remove_company(node_id)
+
+
+@router.get("/companies/search")
+def search_addable_companies(
+    q: Optional[str] = Query(None, description="Search by name or ticker"),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """
+    Search companies from the data store that can be added to the graph.
+    Returns PE portfolio companies and industrial companies with tickers.
+    """
+    from app.services.cascade_company_manager import CascadeCompanyManager
+    mgr = CascadeCompanyManager(db)
+    results = mgr.list_addable_companies(search=q, limit=limit)
+    return {"status": "ok", "total": len(results), "companies": results}
