@@ -271,6 +271,30 @@
       text-anchor: start; dominant-baseline: central;
     }
 
+    /* ── Company Search + Add ── */
+    .company-add-bar { position: relative; margin-bottom: 12px; padding: 0 14px; padding-top: 10px; }
+    .company-add-bar input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 13px; }
+    .company-results { position: absolute; top: 100%; left: 14px; right: 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; max-height: 200px; overflow-y: auto; z-index: 50; display: none; }
+    .company-results .cr-item { padding: 8px 12px; cursor: pointer; display: flex; justify-content: space-between; font-size: 13px; border-bottom: 1px solid var(--border); }
+    .company-results .cr-item:hover { background: rgba(99,102,241,0.1); }
+    .company-results .cr-item .cr-ticker { color: var(--primary); font-weight: 600; }
+    .company-results .cr-item .cr-added { color: var(--success); font-size: 11px; }
+
+    /* ── Chat Panel ── */
+    .chat-panel { position: fixed; bottom: 0; left: 0; right: 0; z-index: 900; transition: transform 0.3s; }
+    .chat-panel.collapsed { transform: translateY(calc(100% - 40px)); }
+    .chat-header { background: var(--primary); color: white; padding: 10px 20px; cursor: pointer; display: flex; justify-content: space-between; font-weight: 600; font-size: 14px; }
+    .chat-body { background: var(--bg-card); border-top: 1px solid var(--border); max-height: 350px; display: flex; flex-direction: column; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 16px; min-height: 200px; }
+    .chat-messages .msg { margin-bottom: 12px; line-height: 1.5; font-size: 13px; }
+    .chat-messages .msg.user { color: var(--accent); }
+    .chat-messages .msg.assistant { color: var(--text); }
+    .chat-messages .msg .tool-badge { background: rgba(99,102,241,0.2); color: var(--primary); padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-right: 4px; }
+    .chat-input-row { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+    .chat-input-row input { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 13px; }
+    .chat-input-row button { background: var(--primary); color: white; border: none; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .chat-thinking { color: var(--text-muted); font-style: italic; font-size: 12px; }
+
     /* ── Responsive ── */
     @media (max-width: 768px) {
       .node-panel { width: 100%; }
@@ -303,6 +327,9 @@
     <button class="preset-btn" data-val="-1.0" onclick="applyPreset(this, -1.0)">Rate Cut -1%</button>
     <button class="preset-btn" data-val="3.0" onclick="applyPreset(this, 3.0)">Stagflation +3%</button>
     <button class="preset-btn reset" onclick="resetSlider()">Reset</button>
+    <select id="scenarioSelect" onchange="runPresetScenario(this.value)" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 12px;border-radius:8px;font-size:13px;cursor:pointer;">
+      <option value="">Scenarios...</option>
+    </select>
   </div>
   <div class="slider-row">
     <div class="slider-label">Federal Funds Rate: <strong id="slider-label-val">+0.00%</strong></div>
@@ -322,6 +349,10 @@
 
   <!-- D3 Graph -->
   <div class="graph-panel" id="graph-panel">
+    <div class="company-add-bar">
+      <input type="text" id="companySearch" placeholder="Search companies to add..." oninput="searchCompanies(this.value)">
+      <div id="companyResults" class="company-results"></div>
+    </div>
     <svg class="graph-svg" id="graph-svg"></svg>
 
     <div class="graph-controls">
@@ -651,7 +682,7 @@ function renderGraph() {
       .on('start', (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
       .on('drag',  (e, d) => { d.fx = e.x; d.fy = e.y; })
       .on('end',   (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }))
-    .on('mouseover', showTooltip)
+    .on('mouseover', (event, d) => showNodeTooltipWithSparkline(d, event))
     .on('mousemove', moveTooltip)
     .on('mouseout',  hideTooltip)
     .on('click', (e, d) => { e.stopPropagation(); onNodeClick(d); });
@@ -1201,6 +1232,241 @@ function esc(s) {
   d.textContent = String(s);
   return d.innerHTML;
 }
+
+// ====================================================================
+// CHAT PANEL
+// ====================================================================
+let chatOpen = false;
+function toggleChat() {
+  chatOpen = !chatOpen;
+  document.getElementById('chatPanel').classList.toggle('collapsed', !chatOpen);
+  document.getElementById('chatToggle').textContent = chatOpen ? '\u25BC' : '\u25B2';
+}
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  appendChatMsg('user', msg);
+  appendChatMsg('assistant', '<span class="chat-thinking">Thinking...</span>');
+  try {
+    const res = await fetch('/api/v1/macro/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: msg}),
+    });
+    const data = await res.json();
+    // Remove thinking indicator
+    const msgs = document.getElementById('chatMessages');
+    msgs.removeChild(msgs.lastChild);
+    // Show tool calls
+    if (data.tool_calls && data.tool_calls.length > 0) {
+      const toolHtml = data.tool_calls.map(tc => `<span class="tool-badge">${tc.tool}</span>`).join('');
+      appendChatMsg('assistant', toolHtml);
+    }
+    // Show response (convert markdown bold to HTML)
+    const formatted = (data.response || 'No response').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    appendChatMsg('assistant', formatted);
+    // Refresh graph if tools mutated it (add_company, remove_company)
+    if (data.tool_calls && data.tool_calls.some(tc => ['add_company','remove_company'].includes(tc.tool))) {
+      loadGraph();
+    }
+  } catch(e) {
+    const msgs = document.getElementById('chatMessages');
+    msgs.removeChild(msgs.lastChild);
+    appendChatMsg('assistant', 'Error: ' + e.message);
+  }
+}
+function appendChatMsg(role, html) {
+  const msgs = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  div.innerHTML = (role === 'user' ? '> ' : '') + html;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+// Start collapsed
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('chatPanel').classList.add('collapsed');
+});
+
+// ====================================================================
+// COMPANY SEARCH + ADD
+// ====================================================================
+let searchTimer;
+function searchCompanies(q) {
+  clearTimeout(searchTimer);
+  const results = document.getElementById('companyResults');
+  if (!q || q.length < 2) { results.style.display = 'none'; return; }
+  searchTimer = setTimeout(async () => {
+    const res = await fetch(`/api/v1/macro/companies/search?q=${encodeURIComponent(q)}&limit=8`);
+    const data = await res.json();
+    if (!data.companies || data.companies.length === 0) {
+      results.innerHTML = '<div class="cr-item" style="color:var(--text-muted)">No matches</div>';
+    } else {
+      results.innerHTML = data.companies.map(c =>
+        c.in_graph
+          ? `<div class="cr-item"><span>${c.name} <span class="cr-ticker">${c.ticker}</span></span><span class="cr-added">In graph</span></div>`
+          : `<div class="cr-item" onclick="addCompanyFromSearch('${c.ticker}','${c.name.replace(/'/g,"\\'")}','${(c.industry||'').replace(/'/g,"\\'")}')"><span>${c.name} <span class="cr-ticker">${c.ticker}</span></span><span style="color:var(--accent)">+ Add</span></div>`
+      ).join('');
+    }
+    results.style.display = 'block';
+  }, 300);
+}
+async function addCompanyFromSearch(ticker, name, industry) {
+  document.getElementById('companyResults').style.display = 'none';
+  document.getElementById('companySearch').value = '';
+  const res = await fetch('/api/v1/macro/companies/add', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name, ticker, industry}),
+  });
+  const data = await res.json();
+  if (data.status === 'created' || data.status === 'already_exists') {
+    loadGraph(); // refresh the D3 graph
+  }
+}
+// Close results on outside click
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.company-add-bar')) document.getElementById('companyResults').style.display = 'none';
+});
+
+// ====================================================================
+// SCENARIO PRESET DROPDOWN
+// ====================================================================
+async function loadScenarioLibrary() {
+  try {
+    const res = await fetch('/api/v1/macro/scenarios/library');
+    const data = await res.json();
+    const select = document.getElementById('scenarioSelect');
+    if (data.scenarios) {
+      data.scenarios.forEach(s => {
+        if (s.available) {
+          const opt = document.createElement('option');
+          opt.value = JSON.stringify(s.shocks);
+          opt.textContent = s.name;
+          select.appendChild(opt);
+        }
+      });
+    }
+  } catch(e) {
+    console.warn('Could not load scenario library:', e);
+  }
+}
+async function runPresetScenario(val) {
+  if (!val) return;
+  const shocks = JSON.parse(val);
+  if (shocks.length === 1) {
+    // Single shock — use the slider
+    const nodeId = shocks[0].node_id;
+    const pct = shocks[0].change_pct;
+    // Update slider if it's FFR
+    if (nodeId === FFR_NODE_ID) {
+      const slider = document.getElementById('rate-slider');
+      if (slider) { slider.value = pct; updateSliderDisplay(pct); }
+    }
+    await runSimulation(pct, nodeId);
+  } else {
+    // Multi-shock
+    const res = await fetch('/api/v1/macro/simulate-multi', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({shocks, horizon_months: 24}),
+    });
+    const data = await res.json();
+    if (data.results) applyMultiShockResults(data.results);
+  }
+  document.getElementById('scenarioSelect').value = '';
+}
+function applyMultiShockResults(results) {
+  // Apply results to graph nodes (same pattern as single shock)
+  const impactMap = {};
+  results.forEach(r => { impactMap[r.node_name] = r.estimated_impact_pct; });
+  // Update cascade map so node rendering picks it up
+  cascadeMap = {};
+  results.forEach(r => { if (r.node_id) cascadeMap[r.node_id] = r; });
+  // Re-apply cascade visuals
+  if (nodeSel) {
+    applyCascade(results);
+  }
+  // Update impact table
+  renderImpactTable(results.map(r => ({
+    node_id: r.node_id,
+    node_name: r.node_name,
+    estimated_impact_pct: r.estimated_impact_pct,
+    peak_impact_month: r.peak_impact_month || 0,
+    confidence: r.confidence || 0,
+    sector_tag: r.sector_tag || '',
+    impact_path: r.impact_paths ? r.impact_paths[0] : (r.impact_path || []),
+  })));
+}
+// Load scenario library on startup
+loadScenarioLibrary();
+
+// ====================================================================
+// SPARKLINE TOOLTIPS
+// ====================================================================
+async function showNodeTooltipWithSparkline(d, event) {
+  // Show basic tooltip immediately
+  showTooltip(event, d);
+  // Fetch history async for sparkline
+  if (d.series_id) {
+    try {
+      const res = await fetch(`${API}/macro/nodes/${d.id}/history?months=24`);
+      const data = await res.json();
+      if (data.data && data.data.length > 2) {
+        const sparkHtml = buildSparklineSVG(data.data.map(p => p.value).filter(v => v != null), 120, 30);
+        const currentVal = data.current_value != null ? data.current_value.toFixed(2) : '\u2014';
+        const impact = cascadeMap[d.id];
+        let impactHtml = '';
+        if (impact) {
+          const pct = impact.estimated_impact_pct;
+          const color = pct > 0 ? 'var(--success)' : pct < 0 ? 'var(--error)' : 'var(--text-muted)';
+          impactHtml = `<br><strong style="color:${color}">Impact: ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</strong>`;
+          if (impact.peak_impact_month != null) impactHtml += `<br>Peak: month ${impact.peak_impact_month}`;
+        }
+        const tip = document.getElementById('d3-tooltip');
+        tip.innerHTML = `
+          <h4>${esc(d.name)}</h4>
+          <div class="type-tag">${esc(d.node_type || '')} ${d.sector_tag ? '/ ' + esc(d.sector_tag) : ''}</div>
+          <div class="rows">
+            <strong>Current:</strong> ${currentVal}<br>
+            ${sparkHtml}
+            ${d.series_id ? '<br><strong>Series:</strong> ' + esc(d.series_id) : ''}
+            ${d.ticker ? '<br><strong>Ticker:</strong> ' + esc(d.ticker) : ''}
+            ${impactHtml}
+          </div>`;
+        positionTooltip(event);
+      }
+    } catch(e) {
+      // Sparkline fetch failed — basic tooltip already shown, no action needed
+    }
+  }
+}
+function buildSparklineSVG(values, w, h) {
+  if (!values.length) return '';
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = max - min || 1;
+  const points = values.map((v, i) => `${(i / (values.length - 1)) * w},${h - ((v - min) / range) * h}`).join(' ');
+  const lastY = h - ((values[values.length - 1] - min) / range) * h;
+  return `<svg width="${w}" height="${h}" style="margin:4px 0"><polyline points="${points}" fill="none" stroke="var(--accent)" stroke-width="1.5"/><circle cx="${w}" cy="${lastY}" r="2.5" fill="var(--accent)"/></svg>`;
+}
 </script>
+
+<!-- Chat Panel -->
+<div id="chatPanel" class="chat-panel">
+  <div class="chat-header" onclick="toggleChat()">
+    <span>Chat with Graph</span>
+    <span id="chatToggle">&#9650;</span>
+  </div>
+  <div class="chat-body" id="chatBody">
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input-row">
+      <input type="text" id="chatInput" placeholder="Ask about macro impacts..." onkeydown="if(event.key==='Enter')sendChat()">
+      <button onclick="sendChat()">Send</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

@@ -250,3 +250,21 @@ class CompanyMacroLinkage(Base):
             f"ticker={self.ticker!r} node={self.node_id} "
             f"direction={self.direction}>"
         )
+
+
+class MacroChatMessage(Base):
+    """Conversation history for LLM-powered cascade chat (PLAN_058 Phase 3)."""
+
+    __tablename__ = "macro_chat_messages"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    conversation_id = Column(String(50), nullable=False, index=True)
+    role = Column(String(20), nullable=False)  # 'user', 'assistant', 'system', 'tool'
+    content = Column(Text, nullable=False)
+    tool_calls = Column(Text, nullable=True)   # JSON array of tool calls made
+    tool_results = Column(Text, nullable=True)  # JSON array of tool results
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_chat_conversation_time", "conversation_id", "created_at"),
+    )

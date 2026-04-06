@@ -789,3 +789,89 @@ def search_addable_companies(
     mgr = CascadeCompanyManager(db)
     results = mgr.list_addable_companies(search=q, limit=limit)
     return {"status": "ok", "total": len(results), "companies": results}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# PHASE 2: DATA INTEGRATION + FORECASTING (PLAN_058)
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.get("/nodes/{node_id}/history")
+def get_macro_node_history(
+    node_id: int,
+    months: int = Query(24, ge=1, le=120),
+    db: Session = Depends(get_db),
+):
+    """Get historical data points for a macro node (sparklines). Returns up to N months of FRED/BLS data."""
+    from app.services.cascade_intelligence import get_node_history
+    return get_node_history(db, node_id, months)
+
+
+class MultiShockRequest(BaseModel):
+    shocks: list  # [{node_id: int, change_pct: float}, ...]
+    horizon_months: int = 24
+
+
+@router.post("/simulate-multi")
+def simulate_multi_shocks(req: MultiShockRequest, db: Session = Depends(get_db)):
+    """
+    Simulate multiple simultaneous macro shocks. Combines impacts additively.
+    Example: rates +2% AND oil +50% simultaneously.
+    """
+    from app.services.cascade_intelligence import simulate_multi
+    return simulate_multi(db, req.shocks, req.horizon_months)
+
+
+class ForecastRequest(BaseModel):
+    node_id: int
+    horizon_months: int = 12
+    n_scenarios: int = 50
+    change_pct: Optional[float] = None  # if set, deterministic mode
+
+
+@router.post("/forecast-cascade")
+def run_forecast_cascade(req: ForecastRequest, db: Session = Depends(get_db)):
+    """
+    Forward-looking cascade with uncertainty bands.
+    Uses O-U mean-reverting model to generate future paths, then cascades
+    at p10/p50/p90 terminal values. Returns impact ranges per downstream node.
+    """
+    from app.services.cascade_intelligence import forecast_cascade
+    return forecast_cascade(db, req.node_id, req.horizon_months, req.n_scenarios, req.change_pct)
+
+
+@router.get("/scenarios/library")
+def get_scenarios_library(db: Session = Depends(get_db)):
+    """
+    Precanned scenario library: Rate Hike, Oil Shock, Stagflation, Housing Crash, etc.
+    Each scenario has resolved node_ids ready for simulate-multi.
+    """
+    from app.services.cascade_intelligence import get_scenario_library
+    scenarios = get_scenario_library(db)
+    return {"status": "ok", "total": len(scenarios), "scenarios": scenarios}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# PHASE 3: LLM CHAT INTERFACE (PLAN_058)
+# ═══════════════════════════════════════════════════════════════════
+
+
+class ChatRequest(BaseModel):
+    message: str
+    conversation_id: Optional[str] = None
+
+
+@router.post("/chat")
+async def cascade_chat(req: ChatRequest, db: Session = Depends(get_db)):
+    """
+    Chat with the macro causal graph using natural language.
+
+    The LLM has access to 10 tools: simulate shocks, add/remove companies,
+    search companies, get history, run forecasts, and more. It will call
+    tools as needed and explain results in plain English.
+
+    Supports multi-turn conversations via conversation_id.
+    """
+    from app.services.cascade_intelligence import CascadeChatOrchestrator
+    orchestrator = CascadeChatOrchestrator(db)
+    return await orchestrator.chat(req.message, req.conversation_id)
