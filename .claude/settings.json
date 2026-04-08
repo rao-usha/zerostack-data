@@ -8,6 +8,12 @@
             "type": "command",
             "command": "bash .claude/hooks/check-log-freshness.sh",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/plan-feedback-tracker.sh",
+            "timeout": 5,
+            "statusMessage": "Checking for plan feedback..."
           }
         ]
       }

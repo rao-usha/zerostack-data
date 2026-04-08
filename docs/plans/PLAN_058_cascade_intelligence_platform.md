@@ -520,3 +520,11 @@ AI: [runs Housing Crash scenario: HOUST -30%, CSUSHPINSA -15%]
     
     Want me to add confidence intervals using our forecasting model?
 ```
+
+---
+
+## Revisions
+
+| Rev | Date | Summary | Doc |
+|-----|------|---------|-----|
+| 01 | 2026-04-08 | Replace force graph with Layered DAG + Sankey. Fix slider, recentering, input flexibility. | [PLAN_058_rev_01](PLAN_058_cascade_intelligence_platform_rev_01.md) |
