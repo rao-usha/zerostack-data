@@ -7,7 +7,7 @@
 #
 # The INSTALL_BROWSERS=1 option adds ~500MB for Chromium (needed for JS-rendered pages)
 
-FROM python:3.11-slim AS base
+FROM python:3.14-slim AS base
 
 WORKDIR /app
 
