@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Synthetic Data Validation — Nexdata</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f172a; --bg-card: #1e293b; --border: #334155;
+      --text: #f1f5f9; --text-muted: #94a3b8;
+      --primary: #6366f1; --accent: #06b6d4;
+      --success: #22c55e; --warning: #f59e0b; --error: #ef4444;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      background: var(--bg-card); border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem; display: flex; align-items: center;
+      justify-content: space-between; height: 56px;
+    }
+    .header-left { display: flex; align-items: center; gap: 1rem; }
+    .back-link {
+      color: var(--text-muted); text-decoration: none; font-size: 0.8rem;
+      display: flex; align-items: center; gap: 0.3rem;
+    }
+    .back-link:hover { color: var(--text); }
+    .header-title { font-size: 1rem; font-weight: 600; }
+    .header-title span { color: var(--primary); }
+    .header-right { display: flex; gap: 0.5rem; align-items: center; }
+    .input-sm {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); padding: 0.35rem 0.6rem; font-size: 0.8rem; width: 80px;
+    }
+    .input-sm:focus { outline: none; border-color: var(--primary); }
+    .input-label { color: var(--text-muted); font-size: 0.7rem; margin-right: 0.2rem; }
+    .btn {
+      border: none; border-radius: 6px; padding: 0.4rem 1rem;
+      font-size: 0.8rem; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 0.4rem;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Scoreboard */
+    .scoreboard {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      border-bottom: 1px solid var(--border);
+    }
+    .score-card {
+      background: var(--bg-card); padding: 1rem 1.25rem;
+      border-right: 1px solid var(--border); cursor: pointer;
+      transition: background 0.15s;
+    }
+    .score-card:last-child { border-right: none; }
+    .score-card:hover { background: #253349; }
+    .score-card.active { border-bottom: 2px solid var(--primary); }
+    .score-name { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .score-row { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.4rem; }
+    .score-value { font-size: 1.5rem; font-weight: 700; }
+    .badge {
+      font-size: 0.65rem; font-weight: 700; padding: 0.15rem 0.5rem;
+      border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .badge-pass { background: rgba(34,197,94,0.15); color: var(--success); }
+    .badge-warn { background: rgba(245,158,11,0.15); color: var(--warning); }
+    .badge-fail { background: rgba(239,68,68,0.15); color: var(--error); }
+    .badge-error { background: rgba(239,68,68,0.15); color: var(--error); }
+    .score-detail { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+    /* Tabs */
+    .tabs {
+      display: flex; border-bottom: 1px solid var(--border);
+      background: var(--bg-card); padding: 0 1.5rem;
+    }
+    .tab {
+      padding: 0.75rem 1.25rem; font-size: 0.82rem; font-weight: 500;
+      color: #64748b; cursor: pointer; border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    /* Content area */
+    .content { padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
+    .content-panel { display: none; }
+    .content-panel.active { display: block; }
+
+    /* Grid layouts */
+    .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .chart-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1rem; min-height: 260px;
+    }
+    .chart-card h3 { font-size: 0.8rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+    /* Test results table */
+    .results-table {
+      width: 100%; border-collapse: collapse; font-size: 0.8rem;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+      overflow: hidden; margin-bottom: 1.5rem;
+    }
+    .results-table th {
+      background: #0f172a; padding: 0.6rem 1rem; text-align: left;
+      font-weight: 600; color: var(--text-muted); font-size: 0.7rem;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .results-table td { padding: 0.55rem 1rem; border-top: 1px solid var(--border); }
+    .results-table tr:hover td { background: #253349; }
+
+    /* Heatmap section */
+    .heatmap-row { display: flex; gap: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .heatmap-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1rem; flex: 1; min-width: 300px;
+    }
+    .heatmap-card h3 { font-size: 0.8rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
+
+    /* Sample data table */
+    .sample-table {
+      width: 100%; border-collapse: collapse; font-size: 0.75rem;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+      overflow: hidden;
+    }
+    .sample-table th {
+      background: #0f172a; padding: 0.5rem 0.7rem; text-align: right;
+      font-weight: 600; color: var(--text-muted); font-size: 0.65rem;
+      text-transform: uppercase;
+    }
+    .sample-table th:first-child { text-align: left; }
+    .sample-table td { padding: 0.4rem 0.7rem; border-top: 1px solid var(--border); text-align: right; font-variant-numeric: tabular-nums; }
+    .sample-table td:first-child { text-align: left; }
+
+    /* Loading / empty states */
+    .loading { text-align: center; padding: 3rem; color: var(--text-muted); }
+    .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Overview summary */
+    .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .overview-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem;
+    }
+    .overview-card h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .stat-line { display: flex; justify-content: space-between; padding: 0.3rem 0; font-size: 0.8rem; }
+    .stat-line .label { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <a href="/" class="back-link">&larr; Dashboard</a>
+    <div class="header-title"><span>Synthetic Data</span> Validation</div>
+  </div>
+  <div class="header-right">
+    <span class="input-label">Seed:</span>
+    <input type="number" id="seedInput" class="input-sm" value="42" />
+    <span class="input-label">N:</span>
+    <input type="number" id="nInput" class="input-sm" value="500" />
+    <button class="btn btn-primary" id="runBtn" onclick="runValidation()">Run Validation</button>
+  </div>
+</div>
+
+<!-- Scoreboard -->
+<div class="scoreboard" id="scoreboard">
+  <div class="score-card" data-gen="job_postings" onclick="showGenerator('job_postings')">
+    <div class="score-name">Job Postings</div>
+    <div class="score-row"><span class="score-value" id="sc-jp-rate">--</span><span class="badge" id="sc-jp-badge">--</span></div>
+    <div class="score-detail" id="sc-jp-detail">Awaiting run</div>
+  </div>
+  <div class="score-card" data-gen="lp_gp" onclick="showGenerator('lp_gp')">
+    <div class="score-name">LP / GP Universe</div>
+    <div class="score-row"><span class="score-value" id="sc-lp-rate">--</span><span class="badge" id="sc-lp-badge">--</span></div>
+    <div class="score-detail" id="sc-lp-detail">Awaiting run</div>
+  </div>
+  <div class="score-card" data-gen="macro_scenarios" onclick="showGenerator('macro_scenarios')">
+    <div class="score-name">Macro Scenarios</div>
+    <div class="score-row"><span class="score-value" id="sc-ms-rate">--</span><span class="badge" id="sc-ms-badge">--</span></div>
+    <div class="score-detail" id="sc-ms-detail">Awaiting run</div>
+  </div>
+  <div class="score-card" data-gen="private_financials" onclick="showGenerator('private_financials')">
+    <div class="score-name">Private Financials</div>
+    <div class="score-row"><span class="score-value" id="sc-pf-rate">--</span><span class="badge" id="sc-pf-badge">--</span></div>
+    <div class="score-detail" id="sc-pf-detail">Awaiting run</div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs" id="tabsBar">
+  <div class="tab active" data-tab="overview" onclick="switchTab('overview')">Overview</div>
+  <div class="tab" data-tab="job_postings" onclick="switchTab('job_postings')">Job Postings</div>
+  <div class="tab" data-tab="lp_gp" onclick="switchTab('lp_gp')">LP / GP</div>
+  <div class="tab" data-tab="macro_scenarios" onclick="switchTab('macro_scenarios')">Macro Scenarios</div>
+  <div class="tab" data-tab="private_financials" onclick="switchTab('private_financials')">Private Financials</div>
+</div>
+
+<!-- Content panels -->
+<div class="content">
+  <div class="content-panel active" id="panel-overview">
+    <div class="loading" id="overview-loading">
+      <div class="spinner"></div>
+      <p style="margin-top:0.75rem;">Click "Run Validation" to begin</p>
+    </div>
+    <div id="overview-content" style="display:none;"></div>
+  </div>
+  <div class="content-panel" id="panel-job_postings"><div class="loading">Select this tab after running validation</div></div>
+  <div class="content-panel" id="panel-lp_gp"><div class="loading">Select this tab after running validation</div></div>
+  <div class="content-panel" id="panel-macro_scenarios"><div class="loading">Select this tab after running validation</div></div>
+  <div class="content-panel" id="panel-private_financials"><div class="loading">Select this tab after running validation</div></div>
+</div>
+
+<script>
+const API_BASE = 'http://localhost:8001/api/v1';
+let allResults = null;
+let chartInstances = {};
+
+const GEN_SLUG = {
+  job_postings: 'job-postings',
+  lp_gp: 'lp-gp',
+  macro_scenarios: 'macro-scenarios',
+  private_financials: 'private-financials',
+};
+const SC_PREFIX = { job_postings: 'jp', lp_gp: 'lp', macro_scenarios: 'ms', private_financials: 'pf' };
+
+// -------------------------------------------------------------------
+// Run validation
+// -------------------------------------------------------------------
+async function runValidation() {
+  const seed = parseInt(document.getElementById('seedInput').value) || 42;
+  const n = parseInt(document.getElementById('nInput').value) || 500;
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+
+  document.getElementById('overview-loading').innerHTML = '<div class="spinner"></div><p style="margin-top:0.75rem;">Running validation tests...</p>';
+  document.getElementById('overview-loading').style.display = '';
+  document.getElementById('overview-content').style.display = 'none';
+
+  try {
+    const resp = await fetch(`${API_BASE}/synthetic/validate?seed=${seed}&n_samples=${n}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    allResults = await resp.json();
+    updateScoreboard();
+    renderOverview();
+    // Pre-render active generator tab if any
+    const activeTab = document.querySelector('.tab.active');
+    if (activeTab && activeTab.dataset.tab !== 'overview') {
+      renderGeneratorPanel(activeTab.dataset.tab);
+    }
+  } catch (err) {
+    document.getElementById('overview-loading').innerHTML = `<p style="color:var(--error);">Error: ${err.message}</p>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run Validation';
+  }
+}
+
+// -------------------------------------------------------------------
+// Scoreboard update
+// -------------------------------------------------------------------
+function updateScoreboard() {
+  if (!allResults || !allResults.generators) return;
+  for (const [gen, data] of Object.entries(allResults.generators)) {
+    const p = SC_PREFIX[gen];
+    if (!p) continue;
+    document.getElementById(`sc-${p}-rate`).textContent = `${data.pass_rate}%`;
+    const badge = document.getElementById(`sc-${p}-badge`);
+    badge.textContent = data.status;
+    badge.className = 'badge badge-' + data.status.toLowerCase();
+    document.getElementById(`sc-${p}-detail`).textContent = `${data.n_passed}/${data.n_tests} tests passed`;
+  }
+}
+
+// -------------------------------------------------------------------
+// Tab switching
+// -------------------------------------------------------------------
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.content-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
+  if (tab !== 'overview' && allResults) {
+    renderGeneratorPanel(tab);
+  }
+}
+
+function showGenerator(gen) {
+  switchTab(gen);
+}
+
+// -------------------------------------------------------------------
+// Overview panel
+// -------------------------------------------------------------------
+function renderOverview() {
+  document.getElementById('overview-loading').style.display = 'none';
+  const container = document.getElementById('overview-content');
+  container.style.display = '';
+
+  const g = allResults.generators;
+  let html = `
+    <div class="overview-grid">
+      <div class="overview-card">
+        <h3>Overall Result</h3>
+        <div class="score-row" style="margin-bottom:0.5rem;">
+          <span class="score-value" style="font-size:2rem;">${allResults.overall_pass_rate}%</span>
+          <span class="badge badge-${allResults.overall_status.toLowerCase()}" style="font-size:0.8rem;">${allResults.overall_status}</span>
+        </div>
+        <div class="stat-line"><span class="label">Total tests</span><span>${allResults.total_tests}</span></div>
+        <div class="stat-line"><span class="label">Passed</span><span style="color:var(--success);">${allResults.total_passed}</span></div>
+        <div class="stat-line"><span class="label">Failed</span><span style="color:var(--error);">${allResults.total_tests - allResults.total_passed}</span></div>
+      </div>`;
+
+  for (const [gen, data] of Object.entries(g)) {
+    const label = gen.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    html += `
+      <div class="overview-card" style="cursor:pointer;" onclick="switchTab('${gen}')">
+        <h3>${label}</h3>
+        <div class="score-row" style="margin-bottom:0.5rem;">
+          <span class="score-value">${data.pass_rate}%</span>
+          <span class="badge badge-${data.status.toLowerCase()}">${data.status}</span>
+        </div>
+        <div class="stat-line"><span class="label">Tests</span><span>${data.n_passed}/${data.n_tests}</span></div>
+      </div>`;
+  }
+  html += '</div>';
+
+  // Summary test table
+  html += '<table class="results-table"><thead><tr><th>Generator</th><th>Test</th><th>Field</th><th>Statistic</th><th>P-Value</th><th>Status</th></tr></thead><tbody>';
+  for (const [gen, data] of Object.entries(g)) {
+    const label = gen.replace(/_/g, ' ');
+    for (const t of (data.tests || [])) {
+      const cls = t.passed ? 'badge-pass' : 'badge-fail';
+      html += `<tr>
+        <td>${label}</td><td>${t.test_name}</td><td>${t.field}</td>
+        <td>${t.statistic}</td><td>${t.p_value}</td>
+        <td><span class="badge ${cls}">${t.passed ? 'PASS' : 'FAIL'}</span></td>
+      </tr>`;
+    }
+  }
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// -------------------------------------------------------------------
+// Per-generator panel rendering
+// -------------------------------------------------------------------
+function renderGeneratorPanel(gen) {
+  if (!allResults || !allResults.generators[gen]) return;
+  const data = allResults.generators[gen];
+  const panel = document.getElementById('panel-' + gen);
+
+  let html = '';
+
+  // --- Histogram charts ---
+  if (data.histograms && data.histograms.length > 0) {
+    html += '<div class="chart-grid">';
+    data.histograms.forEach((hist, idx) => {
+      const canvasId = `chart-${gen}-${idx}`;
+      html += `<div class="chart-card"><h3>${hist.field || 'Distribution ' + idx}</h3><canvas id="${canvasId}"></canvas></div>`;
+    });
+    html += '</div>';
+  }
+
+  // --- Test results table ---
+  if (data.tests && data.tests.length > 0) {
+    html += '<table class="results-table"><thead><tr><th>Field</th><th>Test</th><th>Statistic</th><th>P-Value</th><th>N</th><th>Status</th></tr></thead><tbody>';
+    for (const t of data.tests) {
+      const cls = t.passed ? 'badge-pass' : 'badge-fail';
+      html += `<tr>
+        <td>${t.field}</td><td>${t.test_name}</td>
+        <td>${t.statistic}</td><td>${t.p_value}</td><td>${t.n_samples}</td>
+        <td><span class="badge ${cls}">${t.passed ? 'PASS' : 'FAIL'}</span></td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+  }
+
+  // --- Correlation heatmap ---
+  if (data.correlation) {
+    html += '<div class="heatmap-row">';
+    html += `<div class="heatmap-card"><h3>Expected Correlation</h3><div id="heatmap-exp-${gen}"></div></div>`;
+    html += `<div class="heatmap-card"><h3>Actual Correlation</h3><div id="heatmap-act-${gen}"></div></div>`;
+    html += `<div class="heatmap-card" style="flex:0 0 200px;">
+      <h3>Distance</h3>
+      <div class="stat-line"><span class="label">Frobenius</span><span>${data.correlation.frobenius_norm_diff}</span></div>
+      <div class="stat-line"><span class="label">Max element</span><span>${data.correlation.max_element_diff}</span></div>
+    </div>`;
+    html += '</div>';
+  }
+
+  // --- Sample data ---
+  if (data.sample_data && data.sample_data.length > 0) {
+    const cols = Object.keys(data.sample_data[0]);
+    html += '<h3 style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.5rem;text-transform:uppercase;">Sample Data (first 10)</h3>';
+    html += '<div style="overflow-x:auto;"><table class="sample-table"><thead><tr>';
+    cols.forEach(c => { html += `<th>${c}</th>`; });
+    html += '</tr></thead><tbody>';
+    data.sample_data.forEach(row => {
+      html += '<tr>';
+      cols.forEach(c => { html += `<td>${typeof row[c] === 'number' ? row[c].toFixed(2) : row[c]}</td>`; });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  panel.innerHTML = html;
+
+  // Render Chart.js charts after DOM update
+  setTimeout(() => {
+    if (data.histograms) {
+      data.histograms.forEach((hist, idx) => {
+        const canvasId = `chart-${gen}-${idx}`;
+        renderHistogramChart(canvasId, hist);
+      });
+    }
+    if (data.correlation) {
+      renderHeatmap(`heatmap-exp-${gen}`, data.correlation.labels, data.correlation.expected);
+      renderHeatmap(`heatmap-act-${gen}`, data.correlation.labels, data.correlation.actual);
+    }
+  }, 50);
+}
+
+// -------------------------------------------------------------------
+// Chart.js histogram: bars for actual + line for expected
+// -------------------------------------------------------------------
+function renderHistogramChart(canvasId, hist) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  // Destroy previous instance
+  if (chartInstances[canvasId]) { chartInstances[canvasId].destroy(); }
+
+  const labels = hist.labels || [];
+  const actual = hist.actual || [];
+  const expected = hist.expected || [];
+
+  chartInstances[canvasId] = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Actual',
+          data: actual,
+          backgroundColor: 'rgba(99,102,241,0.6)',
+          borderColor: 'rgba(99,102,241,1)',
+          borderWidth: 1,
+          order: 2,
+        },
+        {
+          label: 'Expected',
+          data: expected,
+          type: 'line',
+          borderColor: 'rgba(6,182,212,1)',
+          backgroundColor: 'rgba(6,182,212,0.1)',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: 'rgba(6,182,212,1)',
+          fill: false,
+          order: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#94a3b8', font: { size: 11 } } },
+      },
+      scales: {
+        x: { ticks: { color: '#64748b', font: { size: 10 }, maxRotation: 45 }, grid: { color: '#1e293b' } },
+        y: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' } },
+      },
+    },
+  });
+}
+
+// -------------------------------------------------------------------
+// D3 correlation heatmap
+// -------------------------------------------------------------------
+function renderHeatmap(containerId, labels, matrix) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+
+  const n = labels.length;
+  const cellSize = Math.min(60, 240 / n);
+  const margin = { top: 5, right: 5, bottom: 50, left: 80 };
+  const w = n * cellSize + margin.left + margin.right;
+  const h = n * cellSize + margin.top + margin.bottom;
+
+  const svg = d3.select('#' + containerId)
+    .append('svg').attr('width', w).attr('height', h)
+    .append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+  const color = d3.scaleSequential(d3.interpolateRdBu).domain([1, -1]);
+
+  // Cells
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      svg.append('rect')
+        .attr('x', j * cellSize).attr('y', i * cellSize)
+        .attr('width', cellSize - 1).attr('height', cellSize - 1)
+        .attr('rx', 2)
+        .attr('fill', color(matrix[i][j]));
+      svg.append('text')
+        .attr('x', j * cellSize + cellSize / 2).attr('y', i * cellSize + cellSize / 2 + 4)
+        .attr('text-anchor', 'middle').attr('font-size', '9px').attr('fill', '#f1f5f9')
+        .text(matrix[i][j].toFixed(2));
+    }
+  }
+
+  // Labels
+  labels.forEach((lb, i) => {
+    svg.append('text')
+      .attr('x', -4).attr('y', i * cellSize + cellSize / 2 + 4)
+      .attr('text-anchor', 'end').attr('font-size', '10px').attr('fill', '#94a3b8')
+      .text(lb);
+    svg.append('text')
+      .attr('x', i * cellSize + cellSize / 2).attr('y', n * cellSize + 14)
+      .attr('text-anchor', 'middle').attr('font-size', '10px').attr('fill', '#94a3b8')
+      .attr('transform', `rotate(45, ${i * cellSize + cellSize / 2}, ${n * cellSize + 14})`)
+      .text(lb);
+  });
+}
+</script>
+</body>
+</html>

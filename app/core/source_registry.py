@@ -46,6 +46,7 @@ class SourceContext:
     table_prefix: str
     tags: List[str] = field(default_factory=list)
     collections: List[SourceCollection] = field(default_factory=list)
+    origin: str = "real"  # "real" or "synthetic" — used for provenance tracking
 
     @property
     def category_label(self) -> str:
@@ -1516,6 +1517,91 @@ SOURCE_REGISTRY: Dict[str, SourceContext] = {
                 table="{slug}_prospects",
             ),
         ],
+    ),
+    # ── Synthetic Data Sources ────────────────────────────────────────────
+    "synthetic_macro_scenarios": SourceContext(
+        key="synthetic_macro_scenarios",
+        display_name="Synthetic Macro Scenarios",
+        short_name="Macro Scenarios",
+        category="macro_economic",
+        description="Correlated macro scenario generator using Ornstein-Uhlenbeck mean-reverting random walks calibrated from FRED history.",
+        update_frequency="varies",
+        api_key_required=False,
+        url="",
+        table_prefix="synthetic_macro_",
+        tags=["synthetic", "macro", "scenarios", "stress-testing"],
+        collections=[
+            SourceCollection(
+                name="Macro Scenarios",
+                endpoint="POST /synthetic/macro-scenarios",
+                description="Generate N correlated macro scenarios over configurable horizon.",
+                table="synthetic_macro_scenarios",
+            ),
+        ],
+        origin="synthetic",
+    ),
+    "synthetic_private_financials": SourceContext(
+        key="synthetic_private_financials",
+        display_name="Synthetic Private Company Financials",
+        short_name="Synth Financials",
+        category="pe_intel",
+        description="Sector-aware synthetic P&L generator using multivariate Gaussian sampling calibrated from SEC EDGAR peer data.",
+        update_frequency="varies",
+        api_key_required=False,
+        url="",
+        table_prefix="synthetic_financials_",
+        tags=["synthetic", "pe", "financials", "private-companies"],
+        collections=[
+            SourceCollection(
+                name="Private Financials",
+                endpoint="POST /synthetic/private-financials",
+                description="Generate synthetic financial profiles for N companies in a target sector.",
+                table="synthetic_private_financials",
+            ),
+        ],
+        origin="synthetic",
+    ),
+    "synthetic_job_postings": SourceContext(
+        key="synthetic_job_postings",
+        display_name="Synthetic Job Postings",
+        short_name="Synth Jobs",
+        category="alt_data",
+        description="Sector-aware synthetic job posting generator for seeding exec signal and hiring velocity analysis.",
+        update_frequency="varies",
+        api_key_required=False,
+        url="",
+        table_prefix="job_postings",
+        tags=["synthetic", "jobs", "hiring", "exec-signals"],
+        collections=[
+            SourceCollection(
+                name="Job Postings",
+                endpoint="POST /synthetic/job-postings",
+                description="Generate synthetic job postings for seeded companies.",
+                table="job_postings",
+            ),
+        ],
+        origin="synthetic",
+    ),
+    "synthetic_lp_gp": SourceContext(
+        key="synthetic_lp_gp",
+        display_name="Synthetic LP-GP Universe",
+        short_name="Synth LP-GP",
+        category="pe_intel",
+        description="Synthetic LP fund universe and LP-GP commitment relationships for pipeline scoring and network analysis.",
+        update_frequency="varies",
+        api_key_required=False,
+        url="",
+        table_prefix="lp_",
+        tags=["synthetic", "pe", "lp", "gp", "commitments"],
+        collections=[
+            SourceCollection(
+                name="LP-GP Universe",
+                endpoint="POST /synthetic/lp-gp-universe",
+                description="Generate synthetic LP funds and LP-GP commitment relationships.",
+                table="lp_fund, lp_gp_relationship",
+            ),
+        ],
+        origin="synthetic",
     ),
 }
 

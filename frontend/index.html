@@ -4902,6 +4902,46 @@
                       default: '2024,2025,2026' },
                 ],
             },
+
+            // ── Synthetic Data Generators ──
+            '/api/v1/synthetic/macro-scenarios': {
+                fields: [
+                    { name: 'n_scenarios', label: 'Number of Scenarios', type: 'number', default: 100, placeholder: '1-1000' },
+                    { name: 'horizon_months', label: 'Horizon (months)', type: 'number', default: 24, placeholder: '1-120' },
+                    { name: 'series', label: 'FRED Series', type: 'text', default: 'DFF,DGS10,DGS2,UNRATE,CPIAUCSL,UMCSENT', placeholder: 'DFF,DGS10,DGS2,UNRATE,CPIAUCSL,UMCSENT' },
+                    { name: 'seed', label: 'Random Seed (optional)', type: 'number', placeholder: 'e.g. 42' },
+                ],
+                _note: 'Generates correlated macro scenarios using VAR model + Cholesky decomposition. Produces monthly paths for each series over the given horizon.',
+            },
+            '/api/v1/synthetic/private-financials': {
+                fields: [
+                    { name: 'n_companies', label: 'Number of Companies', type: 'number', default: 20, placeholder: '1-100' },
+                    { name: 'sector', label: 'Sector', type: 'select', options: [
+                        {value:'industrials',label:'Industrials'},{value:'technology',label:'Technology'},
+                        {value:'healthcare',label:'Healthcare'},{value:'consumer',label:'Consumer'},
+                        {value:'energy',label:'Energy'},{value:'financial',label:'Financial'},
+                        {value:'real_estate',label:'Real Estate'},{value:'logistics',label:'Logistics'},
+                    ]},
+                    { name: 'revenue_min_millions', label: 'Revenue Min ($M)', type: 'number', default: 10, placeholder: '10' },
+                    { name: 'revenue_max_millions', label: 'Revenue Max ($M)', type: 'number', default: 500, placeholder: '500' },
+                    { name: 'seed', label: 'Random Seed (optional)', type: 'number', placeholder: 'e.g. 42' },
+                ],
+                _note: 'Generates realistic private company financials with sector-specific margin profiles, growth rates, and 5-year history.',
+            },
+            '/api/v1/synthetic/job-postings': {
+                fields: [
+                    { name: 'n_per_company', label: 'Postings per Company', type: 'number', default: 80, placeholder: '1-500' },
+                    { name: 'seed', label: 'Random Seed (optional)', type: 'number', placeholder: 'e.g. 42' },
+                ],
+                _note: 'Generates realistic job postings for tracked companies with titles, departments, seniority levels, and salary ranges.',
+            },
+            '/api/v1/synthetic/lp-gp-universe': {
+                fields: [
+                    { name: 'n_lps', label: 'Number of LPs', type: 'number', default: 500, placeholder: '10-2000' },
+                    { name: 'seed', label: 'Random Seed (optional)', type: 'number', placeholder: 'e.g. 42' },
+                ],
+                _note: 'Generates a universe of LPs (pensions, endowments, SWFs, family offices) with AUM, allocations, commitment history, and GP relationships.',
+            },
         };
 
         // ===== Date Field Detection (auto-classify temporal type) =====
@@ -5464,6 +5504,27 @@
                     { key: 'geojson', label: 'GeoJSON Boundaries', tables: ['geojson_boundaries'],
                       endpoints: [{method:'GET', path:'/api/v1/geojson/datasets', label:'List datasets'}, {method:'GET', path:'/api/v1/geojson/boundaries/{dataset_id}', label:'Boundaries'}, {method:'GET', path:'/api/v1/geojson/boundary/{dataset_id}/{geo_id}', label:'Boundary GeoJSON'}, {method:'GET', path:'/api/v1/geojson/featurecollection/{dataset_id}', label:'Feature collection'}, {method:'GET', path:'/api/v1/geojson/search', label:'Search'}],
                       scheduleOptions: ['quarterly','yearly'] },
+                ],
+            },
+            synthetic: {
+                label: 'Synthetic Data',
+                sources: [
+                    { key: 'synthetic_macro_scenarios', label: 'Macro Scenarios', origin: 'synthetic',
+                      tablePrefix: 'synthetic_macro_',
+                      triggers: [{method:'POST', path:'/api/v1/synthetic/macro-scenarios', label:'Generate Macro Scenarios'}],
+                      endpoints: [], scheduleOptions: [] },
+                    { key: 'synthetic_private_financials', label: 'Private Company Financials', origin: 'synthetic',
+                      tablePrefix: 'synthetic_financials_',
+                      triggers: [{method:'POST', path:'/api/v1/synthetic/private-financials', label:'Generate Private Financials'}],
+                      endpoints: [], scheduleOptions: [] },
+                    { key: 'synthetic_job_postings', label: 'Synthetic Job Postings', origin: 'synthetic',
+                      tablePrefix: 'job_postings',
+                      triggers: [{method:'POST', path:'/api/v1/synthetic/job-postings', label:'Generate Job Postings'}],
+                      endpoints: [], scheduleOptions: [] },
+                    { key: 'synthetic_lp_gp', label: 'LP-GP Universe', origin: 'synthetic',
+                      tablePrefix: 'lp_',
+                      triggers: [{method:'POST', path:'/api/v1/synthetic/lp-gp-universe', label:'Generate LP-GP Universe'}],
+                      endpoints: [], scheduleOptions: [] },
                 ],
             },
         };
@@ -6243,10 +6304,16 @@
             // ---- Category accordions ----
             for (const [catKey, category] of Object.entries(SOURCE_REGISTRY)) {
                 let filtered = filterSources(category.sources);
+                // Apply origin filter (real vs synthetic)
+                if (currentOriginFilter === 'synthetic') {
+                    filtered = filtered.filter(s => s.origin === 'synthetic');
+                } else if (currentOriginFilter === 'real') {
+                    filtered = filtered.filter(s => s.origin !== 'synthetic');
+                }
                 // Apply data filter
                 if (currentFilterMode === 'with_data') filtered = filtered.filter(s => getDbRecords(s) > 0);
                 else if (currentFilterMode === 'empty') filtered = filtered.filter(s => getDbRecords(s) === 0);
-                if ((currentFilter || currentFilterMode !== 'all') && filtered.length === 0) continue;
+                if ((currentFilter || currentFilterMode !== 'all' || currentOriginFilter !== 'all') && filtered.length === 0) continue;
 
                 const isExpanded = expandedCategories[catKey];
                 const catRows = inv.catRecords[catKey];
@@ -6909,11 +6976,11 @@
                                 } else if (f.name === 'bounding_box') {
                                     // Comma-separated floats => array of numbers
                                     body[f.name] = val.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
-                                } else if (f.type === 'text' && val.includes(',') && ['filing_types','ciks','categories','years','family_office_names','series_ids','company_names','indicators','countries','state_codes','county_fips_codes','states','variables','places','locations','offenses','subjects','sources','top_pros','top_cons','lp_types','regions','datasets','seed_urls','subsidiary_names','allowed_domains','firm_ids','company_ids','map_functions'].includes(f.name)) {
+                                } else if (f.type === 'text' && val.includes(',') && ['filing_types','ciks','categories','years','family_office_names','series_ids','series','company_names','indicators','countries','state_codes','county_fips_codes','states','variables','places','locations','offenses','subjects','sources','top_pros','top_cons','lp_types','regions','datasets','seed_urls','subsidiary_names','allowed_domains','firm_ids','company_ids','map_functions'].includes(f.name)) {
                                     // comma-separated text => array for known array fields
                                     body[f.name] = val.split(',').map(s => s.trim()).filter(Boolean);
                                 } else if (f.type === 'number') {
-                                    body[f.name] = parseInt(val) || val;
+                                    body[f.name] = Number(val) || val;
                                 } else if (val === 'true' || val === 'false') {
                                     body[f.name] = val === 'true';
                                 } else {

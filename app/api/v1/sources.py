@@ -578,6 +578,7 @@ def get_health_summary(db: Session = Depends(get_db)):
             "frequency": schedule["frequency"],
             "open_anomalies": open_anomalies,
             "tables": table_names,
+            "origin": src.origin,
             **quality,  # quality_score, quality_breakdown (or empty if DQ not run)
         }
         source_health_cache[key] = card
@@ -690,6 +691,7 @@ def list_sources(
             "total_rows": tb["total_rows"],
             "tags": src.tags,
             "collection_count": len(src.collections),
+            "origin": src.origin,
         })
 
     # Build category summary
@@ -773,4 +775,5 @@ def get_source_detail(
         "recent_jobs": jobs,
         "schedule": schedule,
         "api_config": api_config,
+        "origin": src.origin,
     }

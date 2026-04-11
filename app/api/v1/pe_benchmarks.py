@@ -3116,3 +3116,45 @@ def get_holding_stress(
         "financials": h.financials,
         "macro_context": h.macro_context,
     }
+
+
+@router.post("/stress/{firm_id}/scenarios")
+def stress_portfolio_with_scenario(
+    firm_id: int,
+    scenario: dict,
+    db: Session = Depends(get_db),
+):
+    """
+    **Scenario stress test** — apply macro overrides to portfolio stress scoring.
+
+    Pass a scenario dict with any of: fed_funds_rate, cpi_yoy_pct,
+    energy_cost_yoy_pct, oil_price, consumer_sentiment.
+    Values override live FRED data for this scoring run.
+    """
+    from app.services.portfolio_stress_scorer import PortfolioStressScorer
+
+    scorer = PortfolioStressScorer(db)
+    report = scorer.score_portfolio(firm_id, macro_overrides=scenario)
+    return {
+        "status": "ok",
+        "scenario_applied": scenario,
+        "firm_id": report.firm_id,
+        "firm_name": report.firm_name,
+        "portfolio_stress": report.portfolio_stress,
+        "holdings_scored": report.holdings_scored,
+        "holdings_critical": report.holdings_critical,
+        "holdings_elevated": report.holdings_elevated,
+        "holdings_moderate": report.holdings_moderate,
+        "holdings_low": report.holdings_low,
+        "macro_summary": report.macro_summary,
+        "holdings": [
+            {
+                "company_id": h.company_id,
+                "company_name": h.company_name,
+                "sector": h.sector_slug,
+                "stress_score": h.stress_score,
+                "stress_grade": h.stress_grade,
+            }
+            for h in report.holdings[:20]
+        ],
+    }

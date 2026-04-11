@@ -106,6 +106,9 @@ class IngestionJob(Base):
     trigger = Column(String(20), nullable=True)  # "batch", "manual", "scheduled"
     tier = Column(Integer, nullable=True)  # 1-4 for batch jobs, NULL for manual
 
+    # Data provenance — tracks whether ingested data is real or synthetic
+    data_origin = Column(String(16), nullable=False, default="real", server_default="real")  # "real" or "synthetic"
+
     def __repr__(self) -> str:
         return (
             f"<IngestionJob(id={self.id}, source={self.source}, "

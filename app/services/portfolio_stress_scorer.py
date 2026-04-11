@@ -158,9 +158,27 @@ class PortfolioStressScorer:
             if not hasattr(self, '_macro') and s.macro_inputs:
                 self._macro = s.macro_inputs
 
-    def score_portfolio(self, firm_id: int) -> PortfolioStressReport:
-        """Score all active holdings for a PE firm."""
+    def score_portfolio(
+        self,
+        firm_id: int,
+        macro_overrides: Optional[Dict] = None,
+    ) -> PortfolioStressReport:
+        """Score all active holdings for a PE firm.
+
+        Args:
+            firm_id: PE firm ID.
+            macro_overrides: Optional dict of macro values to use instead of
+                live FRED data. Keys: fed_funds_rate, cpi_yoy_pct,
+                energy_cost_yoy_pct, oil_price, consumer_sentiment.
+                Enables scenario-based stress testing via synthetic macro data.
+        """
         self._ensure_sector_scores()
+
+        # Apply scenario overrides if provided
+        if macro_overrides:
+            if not hasattr(self, '_macro'):
+                self._macro = {}
+            self._macro.update(macro_overrides)
 
         # Get firm name
         firm_rows = _safe_query(self.db, "SELECT name FROM pe_firms WHERE id = :fid", {"fid": firm_id})
