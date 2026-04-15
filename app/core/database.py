@@ -91,7 +91,9 @@ def _apply_schema_migrations(engine) -> None:
                 conn.execute(text(sql))
                 conn.commit()
             except Exception as e:
-                logger.debug(f"Migration skipped: {sql[:60]}... ({e})")
+                # Surface failures loudly — a silently-swallowed permission
+                # error previously left the schema out of sync with models.
+                logger.error(f"Migration FAILED: {sql} -- {e}")
 
 
 def get_session_factory():
