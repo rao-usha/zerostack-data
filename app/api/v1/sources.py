@@ -370,6 +370,113 @@ def _health_open_anomaly_count(db: Session, source_key: str) -> int:
     return int(rows[0][0]) if rows else 0
 
 
+# ---------------------------------------------------------------------------
+# Batched variants — one query per aggregation, keyed by source.
+# Used by the /health-summary endpoint to avoid N+1 round-trips against
+# Cloud SQL (51 sources × 4 helpers = 204 queries ≈ 17s observed).
+# ---------------------------------------------------------------------------
+
+def _health_job_info_all(db: Session) -> Dict[str, Dict[str, Any]]:
+    rows = _safe_query(
+        db,
+        """
+        SELECT source, completed_at, rows_inserted, rn
+        FROM (
+            SELECT source, completed_at, rows_inserted,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY source ORDER BY completed_at DESC
+                   ) AS rn
+            FROM ingestion_jobs
+            WHERE status = 'success'
+        ) s
+        WHERE rn <= 2
+        """,
+        {},
+    )
+    out: Dict[str, Dict[str, Any]] = {}
+    for r in rows:
+        bucket = out.setdefault(
+            r.source,
+            {"last_run_at": None, "rows_inserted": None, "prev_rows_inserted": None},
+        )
+        iso = r.completed_at.isoformat() if r.completed_at else None
+        rows_ins = int(r.rows_inserted) if r.rows_inserted is not None else None
+        if r.rn == 1:
+            bucket["last_run_at"] = iso
+            bucket["rows_inserted"] = rows_ins
+        elif r.rn == 2:
+            bucket["prev_rows_inserted"] = rows_ins
+    return out
+
+
+def _health_quality_scores_all(db: Session) -> Dict[str, Dict[str, Any]]:
+    rows = _safe_query(
+        db,
+        """
+        SELECT DISTINCT ON (source)
+               source, quality_score, completeness_score, freshness_score,
+               validity_score, consistency_score
+        FROM dq_quality_snapshots
+        ORDER BY source, snapshot_at DESC
+        """,
+        {},
+    )
+    out: Dict[str, Dict[str, Any]] = {}
+    for r in rows:
+        out[r.source] = {
+            "quality_score": int(r.quality_score) if r.quality_score is not None else None,
+            "quality_breakdown": {
+                "completeness": int(r.completeness_score) if r.completeness_score is not None else None,
+                "freshness": int(r.freshness_score) if r.freshness_score is not None else None,
+                "validity": int(r.validity_score) if r.validity_score is not None else None,
+                "consistency": int(r.consistency_score) if r.consistency_score is not None else None,
+            },
+        }
+    return out
+
+
+def _health_schedule_all(db: Session) -> Dict[str, Dict[str, Any]]:
+    rows = _safe_query(
+        db,
+        """
+        SELECT DISTINCT ON (source) source, next_run_at, frequency
+        FROM ingestion_schedules
+        WHERE is_active = 1
+        ORDER BY source, id
+        """,
+        {},
+    )
+    out: Dict[str, Dict[str, Any]] = {}
+    for r in rows:
+        out[r.source] = {
+            "next_run_at": r.next_run_at.isoformat() if r.next_run_at else None,
+            "frequency": r.frequency,
+        }
+    return out
+
+
+def _health_open_anomaly_counts_all(
+    db: Session, source_keys: List[str]
+) -> Dict[str, int]:
+    # Alerts reference table_name, not source directly, so pull once
+    # and bucket in Python by "source_key as prefix of table_name".
+    rows = _safe_query(
+        db,
+        "SELECT table_name FROM dq_anomaly_alerts WHERE status = 'open'",
+        {},
+    )
+    counts: Dict[str, int] = {k: 0 for k in source_keys}
+    # Longest prefix wins so "pe_collection" isn't also credited to "pe".
+    sorted_keys = sorted(source_keys, key=len, reverse=True)
+    for r in rows:
+        tname = r.table_name or ""
+        for key in sorted_keys:
+            if tname.startswith(key):
+                counts[key] += 1
+                break
+    return counts
+
+
 def _health_top_anomalies(db: Session, limit: int = 5) -> List[Dict]:
     """Return top open anomaly alerts across all sources."""
     rows = _safe_query(
@@ -514,12 +621,21 @@ def get_health_summary(db: Session = Depends(get_db)):
     open_anomaly_total = 0
     last_activity_candidates: List[str] = []
 
+    # Batch-fetch per-source aggregations in 4 queries instead of 4*N.
+    jobs_by_src = _health_job_info_all(db)
+    quality_by_src = _health_quality_scores_all(db)
+    schedule_by_src = _health_schedule_all(db)
+    anomaly_counts_by_src = _health_open_anomaly_counts_all(db, all_source_keys)
+
+    empty_job = {"last_run_at": None, "rows_inserted": None, "prev_rows_inserted": None}
+    empty_schedule = {"next_run_at": None, "frequency": None}
+
     for src in get_all_sources():
         key = src.key
         sla_h = EXPECTED_CADENCE_HOURS.get(key, 168)
 
         # Job info (last 2 successful jobs)
-        job_info = _health_job_info(db, key)
+        job_info = jobs_by_src.get(key, empty_job)
         last_run_at = job_info["last_run_at"]
         rows_ins = job_info["rows_inserted"]
         prev_rows = job_info["prev_rows_inserted"]
@@ -537,13 +653,13 @@ def get_health_summary(db: Session = Depends(get_db)):
         is_stale = sla_st == "stale"
 
         # Quality scores (graceful if table missing)
-        quality = _health_quality_scores(db, key)
+        quality = quality_by_src.get(key, {})
 
         # Schedule
-        schedule = _health_schedule(db, key)
+        schedule = schedule_by_src.get(key, empty_schedule)
 
         # Open anomalies for this source
-        open_anomalies = _health_open_anomaly_count(db, key)
+        open_anomalies = anomaly_counts_by_src.get(key, 0)
         open_anomaly_total += open_anomalies
 
         # Table names from stats; n_live_tup may be 0 after bulk inserts until
