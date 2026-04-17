@@ -23,6 +23,12 @@ import app.core.macro_models  # noqa: F401 — registers tables with Base.metada
 # Import Eval Builder models
 import app.core.eval_models  # noqa: F401 — registers eval_suites/cases/runs/results with Base.metadata
 
+# Import PE models (required so FKs from probability_models resolve correctly)
+import app.core.pe_models  # noqa: F401 — registers pe_portfolio_companies etc. with Base.metadata
+
+# Import Deal Probability Engine models (PLAN_059 Phase 1)
+import app.core.probability_models  # noqa: F401 — registers txn_prob_* tables with Base.metadata
+
 # Import Economic Data Quality models
 from app.core.models import EconDataRevision  # noqa: F401 — registers econ_data_revisions with Base.metadata
 

@@ -140,6 +140,14 @@ from app.api.v1 import (
     osha,
     courtlistener,
     epa_echo,
+    epa_ghg,
+    cms_hospitals,
+    dot_grants,
+    census_bfs,
+    census_cbp,
+    ffiec_banks,
+    google_trends,
+    ferc_energy,
 )
 
 # PE Intelligence Features
@@ -165,6 +173,8 @@ from app.api.v1 import (
     site_intel_water_utilities,
     site_intel_sites,
     datacenter_sites,
+    deal_radar,
+    transaction_probability,
 )
 
 # Investor Intelligence (PLAN_039)
@@ -1285,6 +1295,14 @@ Browse the endpoint sections below to see what's available:
         {"name": "USAspending", "description": "🏛️ **USAspending.gov** - Federal contract and grant awards by NAICS code, location, and agency"},
         {"name": "FDIC BankFind", "description": "🏦 **FDIC BankFind Suite** - Bank financials, demographics, failed banks, and branch-level deposits for 4,000+ U.S. banks"},
         {"name": "epa_echo", "description": "🏭 **EPA ECHO** - Enforcement and Compliance History Online: facility compliance, violations, inspections, and penalties"},
+        {"name": "ffiec_banks", "description": "🏦 **FFIEC Bank Call Reports** - Bank financials via FDIC BankFind Suite: assets, deposits, loans, equity, net income"},
+        {"name": "google_trends", "description": "📈 **Google Trends** - Search interest data, daily trending searches, and interest by region"},
+        {"name": "ferc_energy", "description": "⚡ **FERC Energy Filings** - State electricity profiles: generation, consumption, retail prices, revenue via EIA API"},
+        {"name": "epa_ghg", "description": "🌡️ **EPA GHGRP** - Greenhouse Gas Reporting Program: facility-level emissions, industry type, and parent company data"},
+        {"name": "cms_hospitals", "description": "🏥 **CMS Hospitals** - Hospital provider quality ratings, ownership, emergency services, and domain-specific performance"},
+        {"name": "dot_grants", "description": "🛣️ **DOT Grants** - Department of Transportation infrastructure grant spending by state from USAspending.gov"},
+        {"name": "census_bfs", "description": "📋 **Census Business Formation Statistics** - Business applications, high-propensity apps, planned wages, and first payroll by state"},
+        {"name": "census_cbp", "description": "🏢 **Census County Business Patterns** - Establishments, employment, and payroll by state and NAICS industry"},
         {"name": "openFDA Devices", "description": "💊 **openFDA Device Registrations** - FDA device manufacturer registrations, product codes, 510(k) clearances, and aesthetic device filtering"},
         {"name": "FCC Broadband & Telecom", "description": "📡 **FCC National Broadband Map** - Broadband coverage, ISP availability, technology deployment, digital divide metrics"},
         {"name": "CFTC COT", "description": "📈 **CFTC Commitments of Traders** - Weekly futures positioning data: commercial vs non-commercial, managed money, swap dealers"},
@@ -1490,6 +1508,11 @@ app.include_router(fdic.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(fda.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(irs_soi.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(epa_echo.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(epa_ghg.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(cms_hospitals.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(dot_grants.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(census_bfs.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(census_cbp.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(foot_traffic.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(dunl.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(prediction_markets.router, prefix="/api/v1", dependencies=_auth)
@@ -1614,6 +1637,17 @@ app.include_router(
 )
 app.include_router(site_intel_sites.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(datacenter_sites.router, prefix="/api/v1", dependencies=_auth)
+
+# Deal Radar — Convergence Intelligence
+app.include_router(deal_radar.router, prefix="/api/v1", dependencies=_auth)
+
+# Deal Probability Engine (PLAN_059 Phase 2)
+app.include_router(transaction_probability.router, prefix="/api/v1", dependencies=_auth)
+
+# Specialty Data Sources
+app.include_router(ffiec_banks.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(google_trends.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(ferc_energy.router, prefix="/api/v1", dependencies=_auth)
 
 # Collection Management
 app.include_router(source_configs.router, prefix="/api/v1", dependencies=_auth)

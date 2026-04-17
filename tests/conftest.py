@@ -23,6 +23,7 @@ from app.core.people_models import (
     PeopleWatchlist, PeopleWatchlistPerson,
 )
 import app.core.pe_models  # noqa: F401 — registers PE tables with Base.metadata
+import app.core.probability_models  # noqa: F401 — registers txn_prob_* tables with Base.metadata
 
 
 @pytest.fixture(scope="function")

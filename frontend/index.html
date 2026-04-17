@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexdata - Investment Intelligence</title>
+    <title>Zerostack - Investment Intelligence</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
@@ -90,7 +90,223 @@
         }
         .tab:hover { background: var(--bg-input); color: var(--text); }
         .tab.active { background: var(--primary); border-color: var(--primary); color: white; }
-        .content { padding: 2rem; max-width: 1400px; margin: 0 auto; padding-bottom: 5rem; }
+        .content { padding: 2rem; max-width: 1400px; margin: 0 auto; padding-bottom: 5rem; flex:1; min-width:0; }
+
+        /* AI Assistant Panel (persistent right side) */
+        .page-body { display: flex; min-height: calc(100vh - 130px); }
+
+        .ai-panel {
+            width: 340px;
+            flex-shrink: 0;
+            background: var(--bg-card);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .ai-panel-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .ai-panel-header .ai-icon {
+            width: 20px; height: 20px;
+            border-radius: 6px;
+            background: linear-gradient(135deg, var(--primary), #a78bfa);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px; color: white; font-weight: 700;
+        }
+        .ai-panel-header .ai-title {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+        .ai-panel-header .ai-badge {
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 10px;
+            background: rgba(99,102,241,0.15);
+            color: var(--primary);
+            font-weight: 500;
+            margin-left: auto;
+        }
+
+        .ai-search-wrap {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        .ai-search-input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.8rem;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .ai-search-input:focus { border-color: var(--primary); }
+        .ai-search-input::placeholder { color: #4b5563; }
+
+        .ai-search-hint {
+            font-size: 0.68rem;
+            color: #4b5563;
+            margin-top: 6px;
+            line-height: 1.4;
+        }
+        .ai-search-hint kbd {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-family: inherit;
+            font-size: 0.65rem;
+        }
+
+        .ai-explain {
+            display: none;
+            padding: 8px 16px;
+            font-size: 0.75rem;
+            color: #a78bfa;
+            background: rgba(99,102,241,0.06);
+            border-bottom: 1px solid var(--border);
+            line-height: 1.5;
+        }
+
+        .ai-results {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        .ai-result-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .ai-result-item:hover { background: rgba(255,255,255,0.03); }
+
+        .ai-result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+        .ai-result-name {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text);
+        }
+        .ai-result-badge {
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+        .ai-result-badge.hot { background: rgba(239,68,68,0.15); color: #f87171; }
+        .ai-result-badge.active { background: rgba(245,158,11,0.15); color: #fbbf24; }
+        .ai-result-badge.watch { background: rgba(99,102,241,0.15); color: #a78bfa; }
+
+        .ai-result-meta {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .ai-result-bar {
+            height: 3px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 2px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+        .ai-result-bar-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+
+        .ai-empty {
+            padding: 24px 16px;
+            text-align: center;
+            color: #4b5563;
+            font-size: 0.78rem;
+            line-height: 1.6;
+        }
+
+        .ai-actions {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .ai-action-btn {
+            flex: 1;
+            padding: 8px 0;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .ai-action-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); border-color: var(--primary); }
+        .ai-action-btn.primary { background: var(--primary); border-color: var(--primary); color: white; }
+        .ai-action-btn.primary:hover { filter: brightness(1.1); }
+
+        /* Memo modal */
+        .memo-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 9000;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+        }
+        .memo-modal {
+            position: absolute;
+            top: 3%; left: 8%; right: 8%; bottom: 3%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .memo-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+        .memo-modal-title { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+        .memo-modal-actions { display: flex; gap: 8px; }
+        .memo-modal-btn {
+            padding: 6px 12px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .memo-modal-btn:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+        .memo-modal-body { flex: 1; overflow: hidden; }
+        .memo-modal-body iframe { width: 100%; height: 100%; border: none; }
+
+        @media (max-width: 900px) {
+            .ai-panel { display: none; }
+            .memo-modal { left: 2%; right: 2%; }
+        }
         .card {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -1771,7 +1987,7 @@
     <div class="login-overlay" id="login-overlay" style="display:none;">
         <div class="login-card">
             <div class="login-logo">📈</div>
-            <div class="login-title">Nexdata</div>
+            <div class="login-title">Zerostack</div>
             <div class="login-subtitle">Investment Intelligence Platform</div>
             <input class="login-field" id="login-email" type="email" placeholder="Email" autocomplete="email">
             <input class="login-field" id="login-password" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')authLogin()">
@@ -1784,7 +2000,7 @@
     <header class="header">
         <div class="logo">
             <span style="font-size: 1.5rem;">📈</span>
-            <h1>Nexdata</h1>
+            <h1>Zerostack</h1>
             <span class="tagline">Investment Intelligence</span>
         </div>
         <div class="status">
@@ -1816,7 +2032,9 @@
     </header>
 
     <nav class="tabs">
-        <button class="tab active" onclick="showTab('sources')">📡 Sources</button>
+        <button class="tab active" onclick="showTab('dealradar')">🎯 Deal Radar</button>
+        <button class="tab" onclick="showTab('txnprob')">▞ Probability Engine</button>
+        <button class="tab" onclick="showTab('sources')">📡 Sources</button>
         <button class="tab" onclick="showTab('analytics')">📊 Analytics</button>
         <button class="tab" onclick="showTab('jobs')">🚀 Jobs</button>
         <button class="tab" onclick="showTab('reports')">📄 Reports</button>
@@ -1838,10 +2056,677 @@
         <div id="active-jobs-list"></div>
     </div>
 
-    <div class="print-header"><h2>Nexdata — Confidential</h2><div class="print-meta" id="print-meta"></div></div>
+    <div class="print-header"><h2>Zerostack — Confidential</h2><div class="print-meta" id="print-meta"></div></div>
+    <div class="page-body">
     <main class="content">
-        <!-- Sources Tab (default) -->
-        <div id="tab-sources">
+        <!-- Deal Radar Tab (default) -->
+        <div id="tab-dealradar">
+            <iframe id="dealradar-iframe" src="/deal-radar.html" style="width:100%;height:calc(100vh - 160px);border:none;border-radius:12px;"></iframe>
+        </div>
+
+        <!-- Probability Engine Tab -->
+        <div id="tab-txnprob" class="hidden">
+            <style>
+                .txnprob-wrap { font-size: 13px; }
+                .txnprob-intro { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+                .txnprob-intro-icon { font-size: 1.5rem; }
+                .txnprob-intro-body strong { color: var(--primary); }
+                .txnprob-actions { display: flex; gap: 0.5rem; margin-left: auto; }
+                .txnprob-btn { font-family: inherit; font-size: 0.78rem; padding: 0.5rem 0.9rem; border-radius: 6px; cursor: pointer; border: 1px solid var(--border); background: var(--bg-input); color: var(--text); transition: all .15s; }
+                .txnprob-btn:hover { border-color: var(--primary); }
+                .txnprob-btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+                .txnprob-btn.primary:hover { filter: brightness(1.1); }
+                .txnprob-btn:disabled { opacity: 0.5; cursor: wait; }
+
+                .txnprob-kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.6rem; margin-bottom: 1rem; }
+                .txnprob-kpi { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; }
+                .txnprob-kpi-lbl { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.4rem; }
+                .txnprob-kpi-val { font-size: 1.55rem; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -0.02em; }
+                .txnprob-kpi-val.accent { background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+                .txnprob-nlq-expl { font-size: 0.72rem; color: var(--text-muted); font-style: italic; }
+
+                .txnprob-grid { display: grid; grid-template-columns: 380px 1fr 320px; gap: 1rem; }
+                @media (max-width: 1400px) { .txnprob-grid { grid-template-columns: 320px 1fr 280px; } }
+                @media (max-width: 1100px) { .txnprob-grid { grid-template-columns: 1fr; } }
+
+                .txnprob-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+                .txnprob-card-hdr { padding: 0.7rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+                .txnprob-card-title { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; }
+                .txnprob-card-body { padding: 0.5rem 0; max-height: calc(100vh - 360px); overflow-y: auto; }
+                .txnprob-card-body-pad { padding: 1rem; max-height: calc(100vh - 360px); overflow-y: auto; }
+
+                .txnprob-filters { display: flex; flex-wrap: wrap; gap: 0.35rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+                .txnprob-chip { font-family: inherit; font-size: 0.7rem; padding: 0.25rem 0.6rem; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; transition: all .12s; }
+                .txnprob-chip:hover { border-color: var(--primary); color: var(--text); }
+                .txnprob-chip.active { border-color: var(--primary); background: rgba(99,102,241,0.12); color: var(--primary); }
+
+                .txnprob-rank-item { padding: 0.7rem 1rem; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
+                .txnprob-rank-item:hover, .txnprob-rank-item.selected { background: rgba(99,102,241,0.08); }
+                .txnprob-rank-item.selected { border-left: 3px solid var(--primary); padding-left: calc(1rem - 3px); }
+                .txnprob-rank-row1 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.3rem; }
+                .txnprob-rank-name { font-weight: 600; color: var(--text); font-size: 0.85rem; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .txnprob-rank-grade { font-size: 0.9rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: -0.02em; }
+                .grade-A { color: #22c55e; background: rgba(34,197,94,0.12); }
+                .grade-B { color: #06b6d4; background: rgba(6,182,212,0.12); }
+                .grade-C { color: #f59e0b; background: rgba(245,158,11,0.12); }
+                .grade-D { color: #f97316; background: rgba(249,115,22,0.12); }
+                .grade-F { color: #ef4444; background: rgba(239,68,68,0.12); }
+                .txnprob-rank-meta { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.3rem; display: flex; justify-content: space-between; align-items: center; }
+                .txnprob-rank-prob { font-weight: 700; color: var(--text); font-size: 0.9rem; }
+                .txnprob-rank-bar { height: 3px; background: rgba(148,163,184,0.12); border-radius: 1.5px; overflow: hidden; }
+                .txnprob-rank-bar-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width .4s ease; }
+                .txnprob-rank-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.4rem; }
+                .txnprob-rank-tag { font-size: 0.62rem; font-weight: 600; padding: 2px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.03em; }
+                .txnprob-rank-tag.sev-high { background: rgba(239,68,68,0.15); color: #ef4444; }
+                .txnprob-rank-tag.sev-medium { background: rgba(245,158,11,0.15); color: #f59e0b; }
+                .txnprob-rank-tag.sev-low { background: rgba(99,102,241,0.15); color: var(--primary); }
+
+                .txnprob-empty { padding: 3rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.8rem; }
+                .txnprob-empty-icon { font-size: 2rem; opacity: 0.4; margin-bottom: 0.75rem; }
+
+                .txnprob-detail-hero { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); }
+                .txnprob-detail-title { font-size: 1.3rem; font-weight: 700; color: var(--text); letter-spacing: -0.02em; margin-bottom: 0.25rem; }
+                .txnprob-detail-sub { font-size: 0.75rem; color: var(--text-muted); }
+
+                .txnprob-detail-kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--border); }
+                .txnprob-detail-kpi { padding: 0.9rem 1.25rem; border-right: 1px solid var(--border); }
+                .txnprob-detail-kpi:last-child { border-right: none; }
+                .txnprob-detail-kpi-lbl { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.25rem; }
+                .txnprob-detail-kpi-val { font-size: 1.4rem; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+                .txnprob-detail-kpi-val.accent { background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+                .txnprob-section { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); }
+                .txnprob-section h4 { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.75rem; }
+
+                .txnprob-chart { position: relative; height: 260px; }
+                .txnprob-chart.bar { height: 260px; }
+
+                .txnprob-chain { display: flex; flex-direction: column; gap: 4px; }
+                .txnprob-chain-row { display: grid; grid-template-columns: 170px 40px 1fr 55px 50px; align-items: center; gap: 0.6rem; font-size: 0.72rem; padding: 4px 0; }
+                .txnprob-chain-name { color: var(--text); font-weight: 500; }
+                .txnprob-chain-score { color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
+                .txnprob-chain-track { height: 4px; background: rgba(148,163,184,0.1); border-radius: 2px; overflow: hidden; }
+                .txnprob-chain-fill { height: 100%; border-radius: 2px; transition: width .4s; }
+                .txnprob-chain-fill.low { background: #475569; }
+                .txnprob-chain-fill.mid { background: #f59e0b; }
+                .txnprob-chain-fill.high { background: #22c55e; }
+                .txnprob-chain-weight { color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
+                .txnprob-chain-contrib { color: var(--primary); text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+                .txnprob-cvg { padding: 0.7rem 0.9rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 0.5rem; }
+                .txnprob-cvg:last-child { margin-bottom: 0; }
+                .txnprob-cvg.sev-high { border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.05); }
+                .txnprob-cvg.sev-medium { border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.05); }
+                .txnprob-cvg-label { font-weight: 700; color: var(--text); font-size: 0.85rem; margin-bottom: 0.25rem; }
+                .txnprob-cvg-desc { font-size: 0.72rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 0.4rem; }
+                .txnprob-cvg-sigs { display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.7rem; color: var(--text-muted); }
+                .txnprob-cvg-sigs strong { color: var(--text); font-variant-numeric: tabular-nums; }
+
+                .txnprob-narrative { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.9rem 1rem; font-size: 0.82rem; color: var(--text); line-height: 1.6; }
+                .txnprob-narrative-src { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 0.5rem; }
+
+                .txnprob-side-sect { padding: 0.9rem 1rem; border-bottom: 1px solid var(--border); }
+                .txnprob-side-sect:last-child { border-bottom: none; }
+                .txnprob-side-sect h5 { font-size: 0.68rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.6rem; }
+
+                .txnprob-sector-row { display: flex; align-items: center; justify-content: space-between; padding: 0.35rem 0; border-bottom: 1px dashed var(--border); font-size: 0.72rem; }
+                .txnprob-sector-row:last-child { border-bottom: none; }
+                .txnprob-sector-name { color: var(--text); font-weight: 500; }
+                .txnprob-sector-meta { color: var(--text-muted); font-size: 0.68rem; }
+                .txnprob-sector-val { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+                .txnprob-alert { padding: 0.5rem 0; border-bottom: 1px dashed var(--border); font-size: 0.72rem; }
+                .txnprob-alert:last-child { border-bottom: none; }
+                .txnprob-alert-row1 { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.2rem; }
+                .txnprob-alert-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+                .txnprob-alert-dot.high { background: #ef4444; }
+                .txnprob-alert-dot.medium { background: #f59e0b; }
+                .txnprob-alert-dot.low { background: var(--primary); }
+                .txnprob-alert-type { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+                .txnprob-alert-title { color: var(--text); line-height: 1.4; }
+
+                .txnprob-pattern { padding: 0.45rem 0; border-bottom: 1px dashed var(--border); font-size: 0.72rem; }
+                .txnprob-pattern:last-child { border-bottom: none; }
+                .txnprob-pattern-name { color: var(--text); font-weight: 600; margin-bottom: 0.15rem; }
+                .txnprob-pattern-desc { color: var(--text-muted); font-size: 0.68rem; line-height: 1.4; }
+
+                .txnprob-cal-row { display: flex; justify-content: space-between; margin-bottom: 0.3rem; font-size: 0.72rem; }
+                .txnprob-cal-row:last-child { margin-bottom: 0; }
+                .txnprob-cal-key { color: var(--text-muted); }
+                .txnprob-cal-val { color: var(--text); font-variant-numeric: tabular-nums; }
+
+                .txnprob-spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--text-muted); border-top-color: transparent; border-radius: 50%; animation: txnprob-spin 0.7s linear infinite; vertical-align: middle; }
+                @keyframes txnprob-spin { to { transform: rotate(360deg); } }
+
+                .txnprob-toast { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 10000; padding: 0.8rem 1.2rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.8rem; box-shadow: 0 8px 24px rgba(0,0,0,0.4); transform: translateX(calc(100% + 40px)); transition: transform .3s ease; max-width: 360px; }
+                .txnprob-toast.show { transform: translateX(0); }
+                .txnprob-toast.success { border-color: #22c55e; }
+                .txnprob-toast.error { border-color: #ef4444; }
+            </style>
+
+            <div class="txnprob-wrap">
+                <div class="txnprob-intro">
+                    <span class="txnprob-intro-icon">▞</span>
+                    <div class="txnprob-intro-body">
+                        <strong>Deal Probability Engine.</strong>
+                        Predicts P(transaction within 6–12 months) per private company with an explainable 12-signal chain.
+                        Named convergence patterns flag multi-signal events. Calibrated via Platt scaling when labeled outcomes accumulate.
+                    </div>
+                    <div class="txnprob-actions">
+                        <button class="txnprob-btn" id="txnprob-btn-refresh" onclick="txnProbRefreshAll()">↻ Refresh</button>
+                        <button class="txnprob-btn primary" id="txnprob-btn-scan" onclick="txnProbRunScan()">▶ Scan Universe</button>
+                    </div>
+                </div>
+
+                <div class="txnprob-kpis">
+                    <div class="txnprob-kpi"><div class="txnprob-kpi-lbl">Universe</div><div class="txnprob-kpi-val" id="txnprob-kpi-universe">—</div></div>
+                    <div class="txnprob-kpi"><div class="txnprob-kpi-lbl">Scored</div><div class="txnprob-kpi-val" id="txnprob-kpi-scored">—</div></div>
+                    <div class="txnprob-kpi"><div class="txnprob-kpi-lbl">Avg P(txn)</div><div class="txnprob-kpi-val accent" id="txnprob-kpi-avgprob">—</div></div>
+                    <div class="txnprob-kpi"><div class="txnprob-kpi-lbl">Hot (P ≥ 0.7)</div><div class="txnprob-kpi-val" id="txnprob-kpi-hot">—</div></div>
+                    <div class="txnprob-kpi"><div class="txnprob-kpi-lbl">Convergences</div><div class="txnprob-kpi-val" id="txnprob-kpi-cvg">—</div></div>
+                    <div class="txnprob-kpi"><div class="txnprob-kpi-lbl">Unread Alerts</div><div class="txnprob-kpi-val" id="txnprob-kpi-alerts">—</div></div>
+                </div>
+
+                <div class="txnprob-grid">
+                    <!-- Left: Rankings -->
+                    <div class="txnprob-card">
+                        <div class="txnprob-card-hdr">
+                            <span class="txnprob-card-title">Rankings</span>
+                            <span class="txnprob-nlq-expl" id="txnprob-rank-count">—</span>
+                        </div>
+                        <div class="txnprob-filters">
+                            <button class="txnprob-chip active" data-txnfilter="all" onclick="txnProbSetFilter('all')">All</button>
+                            <button class="txnprob-chip" data-txnfilter="grade-A" onclick="txnProbSetFilter('grade-A')">A</button>
+                            <button class="txnprob-chip" data-txnfilter="grade-B" onclick="txnProbSetFilter('grade-B')">B</button>
+                            <button class="txnprob-chip" data-txnfilter="grade-C" onclick="txnProbSetFilter('grade-C')">C</button>
+                            <button class="txnprob-chip" data-txnfilter="grade-D" onclick="txnProbSetFilter('grade-D')">D</button>
+                            <button class="txnprob-chip" data-txnfilter="hot" onclick="txnProbSetFilter('hot')">🔥 Hot</button>
+                            <button class="txnprob-chip" data-txnfilter="convergence" onclick="txnProbSetFilter('convergence')">⚡ Converge</button>
+                        </div>
+                        <div class="txnprob-card-body" id="txnprob-rankings">
+                            <div class="txnprob-empty">Loading rankings…</div>
+                        </div>
+                    </div>
+
+                    <!-- Center: Detail -->
+                    <div class="txnprob-card">
+                        <div class="txnprob-card-body-pad" id="txnprob-detail" style="padding:0;">
+                            <div class="txnprob-empty">
+                                <div class="txnprob-empty-icon">◉</div>
+                                <div>Select a company from the rankings to see its full signal chain</div>
+                                <div style="margin-top:0.5rem;font-size:0.7rem;opacity:0.7">radar · contributions · convergences · narrative</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Side panels -->
+                    <div class="txnprob-card">
+                        <div class="txnprob-card-body" style="padding:0;">
+                            <div class="txnprob-side-sect">
+                                <h5>Sector Summary</h5>
+                                <div id="txnprob-sectors"><div class="txnprob-empty" style="padding:1rem 0;font-size:0.72rem;">loading…</div></div>
+                            </div>
+                            <div class="txnprob-side-sect">
+                                <h5>Recent Alerts</h5>
+                                <div id="txnprob-alerts-list"><div class="txnprob-empty" style="padding:1rem 0;font-size:0.72rem;">loading…</div></div>
+                            </div>
+                            <div class="txnprob-side-sect">
+                                <h5>Convergence Patterns</h5>
+                                <div id="txnprob-patterns"><div class="txnprob-empty" style="padding:1rem 0;font-size:0.72rem;">loading…</div></div>
+                            </div>
+                            <div class="txnprob-side-sect">
+                                <h5>Calibration · ML</h5>
+                                <div id="txnprob-cal-status"><div class="txnprob-empty" style="padding:1rem 0;font-size:0.72rem;">loading…</div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="txnprob-toast" id="txnprob-toast"></div>
+            </div>
+
+            <script>
+            // ---------------------------------------------------------
+            // Deal Probability Engine — inline tab
+            // ---------------------------------------------------------
+            (function() {
+                if (window._txnProbInit) return;
+                window._txnProbInit = true;
+
+                const TP_STATE = {
+                    rankings: [],
+                    filter: 'all',
+                    selected: null,
+                    convergenceMap: {},   // company_id -> patterns[]
+                    patterns: [],
+                    radarChart: null,
+                    barChart: null,
+                    initialized: false,
+                };
+
+                function tpApiBase() {
+                    return window.location.origin.includes('3001')
+                        ? 'http://localhost:8001'
+                        : window.location.origin;
+                }
+
+                async function tpApi(path, options = {}) {
+                    const res = await fetch(tpApiBase() + path, {
+                        ...options,
+                        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+                    });
+                    if (!res.ok) {
+                        let msg = res.status + ' ' + res.statusText;
+                        try { const b = await res.json(); if (b.detail) msg += ' · ' + b.detail; } catch(e){}
+                        throw new Error(msg);
+                    }
+                    return res.json();
+                }
+
+                function tpToast(msg, kind='info') {
+                    const el = document.getElementById('txnprob-toast');
+                    if (!el) return;
+                    el.textContent = msg;
+                    el.className = 'txnprob-toast ' + kind + ' show';
+                    clearTimeout(el._t);
+                    el._t = setTimeout(() => el.classList.remove('show'), 3000);
+                }
+
+                function tpEscape(s) {
+                    if (s == null) return '';
+                    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+                }
+
+                window.txnProbInitialize = function() {
+                    if (TP_STATE.initialized) return;
+                    TP_STATE.initialized = true;
+                    txnProbRefreshAll();
+                };
+
+                // Public helper the shared AI panel calls when the active tab is 'txnprob'
+                window.txnProbApplyNLQResults = function(results) {
+                    TP_STATE.rankings = (results || []).map(x => ({
+                        company_id: x.company_id,
+                        company_name: x.company_name,
+                        sector: x.sector,
+                        hq_state: x.hq_state,
+                        probability: x.probability,
+                        raw_composite_score: x.raw_composite_score,
+                        grade: x.grade,
+                        active_signal_count: x.active_signal_count,
+                        top_signals: [],
+                    }));
+                    txnProbSetFilter('all');
+                };
+
+                window.txnProbRefreshAll = async function() {
+                    const btn = document.getElementById('txnprob-btn-refresh');
+                    if (btn) btn.disabled = true;
+                    try {
+                        await Promise.all([
+                            tpLoadStats(),
+                            tpLoadRankings(),
+                            tpLoadSectors(),
+                            tpLoadAlerts(),
+                            tpLoadConvergences(),
+                            tpLoadCalibration(),
+                        ]);
+                    } catch (e) {
+                        tpToast('Load failed: ' + e.message, 'error');
+                    } finally {
+                        if (btn) btn.disabled = false;
+                    }
+                };
+
+                window.txnProbRunScan = async function() {
+                    const btn = document.getElementById('txnprob-btn-scan');
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="txnprob-spin"></span> Scanning...';
+                    try {
+                        const r = await tpApi('/api/v1/txn-probability/scan?build_universe_first=true', { method: 'POST' });
+                        tpToast('Scan complete: ' + r.succeeded + '/' + r.total_companies + ' scored', 'success');
+                        await txnProbRefreshAll();
+                    } catch (e) {
+                        tpToast('Scan failed: ' + e.message, 'error');
+                    } finally {
+                        btn.disabled = false;
+                        btn.innerHTML = '▶ Scan Universe';
+                    }
+                };
+
+                async function tpLoadStats() {
+                    try {
+                        const s = await tpApi('/api/v1/txn-probability/stats');
+                        document.getElementById('txnprob-kpi-universe').textContent = s.universe_size ?? '—';
+                        document.getElementById('txnprob-kpi-scored').textContent = s.total_scored ?? '—';
+                        document.getElementById('txnprob-kpi-avgprob').textContent =
+                            s.avg_probability != null ? (s.avg_probability * 100).toFixed(1) + '%' : '—';
+                        document.getElementById('txnprob-kpi-hot').textContent = s.hot_count ?? '—';
+                    } catch(e) { console.warn('stats', e); }
+                }
+
+                async function tpLoadRankings() {
+                    try {
+                        const r = await tpApi('/api/v1/txn-probability/rankings?limit=100');
+                        TP_STATE.rankings = Array.isArray(r) ? r : [];
+                        tpApplyFilter();
+                    } catch(e) {
+                        document.getElementById('txnprob-rankings').innerHTML =
+                            '<div class="txnprob-empty">Failed: ' + tpEscape(e.message) + '</div>';
+                    }
+                }
+
+                window.txnProbSetFilter = function(f) {
+                    TP_STATE.filter = f;
+                    document.querySelectorAll('[data-txnfilter]').forEach(c =>
+                        c.classList.toggle('active', c.dataset.txnfilter === f)
+                    );
+                    tpApplyFilter();
+                };
+
+                function tpApplyFilter() {
+                    let list = TP_STATE.rankings.slice();
+                    if (TP_STATE.filter === 'hot') list = list.filter(r => r.probability >= 0.7);
+                    else if (TP_STATE.filter === 'convergence') list = list.filter(r => TP_STATE.convergenceMap[r.company_id]?.length);
+                    else if (TP_STATE.filter.startsWith('grade-')) {
+                        const g = TP_STATE.filter.split('-')[1];
+                        list = list.filter(r => r.grade === g);
+                    }
+                    document.getElementById('txnprob-rank-count').textContent =
+                        list.length + ' / ' + TP_STATE.rankings.length;
+                    tpRenderRankings(list);
+                }
+
+                function tpRenderRankings(list) {
+                    const body = document.getElementById('txnprob-rankings');
+                    if (!list.length) {
+                        body.innerHTML = '<div class="txnprob-empty">No companies match this filter.<br><br>Try <b>Scan Universe</b> to populate data.</div>';
+                        return;
+                    }
+                    body.innerHTML = list.map(r => {
+                        const p = (r.probability * 100).toFixed(1);
+                        const barW = Math.max(2, r.probability * 100);
+                        const cvgs = TP_STATE.convergenceMap[r.company_id] || [];
+                        const tagHtml = cvgs.slice(0, 3).map(c =>
+                            '<span class="txnprob-rank-tag sev-' + (c.severity || 'low') + '">' +
+                            tpEscape((c.key || '').replace(/_/g, ' ')) + '</span>'
+                        ).join('');
+                        return '<div class="txnprob-rank-item ' + (TP_STATE.selected === r.company_id ? 'selected' : '') + '" onclick="txnProbSelect(' + r.company_id + ')">' +
+                            '<div class="txnprob-rank-row1">' +
+                                '<div class="txnprob-rank-name">' + tpEscape(r.company_name) + '</div>' +
+                                '<div class="txnprob-rank-grade grade-' + (r.grade || 'F') + '">' + (r.grade || 'F') + '</div>' +
+                            '</div>' +
+                            '<div class="txnprob-rank-meta">' +
+                                '<span>' + tpEscape(r.sector || '—') + ' · ' + tpEscape(r.hq_state || '—') + ' · ' + r.active_signal_count + '/12</span>' +
+                                '<span class="txnprob-rank-prob">' + p + '%</span>' +
+                            '</div>' +
+                            '<div class="txnprob-rank-bar"><div class="txnprob-rank-bar-fill" style="width:' + barW + '%"></div></div>' +
+                            (tagHtml ? '<div class="txnprob-rank-tags">' + tagHtml + '</div>' : '') +
+                        '</div>';
+                    }).join('');
+                }
+
+                window.txnProbSelect = async function(id) {
+                    TP_STATE.selected = id;
+                    tpApplyFilter();
+                    const detail = document.getElementById('txnprob-detail');
+                    detail.innerHTML = '<div class="txnprob-empty"><span class="txnprob-spin"></span><div style="margin-top:0.75rem">Loading signal chain...</div></div>';
+                    try {
+                        const d = await tpApi('/api/v1/txn-probability/company/' + id);
+                        if (!d.latest_score) {
+                            detail.innerHTML =
+                                '<div class="txnprob-empty">' +
+                                    '<div class="txnprob-empty-icon">○</div>' +
+                                    '<div>' + tpEscape(d.company?.company_name || 'Company') + ' is not yet scored.</div>' +
+                                    '<button class="txnprob-btn primary" style="margin-top:0.75rem" onclick="txnProbScoreCompany(' + id + ')">Score Now</button>' +
+                                '</div>';
+                            return;
+                        }
+                        tpRenderDetail(d);
+                    } catch (e) {
+                        detail.innerHTML = '<div class="txnprob-empty">Load failed: ' + tpEscape(e.message) + '</div>';
+                    }
+                };
+
+                window.txnProbScoreCompany = async function(id) {
+                    try {
+                        tpToast('Scoring…', 'info');
+                        await tpApi('/api/v1/txn-probability/score/' + id, { method: 'POST' });
+                        await txnProbSelect(id);
+                        tpLoadStats();
+                    } catch(e) { tpToast('Score failed: ' + e.message, 'error'); }
+                };
+
+                function tpRenderDetail(d) {
+                    const c = d.company, s = d.latest_score;
+                    const cvgs = TP_STATE.convergenceMap[c.id] || [];
+                    const chain = s.signal_chain || [];
+
+                    const cvgHtml = cvgs.length ? cvgs.map(v =>
+                        '<div class="txnprob-cvg sev-' + (v.severity || 'low') + '">' +
+                            '<div class="txnprob-cvg-label">⚡ ' + tpEscape(v.label) + '</div>' +
+                            '<div class="txnprob-cvg-desc">' + tpEscape(v.description || '') + '</div>' +
+                            '<div class="txnprob-cvg-sigs">' +
+                                Object.entries(v.matched_signals || {}).map(([k, sc]) =>
+                                    '<span>' + tpEscape(k) + ' <strong>' + (sc ?? 0).toFixed(0) + '</strong></span>'
+                                ).join('') +
+                            '</div>' +
+                        '</div>'
+                    ).join('') : '<div style="font-size:0.72rem;color:var(--text-muted)">No named convergence patterns matched.</div>';
+
+                    const chainHtml = chain.map(sig => {
+                        const cls = sig.score >= 70 ? 'high' : sig.score >= 50 ? 'mid' : 'low';
+                        return '<div class="txnprob-chain-row">' +
+                            '<div class="txnprob-chain-name">' + tpEscape(sig.signal_type) + '</div>' +
+                            '<div class="txnprob-chain-score">' + (sig.score || 0).toFixed(0) + '</div>' +
+                            '<div class="txnprob-chain-track"><div class="txnprob-chain-fill ' + cls + '" style="width:' + (sig.score || 0) + '%"></div></div>' +
+                            '<div class="txnprob-chain-weight">×' + (sig.weight || 0).toFixed(3) + '</div>' +
+                            '<div class="txnprob-chain-contrib">' + (sig.contribution || 0).toFixed(1) + '</div>' +
+                        '</div>';
+                    }).join('');
+
+                    document.getElementById('txnprob-detail').innerHTML =
+                        '<div class="txnprob-detail-hero">' +
+                            '<div class="txnprob-detail-title">' + tpEscape(c.company_name) + '</div>' +
+                            '<div class="txnprob-detail-sub">' +
+                                tpEscape(c.sector || '—') + ' · ' + tpEscape(c.hq_state || '—') + ' · ' +
+                                tpEscape(c.ownership_status || 'Private') +
+                                (c.employee_count_est ? ' · ' + c.employee_count_est + ' employees' : '') +
+                                (c.founded_year ? ' · est. ' + c.founded_year : '') +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="txnprob-detail-kpi-row">' +
+                            '<div class="txnprob-detail-kpi"><div class="txnprob-detail-kpi-lbl">P(transaction)</div><div class="txnprob-detail-kpi-val accent">' + (s.probability * 100).toFixed(1) + '%</div></div>' +
+                            '<div class="txnprob-detail-kpi"><div class="txnprob-detail-kpi-lbl">Grade</div><div class="txnprob-detail-kpi-val">' + s.grade + '</div></div>' +
+                            '<div class="txnprob-detail-kpi"><div class="txnprob-detail-kpi-lbl">Composite</div><div class="txnprob-detail-kpi-val">' + s.raw_composite_score.toFixed(1) + '</div></div>' +
+                            '<div class="txnprob-detail-kpi"><div class="txnprob-detail-kpi-lbl">Active Signals</div><div class="txnprob-detail-kpi-val">' + s.active_signal_count + ' / 12</div></div>' +
+                        '</div>' +
+                        '<div class="txnprob-section"><h4>Signal Radar · All 12 signals (0–100)</h4><div class="txnprob-chart"><canvas id="txnprob-radar"></canvas></div></div>' +
+                        '<div class="txnprob-section"><h4>Signal Contributions · score × weight</h4><div class="txnprob-chart bar"><canvas id="txnprob-bar"></canvas></div></div>' +
+                        '<div class="txnprob-section"><h4>Convergence Patterns</h4>' + cvgHtml + '</div>' +
+                        '<div class="txnprob-section"><h4>Full Signal Chain</h4><div class="txnprob-chain">' + chainHtml + '</div></div>' +
+                        '<div class="txnprob-section"><h4>AI Narrative</h4><div id="txnprob-narrative-box"><button class="txnprob-btn primary" onclick="txnProbLoadNarrative(' + c.id + ')">Generate narrative →</button></div></div>';
+
+                    setTimeout(() => { tpRenderRadar(chain); tpRenderBar(chain); }, 0);
+                }
+
+                function tpRenderRadar(chain) {
+                    const ctx = document.getElementById('txnprob-radar');
+                    if (!ctx || !window.Chart) return;
+                    if (TP_STATE.radarChart) TP_STATE.radarChart.destroy();
+                    TP_STATE.radarChart = new Chart(ctx, {
+                        type: 'radar',
+                        data: {
+                            labels: chain.map(s => s.signal_type.replace(/_/g, ' ')),
+                            datasets: [{
+                                label: 'Score',
+                                data: chain.map(s => s.score),
+                                backgroundColor: 'rgba(99,102,241,0.18)',
+                                borderColor: 'rgba(99,102,241,0.85)',
+                                borderWidth: 1.5,
+                                pointBackgroundColor: '#6366f1',
+                                pointRadius: 3,
+                            }]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                r: {
+                                    min: 0, max: 100,
+                                    ticks: { color: 'rgba(241,245,249,0.35)', backdropColor: 'transparent', font: { size: 9 } },
+                                    grid: { color: 'rgba(148,163,184,0.12)' },
+                                    angleLines: { color: 'rgba(148,163,184,0.12)' },
+                                    pointLabels: { color: 'rgba(241,245,249,0.75)', font: { size: 10 } },
+                                }
+                            }
+                        }
+                    });
+                }
+
+                function tpRenderBar(chain) {
+                    const ctx = document.getElementById('txnprob-bar');
+                    if (!ctx || !window.Chart) return;
+                    if (TP_STATE.barChart) TP_STATE.barChart.destroy();
+                    const sorted = [...chain].sort((a,b) => (b.contribution || 0) - (a.contribution || 0));
+                    TP_STATE.barChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: sorted.map(s => s.signal_type.replace(/_/g, ' ')),
+                            datasets: [{
+                                data: sorted.map(s => s.contribution || 0),
+                                backgroundColor: sorted.map(s =>
+                                    (s.contribution || 0) > 8 ? 'rgba(34,197,94,0.65)' :
+                                    (s.contribution || 0) > 4 ? 'rgba(99,102,241,0.65)' :
+                                    'rgba(148,163,184,0.25)'
+                                ),
+                                borderRadius: 3,
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                x: {
+                                    ticks: { color: 'rgba(241,245,249,0.4)', font: { size: 9 } },
+                                    grid: { color: 'rgba(148,163,184,0.08)' },
+                                },
+                                y: {
+                                    ticks: { color: 'rgba(241,245,249,0.75)', font: { size: 10 } },
+                                    grid: { display: false },
+                                }
+                            }
+                        }
+                    });
+                }
+
+                window.txnProbLoadNarrative = async function(id) {
+                    const box = document.getElementById('txnprob-narrative-box');
+                    box.innerHTML = '<span class="txnprob-spin"></span> <span style="margin-left:0.5rem;color:var(--text-muted)">Generating narrative…</span>';
+                    try {
+                        const r = await tpApi('/api/v1/txn-probability/company/' + id + '/narrative', { method: 'POST' });
+                        box.innerHTML =
+                            '<div class="txnprob-narrative">' + tpEscape(r.narrative) + '</div>' +
+                            '<div class="txnprob-narrative-src">source: ' + tpEscape(r.source) + '</div>';
+                    } catch (e) {
+                        box.innerHTML = '<div class="txnprob-empty">' + tpEscape(e.message) + '</div>';
+                    }
+                };
+
+                async function tpLoadSectors() {
+                    try {
+                        const list = await tpApi('/api/v1/txn-probability/sectors');
+                        const body = document.getElementById('txnprob-sectors');
+                        if (!list.length) { body.innerHTML = '<div class="txnprob-empty" style="padding:0.5rem 0;font-size:0.72rem">No sectors</div>'; return; }
+                        body.innerHTML = list.map(s =>
+                            '<div class="txnprob-sector-row">' +
+                                '<div>' +
+                                    '<div class="txnprob-sector-name">' + tpEscape(s.sector || '—') + '</div>' +
+                                    '<div class="txnprob-sector-meta">' + s.company_count + ' cos</div>' +
+                                '</div>' +
+                                '<div class="txnprob-sector-val">avg ' + (s.avg_probability * 100).toFixed(1) + '%<br>max ' + (s.max_probability * 100).toFixed(1) + '%</div>' +
+                            '</div>'
+                        ).join('');
+                    } catch(e) {
+                        document.getElementById('txnprob-sectors').innerHTML =
+                            '<div class="txnprob-empty" style="padding:0.5rem 0;font-size:0.72rem">' + tpEscape(e.message) + '</div>';
+                    }
+                }
+
+                async function tpLoadAlerts() {
+                    try {
+                        const list = await tpApi('/api/v1/txn-probability/alerts?limit=15');
+                        document.getElementById('txnprob-kpi-alerts').textContent = list.filter(a => !a.is_read).length;
+                        const body = document.getElementById('txnprob-alerts-list');
+                        if (!list.length) { body.innerHTML = '<div class="txnprob-empty" style="padding:0.5rem 0;font-size:0.72rem">No alerts yet</div>'; return; }
+                        body.innerHTML = list.map(a =>
+                            '<div class="txnprob-alert">' +
+                                '<div class="txnprob-alert-row1">' +
+                                    '<span class="txnprob-alert-dot ' + tpEscape(a.severity || 'low') + '"></span>' +
+                                    '<span class="txnprob-alert-type">' + tpEscape(a.alert_type || '') + '</span>' +
+                                '</div>' +
+                                '<div class="txnprob-alert-title">' + tpEscape(a.title || '') + '</div>' +
+                            '</div>'
+                        ).join('');
+                    } catch(e) {
+                        document.getElementById('txnprob-alerts-list').innerHTML =
+                            '<div class="txnprob-empty" style="padding:0.5rem 0;font-size:0.72rem">' + tpEscape(e.message) + '</div>';
+                    }
+                }
+
+                async function tpLoadConvergences() {
+                    try {
+                        const r = await tpApi('/api/v1/txn-probability/convergences');
+                        TP_STATE.patterns = r.patterns || [];
+                        TP_STATE.convergenceMap = {};
+                        (r.companies || []).forEach(c => { TP_STATE.convergenceMap[c.company_id] = c.patterns; });
+                        document.getElementById('txnprob-kpi-cvg').textContent = r.companies_with_matches ?? 0;
+                        const body = document.getElementById('txnprob-patterns');
+                        body.innerHTML = TP_STATE.patterns.map(p =>
+                            '<div class="txnprob-pattern">' +
+                                '<div class="txnprob-pattern-name">' + tpEscape(p.label) + '</div>' +
+                                '<div class="txnprob-pattern-desc">' + tpEscape(p.description) + '</div>' +
+                            '</div>'
+                        ).join('');
+                        tpApplyFilter();
+                    } catch(e) {
+                        document.getElementById('txnprob-patterns').innerHTML =
+                            '<div class="txnprob-empty" style="padding:0.5rem 0;font-size:0.72rem">' + tpEscape(e.message) + '</div>';
+                    }
+                }
+
+                async function tpLoadCalibration() {
+                    try {
+                        const [modelStatus, calList] = await Promise.all([
+                            tpApi('/api/v1/txn-probability/model/status'),
+                            tpApi('/api/v1/txn-probability/calibration'),
+                        ]);
+                        const activeCal = (calList.calibrations || []).find(c => c.is_active);
+                        let html =
+                            '<div class="txnprob-cal-row"><span class="txnprob-cal-key">LightGBM</span><span class="txnprob-cal-val">' + (modelStatus.lightgbm_available ? '✓ available' : '✗ not installed') + '</span></div>' +
+                            '<div class="txnprob-cal-row"><span class="txnprob-cal-key">Labeled samples</span><span class="txnprob-cal-val">' + modelStatus.current_labeled_samples + ' / ' + modelStatus.min_samples_for_training + '</span></div>' +
+                            '<div class="txnprob-cal-row"><span class="txnprob-cal-key">ML trainable</span><span class="txnprob-cal-val">' + (modelStatus.trainable ? 'yes' : 'no') + '</span></div>' +
+                            '<div class="txnprob-cal-row"><span class="txnprob-cal-key">Active calibration</span><span class="txnprob-cal-val">' + tpEscape(activeCal ? activeCal.method : 'default sigmoid') + '</span></div>';
+                        if (activeCal) {
+                            html +=
+                                '<div class="txnprob-cal-row"><span class="txnprob-cal-key">Brier score</span><span class="txnprob-cal-val">' + (activeCal.brier_score || 0).toFixed(4) + '</span></div>' +
+                                '<div class="txnprob-cal-row"><span class="txnprob-cal-key">N samples (fit)</span><span class="txnprob-cal-val">' + activeCal.n_samples + '</span></div>';
+                        }
+                        document.getElementById('txnprob-cal-status').innerHTML = html;
+                    } catch(e) {
+                        document.getElementById('txnprob-cal-status').innerHTML =
+                            '<div class="txnprob-empty" style="padding:0.5rem 0;font-size:0.72rem">' + tpEscape(e.message) + '</div>';
+                    }
+                }
+
+            })();
+            </script>
+        </div>
+
+        <!-- Sources Tab -->
+        <div id="tab-sources" class="hidden">
             <div class="tab-intro">
                 <span class="tab-intro-icon">📡</span>
                 <div class="tab-intro-text">
@@ -3126,7 +4011,51 @@
                 <div id="dq-lb-empty" class="empty" style="display:none;">No source quality data available. Run a DQ analysis first.</div>
             </div>
         </div>
+
     </main>
+
+    <!-- AI Assistant Panel (persistent right side) -->
+    <aside class="ai-panel" id="ai-panel">
+        <div class="ai-panel-header">
+            <div class="ai-icon">AI</div>
+            <div class="ai-title">Intelligence</div>
+            <div class="ai-badge">Live</div>
+        </div>
+        <div class="ai-search-wrap">
+            <input class="ai-search-input" id="ai-query-input" type="text" placeholder="Ask anything about your data..." spellcheck="false" autocomplete="off">
+            <div class="ai-search-hint">Try: "hot regions with EPA violations" or "trade signals in Texas" <kbd>/</kbd></div>
+        </div>
+        <div class="ai-explain" id="ai-explain"></div>
+        <div class="ai-results" id="ai-results">
+            <div class="ai-empty" id="ai-empty">
+                <div style="font-size:1.5rem;margin-bottom:8px;opacity:.5">🎯</div>
+                <div>Ask a question to query across all convergence signals, regions, and data sources.</div>
+                <div style="margin-top:8px;color:#6366f1">Powered by Claude AI</div>
+            </div>
+        </div>
+        <div class="ai-actions">
+            <button class="ai-action-btn" onclick="aiRunQuery('hot clusters')">Hot clusters</button>
+            <button class="ai-action-btn" onclick="aiRunQuery('EPA violations')">EPA signals</button>
+            <button class="ai-action-btn" onclick="aiRunQuery('migration inflow')">Migration</button>
+        </div>
+    </aside>
+    </div><!-- /page-body -->
+
+    <!-- Memo Modal -->
+    <div class="memo-overlay" id="memo-overlay" onclick="if(event.target===this)closeMemoModal()">
+        <div class="memo-modal">
+            <div class="memo-modal-header">
+                <div class="memo-modal-title" id="memo-modal-title">Investment Memo</div>
+                <div class="memo-modal-actions">
+                    <button class="memo-modal-btn" onclick="printMemoModal()">Print / PDF</button>
+                    <button class="memo-modal-btn" onclick="closeMemoModal()">Close</button>
+                </div>
+            </div>
+            <div class="memo-modal-body">
+                <iframe id="memo-modal-iframe" sandbox="allow-same-origin allow-scripts"></iframe>
+            </div>
+        </div>
+    </div>
 
     <footer class="footer">
         <a href="http://localhost:8001/docs" target="_blank">API Docs</a>
@@ -3142,6 +4071,224 @@
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
     <script>
         const API = '/api/v1';
+
+        // ===== AI Intelligence Panel =====
+        (function(){
+            const input = document.getElementById('ai-query-input');
+            const explain = document.getElementById('ai-explain');
+            const results = document.getElementById('ai-results');
+            const empty = document.getElementById('ai-empty');
+
+            if (input) {
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') aiRunQuery(input.value);
+                    if (e.key === 'Escape') { input.value = ''; aiClearResults(); }
+                });
+            }
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    if (input) input.focus();
+                }
+            });
+        })();
+
+        async function aiRunQuery(query) {
+            const input = document.getElementById('ai-query-input');
+            const explain = document.getElementById('ai-explain');
+            const results = document.getElementById('ai-results');
+            const empty = document.getElementById('ai-empty');
+            if (!query || !query.trim()) return;
+            if (input) input.value = query;
+
+            explain.style.display = 'block';
+            explain.textContent = 'Parsing with AI...';
+            if (empty) empty.style.display = 'none';
+            results.innerHTML = '<div class="ai-empty"><div>Querying...</div></div>';
+
+            // Route by active tab: probability engine on txnprob, otherwise deal radar
+            const isTxnProb = (typeof _currentTab !== 'undefined') && _currentTab === 'txnprob';
+            try {
+                if (isTxnProb) {
+                    await aiRunQueryTxnProb(query.trim(), explain, results);
+                } else {
+                    await aiRunQueryDealRadar(query.trim(), explain, results);
+                }
+            } catch(e) {
+                explain.textContent = 'Query failed: ' + e.message;
+                results.innerHTML = '<div class="ai-empty">Error: ' + e.message + '</div>';
+            }
+        }
+
+        async function aiRunQueryDealRadar(query, explain, results) {
+            const resp = await fetch(API + '/deal-radar/query', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({query}),
+            });
+            if (!resp.ok) throw new Error('Query failed');
+            const data = await resp.json();
+
+            explain.textContent = data.explanation + ' — ' + data.total_matched + ' region' + (data.total_matched !== 1 ? 's' : '');
+
+            if (data.regions.length === 0) {
+                results.innerHTML = '<div class="ai-empty">No matching regions found. Try a different query.</div>';
+                return;
+            }
+
+            results.innerHTML = data.regions.map(function(r) {
+                const score = r.convergence_score || 0;
+                const status = r.cluster_status || 'LOW';
+                const badgeClass = status === 'HOT' ? 'hot' : status === 'ACTIVE' ? 'active' : 'watch';
+                const signals = (r.active_signals || []).join(' · ');
+                const color = score >= 72 ? '#f87171' : score >= 58 ? '#fbbf24' : '#a78bfa';
+                return '<div class="ai-result-item" onclick="aiClickRegion(\'' + r.region_id + '\')">' +
+                    '<div class="ai-result-header">' +
+                        '<div class="ai-result-name">' + r.label + '</div>' +
+                        '<div class="ai-result-badge ' + badgeClass + '">' + status + '</div>' +
+                    '</div>' +
+                    '<div class="ai-result-meta">' + Math.round(score) + ' convergence' + (signals ? ' · ' + signals : '') + '</div>' +
+                    '<div class="ai-result-bar"><div class="ai-result-bar-fill" style="width:' + Math.min(score,100) + '%;background:' + color + '"></div></div>' +
+                '</div>';
+            }).join('');
+
+            aiNotifyDealRadar(data.regions.map(function(r){ return r.region_id; }));
+        }
+
+        async function aiRunQueryTxnProb(query, explain, results) {
+            const resp = await fetch(API + '/txn-probability/query', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({query, limit: 50}),
+            });
+            if (!resp.ok) throw new Error('Query failed');
+            const data = await resp.json();
+
+            explain.textContent = data.explanation + ' — ' + data.total_matches + ' company' + (data.total_matches !== 1 ? 'ies' : '');
+
+            if (!data.results || data.results.length === 0) {
+                results.innerHTML = '<div class="ai-empty">No matching companies found. Try a different query.</div>';
+                if (typeof window.txnProbApplyNLQResults === 'function') window.txnProbApplyNLQResults([]);
+                return;
+            }
+
+            results.innerHTML = data.results.map(function(r) {
+                const prob = r.probability || 0;
+                const grade = r.grade || 'F';
+                const badgeClass = grade === 'A' ? 'hot' : grade === 'B' ? 'active' : 'watch';
+                const meta = [r.sector, r.hq_state].filter(Boolean).join(' · ');
+                const color = prob >= 0.7 ? '#f87171' : prob >= 0.5 ? '#fbbf24' : '#a78bfa';
+                const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+                return '<div class="ai-result-item" onclick="aiClickCompany(' + r.company_id + ')">' +
+                    '<div class="ai-result-header">' +
+                        '<div class="ai-result-name">' + esc(r.company_name) + '</div>' +
+                        '<div class="ai-result-badge ' + badgeClass + '">' + grade + '</div>' +
+                    '</div>' +
+                    '<div class="ai-result-meta">' + (prob * 100).toFixed(1) + '% P(txn)' + (meta ? ' · ' + esc(meta) : '') + '</div>' +
+                    '<div class="ai-result-bar"><div class="ai-result-bar-fill" style="width:' + Math.min(prob * 100, 100) + '%;background:' + color + '"></div></div>' +
+                '</div>';
+            }).join('');
+
+            // Also replace the Rankings list inside the tab
+            if (typeof window.txnProbApplyNLQResults === 'function') {
+                window.txnProbApplyNLQResults(data.results);
+            }
+        }
+
+        function aiClickCompany(companyId) {
+            if (typeof window.txnProbSelect === 'function') {
+                window.txnProbSelect(companyId);
+            }
+        }
+
+        // Update AI panel copy based on active tab. Called from showTab().
+        function aiPanelSyncToTab(tab) {
+            const input = document.getElementById('ai-query-input');
+            const hint = document.querySelector('.ai-search-hint');
+            const empty = document.getElementById('ai-empty');
+            const actions = document.querySelector('.ai-actions');
+            if (!input) return;
+
+            if (tab === 'txnprob') {
+                input.placeholder = 'Ask anything about scored companies...';
+                if (hint) hint.innerHTML = 'Try: "healthcare companies ready to exit" or "top grade A companies" <kbd>/</kbd>';
+                if (empty) empty.querySelector('div:nth-child(2)').textContent = 'Ask a question to query across scored companies, signals, and probability.';
+                if (actions) actions.innerHTML =
+                    '<button class="ai-action-btn" onclick="aiRunQuery(\'hot companies\')">Hot companies</button>' +
+                    '<button class="ai-action-btn" onclick="aiRunQuery(\'grade A\')">Grade A</button>' +
+                    '<button class="ai-action-btn" onclick="aiRunQuery(\'healthcare\')">Healthcare</button>';
+            } else {
+                input.placeholder = 'Ask anything about your data...';
+                if (hint) hint.innerHTML = 'Try: "hot regions with EPA violations" or "trade signals in Texas" <kbd>/</kbd>';
+                if (empty) empty.querySelector('div:nth-child(2)').textContent = 'Ask a question to query across all convergence signals, regions, and data sources.';
+                if (actions) actions.innerHTML =
+                    '<button class="ai-action-btn" onclick="aiRunQuery(\'hot clusters\')">Hot clusters</button>' +
+                    '<button class="ai-action-btn" onclick="aiRunQuery(\'EPA violations\')">EPA signals</button>' +
+                    '<button class="ai-action-btn" onclick="aiRunQuery(\'migration inflow\')">Migration</button>';
+            }
+            aiClearResults();
+        }
+
+        function aiClearResults() {
+            const explain = document.getElementById('ai-explain');
+            const results = document.getElementById('ai-results');
+            const empty = document.getElementById('ai-empty');
+            if (explain) explain.style.display = 'none';
+            if (results) results.innerHTML = '';
+            if (empty) { empty.style.display = 'block'; results.appendChild(empty); }
+            aiNotifyDealRadar(null);
+        }
+
+        function aiNotifyDealRadar(regionIds) {
+            // Send message to Deal Radar iframe to highlight/dim regions
+            const iframe = document.getElementById('dealradar-iframe');
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.postMessage({type: 'nlq-filter', regionIds: regionIds}, '*');
+            }
+        }
+
+        function aiClickRegion(regionId) {
+            // Generate memo for clicked region
+            aiGenerateMemo(regionId);
+        }
+
+        async function aiGenerateMemo(regionId) {
+            const overlay = document.getElementById('memo-overlay');
+            const title = document.getElementById('memo-modal-title');
+            const iframe = document.getElementById('memo-modal-iframe');
+
+            overlay.style.display = 'block';
+            title.textContent = 'Generating memo...';
+            iframe.srcdoc = '<html><body style="background:#0f172a;color:#94a3b8;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><div style="text-align:center"><div style="font-size:1.4rem;margin-bottom:8px">Generating investment memo...</div><div style="font-size:0.8rem;opacity:.6">Gathering signal data from 5 sources + AI synthesis</div></div></body></html>';
+
+            try {
+                const resp = await fetch(API + '/deal-radar/memo/' + regionId, { method: 'POST' });
+                if (!resp.ok) throw new Error('Memo generation failed');
+                const data = await resp.json();
+                title.textContent = data.title;
+                iframe.srcdoc = data.html;
+            } catch(e) {
+                title.textContent = 'Generation failed';
+                iframe.srcdoc = '<html><body style="background:#0f172a;color:#f87171;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><div>Failed: ' + e.message + '</div></body></html>';
+            }
+        }
+
+        function closeMemoModal() {
+            document.getElementById('memo-overlay').style.display = 'none';
+        }
+
+        function printMemoModal() {
+            var iframe = document.getElementById('memo-modal-iframe');
+            if (iframe && iframe.contentWindow) iframe.contentWindow.print();
+        }
+
+        // Listen for memo requests from Deal Radar iframe
+        window.addEventListener('message', function(e) {
+            if (e.data && e.data.type === 'generate-memo' && e.data.regionId) {
+                aiGenerateMemo(e.data.regionId);
+            }
+        });
 
         // ===== Auth & Session =====
         let _authToken = localStorage.getItem('nexdata_token') || null;
@@ -3327,11 +4474,11 @@
         }
 
         // ===== Tab Navigation with URL routing =====
-        const TAB_ROUTES = ['sources', 'analytics', 'jobs', 'reports', 'dq', 'settings'];
-        let _currentTab = 'sources';
+        const TAB_ROUTES = ['dealradar', 'txnprob', 'sources', 'analytics', 'jobs', 'reports', 'dq', 'settings'];
+        let _currentTab = 'dealradar';
 
         function showTab(tab, pushState) {
-            if (!TAB_ROUTES.includes(tab)) tab = 'sources';
+            if (!TAB_ROUTES.includes(tab)) tab = 'dealradar';
             document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.content > div').forEach(t => t.classList.add('hidden'));
             // Highlight the correct tab button
@@ -3345,9 +4492,11 @@
             if (tab === 'analytics') analyticsInitialize();
             if (tab === 'reports') reportsInitialize();
             if (tab === 'dq') dqInitialize();
+            if (tab === 'txnprob') txnProbInitialize();
+            if (typeof aiPanelSyncToTab === 'function') aiPanelSyncToTab(tab);
             // Update URL
             if (pushState !== false) {
-                const path = tab === 'sources' ? '/' : '/' + tab;
+                const path = tab === 'dealradar' ? '/' : '/' + tab;
                 history.pushState({ tab }, '', path);
             }
         }
@@ -3361,11 +4510,11 @@
         // Read tab from URL path
         function getTabFromPath() {
             const path = location.pathname.replace(/^\/+|\/+$/g, '');
-            if (!path || path === 'index.html') return 'sources';
+            if (!path || path === 'index.html') return 'dealradar';
             // Map common aliases
             const aliases = { analytics: 'analytics', visualizations: 'analytics', viz: 'analytics', 'pe-intelligence': 'analytics', pe: 'analytics', 'lp-intelligence': 'analytics', lp: 'analytics', dataquality: 'dq', 'data-quality': 'dq' };
             const mapped = aliases[path] || path;
-            return TAB_ROUTES.includes(mapped) ? mapped : 'sources';
+            return TAB_ROUTES.includes(mapped) ? mapped : 'dealradar';
         }
 
         // Initialize from URL on page load
@@ -10475,7 +11624,7 @@
                 });
 
                 const hierarchy = {
-                    name: 'Nexdata',
+                    name: 'Zerostack',
                     children: Object.entries(catMap).map(([cat, kids]) => ({
                         name: cat,
                         children: kids
@@ -13981,6 +15130,7 @@
             schema_drift: '#a855f7',
             cross_source_mismatch: '#ec4899',
             enrichment_opportunity: '#4ade80',
+            enrichment: '#4ade80',
             anomaly: '#60a5fa',
             orchestration: '#06b6d4',
             data_quality: '#6366f1'
