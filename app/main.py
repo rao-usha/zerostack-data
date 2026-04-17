@@ -177,6 +177,9 @@ from app.api.v1 import (
     transaction_probability,
 )
 
+# PE Intelligence Platform (PLAN_060)
+from app.api.v1 import pe_ecosystem, capital_deployment, portfolio_ops, exit_strategy
+
 # Investor Intelligence (PLAN_039)
 from app.api.v1 import afdc, investor_intelligence
 
@@ -1643,6 +1646,12 @@ app.include_router(deal_radar.router, prefix="/api/v1", dependencies=_auth)
 
 # Deal Probability Engine (PLAN_059 Phase 2)
 app.include_router(transaction_probability.router, prefix="/api/v1", dependencies=_auth)
+
+# PE Intelligence Platform (PLAN_060)
+app.include_router(pe_ecosystem.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(capital_deployment.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(portfolio_ops.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(exit_strategy.router, prefix="/api/v1", dependencies=_auth)
 
 # Specialty Data Sources
 app.include_router(ffiec_banks.router, prefix="/api/v1", dependencies=_auth)
