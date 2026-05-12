@@ -97,6 +97,16 @@ services:
       BROWSER_HEADED: ${BROWSER_HEADED:-0}
       # Set to "1" to route jobs through the queue instead of BackgroundTasks
       WORKER_MODE: ${WORKER_MODE:-1}
+    # GPU access for PLAN_062 W3 training (TabDDPM + Diffusion-TS on the RTX 5070).
+    # Docker Desktop WSL2 + Windows NVIDIA driver 591.86 / CUDA 13.1 already in place.
+    # Honored by `docker compose up` (Compose v2) — no Swarm needed.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     depends_on:
       postgres:
         condition: service_healthy
