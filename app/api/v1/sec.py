@@ -344,6 +344,100 @@ async def ingest_financial_data(
     )
 
 
+class BulkXBRLRequest(BaseModel):
+    """Request model for bulk XBRL ingest across many CIKs (PLAN_062 W1.A)."""
+
+    ciks: Optional[List[str]] = Field(
+        default=None,
+        description="Explicit list of CIKs (10-digit normalized). If omitted, "
+        "uses EDGAR's published company_tickers.json top-N universe.",
+    )
+    limit: Optional[int] = Field(
+        default=2500,
+        description="Max CIKs from default universe (ignored if ciks is supplied). "
+        "Default 2500 ≈ S&P 500 + Russell 2000.",
+    )
+    skip_facts: bool = Field(
+        default=True,
+        description="Skip raw financial_facts upsert (10x faster, sufficient for "
+        "income/balance/cashflow population which is the v1 view's data source).",
+    )
+
+
+@router.post("/ingest/xbrl-bulk")
+async def ingest_xbrl_bulk(
+    request: BulkXBRLRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    Bulk XBRL ingest across a CIK universe — PLAN_062 W1.A.
+
+    Creates a single parent orchestrator job (not 2,500 child rows) and runs
+    sequential per-CIK XBRL fetch+parse+upsert in the background. The SEC
+    client's 10 req/sec rate limit is enforced automatically.
+
+    **Default behavior (no body):** Ingest top 2,500 CIKs from EDGAR's
+    published `company_tickers.json`, skipping the raw financial_facts table
+    (~10x faster, sufficient for downstream views).
+
+    **Expected wall time:** ~30–60 minutes for 2,500 CIKs depending on EDGAR
+    response times.
+
+    Use `GET /jobs/{job_id}` to monitor progress.
+    """
+    from app.sources.sec.bulk_ingest_orchestrator import (
+        bulk_ingest_xbrl,
+        schedule_bulk_xbrl_ingest,
+    )
+    from app.sources.sec.cik_list import get_target_universe, normalize_cik
+
+    # Resolve CIK list
+    if request.ciks:
+        ciks = [normalize_cik(c) for c in request.ciks]
+    else:
+        try:
+            ciks = get_target_universe(limit=request.limit)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to fetch EDGAR ticker list: {exc}",
+            )
+
+    if not ciks:
+        raise HTTPException(status_code=400, detail="No CIKs to ingest")
+
+    # Create parent orchestrator job
+    job_id = schedule_bulk_xbrl_ingest(db, ciks, skip_facts=request.skip_facts)
+
+    # Dispatch async run via FastAPI BackgroundTasks
+    # (BackgroundTasks accepts async callables and awaits them)
+    async def _run():
+        # Need a fresh DB session for the background task; the request session
+        # is closed once the response is returned.
+        from app.core.database import get_session_factory
+
+        SessionLocal = get_session_factory()
+        bg_db = SessionLocal()
+        try:
+            await bulk_ingest_xbrl(
+                bg_db, job_id, ciks, skip_facts=request.skip_facts
+            )
+        finally:
+            bg_db.close()
+
+    background_tasks.add_task(_run)
+
+    return {
+        "job_id": job_id,
+        "status": "pending",
+        "cik_count": len(ciks),
+        "skip_facts": request.skip_facts,
+        "check_status": f"/api/v1/jobs/{job_id}",
+        "message": f"Bulk XBRL ingest queued for {len(ciks)} CIKs",
+    }
+
+
 @router.post("/ingest/full-company")
 async def ingest_full_company(
     request: IngestCompanyRequest,

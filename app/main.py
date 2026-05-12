@@ -191,6 +191,8 @@ from app.api.v1 import metro_profiles
 
 # Synthetic Data API (PLAN_052 Phase A / SPEC_042)
 from app.api.v1 import synthetic as synthetic_router
+# Synthetic Consumer Crowd (PLAN_062 addendum 1, Phase 3 / SPEC_050)
+from app.api.v1 import synthetic_crowd as synthetic_crowd_router
 
 # Company Diligence Composite (PLAN_052 Chain 2)
 from app.api.v1 import diligence_composite
@@ -305,6 +307,33 @@ async def lifespan(app: FastAPI):
         logger.info("Batch metadata columns + backfill applied to ingestion_jobs")
     except Exception as e:
         logger.warning(f"Batch metadata migration skipped: {e}")
+
+    # --- SPEC_049 / PLAN_062 W1.C: synthetic-data prerequisite views ---
+    try:
+        from app.core.database import get_engine
+        from app.sources.sec.views import create_public_company_financials_view
+        from app.sources.fred.views import create_fred_observations_view
+
+        engine = get_engine()
+        create_public_company_financials_view(engine)
+        create_fred_observations_view(engine)
+    except Exception as e:
+        logger.warning(f"Synthetic-data prerequisite views skipped: {e}")
+
+    # --- PLAN_062 W2.1: synthetic_model provenance column on ingestion_jobs ---
+    try:
+        from app.core.database import get_engine
+        from sqlalchemy import text as sa_text
+
+        engine = get_engine()
+        with engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE ingestion_jobs ADD COLUMN IF NOT EXISTS "
+                "synthetic_model VARCHAR(64) NULL"
+            ))
+        logger.info("ingestion_jobs.synthetic_model column ensured")
+    except Exception as e:
+        logger.warning(f"synthetic_model column migration skipped: {e}")
 
     # Start scheduler (optional - can be started manually via API)
     try:
@@ -1580,6 +1609,7 @@ app.include_router(pe_import.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_conviction.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(macro_cascade.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(synthetic_router.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(synthetic_crowd_router.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(diligence_composite.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(gp_pipeline.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(exec_signals.router, prefix="/api/v1", dependencies=_auth)

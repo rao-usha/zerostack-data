@@ -74,9 +74,15 @@ class MacroScenarioGenerator:
             history_months = 0
             params = self._fallback_params(series)
             available = series
+            methodology = "default_params_fallback"
         else:
             history_months = max(len(history[s]) for s in available)
             params = self._fit_params(history, available)
+            # Partial fallback if some requested series were missing
+            if len(available) < len(series):
+                methodology = "fred_calibrated_partial"
+            else:
+                methodology = "fred_calibrated_ou_walk"
 
         # Simulate
         scenarios = self._simulate(n_scenarios, horizon_months, available, params, rng)
@@ -97,7 +103,7 @@ class MacroScenarioGenerator:
             "training_history_months": history_months,
             "series": available,
             "current_values": current_values,
-            "methodology": "mean_reverting_correlated_random_walk",
+            "methodology": methodology,
             "scenarios": scenarios,
             "summary": summary,
         }

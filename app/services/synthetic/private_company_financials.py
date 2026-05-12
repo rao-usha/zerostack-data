@@ -187,10 +187,10 @@ class PrivateCompanyFinancialGenerator:
         # 2. Fit distribution from peers or fall back to sector priors
         if peer_count >= self.MIN_PEERS_FOR_FITTED_MODEL:
             dist, fallback = self._fit_from_peers(peers, revenue_min_millions, revenue_max_millions)
-            methodology = "gaussian_copula_from_peers"
+            methodology = "peer_fitted_gaussian_copula"
         else:
             dist, fallback = self._sector_priors(sector, revenue_min_millions, revenue_max_millions)
-            methodology = "gaussian_copula_from_peers"
+            methodology = "sector_priors_fallback"
 
         # 3. Sample correlated margin sets
         companies = self._sample_companies(n_companies, dist, rng)
