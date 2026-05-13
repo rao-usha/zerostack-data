@@ -77,6 +77,33 @@ class SECFinancialFact(Base):
     )
 
 
+class SECCompanyMetadata(Base):
+    """
+    Per-company submission metadata from SEC EDGAR submissions API
+    (PLAN_062 rev_02 Step 1a — needed for NAICS conditioning in TabDDPM retrain).
+
+    One row per CIK. Sourced from /submissions/CIK{cik}.json.
+    """
+
+    __tablename__ = "sec_company_metadata"
+
+    cik = Column(String(10), primary_key=True)
+    company_name = Column(Text, nullable=True)
+    # SIC code (4-digit) — the SEC's primary industry classification
+    sic_code = Column(String(4), nullable=True, index=True)
+    sic_description = Column(Text, nullable=True)
+    # Derived NAICS-2 bucket from SIC→NAICS crosswalk (~20 broad sectors)
+    naics_2 = Column(String(2), nullable=True, index=True)
+    # State of incorporation (Delaware most common)
+    state_of_incorporation = Column(String(4), nullable=True)
+    # Business address state (where they actually operate)
+    business_state = Column(String(4), nullable=True)
+    # Fiscal year end as MMDD ("0925" = Sep 25 = Apple's fiscal year end)
+    fiscal_year_end = Column(String(4), nullable=True)
+    # When this row was last refreshed from EDGAR
+    ingested_at = Column(Date, nullable=True)
+
+
 class SECIncomeStatement(Base):
     """
     Normalized income statement data from SEC filings.

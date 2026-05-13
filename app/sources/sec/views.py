@@ -37,7 +37,13 @@ SELECT
     s.operating_expenses AS operating_expenses_usd,
     s.income_tax_expense AS income_tax_expense_usd,
     s.interest_expense AS interest_expense_usd,
-    s.accession_number
+    s.accession_number,
+    -- PLAN_062 rev_02 Step 1b: NAICS-2 from sec_company_metadata for TabDDPM conditioning
+    m.sic_code,
+    m.sic_description,
+    m.naics_2,
+    m.state_of_incorporation,
+    m.business_state
 FROM sec_income_statement s
 LEFT JOIN (
     SELECT
@@ -57,6 +63,8 @@ LEFT JOIN (
     ON da.cik = s.cik
     AND da.fiscal_year = s.fiscal_year
     AND da.fiscal_period = s.fiscal_period
+LEFT JOIN sec_company_metadata m
+    ON m.cik = s.cik
 WHERE s.revenues IS NOT NULL
   AND s.revenues > 0;
 """

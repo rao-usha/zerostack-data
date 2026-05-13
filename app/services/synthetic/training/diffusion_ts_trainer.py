@@ -69,17 +69,27 @@ class DiffusionTSConfig(TrainingConfig):
     diffusion_steps: int = 500
     noise_schedule: str = "cosine"
     fourier_loss_weight: float = 0.01
-    # Network
-    hidden_dim: int = 256
-    n_transformer_layers: int = 4
-    n_attention_heads: int = 4
+    # Network — rev_02 §2c: bigger to capture fat-tail structure
+    hidden_dim: int = 384               # was 256
+    n_transformer_layers: int = 6       # was 4
+    n_attention_heads: int = 6          # was 4
     dropout: float = 0.1
     # Training
     batch_size: int = 256
     learning_rate: float = 1e-4
-    epochs: int = 200                  # Reduced from paper's 10k — our N is small; early-stop on val loss
+    epochs: int = 5000                  # rev_02 §2c: was 200; each epoch ~50ms so ~5min total
     warmup_steps: int = 1000
     grad_clip: float = 1.0
+    # rev_02 §2a: Min-SNR-γ loss weighting (Hang et al. 2023, arXiv:2303.09556)
+    # γ=5 is paper-recommended; down-weights low-t (already-easy) timesteps so
+    # the model spends more gradient on high-t (fat-tail-bearing) regimes
+    minsnr_gamma: float = 5.0
+    use_minsnr_weighting: bool = True
+    # rev_02 §2b: Importance sampling on t — sample t ~ Beta(2,1)·T which
+    # skews mean from T/2 (uniform) to 2T/3 (more high-t exposure)
+    use_importance_sampling_t: bool = True
+    t_beta_alpha: float = 2.0
+    t_beta_beta: float = 1.0
     # Sampling
     ddim_steps: int = 50
     # Mixed precision
@@ -322,15 +332,38 @@ class DiffusionTSModel(nn.Module):
         return sqrt_alphas * x_0 + sqrt_one_minus * noise
 
     def loss(self, x_0: torch.Tensor) -> torch.Tensor:
-        """L_simple + lambda * L_fourier."""
+        """L_simple + lambda * L_fourier, with rev_02 fat-tail-preservation patches."""
         B = x_0.shape[0]
-        t = torch.randint(0, self.config.diffusion_steps, (B,), device=x_0.device)
+        T = self.config.diffusion_steps
+        device = x_0.device
+
+        # rev_02 §2b: importance sampling on t — Beta(2,1)·T skews toward higher
+        # t (where fat tails dominate the gradient signal)
+        if self.config.use_importance_sampling_t:
+            u = torch.distributions.Beta(
+                self.config.t_beta_alpha, self.config.t_beta_beta,
+            ).sample((B,)).to(device)
+            t = (u * T).long().clamp(0, T - 1)
+        else:
+            t = torch.randint(0, T, (B,), device=device)
+
         noise = torch.randn_like(x_0)
         x_t = self.q_sample(x_0, t, noise)
         noise_pred = self.denoiser(x_t, t)
 
-        # Simple noise-prediction loss
-        l_simple = F.mse_loss(noise_pred, noise)
+        # rev_02 §2a: Min-SNR-γ weighting for ε-prediction
+        # weight = min(SNR_t, γ) / SNR_t = min(1, γ/SNR_t)
+        # Down-weights low-t (high-SNR, easy) timesteps; concentrates gradient
+        # on high-t (low-SNR, fat-tail-bearing) timesteps.
+        if self.config.use_minsnr_weighting:
+            ab_t = self.alphas_cumprod[t]
+            snr_t = ab_t / (1.0 - ab_t + 1e-8)
+            minsnr_w = torch.clamp(self.config.minsnr_gamma / (snr_t + 1e-8), max=1.0)
+            # Per-sample MSE then weighted mean
+            l_per = ((noise_pred - noise) ** 2).mean(dim=tuple(range(1, noise.ndim)))
+            l_simple = (minsnr_w * l_per).mean()
+        else:
+            l_simple = F.mse_loss(noise_pred, noise)
 
         # Fourier-domain auxiliary on the implied x_0 prediction.
         # Clip x_0_pred to z-space sanity range — at high t values, sqrt_alphas

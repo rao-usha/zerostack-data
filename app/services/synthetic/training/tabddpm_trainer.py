@@ -67,9 +67,17 @@ class TabDDPMConfig(TrainingConfig):
     continuous_features: List[str] = field(default_factory=lambda: [
         "log_revenue", "gross_margin", "ebitda_margin", "net_margin",
     ])
-    # Categorical conditioning features (will be one-hot encoded)
+    # Categorical conditioning features (will be one-hot encoded).
+    # rev_02 Step 1c iter 1: added naics_2 — passed Finance (3/3) but Manufacturing
+    # / Professional Services / Construction still failed because those NAICS-2
+    # buckets contain very heterogeneous sub-industries (Aero+Pharma+Steel all
+    # in NAICS=31).
+    # rev_02 Step 1c iter 2: added sic_code (~400 4-digit codes from EDGAR) for
+    # much finer sector granularity. Training data has ~22 rows per SIC on
+    # average; many top SICs have hundreds. Rare SICs will collapse to
+    # neighbor-sector-mean behavior via the one-hot encoding's sparsity.
     categorical_features: List[str] = field(default_factory=lambda: [
-        "revenue_bucket", "era",
+        "revenue_bucket", "era", "naics_2", "sic_code",
     ])
     # Diffusion
     diffusion_steps: int = 1000
@@ -131,7 +139,9 @@ def load_training_dataframe() -> pd.DataFrame:
                 gross_profit_usd,
                 ebitda_usd,
                 net_income_usd,
-                fiscal_year
+                fiscal_year,
+                naics_2,
+                sic_code
             FROM public_company_financials
             WHERE fiscal_period = 'FY'
               AND revenue_usd > 1e6                     -- drop near-zero revenues
@@ -149,6 +159,7 @@ def load_training_dataframe() -> pd.DataFrame:
 
     df = pd.DataFrame(rows, columns=[
         "revenue_usd", "gross_profit_usd", "ebitda_usd", "net_income_usd", "fiscal_year",
+        "naics_2", "sic_code",
     ])
     df = df.astype({
         "revenue_usd": "float64",
@@ -157,6 +168,12 @@ def load_training_dataframe() -> pd.DataFrame:
         "net_income_usd": "float64",
         "fiscal_year": "int64",
     })
+    # Impute missing NAICS-2 and SIC to "UN" / "0000" (UNKNOWN) so the row
+    # stays in training rather than being dropped — better to model the
+    # unknown-sector mass than leak those companies out of the training
+    # distribution entirely.
+    df["naics_2"] = df["naics_2"].fillna("UN")
+    df["sic_code"] = df["sic_code"].fillna("0000")
 
     # Derived features
     df["log_revenue"] = np.log(df["revenue_usd"].clip(lower=1e6))
