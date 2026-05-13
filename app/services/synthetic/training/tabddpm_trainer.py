@@ -68,16 +68,16 @@ class TabDDPMConfig(TrainingConfig):
         "log_revenue", "gross_margin", "ebitda_margin", "net_margin",
     ])
     # Categorical conditioning features (will be one-hot encoded).
-    # rev_02 Step 1c iter 1: added naics_2 — passed Finance (3/3) but Manufacturing
-    # / Professional Services / Construction still failed because those NAICS-2
-    # buckets contain very heterogeneous sub-industries (Aero+Pharma+Steel all
-    # in NAICS=31).
-    # rev_02 Step 1c iter 2: added sic_code (~400 4-digit codes from EDGAR) for
-    # much finer sector granularity. Training data has ~22 rows per SIC on
-    # average; many top SICs have hundreds. Rare SICs will collapse to
-    # neighbor-sector-mean behavior via the one-hot encoding's sparsity.
+    # rev_02 iter 1: naics_2 (17 buckets) + sic_code (~260 4-digit codes).
+    # Per-sector marginals passed 6/6 but pooled correlation Frobenius stuck
+    # at 0.26 (>0.20).
+    # SPEC_051 iter 2: add sic_2 (~60-80 2-digit codes, derived as
+    # LEFT(sic_code, 2)) as middle granularity between NAICS-2 and SIC-4.
+    # Hypothesis: model needs an intermediate bucket where it can learn
+    # within-sub-industry joint structure (e.g. semiconductors share
+    # margin↔revenue dynamics that differ from broader 'Manufacturing').
     categorical_features: List[str] = field(default_factory=lambda: [
-        "revenue_bucket", "era", "naics_2", "sic_code",
+        "revenue_bucket", "era", "naics_2", "sic_2", "sic_code",
     ])
     # Diffusion
     diffusion_steps: int = 1000
@@ -141,6 +141,7 @@ def load_training_dataframe() -> pd.DataFrame:
                 net_income_usd,
                 fiscal_year,
                 naics_2,
+                sic_2,
                 sic_code
             FROM public_company_financials
             WHERE fiscal_period = 'FY'
@@ -159,7 +160,7 @@ def load_training_dataframe() -> pd.DataFrame:
 
     df = pd.DataFrame(rows, columns=[
         "revenue_usd", "gross_profit_usd", "ebitda_usd", "net_income_usd", "fiscal_year",
-        "naics_2", "sic_code",
+        "naics_2", "sic_2", "sic_code",
     ])
     df = df.astype({
         "revenue_usd": "float64",
@@ -168,11 +169,11 @@ def load_training_dataframe() -> pd.DataFrame:
         "net_income_usd": "float64",
         "fiscal_year": "int64",
     })
-    # Impute missing NAICS-2 and SIC to "UN" / "0000" (UNKNOWN) so the row
-    # stays in training rather than being dropped — better to model the
-    # unknown-sector mass than leak those companies out of the training
-    # distribution entirely.
+    # Impute missing NAICS-2/SIC to UNKNOWN sentinels so the row stays in
+    # training rather than being dropped — better to model the unknown-sector
+    # mass than leak those companies out of the training distribution entirely.
     df["naics_2"] = df["naics_2"].fillna("UN")
+    df["sic_2"] = df["sic_2"].fillna("00")
     df["sic_code"] = df["sic_code"].fillna("0000")
 
     # Derived features
@@ -599,6 +600,17 @@ class TabDDPMGenerator(LearnedSyntheticGenerator):
         if self.model is None:
             raise RuntimeError("Model not loaded")
 
+        # SPEC_051 T1 (revised): only seed if caller passes inference_seed.
+        # Auto-seeding by config.random_state is a footgun — specific seeds
+        # can hit pathological DDIM draws (e.g. seed=42 on v4 produced
+        # log_revenue σ=5.1 vs real 1.7, wrecking the correlation matrix).
+        # Multi-seed median is the right pattern; see validation script.
+        if "inference_seed" in conditions:
+            seed = int(conditions["inference_seed"])
+            torch.manual_seed(seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(seed)
+
         # Build conditioning vector
         cond_df = pd.DataFrame({
             "revenue_bucket": [conditions.get("revenue_bucket", "$50-250M")] * n,
@@ -622,10 +634,21 @@ class TabDDPMGenerator(LearnedSyntheticGenerator):
 
     # ---------- ABC: validate ----------
 
-    def validate(self, held_out: pd.DataFrame) -> ValidationReport:
-        """Apply held-out data; sample n_synth = n_held_out rows; compute KS + Frobenius."""
+    def validate(self, held_out: pd.DataFrame, inference_seed: Optional[int] = None) -> ValidationReport:
+        """Apply held-out data; sample n_synth = n_held_out rows; compute KS + Frobenius.
+
+        SPEC_051 T1 update: only seed if the caller explicitly passes inference_seed.
+        Auto-seeding with config.random_state (default 42) turned out to be a
+        footgun — specific seeds can hit pathological draws in the DDIM chain.
+        The validation script loops over multiple seeds and takes the median.
+        """
         if self.model is None:
             raise RuntimeError("Model not loaded")
+
+        if inference_seed is not None:
+            torch.manual_seed(int(inference_seed))
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(int(inference_seed))
 
         n = len(held_out)
         # Match the conditioning to the held-out distribution

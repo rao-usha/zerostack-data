@@ -90,6 +90,18 @@ class DiffusionTSConfig(TrainingConfig):
     use_importance_sampling_t: bool = True
     t_beta_alpha: float = 2.0
     t_beta_beta: float = 1.0
+    # SPEC_051: Student-t noise prior. rev_02 iter 1 (Gaussian noise + min-SNR
+    # + importance sampling) hit 1/8 on FRED stylized facts because synth
+    # kurtosis topped out at ~6 vs real 8-400+. Switching the noise prior to
+    # Student-t(df=4) makes the model see heavier-tailed marginal noise during
+    # training and during reverse-process sampling. df=4 is the smallest df
+    # with finite kurtosis; t_df=4 gives noise kurt ~∞ analytically but
+    # truncated by clipping in practice.
+    use_student_t_noise: bool = True
+    t_noise_df: float = 4.0
+    # Clip Student-t samples to avoid numerical blowups (rare-event tails of
+    # the noise prior itself can otherwise dominate gradients).
+    student_t_clip: float = 8.0
     # Sampling
     ddim_steps: int = 50
     # Mixed precision
@@ -331,6 +343,27 @@ class DiffusionTSModel(nn.Module):
         sqrt_one_minus = self.sqrt_one_minus_alphas_cumprod[t][:, None, None]
         return sqrt_alphas * x_0 + sqrt_one_minus * noise
 
+    def _sample_noise(self, shape, device: torch.device, dtype: torch.dtype = torch.float32) -> torch.Tensor:
+        """
+        SPEC_051 T4: heavy-tailed noise prior. When use_student_t_noise is on,
+        draws from Student-t(df=t_noise_df) scaled to unit variance and clipped
+        to ±student_t_clip. The unit-variance scaling matters because the
+        diffusion math (alphas_cumprod schedule) assumes Var[noise]=1; raw
+        Student-t(df) has Var = df/(df-2) which is > 1.
+        Fallback: standard normal — equivalent to torch.randn(shape, ...).
+        """
+        if not getattr(self.config, "use_student_t_noise", False):
+            return torch.randn(shape, device=device, dtype=dtype)
+
+        df = float(self.config.t_noise_df)
+        # Sample raw Student-t and rescale to unit variance
+        dist = torch.distributions.StudentT(df=df, loc=0.0, scale=1.0)
+        raw = dist.sample(shape).to(device=device, dtype=dtype)
+        if df > 2.0:
+            raw = raw * ((df - 2.0) / df) ** 0.5  # rescale Var -> 1
+        clip = float(getattr(self.config, "student_t_clip", 8.0))
+        return torch.clamp(raw, -clip, clip)
+
     def loss(self, x_0: torch.Tensor) -> torch.Tensor:
         """L_simple + lambda * L_fourier, with rev_02 fat-tail-preservation patches."""
         B = x_0.shape[0]
@@ -347,7 +380,7 @@ class DiffusionTSModel(nn.Module):
         else:
             t = torch.randint(0, T, (B,), device=device)
 
-        noise = torch.randn_like(x_0)
+        noise = self._sample_noise(x_0.shape, device=x_0.device, dtype=x_0.dtype)
         x_t = self.q_sample(x_0, t, noise)
         noise_pred = self.denoiser(x_t, t)
 
@@ -395,7 +428,10 @@ class DiffusionTSModel(nn.Module):
         # Subsample the timestep schedule for DDIM
         step_indices = torch.linspace(T - 1, 0, ddim_steps + 1).round().long().to(device)
 
-        x_t = torch.randn(n, seq_len, self.n_channels, device=device)
+        # SPEC_051: heavy-tailed prior for the reverse process start. Without
+        # this the denoiser would have to invent fat tails from a Gaussian
+        # seed, which it can't reliably do even with a Student-t training loss.
+        x_t = self._sample_noise((n, seq_len, self.n_channels), device=device, dtype=torch.float32)
 
         for i in range(ddim_steps):
             t_cur = step_indices[i].repeat(n)

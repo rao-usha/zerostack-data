@@ -42,6 +42,8 @@ SELECT
     m.sic_code,
     m.sic_description,
     m.naics_2,
+    -- SPEC_051 T3: SIC-2 bucket (intermediate granularity between NAICS-2 and SIC-4)
+    LEFT(m.sic_code, 2) AS sic_2,
     m.state_of_incorporation,
     m.business_state
 FROM sec_income_statement s
