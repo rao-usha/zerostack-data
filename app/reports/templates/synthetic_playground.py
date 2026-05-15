@@ -25,11 +25,13 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.reports.design_system import (
     BLUE, CHART_COLORS, GRAY, GREEN, TEAL,
     build_bar_fallback, build_line_chart_config,
@@ -214,12 +216,25 @@ class SyntheticPlaygroundTemplate(ICReportBase):
     def _render_cta_block(self, generator: str, ref: str) -> str:
         """The 'Made with Nexdata' CTA. Wrapped in a STABLE anchor —
         `<!-- CTA_BLOCK_PLACEHOLDER -->` + `id="nexdata-cta"` — so Step 6/8 code
-        can locate / rewrite it. Links fall back to in-app anchors until
-        canonical marketing URLs exist (PLAN_063 open decision #3)."""
+        can locate / rewrite it.
+
+        URLs come from `settings.playground_cta_platform_url` and
+        `playground_cta_run_url` (SPEC_059). They may contain `{gen}` and
+        `{ref}` placeholders, which get substituted with the run's generator
+        and short_code. URLs without placeholders are honored verbatim, so a
+        deployment can point the buttons at a canonical marketing site by
+        setting the env vars without any code change.
+        """
+        settings = get_settings()
         vertical = _VERTICAL_HINT.get(generator, "investor & operator intelligence")
-        ref_q = f"&ref={ref}" if ref else ""
-        primary_href = f"/playground.html?from=playground&gen={generator}{ref_q}#platform"
-        secondary_href = f"/playground.html?from=playground&gen={generator}{ref_q}"
+
+        # defaultdict(str) makes str.format_map tolerate placeholders that
+        # aren't present in the URL template (the URL passes through verbatim)
+        # AND tolerates the URL template referencing only some of the keys.
+        subs: Dict[str, str] = defaultdict(str, gen=generator, ref=ref or "")
+        primary_href = settings.playground_cta_platform_url.format_map(subs)
+        secondary_href = settings.playground_cta_run_url.format_map(subs)
+
         return f"""<!-- CTA_BLOCK_PLACEHOLDER -->
 <div id="nexdata-cta" style="background:var(--gray-50);border:1px solid var(--gray-200);
      border-top:4px solid {BLUE};border-radius:10px;padding:28px 24px;text-align:center">

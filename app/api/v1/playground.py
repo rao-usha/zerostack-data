@@ -262,7 +262,7 @@ def _run_generator(db: Session, generator: str, params: Dict[str, Any]) -> Dict[
 
 
 def _normalize(generator: str, raw: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
-    """Reshape a generator's raw result into the report-template payload.
+    """Generic fallback normalizer for any generator without a dedicated one.
 
     Defensive — extracts a `summary` from top-level scalar fields and `rows`
     from the first list-of-dicts in the result, so it tolerates shape
@@ -300,6 +300,140 @@ def _normalize(generator: str, raw: Dict[str, Any], params: Dict[str, Any]) -> D
         "summary": summary,
         "rows": rows,
     }
+
+
+# ── Per-generator normalizers (SPEC_059) ──────────────────────────────────
+#
+# Each takes (raw, params) — the raw dict the generator returns plus the
+# inbound request params — and produces the canonical playground-report
+# payload: `summary` (KPI strip), `rows` (sample table, <=20 shown), and an
+# optional `chart` ({labels, series:[{label,data}], y_label}). The generic
+# `_normalize()` above stays as a fallback for future generators that haven't
+# been given a dedicated normalizer yet.
+
+def _normalize_macro(raw: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
+    """Flatten macro-scenario output into a median-path chart + percentile rows."""
+    series_list: List[str] = list(raw.get("series") or [])
+    scenarios = raw.get("scenarios") or []
+    summary_in = raw.get("summary") or {}
+    current = raw.get("current_values") or {}
+    horizon = int(raw.get("horizon_months") or 0)
+
+    # Median path per series, computed elementwise across scenarios. Median (not
+    # mean) preserves heavy tails — UNRATE / UMCSENT / DCOILWTICO shouldn't be
+    # visually compressed by extreme draws.
+    chart_series: List[Dict[str, Any]] = []
+    for s in series_list:
+        paths = [
+            sc["paths"][s]
+            for sc in scenarios
+            if isinstance(sc.get("paths"), dict) and s in sc["paths"]
+        ]
+        if not paths:
+            continue
+        length = min(len(p) for p in paths)
+        median = [
+            round(float(sorted(p[t] for p in paths)[len(paths) // 2]), 4)
+            for t in range(length)
+        ]
+        chart_series.append({"label": s, "data": median})
+
+    labels = [f"M{t + 1}" for t in range(horizon)]
+
+    rows = [
+        {
+            "series": s,
+            "current": current.get(s),
+            "p10": (summary_in.get(s) or {}).get("p10_terminal"),
+            "p50": (summary_in.get(s) or {}).get("p50_terminal"),
+            "p90": (summary_in.get(s) or {}).get("p90_terminal"),
+        }
+        for s in series_list
+    ]
+
+    return {
+        "generator": "macro-scenarios",
+        "generator_label": GENERATORS["macro-scenarios"]["label"],
+        "request_params": {k: v for k, v in params.items() if v is not None},
+        "summary": {
+            "Scenarios": raw.get("n_scenarios"),
+            "Horizon": f"{horizon} mo",
+            "Series": len(series_list),
+            "History (mo)": raw.get("training_history_months"),
+        },
+        "rows": rows,
+        "chart": {"labels": labels, "series": chart_series, "y_label": "Level"},
+    }
+
+
+def _normalize_private_financials(
+    raw: Dict[str, Any], params: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Sector + ratio means in the KPI strip; companies straight into the table."""
+    rs = raw.get("ratio_stats") or {}
+
+    def _mean(stat_key: str) -> Optional[float]:
+        block = rs.get(stat_key)
+        if not isinstance(block, dict):
+            return None
+        return round(float(block.get("mean", 0.0)), 4)
+
+    return {
+        "generator": "private-financials",
+        "generator_label": GENERATORS["private-financials"]["label"],
+        "request_params": {k: v for k, v in params.items() if v is not None},
+        "summary": {
+            "Sector": raw.get("sector"),
+            "Peer Count": raw.get("peer_count"),
+            "Synthetic Companies": raw.get("synthetic_count"),
+            "Gross Margin (mean)": _mean("gross_margin"),
+            "EBITDA Margin (mean)": _mean("ebitda_margin"),
+            "Net Margin (mean)": _mean("net_margin"),
+        },
+        "rows": raw.get("companies") or [],
+        "chart": None,
+    }
+
+
+def _normalize_consumer_crowd(
+    raw: Dict[str, Any], params: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Scenario context + aggregate scalars in the KPI strip; responses → rows."""
+    scen = raw.get("scenario") or {}
+    agg = raw.get("aggregate") or {}
+
+    summary: Dict[str, Any] = {
+        "Scenario": scen.get("category"),
+        "Event": scen.get("event_type"),
+        "Description": scen.get("description"),
+    }
+    for k, v in agg.items():
+        if isinstance(v, (int, float)) and len(summary) < 6:
+            summary[_titleize(k)] = round(v, 3) if isinstance(v, float) else v
+
+    return {
+        "generator": "consumer-crowd",
+        "generator_label": GENERATORS["consumer-crowd"]["label"],
+        "request_params": {k: v for k, v in params.items() if v is not None},
+        "summary": summary,
+        "rows": raw.get("responses") or [],
+        "chart": None,
+    }
+
+
+_NORMALIZERS = {
+    "private-financials": _normalize_private_financials,
+    "macro-scenarios": _normalize_macro,
+    "consumer-crowd": _normalize_consumer_crowd,
+}
+
+
+def _normalize_dispatch(
+    generator: str, raw: Dict[str, Any], params: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Pick the dedicated normalizer for `generator` or fall back to generic."""
+    fn = _NORMALIZERS.get(generator)
+    return fn(raw, params) if fn else _normalize(generator, raw, params)
 
 
 def _titleize(key: str) -> str:
@@ -405,8 +539,10 @@ def run_generator(
             detail=f"Generator '{req.generator}' failed to produce a result.",
         )
 
-    # 2. Normalize -> build the shareable report.
-    payload = _normalize(req.generator, raw, req.params)
+    # 2. Normalize -> build the shareable report. Per-generator normalizers
+    #    (SPEC_059) produce richer summary/rows/chart payloads; unknown
+    #    generators still go through the generic fallback inside _normalize_dispatch.
+    payload = _normalize_dispatch(req.generator, raw, req.params)
     short_code = _short_code()
     payload["ref"] = short_code  # CTA attribution
 

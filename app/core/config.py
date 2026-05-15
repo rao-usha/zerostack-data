@@ -75,6 +75,22 @@ class Settings(BaseSettings):
         le=100000,
         description="Daily generator runs allowed for a pro-tier user",
     )
+    playground_cta_platform_url: str = Field(
+        default="/playground.html?from=playground&gen={gen}&ref={ref}#platform",
+        description=(
+            "URL the 'See the platform' CTA button points to. "
+            "`{gen}` and `{ref}` placeholders are substituted with the run's "
+            "generator name and report short_code; URLs without placeholders "
+            "are honored verbatim. (PLAN_063 / SPEC_059)"
+        ),
+    )
+    playground_cta_run_url: str = Field(
+        default="/playground.html?from=playground&gen={gen}&ref={ref}",
+        description=(
+            "URL the 'Run your own' CTA button points to. Same `{gen}`/`{ref}` "
+            "placeholder substitution as `playground_cta_platform_url`."
+        ),
+    )
 
     # Census API Configuration (OPTIONAL for startup, REQUIRED for ingestion)
     census_survey_api_key: Optional[str] = Field(
