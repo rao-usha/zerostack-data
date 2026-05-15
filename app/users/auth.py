@@ -4,6 +4,8 @@ User Authentication Service.
 Provides user registration, login, JWT token management, and password handling.
 """
 
+import hashlib
+import hmac
 import secrets
 import logging
 from datetime import datetime, timedelta
@@ -36,6 +38,10 @@ def _get_secret_key() -> str:
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 PASSWORD_RESET_EXPIRE_HOURS = 24
+
+# Passwordless sign-in (PLAN_063 / SPEC_053)
+LOGIN_CODE_EXPIRE_MINUTES = 10
+LOGIN_CODE_MAX_ATTEMPTS = 5
 
 
 class AuthService:
@@ -89,6 +95,24 @@ class AuthService:
         """)
         )
 
+        # Passwordless sign-in codes / magic-link tokens (PLAN_063 / SPEC_053)
+        self.db.execute(
+            text("""
+            CREATE TABLE IF NOT EXISTS login_codes (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR(255) NOT NULL,
+                code_hash VARCHAR(64) NOT NULL,
+                token_hash VARCHAR(64) NOT NULL,
+                purpose VARCHAR(20) DEFAULT 'login',
+                expires_at TIMESTAMP NOT NULL,
+                consumed_at TIMESTAMP,
+                attempts INTEGER DEFAULT 0,
+                request_ip VARCHAR(45),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        )
+
         # Create indexes
         self.db.execute(
             text("""
@@ -105,8 +129,30 @@ class AuthService:
             CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash ON refresh_tokens(token_hash)
         """)
         )
+        self.db.execute(
+            text("""
+            CREATE INDEX IF NOT EXISTS idx_login_codes_email ON login_codes(email, created_at DESC)
+        """)
+        )
 
         self.db.commit()
+
+        # Idempotent column migrations for passwordless users (PLAN_063 / SPEC_053).
+        # password_hash must be nullable (passwordless users have none); tier +
+        # signup_source support the playground free tier. Each wrapped so a
+        # re-run, an already-migrated DB, or a non-Postgres backend can't crash
+        # service construction.
+        for migration in (
+            "ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS tier VARCHAR(20) DEFAULT 'free'",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_source VARCHAR(100)",
+        ):
+            try:
+                self.db.execute(text(migration))
+                self.db.commit()
+            except Exception as exc:  # noqa: BLE001 — best-effort, non-fatal
+                self.db.rollback()
+                logger.debug("login_codes/users migration skipped (%s): %s", migration, exc)
 
     def _hash_password(self, password: str) -> str:
         """Hash password with bcrypt."""
@@ -145,6 +191,230 @@ class AuthService:
         self.db.commit()
 
         return token
+
+    def _issue_tokens_for_user(
+        self, user_id: int, email: str, name: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Issue the standard access+refresh token bundle for a user.
+
+        Shared by password login and passwordless sign-in so there is exactly
+        one place that mints tokens.
+        """
+        access_token = self._create_access_token(user_id, email)
+        refresh_token = self._create_refresh_token(user_id)
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            "user": {"id": user_id, "email": email, "name": name},
+        }
+
+    # ------------------------------------------------------------------
+    # Passwordless sign-in (PLAN_063 / SPEC_053)
+    # ------------------------------------------------------------------
+
+    def _generate_login_code(self) -> str:
+        """Return a zero-padded 6-digit numeric login code."""
+        return f"{secrets.randbelow(1_000_000):06d}"
+
+    def _hash_login_code(self, code: str) -> str:
+        """SHA-256 hex digest of a login code (codes are never stored plaintext)."""
+        return hashlib.sha256(code.encode()).hexdigest()
+
+    def _hash_login_token(self, token: str) -> str:
+        """SHA-256 hex digest of a magic-link token."""
+        return hashlib.sha256(token.encode()).hexdigest()
+
+    def _notify_lead_event(self, event: str, **kwargs) -> None:
+        """Best-effort lead-capture hook. Lead capture must never block sign-in,
+        and LeadService (PLAN_063 Step 3) may not exist yet — swallow everything."""
+        try:
+            from app.services.leads.lead_service import LeadService
+
+            lead_service = LeadService(self.db)
+            if event == "signup":
+                lead_service.upsert_from_signup(
+                    email=kwargs["email"],
+                    signup_source=kwargs.get("signup_source", "playground"),
+                    request_ip=kwargs.get("request_ip"),
+                )
+            elif event == "verified":
+                lead_service.mark_verified(kwargs["email"])
+        except Exception as exc:  # noqa: BLE001 — best-effort, non-fatal
+            logger.debug("Lead hook (%s) skipped: %s", event, exc)
+
+    def request_login_code(
+        self,
+        email: str,
+        request_ip: Optional[str] = None,
+        signup_source: str = "playground",
+    ) -> Dict[str, Any]:
+        """Create a passwordless sign-in code + magic-link token for an email.
+
+        Rate-limited; auto-creates a `users` row for new emails. Returns
+        {"email", "code", "link"} — the caller (an async endpoint) is
+        responsible for actually emailing it and must never return the
+        code/link to the client.
+        """
+        email = email.lower().strip()
+
+        # Rate limit: <=3 unconsumed codes / 15 min, <=1 / 60 s
+        recent = self.db.execute(
+            text("""
+            SELECT
+                COUNT(*) FILTER (WHERE created_at > :win_15m) AS cnt_15m,
+                COUNT(*) FILTER (WHERE created_at > :win_60s) AS cnt_60s
+            FROM login_codes
+            WHERE email = :email AND consumed_at IS NULL
+        """),
+            {
+                "email": email,
+                "win_15m": datetime.utcnow() - timedelta(minutes=15),
+                "win_60s": datetime.utcnow() - timedelta(seconds=60),
+            },
+        ).fetchone()
+        if recent and (recent[0] or 0) >= 3:
+            raise ValueError("Too many sign-in requests. Please try again later.")
+        if recent and (recent[1] or 0) >= 1:
+            raise ValueError("Please wait a moment before requesting another code.")
+
+        code = self._generate_login_code()
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(minutes=LOGIN_CODE_EXPIRE_MINUTES)
+
+        self.db.execute(
+            text("""
+            INSERT INTO login_codes
+                (email, code_hash, token_hash, purpose, expires_at, request_ip)
+            VALUES (:email, :code_hash, :token_hash, 'login', :expires_at, :request_ip)
+        """),
+            {
+                "email": email,
+                "code_hash": self._hash_login_code(code),
+                "token_hash": self._hash_login_token(token),
+                "expires_at": expires_at,
+                "request_ip": request_ip,
+            },
+        )
+
+        # Auto-create a passwordless user row for new emails.
+        existing = self.db.execute(
+            text("SELECT id FROM users WHERE email = :email"), {"email": email}
+        ).fetchone()
+        if not existing:
+            self.db.execute(
+                text("""
+                INSERT INTO users (email, password_hash, is_verified, tier, signup_source)
+                VALUES (:email, NULL, FALSE, 'free', :signup_source)
+            """),
+                {"email": email, "signup_source": signup_source},
+            )
+        self.db.commit()
+
+        self._notify_lead_event(
+            "signup", email=email, signup_source=signup_source, request_ip=request_ip
+        )
+
+        from app.core.config import get_settings
+
+        base_url = (get_settings().playground_base_url or "").rstrip("/")
+        link = f"{base_url}/playground.html?verify={token}"
+        return {"email": email, "code": code, "link": link}
+
+    def _consume_login_row(self, row_id: int) -> None:
+        self.db.execute(
+            text("UPDATE login_codes SET consumed_at = CURRENT_TIMESTAMP WHERE id = :id"),
+            {"id": row_id},
+        )
+        self.db.commit()
+
+    def _finalize_login(self, email: str) -> Dict[str, Any]:
+        """Mark the user verified, bump last_login_at, issue tokens."""
+        self.db.execute(
+            text("""
+            UPDATE users
+            SET is_verified = TRUE, last_login_at = CURRENT_TIMESTAMP
+            WHERE email = :email
+        """),
+            {"email": email},
+        )
+        self.db.commit()
+
+        row = self.db.execute(
+            text("SELECT id, email, name, is_active FROM users WHERE email = :email"),
+            {"email": email},
+        ).fetchone()
+        if not row or not row[3]:
+            raise ValueError("Account is not active")
+
+        self._notify_lead_event("verified", email=email)
+        return self._issue_tokens_for_user(row[0], row[1], row[2])
+
+    def verify_login_code(self, email: str, code: str) -> Dict[str, Any]:
+        """Verify a 6-digit login code and issue tokens. Raises ValueError on
+        any failure (no row / expired / wrong code / locked out)."""
+        email = email.lower().strip()
+
+        row = self.db.execute(
+            text("""
+            SELECT id, code_hash, expires_at, attempts
+            FROM login_codes
+            WHERE email = :email AND consumed_at IS NULL
+            ORDER BY created_at DESC
+            LIMIT 1
+        """),
+            {"email": email},
+        ).fetchone()
+        if not row:
+            raise ValueError("Invalid or expired code")
+
+        row_id, code_hash, expires_at, attempts = row
+
+        # Count this attempt first; lock the row once attempts exceed the cap.
+        attempts_now = (attempts or 0) + 1
+        self.db.execute(
+            text("UPDATE login_codes SET attempts = :a WHERE id = :id"),
+            {"a": attempts_now, "id": row_id},
+        )
+        self.db.commit()
+
+        if attempts_now > LOGIN_CODE_MAX_ATTEMPTS:
+            self._consume_login_row(row_id)
+            raise ValueError("Too many attempts. Request a new code.")
+
+        if expires_at < datetime.utcnow():
+            raise ValueError("Code expired. Request a new one.")
+
+        if not hmac.compare_digest(self._hash_login_code(code), code_hash):
+            raise ValueError("Invalid code")
+
+        self._consume_login_row(row_id)
+        return self._finalize_login(email)
+
+    def verify_login_token(self, token: str) -> Dict[str, Any]:
+        """Verify a magic-link token and issue tokens. Raises ValueError on
+        any failure (no row / expired)."""
+        token_hash = self._hash_login_token(token)
+        row = self.db.execute(
+            text("""
+            SELECT id, email, expires_at
+            FROM login_codes
+            WHERE token_hash = :token_hash AND consumed_at IS NULL
+            ORDER BY created_at DESC
+            LIMIT 1
+        """),
+            {"token_hash": token_hash},
+        ).fetchone()
+        if not row:
+            raise ValueError("Invalid or expired sign-in link")
+
+        row_id, email, expires_at = row
+        if expires_at < datetime.utcnow():
+            raise ValueError("Sign-in link expired. Request a new one.")
+
+        self._consume_login_row(row_id)
+        return self._finalize_login(email)
 
     def register(
         self, email: str, password: str, name: Optional[str] = None

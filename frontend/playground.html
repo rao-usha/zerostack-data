@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Synthetic Data Playground — Nexdata</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f172a; --bg-card: #1e293b; --bg-card-2: #253349; --border: #334155;
+      --text: #f1f5f9; --text-muted: #94a3b8;
+      --primary: #6366f1; --primary-hover: #4f46e5; --accent: #06b6d4;
+      --success: #22c55e; --warning: #f59e0b; --error: #ef4444;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5;
+    }
+    a { color: var(--accent); }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 0 1.5rem; }
+
+    /* Header */
+    .header {
+      background: var(--bg-card); border-bottom: 1px solid var(--border);
+      padding: 0.9rem 1.5rem; display: flex; align-items: center; gap: 0.6rem;
+    }
+    .logo {
+      width: 26px; height: 26px; border-radius: 7px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+    }
+    .header-title { font-size: 1rem; font-weight: 700; }
+    .header-title span { color: var(--text-muted); font-weight: 500; }
+    .header-right { margin-left: auto; font-size: 0.8rem; color: var(--text-muted); }
+
+    /* Generic */
+    .view { display: none; padding: 2.5rem 0; }
+    .view.active { display: block; }
+    .btn {
+      border: none; border-radius: 8px; padding: 0.7rem 1.5rem;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 0.4rem; text-decoration: none;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--bg-card-2); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .muted { color: var(--text-muted); }
+    .err { color: var(--error); font-size: 0.85rem; margin-top: 0.6rem; min-height: 1.2rem; }
+    input, select {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
+      color: var(--text); padding: 0.6rem 0.7rem; font-size: 0.9rem; width: 100%;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--primary); }
+    label { display: block; font-size: 0.78rem; color: var(--text-muted); margin: 0.9rem 0 0.3rem; }
+
+    /* Landing */
+    .hero { text-align: center; padding: 1.5rem 0 2.5rem; }
+    .hero h1 { font-size: 2.1rem; font-weight: 800; margin-bottom: 0.7rem; }
+    .hero h1 span { background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p { color: var(--text-muted); font-size: 1.05rem; max-width: 560px; margin: 0 auto; }
+    .gen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+    .gen-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 1.3rem; cursor: pointer; transition: border-color 0.15s, transform 0.15s;
+    }
+    .gen-card:hover { border-color: var(--primary); transform: translateY(-2px); }
+    .gen-card h3 { font-size: 1rem; margin-bottom: 0.4rem; }
+    .gen-card p { font-size: 0.85rem; color: var(--text-muted); }
+    .gen-tag {
+      display: inline-block; font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.04em; padding: 0.15rem 0.5rem; border-radius: 4px; margin-top: 0.7rem;
+      background: rgba(99,102,241,0.15); color: var(--primary);
+    }
+    .steps { display: flex; gap: 1rem; margin-top: 2.5rem; flex-wrap: wrap; }
+    .step { flex: 1; min-width: 180px; font-size: 0.85rem; color: var(--text-muted); }
+    .step b { color: var(--text); display: block; margin-bottom: 0.2rem; }
+    .card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.6rem;
+    }
+    .section-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 1.2rem; }
+
+    /* Spinner */
+    .spinner {
+      width: 38px; height: 38px; border: 3px solid var(--border);
+      border-top-color: var(--primary); border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin: 2rem auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Result */
+    .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.8rem; margin: 1.2rem 0; }
+    .kpi { background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 0.9rem; }
+    .kpi .k { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .kpi .v { font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem; }
+    .cta-band {
+      margin-top: 1.6rem; background: var(--bg); border: 1px solid var(--border);
+      border-top: 3px solid var(--primary); border-radius: 11px; padding: 1.5rem; text-align: center;
+    }
+    .cta-band h3 { font-size: 1.05rem; margin-bottom: 0.4rem; }
+    .cta-band p { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; }
+    .cta-actions { display: flex; gap: 0.7rem; justify-content: center; flex-wrap: wrap; }
+    .row-actions { display: flex; gap: 0.7rem; margin-top: 1.2rem; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo"></div>
+    <div class="header-title">Nexdata <span>· Synthetic Data Playground</span></div>
+    <div class="header-right" id="quotaLabel"></div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- ============ LANDING ============ -->
+    <div class="view active" id="view-landing">
+      <div class="hero">
+        <h1>Run Nexdata's <span>synthetic data generators</span>, free</h1>
+        <p>Generate credible synthetic financials, macro scenario paths, and consumer-crowd
+           responses on demand — then share the report. No signup for your first run.</p>
+      </div>
+      <div class="gen-grid" id="genGrid"></div>
+      <div class="steps">
+        <div class="step"><b>1 · Pick a generator</b>Choose a synthetic dataset and set parameters.</div>
+        <div class="step"><b>2 · Run it free</b>Your first run needs no account. Get a shareable report.</div>
+        <div class="step"><b>3 · Share &amp; explore</b>Forward the report; sign up with just your email for more.</div>
+      </div>
+    </div>
+
+    <!-- ============ GENERATOR ============ -->
+    <div class="view" id="view-generator">
+      <div class="section-title" id="genTitle">Configure</div>
+      <div class="card">
+        <div id="genDesc" class="muted" style="font-size:0.88rem;margin-bottom:0.4rem"></div>
+        <form id="paramForm"></form>
+        <div class="err" id="genErr"></div>
+        <div class="row-actions">
+          <button class="btn btn-primary" id="runBtn" type="button">Run generator</button>
+          <button class="btn btn-ghost" type="button" onclick="showView('landing')">Back</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ RUNNING ============ -->
+    <div class="view" id="view-running">
+      <div class="card" style="text-align:center">
+        <div class="spinner"></div>
+        <div class="muted">Generating synthetic data &amp; building your report…</div>
+      </div>
+    </div>
+
+    <!-- ============ EMAIL GATE ============ -->
+    <div class="view" id="view-gate">
+      <div class="section-title">One email to keep going</div>
+      <div class="card" style="max-width:440px">
+        <div id="gate-step-email">
+          <p class="muted" style="font-size:0.88rem">You've used your free run. Enter your email —
+             we'll send a 6-digit code and a sign-in link. No password.</p>
+          <label for="gateEmail">Work email</label>
+          <input type="email" id="gateEmail" placeholder="you@company.com" />
+          <div class="err" id="gateErr"></div>
+          <div class="row-actions">
+            <button class="btn btn-primary" id="gateSendBtn" type="button">Email me a code</button>
+          </div>
+        </div>
+        <div id="gate-step-code" style="display:none">
+          <p class="muted" style="font-size:0.88rem">Check your inbox. Enter the 6-digit code
+             (or click the link in the email).</p>
+          <label for="gateCode">6-digit code</label>
+          <input type="text" id="gateCode" placeholder="000000" maxlength="6" inputmode="numeric" />
+          <div class="err" id="gateCodeErr"></div>
+          <div class="row-actions">
+            <button class="btn btn-primary" id="gateVerifyBtn" type="button">Verify &amp; continue</button>
+            <button class="btn btn-ghost" type="button" id="gateBackBtn">Use a different email</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ RESULT ============ -->
+    <div class="view" id="view-result">
+      <div class="section-title">Your synthetic sample is ready</div>
+      <div class="card">
+        <div class="muted" id="resultGen" style="font-size:0.9rem"></div>
+        <div class="kpi-row" id="resultKpis"></div>
+        <div class="row-actions">
+          <a class="btn btn-primary" id="openReportBtn" target="_blank" rel="noopener">Open full report ↗</a>
+          <button class="btn btn-ghost" id="shareBtn" type="button">Copy share link</button>
+          <button class="btn btn-ghost" type="button" onclick="showView('landing')">Run another</button>
+        </div>
+        <div class="cta-band">
+          <h3>This is a synthetic sample. The full platform runs on your real data.</h3>
+          <p>Underwriting, datacenter, energy, and litigation-finance teams use Nexdata for production intelligence.</p>
+          <div class="cta-actions">
+            <a class="btn btn-primary" href="#" id="ctaPlatform">See the platform</a>
+            <a class="btn btn-ghost" href="/playground.html">Run your own</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const API = "/api/v1";
+    const LS_TOKEN = "nexdata_token";
+    const LS_USER = "nexdata_user";
+    const LS_SESSION = "nexdata_pg_session";
+
+    // Anonymous session id (reserved for future per-session metering).
+    if (!localStorage.getItem(LS_SESSION)) {
+      localStorage.setItem(LS_SESSION, crypto.randomUUID());
+    }
+
+    let GENERATORS = [];
+    let currentGen = null;
+    let pendingRun = null;   // {generator, params} held across the email gate
+    let gateEmail = null;
+
+    function showView(name) {
+      document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+      document.getElementById("view-" + name).classList.add("active");
+      window.scrollTo(0, 0);
+    }
+
+    function authHeaders() {
+      const t = localStorage.getItem(LS_TOKEN);
+      return t ? { "Authorization": "Bearer " + t } : {};
+    }
+
+    async function loadGenerators() {
+      try {
+        const resp = await fetch(API + "/playground/generators");
+        const data = await resp.json();
+        GENERATORS = data.generators || [];
+      } catch (e) { GENERATORS = []; }
+      const grid = document.getElementById("genGrid");
+      grid.innerHTML = "";
+      GENERATORS.forEach(g => {
+        const card = document.createElement("div");
+        card.className = "gen-card";
+        card.onclick = () => openGenerator(g.name);
+        card.innerHTML =
+          "<h3>" + g.label + "</h3><p>" + g.description + "</p>" +
+          (g.high_value ? '<span class="gen-tag">High-signal</span>' : "");
+        grid.appendChild(card);
+      });
+      refreshQuota();
+    }
+
+    async function refreshQuota() {
+      try {
+        const resp = await fetch(API + "/playground/quota", { headers: authHeaders() });
+        const q = await resp.json();
+        const who = q.authenticated ? ("signed in · " + q.tier) : "anonymous";
+        document.getElementById("quotaLabel").textContent =
+          q.remaining + " / " + q.limit + " runs left today · " + who;
+      } catch (e) {}
+    }
+
+    function openGenerator(name) {
+      currentGen = GENERATORS.find(g => g.name === name);
+      if (!currentGen) return;
+      document.getElementById("genTitle").textContent = "Configure · " + currentGen.label;
+      document.getElementById("genDesc").textContent = currentGen.description;
+      const form = document.getElementById("paramForm");
+      form.innerHTML = "";
+      const schema = currentGen.param_schema || {};
+      Object.keys(schema).forEach(key => {
+        const spec = schema[key];
+        const lbl = document.createElement("label");
+        lbl.textContent = key.replace(/_/g, " ");
+        lbl.setAttribute("for", "p_" + key);
+        const inp = document.createElement("input");
+        inp.id = "p_" + key;
+        inp.dataset.key = key;
+        inp.dataset.type = spec.type;
+        if (spec.type === "integer" || spec.type === "number") inp.type = "number";
+        else inp.type = "text";
+        if (spec.default !== null && spec.default !== undefined) {
+          inp.value = Array.isArray(spec.default) ? spec.default.join(",") : spec.default;
+        }
+        form.appendChild(lbl);
+        form.appendChild(inp);
+      });
+      document.getElementById("genErr").textContent = "";
+      showView("generator");
+    }
+
+    function collectParams() {
+      const params = {};
+      document.querySelectorAll("#paramForm input").forEach(inp => {
+        const key = inp.dataset.key, type = inp.dataset.type;
+        let val = inp.value.trim();
+        if (val === "") return;
+        if (type === "integer") val = parseInt(val, 10);
+        else if (type === "number") val = parseFloat(val);
+        else if (type === "array") val = val.split(",").map(s => s.trim()).filter(Boolean);
+        params[key] = val;
+      });
+      return params;
+    }
+
+    async function doRun(generator, params) {
+      showView("running");
+      let resp;
+      try {
+        resp = await fetch(API + "/playground/run", {
+          method: "POST",
+          headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+          body: JSON.stringify({ generator, params }),
+        });
+      } catch (e) {
+        document.getElementById("genErr").textContent = "Network error. Try again.";
+        showView("generator");
+        return;
+      }
+
+      if (resp.status === 429) {
+        const body = await resp.json().catch(() => ({}));
+        const action = (body.detail && body.detail.action) || "signup_required";
+        pendingRun = { generator, params };
+        if (action === "upgrade") {
+          document.getElementById("gate-step-email").innerHTML =
+            '<p class="muted">You\'ve hit today\'s free-tier limit. It resets tomorrow — ' +
+            'or talk to us about higher limits.</p>';
+          showView("gate");
+        } else {
+          showView("gate");
+        }
+        return;
+      }
+
+      if (!resp.ok) {
+        document.getElementById("genErr").textContent =
+          "That run failed to produce a result. Try different parameters.";
+        showView("generator");
+        return;
+      }
+
+      const data = await resp.json();
+      renderResult(data);
+      refreshQuota();
+    }
+
+    function renderResult(data) {
+      document.getElementById("resultGen").textContent =
+        "Generator: " + (data.generator || "");
+      const kpis = document.getElementById("resultKpis");
+      kpis.innerHTML = "";
+      const summary = data.result || {};
+      Object.keys(summary).slice(0, 6).forEach(k => {
+        const el = document.createElement("div");
+        el.className = "kpi";
+        el.innerHTML = '<div class="k">' + k + '</div><div class="v">' + summary[k] + "</div>";
+        kpis.appendChild(el);
+      });
+      const code = data.report && data.report.short_code;
+      const url = "/p/" + code;
+      document.getElementById("openReportBtn").href = url;
+      document.getElementById("shareBtn").onclick = () => {
+        navigator.clipboard.writeText(window.location.origin + url);
+        document.getElementById("shareBtn").textContent = "Link copied ✓";
+      };
+      document.getElementById("ctaPlatform").href =
+        "/playground.html?from=playground&gen=" + (data.generator || "");
+      showView("result");
+    }
+
+    // ---- Email gate (passwordless) ----
+    document.getElementById("gateSendBtn").onclick = async () => {
+      const email = document.getElementById("gateEmail").value.trim();
+      const errEl = document.getElementById("gateErr");
+      errEl.textContent = "";
+      if (!email || email.indexOf("@") < 0) { errEl.textContent = "Enter a valid email."; return; }
+      gateEmail = email;
+      try {
+        const resp = await fetch(API + "/auth/request-code", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, signup_source: "playground" }),
+        });
+        if (resp.status === 429) { errEl.textContent = "Please wait a moment before requesting another code."; return; }
+        document.getElementById("gate-step-email").style.display = "none";
+        document.getElementById("gate-step-code").style.display = "block";
+      } catch (e) { errEl.textContent = "Network error. Try again."; }
+    };
+
+    document.getElementById("gateBackBtn").onclick = () => {
+      document.getElementById("gate-step-code").style.display = "none";
+      document.getElementById("gate-step-email").style.display = "block";
+    };
+
+    document.getElementById("gateVerifyBtn").onclick = async () => {
+      const code = document.getElementById("gateCode").value.trim();
+      const errEl = document.getElementById("gateCodeErr");
+      errEl.textContent = "";
+      if (!/^\d{4,8}$/.test(code)) { errEl.textContent = "Enter the 6-digit code."; return; }
+      try {
+        const resp = await fetch(API + "/auth/verify-code", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: gateEmail, code }),
+        });
+        if (!resp.ok) { errEl.textContent = "Invalid or expired code."; return; }
+        const bundle = await resp.json();
+        localStorage.setItem(LS_TOKEN, bundle.access_token);
+        localStorage.setItem(LS_USER, JSON.stringify(bundle.user || {}));
+        resumePendingRun();
+      } catch (e) { errEl.textContent = "Network error. Try again."; }
+    };
+
+    function resumePendingRun() {
+      refreshQuota();
+      if (pendingRun) {
+        const { generator, params } = pendingRun;
+        pendingRun = null;
+        doRun(generator, params);
+      } else {
+        showView("landing");
+      }
+    }
+
+    // ---- Magic-link landing (?verify=<token>) ----
+    async function handleMagicLink() {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get("verify");
+      if (!token) return false;
+      try {
+        const resp = await fetch(API + "/auth/verify-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
+        if (resp.ok) {
+          const bundle = await resp.json();
+          localStorage.setItem(LS_TOKEN, bundle.access_token);
+          localStorage.setItem(LS_USER, JSON.stringify(bundle.user || {}));
+        }
+      } catch (e) {}
+      // strip ?verify= from the URL either way
+      params.delete("verify");
+      const clean = window.location.pathname + (params.toString() ? "?" + params.toString() : "");
+      history.replaceState({}, "", clean);
+      return true;
+    }
+
+    document.getElementById("runBtn").onclick = () => {
+      if (!currentGen) return;
+      doRun(currentGen.name, collectParams());
+    };
+
+    // ---- Boot ----
+    (async function init() {
+      await handleMagicLink();
+      await loadGenerators();
+    })();
+  </script>
+</body>
+</html>

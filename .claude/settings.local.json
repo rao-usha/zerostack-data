@@ -92,7 +92,8 @@
       "Bash(MSYS_NO_PATHCONV=1 docker-compose exec:*)",
       "Bash(netstat:*)",
       "Bash(docker system prune:*)",
-      "Bash(docker network prune:*)"
+      "Bash(docker network prune:*)",
+      "Skill(spec)"
     ]
   }
 }

@@ -25,6 +25,7 @@ from app.reports.templates.pe_deal_memo import PEDealMemoTemplate
 from app.reports.templates.pe_market_brief import PEMarketBriefTemplate
 from app.reports.templates.les_schwab_av import LesSchwabAVTemplate
 from app.reports.templates.macro_sector_brief import MacroSectorBriefTemplate
+from app.reports.templates.synthetic_playground import SyntheticPlaygroundTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,7 @@ class ReportBuilder:
             "pe_market_brief": PEMarketBriefTemplate(),
             "les_schwab_av": LesSchwabAVTemplate(),
             "macro_sector_brief": MacroSectorBriefTemplate(),
+            "synthetic_playground": SyntheticPlaygroundTemplate(),
         }
         self._ensure_table()
 
@@ -85,6 +87,25 @@ class ReportBuilder:
         except Exception as e:
             logger.error(f"Error creating reports table: {e}")
             self.db.rollback()
+
+        # PLAN_063 / SPEC_056 — shareable public reports for the Synthetic Data
+        # Playground. `short_code` powers the public /p/<code> URL; `is_public`
+        # gates which reports may be served un-authenticated; `view_count` is
+        # for viral-loop analytics. Each migration is idempotent and wrapped so
+        # a re-run / non-Postgres backend can't crash builder construction.
+        for migration in (
+            "ALTER TABLE reports ADD COLUMN IF NOT EXISTS short_code VARCHAR(16)",
+            "ALTER TABLE reports ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE reports ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_reports_short_code "
+            "ON reports(short_code)",
+        ):
+            try:
+                self.db.execute(text(migration))
+                self.db.commit()
+            except Exception as e:  # noqa: BLE001 — best-effort, non-fatal
+                logger.debug(f"reports migration skipped ({migration}): {e}")
+                self.db.rollback()
 
     def get_templates(self) -> List[Dict[str, Any]]:
         """Get available report templates."""

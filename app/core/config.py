@@ -38,6 +38,44 @@ class Settings(BaseSettings):
         description="JWT secret key for authentication tokens",
     )
 
+    # Transactional email (PLAN_063 — Synthetic Data Playground passwordless auth)
+    email_provider: str = Field(
+        default="console",
+        description="Email provider: 'console' (default, logs only), 'resend', or 'mock'",
+    )
+    resend_api_key: Optional[str] = Field(
+        default=None,
+        description="Resend API key — required only when email_provider='resend'",
+    )
+    email_from: str = Field(
+        default="noreply@nexdata.com",
+        description="From address for transactional email",
+    )
+    playground_base_url: Optional[str] = Field(
+        default=None,
+        description="Public base URL of the playground, used to build magic links",
+    )
+
+    # Synthetic Data Playground free-tier quotas (PLAN_063)
+    playground_free_runs_per_day: int = Field(
+        default=10,
+        ge=1,
+        le=1000,
+        description="Daily generator runs allowed for an authenticated free-tier user",
+    )
+    playground_anon_runs_per_ip: int = Field(
+        default=1,
+        ge=0,
+        le=100,
+        description="Daily generator runs allowed for an anonymous visitor (per IP)",
+    )
+    playground_pro_runs_per_day: int = Field(
+        default=200,
+        ge=1,
+        le=100000,
+        description="Daily generator runs allowed for a pro-tier user",
+    )
+
     # Census API Configuration (OPTIONAL for startup, REQUIRED for ingestion)
     census_survey_api_key: Optional[str] = Field(
         default=None,

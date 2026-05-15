@@ -211,6 +211,11 @@ from app.api.v1 import source_configs, audit, source_health
 
 # Settings
 from app.api.v1 import settings as settings_router
+
+# Synthetic Data Playground (PLAN_063)
+from app.api.v1 import playground as playground_router
+from app.api.v1 import playground_admin as playground_admin_router
+
 from app.graphql import graphql_app
 
 # Configure logging
@@ -1307,6 +1312,8 @@ Browse the endpoint sections below to see what's available:
         {"name": "workspaces", "description": "👥 **Workspaces** - Team collaboration spaces with member management and role-based access"},
         {"name": "API Keys", "description": "🔑 **API Key Management** - Create, list, update, and revoke API keys for public API access"},
         {"name": "Public API", "description": "🌐 **Public API** - Protected endpoints for external developers with API key authentication and rate limiting"},
+        {"name": "Synthetic Data Playground", "description": "🎲 **Synthetic Data Playground** - Free self-serve synthetic-data generators, quota-metered, with shareable HTML reports (PLAN_063)"},
+        {"name": "Playground Admin", "description": "📇 **Playground Admin** - Lead pipeline + intent scoring from the Synthetic Data Playground (JWT-gated sales surface)"},
         # ── Source Directory ──────────────────────────────────────────────
         {"name": "sources", "description": "📚 **Source Directory** — Overview and status for all data sources"},
         # ── Government / Economic Data ─────────────────────────────────
@@ -1493,6 +1500,10 @@ _auth = [Depends(get_current_user)] if _require_auth else []
 app.include_router(auth.router, prefix="/api/v1")  # login/register must be public
 app.include_router(public.router, prefix="/api/v1")  # has its own API key auth
 app.include_router(job_stream.router, prefix="/api/v1")  # SSE streaming
+# Synthetic Data Playground (PLAN_063) — public, self-gated by PlaygroundQuota
+app.include_router(playground_router.router, prefix="/api/v1")
+# Playground admin (leads pipeline) — JWT-gated
+app.include_router(playground_admin_router.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(jobs_monitor.router, prefix="/api/v1", dependencies=_auth)  # Jobs dashboard
 
 # Protected routers
