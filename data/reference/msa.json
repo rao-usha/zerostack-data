@@ -1,0 +1,4849 @@
+{
+  "_meta": {
+    "source": "https://www2.census.gov/programs-surveys/metro-micro/geographies/reference-files/2023/delineation-files/list1_2023.xlsx",
+    "fetched_at": "2026-05-17T02:23:01.429542+00:00",
+    "row_count": 393
+  },
+  "data": {
+    "10180": {
+      "cbsa_code": "10180",
+      "title": "Abilene, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48059",
+        "48253",
+        "48441"
+      ]
+    },
+    "10380": {
+      "cbsa_code": "10380",
+      "title": "Aguadilla, PR",
+      "state_abbrs": [
+        "PR"
+      ],
+      "county_fips_list": [
+        "72003",
+        "72005",
+        "72011",
+        "72071",
+        "72099",
+        "72117",
+        "72131"
+      ]
+    },
+    "10420": {
+      "cbsa_code": "10420",
+      "title": "Akron, OH",
+      "state_abbrs": [
+        "OH"
+      ],
+      "county_fips_list": [
+        "39133",
+        "39153"
+      ]
+    },
+    "10500": {
+      "cbsa_code": "10500",
+      "title": "Albany, GA",
+      "state_abbrs": [
+        "GA"
+      ],
+      "county_fips_list": [
+        "13095",
+        "13177",
+        "13273",
+        "13321"
+      ]
+    },
+    "10540": {
+      "cbsa_code": "10540",
+      "title": "Albany, OR",
+      "state_abbrs": [
+        "OR"
+      ],
+      "county_fips_list": [
+        "41043"
+      ]
+    },
+    "10580": {
+      "cbsa_code": "10580",
+      "title": "Albany-Schenectady-Troy, NY",
+      "state_abbrs": [
+        "NY"
+      ],
+      "county_fips_list": [
+        "36001",
+        "36083",
+        "36091",
+        "36093",
+        "36095"
+      ]
+    },
+    "10740": {
+      "cbsa_code": "10740",
+      "title": "Albuquerque, NM",
+      "state_abbrs": [
+        "NM"
+      ],
+      "county_fips_list": [
+        "35001",
+        "35043",
+        "35057",
+        "35061"
+      ]
+    },
+    "10780": {
+      "cbsa_code": "10780",
+      "title": "Alexandria, LA",
+      "state_abbrs": [
+        "LA"
+      ],
+      "county_fips_list": [
+        "22043",
+        "22079"
+      ]
+    },
+    "10900": {
+      "cbsa_code": "10900",
+      "title": "Allentown-Bethlehem-Easton, PA-NJ",
+      "state_abbrs": [
+        "NJ",
+        "PA"
+      ],
+      "county_fips_list": [
+        "34041",
+        "42025",
+        "42077",
+        "42095"
+      ]
+    },
+    "11020": {
+      "cbsa_code": "11020",
+      "title": "Altoona, PA",
+      "state_abbrs": [
+        "PA"
+      ],
+      "county_fips_list": [
+        "42013"
+      ]
+    },
+    "11100": {
+      "cbsa_code": "11100",
+      "title": "Amarillo, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48011",
+        "48065",
+        "48359",
+        "48375",
+        "48381"
+      ]
+    },
+    "11180": {
+      "cbsa_code": "11180",
+      "title": "Ames, IA",
+      "state_abbrs": [
+        "IA"
+      ],
+      "county_fips_list": [
+        "19015",
+        "19169"
+      ]
+    },
+    "11200": {
+      "cbsa_code": "11200",
+      "title": "Amherst Town-Northampton, MA",
+      "state_abbrs": [
+        "MA"
+      ],
+      "county_fips_list": [
+        "25015"
+      ]
+    },
+    "11260": {
+      "cbsa_code": "11260",
+      "title": "Anchorage, AK",
+      "state_abbrs": [
+        "AK"
+      ],
+      "county_fips_list": [
+        "02020",
+        "02170"
+      ]
+    },
+    "11460": {
+      "cbsa_code": "11460",
+      "title": "Ann Arbor, MI",
+      "state_abbrs": [
+        "MI"
+      ],
+      "county_fips_list": [
+        "26161"
+      ]
+    },
+    "11500": {
+      "cbsa_code": "11500",
+      "title": "Anniston-Oxford, AL",
+      "state_abbrs": [
+        "AL"
+      ],
+      "county_fips_list": [
+        "01015"
+      ]
+    },
+    "11540": {
+      "cbsa_code": "11540",
+      "title": "Appleton, WI",
+      "state_abbrs": [
+        "WI"
+      ],
+      "county_fips_list": [
+        "55015",
+        "55087"
+      ]
+    },
+    "11640": {
+      "cbsa_code": "11640",
+      "title": "Arecibo, PR",
+      "state_abbrs": [
+        "PR"
+      ],
+      "county_fips_list": [
+        "72013",
+        "72027",
+        "72065",
+        "72115"
+      ]
+    },
+    "11700": {
+      "cbsa_code": "11700",
+      "title": "Asheville, NC",
+      "state_abbrs": [
+        "NC"
+      ],
+      "county_fips_list": [
+        "37021",
+        "37089",
+        "37115"
+      ]
+    },
+    "12020": {
+      "cbsa_code": "12020",
+      "title": "Athens-Clarke County, GA",
+      "state_abbrs": [
+        "GA"
+      ],
+      "county_fips_list": [
+        "13059",
+        "13195",
+        "13219",
+        "13221"
+      ]
+    },
+    "12060": {
+      "cbsa_code": "12060",
+      "title": "Atlanta-Sandy Springs-Roswell, GA",
+      "state_abbrs": [
+        "GA"
+      ],
+      "county_fips_list": [
+        "13013",
+        "13015",
+        "13035",
+        "13045",
+        "13057",
+        "13063",
+        "13067",
+        "13077",
+        "13085",
+        "13089",
+        "13097",
+        "13113",
+        "13117",
+        "13121",
+        "13135",
+        "13143",
+        "13149",
+        "13151",
+        "13159",
+        "13187",
+        "13199",
+        "13211",
+        "13217",
+        "13223",
+        "13227",
+        "13231",
+        "13247",
+        "13255",
+        "13297"
+      ]
+    },
+    "12100": {
+      "cbsa_code": "12100",
+      "title": "Atlantic City-Hammonton, NJ",
+      "state_abbrs": [
+        "NJ"
+      ],
+      "county_fips_list": [
+        "34001",
+        "34009"
+      ]
+    },
+    "12220": {
+      "cbsa_code": "12220",
+      "title": "Auburn-Opelika, AL",
+      "state_abbrs": [
+        "AL"
+      ],
+      "county_fips_list": [
+        "01081",
+        "01087"
+      ]
+    },
+    "12260": {
+      "cbsa_code": "12260",
+      "title": "Augusta-Richmond County, GA-SC",
+      "state_abbrs": [
+        "GA",
+        "SC"
+      ],
+      "county_fips_list": [
+        "13033",
+        "13073",
+        "13181",
+        "13189",
+        "13245",
+        "45003",
+        "45037"
+      ]
+    },
+    "12420": {
+      "cbsa_code": "12420",
+      "title": "Austin-Round Rock-San Marcos, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48021",
+        "48055",
+        "48209",
+        "48453",
+        "48491"
+      ]
+    },
+    "12540": {
+      "cbsa_code": "12540",
+      "title": "Bakersfield-Delano, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06029"
+      ]
+    },
+    "12580": {
+      "cbsa_code": "12580",
+      "title": "Baltimore-Columbia-Towson, MD",
+      "state_abbrs": [
+        "MD"
+      ],
+      "county_fips_list": [
+        "24003",
+        "24005",
+        "24013",
+        "24025",
+        "24027",
+        "24035",
+        "24510"
+      ]
+    },
+    "12620": {
+      "cbsa_code": "12620",
+      "title": "Bangor, ME",
+      "state_abbrs": [
+        "ME"
+      ],
+      "county_fips_list": [
+        "23019"
+      ]
+    },
+    "12700": {
+      "cbsa_code": "12700",
+      "title": "Barnstable Town, MA",
+      "state_abbrs": [
+        "MA"
+      ],
+      "county_fips_list": [
+        "25001"
+      ]
+    },
+    "12940": {
+      "cbsa_code": "12940",
+      "title": "Baton Rouge, LA",
+      "state_abbrs": [
+        "LA"
+      ],
+      "county_fips_list": [
+        "22005",
+        "22007",
+        "22033",
+        "22037",
+        "22047",
+        "22063",
+        "22077",
+        "22091",
+        "22121",
+        "22125"
+      ]
+    },
+    "12980": {
+      "cbsa_code": "12980",
+      "title": "Battle Creek, MI",
+      "state_abbrs": [
+        "MI"
+      ],
+      "county_fips_list": [
+        "26025"
+      ]
+    },
+    "13020": {
+      "cbsa_code": "13020",
+      "title": "Bay City, MI",
+      "state_abbrs": [
+        "MI"
+      ],
+      "county_fips_list": [
+        "26017"
+      ]
+    },
+    "13140": {
+      "cbsa_code": "13140",
+      "title": "Beaumont-Port Arthur, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48199",
+        "48245",
+        "48361"
+      ]
+    },
+    "13220": {
+      "cbsa_code": "13220",
+      "title": "Beckley, WV",
+      "state_abbrs": [
+        "WV"
+      ],
+      "county_fips_list": [
+        "54019",
+        "54081"
+      ]
+    },
+    "13380": {
+      "cbsa_code": "13380",
+      "title": "Bellingham, WA",
+      "state_abbrs": [
+        "WA"
+      ],
+      "county_fips_list": [
+        "53073"
+      ]
+    },
+    "13460": {
+      "cbsa_code": "13460",
+      "title": "Bend, OR",
+      "state_abbrs": [
+        "OR"
+      ],
+      "county_fips_list": [
+        "41013",
+        "41017",
+        "41031"
+      ]
+    },
+    "13740": {
+      "cbsa_code": "13740",
+      "title": "Billings, MT",
+      "state_abbrs": [
+        "MT"
+      ],
+      "county_fips_list": [
+        "30009",
+        "30095",
+        "30111"
+      ]
+    },
+    "13780": {
+      "cbsa_code": "13780",
+      "title": "Binghamton, NY",
+      "state_abbrs": [
+        "NY"
+      ],
+      "county_fips_list": [
+        "36007",
+        "36107"
+      ]
+    },
+    "13820": {
+      "cbsa_code": "13820",
+      "title": "Birmingham, AL",
+      "state_abbrs": [
+        "AL"
+      ],
+      "county_fips_list": [
+        "01007",
+        "01009",
+        "01021",
+        "01073",
+        "01115",
+        "01117",
+        "01127"
+      ]
+    },
+    "13900": {
+      "cbsa_code": "13900",
+      "title": "Bismarck, ND",
+      "state_abbrs": [
+        "ND"
+      ],
+      "county_fips_list": [
+        "38015",
+        "38059",
+        "38065"
+      ]
+    },
+    "13980": {
+      "cbsa_code": "13980",
+      "title": "Blacksburg-Christiansburg-Radford, VA",
+      "state_abbrs": [
+        "VA"
+      ],
+      "county_fips_list": [
+        "51063",
+        "51071",
+        "51121",
+        "51155",
+        "51750"
+      ]
+    },
+    "14010": {
+      "cbsa_code": "14010",
+      "title": "Bloomington, IL",
+      "state_abbrs": [
+        "IL"
+      ],
+      "county_fips_list": [
+        "17113"
+      ]
+    },
+    "14020": {
+      "cbsa_code": "14020",
+      "title": "Bloomington, IN",
+      "state_abbrs": [
+        "IN"
+      ],
+      "county_fips_list": [
+        "18105",
+        "18119"
+      ]
+    },
+    "14260": {
+      "cbsa_code": "14260",
+      "title": "Boise City, ID",
+      "state_abbrs": [
+        "ID"
+      ],
+      "county_fips_list": [
+        "16001",
+        "16015",
+        "16027",
+        "16045",
+        "16073"
+      ]
+    },
+    "14460": {
+      "cbsa_code": "14460",
+      "title": "Boston-Cambridge-Newton, MA-NH",
+      "state_abbrs": [
+        "MA",
+        "NH"
+      ],
+      "county_fips_list": [
+        "25009",
+        "25017",
+        "25021",
+        "25023",
+        "25025",
+        "33015",
+        "33017"
+      ]
+    },
+    "14500": {
+      "cbsa_code": "14500",
+      "title": "Boulder, CO",
+      "state_abbrs": [
+        "CO"
+      ],
+      "county_fips_list": [
+        "08013"
+      ]
+    },
+    "14540": {
+      "cbsa_code": "14540",
+      "title": "Bowling Green, KY",
+      "state_abbrs": [
+        "KY"
+      ],
+      "county_fips_list": [
+        "21003",
+        "21031",
+        "21061",
+        "21227"
+      ]
+    },
+    "14580": {
+      "cbsa_code": "14580",
+      "title": "Bozeman, MT",
+      "state_abbrs": [
+        "MT"
+      ],
+      "county_fips_list": [
+        "30031"
+      ]
+    },
+    "14740": {
+      "cbsa_code": "14740",
+      "title": "Bremerton-Silverdale-Port Orchard, WA",
+      "state_abbrs": [
+        "WA"
+      ],
+      "county_fips_list": [
+        "53035"
+      ]
+    },
+    "14860": {
+      "cbsa_code": "14860",
+      "title": "Bridgeport-Stamford-Danbury, CT",
+      "state_abbrs": [
+        "CT"
+      ],
+      "county_fips_list": [
+        "09120",
+        "09190"
+      ]
+    },
+    "15180": {
+      "cbsa_code": "15180",
+      "title": "Brownsville-Harlingen, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48061"
+      ]
+    },
+    "15260": {
+      "cbsa_code": "15260",
+      "title": "Brunswick-St. Simons, GA",
+      "state_abbrs": [
+        "GA"
+      ],
+      "county_fips_list": [
+        "13025",
+        "13127",
+        "13191"
+      ]
+    },
+    "15380": {
+      "cbsa_code": "15380",
+      "title": "Buffalo-Cheektowaga, NY",
+      "state_abbrs": [
+        "NY"
+      ],
+      "county_fips_list": [
+        "36029",
+        "36063"
+      ]
+    },
+    "15500": {
+      "cbsa_code": "15500",
+      "title": "Burlington, NC",
+      "state_abbrs": [
+        "NC"
+      ],
+      "county_fips_list": [
+        "37001"
+      ]
+    },
+    "15540": {
+      "cbsa_code": "15540",
+      "title": "Burlington-South Burlington, VT",
+      "state_abbrs": [
+        "VT"
+      ],
+      "county_fips_list": [
+        "50007",
+        "50011",
+        "50013"
+      ]
+    },
+    "15940": {
+      "cbsa_code": "15940",
+      "title": "Canton-Massillon, OH",
+      "state_abbrs": [
+        "OH"
+      ],
+      "county_fips_list": [
+        "39019",
+        "39151"
+      ]
+    },
+    "15980": {
+      "cbsa_code": "15980",
+      "title": "Cape Coral-Fort Myers, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12071"
+      ]
+    },
+    "16020": {
+      "cbsa_code": "16020",
+      "title": "Cape Girardeau, MO-IL",
+      "state_abbrs": [
+        "IL",
+        "MO"
+      ],
+      "county_fips_list": [
+        "17003",
+        "29017",
+        "29031"
+      ]
+    },
+    "16180": {
+      "cbsa_code": "16180",
+      "title": "Carson City, NV",
+      "state_abbrs": [
+        "NV"
+      ],
+      "county_fips_list": [
+        "32510"
+      ]
+    },
+    "16220": {
+      "cbsa_code": "16220",
+      "title": "Casper, WY",
+      "state_abbrs": [
+        "WY"
+      ],
+      "county_fips_list": [
+        "56025"
+      ]
+    },
+    "16300": {
+      "cbsa_code": "16300",
+      "title": "Cedar Rapids, IA",
+      "state_abbrs": [
+        "IA"
+      ],
+      "county_fips_list": [
+        "19011",
+        "19105",
+        "19113"
+      ]
+    },
+    "16540": {
+      "cbsa_code": "16540",
+      "title": "Chambersburg, PA",
+      "state_abbrs": [
+        "PA"
+      ],
+      "county_fips_list": [
+        "42055"
+      ]
+    },
+    "16580": {
+      "cbsa_code": "16580",
+      "title": "Champaign-Urbana, IL",
+      "state_abbrs": [
+        "IL"
+      ],
+      "county_fips_list": [
+        "17019",
+        "17053",
+        "17147"
+      ]
+    },
+    "16620": {
+      "cbsa_code": "16620",
+      "title": "Charleston, WV",
+      "state_abbrs": [
+        "WV"
+      ],
+      "county_fips_list": [
+        "54005",
+        "54015",
+        "54039"
+      ]
+    },
+    "16700": {
+      "cbsa_code": "16700",
+      "title": "Charleston-North Charleston, SC",
+      "state_abbrs": [
+        "SC"
+      ],
+      "county_fips_list": [
+        "45015",
+        "45019",
+        "45035"
+      ]
+    },
+    "16740": {
+      "cbsa_code": "16740",
+      "title": "Charlotte-Concord-Gastonia, NC-SC",
+      "state_abbrs": [
+        "NC",
+        "SC"
+      ],
+      "county_fips_list": [
+        "37007",
+        "37025",
+        "37071",
+        "37097",
+        "37109",
+        "37119",
+        "37159",
+        "37179",
+        "45023",
+        "45057",
+        "45091"
+      ]
+    },
+    "16820": {
+      "cbsa_code": "16820",
+      "title": "Charlottesville, VA",
+      "state_abbrs": [
+        "VA"
+      ],
+      "county_fips_list": [
+        "51003",
+        "51065",
+        "51079",
+        "51125",
+        "51540"
+      ]
+    },
+    "16860": {
+      "cbsa_code": "16860",
+      "title": "Chattanooga, TN-GA",
+      "state_abbrs": [
+        "GA",
+        "TN"
+      ],
+      "county_fips_list": [
+        "13047",
+        "13083",
+        "13295",
+        "47065",
+        "47115",
+        "47153"
+      ]
+    },
+    "16940": {
+      "cbsa_code": "16940",
+      "title": "Cheyenne, WY",
+      "state_abbrs": [
+        "WY"
+      ],
+      "county_fips_list": [
+        "56021"
+      ]
+    },
+    "16980": {
+      "cbsa_code": "16980",
+      "title": "Chicago-Naperville-Elgin, IL-IN",
+      "state_abbrs": [
+        "IL",
+        "IN"
+      ],
+      "county_fips_list": [
+        "17031",
+        "17037",
+        "17043",
+        "17063",
+        "17089",
+        "17093",
+        "17097",
+        "17111",
+        "17197",
+        "18073",
+        "18089",
+        "18111",
+        "18127"
+      ]
+    },
+    "17020": {
+      "cbsa_code": "17020",
+      "title": "Chico, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06007"
+      ]
+    },
+    "17140": {
+      "cbsa_code": "17140",
+      "title": "Cincinnati, OH-KY-IN",
+      "state_abbrs": [
+        "IN",
+        "KY",
+        "OH"
+      ],
+      "county_fips_list": [
+        "18029",
+        "18047",
+        "18115",
+        "21015",
+        "21023",
+        "21037",
+        "21077",
+        "21081",
+        "21117",
+        "21191",
+        "39015",
+        "39017",
+        "39025",
+        "39061",
+        "39165"
+      ]
+    },
+    "17300": {
+      "cbsa_code": "17300",
+      "title": "Clarksville, TN-KY",
+      "state_abbrs": [
+        "KY",
+        "TN"
+      ],
+      "county_fips_list": [
+        "21047",
+        "21221",
+        "47125",
+        "47161"
+      ]
+    },
+    "17410": {
+      "cbsa_code": "17410",
+      "title": "Cleveland, OH",
+      "state_abbrs": [
+        "OH"
+      ],
+      "county_fips_list": [
+        "39007",
+        "39035",
+        "39055",
+        "39085",
+        "39093",
+        "39103"
+      ]
+    },
+    "17420": {
+      "cbsa_code": "17420",
+      "title": "Cleveland, TN",
+      "state_abbrs": [
+        "TN"
+      ],
+      "county_fips_list": [
+        "47011",
+        "47139"
+      ]
+    },
+    "17660": {
+      "cbsa_code": "17660",
+      "title": "Coeur d'Alene, ID",
+      "state_abbrs": [
+        "ID"
+      ],
+      "county_fips_list": [
+        "16055"
+      ]
+    },
+    "17780": {
+      "cbsa_code": "17780",
+      "title": "College Station-Bryan, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48041",
+        "48051",
+        "48395"
+      ]
+    },
+    "17820": {
+      "cbsa_code": "17820",
+      "title": "Colorado Springs, CO",
+      "state_abbrs": [
+        "CO"
+      ],
+      "county_fips_list": [
+        "08041",
+        "08119"
+      ]
+    },
+    "17860": {
+      "cbsa_code": "17860",
+      "title": "Columbia, MO",
+      "state_abbrs": [
+        "MO"
+      ],
+      "county_fips_list": [
+        "29019",
+        "29053",
+        "29089"
+      ]
+    },
+    "17900": {
+      "cbsa_code": "17900",
+      "title": "Columbia, SC",
+      "state_abbrs": [
+        "SC"
+      ],
+      "county_fips_list": [
+        "45017",
+        "45039",
+        "45055",
+        "45063",
+        "45079",
+        "45081"
+      ]
+    },
+    "17980": {
+      "cbsa_code": "17980",
+      "title": "Columbus, GA-AL",
+      "state_abbrs": [
+        "AL",
+        "GA"
+      ],
+      "county_fips_list": [
+        "01113",
+        "13053",
+        "13145",
+        "13197",
+        "13215",
+        "13259",
+        "13263"
+      ]
+    },
+    "18020": {
+      "cbsa_code": "18020",
+      "title": "Columbus, IN",
+      "state_abbrs": [
+        "IN"
+      ],
+      "county_fips_list": [
+        "18005"
+      ]
+    },
+    "18140": {
+      "cbsa_code": "18140",
+      "title": "Columbus, OH",
+      "state_abbrs": [
+        "OH"
+      ],
+      "county_fips_list": [
+        "39041",
+        "39045",
+        "39049",
+        "39073",
+        "39089",
+        "39097",
+        "39117",
+        "39127",
+        "39129",
+        "39159"
+      ]
+    },
+    "18580": {
+      "cbsa_code": "18580",
+      "title": "Corpus Christi, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48007",
+        "48355",
+        "48409"
+      ]
+    },
+    "18700": {
+      "cbsa_code": "18700",
+      "title": "Corvallis, OR",
+      "state_abbrs": [
+        "OR"
+      ],
+      "county_fips_list": [
+        "41003"
+      ]
+    },
+    "18880": {
+      "cbsa_code": "18880",
+      "title": "Crestview-Fort Walton Beach-Destin, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12091",
+        "12131"
+      ]
+    },
+    "19100": {
+      "cbsa_code": "19100",
+      "title": "Dallas-Fort Worth-Arlington, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48085",
+        "48113",
+        "48121",
+        "48139",
+        "48231",
+        "48251",
+        "48257",
+        "48367",
+        "48397",
+        "48439",
+        "48497"
+      ]
+    },
+    "19140": {
+      "cbsa_code": "19140",
+      "title": "Dalton, GA",
+      "state_abbrs": [
+        "GA"
+      ],
+      "county_fips_list": [
+        "13213",
+        "13313"
+      ]
+    },
+    "19300": {
+      "cbsa_code": "19300",
+      "title": "Daphne-Fairhope-Foley, AL",
+      "state_abbrs": [
+        "AL"
+      ],
+      "county_fips_list": [
+        "01003"
+      ]
+    },
+    "19340": {
+      "cbsa_code": "19340",
+      "title": "Davenport-Moline-Rock Island, IA-IL",
+      "state_abbrs": [
+        "IA",
+        "IL"
+      ],
+      "county_fips_list": [
+        "17073",
+        "17131",
+        "17161",
+        "19163"
+      ]
+    },
+    "19430": {
+      "cbsa_code": "19430",
+      "title": "Dayton-Kettering-Beavercreek, OH",
+      "state_abbrs": [
+        "OH"
+      ],
+      "county_fips_list": [
+        "39057",
+        "39109",
+        "39113"
+      ]
+    },
+    "19460": {
+      "cbsa_code": "19460",
+      "title": "Decatur, AL",
+      "state_abbrs": [
+        "AL"
+      ],
+      "county_fips_list": [
+        "01079",
+        "01103"
+      ]
+    },
+    "19500": {
+      "cbsa_code": "19500",
+      "title": "Decatur, IL",
+      "state_abbrs": [
+        "IL"
+      ],
+      "county_fips_list": [
+        "17115"
+      ]
+    },
+    "19660": {
+      "cbsa_code": "19660",
+      "title": "Deltona-Daytona Beach-Ormond Beach, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12035",
+        "12127"
+      ]
+    },
+    "19740": {
+      "cbsa_code": "19740",
+      "title": "Denver-Aurora-Centennial, CO",
+      "state_abbrs": [
+        "CO"
+      ],
+      "county_fips_list": [
+        "08001",
+        "08005",
+        "08014",
+        "08019",
+        "08031",
+        "08035",
+        "08039",
+        "08047",
+        "08059",
+        "08093"
+      ]
+    },
+    "19780": {
+      "cbsa_code": "19780",
+      "title": "Des Moines-West Des Moines, IA",
+      "state_abbrs": [
+        "IA"
+      ],
+      "county_fips_list": [
+        "19049",
+        "19077",
+        "19099",
+        "19121",
+        "19153",
+        "19181"
+      ]
+    },
+    "19820": {
+      "cbsa_code": "19820",
+      "title": "Detroit-Warren-Dearborn, MI",
+      "state_abbrs": [
+        "MI"
+      ],
+      "county_fips_list": [
+        "26087",
+        "26093",
+        "26099",
+        "26125",
+        "26147",
+        "26163"
+      ]
+    },
+    "20020": {
+      "cbsa_code": "20020",
+      "title": "Dothan, AL",
+      "state_abbrs": [
+        "AL"
+      ],
+      "county_fips_list": [
+        "01061",
+        "01067",
+        "01069"
+      ]
+    },
+    "20100": {
+      "cbsa_code": "20100",
+      "title": "Dover, DE",
+      "state_abbrs": [
+        "DE"
+      ],
+      "county_fips_list": [
+        "10001"
+      ]
+    },
+    "20220": {
+      "cbsa_code": "20220",
+      "title": "Dubuque, IA",
+      "state_abbrs": [
+        "IA"
+      ],
+      "county_fips_list": [
+        "19061"
+      ]
+    },
+    "20260": {
+      "cbsa_code": "20260",
+      "title": "Duluth, MN-WI",
+      "state_abbrs": [
+        "MN",
+        "WI"
+      ],
+      "county_fips_list": [
+        "27017",
+        "27137",
+        "55031"
+      ]
+    },
+    "20500": {
+      "cbsa_code": "20500",
+      "title": "Durham-Chapel Hill, NC",
+      "state_abbrs": [
+        "NC"
+      ],
+      "county_fips_list": [
+        "37037",
+        "37063",
+        "37135",
+        "37145"
+      ]
+    },
+    "20580": {
+      "cbsa_code": "20580",
+      "title": "Eagle Pass, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48323"
+      ]
+    },
+    "20740": {
+      "cbsa_code": "20740",
+      "title": "Eau Claire, WI",
+      "state_abbrs": [
+        "WI"
+      ],
+      "county_fips_list": [
+        "55017",
+        "55035"
+      ]
+    },
+    "20940": {
+      "cbsa_code": "20940",
+      "title": "El Centro, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06025"
+      ]
+    },
+    "21060": {
+      "cbsa_code": "21060",
+      "title": "Elizabethtown, KY",
+      "state_abbrs": [
+        "KY"
+      ],
+      "county_fips_list": [
+        "21093",
+        "21123"
+      ]
+    },
+    "21140": {
+      "cbsa_code": "21140",
+      "title": "Elkhart-Goshen, IN",
+      "state_abbrs": [
+        "IN"
+      ],
+      "county_fips_list": [
+        "18039"
+      ]
+    },
+    "21300": {
+      "cbsa_code": "21300",
+      "title": "Elmira, NY",
+      "state_abbrs": [
+        "NY"
+      ],
+      "county_fips_list": [
+        "36015"
+      ]
+    },
+    "21340": {
+      "cbsa_code": "21340",
+      "title": "El Paso, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48141",
+        "48229"
+      ]
+    },
+    "21420": {
+      "cbsa_code": "21420",
+      "title": "Enid, OK",
+      "state_abbrs": [
+        "OK"
+      ],
+      "county_fips_list": [
+        "40047"
+      ]
+    },
+    "21500": {
+      "cbsa_code": "21500",
+      "title": "Erie, PA",
+      "state_abbrs": [
+        "PA"
+      ],
+      "county_fips_list": [
+        "42049"
+      ]
+    },
+    "21660": {
+      "cbsa_code": "21660",
+      "title": "Eugene-Springfield, OR",
+      "state_abbrs": [
+        "OR"
+      ],
+      "county_fips_list": [
+        "41039"
+      ]
+    },
+    "21780": {
+      "cbsa_code": "21780",
+      "title": "Evansville, IN",
+      "state_abbrs": [
+        "IN"
+      ],
+      "county_fips_list": [
+        "18129",
+        "18163",
+        "18173"
+      ]
+    },
+    "21820": {
+      "cbsa_code": "21820",
+      "title": "Fairbanks-College, AK",
+      "state_abbrs": [
+        "AK"
+      ],
+      "county_fips_list": [
+        "02090"
+      ]
+    },
+    "22020": {
+      "cbsa_code": "22020",
+      "title": "Fargo, ND-MN",
+      "state_abbrs": [
+        "MN",
+        "ND"
+      ],
+      "county_fips_list": [
+        "27027",
+        "38017"
+      ]
+    },
+    "22140": {
+      "cbsa_code": "22140",
+      "title": "Farmington, NM",
+      "state_abbrs": [
+        "NM"
+      ],
+      "county_fips_list": [
+        "35045"
+      ]
+    },
+    "22180": {
+      "cbsa_code": "22180",
+      "title": "Fayetteville, NC",
+      "state_abbrs": [
+        "NC"
+      ],
+      "county_fips_list": [
+        "37051",
+        "37093"
+      ]
+    },
+    "22220": {
+      "cbsa_code": "22220",
+      "title": "Fayetteville-Springdale-Rogers, AR",
+      "state_abbrs": [
+        "AR"
+      ],
+      "county_fips_list": [
+        "05007",
+        "05087",
+        "05143"
+      ]
+    },
+    "22380": {
+      "cbsa_code": "22380",
+      "title": "Flagstaff, AZ",
+      "state_abbrs": [
+        "AZ"
+      ],
+      "county_fips_list": [
+        "04005"
+      ]
+    },
+    "22420": {
+      "cbsa_code": "22420",
+      "title": "Flint, MI",
+      "state_abbrs": [
+        "MI"
+      ],
+      "county_fips_list": [
+        "26049"
+      ]
+    },
+    "22500": {
+      "cbsa_code": "22500",
+      "title": "Florence, SC",
+      "state_abbrs": [
+        "SC"
+      ],
+      "county_fips_list": [
+        "45031",
+        "45041"
+      ]
+    },
+    "22520": {
+      "cbsa_code": "22520",
+      "title": "Florence-Muscle Shoals, AL",
+      "state_abbrs": [
+        "AL"
+      ],
+      "county_fips_list": [
+        "01033",
+        "01077"
+      ]
+    },
+    "22540": {
+      "cbsa_code": "22540",
+      "title": "Fond du Lac, WI",
+      "state_abbrs": [
+        "WI"
+      ],
+      "county_fips_list": [
+        "55039"
+      ]
+    },
+    "22660": {
+      "cbsa_code": "22660",
+      "title": "Fort Collins-Loveland, CO",
+      "state_abbrs": [
+        "CO"
+      ],
+      "county_fips_list": [
+        "08069"
+      ]
+    },
+    "22900": {
+      "cbsa_code": "22900",
+      "title": "Fort Smith, AR-OK",
+      "state_abbrs": [
+        "AR",
+        "OK"
+      ],
+      "county_fips_list": [
+        "05033",
+        "05131",
+        "40135"
+      ]
+    },
+    "23060": {
+      "cbsa_code": "23060",
+      "title": "Fort Wayne, IN",
+      "state_abbrs": [
+        "IN"
+      ],
+      "county_fips_list": [
+        "18003",
+        "18179",
+        "18183"
+      ]
+    },
+    "23420": {
+      "cbsa_code": "23420",
+      "title": "Fresno, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06019",
+        "06039"
+      ]
+    },
+    "23460": {
+      "cbsa_code": "23460",
+      "title": "Gadsden, AL",
+      "state_abbrs": [
+        "AL"
+      ],
+      "county_fips_list": [
+        "01055"
+      ]
+    },
+    "23540": {
+      "cbsa_code": "23540",
+      "title": "Gainesville, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12001",
+        "12041",
+        "12075"
+      ]
+    },
+    "23580": {
+      "cbsa_code": "23580",
+      "title": "Gainesville, GA",
+      "state_abbrs": [
+        "GA"
+      ],
+      "county_fips_list": [
+        "13139"
+      ]
+    },
+    "23900": {
+      "cbsa_code": "23900",
+      "title": "Gettysburg, PA",
+      "state_abbrs": [
+        "PA"
+      ],
+      "county_fips_list": [
+        "42001"
+      ]
+    },
+    "24020": {
+      "cbsa_code": "24020",
+      "title": "Glens Falls, NY",
+      "state_abbrs": [
+        "NY"
+      ],
+      "county_fips_list": [
+        "36113",
+        "36115"
+      ]
+    },
+    "24140": {
+      "cbsa_code": "24140",
+      "title": "Goldsboro, NC",
+      "state_abbrs": [
+        "NC"
+      ],
+      "county_fips_list": [
+        "37191"
+      ]
+    },
+    "24220": {
+      "cbsa_code": "24220",
+      "title": "Grand Forks, ND-MN",
+      "state_abbrs": [
+        "MN",
+        "ND"
+      ],
+      "county_fips_list": [
+        "27119",
+        "38035"
+      ]
+    },
+    "24260": {
+      "cbsa_code": "24260",
+      "title": "Grand Island, NE",
+      "state_abbrs": [
+        "NE"
+      ],
+      "county_fips_list": [
+        "31079",
+        "31093",
+        "31121"
+      ]
+    },
+    "24300": {
+      "cbsa_code": "24300",
+      "title": "Grand Junction, CO",
+      "state_abbrs": [
+        "CO"
+      ],
+      "county_fips_list": [
+        "08077"
+      ]
+    },
+    "24340": {
+      "cbsa_code": "24340",
+      "title": "Grand Rapids-Wyoming-Kentwood, MI",
+      "state_abbrs": [
+        "MI"
+      ],
+      "county_fips_list": [
+        "26015",
+        "26067",
+        "26081",
+        "26117",
+        "26139"
+      ]
+    },
+    "24420": {
+      "cbsa_code": "24420",
+      "title": "Grants Pass, OR",
+      "state_abbrs": [
+        "OR"
+      ],
+      "county_fips_list": [
+        "41033"
+      ]
+    },
+    "24500": {
+      "cbsa_code": "24500",
+      "title": "Great Falls, MT",
+      "state_abbrs": [
+        "MT"
+      ],
+      "county_fips_list": [
+        "30013"
+      ]
+    },
+    "24540": {
+      "cbsa_code": "24540",
+      "title": "Greeley, CO",
+      "state_abbrs": [
+        "CO"
+      ],
+      "county_fips_list": [
+        "08123"
+      ]
+    },
+    "24580": {
+      "cbsa_code": "24580",
+      "title": "Green Bay, WI",
+      "state_abbrs": [
+        "WI"
+      ],
+      "county_fips_list": [
+        "55009",
+        "55061",
+        "55083"
+      ]
+    },
+    "24660": {
+      "cbsa_code": "24660",
+      "title": "Greensboro-High Point, NC",
+      "state_abbrs": [
+        "NC"
+      ],
+      "county_fips_list": [
+        "37081",
+        "37151",
+        "37157"
+      ]
+    },
+    "24780": {
+      "cbsa_code": "24780",
+      "title": "Greenville, NC",
+      "state_abbrs": [
+        "NC"
+      ],
+      "county_fips_list": [
+        "37147"
+      ]
+    },
+    "24860": {
+      "cbsa_code": "24860",
+      "title": "Greenville-Anderson-Greer, SC",
+      "state_abbrs": [
+        "SC"
+      ],
+      "county_fips_list": [
+        "45007",
+        "45045",
+        "45059",
+        "45077"
+      ]
+    },
+    "25020": {
+      "cbsa_code": "25020",
+      "title": "Guayama, PR",
+      "state_abbrs": [
+        "PR"
+      ],
+      "county_fips_list": [
+        "72015",
+        "72057",
+        "72109"
+      ]
+    },
+    "25060": {
+      "cbsa_code": "25060",
+      "title": "Gulfport-Biloxi, MS",
+      "state_abbrs": [
+        "MS"
+      ],
+      "county_fips_list": [
+        "28045",
+        "28047",
+        "28059",
+        "28131"
+      ]
+    },
+    "25180": {
+      "cbsa_code": "25180",
+      "title": "Hagerstown-Martinsburg, MD-WV",
+      "state_abbrs": [
+        "MD",
+        "WV"
+      ],
+      "county_fips_list": [
+        "24043",
+        "54003",
+        "54065"
+      ]
+    },
+    "25220": {
+      "cbsa_code": "25220",
+      "title": "Hammond, LA",
+      "state_abbrs": [
+        "LA"
+      ],
+      "county_fips_list": [
+        "22105"
+      ]
+    },
+    "25260": {
+      "cbsa_code": "25260",
+      "title": "Hanford-Corcoran, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06031"
+      ]
+    },
+    "25420": {
+      "cbsa_code": "25420",
+      "title": "Harrisburg-Carlisle, PA",
+      "state_abbrs": [
+        "PA"
+      ],
+      "county_fips_list": [
+        "42041",
+        "42043",
+        "42099"
+      ]
+    },
+    "25500": {
+      "cbsa_code": "25500",
+      "title": "Harrisonburg, VA",
+      "state_abbrs": [
+        "VA"
+      ],
+      "county_fips_list": [
+        "51165",
+        "51660"
+      ]
+    },
+    "25540": {
+      "cbsa_code": "25540",
+      "title": "Hartford-West Hartford-East Hartford, CT",
+      "state_abbrs": [
+        "CT"
+      ],
+      "county_fips_list": [
+        "09110",
+        "09130"
+      ]
+    },
+    "25620": {
+      "cbsa_code": "25620",
+      "title": "Hattiesburg, MS",
+      "state_abbrs": [
+        "MS"
+      ],
+      "county_fips_list": [
+        "28035",
+        "28073",
+        "28111"
+      ]
+    },
+    "25740": {
+      "cbsa_code": "25740",
+      "title": "Helena, MT",
+      "state_abbrs": [
+        "MT"
+      ],
+      "county_fips_list": [
+        "30007",
+        "30043",
+        "30049"
+      ]
+    },
+    "25860": {
+      "cbsa_code": "25860",
+      "title": "Hickory-Lenoir-Morganton, NC",
+      "state_abbrs": [
+        "NC"
+      ],
+      "county_fips_list": [
+        "37003",
+        "37023",
+        "37027",
+        "37035"
+      ]
+    },
+    "25940": {
+      "cbsa_code": "25940",
+      "title": "Hilton Head Island-Bluffton-Port Royal, SC",
+      "state_abbrs": [
+        "SC"
+      ],
+      "county_fips_list": [
+        "45013",
+        "45053"
+      ]
+    },
+    "25980": {
+      "cbsa_code": "25980",
+      "title": "Hinesville, GA",
+      "state_abbrs": [
+        "GA"
+      ],
+      "county_fips_list": [
+        "13179",
+        "13183"
+      ]
+    },
+    "26140": {
+      "cbsa_code": "26140",
+      "title": "Homosassa Springs, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12017"
+      ]
+    },
+    "26300": {
+      "cbsa_code": "26300",
+      "title": "Hot Springs, AR",
+      "state_abbrs": [
+        "AR"
+      ],
+      "county_fips_list": [
+        "05051"
+      ]
+    },
+    "26380": {
+      "cbsa_code": "26380",
+      "title": "Houma-Bayou Cane-Thibodaux, LA",
+      "state_abbrs": [
+        "LA"
+      ],
+      "county_fips_list": [
+        "22057",
+        "22109"
+      ]
+    },
+    "26420": {
+      "cbsa_code": "26420",
+      "title": "Houston-Pasadena-The Woodlands, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48015",
+        "48039",
+        "48071",
+        "48157",
+        "48167",
+        "48201",
+        "48291",
+        "48339",
+        "48407",
+        "48473"
+      ]
+    },
+    "26580": {
+      "cbsa_code": "26580",
+      "title": "Huntington-Ashland, WV-KY-OH",
+      "state_abbrs": [
+        "KY",
+        "OH",
+        "WV"
+      ],
+      "county_fips_list": [
+        "21019",
+        "21043",
+        "21089",
+        "21127",
+        "39087",
+        "54011",
+        "54079",
+        "54099"
+      ]
+    },
+    "26620": {
+      "cbsa_code": "26620",
+      "title": "Huntsville, AL",
+      "state_abbrs": [
+        "AL"
+      ],
+      "county_fips_list": [
+        "01083",
+        "01089"
+      ]
+    },
+    "26820": {
+      "cbsa_code": "26820",
+      "title": "Idaho Falls, ID",
+      "state_abbrs": [
+        "ID"
+      ],
+      "county_fips_list": [
+        "16019",
+        "16023",
+        "16051"
+      ]
+    },
+    "26900": {
+      "cbsa_code": "26900",
+      "title": "Indianapolis-Carmel-Greenwood, IN",
+      "state_abbrs": [
+        "IN"
+      ],
+      "county_fips_list": [
+        "18011",
+        "18013",
+        "18057",
+        "18059",
+        "18063",
+        "18081",
+        "18095",
+        "18097",
+        "18109",
+        "18145",
+        "18159"
+      ]
+    },
+    "26980": {
+      "cbsa_code": "26980",
+      "title": "Iowa City, IA",
+      "state_abbrs": [
+        "IA"
+      ],
+      "county_fips_list": [
+        "19103",
+        "19183"
+      ]
+    },
+    "27060": {
+      "cbsa_code": "27060",
+      "title": "Ithaca, NY",
+      "state_abbrs": [
+        "NY"
+      ],
+      "county_fips_list": [
+        "36109"
+      ]
+    },
+    "27100": {
+      "cbsa_code": "27100",
+      "title": "Jackson, MI",
+      "state_abbrs": [
+        "MI"
+      ],
+      "county_fips_list": [
+        "26075"
+      ]
+    },
+    "27140": {
+      "cbsa_code": "27140",
+      "title": "Jackson, MS",
+      "state_abbrs": [
+        "MS"
+      ],
+      "county_fips_list": [
+        "28029",
+        "28049",
+        "28051",
+        "28089",
+        "28121",
+        "28123",
+        "28127",
+        "28163"
+      ]
+    },
+    "27180": {
+      "cbsa_code": "27180",
+      "title": "Jackson, TN",
+      "state_abbrs": [
+        "TN"
+      ],
+      "county_fips_list": [
+        "47023",
+        "47033",
+        "47053",
+        "47113"
+      ]
+    },
+    "27260": {
+      "cbsa_code": "27260",
+      "title": "Jacksonville, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12003",
+        "12019",
+        "12031",
+        "12089",
+        "12109"
+      ]
+    },
+    "27340": {
+      "cbsa_code": "27340",
+      "title": "Jacksonville, NC",
+      "state_abbrs": [
+        "NC"
+      ],
+      "county_fips_list": [
+        "37133"
+      ]
+    },
+    "27500": {
+      "cbsa_code": "27500",
+      "title": "Janesville-Beloit, WI",
+      "state_abbrs": [
+        "WI"
+      ],
+      "county_fips_list": [
+        "55105"
+      ]
+    },
+    "27620": {
+      "cbsa_code": "27620",
+      "title": "Jefferson City, MO",
+      "state_abbrs": [
+        "MO"
+      ],
+      "county_fips_list": [
+        "29027",
+        "29051",
+        "29135",
+        "29151"
+      ]
+    },
+    "27740": {
+      "cbsa_code": "27740",
+      "title": "Johnson City, TN",
+      "state_abbrs": [
+        "TN"
+      ],
+      "county_fips_list": [
+        "47019",
+        "47171",
+        "47179"
+      ]
+    },
+    "27780": {
+      "cbsa_code": "27780",
+      "title": "Johnstown, PA",
+      "state_abbrs": [
+        "PA"
+      ],
+      "county_fips_list": [
+        "42021"
+      ]
+    },
+    "27860": {
+      "cbsa_code": "27860",
+      "title": "Jonesboro, AR",
+      "state_abbrs": [
+        "AR"
+      ],
+      "county_fips_list": [
+        "05031",
+        "05111"
+      ]
+    },
+    "27900": {
+      "cbsa_code": "27900",
+      "title": "Joplin, MO-KS",
+      "state_abbrs": [
+        "KS",
+        "MO"
+      ],
+      "county_fips_list": [
+        "20021",
+        "29097",
+        "29145"
+      ]
+    },
+    "27980": {
+      "cbsa_code": "27980",
+      "title": "Kahului-Wailuku, HI",
+      "state_abbrs": [
+        "HI"
+      ],
+      "county_fips_list": [
+        "15005",
+        "15009"
+      ]
+    },
+    "28020": {
+      "cbsa_code": "28020",
+      "title": "Kalamazoo-Portage, MI",
+      "state_abbrs": [
+        "MI"
+      ],
+      "county_fips_list": [
+        "26077"
+      ]
+    },
+    "28100": {
+      "cbsa_code": "28100",
+      "title": "Kankakee, IL",
+      "state_abbrs": [
+        "IL"
+      ],
+      "county_fips_list": [
+        "17091"
+      ]
+    },
+    "28140": {
+      "cbsa_code": "28140",
+      "title": "Kansas City, MO-KS",
+      "state_abbrs": [
+        "KS",
+        "MO"
+      ],
+      "county_fips_list": [
+        "20091",
+        "20103",
+        "20107",
+        "20121",
+        "20209",
+        "29013",
+        "29025",
+        "29037",
+        "29047",
+        "29049",
+        "29095",
+        "29107",
+        "29165",
+        "29177"
+      ]
+    },
+    "28420": {
+      "cbsa_code": "28420",
+      "title": "Kennewick-Richland, WA",
+      "state_abbrs": [
+        "WA"
+      ],
+      "county_fips_list": [
+        "53005",
+        "53021"
+      ]
+    },
+    "28450": {
+      "cbsa_code": "28450",
+      "title": "Kenosha, WI",
+      "state_abbrs": [
+        "WI"
+      ],
+      "county_fips_list": [
+        "55059"
+      ]
+    },
+    "28660": {
+      "cbsa_code": "28660",
+      "title": "Killeen-Temple, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48027",
+        "48099",
+        "48281"
+      ]
+    },
+    "28700": {
+      "cbsa_code": "28700",
+      "title": "Kingsport-Bristol, TN-VA",
+      "state_abbrs": [
+        "TN",
+        "VA"
+      ],
+      "county_fips_list": [
+        "47073",
+        "47163",
+        "51169",
+        "51191",
+        "51520"
+      ]
+    },
+    "28740": {
+      "cbsa_code": "28740",
+      "title": "Kingston, NY",
+      "state_abbrs": [
+        "NY"
+      ],
+      "county_fips_list": [
+        "36111"
+      ]
+    },
+    "28880": {
+      "cbsa_code": "28880",
+      "title": "Kiryas Joel-Poughkeepsie-Newburgh, NY",
+      "state_abbrs": [
+        "NY"
+      ],
+      "county_fips_list": [
+        "36027",
+        "36071"
+      ]
+    },
+    "28940": {
+      "cbsa_code": "28940",
+      "title": "Knoxville, TN",
+      "state_abbrs": [
+        "TN"
+      ],
+      "county_fips_list": [
+        "47001",
+        "47009",
+        "47013",
+        "47057",
+        "47093",
+        "47105",
+        "47129",
+        "47145",
+        "47173"
+      ]
+    },
+    "29020": {
+      "cbsa_code": "29020",
+      "title": "Kokomo, IN",
+      "state_abbrs": [
+        "IN"
+      ],
+      "county_fips_list": [
+        "18067"
+      ]
+    },
+    "29100": {
+      "cbsa_code": "29100",
+      "title": "La Crosse-Onalaska, WI-MN",
+      "state_abbrs": [
+        "MN",
+        "WI"
+      ],
+      "county_fips_list": [
+        "27055",
+        "55063",
+        "55123"
+      ]
+    },
+    "29180": {
+      "cbsa_code": "29180",
+      "title": "Lafayette, LA",
+      "state_abbrs": [
+        "LA"
+      ],
+      "county_fips_list": [
+        "22001",
+        "22055",
+        "22099",
+        "22113"
+      ]
+    },
+    "29200": {
+      "cbsa_code": "29200",
+      "title": "Lafayette-West Lafayette, IN",
+      "state_abbrs": [
+        "IN"
+      ],
+      "county_fips_list": [
+        "18007",
+        "18015",
+        "18157",
+        "18171"
+      ]
+    },
+    "29340": {
+      "cbsa_code": "29340",
+      "title": "Lake Charles, LA",
+      "state_abbrs": [
+        "LA"
+      ],
+      "county_fips_list": [
+        "22019",
+        "22023",
+        "22053"
+      ]
+    },
+    "29420": {
+      "cbsa_code": "29420",
+      "title": "Lake Havasu City-Kingman, AZ",
+      "state_abbrs": [
+        "AZ"
+      ],
+      "county_fips_list": [
+        "04015"
+      ]
+    },
+    "29460": {
+      "cbsa_code": "29460",
+      "title": "Lakeland-Winter Haven, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12105"
+      ]
+    },
+    "29540": {
+      "cbsa_code": "29540",
+      "title": "Lancaster, PA",
+      "state_abbrs": [
+        "PA"
+      ],
+      "county_fips_list": [
+        "42071"
+      ]
+    },
+    "29620": {
+      "cbsa_code": "29620",
+      "title": "Lansing-East Lansing, MI",
+      "state_abbrs": [
+        "MI"
+      ],
+      "county_fips_list": [
+        "26037",
+        "26045",
+        "26065"
+      ]
+    },
+    "29700": {
+      "cbsa_code": "29700",
+      "title": "Laredo, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48479"
+      ]
+    },
+    "29740": {
+      "cbsa_code": "29740",
+      "title": "Las Cruces, NM",
+      "state_abbrs": [
+        "NM"
+      ],
+      "county_fips_list": [
+        "35013"
+      ]
+    },
+    "29820": {
+      "cbsa_code": "29820",
+      "title": "Las Vegas-Henderson-North Las Vegas, NV",
+      "state_abbrs": [
+        "NV"
+      ],
+      "county_fips_list": [
+        "32003"
+      ]
+    },
+    "29940": {
+      "cbsa_code": "29940",
+      "title": "Lawrence, KS",
+      "state_abbrs": [
+        "KS"
+      ],
+      "county_fips_list": [
+        "20045"
+      ]
+    },
+    "30020": {
+      "cbsa_code": "30020",
+      "title": "Lawton, OK",
+      "state_abbrs": [
+        "OK"
+      ],
+      "county_fips_list": [
+        "40031",
+        "40033"
+      ]
+    },
+    "30140": {
+      "cbsa_code": "30140",
+      "title": "Lebanon, PA",
+      "state_abbrs": [
+        "PA"
+      ],
+      "county_fips_list": [
+        "42075"
+      ]
+    },
+    "30300": {
+      "cbsa_code": "30300",
+      "title": "Lewiston, ID-WA",
+      "state_abbrs": [
+        "ID",
+        "WA"
+      ],
+      "county_fips_list": [
+        "16069",
+        "53003"
+      ]
+    },
+    "30340": {
+      "cbsa_code": "30340",
+      "title": "Lewiston-Auburn, ME",
+      "state_abbrs": [
+        "ME"
+      ],
+      "county_fips_list": [
+        "23001"
+      ]
+    },
+    "30460": {
+      "cbsa_code": "30460",
+      "title": "Lexington-Fayette, KY",
+      "state_abbrs": [
+        "KY"
+      ],
+      "county_fips_list": [
+        "21017",
+        "21049",
+        "21067",
+        "21113",
+        "21209",
+        "21239"
+      ]
+    },
+    "30500": {
+      "cbsa_code": "30500",
+      "title": "Lexington Park, MD",
+      "state_abbrs": [
+        "MD"
+      ],
+      "county_fips_list": [
+        "24009",
+        "24037"
+      ]
+    },
+    "30620": {
+      "cbsa_code": "30620",
+      "title": "Lima, OH",
+      "state_abbrs": [
+        "OH"
+      ],
+      "county_fips_list": [
+        "39003"
+      ]
+    },
+    "30700": {
+      "cbsa_code": "30700",
+      "title": "Lincoln, NE",
+      "state_abbrs": [
+        "NE"
+      ],
+      "county_fips_list": [
+        "31109",
+        "31159"
+      ]
+    },
+    "30780": {
+      "cbsa_code": "30780",
+      "title": "Little Rock-North Little Rock-Conway, AR",
+      "state_abbrs": [
+        "AR"
+      ],
+      "county_fips_list": [
+        "05045",
+        "05053",
+        "05085",
+        "05105",
+        "05119",
+        "05125"
+      ]
+    },
+    "30860": {
+      "cbsa_code": "30860",
+      "title": "Logan, UT-ID",
+      "state_abbrs": [
+        "ID",
+        "UT"
+      ],
+      "county_fips_list": [
+        "16041",
+        "49005"
+      ]
+    },
+    "30980": {
+      "cbsa_code": "30980",
+      "title": "Longview, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48183",
+        "48203",
+        "48401",
+        "48459"
+      ]
+    },
+    "31020": {
+      "cbsa_code": "31020",
+      "title": "Longview-Kelso, WA",
+      "state_abbrs": [
+        "WA"
+      ],
+      "county_fips_list": [
+        "53015"
+      ]
+    },
+    "31080": {
+      "cbsa_code": "31080",
+      "title": "Los Angeles-Long Beach-Anaheim, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06037",
+        "06059"
+      ]
+    },
+    "31140": {
+      "cbsa_code": "31140",
+      "title": "Louisville/Jefferson County, KY-IN",
+      "state_abbrs": [
+        "IN",
+        "KY"
+      ],
+      "county_fips_list": [
+        "18019",
+        "18043",
+        "18061",
+        "18175",
+        "21029",
+        "21103",
+        "21111",
+        "21163",
+        "21179",
+        "21185",
+        "21211",
+        "21215"
+      ]
+    },
+    "31180": {
+      "cbsa_code": "31180",
+      "title": "Lubbock, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48079",
+        "48107",
+        "48169",
+        "48219",
+        "48303",
+        "48305"
+      ]
+    },
+    "31340": {
+      "cbsa_code": "31340",
+      "title": "Lynchburg, VA",
+      "state_abbrs": [
+        "VA"
+      ],
+      "county_fips_list": [
+        "51009",
+        "51011",
+        "51019",
+        "51031",
+        "51680"
+      ]
+    },
+    "31420": {
+      "cbsa_code": "31420",
+      "title": "Macon-Bibb County, GA",
+      "state_abbrs": [
+        "GA"
+      ],
+      "county_fips_list": [
+        "13021",
+        "13079",
+        "13169",
+        "13207",
+        "13289"
+      ]
+    },
+    "31540": {
+      "cbsa_code": "31540",
+      "title": "Madison, WI",
+      "state_abbrs": [
+        "WI"
+      ],
+      "county_fips_list": [
+        "55021",
+        "55025",
+        "55045",
+        "55049"
+      ]
+    },
+    "31700": {
+      "cbsa_code": "31700",
+      "title": "Manchester-Nashua, NH",
+      "state_abbrs": [
+        "NH"
+      ],
+      "county_fips_list": [
+        "33011"
+      ]
+    },
+    "31740": {
+      "cbsa_code": "31740",
+      "title": "Manhattan, KS",
+      "state_abbrs": [
+        "KS"
+      ],
+      "county_fips_list": [
+        "20061",
+        "20149",
+        "20161"
+      ]
+    },
+    "31860": {
+      "cbsa_code": "31860",
+      "title": "Mankato, MN",
+      "state_abbrs": [
+        "MN"
+      ],
+      "county_fips_list": [
+        "27013",
+        "27103"
+      ]
+    },
+    "31900": {
+      "cbsa_code": "31900",
+      "title": "Mansfield, OH",
+      "state_abbrs": [
+        "OH"
+      ],
+      "county_fips_list": [
+        "39139"
+      ]
+    },
+    "32420": {
+      "cbsa_code": "32420",
+      "title": "Mayag\u00fcez, PR",
+      "state_abbrs": [
+        "PR"
+      ],
+      "county_fips_list": [
+        "72023",
+        "72067",
+        "72079",
+        "72097",
+        "72121",
+        "72125"
+      ]
+    },
+    "32580": {
+      "cbsa_code": "32580",
+      "title": "McAllen-Edinburg-Mission, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48215"
+      ]
+    },
+    "32780": {
+      "cbsa_code": "32780",
+      "title": "Medford, OR",
+      "state_abbrs": [
+        "OR"
+      ],
+      "county_fips_list": [
+        "41029"
+      ]
+    },
+    "32820": {
+      "cbsa_code": "32820",
+      "title": "Memphis, TN-MS-AR",
+      "state_abbrs": [
+        "AR",
+        "MS",
+        "TN"
+      ],
+      "county_fips_list": [
+        "05035",
+        "28009",
+        "28033",
+        "28093",
+        "28137",
+        "28143",
+        "47047",
+        "47157",
+        "47167"
+      ]
+    },
+    "32900": {
+      "cbsa_code": "32900",
+      "title": "Merced, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06047"
+      ]
+    },
+    "33100": {
+      "cbsa_code": "33100",
+      "title": "Miami-Fort Lauderdale-West Palm Beach, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12011",
+        "12086",
+        "12099"
+      ]
+    },
+    "33140": {
+      "cbsa_code": "33140",
+      "title": "Michigan City-La Porte, IN",
+      "state_abbrs": [
+        "IN"
+      ],
+      "county_fips_list": [
+        "18091"
+      ]
+    },
+    "33220": {
+      "cbsa_code": "33220",
+      "title": "Midland, MI",
+      "state_abbrs": [
+        "MI"
+      ],
+      "county_fips_list": [
+        "26111"
+      ]
+    },
+    "33260": {
+      "cbsa_code": "33260",
+      "title": "Midland, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48317",
+        "48329"
+      ]
+    },
+    "33340": {
+      "cbsa_code": "33340",
+      "title": "Milwaukee-Waukesha, WI",
+      "state_abbrs": [
+        "WI"
+      ],
+      "county_fips_list": [
+        "55079",
+        "55089",
+        "55131",
+        "55133"
+      ]
+    },
+    "33460": {
+      "cbsa_code": "33460",
+      "title": "Minneapolis-St. Paul-Bloomington, MN-WI",
+      "state_abbrs": [
+        "MN",
+        "WI"
+      ],
+      "county_fips_list": [
+        "27003",
+        "27019",
+        "27025",
+        "27037",
+        "27053",
+        "27059",
+        "27079",
+        "27095",
+        "27123",
+        "27139",
+        "27141",
+        "27163",
+        "27171",
+        "55093",
+        "55109"
+      ]
+    },
+    "33500": {
+      "cbsa_code": "33500",
+      "title": "Minot, ND",
+      "state_abbrs": [
+        "ND"
+      ],
+      "county_fips_list": [
+        "38049",
+        "38075",
+        "38101"
+      ]
+    },
+    "33540": {
+      "cbsa_code": "33540",
+      "title": "Missoula, MT",
+      "state_abbrs": [
+        "MT"
+      ],
+      "county_fips_list": [
+        "30061",
+        "30063"
+      ]
+    },
+    "33660": {
+      "cbsa_code": "33660",
+      "title": "Mobile, AL",
+      "state_abbrs": [
+        "AL"
+      ],
+      "county_fips_list": [
+        "01097"
+      ]
+    },
+    "33700": {
+      "cbsa_code": "33700",
+      "title": "Modesto, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06099"
+      ]
+    },
+    "33740": {
+      "cbsa_code": "33740",
+      "title": "Monroe, LA",
+      "state_abbrs": [
+        "LA"
+      ],
+      "county_fips_list": [
+        "22067",
+        "22073",
+        "22083",
+        "22111"
+      ]
+    },
+    "33780": {
+      "cbsa_code": "33780",
+      "title": "Monroe, MI",
+      "state_abbrs": [
+        "MI"
+      ],
+      "county_fips_list": [
+        "26115"
+      ]
+    },
+    "33860": {
+      "cbsa_code": "33860",
+      "title": "Montgomery, AL",
+      "state_abbrs": [
+        "AL"
+      ],
+      "county_fips_list": [
+        "01001",
+        "01051",
+        "01085",
+        "01101"
+      ]
+    },
+    "34060": {
+      "cbsa_code": "34060",
+      "title": "Morgantown, WV",
+      "state_abbrs": [
+        "WV"
+      ],
+      "county_fips_list": [
+        "54061",
+        "54077"
+      ]
+    },
+    "34100": {
+      "cbsa_code": "34100",
+      "title": "Morristown, TN",
+      "state_abbrs": [
+        "TN"
+      ],
+      "county_fips_list": [
+        "47063",
+        "47089"
+      ]
+    },
+    "34580": {
+      "cbsa_code": "34580",
+      "title": "Mount Vernon-Anacortes, WA",
+      "state_abbrs": [
+        "WA"
+      ],
+      "county_fips_list": [
+        "53057"
+      ]
+    },
+    "34620": {
+      "cbsa_code": "34620",
+      "title": "Muncie, IN",
+      "state_abbrs": [
+        "IN"
+      ],
+      "county_fips_list": [
+        "18035"
+      ]
+    },
+    "34740": {
+      "cbsa_code": "34740",
+      "title": "Muskegon-Norton Shores, MI",
+      "state_abbrs": [
+        "MI"
+      ],
+      "county_fips_list": [
+        "26121"
+      ]
+    },
+    "34820": {
+      "cbsa_code": "34820",
+      "title": "Myrtle Beach-Conway-North Myrtle Beach, SC",
+      "state_abbrs": [
+        "SC"
+      ],
+      "county_fips_list": [
+        "45051"
+      ]
+    },
+    "34900": {
+      "cbsa_code": "34900",
+      "title": "Napa, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06055"
+      ]
+    },
+    "34940": {
+      "cbsa_code": "34940",
+      "title": "Naples-Marco Island, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12021"
+      ]
+    },
+    "34980": {
+      "cbsa_code": "34980",
+      "title": "Nashville-Davidson--Murfreesboro--Franklin, TN",
+      "state_abbrs": [
+        "TN"
+      ],
+      "county_fips_list": [
+        "47015",
+        "47021",
+        "47037",
+        "47043",
+        "47081",
+        "47111",
+        "47119",
+        "47147",
+        "47149",
+        "47159",
+        "47165",
+        "47169",
+        "47187",
+        "47189"
+      ]
+    },
+    "35300": {
+      "cbsa_code": "35300",
+      "title": "New Haven, CT",
+      "state_abbrs": [
+        "CT"
+      ],
+      "county_fips_list": [
+        "09170"
+      ]
+    },
+    "35380": {
+      "cbsa_code": "35380",
+      "title": "New Orleans-Metairie, LA",
+      "state_abbrs": [
+        "LA"
+      ],
+      "county_fips_list": [
+        "22051",
+        "22071",
+        "22075",
+        "22087",
+        "22089",
+        "22093",
+        "22095"
+      ]
+    },
+    "35620": {
+      "cbsa_code": "35620",
+      "title": "New York-Newark-Jersey City, NY-NJ",
+      "state_abbrs": [
+        "NJ",
+        "NY"
+      ],
+      "county_fips_list": [
+        "34003",
+        "34013",
+        "34017",
+        "34019",
+        "34023",
+        "34025",
+        "34027",
+        "34029",
+        "34031",
+        "34035",
+        "34037",
+        "34039",
+        "36005",
+        "36047",
+        "36059",
+        "36061",
+        "36079",
+        "36081",
+        "36085",
+        "36087",
+        "36103",
+        "36119"
+      ]
+    },
+    "35660": {
+      "cbsa_code": "35660",
+      "title": "Niles, MI",
+      "state_abbrs": [
+        "MI"
+      ],
+      "county_fips_list": [
+        "26021"
+      ]
+    },
+    "35840": {
+      "cbsa_code": "35840",
+      "title": "North Port-Bradenton-Sarasota, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12081",
+        "12115"
+      ]
+    },
+    "35980": {
+      "cbsa_code": "35980",
+      "title": "Norwich-New London-Willimantic, CT",
+      "state_abbrs": [
+        "CT"
+      ],
+      "county_fips_list": [
+        "09180"
+      ]
+    },
+    "36100": {
+      "cbsa_code": "36100",
+      "title": "Ocala, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12083"
+      ]
+    },
+    "36220": {
+      "cbsa_code": "36220",
+      "title": "Odessa, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48135"
+      ]
+    },
+    "36260": {
+      "cbsa_code": "36260",
+      "title": "Ogden, UT",
+      "state_abbrs": [
+        "UT"
+      ],
+      "county_fips_list": [
+        "49011",
+        "49029",
+        "49057"
+      ]
+    },
+    "36420": {
+      "cbsa_code": "36420",
+      "title": "Oklahoma City, OK",
+      "state_abbrs": [
+        "OK"
+      ],
+      "county_fips_list": [
+        "40017",
+        "40027",
+        "40051",
+        "40081",
+        "40083",
+        "40087",
+        "40109"
+      ]
+    },
+    "36500": {
+      "cbsa_code": "36500",
+      "title": "Olympia-Lacey-Tumwater, WA",
+      "state_abbrs": [
+        "WA"
+      ],
+      "county_fips_list": [
+        "53067"
+      ]
+    },
+    "36540": {
+      "cbsa_code": "36540",
+      "title": "Omaha, NE-IA",
+      "state_abbrs": [
+        "IA",
+        "NE"
+      ],
+      "county_fips_list": [
+        "19085",
+        "19129",
+        "19155",
+        "31025",
+        "31055",
+        "31153",
+        "31155",
+        "31177"
+      ]
+    },
+    "36740": {
+      "cbsa_code": "36740",
+      "title": "Orlando-Kissimmee-Sanford, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12069",
+        "12095",
+        "12097",
+        "12117"
+      ]
+    },
+    "36780": {
+      "cbsa_code": "36780",
+      "title": "Oshkosh-Neenah, WI",
+      "state_abbrs": [
+        "WI"
+      ],
+      "county_fips_list": [
+        "55139"
+      ]
+    },
+    "36980": {
+      "cbsa_code": "36980",
+      "title": "Owensboro, KY",
+      "state_abbrs": [
+        "KY"
+      ],
+      "county_fips_list": [
+        "21059",
+        "21149"
+      ]
+    },
+    "37100": {
+      "cbsa_code": "37100",
+      "title": "Oxnard-Thousand Oaks-Ventura, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06111"
+      ]
+    },
+    "37140": {
+      "cbsa_code": "37140",
+      "title": "Paducah, KY-IL",
+      "state_abbrs": [
+        "IL",
+        "KY"
+      ],
+      "county_fips_list": [
+        "17127",
+        "21007",
+        "21039",
+        "21139",
+        "21145"
+      ]
+    },
+    "37340": {
+      "cbsa_code": "37340",
+      "title": "Palm Bay-Melbourne-Titusville, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12009"
+      ]
+    },
+    "37460": {
+      "cbsa_code": "37460",
+      "title": "Panama City-Panama City Beach, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12005",
+        "12133"
+      ]
+    },
+    "37620": {
+      "cbsa_code": "37620",
+      "title": "Parkersburg-Vienna, WV",
+      "state_abbrs": [
+        "WV"
+      ],
+      "county_fips_list": [
+        "54105",
+        "54107"
+      ]
+    },
+    "37860": {
+      "cbsa_code": "37860",
+      "title": "Pensacola-Ferry Pass-Brent, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12033",
+        "12113"
+      ]
+    },
+    "37900": {
+      "cbsa_code": "37900",
+      "title": "Peoria, IL",
+      "state_abbrs": [
+        "IL"
+      ],
+      "county_fips_list": [
+        "17123",
+        "17143",
+        "17175",
+        "17179",
+        "17203"
+      ]
+    },
+    "37980": {
+      "cbsa_code": "37980",
+      "title": "Philadelphia-Camden-Wilmington, PA-NJ-DE-MD",
+      "state_abbrs": [
+        "DE",
+        "MD",
+        "NJ",
+        "PA"
+      ],
+      "county_fips_list": [
+        "10003",
+        "24015",
+        "34005",
+        "34007",
+        "34015",
+        "34033",
+        "42017",
+        "42029",
+        "42045",
+        "42091",
+        "42101"
+      ]
+    },
+    "38060": {
+      "cbsa_code": "38060",
+      "title": "Phoenix-Mesa-Chandler, AZ",
+      "state_abbrs": [
+        "AZ"
+      ],
+      "county_fips_list": [
+        "04013",
+        "04021"
+      ]
+    },
+    "38240": {
+      "cbsa_code": "38240",
+      "title": "Pinehurst-Southern Pines, NC",
+      "state_abbrs": [
+        "NC"
+      ],
+      "county_fips_list": [
+        "37125"
+      ]
+    },
+    "38300": {
+      "cbsa_code": "38300",
+      "title": "Pittsburgh, PA",
+      "state_abbrs": [
+        "PA"
+      ],
+      "county_fips_list": [
+        "42003",
+        "42005",
+        "42007",
+        "42019",
+        "42051",
+        "42073",
+        "42125",
+        "42129"
+      ]
+    },
+    "38340": {
+      "cbsa_code": "38340",
+      "title": "Pittsfield, MA",
+      "state_abbrs": [
+        "MA"
+      ],
+      "county_fips_list": [
+        "25003"
+      ]
+    },
+    "38540": {
+      "cbsa_code": "38540",
+      "title": "Pocatello, ID",
+      "state_abbrs": [
+        "ID"
+      ],
+      "county_fips_list": [
+        "16005"
+      ]
+    },
+    "38660": {
+      "cbsa_code": "38660",
+      "title": "Ponce, PR",
+      "state_abbrs": [
+        "PR"
+      ],
+      "county_fips_list": [
+        "72059",
+        "72075",
+        "72111",
+        "72113",
+        "72149",
+        "72153"
+      ]
+    },
+    "38860": {
+      "cbsa_code": "38860",
+      "title": "Portland-South Portland, ME",
+      "state_abbrs": [
+        "ME"
+      ],
+      "county_fips_list": [
+        "23005",
+        "23023",
+        "23031"
+      ]
+    },
+    "38900": {
+      "cbsa_code": "38900",
+      "title": "Portland-Vancouver-Hillsboro, OR-WA",
+      "state_abbrs": [
+        "OR",
+        "WA"
+      ],
+      "county_fips_list": [
+        "41005",
+        "41009",
+        "41051",
+        "41067",
+        "41071",
+        "53011",
+        "53059"
+      ]
+    },
+    "38940": {
+      "cbsa_code": "38940",
+      "title": "Port St. Lucie, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12085",
+        "12111"
+      ]
+    },
+    "39150": {
+      "cbsa_code": "39150",
+      "title": "Prescott Valley-Prescott, AZ",
+      "state_abbrs": [
+        "AZ"
+      ],
+      "county_fips_list": [
+        "04025"
+      ]
+    },
+    "39300": {
+      "cbsa_code": "39300",
+      "title": "Providence-Warwick, RI-MA",
+      "state_abbrs": [
+        "MA",
+        "RI"
+      ],
+      "county_fips_list": [
+        "25005",
+        "44001",
+        "44003",
+        "44005",
+        "44007",
+        "44009"
+      ]
+    },
+    "39340": {
+      "cbsa_code": "39340",
+      "title": "Provo-Orem-Lehi, UT",
+      "state_abbrs": [
+        "UT"
+      ],
+      "county_fips_list": [
+        "49023",
+        "49049"
+      ]
+    },
+    "39380": {
+      "cbsa_code": "39380",
+      "title": "Pueblo, CO",
+      "state_abbrs": [
+        "CO"
+      ],
+      "county_fips_list": [
+        "08101"
+      ]
+    },
+    "39460": {
+      "cbsa_code": "39460",
+      "title": "Punta Gorda, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12015"
+      ]
+    },
+    "39540": {
+      "cbsa_code": "39540",
+      "title": "Racine-Mount Pleasant, WI",
+      "state_abbrs": [
+        "WI"
+      ],
+      "county_fips_list": [
+        "55101"
+      ]
+    },
+    "39580": {
+      "cbsa_code": "39580",
+      "title": "Raleigh-Cary, NC",
+      "state_abbrs": [
+        "NC"
+      ],
+      "county_fips_list": [
+        "37069",
+        "37101",
+        "37183"
+      ]
+    },
+    "39660": {
+      "cbsa_code": "39660",
+      "title": "Rapid City, SD",
+      "state_abbrs": [
+        "SD"
+      ],
+      "county_fips_list": [
+        "46033",
+        "46093",
+        "46103"
+      ]
+    },
+    "39740": {
+      "cbsa_code": "39740",
+      "title": "Reading, PA",
+      "state_abbrs": [
+        "PA"
+      ],
+      "county_fips_list": [
+        "42011"
+      ]
+    },
+    "39820": {
+      "cbsa_code": "39820",
+      "title": "Redding, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06089"
+      ]
+    },
+    "39900": {
+      "cbsa_code": "39900",
+      "title": "Reno, NV",
+      "state_abbrs": [
+        "NV"
+      ],
+      "county_fips_list": [
+        "32019",
+        "32029",
+        "32031"
+      ]
+    },
+    "40060": {
+      "cbsa_code": "40060",
+      "title": "Richmond, VA",
+      "state_abbrs": [
+        "VA"
+      ],
+      "county_fips_list": [
+        "51007",
+        "51036",
+        "51041",
+        "51053",
+        "51075",
+        "51085",
+        "51087",
+        "51097",
+        "51101",
+        "51127",
+        "51145",
+        "51149",
+        "51183",
+        "51570",
+        "51670",
+        "51730",
+        "51760"
+      ]
+    },
+    "40140": {
+      "cbsa_code": "40140",
+      "title": "Riverside-San Bernardino-Ontario, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06065",
+        "06071"
+      ]
+    },
+    "40220": {
+      "cbsa_code": "40220",
+      "title": "Roanoke, VA",
+      "state_abbrs": [
+        "VA"
+      ],
+      "county_fips_list": [
+        "51023",
+        "51045",
+        "51067",
+        "51161",
+        "51770",
+        "51775"
+      ]
+    },
+    "40340": {
+      "cbsa_code": "40340",
+      "title": "Rochester, MN",
+      "state_abbrs": [
+        "MN"
+      ],
+      "county_fips_list": [
+        "27039",
+        "27045",
+        "27109",
+        "27157"
+      ]
+    },
+    "40380": {
+      "cbsa_code": "40380",
+      "title": "Rochester, NY",
+      "state_abbrs": [
+        "NY"
+      ],
+      "county_fips_list": [
+        "36051",
+        "36055",
+        "36069",
+        "36073",
+        "36117"
+      ]
+    },
+    "40420": {
+      "cbsa_code": "40420",
+      "title": "Rockford, IL",
+      "state_abbrs": [
+        "IL"
+      ],
+      "county_fips_list": [
+        "17007",
+        "17201"
+      ]
+    },
+    "40580": {
+      "cbsa_code": "40580",
+      "title": "Rocky Mount, NC",
+      "state_abbrs": [
+        "NC"
+      ],
+      "county_fips_list": [
+        "37065",
+        "37127"
+      ]
+    },
+    "40660": {
+      "cbsa_code": "40660",
+      "title": "Rome, GA",
+      "state_abbrs": [
+        "GA"
+      ],
+      "county_fips_list": [
+        "13115"
+      ]
+    },
+    "40900": {
+      "cbsa_code": "40900",
+      "title": "Sacramento-Roseville-Folsom, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06017",
+        "06061",
+        "06067",
+        "06113"
+      ]
+    },
+    "40980": {
+      "cbsa_code": "40980",
+      "title": "Saginaw, MI",
+      "state_abbrs": [
+        "MI"
+      ],
+      "county_fips_list": [
+        "26145"
+      ]
+    },
+    "41060": {
+      "cbsa_code": "41060",
+      "title": "St. Cloud, MN",
+      "state_abbrs": [
+        "MN"
+      ],
+      "county_fips_list": [
+        "27009",
+        "27145"
+      ]
+    },
+    "41100": {
+      "cbsa_code": "41100",
+      "title": "St. George, UT",
+      "state_abbrs": [
+        "UT"
+      ],
+      "county_fips_list": [
+        "49053"
+      ]
+    },
+    "41140": {
+      "cbsa_code": "41140",
+      "title": "St. Joseph, MO-KS",
+      "state_abbrs": [
+        "KS",
+        "MO"
+      ],
+      "county_fips_list": [
+        "20043",
+        "29003",
+        "29021",
+        "29063"
+      ]
+    },
+    "41180": {
+      "cbsa_code": "41180",
+      "title": "St. Louis, MO-IL",
+      "state_abbrs": [
+        "IL",
+        "MO"
+      ],
+      "county_fips_list": [
+        "17005",
+        "17013",
+        "17027",
+        "17083",
+        "17117",
+        "17119",
+        "17133",
+        "17163",
+        "29071",
+        "29099",
+        "29113",
+        "29183",
+        "29189",
+        "29219",
+        "29510"
+      ]
+    },
+    "41420": {
+      "cbsa_code": "41420",
+      "title": "Salem, OR",
+      "state_abbrs": [
+        "OR"
+      ],
+      "county_fips_list": [
+        "41047",
+        "41053"
+      ]
+    },
+    "41500": {
+      "cbsa_code": "41500",
+      "title": "Salinas, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06053"
+      ]
+    },
+    "41540": {
+      "cbsa_code": "41540",
+      "title": "Salisbury, MD",
+      "state_abbrs": [
+        "MD"
+      ],
+      "county_fips_list": [
+        "24039",
+        "24045"
+      ]
+    },
+    "41620": {
+      "cbsa_code": "41620",
+      "title": "Salt Lake City-Murray, UT",
+      "state_abbrs": [
+        "UT"
+      ],
+      "county_fips_list": [
+        "49035",
+        "49045"
+      ]
+    },
+    "41660": {
+      "cbsa_code": "41660",
+      "title": "San Angelo, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48235",
+        "48451"
+      ]
+    },
+    "41700": {
+      "cbsa_code": "41700",
+      "title": "San Antonio-New Braunfels, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48013",
+        "48019",
+        "48029",
+        "48091",
+        "48187",
+        "48259",
+        "48325",
+        "48493"
+      ]
+    },
+    "41740": {
+      "cbsa_code": "41740",
+      "title": "San Diego-Chula Vista-Carlsbad, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06073"
+      ]
+    },
+    "41780": {
+      "cbsa_code": "41780",
+      "title": "Sandusky, OH",
+      "state_abbrs": [
+        "OH"
+      ],
+      "county_fips_list": [
+        "39043",
+        "39123"
+      ]
+    },
+    "41860": {
+      "cbsa_code": "41860",
+      "title": "San Francisco-Oakland-Fremont, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06001",
+        "06013",
+        "06041",
+        "06075",
+        "06081"
+      ]
+    },
+    "41940": {
+      "cbsa_code": "41940",
+      "title": "San Jose-Sunnyvale-Santa Clara, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06069",
+        "06085"
+      ]
+    },
+    "41980": {
+      "cbsa_code": "41980",
+      "title": "San Juan-Bayam\u00f3n-Caguas, PR",
+      "state_abbrs": [
+        "PR"
+      ],
+      "county_fips_list": [
+        "72007",
+        "72009",
+        "72017",
+        "72019",
+        "72021",
+        "72025",
+        "72029",
+        "72031",
+        "72033",
+        "72035",
+        "72037",
+        "72039",
+        "72041",
+        "72045",
+        "72047",
+        "72051",
+        "72053",
+        "72054",
+        "72061",
+        "72063",
+        "72069",
+        "72077",
+        "72085",
+        "72087",
+        "72089",
+        "72091",
+        "72095",
+        "72101",
+        "72103",
+        "72105",
+        "72107",
+        "72119",
+        "72127",
+        "72129",
+        "72135",
+        "72137",
+        "72139",
+        "72143",
+        "72145",
+        "72151"
+      ]
+    },
+    "42020": {
+      "cbsa_code": "42020",
+      "title": "San Luis Obispo-Paso Robles, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06079"
+      ]
+    },
+    "42100": {
+      "cbsa_code": "42100",
+      "title": "Santa Cruz-Watsonville, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06087"
+      ]
+    },
+    "42140": {
+      "cbsa_code": "42140",
+      "title": "Santa Fe, NM",
+      "state_abbrs": [
+        "NM"
+      ],
+      "county_fips_list": [
+        "35049"
+      ]
+    },
+    "42200": {
+      "cbsa_code": "42200",
+      "title": "Santa Maria-Santa Barbara, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06083"
+      ]
+    },
+    "42220": {
+      "cbsa_code": "42220",
+      "title": "Santa Rosa-Petaluma, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06097"
+      ]
+    },
+    "42340": {
+      "cbsa_code": "42340",
+      "title": "Savannah, GA",
+      "state_abbrs": [
+        "GA"
+      ],
+      "county_fips_list": [
+        "13029",
+        "13051",
+        "13103"
+      ]
+    },
+    "42540": {
+      "cbsa_code": "42540",
+      "title": "Scranton--Wilkes-Barre, PA",
+      "state_abbrs": [
+        "PA"
+      ],
+      "county_fips_list": [
+        "42069",
+        "42079",
+        "42131"
+      ]
+    },
+    "42660": {
+      "cbsa_code": "42660",
+      "title": "Seattle-Tacoma-Bellevue, WA",
+      "state_abbrs": [
+        "WA"
+      ],
+      "county_fips_list": [
+        "53033",
+        "53053",
+        "53061"
+      ]
+    },
+    "42680": {
+      "cbsa_code": "42680",
+      "title": "Sebastian-Vero Beach-West Vero Corridor, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12061"
+      ]
+    },
+    "42700": {
+      "cbsa_code": "42700",
+      "title": "Sebring, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12055"
+      ]
+    },
+    "43100": {
+      "cbsa_code": "43100",
+      "title": "Sheboygan, WI",
+      "state_abbrs": [
+        "WI"
+      ],
+      "county_fips_list": [
+        "55117"
+      ]
+    },
+    "43300": {
+      "cbsa_code": "43300",
+      "title": "Sherman-Denison, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48181"
+      ]
+    },
+    "43340": {
+      "cbsa_code": "43340",
+      "title": "Shreveport-Bossier City, LA",
+      "state_abbrs": [
+        "LA"
+      ],
+      "county_fips_list": [
+        "22015",
+        "22017",
+        "22031"
+      ]
+    },
+    "43420": {
+      "cbsa_code": "43420",
+      "title": "Sierra Vista-Douglas, AZ",
+      "state_abbrs": [
+        "AZ"
+      ],
+      "county_fips_list": [
+        "04003"
+      ]
+    },
+    "43580": {
+      "cbsa_code": "43580",
+      "title": "Sioux City, IA-NE-SD",
+      "state_abbrs": [
+        "IA",
+        "NE",
+        "SD"
+      ],
+      "county_fips_list": [
+        "19193",
+        "31043",
+        "46127"
+      ]
+    },
+    "43620": {
+      "cbsa_code": "43620",
+      "title": "Sioux Falls, SD-MN",
+      "state_abbrs": [
+        "MN",
+        "SD"
+      ],
+      "county_fips_list": [
+        "27133",
+        "46083",
+        "46087",
+        "46099",
+        "46125"
+      ]
+    },
+    "43640": {
+      "cbsa_code": "43640",
+      "title": "Slidell-Mandeville-Covington, LA",
+      "state_abbrs": [
+        "LA"
+      ],
+      "county_fips_list": [
+        "22103"
+      ]
+    },
+    "43780": {
+      "cbsa_code": "43780",
+      "title": "South Bend-Mishawaka, IN-MI",
+      "state_abbrs": [
+        "IN",
+        "MI"
+      ],
+      "county_fips_list": [
+        "18141",
+        "26027"
+      ]
+    },
+    "43900": {
+      "cbsa_code": "43900",
+      "title": "Spartanburg, SC",
+      "state_abbrs": [
+        "SC"
+      ],
+      "county_fips_list": [
+        "45083",
+        "45087"
+      ]
+    },
+    "44060": {
+      "cbsa_code": "44060",
+      "title": "Spokane-Spokane Valley, WA",
+      "state_abbrs": [
+        "WA"
+      ],
+      "county_fips_list": [
+        "53063",
+        "53065"
+      ]
+    },
+    "44100": {
+      "cbsa_code": "44100",
+      "title": "Springfield, IL",
+      "state_abbrs": [
+        "IL"
+      ],
+      "county_fips_list": [
+        "17129",
+        "17167"
+      ]
+    },
+    "44140": {
+      "cbsa_code": "44140",
+      "title": "Springfield, MA",
+      "state_abbrs": [
+        "MA"
+      ],
+      "county_fips_list": [
+        "25013"
+      ]
+    },
+    "44180": {
+      "cbsa_code": "44180",
+      "title": "Springfield, MO",
+      "state_abbrs": [
+        "MO"
+      ],
+      "county_fips_list": [
+        "29043",
+        "29059",
+        "29077",
+        "29167",
+        "29225"
+      ]
+    },
+    "44220": {
+      "cbsa_code": "44220",
+      "title": "Springfield, OH",
+      "state_abbrs": [
+        "OH"
+      ],
+      "county_fips_list": [
+        "39023"
+      ]
+    },
+    "44300": {
+      "cbsa_code": "44300",
+      "title": "State College, PA",
+      "state_abbrs": [
+        "PA"
+      ],
+      "county_fips_list": [
+        "42027"
+      ]
+    },
+    "44420": {
+      "cbsa_code": "44420",
+      "title": "Staunton-Stuarts Draft, VA",
+      "state_abbrs": [
+        "VA"
+      ],
+      "county_fips_list": [
+        "51015",
+        "51790",
+        "51820"
+      ]
+    },
+    "44700": {
+      "cbsa_code": "44700",
+      "title": "Stockton-Lodi, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06077"
+      ]
+    },
+    "44940": {
+      "cbsa_code": "44940",
+      "title": "Sumter, SC",
+      "state_abbrs": [
+        "SC"
+      ],
+      "county_fips_list": [
+        "45085"
+      ]
+    },
+    "45060": {
+      "cbsa_code": "45060",
+      "title": "Syracuse, NY",
+      "state_abbrs": [
+        "NY"
+      ],
+      "county_fips_list": [
+        "36053",
+        "36067",
+        "36075"
+      ]
+    },
+    "45220": {
+      "cbsa_code": "45220",
+      "title": "Tallahassee, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12039",
+        "12065",
+        "12073",
+        "12129"
+      ]
+    },
+    "45300": {
+      "cbsa_code": "45300",
+      "title": "Tampa-St. Petersburg-Clearwater, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12053",
+        "12057",
+        "12101",
+        "12103"
+      ]
+    },
+    "45460": {
+      "cbsa_code": "45460",
+      "title": "Terre Haute, IN",
+      "state_abbrs": [
+        "IN"
+      ],
+      "county_fips_list": [
+        "18021",
+        "18153",
+        "18165",
+        "18167"
+      ]
+    },
+    "45500": {
+      "cbsa_code": "45500",
+      "title": "Texarkana, TX-AR",
+      "state_abbrs": [
+        "AR",
+        "TX"
+      ],
+      "county_fips_list": [
+        "05081",
+        "05091",
+        "48037"
+      ]
+    },
+    "45780": {
+      "cbsa_code": "45780",
+      "title": "Toledo, OH",
+      "state_abbrs": [
+        "OH"
+      ],
+      "county_fips_list": [
+        "39051",
+        "39095",
+        "39173"
+      ]
+    },
+    "45820": {
+      "cbsa_code": "45820",
+      "title": "Topeka, KS",
+      "state_abbrs": [
+        "KS"
+      ],
+      "county_fips_list": [
+        "20085",
+        "20087",
+        "20139",
+        "20177",
+        "20197"
+      ]
+    },
+    "45900": {
+      "cbsa_code": "45900",
+      "title": "Traverse City, MI",
+      "state_abbrs": [
+        "MI"
+      ],
+      "county_fips_list": [
+        "26019",
+        "26055",
+        "26079",
+        "26089"
+      ]
+    },
+    "45940": {
+      "cbsa_code": "45940",
+      "title": "Trenton-Princeton, NJ",
+      "state_abbrs": [
+        "NJ"
+      ],
+      "county_fips_list": [
+        "34021"
+      ]
+    },
+    "46060": {
+      "cbsa_code": "46060",
+      "title": "Tucson, AZ",
+      "state_abbrs": [
+        "AZ"
+      ],
+      "county_fips_list": [
+        "04019"
+      ]
+    },
+    "46140": {
+      "cbsa_code": "46140",
+      "title": "Tulsa, OK",
+      "state_abbrs": [
+        "OK"
+      ],
+      "county_fips_list": [
+        "40037",
+        "40111",
+        "40113",
+        "40117",
+        "40131",
+        "40143",
+        "40145"
+      ]
+    },
+    "46220": {
+      "cbsa_code": "46220",
+      "title": "Tuscaloosa, AL",
+      "state_abbrs": [
+        "AL"
+      ],
+      "county_fips_list": [
+        "01063",
+        "01065",
+        "01107",
+        "01125"
+      ]
+    },
+    "46300": {
+      "cbsa_code": "46300",
+      "title": "Twin Falls, ID",
+      "state_abbrs": [
+        "ID"
+      ],
+      "county_fips_list": [
+        "16053",
+        "16083"
+      ]
+    },
+    "46340": {
+      "cbsa_code": "46340",
+      "title": "Tyler, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48423"
+      ]
+    },
+    "46520": {
+      "cbsa_code": "46520",
+      "title": "Urban Honolulu, HI",
+      "state_abbrs": [
+        "HI"
+      ],
+      "county_fips_list": [
+        "15003"
+      ]
+    },
+    "46540": {
+      "cbsa_code": "46540",
+      "title": "Utica-Rome, NY",
+      "state_abbrs": [
+        "NY"
+      ],
+      "county_fips_list": [
+        "36043",
+        "36065"
+      ]
+    },
+    "46660": {
+      "cbsa_code": "46660",
+      "title": "Valdosta, GA",
+      "state_abbrs": [
+        "GA"
+      ],
+      "county_fips_list": [
+        "13027",
+        "13101",
+        "13173",
+        "13185"
+      ]
+    },
+    "46700": {
+      "cbsa_code": "46700",
+      "title": "Vallejo, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06095"
+      ]
+    },
+    "47020": {
+      "cbsa_code": "47020",
+      "title": "Victoria, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48175",
+        "48469"
+      ]
+    },
+    "47220": {
+      "cbsa_code": "47220",
+      "title": "Vineland, NJ",
+      "state_abbrs": [
+        "NJ"
+      ],
+      "county_fips_list": [
+        "34011"
+      ]
+    },
+    "47260": {
+      "cbsa_code": "47260",
+      "title": "Virginia Beach-Chesapeake-Norfolk, VA-NC",
+      "state_abbrs": [
+        "NC",
+        "VA"
+      ],
+      "county_fips_list": [
+        "37029",
+        "37053",
+        "37073",
+        "51073",
+        "51093",
+        "51095",
+        "51115",
+        "51181",
+        "51199",
+        "51550",
+        "51650",
+        "51700",
+        "51710",
+        "51735",
+        "51740",
+        "51800",
+        "51810",
+        "51830"
+      ]
+    },
+    "47300": {
+      "cbsa_code": "47300",
+      "title": "Visalia, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06107"
+      ]
+    },
+    "47380": {
+      "cbsa_code": "47380",
+      "title": "Waco, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48035",
+        "48145",
+        "48309"
+      ]
+    },
+    "47460": {
+      "cbsa_code": "47460",
+      "title": "Walla Walla, WA",
+      "state_abbrs": [
+        "WA"
+      ],
+      "county_fips_list": [
+        "53071"
+      ]
+    },
+    "47580": {
+      "cbsa_code": "47580",
+      "title": "Warner Robins, GA",
+      "state_abbrs": [
+        "GA"
+      ],
+      "county_fips_list": [
+        "13153",
+        "13225"
+      ]
+    },
+    "47900": {
+      "cbsa_code": "47900",
+      "title": "Washington-Arlington-Alexandria, DC-VA-MD-WV",
+      "state_abbrs": [
+        "DC",
+        "MD",
+        "VA",
+        "WV"
+      ],
+      "county_fips_list": [
+        "11001",
+        "24017",
+        "24021",
+        "24031",
+        "24033",
+        "51013",
+        "51043",
+        "51047",
+        "51059",
+        "51061",
+        "51107",
+        "51153",
+        "51157",
+        "51177",
+        "51179",
+        "51187",
+        "51510",
+        "51600",
+        "51610",
+        "51630",
+        "51683",
+        "51685",
+        "54037"
+      ]
+    },
+    "47930": {
+      "cbsa_code": "47930",
+      "title": "Waterbury-Shelton, CT",
+      "state_abbrs": [
+        "CT"
+      ],
+      "county_fips_list": [
+        "09140"
+      ]
+    },
+    "47940": {
+      "cbsa_code": "47940",
+      "title": "Waterloo-Cedar Falls, IA",
+      "state_abbrs": [
+        "IA"
+      ],
+      "county_fips_list": [
+        "19013",
+        "19017",
+        "19075"
+      ]
+    },
+    "48060": {
+      "cbsa_code": "48060",
+      "title": "Watertown-Fort Drum, NY",
+      "state_abbrs": [
+        "NY"
+      ],
+      "county_fips_list": [
+        "36045"
+      ]
+    },
+    "48140": {
+      "cbsa_code": "48140",
+      "title": "Wausau, WI",
+      "state_abbrs": [
+        "WI"
+      ],
+      "county_fips_list": [
+        "55073"
+      ]
+    },
+    "48260": {
+      "cbsa_code": "48260",
+      "title": "Weirton-Steubenville, WV-OH",
+      "state_abbrs": [
+        "OH",
+        "WV"
+      ],
+      "county_fips_list": [
+        "39081",
+        "54009",
+        "54029"
+      ]
+    },
+    "48300": {
+      "cbsa_code": "48300",
+      "title": "Wenatchee-East Wenatchee, WA",
+      "state_abbrs": [
+        "WA"
+      ],
+      "county_fips_list": [
+        "53007",
+        "53017"
+      ]
+    },
+    "48540": {
+      "cbsa_code": "48540",
+      "title": "Wheeling, WV-OH",
+      "state_abbrs": [
+        "OH",
+        "WV"
+      ],
+      "county_fips_list": [
+        "39013",
+        "54051",
+        "54069"
+      ]
+    },
+    "48620": {
+      "cbsa_code": "48620",
+      "title": "Wichita, KS",
+      "state_abbrs": [
+        "KS"
+      ],
+      "county_fips_list": [
+        "20015",
+        "20079",
+        "20173",
+        "20191"
+      ]
+    },
+    "48660": {
+      "cbsa_code": "48660",
+      "title": "Wichita Falls, TX",
+      "state_abbrs": [
+        "TX"
+      ],
+      "county_fips_list": [
+        "48009",
+        "48077",
+        "48485"
+      ]
+    },
+    "48680": {
+      "cbsa_code": "48680",
+      "title": "Wildwood-The Villages, FL",
+      "state_abbrs": [
+        "FL"
+      ],
+      "county_fips_list": [
+        "12119"
+      ]
+    },
+    "48700": {
+      "cbsa_code": "48700",
+      "title": "Williamsport, PA",
+      "state_abbrs": [
+        "PA"
+      ],
+      "county_fips_list": [
+        "42081"
+      ]
+    },
+    "48900": {
+      "cbsa_code": "48900",
+      "title": "Wilmington, NC",
+      "state_abbrs": [
+        "NC"
+      ],
+      "county_fips_list": [
+        "37019",
+        "37129",
+        "37141"
+      ]
+    },
+    "49020": {
+      "cbsa_code": "49020",
+      "title": "Winchester, VA-WV",
+      "state_abbrs": [
+        "VA",
+        "WV"
+      ],
+      "county_fips_list": [
+        "51069",
+        "51840",
+        "54027"
+      ]
+    },
+    "49180": {
+      "cbsa_code": "49180",
+      "title": "Winston-Salem, NC",
+      "state_abbrs": [
+        "NC"
+      ],
+      "county_fips_list": [
+        "37057",
+        "37059",
+        "37067",
+        "37169",
+        "37197"
+      ]
+    },
+    "49340": {
+      "cbsa_code": "49340",
+      "title": "Worcester, MA",
+      "state_abbrs": [
+        "MA"
+      ],
+      "county_fips_list": [
+        "25027"
+      ]
+    },
+    "49420": {
+      "cbsa_code": "49420",
+      "title": "Yakima, WA",
+      "state_abbrs": [
+        "WA"
+      ],
+      "county_fips_list": [
+        "53077"
+      ]
+    },
+    "49620": {
+      "cbsa_code": "49620",
+      "title": "York-Hanover, PA",
+      "state_abbrs": [
+        "PA"
+      ],
+      "county_fips_list": [
+        "42133"
+      ]
+    },
+    "49660": {
+      "cbsa_code": "49660",
+      "title": "Youngstown-Warren, OH",
+      "state_abbrs": [
+        "OH"
+      ],
+      "county_fips_list": [
+        "39099",
+        "39155"
+      ]
+    },
+    "49700": {
+      "cbsa_code": "49700",
+      "title": "Yuba City, CA",
+      "state_abbrs": [
+        "CA"
+      ],
+      "county_fips_list": [
+        "06101",
+        "06115"
+      ]
+    },
+    "49740": {
+      "cbsa_code": "49740",
+      "title": "Yuma, AZ",
+      "state_abbrs": [
+        "AZ"
+      ],
+      "county_fips_list": [
+        "04027"
+      ]
+    }
+  }
+}

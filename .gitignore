@@ -62,10 +62,11 @@ service_startup.log
 app_stdout.log
 app_stderr.log
 
-# Data files (local only - but keep README files)
+# Data files (local only - but keep README files + small reference dictionaries)
 data/*
 !data/README.md
 !data/.gitkeep
+!data/reference/
 sec_data_output/
 demo_output/
 
