@@ -26,6 +26,7 @@ from app.reports.templates.pe_market_brief import PEMarketBriefTemplate
 from app.reports.templates.les_schwab_av import LesSchwabAVTemplate
 from app.reports.templates.macro_sector_brief import MacroSectorBriefTemplate
 from app.reports.templates.synthetic_playground import SyntheticPlaygroundTemplate
+from app.reports.templates.market_intelligence_pack import MarketIntelligencePackTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ class ReportBuilder:
             "les_schwab_av": LesSchwabAVTemplate(),
             "macro_sector_brief": MacroSectorBriefTemplate(),
             "synthetic_playground": SyntheticPlaygroundTemplate(),
+            "market_intelligence_pack": MarketIntelligencePackTemplate(),
         }
         self._ensure_table()
 

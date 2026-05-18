@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sector × Market Intelligence Pack | NAICS 2382 — Building Equipment Contractors · Houston-Pasadena-The Woodlands, TX · 2026-05-18</title>
+    <style>
+:root {
+  --primary: #1a365d;
+  --primary-light: #2b6cb0;
+  --accent: #ed8936;
+  --accent-red: #e53e3e;
+  --accent-green: #38a169;
+  --gray-50: #f7fafc;
+  --gray-100: #edf2f7;
+  --gray-200: #e2e8f0;
+  --gray-300: #cbd5e0;
+  --gray-500: #718096;
+  --gray-700: #4a5568;
+  --gray-800: #2d3748;
+  --gray-900: #1a202c;
+  --white: #ffffff;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: var(--gray-800);
+  background: var(--gray-50);
+  line-height: 1.6;
+}
+
+.page-header {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: var(--white);
+  padding: 40px 0;
+}
+.page-header .container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.page-header h1 { font-size: 28px; font-weight: 700; }
+.page-header .subtitle { font-size: 16px; opacity: 0.85; margin-top: 4px; }
+.page-header .badge {
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.3);
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+/* KPI Strip */
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: -32px 0 32px 0;
+  position: relative;
+  z-index: 10;
+}
+.kpi-card {
+  background: var(--white);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  text-align: center;
+}
+.kpi-card .label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--gray-500);
+  font-weight: 600;
+}
+.kpi-card .value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--primary);
+  margin: 4px 0;
+}
+.kpi-card .delta {
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.delta.up { color: var(--accent-green); }
+.delta.down { color: var(--accent-red); }
+.delta.neutral { color: var(--gray-500); }
+
+/* Table of Contents */
+.toc {
+  background: var(--white);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  margin-bottom: 24px;
+  padding: 20px 24px;
+}
+.toc h2 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+.toc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 6px 24px;
+}
+.toc a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--gray-700);
+  font-size: 14px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.toc a:hover { background: var(--gray-100); }
+.toc a .toc-num {
+  background: var(--primary);
+  color: var(--white);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Sections */
+.section {
+  background: var(--white);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.section-header {
+  padding: 20px 24px 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.section-number {
+  background: var(--primary);
+  color: var(--white);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.section-body { padding: 16px 24px 24px 24px; }
+.section-body p { color: var(--gray-700); font-size: 14px; margin-bottom: 12px; }
+.section-body .count-badge {
+  background: var(--gray-100);
+  color: var(--gray-500);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 12px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* Charts */
+.chart-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin: 12px 0;
+}
+@media (max-width: 768px) { .chart-row { grid-template-columns: 1fr; } }
+.chart-container { position: relative; width: 100%; }
+.chart-container.tall { height: 360px; }
+.chart-container.medium { height: 300px; }
+.chart-container.short { height: 240px; }
+.chart-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.chart-fallback { display: none; padding: 12px 0; }
+.chart-fallback .fb-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: var(--gray-700);
+}
+.chart-fallback .fb-label { min-width: 160px; }
+.chart-fallback .fb-bar-track {
+  flex: 1; height: 8px;
+  background: var(--gray-100);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.chart-fallback .fb-bar-fill { height: 100%; border-radius: 4px; }
+.chart-fallback .fb-value {
+  min-width: 60px;
+  text-align: right;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+/* Tables */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 12px;
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table thead th {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  font-weight: 600;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 2px solid var(--gray-200);
+  white-space: nowrap;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.data-table thead th.right { text-align: right; }
+.data-table tbody td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--gray-100);
+  vertical-align: middle;
+}
+.data-table tbody td.right { text-align: right; font-variant-numeric: tabular-nums; }
+.data-table tbody td.bold { font-weight: 600; }
+.data-table tbody tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover { background: var(--gray-50); }
+.data-table tfoot td {
+  padding: 10px 12px;
+  border-top: 2px solid var(--gray-300);
+  font-weight: 700;
+  background: var(--gray-50);
+}
+.data-table tfoot td.right { text-align: right; font-variant-numeric: tabular-nums; }
+.company-name { font-weight: 600; color: var(--gray-900); }
+.ticker {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+  color: var(--primary-light);
+  font-weight: 500;
+}
+.change-positive { color: var(--accent-green); font-weight: 600; }
+.change-negative { color: var(--accent-red); font-weight: 600; }
+.change-neutral { color: var(--gray-500); }
+
+/* Status pills */
+.pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pill-public  { background: #dbeafe; color: #1d4ed8; }
+.pill-pe      { background: #fef3c7; color: #92400e; }
+.pill-sub     { background: var(--gray-100); color: var(--gray-700); }
+.pill-private { background: #f0fdf4; color: #166534; }
+.pill-default { background: var(--gray-100); color: var(--gray-700); }
+
+/* Call-out boxes */
+.callout {
+  border-left: 4px solid var(--primary-light);
+  background: #ebf8ff;
+  padding: 12px 16px;
+  border-radius: 0 6px 6px 0;
+  margin: 12px 0;
+  font-size: 13px;
+  color: var(--gray-700);
+}
+.callout.warn {
+  border-left-color: var(--accent);
+  background: #fffaf0;
+}
+.callout.good {
+  border-left-color: var(--accent-green);
+  background: #f0fff4;
+}
+.callout strong { color: var(--gray-900); }
+
+/* Custom chart legend */
+.chart-legend { padding: 8px 0; }
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--gray-100);
+  font-size: 13px;
+}
+.legend-item:last-child { border-bottom: none; }
+.legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.legend-label { flex: 1; color: var(--gray-700); font-weight: 500; }
+.legend-value {
+  font-weight: 600; color: var(--gray-900);
+  font-variant-numeric: tabular-nums;
+  min-width: 40px; text-align: right;
+}
+.legend-pct { color: var(--gray-500); font-size: 12px; min-width: 36px; text-align: right; }
+
+/* Segment cards */
+.segments-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.segment-card {
+  background: var(--white);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.segment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+.segment-name { font-weight: 600; color: var(--gray-900); font-size: 14px; }
+.segment-aum  { font-weight: 700; color: var(--primary); font-size: 16px; }
+.segment-strategy { color: var(--gray-500); font-size: 12px; margin-bottom: 12px; }
+.segment-bar-track {
+  height: 6px;
+  background: var(--gray-100);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.segment-bar-fill {
+  height: 100%;
+  background: var(--primary-light);
+  border-radius: 3px;
+}
+.segment-pct { font-size: 12px; color: var(--gray-500); margin-top: 6px; }
+.segment-total {
+  text-align: right;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-top: 16px;
+  font-size: 14px;
+}
+
+/* Profile / team cards */
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+.profile-card {
+  background: var(--white);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: box-shadow 0.15s ease;
+}
+.profile-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+.avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--white);
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.card-name { font-size: 15px; font-weight: 600; color: var(--gray-900); }
+.card-name a { color: var(--primary-light); text-decoration: none; }
+.card-name a:hover { text-decoration: underline; }
+.card-title { color: var(--gray-500); font-size: 13px; margin: 1px 0 0; }
+.card-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+.card-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge-seniority { background: var(--primary); color: var(--white); }
+.badge-dept { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+.badge-tenure { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.card-bio { color: var(--gray-500); font-size: 13px; line-height: 1.6; margin: 8px 0 4px; }
+.card-section { margin-top: 10px; }
+.section-label {
+  font-size: 11px; font-weight: 700;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.exp-list, .edu-list {
+  margin: 4px 0 0 16px; padding: 0;
+  font-size: 13px; color: var(--gray-500);
+}
+.exp-list li, .edu-list li { margin-bottom: 3px; }
+.exp-years { color: var(--gray-300); }
+
+/* Footer */
+.page-footer {
+  padding: 24px 0 40px 0;
+  text-align: center;
+  color: var(--gray-500);
+  font-size: 12px;
+}
+.page-footer .notes {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: left;
+  background: var(--white);
+  border-radius: 10px;
+  padding: 20px 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  margin-bottom: 16px;
+}
+.page-footer .notes h3 {
+  font-size: 14px;
+  color: var(--gray-700);
+  margin-bottom: 8px;
+}
+.page-footer .notes ul { padding-left: 20px; }
+.page-footer .notes li { margin-bottom: 4px; font-size: 12px; color: var(--gray-500); }
+
+/* Top-values cards */
+.topval-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 12px 0;
+}
+.topval-card {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.topval-card .tv-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topval-card .tv-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.topval-card .tv-row:last-child { margin-bottom: 0; }
+.topval-card .tv-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--gray-700);
+}
+.topval-card .tv-bar {
+  width: 60px;
+  height: 6px;
+  background: var(--gray-200);
+  border-radius: 3px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.topval-card .tv-bar-fill {
+  height: 100%;
+  background: var(--primary-light);
+  border-radius: 3px;
+}
+.topval-card .tv-count {
+  min-width: 48px;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--gray-900);
+  font-size: 12px;
+}
+
+/* Footnote */
+.footnote {
+  color: var(--gray-500);
+  font-size: 12px;
+  margin-top: 10px;
+  font-style: italic;
+}
+
+/* Utility */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+.mt-16 { margin-top: 16px; }
+.mb-8 { margin-bottom: 8px; }
+
+/* Theme toggle switch */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+.theme-toggle .toggle-track {
+  width: 48px;
+  height: 26px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 13px;
+  position: relative;
+  transition: background 0.2s;
+}
+.theme-toggle .toggle-thumb {
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  color: #ed8936;
+}
+.theme-toggle .toggle-thumb::after { content: '\2600\FE0E'; }
+
+/* ── Dark Mode ── */
+[data-theme="dark"] {
+  --primary: #63b3ed;
+  --primary-light: #90cdf4;
+  --accent: #ed8936;
+  --accent-red: #fc8181;
+  --accent-green: #68d391;
+  --gray-50: #1a202c;
+  --gray-100: #2d3748;
+  --gray-200: #4a5568;
+  --gray-300: #718096;
+  --gray-500: #a0aec0;
+  --gray-700: #e2e8f0;
+  --gray-800: #edf2f7;
+  --gray-900: #f7fafc;
+  --white: #2d3748;
+}
+[data-theme="dark"] .page-header {
+  background: linear-gradient(135deg, #1a365d 0%, #2a4365 100%);
+  color: #f7fafc;
+}
+[data-theme="dark"] .page-header .badge {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.2);
+}
+[data-theme="dark"] .kpi-card .value { color: #90cdf4; }
+[data-theme="dark"] .section-number { background: #63b3ed; color: #1a202c; }
+[data-theme="dark"] .kpi-card,
+[data-theme="dark"] .section,
+[data-theme="dark"] .toc,
+[data-theme="dark"] .page-footer .notes {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+[data-theme="dark"] .callout {
+  border-left-color: #63b3ed;
+  background: #2a4365;
+  color: #e2e8f0;
+}
+[data-theme="dark"] .callout.warn {
+  border-left-color: var(--accent);
+  background: #744210;
+}
+[data-theme="dark"] .callout.good {
+  border-left-color: var(--accent-green);
+  background: #22543d;
+}
+[data-theme="dark"] .callout strong { color: #f7fafc; }
+[data-theme="dark"] .toc a .toc-num { background: #63b3ed; color: #1a202c; }
+[data-theme="dark"] .pill-public  { background: #1e3a5f; color: #93c5fd; }
+[data-theme="dark"] .pill-pe      { background: #422006; color: #fbbf24; }
+[data-theme="dark"] .pill-sub     { background: #334155; color: #cbd5e1; }
+[data-theme="dark"] .pill-private { background: #14332a; color: #6ee7b7; }
+[data-theme="dark"] .pill-default { background: #334155; color: #cbd5e1; }
+[data-theme="dark"] .badge-seniority { background: #334155; color: #e2e8f0; }
+[data-theme="dark"] .badge-dept { background: #1e3a5f; color: #93c5fd; border-color: #1e3a5f; }
+[data-theme="dark"] .badge-tenure { background: #14332a; color: #6ee7b7; border-color: #14332a; }
+[data-theme="dark"] .theme-toggle .toggle-track { background: rgba(144,205,244,0.3); }
+[data-theme="dark"] .theme-toggle .toggle-thumb { transform: translateX(22px); color: #63b3ed; }
+[data-theme="dark"] .theme-toggle .toggle-thumb::after { content: '\263E\FE0E'; }
+
+/* Sensitivity grids */
+.sensitivity-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  margin: 12px 0;
+}
+.sensitivity-grid th, .sensitivity-grid td {
+  padding: 8px 12px;
+  text-align: center;
+  border: 1px solid var(--gray-200);
+}
+.sensitivity-grid th {
+  background: var(--gray-100);
+  font-weight: 600;
+  color: var(--gray-700);
+  font-size: 12px;
+}
+.sensitivity-grid td { min-width: 64px; }
+.sg-highlight { outline: 2px solid var(--primary-light); outline-offset: -2px; font-weight: 700; }
+[data-theme="dark"] .sensitivity-grid th { background: var(--gray-100); }
+[data-theme="dark"] .sensitivity-grid td { border-color: var(--gray-200); }
+
+/* Signal pills (alpha scoring) */
+.signal-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.signal-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #ebf8ff;
+  color: #2b6cb0;
+  white-space: nowrap;
+}
+[data-theme="dark"] .signal-pill { background: #1e3a5f; color: #90cdf4; }
+
+/* ── Print ── */
+@media print {
+  .theme-toggle { display: none !important; }
+  .kpi-card, .section, .toc, .profile-card, .segment-card, .page-footer .notes {
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0;
+  }
+  .page-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sensitivity-grid td, .sensitivity-grid th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+  .team-grid { grid-template-columns: 1fr; }
+  .segments-grid { grid-template-columns: 1fr; }
+}
+</style>
+    <script>
+(function() {
+    var stored = localStorage.getItem('nexdata-theme');
+    if (stored === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } else if (!stored && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    }
+})();
+</script>
+</head>
+<body>
+<div class="page-header">
+  <div class="container">
+    <div>
+      <h1>Sector × Market Intelligence Pack</h1>
+      <div class="subtitle">NAICS 2382 — Building Equipment Contractors · Houston-Pasadena-The Woodlands, TX · 2026-05-18</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <div class="theme-toggle" id="themeToggle" role="switch" aria-label="Toggle dark mode" aria-checked="false" tabindex="0">
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+      </div>
+      <div class="badge">public-data intelligence</div>
+    </div>
+  </div>
+</div><div class="container"><div class="toc">
+    <h2>Contents</h2>
+    <div class="toc-grid">
+        <a href="#sec-density"><span class="toc-num">1</span> Structural Density</a>
+<a href="#sec-operating"><span class="toc-num">2</span> Operating Environment</a>
+<a href="#sec-risk"><span class="toc-num">3</span> Risk Profile</a>
+<a href="#sec-infra"><span class="toc-num">4</span> Infrastructure Proximity</a>
+<a href="#sec-trade"><span class="toc-num">5</span> Trade Exposure</a>
+<a href="#sec-public"><span class="toc-num">6</span> Public-Co Operators</a>
+<a href="#sec-private"><span class="toc-num">7</span> Named Private Operators</a>
+<a href="#sec-questions"><span class="toc-num">8</span> Diligence Questions</a>
+<a href="#sec-sources"><span class="toc-num">9</span> Source Appendix</a>
+
+    </div>
+</div></div><div class="container"><div class="section" id="sec-exec">
+    <div class="section-header">
+        <div class="section-number">1</div>
+        <h2>Executive Summary</h2>
+    </div>
+    <div class="section-body"><div class="callout"><strong>Client note:</strong> SPEC_061 smoke test — Houston building-equipment contractors (HVAC / plumbing / electrical) landscape.</div><div class="container"><div class="kpi-strip"><div class="kpi-card">
+    <div class="label">Establishments in scope</div>
+    <div class="value">1,836</div>
+</div>
+<div class="kpi-card">
+    <div class="label">Employees</div>
+    <div class="value">23,453</div>
+</div>
+<div class="kpi-card">
+    <div class="label">Annual payroll</div>
+    <div class="value">$1.6B</div>
+</div>
+<div class="kpi-card">
+    <div class="label">Avg HHI</div>
+    <div class="value">0.063</div>
+</div></div></div>    </div>
+</div></div><div class="container"><div class="section" id="sec-def">
+    <div class="section-header">
+        <div class="section-number">2</div>
+        <h2>Sector &amp; Geography Definition</h2>
+    </div>
+    <div class="section-body"><div class="table-wrap"><table class="data-table">
+    <thead><tr><th>Field</th><th>Value</th></tr></thead>
+    <tbody><tr><td>NAICS code</td><td>2382</td></tr>
+<tr><td>NAICS label</td><td>Building Equipment Contractors</td></tr>
+<tr><td>NAICS-2 parent</td><td>23 — Construction</td></tr>
+<tr><td>NAICS-3 parent</td><td>238 — Specialty Trade Contractors</td></tr>
+<tr><td>MSA</td><td>26420 — Houston-Pasadena-The Woodlands, TX</td></tr>
+<tr><td>Constituent counties</td><td>10</td></tr>
+<tr><td>States</td><td>TX</td></tr>
+<tr><td>Geography mode</td><td>msa</td></tr></tbody>
+</table></div>    </div>
+</div></div><div class="container"><div class="section" id="sec-density">
+    <div class="section-header">
+        <div class="section-number">3</div>
+        <h2>Structural Density</h2>
+    </div>
+    <div class="section-body"><div class="table-wrap"><table class="data-table">
+    <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+    <tbody><tr><td>Establishments</td><td>1,836</td></tr>
+<tr><td>Employees</td><td>23,453</td></tr>
+<tr><td>Annual payroll</td><td>$1.6B</td></tr>
+<tr><td>Concentration (HHI, avg)</td><td>0.0632</td></tr>
+<tr><td>Small-biz share (avg)</td><td>97.4%</td></tr>
+<tr><td>Counties rolled up</td><td>10</td></tr>
+<tr><td>Source</td><td>census_cbp</td></tr></tbody>
+</table></div><div style='margin-top:16px'></div><div class="chart-title">Establishments by employee-count bucket</div><div class="chart-container medium">
+    <canvas id="mip_size_dist"></canvas>
+    <div id="mip_size_dist_fallback" class="chart-fallback"><div class="fb-row"><span class="fb-label">1-4</span><div class="fb-bar-track"><div class="fb-bar-fill" style="width:0%;background:#2b6cb0"></div></div><span class="fb-value">0</span></div>
+<div class="fb-row"><span class="fb-label">5-9</span><div class="fb-bar-track"><div class="fb-bar-fill" style="width:0%;background:#2b6cb0"></div></div><span class="fb-value">0</span></div>
+<div class="fb-row"><span class="fb-label">10-19</span><div class="fb-bar-track"><div class="fb-bar-fill" style="width:0%;background:#2b6cb0"></div></div><span class="fb-value">0</span></div>
+<div class="fb-row"><span class="fb-label">20-49</span><div class="fb-bar-track"><div class="fb-bar-fill" style="width:0%;background:#2b6cb0"></div></div><span class="fb-value">0</span></div>
+<div class="fb-row"><span class="fb-label">50-99</span><div class="fb-bar-track"><div class="fb-bar-fill" style="width:0%;background:#2b6cb0"></div></div><span class="fb-value">0</span></div>
+<div class="fb-row"><span class="fb-label">100-249</span><div class="fb-bar-track"><div class="fb-bar-fill" style="width:0%;background:#2b6cb0"></div></div><span class="fb-value">0</span></div>
+<div class="fb-row"><span class="fb-label">250+</span><div class="fb-bar-track"><div class="fb-bar-fill" style="width:0%;background:#2b6cb0"></div></div><span class="fb-value">0</span></div></div>
+</div>    </div>
+</div></div><div class="container"><div class="section" id="sec-operating">
+    <div class="section-header">
+        <div class="section-number">6</div>
+        <h2>Operating Environment (Macro Context)</h2>
+    </div>
+    <div class="section-body"><div class="table-wrap"><table class="data-table">
+    <thead><tr><th>Series</th><th>Latest value</th><th>As of</th></tr></thead>
+    <tbody><tr><td>DFF</td><td>3.6%</td><td>2026-05-07</td></tr>
+<tr><td>DGS10</td><td>4.4%</td><td>2026-05-07</td></tr>
+<tr><td>DGS2</td><td>3.9%</td><td>2026-05-07</td></tr></tbody>
+</table></div><div style='margin-top:16px'></div><div class="callout">FRED Industrial Production index (TCU) latest value <strong>75.6596</strong> as of 2026-03-01.</div>    </div>
+</div></div><div class="container"><div class="section" id="sec-risk">
+    <div class="section-header">
+        <div class="section-number">7</div>
+        <h2>Risk Profile</h2>
+    </div>
+    <div class="section-body"><div class="table-wrap"><table class="data-table">
+    <thead><tr><th>Incident type</th><th>Declarations</th><th>Most recent</th></tr></thead>
+    <tbody><tr><td>Hurricane</td><td>1,307</td><td>2024-07-09</td></tr>
+<tr><td>Fire</td><td>1,100</td><td>2026-02-18</td></tr>
+<tr><td>Severe Ice Storm</td><td>554</td><td>2021-02-19</td></tr>
+<tr><td>Biological</td><td>515</td><td>2020-03-25</td></tr>
+<tr><td>Severe Storm</td><td>299</td><td>2016-02-09</td></tr>
+<tr><td>Flood</td><td>294</td><td>2025-07-06</td></tr>
+<tr><td>Other</td><td>56</td><td>2013-08-02</td></tr>
+<tr><td>Coastal Storm</td><td>42</td><td>2002-09-26</td></tr>
+<tr><td>Winter Storm</td><td>23</td><td>2023-04-21</td></tr>
+<tr><td>Tornado</td><td>5</td><td>2000-04-07</td></tr></tbody>
+</table></div><div style='margin-top:16px'></div><div class="table-wrap"><table class="data-table">
+    <thead><tr><th>NRI dimension</th><th>Avg score</th></tr></thead>
+    <tbody><tr><td>Overall risk</td><td>79.58</td></tr>
+<tr><td>Flood</td><td>None</td></tr>
+<tr><td>Hurricane</td><td>89.49</td></tr>
+<tr><td>Tornado</td><td>92.03</td></tr>
+<tr><td>Wildfire</td><td>77.21</td></tr>
+<tr><td>Counties scored</td><td>10</td></tr></tbody>
+</table></div>    </div>
+</div></div><div class="container"><div class="section" id="sec-infra">
+    <div class="section-header">
+        <div class="section-number">8</div>
+        <h2>Infrastructure Proximity (state-level)</h2>
+    </div>
+    <div class="section-body"><div class="table-wrap"><table class="data-table">
+    <thead><tr><th>Asset class</th><th>Count in scope state(s)</th></tr></thead>
+    <tbody><tr><td>Power plants</td><td>1,023</td></tr>
+<tr><td>Transmission lines</td><td>0</td></tr>
+<tr><td>Rail segments</td><td>5,592</td></tr>
+<tr><td>Airports</td><td>208</td></tr>
+<tr><td>Data centers</td><td>114</td></tr></tbody>
+</table></div>    </div>
+</div></div><div class="container"><div class="section" id="sec-trade">
+    <div class="section-header">
+        <div class="section-number">9</div>
+        <h2>Trade Exposure</h2>
+    </div>
+    <div class="section-body"><div class="table-wrap"><table class="data-table">
+    <thead><tr><th>State code</th><th>State</th><th>YTD exports</th><th>Trade partners</th><th>HS codes</th></tr></thead>
+    <tbody><tr><td>TX</td><td>None</td><td>$12,265.8B</td><td>253</td><td>97</td></tr></tbody>
+</table></div>    </div>
+</div></div><div class="container"><div class="section" id="sec-public">
+    <div class="section-header">
+        <div class="section-number">11</div>
+        <h2>Public-Co Operators (SEC, NAICS↔SIC crosswalk)</h2>
+    </div>
+    <div class="section-body"><div class="table-wrap"><table class="data-table">
+    <thead><tr><th>CIK</th><th>Company</th><th>SIC</th><th>Business state</th></tr></thead>
+    <tbody><tr><td>0001035983</td><td>COMFORT SYSTEMS USA INC</td><td>1731</td><td>TX</td></tr>
+<tr><td>0001048268</td><td>IES Holdings, Inc.</td><td>1731</td><td>TX</td></tr>
+<tr><td>0001050915</td><td>QUANTA SERVICES, INC.</td><td>1731</td><td>TX</td></tr></tbody>
+</table></div>    </div>
+</div></div><div class="container"><div class="section" id="sec-private">
+    <div class="section-header">
+        <div class="section-number">12</div>
+        <h2>Named Private Operators (best-effort, regulated-facility data)</h2>
+    </div>
+    <div class="section-body"><div class="callout">Showing 20 EPA-ECHO-sourced operators (regulated facilities only). Full curator with NPPES + USAspending blends lands in SPEC_062.</div><div class="table-wrap"><table class="data-table">
+    <thead><tr><th>Facility</th><th>State</th><th>County</th><th>Compliance</th><th>Violations</th><th>Inspections</th></tr></thead>
+    <tbody><tr><td>GRUPO PETROGAS LLC</td><td>TX</td><td>HIDALGO</td><td>No Violation Identified</td><td>3</td><td>0</td></tr>
+<tr><td>MARKET STREET SILO</td><td>TX</td><td>HARRIS</td><td>No Violation Identified</td><td>1</td><td>0</td></tr>
+<tr><td>ALVIN FIELD SERIVCES ONYX INDUSTRIAL SERVICES</td><td>TX</td><td>BRAZORIA</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>CHRISTIANSON AC & PLUMBING ROUND ROCK</td><td>TX</td><td>WILLIAMSON</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>CYPRESS BAYOU INDUSTRIAL PAINTING</td><td>TX</td><td>ORANGE</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>D&H UNITED FUELING SOLUTIONS</td><td>TX</td><td>EL PASO</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>EVERGREEN ENVIRONMENTAL SERVICES</td><td>TX</td><td>HARRIS</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>FEED YARD INDUSTRIAL SOLUTIONS</td><td>TX</td><td>POTTER</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>HPC INDUSTRIAL SERVICES</td><td>TX</td><td>HARRIS</td><td>No Violation Identified</td><td>0</td><td>2</td></tr>
+<tr><td>JOHNSON CONTROLS</td><td>TX</td><td>DALLAS</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>NATIONAL OILWELL GALENA PARK</td><td>TX</td><td>HARRIS COUNTY</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>NORTHEAST SERVICE CENTER SOUTHWESTERN PUBLIC SER</td><td>TX</td><td>POTTER</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>PETREK MECHANICAL CONTRACTORS</td><td>TX</td><td>TARRANT</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>PRADO & KNOWLES LS RECONSTRUCTION</td><td>TX</td><td>EL PASO</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>SAN-COAT</td><td>TX</td><td>BEXAR</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>SPS LUBBOCK SERVICE CENTER</td><td>TX</td><td>LUBBOCK</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>SUMMIT REFRIGERANTS</td><td>TX</td><td>HARRIS</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>TAYLOR WATERPROOFING PLUS</td><td>TX</td><td>HARRIS</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>THOMAS M HARTLEY</td><td>TX</td><td>TRAVIS</td><td>No Violation Identified</td><td>0</td><td>0</td></tr>
+<tr><td>USA ENVIRONMENT</td><td>TX</td><td>HARRIS</td><td>No Violation Identified</td><td>0</td><td>0</td></tr></tbody>
+</table></div>    </div>
+</div></div><div class="container"><div class="section" id="sec-questions">
+    <div class="section-header">
+        <div class="section-number">13</div>
+        <h2>Diligence Questions</h2>
+    </div>
+    <div class="section-body"><ol style='line-height:1.6'><li>Structural density: 1,836 establishments visible in this sector × geography. What share is captured by the top 5–10 named operators below, and what does that imply about roll-up opportunity?</li><li>Concentration (avg HHI = 0.063) suggests a fragmented market. How does that align with the buyer's preferred deal structure (single-platform vs. add-on)?</li><li>Risk profile shows elevated natural-hazard exposure. What's the buyer's insurance / asset-protection posture, and does the thesis tolerate the implied capex / opex headwinds?</li><li>Public-co operators in scope provide a benchmark for size + margin shape. Is the buyer's target priced at a discount or premium to those comparables?</li></ol>    </div>
+</div></div><div class="container"><div class="section" id="sec-sources">
+    <div class="section-header">
+        <div class="section-number">14</div>
+        <h2>Source Appendix</h2>
+    </div>
+    <div class="section-body"><div class="table-wrap"><table class="data-table">
+    <thead><tr><th>Section</th><th>Source table</th><th>Rows used</th></tr></thead>
+    <tbody><tr><td>structural_density</td><td>census_cbp</td><td>10</td></tr>
+<tr><td>operating_environment</td><td>fred_interest_rates</td><td>3</td></tr>
+<tr><td>operating_environment</td><td>fred_industrial_production</td><td>1</td></tr>
+<tr><td>risk_profile</td><td>fema_disaster_declarations</td><td>10</td></tr>
+<tr><td>risk_profile</td><td>national_risk_index</td><td>10</td></tr>
+<tr><td>infra_proximity</td><td>power_plant</td><td>1,023</td></tr>
+<tr><td>infra_proximity</td><td>rail_line</td><td>5,592</td></tr>
+<tr><td>infra_proximity</td><td>airport</td><td>208</td></tr>
+<tr><td>infra_proximity</td><td>data_center_facility</td><td>114</td></tr>
+<tr><td>trade_exposure</td><td>us_trade_exports_state</td><td>1</td></tr>
+<tr><td>public_cos</td><td>sec_company_metadata</td><td>3</td></tr>
+<tr><td>named_privates</td><td>epa_echo_facilities</td><td>20</td></tr></tbody>
+</table></div><div style='margin-top:12px;font-size:12px;color:var(--gray-500)'>Every numeric value above traces back to one of these sources. Sections returning zero rows are omitted from the report rather than rendered with placeholder data.</div>    </div>
+</div></div><div class="container">
+    <div class="page-footer">
+        <div class="notes">
+            <h3>Data Quality Notes &amp; Methodology</h3>
+            <ul><li>This report assembles only governed public-data sources — Census, ACS, IRS SOI, SEC, FDIC, FRED, Treasury, FEMA, EPA, FCC, BTS, USAspending. No PII, no scraping, no private-company database depth.</li><li>Sections that returned no data are silently omitted — absence of a section indicates absence of data for the chosen geography, not absence of the phenomenon.</li><li>PLAN_065 / SPEC_061.</li></ul>
+        </div>
+        <div>Generated 2026-05-18T20:43:28 UTC | Nexdata Market Intelligence Pack</div>
+    </div>
+</div>
+    <script>
+window.CHARTJS_AVAILABLE = false;
+
+function renderChartOrFallback(canvasId, config) {
+    if (window.CHARTJS_AVAILABLE && typeof Chart !== 'undefined') {
+        var ctx = document.getElementById(canvasId);
+        if (ctx) new Chart(ctx, config);
+    } else {
+        var wrapper = document.getElementById(canvasId + '_fallback');
+        if (wrapper) wrapper.style.display = 'block';
+        var canvas = document.getElementById(canvasId);
+        if (canvas) canvas.style.display = 'none';
+    }
+}
+
+function _nexdataSetChartDefaults() {
+    if (typeof Chart === 'undefined') return;
+    Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif";
+    Chart.defaults.font.size = 12;
+    Chart.defaults.color = '#4a5568';
+}
+
+/* Dark mode re-theming IIFE — matches chartjs_conventions.md */
+(function() {
+    var LIGHT = { text: '#4a5568', grid: '#edf2f7', doughnutBorder: '#ffffff' };
+    var DARK  = { text: '#a0aec0', grid: '#4a5568', doughnutBorder: '#2d3748' };
+
+    function applyTheme(isDark) {
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        localStorage.setItem('nexdata-theme', isDark ? 'dark' : 'light');
+        var toggle = document.getElementById('themeToggle');
+        if (toggle) toggle.setAttribute('aria-checked', isDark ? 'true' : 'false');
+        if (typeof Chart === 'undefined') return;
+        var palette = isDark ? DARK : LIGHT;
+        Chart.defaults.color = palette.text;
+        Object.values(Chart.instances).forEach(function(chart) {
+            var scales = chart.options.scales || {};
+            Object.keys(scales).forEach(function(key) {
+                var s = scales[key];
+                if (s.grid) s.grid.color = s.grid.display === false ? undefined : palette.grid;
+                if (s.ticks) s.ticks.color = palette.text;
+            });
+            var plugins = chart.options.plugins || {};
+            if (plugins.legend && plugins.legend.labels) plugins.legend.labels.color = palette.text;
+            if (chart.config.type === 'doughnut') {
+                chart.data.datasets.forEach(function(ds) { ds.borderColor = palette.doughnutBorder; });
+            }
+            chart.update('none');
+        });
+    }
+
+    var systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+    var userOverride = null;
+    function currentIsDark() {
+        if (userOverride !== null) return userOverride;
+        var stored = localStorage.getItem('nexdata-theme');
+        if (stored) return stored === 'dark';
+        return systemDark.matches;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        applyTheme(currentIsDark());
+    });
+
+    var toggleEl = document.getElementById('themeToggle');
+    if (toggleEl) {
+        toggleEl.addEventListener('click', function() { userOverride = !currentIsDark(); applyTheme(userOverride); });
+        toggleEl.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEl.click(); }
+        });
+    }
+    systemDark.addEventListener('change', function() { if (userOverride === null) applyTheme(systemDark.matches); });
+})();
+</script>
+    <script>
+    function _nexdataInitCharts() {
+        _nexdataSetChartDefaults();
+        renderChartOrFallback('mip_size_dist', {"type": "bar", "data": {"labels": ["1-4", "5-9", "10-19", "20-49", "50-99", "100-249", "250+"], "datasets": [{"label": "Establishments", "data": [0, 0, 0, 0, 0, 0, 0], "backgroundColor": ["#2b6cb0", "#2b6cb0", "#2b6cb0", "#2b6cb0", "#2b6cb0", "#2b6cb0", "#2b6cb0"], "borderWidth": 0, "borderRadius": 4, "barPercentage": 0.7, "categoryPercentage": 0.8}]}, "options": {"indexAxis": "y", "responsive": true, "maintainAspectRatio": false, "layout": {"padding": {"top": 8, "bottom": 8}}, "plugins": {"legend": {"display": false}}, "scales": {"x": {"grid": {"color": "#edf2f7"}, "ticks": {"color": "#4a5568"}, "beginAtZero": true}, "y": {"grid": {"display": false}, "ticks": {"color": "#4a5568", "font": {"size": 13}}}}}});
+    }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" onload="window.CHARTJS_AVAILABLE=true;_nexdataInitCharts();" onerror="document.querySelectorAll('.chart-fallback').forEach(function(e){e.style.display='block'});document.querySelectorAll('.chart-container canvas').forEach(function(e){e.style.display='none'})"></script>
+    <script>
+    if (window.CHARTJS_AVAILABLE && typeof Chart !== 'undefined') {
+        _nexdataInitCharts();
+    }
+    </script>
+</body>
+</html>

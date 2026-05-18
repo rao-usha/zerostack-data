@@ -110,6 +110,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # Make the host machine reachable from inside the container as
+    # `host.docker.internal`. Required for talking to cloud-sql-proxy (running
+    # on the host's 127.0.0.1:5435) from runtime code — PLAN_065 / SPEC_061 MIP
+    # queries cloud-only tables. Linux Docker doesn't add this DNS entry by
+    # default; this line makes it portable across Docker Desktop + Linux.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./app:/app/app
       - ./alembic:/app/alembic
@@ -117,6 +124,7 @@ services:
       - ./data/kaggle:/app/data/kaggle
       - ./data/seeds:/app/data/seeds
       - ./data/reports:/app/data/reports
+      - ./data/reference:/app/data/reference
       - ./scripts:/app/scripts
       - ./.kaggle:/home/appuser/.kaggle:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
