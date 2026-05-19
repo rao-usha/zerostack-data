@@ -75,6 +75,22 @@ class Settings(BaseSettings):
         le=100000,
         description="Daily generator runs allowed for a pro-tier user",
     )
+    # Diligence orders (PLAN_065 / SPEC_062) — Stripe Payment Links + notify email.
+    # All optional: when unset, the intake API returns payment_url=None and the
+    # client renders a "we'll be in touch" success message instead of a pay link.
+    stripe_payment_link_url_2500: Optional[str] = Field(
+        default=None,
+        description="Stripe Payment Link URL for the $2,500 single-map SKU.",
+    )
+    stripe_payment_link_url_7500: Optional[str] = Field(
+        default=None,
+        description="Stripe Payment Link URL for the $7,500 3-map pilot SKU.",
+    )
+    diligence_notify_email: Optional[str] = Field(
+        default=None,
+        description="Inbox where new diligence-order notifications are sent (best-effort).",
+    )
+
     playground_cta_platform_url: str = Field(
         default="/playground.html?from=playground&gen={gen}&ref={ref}#platform",
         description=(
