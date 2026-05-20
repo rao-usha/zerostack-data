@@ -219,6 +219,9 @@ from app.api.v1 import playground_admin as playground_admin_router
 # Diligence Pack intake (PLAN_065 / SPEC_062) — public, anonymous-friendly
 from app.api.v1 import diligence_pack as diligence_pack_router
 
+# Nexdata Atlas (SPEC_064 / PLAN_065 rev_01) — primary public-data explorer
+from app.api.v1 import atlas as atlas_router
+
 from app.graphql import graphql_app
 
 # Configure logging
@@ -1509,6 +1512,8 @@ app.include_router(playground_router.router, prefix="/api/v1")
 app.include_router(playground_admin_router.router, prefix="/api/v1", dependencies=_auth)
 # Diligence Pack intake (PLAN_065 / SPEC_062) — public; self-validates inputs
 app.include_router(diligence_pack_router.router, prefix="/api/v1")
+# Nexdata Atlas (SPEC_064) — public interactive explorer; the primary product surface
+app.include_router(atlas_router.router, prefix="/api/v1")
 app.include_router(jobs_monitor.router, prefix="/api/v1", dependencies=_auth)  # Jobs dashboard
 
 # Protected routers

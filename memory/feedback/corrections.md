@@ -15,3 +15,41 @@ Append-only. One entry per correction / lesson. Fed back into rubrics.
 - Never use `logger.debug` for "this might fail and that's fine" patterns at startup. If a failure is benign, say so explicitly in the message and still log at WARN or higher.
 
 ---
+
+## 2026-05-20 — Report-first monetization was the wrong commercial shape
+
+**Context:** PLAN_065 built a paid public-data report product end-to-end —
+`market_intelligence_pack` report template (SPEC_061), `/diligence-pack/*`
+orders API + Stripe routing (SPEC_062), and a `$2,500 / $7,500` intake
+landing page (SPEC_063). The engineering was sound and shipped clean (104
+tests passing). But the commercial framing — "pay for an AI-generated
+report" as the first user experience — was rejected. Users increasingly
+expect generated reports to be free; a static AI report competes with
+frontier LLMs on prose, which is a losing wedge.
+
+**Correction:** Pivot to **Nexdata Atlas** (SPEC_064) — an interactive
+public-data exploration product. The report/orders/intake engineering is
+all KEPT but DEMOTED: report → export/deep-dive renderer, orders → concierge
+fallback, intake page → "request custom work after exploring". The
+defensible moat is the governed cross-dataset joins + entity resolution +
+provenance + usage telemetry, not the prose.
+
+**Rubric additions:**
+- For any plan whose deliverable is "a paid artifact", explicitly answer two
+  *separate* questions before building the funnel: (a) "is this artifact
+  good?" and (b) "should this artifact be *sold*, or *used*?" A good
+  artifact can be a free proof / export / deep-dive without being the thing
+  the funnel sells. PLAN_065 revised the artifact twice but never
+  questioned (b).
+- When the core technology cost (here: LLM prose generation) is collapsing
+  toward zero, do not monetize that technology directly. Monetize what
+  isn't collapsing — governed data, provenance, the compounding telemetry.
+- Build the telemetry/event spine as a v1 feature, not a later addition. A
+  product that can't observe which outputs users value can't improve
+  ranking, ingestion priorities, or monetization.
+- Engineering sunk cost ≠ commercial sunk cost. When a commercial framing is
+  wrong, keep 100% of the working engineering and discard 100% of the
+  framing — they are separable. Don't defend a funnel just because code
+  exists for it.
+
+---

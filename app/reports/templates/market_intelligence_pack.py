@@ -779,11 +779,24 @@ class MarketIntelligencePackTemplate:
     # ── DB helpers ───────────────────────────────────────────────────────────
 
     def _safe_query(self, db, sql: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Run a query; on any failure log + return []. Keeps the report rendering."""
+        """Run a query; on any failure log + return []. Keeps the report rendering.
+
+        CRITICAL: on failure we MUST rollback. A failed statement aborts the
+        whole Postgres transaction — every subsequent query on the same
+        session would then fail with "current transaction is aborted" until a
+        rollback clears it. Without this, running the template against a DB
+        that lacks a queried table (e.g. Atlas calling gather_data on the
+        local DB where cloud-only tables are absent) poisons the session for
+        any caller that reuses it afterward.
+        """
         try:
             return [dict(r) for r in db.execute(text(sql), params).mappings().all()]
         except Exception as exc:  # noqa: BLE001
             logger.warning("MIP query failed: %s — %s", sql.strip().splitlines()[0], exc)
+            try:
+                db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
             return []
 
     def _safe_scalar(self, db, sql: str, params: Dict[str, Any]):
@@ -792,6 +805,10 @@ class MarketIntelligencePackTemplate:
             return r
         except Exception as exc:  # noqa: BLE001
             logger.warning("MIP scalar query failed: %s — %s", sql.strip().splitlines()[0], exc)
+            try:
+                db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
             return None
 
     # ── render helpers — one method per section ──────────────────────────────

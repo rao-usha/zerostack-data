@@ -192,11 +192,11 @@
           <button class="btn btn-ghost" type="button" onclick="showView('landing')">Run another</button>
         </div>
         <div class="cta-band">
-          <h3>This is a synthetic sample. The full platform runs on your real data.</h3>
-          <p>Underwriting, datacenter, energy, and litigation-finance teams use Nexdata for production intelligence.</p>
+          <h3>This is synthetic. Now explore a real market.</h3>
+          <p>Nexdata Atlas maps any U.S. market from governed public data — industry footprint, risk, infrastructure, operators — connected and sourced.</p>
           <div class="cta-actions">
-            <a class="btn btn-primary" href="#" id="ctaPlatform">See the platform</a>
-            <a class="btn btn-ghost" href="/playground.html">Run your own</a>
+            <a class="btn btn-primary" href="/atlas.html" id="ctaPlatform">Explore real markets in Atlas</a>
+            <a class="btn btn-ghost" href="/playground.html">Run another sample</a>
           </div>
         </div>
       </div>
@@ -365,8 +365,9 @@
         navigator.clipboard.writeText(window.location.origin + url);
         document.getElementById("shareBtn").textContent = "Link copied ✓";
       };
+      // CTA leads into Atlas exploration, not a report/platform purchase (PLAN_065 rev_01).
       document.getElementById("ctaPlatform").href =
-        "/playground.html?from=playground&gen=" + (data.generator || "");
+        "/atlas.html?from=playground&gen=" + (data.generator || "");
       showView("result");
     }
 

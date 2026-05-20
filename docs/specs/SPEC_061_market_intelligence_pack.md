@@ -1,19 +1,75 @@
-# SPEC 061 — Market Intelligence Pack Report Template
+# SPEC 061 — Market Intelligence Pack Data Foundation
 
-**Status:** Draft
+**Status:** Shipped; commercial framing revised 2026-05-20
 **Task type:** report
 **Date:** 2026-05-16
 **Plan:** PLAN_065 (Sector × Market Intelligence Pack)
 **Test file:** tests/test_spec_061_market_intelligence_pack.py
 **Builds on:** SPEC_060 (taxonomies + CBP audit), commit `0829878`
+**Commercial pivot:** This spec is no longer the primary monetization surface.
+It is now the structured data/provenance foundation for Nexdata Atlas. The HTML
+report remains useful as an export/deep-dive artifact, but the first user
+experience should be interactive exploration, not "pay for an AI report."
 
 ## Goal
 
-Build the report template that turns a `(naics_code, msa_code | state | counties)` input
-into a 14-section, decision-grade sector × market intelligence map, rendered as a
-single self-contained HTML doc consistent with the existing design system.
-This is the artifact the paying customer receives — every other PLAN_065 spec
-exists to source, price, deliver, or queue this template.
+Build the structured market-intelligence data layer that turns a
+`(naics_code, msa_code | state | counties)` input into cross-dataset sections
+with provenance. The shipped HTML report is one renderer for that data, but the
+same section outputs should feed Atlas insight cards, source drawers, related
+queries, and shareable explorations.
+
+What changed on 2026-05-20: reports should not be the main viral or commercial
+wedge. Users increasingly expect generated reports to be cheap/free. The
+defensible value is the cross-dataset connective tissue: entity/geography
+resolution, dataset joins, coverage notes, provenance, and learning from how
+users explore those joins.
+
+## 2026-05-20 Pivot Notes
+
+### Remove from the commercial path
+
+- Do **not** describe this as the paid artifact the customer buys first.
+- Do **not** make `$2,500 / $7,500` report pricing the first CTA.
+- Do **not** route the main user journey from query → order form → static
+  report.
+- Do **not** build more lead-ops around this report until the exploration loop
+  proves demand.
+- Do **not** imply the report covers sections whose source data is unavailable.
+
+### Keep and reuse
+
+- Keep the NAICS/MSA validation and coverage-gated taxonomy work.
+- Keep NAICS-6 → NAICS-4 CBP rollup logic.
+- Keep skip-on-empty section behavior.
+- Keep source/provenance tracking.
+- Keep deterministic output and design-system rendering.
+- Keep the EPA-ECHO named-operators stub where it returns real operator data.
+- Keep the report renderer as **Export / Deep Dive**, not the top-level product.
+
+### Add for Atlas compatibility
+
+Future Atlas specs should either reuse or refactor this template's gather layer
+so every populated section can become an insight card:
+
+```python
+{
+    "id": "structural_density",
+    "title": "Industry Footprint",
+    "summary": "...",
+    "metrics": [...],
+    "why_it_matters": "...",
+    "datasets_used": ["census_cbp"],
+    "confidence": "high|medium|low",
+    "coverage": {...},
+    "provenance": [...],
+    "links": [...],
+}
+```
+
+The important new product behavior is query → connected insight cards →
+source trail → related/forked explorations → telemetry, with report export
+available only after the exploration has already shown value.
 
 ## Acceptance Criteria
 
@@ -34,8 +90,10 @@ exists to source, price, deliver, or queue this template.
       `census_business_patterns` for the 7 sparse MSAs and for state mode.
 - [ ] §11 (Public-co operators) uses the SPEC_060 NAICS↔SIC crosswalk to find
       `sec_company_metadata` matches.
-- [ ] §12 (Named private operators) calls the SPEC_062 curator (placeholder
-      callable for now; real curator lands in SPEC_062).
+- [ ] §12 (Named private operators) uses the available curator. The shipped
+      v1 EPA-ECHO JSONB filter is acceptable when it returns real public
+      operator data; broader NPPES/USAspending blending is a later enrichment,
+      not a blocker for Atlas v1.
 - [ ] §13 + §14 (Diligence questions, Source appendix + provenance) render
       automatically from the rows that came back — every numeric value can be
       traced back to its source table + row count.
@@ -87,6 +145,38 @@ _(No `report.md` rubric in memory; generic report checklist.)_
       section is the budget; ≤20 SELECTs total).
 
 ## Design Notes
+
+### Atlas compatibility guidance
+
+This spec shipped as a report template, but the data contract should be treated
+as reusable infrastructure. When building Atlas, do not copy the rendered HTML
+sections. Reuse the data-gathering and provenance ideas, then transform each
+available section into a card with:
+
+- a compact metric summary,
+- a plain-English "why this matters",
+- explicit datasets used,
+- coverage/confidence notes,
+- source/provenance rows or source descriptions,
+- links to adjacent cards and related queries,
+- telemetry IDs so card views/expansions/feedback can train ranking later.
+
+The first Atlas path should prefer the sections that actually worked in the
+SPEC_061 cloud smoke test:
+
+- structural density / industry footprint from CBP rollups,
+- operating environment where data is populated,
+- risk/profile sections with FEMA or other available public data,
+- infrastructure/logistics sections from FCC/BTS/port/container tables,
+- public-company context from SEC metadata where SIC/NAICS matches exist,
+- named operators from EPA-ECHO where available,
+- provenance/source appendix.
+
+Do not force the sections that were known weak or absent in the smoke test:
+
+- demand context from ACS + IRS SOI county until geo-id formatting is fixed,
+- manufacturing sectors absent from cloud CBP coverage until backfilled,
+- any section that depends on empty PE/person/org/medspa tables.
 
 ### Class shape
 
@@ -201,10 +291,11 @@ actual content are present in the final doc.
 
 ### Named-privates integration
 
-For v1 the curator is a callable injected at template-init time. SPEC_062
-ships the real one; this spec ships a stub `_default_named_operators_curator`
-that returns `{"items": [], "note": "Curator not yet integrated (SPEC_062)."}`.
-This decouples timing — the template can ship without blocking on SPEC_062.
+For v1 the curator is a callable injected at template-init time. The shipped
+default should query available public operator datasets where possible (EPA-ECHO
+worked in the smoke test). A future enrichment can blend NPPES + USAspending +
+additional public company/operator sources, but Atlas v1 should not block on
+that enrichment.
 
 ## Files to Create/Modify
 

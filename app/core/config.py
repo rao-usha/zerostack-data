@@ -92,18 +92,20 @@ class Settings(BaseSettings):
     )
 
     playground_cta_platform_url: str = Field(
-        default="/playground.html?from=playground&gen={gen}&ref={ref}#platform",
+        default="/atlas.html?from=playground&gen={gen}&ref={ref}",
         description=(
-            "URL the 'See the platform' CTA button points to. "
-            "`{gen}` and `{ref}` placeholders are substituted with the run's "
-            "generator name and report short_code; URLs without placeholders "
-            "are honored verbatim. (PLAN_063 / SPEC_059)"
+            "URL the primary CTA button on a shared playground report points "
+            "to. Since PLAN_065 rev_01 this leads into Atlas exploration, NOT "
+            "a report/platform purchase. `{gen}` and `{ref}` placeholders are "
+            "substituted with the run's generator name and report short_code; "
+            "URLs without placeholders are honored verbatim. (PLAN_063 / "
+            "SPEC_059, repointed by SPEC_064)"
         ),
     )
     playground_cta_run_url: str = Field(
-        default="/playground.html?from=playground&gen={gen}&ref={ref}",
+        default="/atlas.html?from=playground&gen={gen}&ref={ref}",
         description=(
-            "URL the 'Run your own' CTA button points to. Same `{gen}`/`{ref}` "
+            "URL the secondary CTA button points to. Same `{gen}`/`{ref}` "
             "placeholder substitution as `playground_cta_platform_url`."
         ),
     )

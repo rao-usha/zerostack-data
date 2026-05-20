@@ -44,14 +44,17 @@ from app.reports.templates._ic_report_base import ICReportBase
 logger = logging.getLogger(__name__)
 
 
-# CTA copy — the growth mechanism. Stable text so Step 6/8 can reason about it.
+# CTA copy — the growth mechanism. Since PLAN_065 rev_01 the CTA leads into
+# Atlas exploration (free, interactive, cross-dataset), NOT a paid report or a
+# generic "see the platform" page. Stable text so Step 6/8 can reason about it.
 CTA_HEADLINE = (
     "Made with Nexdata — this is a synthetic sample. "
-    "The full platform runs on your real data."
+    "Explore a real market in Nexdata Atlas."
 )
 CTA_SUBCOPY = (
-    "Underwriting, datacenter, energy, and litigation-finance teams use Nexdata "
-    "for production intelligence."
+    "Atlas maps any U.S. market from governed public data — industry "
+    "footprint, risk, infrastructure, operators — connected and sourced. "
+    "Free to explore."
 )
 
 # generator -> most-relevant enterprise vertical hint (for the CTA deep-link copy)

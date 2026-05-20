@@ -437,3 +437,25 @@ strategy step is reviewable independent of the code.
 - **Stretch:** 1 paid pilot ($7,500) + 1 retainer conversation in late-stage.
 
 Day-30 outcome decides PLAN_066: "productize manual curation + scale outreach" vs "re-evaluate wedge."
+
+---
+
+## Revisions
+
+### rev_01 — 2026-05-20 — Pivot to Nexdata Atlas (report-first monetization rejected)
+
+The report-first commercial framing of this plan was rejected by the user.
+The engineering (SPEC_061 report template, SPEC_062 orders API, SPEC_063
+intake page) is **kept and repositioned** — the report becomes an
+export/deep-dive renderer, the orders API becomes a concierge fallback, and
+the `$2,500 / $7,500` pricing leaves all first-touch surfaces. The new
+primary product is **Nexdata Atlas** — an interactive public-data
+exploration engine (query → insight cards → connections → provenance →
+share/fork → telemetry).
+
+See **`docs/plans/PLAN_065_industrial_diligence_pack_rev_01.md`** for the
+full What Was Wrong / What Was Fixed / Lessons Learned, and
+**`docs/specs/SPEC_064_atlas_data_explorer.md`** for the Atlas build spec.
+
+This plan (rev_00, everything above this Revisions section) is retained as
+historical record. It is **no longer the active commercial plan.**
