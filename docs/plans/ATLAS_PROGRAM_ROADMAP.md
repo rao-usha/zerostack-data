@@ -32,7 +32,8 @@ compounds** — not prose generation, which is collapsing toward free.
 | **PLAN_067** — Data Coverage Expansion | Backfill the verified data gaps (ACS county grain, USAspending real ingest, FCC county broadband, multi-year CBP, SEC filing dates) so more layers go ✅ | 3a (parallel) |
 | **PLAN_068** — Growth & Distribution | The acquisition engine: embeddable map widget, social-card generation, the stories content cadence, EDO-network GTM | 3b |
 | **PLAN_069** — Monetization | The paid tier: branded region exports, benchmarking pro, monitoring pro, team seats, API — reusing the SPEC_062 Stripe substrate | 4 |
-| **PLAN_070** — Learning Layer *(future, not yet drafted)* | Telemetry-driven ranking — the product learns which layers/cards/stories to surface first | 5 |
+| **PLAN_070** — Atlas Dynamic UI | Coupling / motion / surprise — the features that make the explorer interesting to use. Design source-of-truth for SPEC_066 / 066b / 066c | 1b |
+| **PLAN_071** — Learning Layer *(future, not yet drafted)* | Telemetry-driven ranking — the product learns which layers/cards/stories to surface first | 5 |
 
 ---
 
@@ -84,7 +85,17 @@ Gated hard on GATE 2. The paid tier is depth/branding/scale/team/API — never
 "unlock the basic map." Free stays genuinely useful because the loop depends
 on it.
 
-### Phase 5 — Learning layer  *(future PLAN_070)*
+### Phase 1b — Dynamic UI  *(PLAN_070)*
+Sits *between* Phase 1 (build the map) and Phase 2 (prove the loop). The
+SPEC_066 map alone is functional but plain; an "explorer with no dynamism"
+undersells the data and produces a misleading Phase-2 read. PLAN_070
+codifies the coupling/motion/surprise features (SPEC_066b) that ship
+alongside SPEC_066 so the loop has a fair chance to retain. The dynamic UI
+is also the **wedge-discovery signal**: every brush, scrub, bivariate pair,
+and arc-click is a telemetry event that tells us which domains and
+comparisons matter.
+
+### Phase 5 — Learning layer  *(future PLAN_071)*
 Once there's real telemetry volume, use `atlas_events` + `atlas_card_feedback`
 to rank layers/cards/stories — surface what users value first. This is the
 long-term compounding moat (SPEC_064's "the product learns which answers are
@@ -95,15 +106,15 @@ worth showing"). Not drafted until Phases 1-2 produce the data to learn from.
 ## Dependency graph
 
 ```
-PLAN_066 (map) ──ship──► [GATE 2: 30-day loop proof] ──pass──► PLAN_069 (monetize)
-      │                          │
-      │                          └── early signal ──► PLAN_068-heavy (growth motion)
-      │
-      ├──► PLAN_068-light (widget, cards, first stories) — starts at map-ship
-      │
-      └──► PLAN_067 (coverage expansion) — parallel, additive, no gate
-                          │
-                          └──► (enough telemetry) ──► PLAN_070 (learning)
+PLAN_066 (map) + PLAN_070 (dynamic UI) ──ship──► [GATE 2: 30-day loop proof] ──pass──► PLAN_069 (monetize)
+              │                                              │
+              │                                              └── early signal ──► PLAN_068-heavy (growth motion)
+              │
+              ├──► PLAN_068-light (widget, cards, first stories) — starts at map-ship
+              │
+              └──► PLAN_067 (coverage expansion) — parallel, additive, no gate
+                                  │
+                                  └──► (enough telemetry) ──► PLAN_071 (learning)
 ```
 
 ---
