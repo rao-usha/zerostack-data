@@ -22,6 +22,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.services.atlas import AtlasService
+from app.services.atlas import boundaries as boundaries_mod
+from app.services.atlas import layers as layers_mod
 from app.services.atlas.telemetry import AtlasTelemetry
 from app.services.diligence.taxonomies import load_msa, load_naics
 
@@ -164,3 +166,64 @@ def get_taxonomies():
         key=lambda x: x["title"],
     )
     return {"naics": naics_tree, "msa": msa_list}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Layer API — SPEC_065 (the map's data backbone)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/layers")
+def list_layers_endpoint():
+    """Return the layer registry grouped by domain. Drives the map's layer
+    panel. Honest grain + vintage per layer; layers cut by the data-review
+    (usaspending thin/dateless; ACS county-wealth deferred) are simply absent."""
+    return {
+        "layers_by_domain": layers_mod.list_layers_by_domain(),
+        "excluded_by_design": layers_mod.EXCLUDED_BY_DESIGN,
+    }
+
+
+@router.get("/layer/{layer_id}")
+def get_layer_endpoint(layer_id: str, db: Session = Depends(get_db)):
+    """Return one layer's data — choropleth `{geo_id: value}` + legend OR
+    point GeoJSON FeatureCollection, depending on the layer's declared grain."""
+    try:
+        layers_mod.get_layer(layer_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Unknown layer: {layer_id!r}")
+    result = layers_mod.build_layer(db, layer_id)
+    return result.to_dict()
+
+
+@router.get("/boundaries")
+def get_boundaries_endpoint(
+    geo_level: str = "county",
+    tolerance: float = 0.005,
+    db: Session = Depends(get_db),
+):
+    """Return a GeoJSON FeatureCollection of county or state boundaries with
+    server-side geometry simplification. The map joins layer values to this
+    geometry client-side. Cached in-process per (geo_level, tolerance) since
+    boundaries don't change."""
+    try:
+        return boundaries_mod.fetch_boundaries(db, geo_level=geo_level, tolerance=tolerance)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/place/{geo_id}")
+def get_place_endpoint(geo_id: str, db: Session = Depends(get_db)):
+    """For every registered choropleth layer applicable at this place's
+    grain (county or state), return its value at `geo_id`. The data
+    backbone for click-a-place drill-down — the layer-aggregate sibling of
+    `/explore`'s cross-dataset cards."""
+    if not (geo_id.isdigit() and len(geo_id) in (2, 5)):
+        raise HTTPException(
+            status_code=400,
+            detail=f"geo_id must be 2-digit state FIPS or 5-digit county FIPS; got {geo_id!r}",
+        )
+    return {
+        "geo_id": geo_id,
+        "grain": "state" if len(geo_id) == 2 else "county",
+        "layers": layers_mod.place_aggregate(db, geo_id),
+    }

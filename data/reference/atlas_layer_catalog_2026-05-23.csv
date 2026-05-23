@@ -1,0 +1,320 @@
+table,row_count,domain,geo_grain,geo_key,distinct_geos,date_column,vintage,verdict,note
+geojson_boundaries,3331,_canvas,zcta_or_other,geo_id,3273,,,—,"canvas / geo helper, not a layer"
+county_elevation,3221,_geo_meta,state,state,52,collected_at,2026-03-06 19:04:37.995113 → 2026-03-08 01:09:59.682669,—,"canvas / geo helper, not a layer"
+county_regulatory_scores,15789,_geo_meta,county,county_fips,3024,,,—,"canvas / geo helper, not a layer"
+government_unit,3139,_geo_meta,county,county_fips,3139,collected_at,2026-03-11 20:33:09.552189 → 2026-03-11 20:33:45.827888,—,"canvas / geo helper, not a layer"
+usda_crop_production,6200,agriculture,national,,,year,2024 → 2026,—,national time-series / context — not a layer
+usda_livestock,433,agriculture,national,,,year,2026 → 2026,—,national time-series / context — not a layer
+usda_truck_rate,100,agriculture,national,,,collected_at,2026-02-03 16:51:54.211798 → 2026-03-11 21:57:19.783366,—,national time-series / context — not a layer
+acs5_2021_b01001,169,demographics,state,state_fips,52,,,✅,state grain (52 states)
+acs5_2023_b01001,370,demographics,state,state_fips,52,,,✅,state grain (52 states)
+irs_soi_business_income,110398,demographics,state,state_code,51,tax_year,2018 → 2021,✅,state grain (51 states)
+irs_soi_county_income,100544,demographics,state,state_code,51,tax_year,2018 → 2021,✅,state grain (51 states)
+irs_soi_zip_income,331168,demographics,state,state_code,51,tax_year,2019 → 2021,✅,state grain (51 states)
+acs5_2015_b01001,-1,demographics,state,state_fips,0,,,🟡,state grain (partial: 0)
+acs5_2015_b19013,-1,demographics,state,state_fips,0,,,🟡,state grain (partial: 0)
+acs5_2020_b01001,58,demographics,state,state_fips,1,,,🟡,state grain (partial: 1)
+acs5_2022_b01001,58,demographics,state,state_fips,1,,,🟡,state grain (partial: 1)
+acs5_2022_b01003,-1,demographics,state,state_fips,0,,,🟡,state grain (partial: 0)
+acs5_2022_b02001,-1,demographics,state,state_fips,0,,,🟡,state grain (partial: 0)
+acs5_2022_b08301,-1,demographics,state,state_fips,0,,,🟡,state grain (partial: 0)
+acs5_2022_b15003,-1,demographics,state,state_fips,0,,,🟡,state grain (partial: 0)
+acs5_2022_b19013,-1,demographics,state,state_fips,0,,,🟡,state grain (partial: 0)
+acs5_2022_b23025,-1,demographics,state,state_fips,0,,,🟡,state grain (partial: 0)
+acs5_2022_b25003,-1,demographics,state,state_fips,0,,,🟡,state grain (partial: 0)
+acs5_2022_b25077,-1,demographics,state,state_fips,0,,,🟡,state grain (partial: 0)
+acs5_2023_b19013,33772,demographics,state,state_fips,0,,,⏸,ZIP-keyed; county layer deferred to PLAN_067 SPEC_070
+irs_soi_migration,447240,demographics,national,,,tax_year,2018 → 2021,—,national time-series / context — not a layer
+fema_hma_projects,52661,disaster,state,state_code,59,ingested_at,2026-01-02 01:22:47.963259 → 2026-02-09 01:39:01.600701,✅,state grain (59 states)
+flood_zone,9107,disaster,state,state,51,collected_at,2026-03-11 20:37:49.243198 → 2026-03-11 22:01:29.665903,✅,state grain (51 states)
+national_risk_index,3564,disaster,county,county_fips,3564,collected_at,2026-02-15 23:30:38.109994 → 2026-03-05 14:54:05.420974,✅,full county (3564)
+fema_disaster_declarations,51093,disaster,county,fips_county_code,333,fy_declared,1999 → 2026,🟡,partial county coverage (333/~3143)
+fema_pa_projects,100000,disaster,state,state,0,obligation_date,,🟡,state grain (partial: 0)
+census_business_patterns,63000,economy,state,state_fips,50,year,2022 → 2022,✅,state grain (50 states)
+census_cbp,7160,economy,county,county_fips,2792,year,2021 → 2021,✅,full county (2792)
+bea_gdp_industry,-1,economy,national,,,ingested_at,,—,national time-series / context — not a layer
+bea_international,65,economy,national,,,ingested_at,2026-02-09 01:41:18.115463 → 2026-02-09 01:41:18.115463,—,national time-series / context — not a layer
+bea_nipa,1740,economy,national,,,ingested_at,2026-02-09 01:53:09.895326 → 2026-03-11 20:23:03.583491,—,national time-series / context — not a layer
+bea_regional,1080,economy,national,,,ingested_at,2026-01-02 00:34:57.874555 → 2026-02-09 01:41:17.115214,—,national time-series / context — not a layer
+bls_ces_employment,505,economy,national,,,year,2019 → 2026,—,national time-series / context — not a layer
+bls_cpi,1536,economy,national,,,year,2015 → 2025,—,national time-series / context — not a layer
+bls_cpi_consumer_prices,60,economy,national,,,year,2019 → 2023,—,national time-series / context — not a layer
+bls_cps_labor_force,924,economy,national,,,year,2015 → 2025,—,national time-series / context — not a layer
+bls_cps_unemployment,180,economy,national,,,year,2019 → 2023,—,national time-series / context — not a layer
+bls_jolts,1320,economy,national,,,year,2015 → 2025,—,national time-series / context — not a layer
+bls_jolts_openings,-1,economy,national,,,year,,—,national time-series / context — not a layer
+bls_oes,40,economy,national,,,year,2024 → 2024,—,national time-series / context — not a layer
+bls_ppi,660,economy,national,,,year,2015 → 2025,—,national time-series / context — not a layer
+bls_ppi_producer_prices,60,economy,national,,,year,2019 → 2023,—,national time-series / context — not a layer
+power_plant,14131,energy,point,lat/lon,,collected_at,2026-02-03 19:52:17.033822 → 2026-04-15 03:13:45.367933,✅,"point layer (14,131 features)"
+renewable_resource,3179,energy,point,lat/lon,,collected_at,2026-03-06 16:09:47.921885 → 2026-04-15 03:15:26.997847,✅,"point layer (3,179 features)"
+substation,8738,energy,point,lat/lon,,collected_at,2026-02-03 19:54:12.271889 → 2026-04-15 03:13:20.370165,✅,"point layer (8,738 features)"
+electricity_price,40378,energy,national,,,collected_at,2026-02-02 20:18:33.646713 → 2026-04-15 03:14:30.624584,—,national time-series / context — not a layer
+transmission_line,52244,energy,national,,,collected_at,2026-04-15 03:15:33.507851 → 2026-04-15 03:15:34.458813,—,national time-series / context — not a layer
+utility_rate,8393,energy,national,,,collected_at,2026-02-03 18:27:21.169296 → 2026-04-15 03:15:06.774726,—,national time-series / context — not a layer
+brownfield_site,45204,environment,point,lat/lon,,collected_at,2026-03-07 23:28:51.124143 → 2026-03-11 22:00:59.906491,✅,"point layer (45,204 features)"
+environmental_facility,64505,environment,point,lat/lon,,collected_at,2026-02-25 02:44:34.831522 → 2026-03-11 21:24:00.597915,✅,"point layer (64,505 features)"
+epa_echo_facilities,1068232,environment,point,lat/lon,,ingested_at,2026-03-07 23:28:34.064005 → 2026-03-08 22:27:02.334639,✅,"point layer (1,068,232 features)"
+epa_ghg_emissions,2000,environment,point,lat/lon,,ingested_at,2026-03-31 18:47:15.011612 → 2026-03-31 18:47:56.772465,✅,"point layer (2,000 features)"
+water_monitoring_site,33279,environment,point,lat/lon,,collected_at,2026-02-03 18:26:55.994846 → 2026-03-11 22:01:23.838191,✅,"point layer (33,279 features)"
+wetland,39893,environment,state,state,51,collected_at,2026-03-06 03:55:28.575805 → 2026-03-11 22:00:54.717306,✅,state grain (51 states)
+public_water_system,277089,environment,state,state,21,collected_at,2026-02-03 18:27:21.041723 → 2026-03-11 21:01:58.188511,🟡,state grain (partial: 21)
+water_system_violation,-1,environment,national,,,collected_at,,—,national time-series / context — not a layer
+usaspending_awards,10190,federal,national,,,period_of_performance_start,,⏸,Deferred to PLAN_067 SPEC_071 — thin/dateless
+fdic_institutions,4370,finance,county,stcnty,1960,ingested_at,2026-01-12 17:03:05.998303 → 2026-02-13 22:18:24.136953,🟡,partial county coverage (1960/~3143)
+fdic_summary_deposits,-1,finance,county,stcnty,0,year,,🟡,partial county coverage (0/~3143)
+fdic_bank_financials,1674936,finance,national,,,repdte,1984-03-31 → 2025-12-31,—,national time-series / context — not a layer
+fdic_failed_banks,3626,finance,national,,,ingested_at,2026-03-11 23:28:17.563464 → 2026-03-11 23:28:31.340764,—,national time-series / context — not a layer
+ffiec_bank_calls,4658,finance,national,,,ingested_at,2026-03-31 17:46:46.661868 → 2026-03-31 18:17:20.210166,—,national time-series / context — not a layer
+fred_commodities,17516,finance,national,,,date,1986-01-02 → 2026-05-04,—,national time-series / context — not a layer
+fred_consumer_sentiment,631,finance,national,,,date,1965-02-01 → 2026-03-01,—,national time-series / context — not a layer
+fred_economic_indicators,3105,finance,national,,,date,1965-01-01 → 2026-04-01,—,national time-series / context — not a layer
+fred_industrial_production,2832,finance,national,,,date,1965-01-01 → 2026-03-01,—,national time-series / context — not a layer
+fred_interest_rates,104585,finance,national,,,date,1965-01-01 → 2026-05-07,—,national time-series / context — not a layer
+fred_monetary_aggregates,2935,finance,national,,,date,1965-01-01 → 2026-03-01,—,national time-series / context — not a layer
+sec_10k,789,finance,national,,,,,—,national time-series / context — not a layer
+sec_10q,2475,finance,national,,,,,—,national time-series / context — not a layer
+sec_8k,-1,finance,national,,,,,—,national time-series / context — not a layer
+sec_balance_sheet,97439,finance,national,,,fiscal_year,2008 → 44012,—,national time-series / context — not a layer
+sec_cash_flow_statement,97439,finance,national,,,fiscal_year,2008 → 44012,—,national time-series / context — not a layer
+sec_company_metadata,2306,finance,national,,,ingested_at,2026-05-12 → 2026-05-12,—,national time-series / context — not a layer
+sec_filing_sections,-1,finance,national,,,,,—,national time-series / context — not a layer
+sec_financial_facts,33140,finance,national,,,fiscal_year,2009 → 2026,—,national time-series / context — not a layer
+sec_form_adv,-1,finance,national,,,ingested_at,,—,national time-series / context — not a layer
+sec_form_adv_personnel,-1,finance,national,,,ingested_at,,—,national time-series / context — not a layer
+sec_income_statement,97439,finance,national,,,fiscal_year,2008 → 44012,—,national time-series / context — not a layer
+treasury_auctions,2686,finance,national,,,record_date,2020-01-07 → 2026-02-12,—,national time-series / context — not a layer
+treasury_daily_balance,247356,finance,national,,,record_calendar_year,2020 → 2026,—,national time-series / context — not a layer
+treasury_debt_outstanding,6,finance,national,,,record_calendar_year,2020 → 2025,—,national time-series / context — not a layer
+treasury_interest_rates,1237,finance,national,,,record_calendar_year,2020 → 2026,—,national time-series / context — not a layer
+treasury_monthly_statement,9904,finance,national,,,record_calendar_year,2020 → 2025,—,national time-series / context — not a layer
+cms_hospitals,5426,health,state,state,56,ingested_at,2026-03-31 17:50:50.992943 → 2026-03-31 18:22:23.700015,✅,state grain (56 states)
+medspa_zip_affordability,911,health,state,state_abbr,22,,,🟡,state grain (partial: 22)
+cms_drug_pricing,71595,health,national,,,year,2019 → 2023,—,national time-series / context — not a layer
+cms_hospital_cost_reports,10,health,national,,,,,—,national time-series / context — not a layer
+cms_medicare_utilization,21260,health,national,,,,,—,national time-series / context — not a layer
+medspa_prospect_snapshots,-1,health,national,,,,,—,national time-series / context — not a layer
+nppes_providers,39817,health,national,,,,,—,national time-series / context — not a layer
+broadband_availability,10512,infrastructure,point,lat/lon,,collected_at,2026-02-25 03:40:30.854125 → 2026-03-11 21:40:40.480105,✅,"point layer (10,512 features)"
+data_center_facility,1383,infrastructure,point,lat/lon,,collected_at,2026-02-22 01:35:59.860966 → 2026-03-07 23:40:21.43584,✅,"point layer (1,383 features)"
+fcc_broadband_coverage,10145,infrastructure,national,,,ingested_at,2026-02-26 15:52:34.179421 → 2026-03-11 22:00:54.232749,—,national time-series / context — not a layer
+fcc_broadband_summary,51,infrastructure,national,,,ingested_at,2026-02-26 15:52:34.463944 → 2026-03-11 22:00:54.592133,—,national time-series / context — not a layer
+intl_worldbank_countries,296,international,point,lat/lon,,ingested_at,2026-02-09 01:35:34.192581 → 2026-02-09 01:35:34.192581,✅,point layer (296 features)
+intl_bis_eer,-1,international,national,,,ingested_at,,—,national time-series / context — not a layer
+intl_bis_property,-1,international,national,,,ingested_at,,—,national time-series / context — not a layer
+intl_imf_ifs,-1,international,national,,,ingested_at,,—,national time-series / context — not a layer
+intl_oecd_alfs,893,international,national,,,ingested_at,2025-12-31 21:13:54.475294 → 2026-02-09 01:42:29.678099,—,national time-series / context — not a layer
+intl_oecd_batis,-1,international,national,,,ingested_at,,—,national time-series / context — not a layer
+intl_oecd_kei,18897,international,national,,,ingested_at,2025-12-31 21:13:09.032457 → 2026-02-09 01:45:22.660179,—,national time-series / context — not a layer
+intl_oecd_mei,750,international,national,,,ingested_at,2025-12-31 20:44:03.731906 → 2026-02-09 01:37:22.324292,—,national time-series / context — not a layer
+intl_oecd_tax,14222,international,national,,,ingested_at,2025-12-31 21:15:03.544245 → 2026-02-09 01:45:05.641216,—,national time-series / context — not a layer
+intl_worldbank_indicators,1000,international,national,,,ingested_at,2026-02-09 01:41:49.62402 → 2026-02-09 01:41:49.848196,—,national time-series / context — not a layer
+intl_worldbank_wdi,164970,international,national,,,year,1990 → 2024,—,national time-series / context — not a layer
+cftc_cot_disaggregated_combined,40304,markets,national,,,year,2023 → 2025,—,national time-series / context — not a layer
+cftc_cot_legacy_combined,64392,markets,national,,,year,2022 → 2025,—,national time-series / context — not a layer
+cftc_cot_tff_combined,6779,markets,national,,,year,2024 → 2025,—,national time-series / context — not a layer
+prediction_market_jobs,3,markets,national,,,,,—,national time-series / context — not a layer
+prediction_markets,25,markets,national,,,,,—,national time-series / context — not a layer
+building_permit,6047,real_estate,county,county_fips,3024,collected_at,2026-03-11 21:56:05.258238 → 2026-03-11 21:56:52.228509,✅,full county (3024)
+opportunity_zone,8765,real_estate,state,state,56,collected_at,2026-02-25 02:23:34.619907 → 2026-03-05 14:54:49.251298,✅,state grain (56 states)
+realestate_osm_buildings,361,real_estate,point,lat/lon,,ingested_at,2025-11-29 17:25:48.901258 → 2025-11-29 17:25:48.901258,✅,point layer (361 features)
+land_use_parcel,1382,real_estate,county,county_fips,21,collected_at,2026-03-06 15:13:23.492434 → 2026-03-11 22:01:27.306258,🟡,partial county coverage (21/~3143)
+realestate_redfin,-1,real_estate,state,state_code,0,ingested_at,,🟡,state grain (partial: 0)
+realestate_fhfa_hpi,4344,real_estate,national,,,date,2020-01-01 → 2025-12-01,—,national time-series / context — not a layer
+realestate_hud_permits,-1,real_estate,national,,,date,,—,national time-series / context — not a layer
+zoning_district,3695,real_estate,national,,,collected_at,2026-03-06 15:04:52.332403 → 2026-03-11 20:52:09.309791,—,national time-series / context — not a layer
+us_trade_exports_state,546095,trade,state,state_code,46,year,2019 → 2024,✅,state grain (46 states)
+us_trade_exports_hs,26063,trade,national,,,year,2019 → 2024,—,national time-series / context — not a layer
+us_trade_imports_hs,18952,trade,national,,,year,2019 → 2024,—,national time-series / context — not a layer
+us_trade_port_trade,-1,trade,national,,,year,,—,national time-series / context — not a layer
+airport,13233,transport,point,lat/lon,,collected_at,2026-03-11 22:00:23.225068 → 2026-03-11 22:00:23.761163,✅,"point layer (13,233 features)"
+bts_border_crossing,45194,transport,point,lat/lon,,date,2020-01 → 2026-01,✅,"point layer (45,194 features)"
+rail_line,71089,transport,state,state,48,collected_at,2026-03-11 20:25:25.296479 → 2026-03-11 20:53:43.760498,✅,state grain (48 states)
+air_cargo_stats,299,transport,national,,,collected_at,2026-02-25 02:23:19.682254 → 2026-03-11 21:55:09.949025,—,national time-series / context — not a layer
+bts_faf_regional,-1,transport,national,,,year,,—,national time-series / context — not a layer
+container_freight_index,774,transport,national,,,collected_at,2026-02-03 16:52:07.81207 → 2026-03-11 21:55:24.18163,—,national time-series / context — not a layer
+port_throughput,-1,transport,national,,,collected_at,,—,national time-series / context — not a layer
+port_throughput_monthly,247,transport,national,,,collected_at,2026-02-25 02:23:43.786514 → 2026-03-11 21:56:00.229157,—,national time-series / context — not a layer
+trade_gateway_stats,260,transport,national,,,collected_at,2026-02-25 02:23:18.365642 → 2026-03-11 21:55:26.084134,—,national time-series / context — not a layer
+acquisition_target_scores,1,unclassified,national,,,,,—,unclassified — review manually
+agentic_collection_jobs,3,unclassified,national,,,,,—,unclassified — review manually
+alert_subscriptions,1,unclassified,national,,,,,—,unclassified — review manually
+anomalies,-1,unclassified,national,,,,,—,unclassified — review manually
+anomaly_scans,4,unclassified,national,,,,,—,unclassified — review manually
+api_usage,6,unclassified,national,,,,,—,unclassified — review manually
+app_store_apps,1,unclassified,national,,,,,—,unclassified — review manually
+app_store_rankings,-1,unclassified,national,,,,,—,unclassified — review manually
+app_store_rating_history,1,unclassified,national,,,,,—,unclassified — review manually
+baselines,-1,unclassified,national,,,,,—,unclassified — review manually
+batch_runs,-1,unclassified,national,,,,,—,unclassified — review manually
+batch_source_tier_overrides,-1,unclassified,national,,,,,—,unclassified — review manually
+batch_tier_config,-1,unclassified,national,,,,,—,unclassified — review manually
+board_interlocks,-1,unclassified,national,,,,,—,unclassified — review manually
+board_seats,-1,unclassified,national,,,,,—,unclassified — review manually
+canonical_entities,4,unclassified,national,,,,,—,unclassified — review manually
+carrier_safety,50,unclassified,national,,,collected_at,2026-02-03 16:52:05.940273 → 2026-03-11 22:01:23.328429,—,unclassified — review manually
+cascade_results,-1,unclassified,national,,,,,—,unclassified — review manually
+cascade_scenarios,-1,unclassified,national,,,,,—,unclassified — review manually
+causal_edges,-1,unclassified,national,,,,,—,unclassified — review manually
+census_bfs,74,unclassified,state,state_fips,1,ingested_at,2026-03-31 18:41:49.232196 → 2026-03-31 18:41:49.232196,—,unclassified — review manually
+census_variable_metadata,196,unclassified,national,,,,,—,unclassified — review manually
+climate_data,-1,unclassified,point,lat/lon,,collected_at,,—,unclassified — review manually
+co_investments,-1,unclassified,national,,,,,—,unclassified — review manually
+collection_groups,-1,unclassified,national,,,,,—,unclassified — review manually
+collection_watermarks,35,unclassified,national,,,,,—,unclassified — review manually
+commute_flow,-1,unclassified,national,,,collected_at,,—,unclassified — review manually
+company_app_portfolios,1,unclassified,national,,,,,—,unclassified — review manually
+company_ats_config,233,unclassified,national,,,,,—,unclassified — review manually
+company_enrichment,4,unclassified,national,,,,,—,unclassified — review manually
+company_health_scores,4,unclassified,national,,,,,—,unclassified — review manually
+company_macro_linkages,-1,unclassified,national,,,,,—,unclassified — review manually
+company_scores,8,unclassified,national,,,,,—,unclassified — review manually
+company_web_traffic,3,unclassified,national,,,fetched_at,2026-02-23 20:01:59.996086 → 2026-02-23 20:03:44.366511,—,unclassified — review manually
+competitive_analyses,2,unclassified,national,,,,,—,unclassified — review manually
+competitive_movements,-1,unclassified,national,,,,,—,unclassified — review manually
+convergence_clusters,-1,unclassified,national,,,,,—,unclassified — review manually
+convergence_regions,-1,unclassified,national,,,,,—,unclassified — review manually
+convergence_signals,86,unclassified,national,,,,,—,unclassified — review manually
+courtlistener_dockets,-1,unclassified,national,,,ingested_at,,—,unclassified — review manually
+data_commons_observations,42468,unclassified,national,,,ingested_at,2026-02-09 01:25:50.865488 → 2026-02-13 22:28:41.352668,—,unclassified — review manually
+data_gaps,-1,unclassified,national,,,,,—,unclassified — review manually
+data_provenance,-1,unclassified,national,,,,,—,unclassified — review manually
+datacenter_site_pipeline,-1,unclassified,county,county_fips,1,,,—,unclassified — review manually
+deal_activities,1,unclassified,national,,,,,—,unclassified — review manually
+deal_predictions,2,unclassified,national,,,,,—,unclassified — review manually
+deal_scenarios,-1,unclassified,national,,,,,—,unclassified — review manually
+deals,12,unclassified,national,,,,,—,unclassified — review manually
+deep_research_jobs,3,unclassified,national,,,,,—,unclassified — review manually
+diligence_cache,1,unclassified,national,,,,,—,unclassified — review manually
+diligence_jobs,4,unclassified,national,,,,,—,unclassified — review manually
+diligence_templates,3,unclassified,national,,,,,—,unclassified — review manually
+dot_infra_grants,336,unclassified,national,,,fiscal_year,2021 → 2026,—,unclassified — review manually
+econ_data_revisions,-1,unclassified,national,,,,,—,unclassified — review manually
+educational_attainment,-1,unclassified,national,,,collected_at,,—,unclassified — review manually
+enrichment_jobs,5,unclassified,national,,,,,—,unclassified — review manually
+entity_aliases,6,unclassified,national,,,,,—,unclassified — review manually
+entity_merge_history,7,unclassified,national,,,,,—,unclassified — review manually
+epoch_datacenter,23,unclassified,point,lat/lon,,collected_at,2026-03-11 21:55:21.384058 → 2026-03-11 21:55:21.481384,—,unclassified — review manually
+eval_cases,-1,unclassified,national,,,,,—,unclassified — review manually
+eval_results,-1,unclassified,national,,,,,—,unclassified — review manually
+eval_runs,-1,unclassified,national,,,,,—,unclassified — review manually
+eval_suites,-1,unclassified,national,,,,,—,unclassified — review manually
+exit_readiness_scores,1,unclassified,national,,,,,—,unclassified — review manually
+fault_line,21,unclassified,national,,,collected_at,2026-02-15 23:30:41.734115 → 2026-03-11 22:01:03.165617,—,unclassified — review manually
+fbi_crime_estimates_national,-1,unclassified,state,state_abbr,0,year,,—,unclassified — review manually
+fbi_crime_estimates_state,-1,unclassified,state,state_abbr,0,year,,—,unclassified — review manually
+fbi_crime_hate_crime_national,-1,unclassified,state,state_abbr,0,ingested_at,,—,unclassified — review manually
+fbi_crime_leoka_national,-1,unclassified,state,state_abbr,0,ingested_at,,—,unclassified — review manually
+fbi_crime_nibrs_state,-1,unclassified,state,state_abbr,0,ingested_at,,—,unclassified — review manually
+fbi_crime_summarized_agency,-1,unclassified,state,state_abbr,0,year,,—,unclassified — review manually
+ferc_energy_filings,-1,unclassified,national,,,ingested_at,,—,unclassified — review manually
+foot_traffic_collection_jobs,3,unclassified,national,,,,,—,unclassified — review manually
+foot_traffic_observations,-1,unclassified,national,,,collected_at,,—,unclassified — review manually
+foreign_trade_zone,105,unclassified,point,lat/lon,,collected_at,2026-03-11 21:54:39.828685 → 2026-03-11 21:54:39.84318,—,unclassified — review manually
+form_adv_advisers,10,unclassified,national,,,,,—,unclassified — review manually
+form_d_filings,-1,unclassified,national,,,,,—,unclassified — review manually
+freight_corridor,-1,unclassified,national,,,collected_at,,—,unclassified — review manually
+freight_rate_index,-1,unclassified,national,,,collected_at,,—,unclassified — review manually
+generated_reports,8,unclassified,national,,,,,—,unclassified — review manually
+github_activity_snapshots,-1,unclassified,national,,,,,—,unclassified — review manually
+github_contributors,-1,unclassified,national,,,,,—,unclassified — review manually
+github_organizations,4,unclassified,national,,,,,—,unclassified — review manually
+github_repositories,305,unclassified,national,,,,,—,unclassified — review manually
+glassdoor_companies,2,unclassified,national,,,,,—,unclassified — review manually
+glassdoor_review_summaries,-1,unclassified,national,,,,,—,unclassified — review manually
+glassdoor_salaries,2,unclassified,national,,,,,—,unclassified — review manually
+google_trends,-1,unclassified,national,,,date,,—,unclassified — review manually
+heavy_haul_route,-1,unclassified,national,,,collected_at,,—,unclassified — review manually
+hiring_velocity_scores,26,unclassified,national,,,,,—,unclassified — review manually
+hunt_jobs,1,unclassified,national,,,,,—,unclassified — review manually
+impact_analysis,-1,unclassified,national,,,,,—,unclassified — review manually
+incentive_deal,76,unclassified,state,state,25,year,2005 → 2023,—,unclassified — review manually
+incentive_program,50,unclassified,national,,,collected_at,2026-03-11 21:54:43.401701 → 2026-03-11 21:54:43.401874,—,unclassified — review manually
+industrial_site,41,unclassified,point,lat/lon,,collected_at,2026-03-07 21:42:46.191536 → 2026-03-11 21:54:43.960105,—,unclassified — review manually
+industry_employment,832,unclassified,national,,,collected_at,2026-03-07 23:28:28.46257 → 2026-03-11 22:01:31.02746,—,unclassified — review manually
+insider_transactions,-1,unclassified,national,,,,,—,unclassified — review manually
+interconnection_queue,-1,unclassified,point,lat/lon,,collected_at,,—,unclassified — review manually
+intermodal_terminal,15,unclassified,point,lat/lon,,collected_at,2026-03-11 21:59:25.366932 → 2026-03-11 21:59:25.367349,—,unclassified — review manually
+internet_exchange,214,unclassified,point,lat/lon,,collected_at,2026-02-02 19:37:59.250158 → 2026-03-07 23:40:20.760021,—,unclassified — review manually
+investor_aum_history,-1,unclassified,national,,,,,—,unclassified — review manually
+investor_contacts,-1,unclassified,national,,,,,—,unclassified — review manually
+investor_preferences,1,unclassified,national,,,,,—,unclassified — review manually
+investor_themes,-1,unclassified,national,,,,,—,unclassified — review manually
+labor_market_area,51,unclassified,national,,,collected_at,2026-02-26 17:52:32.683782 → 2026-03-05 14:54:33.219184,—,unclassified — review manually
+leadership_changes,-1,unclassified,national,,,,,—,unclassified — review manually
+lineage_edges,1,unclassified,national,,,,,—,unclassified — review manually
+lineage_events,-1,unclassified,national,,,,,—,unclassified — review manually
+lineage_nodes,2,unclassified,national,,,,,—,unclassified — review manually
+location_metadata,-1,unclassified,national,,,,,—,unclassified — review manually
+locations,-1,unclassified,point,lat/lon,,,,—,unclassified — review manually
+macro_chat_messages,-1,unclassified,national,,,,,—,unclassified — review manually
+macro_nodes,-1,unclassified,national,,,,,—,unclassified — review manually
+market_alerts,-1,unclassified,national,,,,,—,unclassified — review manually
+market_briefs,2,unclassified,national,,,,,—,unclassified — review manually
+market_categories,-1,unclassified,national,,,,,—,unclassified — review manually
+market_scans,4,unclassified,national,,,,,—,unclassified — review manually
+market_signals,-1,unclassified,national,,,,,—,unclassified — review manually
+metro_profiles,-1,unclassified,national,,,,,—,unclassified — review manually
+metro_reference,-1,unclassified,state,state_abbr,0,,,—,unclassified — review manually
+motor_carrier,10,unclassified,national,,,collected_at,2026-03-11 22:00:11.826578 → 2026-03-11 22:00:11.826783,—,unclassified — review manually
+natural_gas_pipeline,8,unclassified,point,lat/lon,,collected_at,2026-02-03 20:12:57.347525 → 2026-02-03 20:12:57.347555,—,unclassified — review manually
+natural_gas_storage,7,unclassified,point,lat/lon,,collected_at,2026-02-03 20:12:57.399579 → 2026-02-03 20:12:57.399607,—,unclassified — review manually
+network_latency,-1,unclassified,national,,,collected_at,,—,unclassified — review manually
+news_digests,1,unclassified,national,,,,,—,unclassified — review manually
+news_items,398,unclassified,national,,,fetched_at,2026-01-16 18:46:48.079669 → 2026-01-16 18:46:49.438798,—,unclassified — review manually
+news_matches,-1,unclassified,national,,,,,—,unclassified — review manually
+news_watch_items,2,unclassified,national,,,,,—,unclassified — review manually
+nightly_batch,5,unclassified,national,,,,,—,unclassified — review manually
+occupational_wage,458,unclassified,national,,,collected_at,2026-02-26 17:52:34.910748 → 2026-03-05 14:54:35.449136,—,unclassified — review manually
+osha_inspections,-1,unclassified,national,,,ingested_at,,—,unclassified — review manually
+password_reset_tokens,-1,unclassified,national,,,,,—,unclassified — review manually
+people_collection_jobs,1990,unclassified,national,,,,,—,unclassified — review manually
+people_education,-1,unclassified,national,,,,,—,unclassified — review manually
+people_experience,-1,unclassified,national,,,,,—,unclassified — review manually
+people_merge_candidates,195,unclassified,national,,,,,—,unclassified — review manually
+people_peer_set_members,-1,unclassified,national,,,,,—,unclassified — review manually
+people_peer_sets,1,unclassified,national,,,,,—,unclassified — review manually
+people_portfolio_companies,-1,unclassified,national,,,,,—,unclassified — review manually
+people_portfolios,2,unclassified,national,,,,,—,unclassified — review manually
+people_watchlist_people,-1,unclassified,national,,,,,—,unclassified — review manually
+people_watchlists,1,unclassified,national,,,,,—,unclassified — review manually
+person_pedigree_scores,-1,unclassified,national,,,,,—,unclassified — review manually
+port,150,unclassified,point,lat/lon,,collected_at,2026-03-11 21:55:16.125753 → 2026-03-11 21:55:16.141735,—,unclassified — review manually
+portfolio_alerts,-1,unclassified,national,,,,,—,unclassified — review manually
+portfolio_companies,5409,unclassified,national,,,,,—,unclassified — review manually
+portfolio_imports,3,unclassified,national,,,,,—,unclassified — review manually
+portfolio_snapshots,-1,unclassified,national,,,,,—,unclassified — review manually
+refresh_tokens,2,unclassified,national,,,,,—,unclassified — review manually
+report_templates,-1,unclassified,national,,,,,—,unclassified — review manually
+research_cache,6,unclassified,national,,,,,—,unclassified — review manually
+research_jobs,24,unclassified,national,,,,,—,unclassified — review manually
+saved_searches,1,unclassified,national,,,,,—,unclassified — review manually
+sector_signal_weights,-1,unclassified,national,,,,,—,unclassified — review manually
+seismic_hazard,538,unclassified,point,lat/lon,,collected_at,2026-02-15 23:30:41.354772 → 2026-03-11 22:01:02.150104,—,unclassified — review manually
+source_api_keys,-1,unclassified,national,,,,,—,unclassified — review manually
+source_configs,-1,unclassified,national,,,,,—,unclassified — review manually
+source_freshness_sla,-1,unclassified,national,,,,,—,unclassified — review manually
+source_rate_limits,23,unclassified,national,,,,,—,unclassified — review manually
+source_reliability,-1,unclassified,national,,,,,—,unclassified — review manually
+submarine_cable_landing,-1,unclassified,point,lat/lon,,collected_at,,—,unclassified — review manually
+template_executions,2,unclassified,national,,,,,—,unclassified — review manually
+three_pl_company,107,unclassified,national,,,collected_at,2026-02-24 02:23:45.07443 → 2026-03-11 21:56:03.779042,—,unclassified — review manually
+trucking_lane_rate,-1,unclassified,national,,,collected_at,,—,unclassified — review manually
+txn_prob_alerts,-1,unclassified,national,,,,,—,unclassified — review manually
+txn_prob_calibrations,-1,unclassified,national,,,,,—,unclassified — review manually
+txn_prob_companies,-1,unclassified,national,,,,,—,unclassified — review manually
+txn_prob_outcomes,-1,unclassified,national,,,,,—,unclassified — review manually
+txn_prob_scores,-1,unclassified,national,,,,,—,unclassified — review manually
+txn_prob_signals,-1,unclassified,national,,,,,—,unclassified — review manually
+uspto_assignees,-1,unclassified,national,,,ingested_at,,—,unclassified — review manually
+uspto_inventors,-1,unclassified,national,,,ingested_at,,—,unclassified — review manually
+uspto_patents,-1,unclassified,national,,,ingested_at,,—,unclassified — review manually
+utility_territory,63,unclassified,national,,,collected_at,2026-02-26 21:10:45.758532 → 2026-04-15 03:14:35.877609,—,unclassified — review manually
+warehouse_facility,-1,unclassified,point,lat/lon,,collected_at,,—,unclassified — review manually
+warehouse_listing,60,unclassified,point,lat/lon,,collected_at,2026-02-03 16:55:00.481349 → 2026-02-25 02:23:14.825028,—,unclassified — review manually
+watchlist_items,1,unclassified,national,,,,,—,unclassified — review manually
+watchlists,2,unclassified,national,,,,,—,unclassified — review manually
+workspace_invitations,1,unclassified,national,,,,,—,unclassified — review manually
+workspace_members,1,unclassified,national,,,,,—,unclassified — review manually
+workspaces,1,unclassified,national,,,,,—,unclassified — review manually
+yelp_businesses,400,unclassified,point,lat/lon,,ingested_at,2026-03-11 23:27:40.824003 → 2026-03-11 23:27:40.824003,—,unclassified — review manually
