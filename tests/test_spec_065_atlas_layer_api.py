@@ -37,23 +37,36 @@ class TestRegistryShape:
                       "vintage", "coverage_note", "unit", "description", "builder"):
                 assert hasattr(spec, f), f"layer {layer_id} missing {f}"
 
-    def test_registry_excludes_usaspending(self):
-        """T2: honest cuts enforced — usaspending is still deferred.
+    def test_registry_honest_cuts_state(self):
+        """T2: the honest-cut layers PLAN_066 §4 originally deferred are
+        now backfilled — defend that they're genuinely present.
 
-        Updated 2026-05-23 by SPEC_070: the ACS-county-wealth layer is no
-        longer deferred — it's implemented as `demo_acs_median_income`
-        (table `acs5_county_2023_b19013`). The test now only asserts the
-        remaining deferral (usaspending → SPEC_071) and that the ACS layer
-        is genuinely present.
+        History:
+        - SPEC_065: registry deferred ACS-county-wealth + usaspending_awards
+          via EXCLUDED_BY_DESIGN.
+        - SPEC_070 (2026-05-23): implemented ACS-county-wealth as
+          `demo_acs_median_income` (table `acs5_county_2023_b19013`);
+          removed from EXCLUDED_BY_DESIGN.
+        - SPEC_071 (2026-05-23): implemented federal-dollars as
+          `econ_federal_dollars` (table `usaspending_county_fy_totals`);
+          removed `usaspending_awards` from EXCLUDED_BY_DESIGN.
+
+        The test now defends presence of the backfilled layers and the
+        absence of the legacy stub-table names in the registry.
         """
         from app.services.atlas.layers import LAYERS, EXCLUDED_BY_DESIGN
         ids = set(LAYERS)
-        assert not any("usaspending" in lid for lid in ids), \
-            "usaspending must not be a layer per PLAN_066 §4 (thin/dateless)"
-        assert "usaspending_awards" in EXCLUDED_BY_DESIGN
-        # SPEC_070 — ACS county wealth is now a real layer
+        # Legacy stub tables must not appear as layer ids
+        assert not any("usaspending_awards" == lid for lid in ids), \
+            "the usable layer is econ_federal_dollars, not the legacy stub"
+        # SPEC_070 — ACS county wealth backfilled
         assert "demo_acs_median_income" in ids, \
             "SPEC_070 should have added demo_acs_median_income"
+        # SPEC_071 — federal dollars backfilled
+        assert "econ_federal_dollars" in ids, \
+            "SPEC_071 should have added econ_federal_dollars"
+        # EXCLUDED_BY_DESIGN itself remains a real mechanism even if currently empty
+        assert isinstance(EXCLUDED_BY_DESIGN, dict)
 
     def test_registry_groups_by_domain(self):
         """T3: list_layers_by_domain returns dict keyed by domain, sorted."""

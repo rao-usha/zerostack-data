@@ -312,6 +312,30 @@ def _build_irs_county_agi(db: Session) -> LayerResult:
     )
 
 
+def _build_federal_dollars(db: Session) -> LayerResult:
+    """USAspending federal contract dollars per county — SPEC_071.
+    Reads from `usaspending_county_fy_totals`, latest fiscal_year ×
+    contracts. Populated by `scripts/ingest_usaspending_county.py`."""
+    rows = _safe_query(db, """
+        WITH latest AS (
+            SELECT MAX(fiscal_year) AS fy
+            FROM usaspending_county_fy_totals
+            WHERE award_type_group = 'contracts'
+        )
+        SELECT geo_id, total_obligation AS value
+        FROM usaspending_county_fy_totals, latest
+        WHERE fiscal_year = latest.fy
+          AND award_type_group = 'contracts'
+          AND total_obligation > 0
+    """)
+    values = {r["geo_id"]: float(r["value"]) for r in rows if r["geo_id"]}
+    return LayerResult(
+        layer_id="econ_federal_dollars", grain="county", values=values,
+        legend=_legend(list(values.values()), "USD federal contract obligations"),
+        provenance=[{"table": "usaspending_county_fy_totals", "rows": len(values)}],
+    )
+
+
 def _build_acs_median_income(db: Session) -> LayerResult:
     """ACS B19013 median household income at county summary — SPEC_070.
     Reads from the grain-explicit `acs5_county_2023_b19013` table
@@ -580,6 +604,16 @@ LAYERS: Dict[str, LayerSpec] = {
         builder=_build_irs_migration_net,
     ),
     # Economy
+    "econ_federal_dollars": LayerSpec(
+        id="econ_federal_dollars", label="Federal Contract Dollars (FY)",
+        domain="economy", grain="county", default_on=False,
+        vintage="FY2024 contracts",
+        coverage_note="2,750 counties via USAspending spending_by_geography (SPEC_071)",
+        unit="USD",
+        description="Federal prime contract obligations to recipients with place "
+                    "of performance in the county, latest fiscal year.",
+        builder=_build_federal_dollars,
+    ),
     "econ_cbp_establishments_state": LayerSpec(
         id="econ_cbp_establishments_state", label="Business Establishments (state)",
         domain="economy", grain="state", default_on=False,
@@ -621,10 +655,12 @@ LAYERS: Dict[str, LayerSpec] = {
 
 # Honest cuts — these are NOT registered, by design. The tests assert it.
 EXCLUDED_BY_DESIGN = {
-    "usaspending_awards": "thin/dateless slice — PLAN_067 SPEC_071 backfill",
-    # SPEC_070 (2026-05-23): ACS county wealth is now implemented as
-    # `demo_acs_median_income` (table `acs5_county_2023_b19013`), so the
-    # prior "ZCTA-keyed, deferred" entry is removed.
+    # SPEC_070 (2026-05-23): ACS county wealth is implemented as
+    # `demo_acs_median_income` (table `acs5_county_2023_b19013`).
+    # SPEC_071 (2026-05-23): the `usaspending_awards` stub is now superseded
+    # by `usaspending_county_fy_totals` (county-aggregate via
+    # spending_by_geography) — surfaced as `econ_federal_dollars`. The
+    # legacy stub table is left intact but unused.
 }
 
 
