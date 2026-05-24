@@ -195,7 +195,15 @@ class TestEndpoints:
         assert resp.status_code == 404
 
     def test_boundaries_endpoint_returns_county_geojson(self, client):
-        """T9: GET /boundaries?geo_level=county → FeatureCollection with ≥3,000 features."""
+        """T9: GET /boundaries?geo_level=county → FeatureCollection with ≥3,000 features.
+
+        Hardened 2026-05-23: also asserts each feature has a Leaflet-renderable
+        geometry — `type` ∈ {Polygon, MultiPolygon} and non-empty coordinates.
+        The original assertion missed a bug where the `geojson_boundaries`
+        column stored a wrapped Feature and `_simplify_python` returned it
+        verbatim, producing `geometry.type == "Feature"` with no coordinates
+        — Leaflet refused to render the result.
+        """
         resp = client.get("/api/v1/atlas/boundaries", params={"geo_level": "county"})
         assert resp.status_code == 200
         body = resp.json()
@@ -203,6 +211,14 @@ class TestEndpoints:
         assert len(body["features"]) >= 3000
         # Each feature carries geo_id
         assert "geo_id" in body["features"][0]["properties"]
+        # Each feature has a Leaflet-renderable geometry — sample the first 50
+        for f in body["features"][:50]:
+            g = f.get("geometry") or {}
+            assert g.get("type") in ("Polygon", "MultiPolygon"), \
+                f"feature {f['properties']['geo_id']} has wrong geometry type: {g.get('type')!r}"
+            coords = g.get("coordinates")
+            assert coords, \
+                f"feature {f['properties']['geo_id']} has empty coordinates"
 
     def test_place_endpoint_returns_multilayer_aggregate(self, client):
         """T10: GET /place/48201 (Harris County) returns ≥4 layer values."""

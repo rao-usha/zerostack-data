@@ -50,11 +50,19 @@ def _has_postgis(db: Session) -> bool:
 def _simplify_python(geojson: Dict[str, Any], tolerance: float) -> Dict[str, Any]:
     """Fallback: very light vertex-skipping when PostGIS isn't available.
 
+    Accepts either a bare geometry (Polygon / MultiPolygon) or a wrapped
+    Feature — `geojson_boundaries.geojson` stores Features, so we unwrap.
+
     Not a true Douglas-Peucker — drops every Nth point per ring. Good enough
     for v1 county-scale display; PostGIS is the real path when present.
     Tolerance is interpreted as the keep-1-in-N factor (tolerance=0.005 →
     keep 1 in ~5, drop 4 of 5).
     """
+    if not geojson:
+        return geojson
+    # Unwrap a Feature → its geometry
+    if geojson.get("type") == "Feature":
+        geojson = geojson.get("geometry") or {}
     if not geojson or geojson.get("type") not in ("Polygon", "MultiPolygon"):
         return geojson
     # Keep every Nth vertex; minimum 4 vertices per ring.

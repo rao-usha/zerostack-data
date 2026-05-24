@@ -3,407 +3,631 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nexdata Atlas — explore public-data markets</title>
+  <title>Nexdata Atlas — the general explorer of American public data</title>
+
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin=""></script>
+
   <style>
     :root {
-      --bg:#0a0e1a; --card:#141b2d; --card-hover:#1a2138;
-      --primary:#6366f1; --primary-hover:#818cf8; --accent:#22d3ee;
+      --bg:#0a0e1a; --panel:#141b2d; --panel-2:#1a2138;
+      --primary:#6366f1; --primary-hover:#818cf8;
+      --accent:#22d3ee;
       --text:#e4e6eb; --muted:#9aa3b8; --dim:#6b7280;
-      --border:#2a3145; --success:#10b981; --warn:#f59e0b;
+      --border:#2a3145; --warn:#f59e0b; --success:#10b981;
+
+      /* 5-step sequential color ramp (low→high) for choropleths */
+      --c1:#0c2a4f; --c2:#0e4775; --c3:#1f6fb0; --c4:#41a0d6; --c5:#7dd3fc;
+      /* "no data" color */
+      --cno:#1f2937;
     }
     * { box-sizing: border-box; }
-    body {
-      margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-      background:var(--bg); color:var(--text); line-height:1.55;
-    }
+    html, body { margin:0; padding:0; height:100%; overflow:hidden;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+      background:var(--bg); color:var(--text); }
     a { color:var(--accent); text-decoration:none; }
-    .container { max-width:1100px; margin:0 auto; padding:24px; }
 
-    /* Hero / search */
-    .hero { background:linear-gradient(135deg,#0a0e1a,#14213a); border-bottom:1px solid var(--border);
-            padding:56px 24px 40px; text-align:center; }
-    .hero h1 { margin:0 0 8px; font-size:38px; font-weight:800; letter-spacing:-.02em; }
-    .hero h1 .g { background:linear-gradient(90deg,var(--primary),var(--accent));
-                  -webkit-background-clip:text; background-clip:text; color:transparent; }
-    .hero p { color:var(--muted); font-size:17px; margin:0 auto 24px; max-width:620px; }
-    .searchbar { display:flex; gap:8px; max-width:680px; margin:0 auto; }
-    .searchbar input {
-      flex:1; padding:14px 16px; font-size:16px; border-radius:10px;
-      border:1px solid var(--border); background:var(--card); color:var(--text);
+    /* ─── grid layout ────────────────────────────────────────── */
+    #app { display:grid; height:100vh;
+      grid-template-rows:48px 1fr;
+      grid-template-columns:280px 1fr 340px;
+      grid-template-areas:
+        "header header header"
+        "layers map place"; }
+    @media (max-width:1000px) {
+      #app { grid-template-columns:240px 1fr; grid-template-areas:
+        "header header"
+        "layers map"
+        "place place"; }
+      #place-panel { max-height:240px; }
     }
-    .searchbar input:focus { outline:none; border-color:var(--primary); }
-    .btn { padding:14px 22px; border:none; border-radius:10px; font-weight:600;
-           font-size:15px; cursor:pointer; background:var(--primary); color:#fff; }
-    .btn:hover { background:var(--primary-hover); }
-    .btn:disabled { opacity:.5; cursor:not-allowed; }
-    .btn-sm { padding:7px 13px; font-size:13px; border-radius:7px; }
-    .btn-ghost { background:transparent; border:1px solid var(--border); color:var(--accent); }
-    .examples { margin-top:14px; font-size:13px; color:var(--dim); }
-    .examples a { margin:0 6px; cursor:pointer; }
 
-    /* Chips */
-    .chips { display:flex; gap:8px; flex-wrap:wrap; margin:18px 0; }
-    .chip { background:var(--card); border:1px solid var(--border); border-radius:20px;
-            padding:6px 14px; font-size:13px; color:var(--text); }
-    .chip .k { color:var(--dim); margin-right:6px; }
+    /* ─── header / chrome ─────────────────────────────────────── */
+    #header { grid-area:header; display:flex; align-items:center; padding:0 16px;
+      background:var(--panel); border-bottom:1px solid var(--border); gap:18px; }
+    #header h1 { margin:0; font-size:15px; font-weight:700; letter-spacing:.02em; }
+    #header h1 .g { background:linear-gradient(90deg,var(--primary),var(--accent));
+      -webkit-background-clip:text; background-clip:text; color:transparent; }
+    #counters { display:flex; gap:18px; font-size:11px; color:var(--muted);
+      letter-spacing:.04em; text-transform:uppercase; flex:1; }
+    #counters b { color:var(--text); font-weight:700; font-size:13px; margin-right:4px;
+      font-variant-numeric:tabular-nums; }
+    #search-wrap { display:flex; align-items:center; gap:6px; }
+    #search { background:var(--bg); border:1px solid var(--border); color:var(--text);
+      padding:6px 10px; border-radius:6px; font-size:13px; width:240px; }
+    #search:focus { outline:none; border-color:var(--primary); }
+    .btn-icon { background:transparent; border:1px solid var(--border); color:var(--accent);
+      padding:5px 10px; border-radius:6px; cursor:pointer; font-size:12px; }
+    .btn-icon:hover { border-color:var(--accent); }
 
-    /* Summary */
-    .summary-box { background:var(--card); border:1px solid var(--border);
-                   border-left:3px solid var(--accent); border-radius:8px;
-                   padding:16px 18px; margin:16px 0; }
-    .summary-box h2 { margin:0 0 4px; font-size:20px; }
-    .summary-box .why { color:var(--muted); font-size:14px; }
+    /* ─── layer panel ─────────────────────────────────────────── */
+    #layer-panel { grid-area:layers; background:var(--panel);
+      border-right:1px solid var(--border); overflow-y:auto; }
+    .panel-title { font-size:11px; text-transform:uppercase; letter-spacing:.06em;
+      color:var(--dim); padding:14px 16px 6px; }
+    .domain { padding:0 8px 10px; }
+    .domain h3 { font-size:12px; font-weight:600; color:var(--accent);
+      margin:8px 8px 4px; text-transform:uppercase; letter-spacing:.04em; }
+    .layer-btn { display:block; width:100%; text-align:left; background:transparent;
+      border:none; color:var(--text); padding:7px 8px; border-radius:5px; cursor:pointer;
+      font-size:13px; line-height:1.3; transition:background .12s; }
+    .layer-btn:hover { background:var(--panel-2); }
+    .layer-btn.active-base { background:rgba(99,102,241,.18); color:var(--primary-hover);
+      border-left:3px solid var(--primary); padding-left:5px; }
+    .layer-btn.active-overlay { background:rgba(34,211,238,.10); }
+    .layer-btn .grain { font-size:10px; color:var(--dim); text-transform:uppercase;
+      margin-left:6px; letter-spacing:.04em; }
+    .layer-btn .meta { font-size:11px; color:var(--muted); margin-top:2px; }
 
-    /* Card grid */
-    .card-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin:18px 0; }
-    @media (max-width:760px){ .card-grid { grid-template-columns:1fr; } }
-    .icard { background:var(--card); border:1px solid var(--border); border-radius:12px;
-             padding:20px; transition:border-color .15s; }
-    .icard:hover { border-color:var(--primary); }
-    .icard h3 { margin:0 0 4px; font-size:17px; }
-    .icard .csum { color:var(--muted); font-size:13px; margin-bottom:12px; }
-    .metrics { display:flex; flex-wrap:wrap; gap:14px; margin-bottom:12px; }
-    .metric .v { font-size:20px; font-weight:700; }
-    .metric .l { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.04em; }
-    .metric .d { font-size:11px; color:var(--muted); }
-    .why-it { font-size:13px; color:var(--muted); border-top:1px solid var(--border);
-              padding-top:10px; margin-top:6px; }
-    .icard-foot { display:flex; align-items:center; gap:10px; margin-top:12px;
-                  font-size:12px; color:var(--dim); }
-    .conf { padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
-    .conf.high { background:rgba(16,185,129,.15); color:var(--success); }
-    .conf.medium { background:rgba(245,158,11,.15); color:var(--warn); }
-    .conf.low { background:rgba(107,114,128,.2); color:var(--dim); }
-    .icard-foot .sp { flex:1; }
-    .icard-foot a, .icard-foot button { cursor:pointer; }
+    /* ─── map ─────────────────────────────────────────────────── */
+    #map { grid-area:map; background:#06090f; }
+    .leaflet-container { background:#06090f; }
+    /* leaflet tooltip override */
+    .leaflet-tooltip {
+      background:rgba(20,27,45,.95) !important;
+      color:var(--text) !important;
+      border:1px solid var(--border) !important;
+      border-radius:6px !important;
+      padding:6px 10px !important;
+      font-size:12px !important;
+      box-shadow:0 4px 12px rgba(0,0,0,.4) !important;
+    }
+    .leaflet-tooltip-top:before { border-top-color:var(--border) !important; }
 
-    /* Connections */
-    .section-h { font-size:14px; color:var(--dim); text-transform:uppercase;
-                 letter-spacing:.06em; margin:24px 0 10px; }
-    .conn-list { list-style:none; padding:0; margin:0; }
-    .conn-list li { padding:8px 0; border-bottom:1px solid var(--border); font-size:14px; }
-    .conn-list .rel { color:var(--muted); }
-    .conn-list .ar { color:var(--accent); margin:0 8px; }
+    /* ─── map overlays (legend + actions) ─────────────────────── */
+    #legend { position:absolute; bottom:24px; right:24px; background:rgba(20,27,45,.95);
+      border:1px solid var(--border); border-radius:8px; padding:10px 12px;
+      font-size:11px; color:var(--muted); min-width:200px; z-index:500;
+      box-shadow:0 4px 16px rgba(0,0,0,.5); }
+    #legend .label { color:var(--text); font-size:12px; font-weight:600; margin-bottom:6px; }
+    #legend .unit { color:var(--dim); font-size:10px; text-transform:uppercase;
+      letter-spacing:.04em; margin-top:2px; }
+    .ramp { display:flex; height:10px; border-radius:2px; overflow:hidden; margin:6px 0; }
+    .ramp .swatch { flex:1; }
+    .ramp-labels { display:flex; justify-content:space-between; font-size:10px;
+      color:var(--dim); font-variant-numeric:tabular-nums; }
+    #map-actions { position:absolute; top:60px; right:12px; z-index:500; display:flex;
+      flex-direction:column; gap:6px; }
+    #map-actions button { background:rgba(20,27,45,.95); border:1px solid var(--border);
+      color:var(--text); padding:6px 10px; border-radius:6px; cursor:pointer; font-size:12px; }
+    #map-actions button:hover { border-color:var(--accent); color:var(--accent); }
 
-    /* Related queries */
-    .related { display:flex; gap:8px; flex-wrap:wrap; }
-    .related button { background:var(--card); border:1px solid var(--border); color:var(--text);
-                      border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer; }
-    .related button:hover { border-color:var(--accent); }
+    /* ─── place panel ─────────────────────────────────────────── */
+    #place-panel { grid-area:place; background:var(--panel);
+      border-left:1px solid var(--border); overflow-y:auto; padding:16px; }
+    #place-panel .empty { color:var(--dim); font-size:13px; text-align:center;
+      padding:48px 16px; }
+    .place-title { font-size:18px; font-weight:700; margin:0 0 4px; }
+    .place-id { font-family:ui-monospace,Menlo,monospace; font-size:11px;
+      color:var(--dim); margin-bottom:14px; }
+    .place-layer { padding:10px 0; border-bottom:1px solid var(--border); }
+    .place-layer:last-child { border-bottom:none; }
+    .place-layer .lname { font-size:13px; font-weight:600; color:var(--text); }
+    .place-layer .lval { font-size:20px; font-variant-numeric:tabular-nums;
+      color:var(--accent); margin:3px 0; font-weight:700; }
+    .place-layer .lmeta { font-size:11px; color:var(--dim); }
+    .place-layer .ldomain { display:inline-block; font-size:10px;
+      background:var(--panel-2); padding:2px 7px; border-radius:10px;
+      color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+    #place-actions { margin-top:18px; padding-top:14px;
+      border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap; }
+    #place-actions button, #place-actions a { background:var(--panel-2);
+      border:1px solid var(--border); color:var(--text); padding:7px 12px;
+      border-radius:6px; cursor:pointer; font-size:12px; }
+    #place-actions a:hover, #place-actions button:hover {
+      border-color:var(--accent); color:var(--accent); }
 
-    /* Provenance drawer */
-    .drawer-bg { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; z-index:50; }
-    .drawer-bg.open { display:block; }
-    .drawer { position:fixed; top:0; right:0; height:100%; width:420px; max-width:90vw;
-              background:var(--card); border-left:1px solid var(--border); z-index:51;
-              transform:translateX(100%); transition:transform .2s; padding:24px; overflow-y:auto; }
-    .drawer.open { transform:translateX(0); }
-    .drawer h3 { margin:0 0 12px; }
-    .prov-row { border-bottom:1px solid var(--border); padding:10px 0; font-size:13px; }
-    .prov-row .ds { font-family:ui-monospace,Menlo,monospace; color:var(--accent); }
-
-    .coverage { background:rgba(245,158,11,.07); border:1px solid var(--warn);
-                border-radius:8px; padding:12px 14px; margin:14px 0; font-size:13px; color:#fcd34d; }
-    .coverage ul { margin:6px 0 0; padding-left:18px; }
-
-    .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
-             background:var(--primary); color:#fff; padding:10px 18px; border-radius:8px;
-             font-size:14px; opacity:0; transition:opacity .2s; pointer-events:none; }
-    .toast.show { opacity:1; }
-
-    footer { text-align:center; color:var(--dim); font-size:13px; padding:32px; }
-    .hidden { display:none; }
-    .loading { text-align:center; color:var(--muted); padding:48px; font-size:15px; }
+    /* loading / toast */
+    .spinner { color:var(--muted); font-size:12px; padding:8px 14px; }
+    #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+      background:var(--primary); color:#fff; padding:9px 18px; border-radius:8px;
+      font-size:13px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:1000; }
+    #toast.show { opacity:1; }
   </style>
 </head>
 <body>
 
-  <header class="hero">
-    <h1>Nexdata <span class="g">Atlas</span></h1>
-    <p>Explore any U.S. market the public data actually covers — industry footprint,
-       risk, infrastructure, operators — connected, sourced, and free to explore.</p>
-    <div class="searchbar">
-      <input id="q" placeholder="Try: Houston building equipment contractors" autocomplete="off">
-      <button class="btn" id="go">Explore</button>
-    </div>
-    <div class="examples">
-      Examples:
-      <a data-q="Houston building equipment contractors">Houston building equipment contractors</a>·
-      <a data-q="Dallas residential building construction">Dallas residential building construction</a>·
-      <a data-q="Denver oil and gas extraction">Denver oil &amp; gas extraction</a>
-    </div>
-  </header>
+  <div id="app">
 
-  <div class="container">
-    <div id="loading" class="loading hidden">Assembling exploration…</div>
-    <div id="error" class="coverage hidden"></div>
-    <div id="result" class="hidden">
-
-      <div class="chips" id="chips"></div>
-
-      <div class="summary-box">
-        <h2 id="headline">—</h2>
-        <div class="why" id="why">—</div>
+    <!-- ─── HEADER ──────────────────────────────────────────── -->
+    <header id="header">
+      <h1>Nexdata <span class="g">Atlas</span></h1>
+      <div id="counters">
+        <span><b id="ct-layers">—</b> layers</span>
+        <span><b id="ct-domains">—</b> domains</span>
+        <span><b>3,143</b> counties</span>
+        <span><b>1.07M</b> EPA facilities</span>
+        <span><b>51,093</b> FEMA declarations since 1999</span>
       </div>
-
-      <div id="coverage" class="coverage hidden"></div>
-
-      <div class="section-h">Insight cards</div>
-      <div class="card-grid" id="cards"></div>
-
-      <div id="conn-section" class="hidden">
-        <div class="section-h">How these connect</div>
-        <ul class="conn-list" id="connections"></ul>
+      <div id="search-wrap">
+        <input id="search" placeholder="Fast-travel: a place or NAICS sector…">
+        <button class="btn-icon" id="go">Go</button>
       </div>
+      <button class="btn-icon" id="share">Share view</button>
+    </header>
 
-      <div id="related-section" class="hidden">
-        <div class="section-h">Related explorations</div>
-        <div class="related" id="related"></div>
-      </div>
+    <!-- ─── LAYER PANEL ─────────────────────────────────────── -->
+    <aside id="layer-panel">
+      <div class="panel-title">Layers</div>
+      <div id="layer-list" class="spinner">Loading layers…</div>
+    </aside>
 
-      <div class="section-h">This exploration</div>
-      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:32px">
-        <button class="btn btn-sm" id="share">Copy share link</button>
-        <button class="btn btn-sm btn-ghost" id="export">Export as report</button>
-        <button class="btn btn-sm btn-ghost" id="custom">Request a custom deep dive</button>
+    <!-- ─── MAP ─────────────────────────────────────────────── -->
+    <main id="map">
+      <div id="map-actions">
+        <button id="reset-view">Reset view</button>
+        <button id="boundaries-toggle">Hide boundaries</button>
       </div>
-    </div>
+      <div id="legend" style="display:none">
+        <div class="label" id="legend-label">—</div>
+        <div class="ramp">
+          <div class="swatch" style="background:var(--c1)"></div>
+          <div class="swatch" style="background:var(--c2)"></div>
+          <div class="swatch" style="background:var(--c3)"></div>
+          <div class="swatch" style="background:var(--c4)"></div>
+          <div class="swatch" style="background:var(--c5)"></div>
+        </div>
+        <div class="ramp-labels"><span id="lr-min">—</span><span id="lr-max">—</span></div>
+        <div class="unit" id="legend-unit">—</div>
+      </div>
+    </main>
+
+    <!-- ─── PLACE PANEL ─────────────────────────────────────── -->
+    <aside id="place-panel">
+      <div class="empty" id="place-empty">
+        Click a county on the map.<br><br>
+        Or pick a layer to recolor →
+      </div>
+      <div id="place-content" style="display:none">
+        <div class="place-title" id="place-title">—</div>
+        <div class="place-id" id="place-id">—</div>
+        <div id="place-layers"></div>
+        <div id="place-actions">
+          <a id="deeper" target="_blank">Deeper analysis →</a>
+        </div>
+      </div>
+    </aside>
+
   </div>
 
-  <!-- Provenance drawer -->
-  <div class="drawer-bg" id="drawer-bg"></div>
-  <div class="drawer" id="drawer">
-    <h3 id="drawer-title">Source trail</h3>
-    <div id="drawer-body"></div>
-    <button class="btn btn-sm btn-ghost" id="drawer-close" style="margin-top:16px">Close</button>
-  </div>
-
-  <div class="toast" id="toast"></div>
-
-  <footer>
-    Nexdata Atlas · governed public-data exploration ·
-    <a href="/playground.html">Synthetic data playground</a>
-  </footer>
+  <div id="toast"></div>
 
   <script>
-    const API = '/api/v1/atlas';
-    let CURRENT = null;             // current exploration object
-    const SESSION = 'sess-' + Math.random().toString(36).slice(2, 12);
+  // ═══════════════════════════════════════════════════════════════════════
+  // Nexdata Atlas — Map v1 — SPEC_066
+  // ═══════════════════════════════════════════════════════════════════════
 
-    // ── telemetry (fire-and-forget) ──────────────────────────────────────
-    function track(eventType, extra) {
-      try {
-        fetch(API + '/events', {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify(Object.assign({
-            event_type: eventType, session_id: SESSION,
-            exploration_id: CURRENT ? CURRENT.id : null,
-          }, extra || {})),
+  const API = '/api/v1/atlas';
+  const SESSION = 'sess-' + Math.random().toString(36).slice(2, 10);
+
+  // ── state (URL-mirrored) ────────────────────────────────────────────────
+  const state = {
+    layerId: 'disaster_nri',     // default base choropleth
+    overlayId: null,             // optional point layer
+    placeId: null,
+    view: { lat: 38.5, lon: -96, zoom: 4 },
+    showBoundaries: true,
+  };
+
+  let MAP = null;
+  let BOUNDARIES = null;           // GeoJSON FeatureCollection
+  let BOUNDARY_LAYER = null;       // Leaflet GeoJSON layer
+  let OVERLAY_LAYER = null;        // current point overlay
+  let REGISTRY = null;             // grouped layer registry
+  let CURRENT_LAYER_RESULT = null; // {layer_id, values, ...}
+  let LAYER_SPECS = {};            // flat lookup: id → spec
+
+  // ── helpers ─────────────────────────────────────────────────────────────
+  function track(eventType, payload) {
+    try {
+      fetch(API + '/events', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          event_type: eventType, session_id: SESSION,
+          payload: payload || {},
+        }),
+      });
+    } catch (e) { /* telemetry never breaks UX */ }
+  }
+
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+  }
+
+  function fmtVal(v, unit) {
+    if (v === null || v === undefined) return '—';
+    if (typeof v !== 'number') return String(v);
+    if (unit && unit.toUpperCase().includes('USD')) {
+      if (Math.abs(v) >= 1e9) return '$' + (v/1e9).toFixed(2) + 'B';
+      if (Math.abs(v) >= 1e6) return '$' + (v/1e6).toFixed(2) + 'M';
+      if (Math.abs(v) >= 1e3) return '$' + (v/1e3).toFixed(1) + 'K';
+      return '$' + v.toFixed(0);
+    }
+    if (Math.abs(v) >= 1000) return v.toLocaleString();
+    if (Math.abs(v) < 10 && v % 1 !== 0) return v.toFixed(2);
+    return Math.round(v).toLocaleString();
+  }
+
+  // 5-step color ramp via CSS variable lookup (one of c1..c5)
+  const RAMP = ['var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)'];
+  const RAMP_HEX = ['#0c2a4f','#0e4775','#1f6fb0','#41a0d6','#7dd3fc'];
+
+  function bucketColor(value, breaks) {
+    if (value === null || value === undefined) return 'var(--cno)';
+    if (!breaks || breaks.length < 4) return RAMP[2];
+    if (value < breaks[0]) return RAMP_HEX[0];
+    if (value < breaks[1]) return RAMP_HEX[1];
+    if (value < breaks[2]) return RAMP_HEX[2];
+    if (value < breaks[3]) return RAMP_HEX[3];
+    return RAMP_HEX[4];
+  }
+
+  // ── URL state ───────────────────────────────────────────────────────────
+  function syncURL() {
+    const p = new URLSearchParams();
+    if (state.layerId) p.set('layer', state.layerId);
+    if (state.overlayId) p.set('overlay', state.overlayId);
+    if (state.placeId) p.set('place', state.placeId);
+    const c = MAP ? MAP.getCenter() : state.view;
+    const z = MAP ? MAP.getZoom() : state.view.zoom;
+    p.set('lat', (c.lat ?? c.lat).toFixed(3));
+    p.set('lon', (c.lng ?? c.lon).toFixed(3));
+    p.set('zoom', String(Math.round(z * 10) / 10));
+    history.replaceState(null, '', '/atlas.html?' + p.toString());
+  }
+  function loadURL() {
+    const p = new URLSearchParams(location.search);
+    if (p.get('layer')) state.layerId = p.get('layer');
+    if (p.get('overlay')) state.overlayId = p.get('overlay');
+    if (p.get('place')) state.placeId = p.get('place');
+    if (p.get('lat')) state.view.lat = parseFloat(p.get('lat'));
+    if (p.get('lon')) state.view.lon = parseFloat(p.get('lon'));
+    if (p.get('zoom')) state.view.zoom = parseFloat(p.get('zoom'));
+  }
+
+  // ── init ────────────────────────────────────────────────────────────────
+  async function init() {
+    loadURL();
+    initMap();
+    // parallel: registry + boundaries + initial layer
+    const [reg, bounds, layer] = await Promise.all([
+      fetch(API + '/layers').then(r => r.json()),
+      fetch(API + '/boundaries?geo_level=county&tolerance=0.005').then(r => r.json()),
+      fetch(API + '/layer/' + encodeURIComponent(state.layerId)).then(r => r.json()),
+    ]);
+    REGISTRY = reg.layers_by_domain;
+    flattenSpecs(REGISTRY);
+    renderCounters(REGISTRY);
+    renderLayerPanel(REGISTRY);
+
+    BOUNDARIES = bounds;
+    renderBoundaries(bounds);
+
+    CURRENT_LAYER_RESULT = layer;
+    applyLayerToBoundaries(layer);
+    markActiveLayerButton(state.layerId);
+
+    // Optional point overlay from URL
+    if (state.overlayId) await activateOverlay(state.overlayId);
+    // Re-open the place panel if URL specified one
+    if (state.placeId) await openPlace(state.placeId);
+
+    track('query_submitted', { source:'landing', layer: state.layerId,
+                                place: state.placeId || null });
+  }
+
+  function flattenSpecs(grouped) {
+    LAYER_SPECS = {};
+    for (const dom of Object.keys(grouped)) {
+      for (const s of grouped[dom]) LAYER_SPECS[s.id] = s;
+    }
+  }
+
+  function renderCounters(grouped) {
+    let total = 0; for (const d of Object.keys(grouped)) total += grouped[d].length;
+    document.getElementById('ct-layers').textContent = total;
+    document.getElementById('ct-domains').textContent = Object.keys(grouped).length;
+  }
+
+  // ── map setup ───────────────────────────────────────────────────────────
+  function initMap() {
+    MAP = L.map('map', {
+      preferCanvas: true,
+      worldCopyJump: false,
+      zoomControl: true,
+      attributionControl: false,
+    }).setView([state.view.lat, state.view.lon], state.view.zoom);
+
+    MAP.on('moveend zoomend', () => { state.view = {
+      lat: MAP.getCenter().lat, lon: MAP.getCenter().lng, zoom: MAP.getZoom() };
+      syncURL();
+    });
+  }
+
+  // ── render boundaries (once) ────────────────────────────────────────────
+  function renderBoundaries(geojson) {
+    BOUNDARY_LAYER = L.geoJSON(geojson, {
+      renderer: L.canvas(),
+      style: f => ({
+        fillColor: 'var(--cno)',  // overwritten by applyLayerToBoundaries
+        weight: 0.4,
+        color: '#2a3145',
+        fillOpacity: 0.85,
+      }),
+      onEachFeature: (feature, layer) => {
+        layer.on({
+          mouseover: e => {
+            const target = e.target;
+            target.setStyle({ weight: 1.5, color: '#22d3ee' });
+            target.bringToFront();
+          },
+          mouseout: e => {
+            BOUNDARY_LAYER.resetStyle(e.target);
+            // re-apply current layer colors so we don't lose state
+            if (CURRENT_LAYER_RESULT) styleFeature(e.target.feature, e.target);
+          },
+          click: e => {
+            const gid = feature.properties.geo_id;
+            openPlace(gid);
+            L.DomEvent.stopPropagation(e);
+          },
         });
-      } catch (e) { /* telemetry never breaks UX */ }
+        const gid = feature.properties.geo_id;
+        const name = feature.properties.geo_name || gid;
+        layer.bindTooltip(() => tooltipHTML(gid, name), { sticky: true, direction: 'top' });
+      },
+    }).addTo(MAP);
+  }
+
+  function tooltipHTML(geoId, name) {
+    const layerSpec = LAYER_SPECS[state.layerId] || {};
+    let valStr = '—';
+    if (CURRENT_LAYER_RESULT && CURRENT_LAYER_RESULT.values
+        && CURRENT_LAYER_RESULT.values[geoId] !== undefined) {
+      valStr = fmtVal(CURRENT_LAYER_RESULT.values[geoId], layerSpec.unit);
+    }
+    return `<b>${name}</b><br>
+      <span style="color:#9aa3b8">${layerSpec.label || state.layerId}:</span>
+      <b>${valStr}</b>
+      <span style="color:#6b7280">${layerSpec.unit || ''}</span>`;
+  }
+
+  function styleFeature(feature, layer) {
+    if (!CURRENT_LAYER_RESULT || !CURRENT_LAYER_RESULT.values) return;
+    const gid = feature.properties.geo_id;
+    const v = CURRENT_LAYER_RESULT.values[gid];
+    const breaks = (CURRENT_LAYER_RESULT.legend || {}).breaks || [];
+    layer.setStyle({ fillColor: bucketColor(v, breaks) });
+  }
+
+  function applyLayerToBoundaries(layerResult) {
+    CURRENT_LAYER_RESULT = layerResult;
+    if (!BOUNDARY_LAYER) return;
+    BOUNDARY_LAYER.eachLayer(featureLayer => styleFeature(featureLayer.feature, featureLayer));
+    renderLegend(layerResult);
+  }
+
+  function renderLegend(result) {
+    const spec = LAYER_SPECS[result.layer_id] || {};
+    const leg = result.legend || {};
+    document.getElementById('legend').style.display = 'block';
+    document.getElementById('legend-label').textContent = spec.label || result.layer_id;
+    document.getElementById('legend-unit').textContent =
+      (spec.unit || leg.unit || '') + (spec.vintage ? ' · ' + spec.vintage : '');
+    document.getElementById('lr-min').textContent = fmtVal(leg.min, spec.unit);
+    document.getElementById('lr-max').textContent = fmtVal(leg.max, spec.unit);
+  }
+
+  // ── point overlay (for point-grain layers) ──────────────────────────────
+  function clearOverlay() {
+    if (OVERLAY_LAYER) { MAP.removeLayer(OVERLAY_LAYER); OVERLAY_LAYER = null; }
+    state.overlayId = null;
+  }
+  async function activateOverlay(layerId) {
+    clearOverlay();
+    const res = await fetch(API + '/layer/' + encodeURIComponent(layerId)).then(r => r.json());
+    const features = res.features || [];
+    OVERLAY_LAYER = L.layerGroup();
+    for (const f of features) {
+      const [lon, lat] = f.geometry.coordinates;
+      const m = L.circleMarker([lat, lon], {
+        radius: 3, color: '#22d3ee', weight: 1,
+        fillColor: '#22d3ee', fillOpacity: 0.55,
+      });
+      const p = f.properties || {};
+      m.bindTooltip(`<b>${p.name || '—'}</b>`, { sticky: true });
+      OVERLAY_LAYER.addLayer(m);
+    }
+    OVERLAY_LAYER.addTo(MAP);
+    state.overlayId = layerId;
+    syncURL();
+    markActiveLayerButton(state.layerId);
+    track('layer_toggled', { layer_id: layerId, role: 'overlay' });
+  }
+
+  // ── layer panel ─────────────────────────────────────────────────────────
+  function renderLayerPanel(grouped) {
+    const root = document.getElementById('layer-list');
+    root.classList.remove('spinner');
+    root.innerHTML = '';
+    for (const dom of Object.keys(grouped)) {
+      const div = document.createElement('div');
+      div.className = 'domain';
+      const h3 = document.createElement('h3'); h3.textContent = dom;
+      div.appendChild(h3);
+      for (const spec of grouped[dom]) {
+        const b = document.createElement('button');
+        b.className = 'layer-btn';
+        b.dataset.layerId = spec.id;
+        b.dataset.grain = spec.grain;
+        b.innerHTML = `<div>${spec.label}<span class="grain">${spec.grain}</span></div>
+                       <div class="meta">${spec.vintage || ''} · ${spec.coverage_note || ''}</div>`;
+        b.onclick = () => onLayerClick(spec);
+        div.appendChild(b);
+      }
+      root.appendChild(div);
+    }
+  }
+
+  function markActiveLayerButton(layerId) {
+    document.querySelectorAll('.layer-btn').forEach(b => {
+      b.classList.remove('active-base', 'active-overlay');
+      if (b.dataset.layerId === state.layerId) b.classList.add('active-base');
+      if (b.dataset.layerId === state.overlayId) b.classList.add('active-overlay');
+    });
+  }
+
+  async function onLayerClick(spec) {
+    if (spec.grain === 'point') {
+      // Toggle as overlay: re-click an active overlay clears it.
+      if (state.overlayId === spec.id) clearOverlay();
+      else await activateOverlay(spec.id);
+      markActiveLayerButton();
+      return;
+    }
+    // Choropleth — set as base.
+    state.layerId = spec.id;
+    syncURL();
+    track('layer_toggled', { layer_id: spec.id, role: 'base' });
+    const res = await fetch(API + '/layer/' + encodeURIComponent(spec.id)).then(r => r.json());
+    applyLayerToBoundaries(res);
+    markActiveLayerButton();
+  }
+
+  // ── place panel ─────────────────────────────────────────────────────────
+  async function openPlace(geoId) {
+    state.placeId = geoId;
+    syncURL();
+    const data = await fetch(API + '/place/' + encodeURIComponent(geoId)).then(r => r.json());
+    if (!data || data.detail) { toast('No data for ' + geoId); return; }
+
+    // Find a display name from boundary properties
+    let name = geoId;
+    if (BOUNDARY_LAYER) {
+      BOUNDARY_LAYER.eachLayer(fl => {
+        if (fl.feature.properties.geo_id === geoId)
+          name = fl.feature.properties.geo_name || geoId;
+      });
     }
 
-    function toast(msg) {
-      const t = document.getElementById('toast');
-      t.textContent = msg; t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), 2200);
-    }
+    document.getElementById('place-empty').style.display = 'none';
+    document.getElementById('place-content').style.display = 'block';
+    document.getElementById('place-title').textContent = name;
+    document.getElementById('place-id').textContent =
+      `FIPS ${geoId} · ${data.grain} · ${Object.keys(data.layers || {}).length} layer values`;
 
-    // ── explore ──────────────────────────────────────────────────────────
-    async function explore(query) {
-      if (!query.trim()) return;
-      document.getElementById('result').classList.add('hidden');
-      document.getElementById('error').classList.add('hidden');
-      document.getElementById('loading').classList.remove('hidden');
-      track('query_submitted', { payload:{ query } });
-      try {
-        const resp = await fetch(API + '/explore', {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ query, session_id: SESSION }),
-        });
-        const data = await resp.json();
-        document.getElementById('loading').classList.add('hidden');
-        if (resp.status !== 200) {
-          showError(typeof data.detail === 'string' ? data.detail : 'Exploration failed.');
-          return;
+    const root = document.getElementById('place-layers');
+    root.innerHTML = '';
+    const layers = data.layers || {};
+    if (!Object.keys(layers).length) {
+      root.innerHTML = '<div class="empty" style="padding:24px 0">' +
+        'No layers have values for this place.</div>';
+    } else {
+      for (const [lid, info] of Object.entries(layers)) {
+        const div = document.createElement('div');
+        div.className = 'place-layer';
+        div.innerHTML = `
+          <div class="lname">${info.label}
+            <span class="ldomain">${info.domain}</span></div>
+          <div class="lval">${fmtVal(info.value, info.unit)}</div>
+          <div class="lmeta">${info.unit || ''} · ${info.vintage || ''}</div>`;
+        root.appendChild(div);
+      }
+    }
+    document.getElementById('deeper').href =
+      '/atlas.html?explore=' + encodeURIComponent(name);
+
+    track('place_clicked', { geo_id: geoId, layer_count: Object.keys(layers).length });
+  }
+
+  // ── search (fast-travel — uses SPEC_064 explore endpoint) ───────────────
+  async function fastTravel(query) {
+    if (!query.trim()) return;
+    try {
+      const res = await fetch(API + '/explore', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ query, session_id: SESSION }),
+      });
+      if (!res.ok) { toast('No match — try a different name'); return; }
+      const data = await res.json();
+      const re = data.resolved_entities || {};
+      if (re.geographies && re.geographies.length) {
+        // Jump to first county; open place panel
+        const fips = re.geographies[0];
+        // We don't have lat/lon for the county here — recenter only roughly via the boundary
+        if (BOUNDARY_LAYER) {
+          BOUNDARY_LAYER.eachLayer(fl => {
+            if (fl.feature.properties.geo_id === fips) {
+              const b = fl.getBounds();
+              MAP.fitBounds(b, { maxZoom: 8 });
+            }
+          });
         }
-        CURRENT = data;
-        render(data);
-        history.replaceState(null, '', '/atlas.html?q=' + encodeURIComponent(query));
-      } catch (e) {
-        document.getElementById('loading').classList.add('hidden');
-        showError('Network error — the API may be down.');
+        await openPlace(fips);
+        track('search_executed', { query, resolved: fips });
+      } else {
+        toast('Resolved but no county to jump to');
       }
+    } catch (e) {
+      toast('Search failed');
     }
+  }
 
-    function showError(msg) {
-      const el = document.getElementById('error');
-      el.textContent = msg; el.classList.remove('hidden');
+  // ── wiring ──────────────────────────────────────────────────────────────
+  document.getElementById('go').onclick =
+    () => fastTravel(document.getElementById('search').value);
+  document.getElementById('search').onkeydown = e => {
+    if (e.key === 'Enter') fastTravel(e.target.value);
+  };
+  document.getElementById('share').onclick = () => {
+    navigator.clipboard.writeText(location.href);
+    toast('Share link copied');
+    track('share_created', { url: location.href });
+  };
+  document.getElementById('reset-view').onclick = () => {
+    MAP.setView([38.5, -96], 4);
+  };
+  document.getElementById('boundaries-toggle').onclick = e => {
+    state.showBoundaries = !state.showBoundaries;
+    if (BOUNDARY_LAYER) {
+      if (state.showBoundaries) BOUNDARY_LAYER.addTo(MAP);
+      else MAP.removeLayer(BOUNDARY_LAYER);
     }
+    e.target.textContent = state.showBoundaries ? 'Hide boundaries' : 'Show boundaries';
+  };
 
-    // ── render ───────────────────────────────────────────────────────────
-    function render(d) {
-      // chips
-      const re = d.resolved_entities || {};
-      const chips = [];
-      if (re.msa) chips.push(`<span class="chip"><span class="k">MSA</span>${re.msa.title}</span>`);
-      if (re.naics) chips.push(`<span class="chip"><span class="k">NAICS ${re.naics.code}</span>${re.naics.label}</span>`);
-      if (re.geographies && re.geographies.length)
-        chips.push(`<span class="chip"><span class="k">Counties</span>${re.geographies.length}</span>`);
-      if (re.datasets && re.datasets.length)
-        chips.push(`<span class="chip"><span class="k">Datasets</span>${re.datasets.length}</span>`);
-      document.getElementById('chips').innerHTML = chips.join('');
-
-      // summary
-      document.getElementById('headline').textContent = d.summary.headline || d.query;
-      document.getElementById('why').textContent = d.summary.why_interesting || '';
-
-      // coverage notes
-      const cov = document.getElementById('coverage');
-      const notes = (d.summary.coverage_notes || []);
-      if (notes.length) {
-        cov.innerHTML = '<strong>Coverage notes</strong> — what the public data could not support:'
-          + '<ul>' + notes.map(n => '<li>' + n + '</li>').join('') + '</ul>';
-        cov.classList.remove('hidden');
-      } else { cov.classList.add('hidden'); }
-
-      // cards
-      document.getElementById('cards').innerHTML = (d.cards || []).map(cardHtml).join('')
-        || '<div class="loading">No insight cards had usable data for this query.</div>';
-
-      // connections
-      const connSec = document.getElementById('conn-section');
-      if (d.connections && d.connections.length) {
-        document.getElementById('connections').innerHTML = d.connections.map(c =>
-          `<li data-src="${c.source_card}" data-tgt="${c.target_card}">
-             <strong>${cardTitle(d, c.source_card)}</strong>
-             <span class="ar">→</span>
-             <strong>${cardTitle(d, c.target_card)}</strong>
-             <span class="rel"> — ${c.relationship}</span>
-           </li>`).join('');
-        connSec.classList.remove('hidden');
-      } else { connSec.classList.add('hidden'); }
-
-      // related queries
-      const relSec = document.getElementById('related-section');
-      if (d.related_queries && d.related_queries.length) {
-        document.getElementById('related').innerHTML = d.related_queries.map(r =>
-          `<button data-q="${r.query.replace(/"/g,'&quot;')}">${r.query}</button>`).join('');
-        relSec.classList.remove('hidden');
-      } else { relSec.classList.add('hidden'); }
-
-      document.getElementById('result').classList.remove('hidden');
-      (d.cards || []).forEach(c => track('card_viewed', { card_id: c.id }));
-    }
-
-    function cardTitle(d, id) {
-      const c = (d.cards || []).find(x => x.id === id);
-      return c ? c.title : id;
-    }
-
-    function cardHtml(c) {
-      const metrics = (c.metrics || []).map(m =>
-        `<div class="metric"><div class="v">${m.value}</div>
-         <div class="l">${m.label}</div>${m.detail ? '<div class="d">'+m.detail+'</div>' : ''}</div>`
-      ).join('');
-      return `<div class="icard" data-card="${c.id}">
-        <h3>${c.title}</h3>
-        <div class="csum">${c.summary}</div>
-        <div class="metrics">${metrics}</div>
-        <div class="why-it">${c.why_it_matters || ''}</div>
-        <div class="icard-foot">
-          <span class="conf ${c.confidence}">${c.confidence}</span>
-          <span>${(c.datasets_used||[]).join(', ')}</span>
-          <span class="sp"></span>
-          <a class="src-link" data-card="${c.id}">Source trail</a>
-          <button class="btn-sm btn-ghost" data-fb="thumbs_up" data-card="${c.id}">▲</button>
-          <button class="btn-sm btn-ghost" data-fb="thumbs_down" data-card="${c.id}">▼</button>
-        </div>
-      </div>`;
-    }
-
-    // ── provenance drawer ────────────────────────────────────────────────
-    function openDrawer(cardId) {
-      const c = (CURRENT.cards || []).find(x => x.id === cardId);
-      if (!c) return;
-      document.getElementById('drawer-title').textContent = 'Source trail — ' + c.title;
-      document.getElementById('drawer-body').innerHTML =
-        (c.provenance && c.provenance.length
-          ? c.provenance.map(p =>
-              `<div class="prov-row"><span class="ds">${p.dataset}</span><br>
-               ${p.description} — <strong>${p.rows_used.toLocaleString()}</strong> rows used</div>`).join('')
-          : '<div class="prov-row">No provenance recorded.</div>')
-        + `<div class="prov-row" style="border:none;color:var(--dim)">
-             Coverage: ${JSON.stringify(c.coverage || {})}</div>`;
-      document.getElementById('drawer-bg').classList.add('open');
-      document.getElementById('drawer').classList.add('open');
-      track('source_opened', { card_id: cardId });
-    }
-    function closeDrawer() {
-      document.getElementById('drawer-bg').classList.remove('open');
-      document.getElementById('drawer').classList.remove('open');
-    }
-
-    // ── events ───────────────────────────────────────────────────────────
-    document.getElementById('go').addEventListener('click',
-      () => explore(document.getElementById('q').value));
-    document.getElementById('q').addEventListener('keydown',
-      e => { if (e.key === 'Enter') explore(e.target.value); });
-
-    document.querySelectorAll('.examples a').forEach(a =>
-      a.addEventListener('click', () => {
-        document.getElementById('q').value = a.dataset.q;
-        explore(a.dataset.q);
-      }));
-
-    document.body.addEventListener('click', (e) => {
-      const t = e.target;
-      if (t.dataset && t.dataset.q && t.tagName === 'BUTTON') {     // related query
-        document.getElementById('q').value = t.dataset.q;
-        track('related_query_clicked', { payload:{ query: t.dataset.q } });
-        explore(t.dataset.q);
-      }
-      if (t.classList.contains('src-link')) openDrawer(t.dataset.card);
-      if (t.dataset && t.dataset.fb) {                              // thumbs feedback
-        fetch(API + '/feedback', {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({
-            card_id: t.dataset.card, feedback: t.dataset.fb,
-            session_id: SESSION, exploration_id: CURRENT ? CURRENT.id : null,
-          }),
-        });
-        toast(t.dataset.fb === 'thumbs_up' ? 'Marked useful — thanks' : 'Noted — thanks');
-      }
-      if (t.closest && t.closest('.conn-list li')) {
-        const li = t.closest('.conn-list li');
-        track('connection_clicked', { payload:{ src: li.dataset.src, tgt: li.dataset.tgt } });
-      }
-    });
-
-    document.getElementById('drawer-close').addEventListener('click', closeDrawer);
-    document.getElementById('drawer-bg').addEventListener('click', closeDrawer);
-
-    document.getElementById('share').addEventListener('click', () => {
-      if (!CURRENT) return;
-      const url = location.origin + '/atlas.html?q=' + encodeURIComponent(CURRENT.query);
-      navigator.clipboard.writeText(url).then(() => toast('Share link copied'));
-      track('share_created', {});
-    });
-    document.getElementById('export').addEventListener('click', () => {
-      track('export_clicked', {});
-      toast('Report export — available after exploring (deep-dive renderer).');
-    });
-    document.getElementById('custom').addEventListener('click', () => {
-      track('export_clicked', { payload:{ kind:'custom_deep_dive' } });
-      window.location.href = '/diligence.html';
-    });
-
-    // deep-link: ?q= auto-runs
-    const params = new URLSearchParams(location.search);
-    if (params.get('q')) {
-      document.getElementById('q').value = params.get('q');
-      explore(params.get('q'));
-    }
+  init().catch(err => {
+    console.error('Atlas init failed', err);
+    document.getElementById('layer-list').innerHTML =
+      '<div class="spinner" style="color:var(--warn)">Failed to load — refresh the page.</div>';
+  });
   </script>
 </body>
 </html>
