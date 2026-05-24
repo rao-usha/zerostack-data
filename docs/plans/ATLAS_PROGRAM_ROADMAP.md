@@ -34,6 +34,7 @@ compounds** — not prose generation, which is collapsing toward free.
 | **PLAN_069** — Monetization | The paid tier: branded region exports, benchmarking pro, monitoring pro, team seats, API — reusing the SPEC_062 Stripe substrate | 4 |
 | **PLAN_070** — Atlas Dynamic UI | Coupling / motion / surprise — the features that make the explorer interesting to use. Design source-of-truth for SPEC_066 / 066b / 066c | 1b |
 | **PLAN_071** — Learning Layer *(future, not yet drafted)* | Telemetry-driven ranking — the product learns which layers/cards/stories to surface first | 5 |
+| **PLAN_072** — Loop-Compelling | Three waves that make Phase 2's loop measurement fair: smoke harness (SPEC_073), deferred dynamic features (SPEC_066c), Recent Activity feed (SPEC_067) | 1c |
 
 ---
 
@@ -95,6 +96,22 @@ is also the **wedge-discovery signal**: every brush, scrub, bivariate pair,
 and arc-click is a telemetry event that tells us which domains and
 comparisons matter.
 
+### Phase 1c — Loop-Compelling  *(PLAN_072)*
+Same logic as Phase 1b, second pass. Three additive surfaces:
+- **SPEC_073** — headless-Chrome smoke harness that runs `ATLAS_TOUR.md`
+  end-to-end. Future specs ship against a green baseline; regressions
+  die same-day rather than biasing the Phase-2 measurement.
+- **SPEC_066c** — the PLAN_070 §3 🥉 deferred features (FEMA
+  time-cascade scrubber, EPA kernel-density heatmap, calendar heatmap,
+  swipe-compare, lasso-select).
+- **SPEC_067** — Recent Activity feed. The single biggest driver of
+  return-visit behavior is *a reason to check again today*. Surfaces
+  fresh FEMA / SEC / USAspending events on a map. Reuses PLAN_067
+  data backfills as they land (FEMA-only MVP first).
+
+Phase 2 *can* start with just Phase 1b shipped, but reads better with
+1c shipped because compelling-but-unmeasured ≠ underbuilt-but-measured.
+
 ### Phase 5 — Learning layer  *(future PLAN_071)*
 Once there's real telemetry volume, use `atlas_events` + `atlas_card_feedback`
 to rank layers/cards/stories — surface what users value first. This is the
@@ -106,13 +123,15 @@ worth showing"). Not drafted until Phases 1-2 produce the data to learn from.
 ## Dependency graph
 
 ```
-PLAN_066 (map) + PLAN_070 (dynamic UI) ──ship──► [GATE 2: 30-day loop proof] ──pass──► PLAN_069 (monetize)
-              │                                              │
-              │                                              └── early signal ──► PLAN_068-heavy (growth motion)
+PLAN_066 (map) + PLAN_070 (dynamic UI) + PLAN_072 (loop-compelling) ──ship──► [GATE 2: 30-day loop proof] ──pass──► PLAN_069 (monetize)
+              │                                                                          │
+              │                                                                          └── early signal ──► PLAN_068-heavy (growth motion)
               │
               ├──► PLAN_068-light (widget, cards, first stories) — starts at map-ship
               │
               └──► PLAN_067 (coverage expansion) — parallel, additive, no gate
+                                  │       │
+                                  │       └──► feeds PLAN_072 SPEC_067 Recent Activity (SEC/USA as backfills land)
                                   │
                                   └──► (enough telemetry) ──► PLAN_071 (learning)
 ```
