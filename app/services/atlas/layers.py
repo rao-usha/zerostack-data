@@ -312,6 +312,27 @@ def _build_irs_county_agi(db: Session) -> LayerResult:
     )
 
 
+def _build_broadband_subscription(db: Session) -> LayerResult:
+    """ACS B28002 household broadband-subscription rate at county
+    summary — SPEC_072. Reads from `acs5_county_2023_b28002`; computes
+    % = households_with_broadband / total_households × 100. Demand-side
+    signal (FCC infrastructure-side is deferred to SPEC_072b)."""
+    rows = _safe_query(db, """
+        SELECT geo_id,
+               (b28002_004e::numeric / NULLIF(b28002_001e, 0) * 100) AS value
+        FROM acs5_county_2023_b28002
+        WHERE b28002_001e IS NOT NULL AND b28002_001e > 0
+          AND b28002_004e IS NOT NULL
+    """)
+    values = {r["geo_id"]: float(r["value"])
+              for r in rows if r["geo_id"] and r["value"] is not None}
+    return LayerResult(
+        layer_id="infra_broadband_subscription", grain="county", values=values,
+        legend=_legend(list(values.values()), "% households with broadband"),
+        provenance=[{"table": "acs5_county_2023_b28002", "rows": len(values)}],
+    )
+
+
 def _build_federal_dollars(db: Session) -> LayerResult:
     """USAspending federal contract dollars per county — SPEC_071.
     Reads from `usaspending_county_fy_totals`, latest fiscal_year ×
@@ -550,13 +571,27 @@ LAYERS: Dict[str, LayerSpec] = {
         description="PeeringDB data-center inventory.",
         builder=_build_data_centers,
     ),
+    "infra_broadband_subscription": LayerSpec(
+        id="infra_broadband_subscription", label="Broadband Subscription Rate",
+        domain="infrastructure", grain="county", default_on=False,
+        vintage="2023 ACS 5-year",
+        coverage_note="3,222 counties via ACS B28002 (demand-side; SPEC_072)",
+        unit="% households",
+        description="Percentage of households with a broadband internet "
+                    "subscription, ACS B28002 county summary. Complements "
+                    "(does not replace) `infra_fcc_providers_state` — this is "
+                    "demand-side (who actually subscribes), FCC is supply-side.",
+        builder=_build_broadband_subscription,
+    ),
     "infra_fcc_providers_state": LayerSpec(
         id="infra_fcc_providers_state", label="Broadband Providers (state)",
         domain="infrastructure", grain="state", default_on=False,
         vintage="recent", coverage_note="state grain only (no county data in FCC table)",
         unit="providers",
-        description="Distinct broadband providers per state. State-grain only — "
-                    "county coverage deferred to PLAN_067 SPEC_072.",
+        description="Distinct broadband providers per state. State-grain only. "
+                    "True FCC BDC county-grain integration is deferred to a "
+                    "future SPEC_072b (the FCC public county API is currently "
+                    "405-Method-Not-Available; bulk-CSV path is its own scope).",
         builder=_build_fcc_broadband_state,
     ),
     # Transport
