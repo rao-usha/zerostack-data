@@ -312,6 +312,23 @@ def _build_irs_county_agi(db: Session) -> LayerResult:
     )
 
 
+def _build_acs_median_income(db: Session) -> LayerResult:
+    """ACS B19013 median household income at county summary — SPEC_070.
+    Reads from the grain-explicit `acs5_county_2023_b19013` table
+    populated by `scripts/ingest_acs_county_b19013.py`."""
+    rows = _safe_query(db, """
+        SELECT geo_id, b19013_001e AS value
+        FROM acs5_county_2023_b19013
+        WHERE b19013_001e IS NOT NULL AND b19013_001e > 0
+    """)
+    values = {r["geo_id"]: int(r["value"]) for r in rows if r["geo_id"]}
+    return LayerResult(
+        layer_id="demo_acs_median_income", grain="county", values=values,
+        legend=_legend(list(values.values()), "USD median household income"),
+        provenance=[{"table": "acs5_county_2023_b19013", "rows": len(values)}],
+    )
+
+
 def _build_irs_migration_net(db: Session) -> LayerResult:
     """Net migration AGI per destination county — inflow minus outflow."""
     rows = _safe_query(db, """
@@ -536,6 +553,15 @@ LAYERS: Dict[str, LayerSpec] = {
         builder=_build_rail_density,
     ),
     # Demographics
+    "demo_acs_median_income": LayerSpec(
+        id="demo_acs_median_income", label="Median Household Income (ACS)",
+        domain="demographics", grain="county", default_on=False,
+        vintage="2023 ACS 5-year", coverage_note="3,222 counties",
+        unit="USD",
+        description="Median household income from ACS B19013 — county summary, "
+                    "ingested directly from Census API (SPEC_070).",
+        builder=_build_acs_median_income,
+    ),
     "demo_irs_county_agi_per_return": LayerSpec(
         id="demo_irs_county_agi_per_return", label="Avg AGI per Tax Return",
         domain="demographics", grain="county", default_on=False,
@@ -596,8 +622,9 @@ LAYERS: Dict[str, LayerSpec] = {
 # Honest cuts — these are NOT registered, by design. The tests assert it.
 EXCLUDED_BY_DESIGN = {
     "usaspending_awards": "thin/dateless slice — PLAN_067 SPEC_071 backfill",
-    "acs5_2023_b19013_as_county": "ZCTA-keyed; needs ZCTA→county crosswalk — "
-                                    "PLAN_067 SPEC_070",
+    # SPEC_070 (2026-05-23): ACS county wealth is now implemented as
+    # `demo_acs_median_income` (table `acs5_county_2023_b19013`), so the
+    # prior "ZCTA-keyed, deferred" entry is removed.
 }
 
 

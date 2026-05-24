@@ -37,19 +37,23 @@ class TestRegistryShape:
                       "vintage", "coverage_note", "unit", "description", "builder"):
                 assert hasattr(spec, f), f"layer {layer_id} missing {f}"
 
-    def test_registry_excludes_usaspending_and_acs_county(self):
-        """T2: honest cuts enforced — usaspending + ACS-county not registered."""
+    def test_registry_excludes_usaspending(self):
+        """T2: honest cuts enforced — usaspending is still deferred.
+
+        Updated 2026-05-23 by SPEC_070: the ACS-county-wealth layer is no
+        longer deferred — it's implemented as `demo_acs_median_income`
+        (table `acs5_county_2023_b19013`). The test now only asserts the
+        remaining deferral (usaspending → SPEC_071) and that the ACS layer
+        is genuinely present.
+        """
         from app.services.atlas.layers import LAYERS, EXCLUDED_BY_DESIGN
         ids = set(LAYERS)
-        # No usaspending layer registered
         assert not any("usaspending" in lid for lid in ids), \
             "usaspending must not be a layer per PLAN_066 §4 (thin/dateless)"
-        # No ACS-as-county-wealth layer registered (B19013 keyed by ZCTA)
-        assert not any(lid.startswith("acs5_") and "county" in lid for lid in ids), \
-            "ACS B19013 county layer must be deferred (PLAN_067 SPEC_070)"
-        # Exclusions are documented
         assert "usaspending_awards" in EXCLUDED_BY_DESIGN
-        assert any("acs" in k.lower() for k in EXCLUDED_BY_DESIGN)
+        # SPEC_070 — ACS county wealth is now a real layer
+        assert "demo_acs_median_income" in ids, \
+            "SPEC_070 should have added demo_acs_median_income"
 
     def test_registry_groups_by_domain(self):
         """T3: list_layers_by_domain returns dict keyed by domain, sorted."""
