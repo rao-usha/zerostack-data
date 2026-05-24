@@ -24,6 +24,7 @@ from app.core.database import get_db
 from app.services.atlas import AtlasService
 from app.services.atlas import boundaries as boundaries_mod
 from app.services.atlas import layers as layers_mod
+from app.services.atlas import series as series_mod
 from app.services.atlas.telemetry import AtlasTelemetry
 from app.services.diligence.taxonomies import load_msa, load_naics
 
@@ -227,3 +228,41 @@ def get_place_endpoint(geo_id: str, db: Session = Depends(get_db)):
         "grain": "state" if len(geo_id) == 2 else "county",
         "layers": layers_mod.place_aggregate(db, geo_id),
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC_066b additions — place-level time series (sparklines) + migration arcs
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/place/{geo_id}/series")
+def get_place_series_endpoint(
+    geo_id: str,
+    layer: str,
+    db: Session = Depends(get_db),
+):
+    """Time series at a place for one series-capable layer (FEMA per year,
+    FDIC quarterly deposits, IRS migration net AGI per year). Drives the
+    place panel sparklines in SPEC_066b. Unsupported layers return an
+    empty `points: []` rather than 404 — UI gracefully hides the spark."""
+    if not (geo_id.isdigit() and len(geo_id) in (2, 5)):
+        raise HTTPException(
+            status_code=400,
+            detail=f"geo_id must be 2- or 5-digit FIPS; got {geo_id!r}",
+        )
+    return series_mod.fetch_place_series(db, geo_id=geo_id, layer_id=layer)
+
+
+@router.get("/migration")
+def get_migration_flows_endpoint(
+    top_n: int = 100,
+    flow_type: str = "inflow",
+    db: Session = Depends(get_db),
+):
+    """Top-N county-to-county IRS migration flows for the latest tax year.
+    Drives the animated arc layer in SPEC_066b. Frontend joins origin/dest
+    FIPS to its already-loaded boundary centroids — no centroids in the
+    payload."""
+    try:
+        return series_mod.fetch_top_migration_flows(db, top_n=top_n, flow_type=flow_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))

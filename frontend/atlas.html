@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nexdata Atlas — the general explorer of American public data</title>
 
+  <!-- Leaflet (SPEC_066) -->
   <link rel="stylesheet"
         href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
@@ -12,6 +13,12 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
           crossorigin=""></script>
+
+  <!-- D3 v7 + Observable Plot (SPEC_066b) — for the dynamic UI layer:
+       bivariate scales, brushed histogram, scatter, migration arcs,
+       smooth transitions, sparklines. -->
+  <script src="https://unpkg.com/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6.16/dist/plot.umd.min.js"></script>
 
   <style>
     :root {
@@ -35,7 +42,7 @@
     /* ─── grid layout ────────────────────────────────────────── */
     #app { display:grid; height:100vh;
       grid-template-rows:48px 1fr;
-      grid-template-columns:280px 1fr 340px;
+      grid-template-columns:300px 1fr 360px;
       grid-template-areas:
         "header header header"
         "layers map place"; }
@@ -59,15 +66,18 @@
       font-variant-numeric:tabular-nums; }
     #search-wrap { display:flex; align-items:center; gap:6px; }
     #search { background:var(--bg); border:1px solid var(--border); color:var(--text);
-      padding:6px 10px; border-radius:6px; font-size:13px; width:240px; }
+      padding:6px 10px; border-radius:6px; font-size:13px; width:230px; }
     #search:focus { outline:none; border-color:var(--primary); }
     .btn-icon { background:transparent; border:1px solid var(--border); color:var(--accent);
-      padding:5px 10px; border-radius:6px; cursor:pointer; font-size:12px; }
+      padding:5px 10px; border-radius:6px; cursor:pointer; font-size:12px;
+      transition:border-color .15s, color .15s; }
     .btn-icon:hover { border-color:var(--accent); }
+    .btn-icon.on { background:rgba(34,211,238,.15); color:#fff; border-color:var(--accent); }
 
     /* ─── layer panel ─────────────────────────────────────────── */
     #layer-panel { grid-area:layers; background:var(--panel);
-      border-right:1px solid var(--border); overflow-y:auto; }
+      border-right:1px solid var(--border); overflow-y:auto;
+      display:flex; flex-direction:column; }
     .panel-title { font-size:11px; text-transform:uppercase; letter-spacing:.06em;
       color:var(--dim); padding:14px 16px 6px; }
     .domain { padding:0 8px 10px; }
@@ -80,14 +90,31 @@
     .layer-btn.active-base { background:rgba(99,102,241,.18); color:var(--primary-hover);
       border-left:3px solid var(--primary); padding-left:5px; }
     .layer-btn.active-overlay { background:rgba(34,211,238,.10); }
+    .layer-btn.active-compare { background:rgba(245,158,11,.14); color:#fbbf24;
+      border-left:3px solid var(--warn); padding-left:5px; }
     .layer-btn .grain { font-size:10px; color:var(--dim); text-transform:uppercase;
       margin-left:6px; letter-spacing:.04em; }
     .layer-btn .meta { font-size:11px; color:var(--muted); margin-top:2px; }
 
+    /* SPEC_066b: active-layer controls dock at the bottom of the panel */
+    #control-panel { position:sticky; bottom:0; background:var(--panel-2);
+      border-top:1px solid var(--border); padding:10px 14px; font-size:12px;
+      box-shadow:0 -8px 16px rgba(0,0,0,.3); }
+    #control-panel .ctitle { font-size:10px; text-transform:uppercase;
+      color:var(--dim); letter-spacing:.06em; margin-bottom:6px; }
+    #control-panel .crow { display:flex; align-items:center; gap:8px; margin:6px 0; }
+    #opacity-slider { flex:1; }
+    input[type="range"] { accent-color:var(--accent); }
+    #compare-pill { display:none; background:rgba(245,158,11,.12);
+      color:#fbbf24; padding:5px 8px; border-radius:5px;
+      font-size:11px; margin-top:6px; }
+    #brush-host { margin-top:10px; }
+    #brush-host svg { display:block; }
+    .brush .selection { fill:var(--accent); fill-opacity:.18; stroke:var(--accent); }
+
     /* ─── map ─────────────────────────────────────────────────── */
-    #map { grid-area:map; background:#06090f; }
+    #map { grid-area:map; background:#06090f; position:relative; }
     .leaflet-container { background:#06090f; }
-    /* leaflet tooltip override */
     .leaflet-tooltip {
       background:rgba(20,27,45,.95) !important;
       color:var(--text) !important;
@@ -99,7 +126,6 @@
     }
     .leaflet-tooltip-top:before { border-top-color:var(--border) !important; }
 
-    /* ─── map overlays (legend + actions) ─────────────────────── */
     #legend { position:absolute; bottom:24px; right:24px; background:rgba(20,27,45,.95);
       border:1px solid var(--border); border-radius:8px; padding:10px 12px;
       font-size:11px; color:var(--muted); min-width:200px; z-index:500;
@@ -111,11 +137,54 @@
     .ramp .swatch { flex:1; }
     .ramp-labels { display:flex; justify-content:space-between; font-size:10px;
       color:var(--dim); font-variant-numeric:tabular-nums; }
+    /* 3×3 bivariate grid (SPEC_066b) */
+    #bivariate-legend { display:none; position:absolute; bottom:24px; right:24px;
+      background:rgba(20,27,45,.95); border:1px solid var(--border); border-radius:8px;
+      padding:10px 12px; z-index:500; box-shadow:0 4px 16px rgba(0,0,0,.5); }
+    #bivariate-legend .label { color:var(--text); font-size:12px; font-weight:600; margin-bottom:6px; }
+    #bivariate-legend .grid { display:grid; grid-template-columns:repeat(3,18px);
+      grid-template-rows:repeat(3,18px); gap:2px; margin:6px 0; }
+    #bivariate-legend .cell { width:18px; height:18px; border-radius:2px; cursor:default; }
+    #bivariate-legend .axes { display:flex; justify-content:space-between;
+      font-size:10px; color:var(--dim); margin-top:4px; }
+    #bivariate-legend .ax-y { font-size:10px; color:var(--dim); margin-right:6px;
+      align-self:center; max-width:80px; line-height:1.2; }
+    #bivariate-legend .grid-wrap { display:flex; align-items:center; }
+
     #map-actions { position:absolute; top:60px; right:12px; z-index:500; display:flex;
       flex-direction:column; gap:6px; }
     #map-actions button { background:rgba(20,27,45,.95); border:1px solid var(--border);
-      color:var(--text); padding:6px 10px; border-radius:6px; cursor:pointer; font-size:12px; }
+      color:var(--text); padding:6px 10px; border-radius:6px; cursor:pointer; font-size:12px;
+      transition:border-color .15s, color .15s; }
     #map-actions button:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* Migration arc layer — SPEC_066b Wave 4 */
+    svg.atlas-arc-overlay { pointer-events:auto; }
+    svg.atlas-arc-overlay path.arc {
+      fill:none; stroke:#fbbf24; stroke-opacity:0.78;
+      transition:stroke-opacity .2s; cursor:pointer;
+      pointer-events:visibleStroke;
+    }
+    svg.atlas-arc-overlay path.arc:hover { stroke-opacity:1; stroke:#fff; }
+    @keyframes flow { to { stroke-dashoffset:-100; } }
+    svg.atlas-arc-overlay path.arc.flowing {
+      stroke-dasharray:6 6; animation: flow 3s linear infinite;
+    }
+
+    /* Floating scatter overlay (SPEC_066b Wave 3) */
+    #scatter-overlay { position:absolute; left:24px; bottom:24px; z-index:500;
+      background:rgba(20,27,45,.97); border:1px solid var(--border);
+      border-radius:10px; padding:14px 14px 10px; display:none;
+      box-shadow:0 8px 28px rgba(0,0,0,.6); }
+    #scatter-overlay h4 { margin:0 0 6px; font-size:13px; font-weight:600; color:var(--text); }
+    #scatter-overlay .pickerline { font-size:11px; color:var(--muted); margin-bottom:6px; }
+    #scatter-overlay select { background:var(--bg); color:var(--text);
+      border:1px solid var(--border); border-radius:5px; padding:3px 6px;
+      font-size:12px; margin:0 4px; max-width:120px; }
+    #scatter-overlay button.close { position:absolute; top:8px; right:10px;
+      background:transparent; color:var(--dim); border:none; cursor:pointer;
+      font-size:18px; padding:0; line-height:1; }
+    #scatter-host { width:280px; height:240px; }
 
     /* ─── place panel ─────────────────────────────────────────── */
     #place-panel { grid-area:place; background:var(--panel);
@@ -134,6 +203,10 @@
     .place-layer .ldomain { display:inline-block; font-size:10px;
       background:var(--panel-2); padding:2px 7px; border-radius:10px;
       color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+    .place-layer .ldist { margin-top:6px; }
+    .place-layer .lspark { margin-top:4px; }
+    .place-layer .lpercentile { font-size:11px; color:var(--success); margin-top:2px;
+      font-weight:600; }
     #place-actions { margin-top:18px; padding-top:14px;
       border-top:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap; }
     #place-actions button, #place-actions a { background:var(--panel-2);
@@ -141,6 +214,11 @@
       border-radius:6px; cursor:pointer; font-size:12px; }
     #place-actions a:hover, #place-actions button:hover {
       border-color:var(--accent); color:var(--accent); }
+
+    /* dark-mode tweaks for Plot/D3 SVGs */
+    .lspark svg text, .ldist svg text, #brush-host svg text, #scatter-host svg text {
+      fill:var(--muted) !important; font-size:9px !important;
+    }
 
     /* loading / toast */
     .spinner { color:var(--muted); font-size:12px; padding:8px 14px; }
@@ -158,23 +236,40 @@
     <header id="header">
       <h1>Nexdata <span class="g">Atlas</span></h1>
       <div id="counters">
-        <span><b id="ct-layers">—</b> layers</span>
-        <span><b id="ct-domains">—</b> domains</span>
-        <span><b>3,143</b> counties</span>
-        <span><b>1.07M</b> EPA facilities</span>
-        <span><b>51,093</b> FEMA declarations since 1999</span>
+        <span><b id="ct-layers">0</b> layers</span>
+        <span><b id="ct-domains">0</b> domains</span>
+        <span><b id="ct-counties">0</b> counties</span>
+        <span><b id="ct-epa">0</b> EPA facilities</span>
+        <span><b id="ct-fema">0</b> FEMA decls since 1999</span>
       </div>
       <div id="search-wrap">
         <input id="search" placeholder="Fast-travel: a place or NAICS sector…">
         <button class="btn-icon" id="go">Go</button>
       </div>
+      <button class="btn-icon" id="compare-toggle" title="Bivariate compare mode">Compare layers</button>
+      <button class="btn-icon" id="scatter-toggle" title="Scatter pair explorer">🔬 Scatter</button>
       <button class="btn-icon" id="share">Share view</button>
     </header>
 
     <!-- ─── LAYER PANEL ─────────────────────────────────────── -->
     <aside id="layer-panel">
       <div class="panel-title">Layers</div>
-      <div id="layer-list" class="spinner">Loading layers…</div>
+      <div id="layer-list" class="spinner" style="flex:1">Loading layers…</div>
+
+      <!-- Active-layer controls (SPEC_066b) — pinned to bottom -->
+      <div id="control-panel">
+        <div class="ctitle">Active layer</div>
+        <div id="active-layer-name" style="font-weight:600; color:var(--text);">—</div>
+        <div class="crow">
+          <span style="font-size:11px; color:var(--dim); width:50px">Opacity</span>
+          <input type="range" id="opacity-slider" min="0" max="100" value="85" style="flex:1">
+          <span id="opacity-readout" style="font-size:11px; color:var(--muted);
+            width:34px; text-align:right; font-variant-numeric:tabular-nums">85%</span>
+        </div>
+        <div id="compare-pill"></div>
+        <!-- Brushed histogram for the active choropleth (Wave 2) -->
+        <div id="brush-host"></div>
+      </div>
     </aside>
 
     <!-- ─── MAP ─────────────────────────────────────────────── -->
@@ -194,6 +289,25 @@
         </div>
         <div class="ramp-labels"><span id="lr-min">—</span><span id="lr-max">—</span></div>
         <div class="unit" id="legend-unit">—</div>
+      </div>
+      <div id="bivariate-legend">
+        <div class="label" id="biv-label">Compare</div>
+        <div class="grid-wrap">
+          <div class="ax-y" id="biv-ax-y">B: low → high</div>
+          <div id="biv-grid" class="grid"></div>
+        </div>
+        <div class="axes"><span>A: low</span><span>high</span></div>
+      </div>
+
+      <!-- Wave 3: scatter overlay -->
+      <div id="scatter-overlay">
+        <button class="close" id="scatter-close">×</button>
+        <h4>Scatter pair</h4>
+        <div class="pickerline">
+          x: <select id="scatter-x"></select>
+          y: <select id="scatter-y"></select>
+        </div>
+        <div id="scatter-host"></div>
       </div>
     </main>
 
@@ -219,48 +333,49 @@
 
   <script>
   // ═══════════════════════════════════════════════════════════════════════
-  // Nexdata Atlas — Map v1 — SPEC_066
+  // Nexdata Atlas — SPEC_066 (map canvas) + SPEC_066b (dynamic UI)
   // ═══════════════════════════════════════════════════════════════════════
 
   const API = '/api/v1/atlas';
   const SESSION = 'sess-' + Math.random().toString(36).slice(2, 10);
 
-  // ── state (URL-mirrored) ────────────────────────────────────────────────
   const state = {
-    layerId: 'disaster_nri',     // default base choropleth
-    overlayId: null,             // optional point layer
+    layerId: 'disaster_nri',
+    overlayId: null,
+    compareLayerId: null,
     placeId: null,
     view: { lat: 38.5, lon: -96, zoom: 4 },
     showBoundaries: true,
+    opacity: 0.85,
+    mode: 'normal',              // 'normal' | 'bivariate'
+    brushRange: null,
   };
 
   let MAP = null;
-  let BOUNDARIES = null;           // GeoJSON FeatureCollection
-  let BOUNDARY_LAYER = null;       // Leaflet GeoJSON layer
-  let OVERLAY_LAYER = null;        // current point overlay
-  let REGISTRY = null;             // grouped layer registry
-  let CURRENT_LAYER_RESULT = null; // {layer_id, values, ...}
-  let LAYER_SPECS = {};            // flat lookup: id → spec
+  let BOUNDARIES = null;
+  let BOUNDARY_LAYER = null;
+  let OVERLAY_LAYER = null;
+  let ARC_LAYER = null;
+  let REGISTRY = null;
+  let LAYER_SPECS = {};
+  let CURRENT_LAYER_RESULT = null;
+  let COMPARE_LAYER_RESULT = null;
+  let CENTROIDS = {};
 
   // ── helpers ─────────────────────────────────────────────────────────────
   function track(eventType, payload) {
     try {
       fetch(API + '/events', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          event_type: eventType, session_id: SESSION,
-          payload: payload || {},
-        }),
+        body: JSON.stringify({ event_type: eventType, session_id: SESSION, payload: payload || {} }),
       });
-    } catch (e) { /* telemetry never breaks UX */ }
+    } catch (e) {}
   }
-
   function toast(msg) {
     const t = document.getElementById('toast');
     t.textContent = msg; t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 2000);
   }
-
   function fmtVal(v, unit) {
     if (v === null || v === undefined) return '—';
     if (typeof v !== 'number') return String(v);
@@ -274,19 +389,41 @@
     if (Math.abs(v) < 10 && v % 1 !== 0) return v.toFixed(2);
     return Math.round(v).toLocaleString();
   }
+  function ordinal(n) {
+    const s = ['th','st','nd','rd'], v = n % 100;
+    return n + (s[(v-20)%10] || s[v] || s[0]);
+  }
 
-  // 5-step color ramp via CSS variable lookup (one of c1..c5)
-  const RAMP = ['var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)'];
+  // Sequential ramp + bivariate 3×3 palette (SPEC_066b)
   const RAMP_HEX = ['#0c2a4f','#0e4775','#1f6fb0','#41a0d6','#7dd3fc'];
-
+  const BIV_HEX = [
+    '#1f2937', '#3b4a5e', '#5a6b80',   // B-low row    (A: low, mid, high)
+    '#36556d', '#5a7895', '#84a2bf',   // B-mid row
+    '#41a0d6', '#84caea', '#bbe6f6',   // B-high row
+  ];
+  function bucketIdx(value, breaks) {
+    if (value === null || value === undefined || !breaks || breaks.length < 4) return null;
+    if (value < breaks[0]) return 0;
+    if (value < breaks[1]) return 1;
+    if (value < breaks[2]) return 2;
+    if (value < breaks[3]) return 3;
+    return 4;
+  }
   function bucketColor(value, breaks) {
-    if (value === null || value === undefined) return 'var(--cno)';
-    if (!breaks || breaks.length < 4) return RAMP[2];
-    if (value < breaks[0]) return RAMP_HEX[0];
-    if (value < breaks[1]) return RAMP_HEX[1];
-    if (value < breaks[2]) return RAMP_HEX[2];
-    if (value < breaks[3]) return RAMP_HEX[3];
-    return RAMP_HEX[4];
+    const i = bucketIdx(value, breaks);
+    if (i === null) return 'var(--cno)';
+    return RAMP_HEX[i];
+  }
+  function quintile3(value, breaks) {
+    const i = bucketIdx(value, breaks);
+    if (i === null) return null;
+    return i <= 1 ? 0 : (i === 2 ? 1 : 2);
+  }
+  function bivariateColor(valA, breaksA, valB, breaksB) {
+    const a = quintile3(valA, breaksA);
+    const b = quintile3(valB, breaksB);
+    if (a === null || b === null) return 'var(--cno)';
+    return BIV_HEX[b * 3 + a];
   }
 
   // ── URL state ───────────────────────────────────────────────────────────
@@ -294,6 +431,7 @@
     const p = new URLSearchParams();
     if (state.layerId) p.set('layer', state.layerId);
     if (state.overlayId) p.set('overlay', state.overlayId);
+    if (state.compareLayerId) p.set('compare', state.compareLayerId);
     if (state.placeId) p.set('place', state.placeId);
     const c = MAP ? MAP.getCenter() : state.view;
     const z = MAP ? MAP.getZoom() : state.view.zoom;
@@ -306,17 +444,19 @@
     const p = new URLSearchParams(location.search);
     if (p.get('layer')) state.layerId = p.get('layer');
     if (p.get('overlay')) state.overlayId = p.get('overlay');
+    if (p.get('compare')) { state.compareLayerId = p.get('compare'); state.mode = 'bivariate'; }
     if (p.get('place')) state.placeId = p.get('place');
     if (p.get('lat')) state.view.lat = parseFloat(p.get('lat'));
     if (p.get('lon')) state.view.lon = parseFloat(p.get('lon'));
     if (p.get('zoom')) state.view.zoom = parseFloat(p.get('zoom'));
   }
 
-  // ── init ────────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  // INIT
+  // ═══════════════════════════════════════════════════════════════════════
   async function init() {
     loadURL();
     initMap();
-    // parallel: registry + boundaries + initial layer
     const [reg, bounds, layer] = await Promise.all([
       fetch(API + '/layers').then(r => r.json()),
       fetch(API + '/boundaries?geo_level=county&tolerance=0.005').then(r => r.json()),
@@ -324,80 +464,98 @@
     ]);
     REGISTRY = reg.layers_by_domain;
     flattenSpecs(REGISTRY);
-    renderCounters(REGISTRY);
+    populateScatterPickers();
+    renderCountersAnimated(REGISTRY);    // Wave 1
     renderLayerPanel(REGISTRY);
 
     BOUNDARIES = bounds;
+    computeCentroids(bounds);            // Wave 4 prereq
     renderBoundaries(bounds);
 
     CURRENT_LAYER_RESULT = layer;
-    applyLayerToBoundaries(layer);
-    markActiveLayerButton(state.layerId);
+    applyLayerToBoundaries(layer, /*transition=*/false);
+    markActiveLayerButton();
+    updateActiveLayerControls();
+    renderBrushedHistogram(layer);       // Wave 2
 
-    // Optional point overlay from URL
     if (state.overlayId) await activateOverlay(state.overlayId);
-    // Re-open the place panel if URL specified one
+    if (state.compareLayerId) await activateCompare(state.compareLayerId);
     if (state.placeId) await openPlace(state.placeId);
+    if (state.layerId === 'demo_irs_migration_net_agi') {
+      state.opacity = 0.22;
+      document.getElementById('opacity-slider').value = 22;
+      document.getElementById('opacity-readout').textContent = '22%';
+      applyLayerToBoundaries(CURRENT_LAYER_RESULT, false);
+      await renderMigrationArcs();
+    }
 
-    track('query_submitted', { source:'landing', layer: state.layerId,
-                                place: state.placeId || null });
+    track('query_submitted', { source:'landing', layer: state.layerId, place: state.placeId || null });
   }
 
   function flattenSpecs(grouped) {
     LAYER_SPECS = {};
-    for (const dom of Object.keys(grouped)) {
+    for (const dom of Object.keys(grouped))
       for (const s of grouped[dom]) LAYER_SPECS[s.id] = s;
-    }
   }
 
-  function renderCounters(grouped) {
+  // ═══════════════════════════════════════════════════════════════════════
+  // WAVE 1 — animated counter ticks (D3 tween) + opacity slider + transitions
+  // ═══════════════════════════════════════════════════════════════════════
+  function tweenInt(el, from, to, ms, formatter) {
+    formatter = formatter || (n => Math.round(n).toLocaleString());
+    d3.select(el).transition().duration(ms).tween('text', function () {
+      const i = d3.interpolateNumber(from, to);
+      return t => { this.textContent = formatter(i(t)); };
+    });
+  }
+  function renderCountersAnimated(grouped) {
     let total = 0; for (const d of Object.keys(grouped)) total += grouped[d].length;
-    document.getElementById('ct-layers').textContent = total;
-    document.getElementById('ct-domains').textContent = Object.keys(grouped).length;
+    tweenInt(document.getElementById('ct-layers'),    0, total, 800);
+    tweenInt(document.getElementById('ct-domains'),   0, Object.keys(grouped).length, 800);
+    tweenInt(document.getElementById('ct-counties'),  0, 3143, 1100);
+    tweenInt(document.getElementById('ct-epa'),       0, 1070000, 1300, n =>
+      (n >= 1e6 ? (n/1e6).toFixed(2)+'M' : (n/1e3).toFixed(0)+'K'));
+    tweenInt(document.getElementById('ct-fema'),      0, 51093, 1100);
   }
 
-  // ── map setup ───────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  // MAP + BOUNDARIES
+  // ═══════════════════════════════════════════════════════════════════════
   function initMap() {
     MAP = L.map('map', {
-      preferCanvas: true,
-      worldCopyJump: false,
-      zoomControl: true,
-      attributionControl: false,
+      preferCanvas: true, worldCopyJump: false, zoomControl: true, attributionControl: false,
     }).setView([state.view.lat, state.view.lon], state.view.zoom);
-
-    MAP.on('moveend zoomend', () => { state.view = {
-      lat: MAP.getCenter().lat, lon: MAP.getCenter().lng, zoom: MAP.getZoom() };
+    MAP.on('moveend zoomend', () => {
+      state.view = { lat: MAP.getCenter().lat, lon: MAP.getCenter().lng, zoom: MAP.getZoom() };
       syncURL();
     });
   }
 
-  // ── render boundaries (once) ────────────────────────────────────────────
+  function computeCentroids(geojson) {
+    CENTROIDS = {};
+    for (const f of geojson.features) {
+      const g = f.geometry; if (!g) continue;
+      const ring = (g.type === 'Polygon') ? g.coordinates[0]
+                 : (g.type === 'MultiPolygon') ? g.coordinates[0][0]
+                 : null;
+      if (!ring || !ring.length) continue;
+      let sx = 0, sy = 0;
+      for (const p of ring) { sx += p[0]; sy += p[1]; }
+      CENTROIDS[f.properties.geo_id] = [sx / ring.length, sy / ring.length];
+    }
+  }
+
   function renderBoundaries(geojson) {
     BOUNDARY_LAYER = L.geoJSON(geojson, {
       renderer: L.canvas(),
-      style: f => ({
-        fillColor: 'var(--cno)',  // overwritten by applyLayerToBoundaries
-        weight: 0.4,
-        color: '#2a3145',
-        fillOpacity: 0.85,
-      }),
+      style: () => ({ fillColor: 'var(--cno)', weight: 0.4, color: '#2a3145',
+                       fillOpacity: state.opacity }),
       onEachFeature: (feature, layer) => {
         layer.on({
-          mouseover: e => {
-            const target = e.target;
-            target.setStyle({ weight: 1.5, color: '#22d3ee' });
-            target.bringToFront();
-          },
-          mouseout: e => {
-            BOUNDARY_LAYER.resetStyle(e.target);
-            // re-apply current layer colors so we don't lose state
-            if (CURRENT_LAYER_RESULT) styleFeature(e.target.feature, e.target);
-          },
-          click: e => {
-            const gid = feature.properties.geo_id;
-            openPlace(gid);
-            L.DomEvent.stopPropagation(e);
-          },
+          mouseover: e => { e.target.setStyle({ weight: 1.5, color: '#22d3ee' }); e.target.bringToFront(); },
+          mouseout:  e => { BOUNDARY_LAYER.resetStyle(e.target);
+                            if (CURRENT_LAYER_RESULT) styleFeature(e.target.feature, e.target); },
+          click: e => { openPlace(feature.properties.geo_id); L.DomEvent.stopPropagation(e); },
         });
         const gid = feature.properties.geo_id;
         const name = feature.properties.geo_name || gid;
@@ -407,37 +565,66 @@
   }
 
   function tooltipHTML(geoId, name) {
-    const layerSpec = LAYER_SPECS[state.layerId] || {};
-    let valStr = '—';
-    if (CURRENT_LAYER_RESULT && CURRENT_LAYER_RESULT.values
-        && CURRENT_LAYER_RESULT.values[geoId] !== undefined) {
-      valStr = fmtVal(CURRENT_LAYER_RESULT.values[geoId], layerSpec.unit);
+    const spec = LAYER_SPECS[state.layerId] || {};
+    let s = `<b>${name}</b><br><span style="color:#9aa3b8">${spec.label || state.layerId}:</span> `;
+    const v = (CURRENT_LAYER_RESULT?.values || {})[geoId];
+    s += `<b>${fmtVal(v, spec.unit)}</b> <span style="color:#6b7280">${spec.unit || ''}</span>`;
+    if (state.mode === 'bivariate' && state.compareLayerId && COMPARE_LAYER_RESULT) {
+      const specB = LAYER_SPECS[state.compareLayerId] || {};
+      const vB = (COMPARE_LAYER_RESULT.values || {})[geoId];
+      s += `<br><span style="color:#fbbf24">${specB.label}:</span> <b>${fmtVal(vB, specB.unit)}</b>`;
     }
-    return `<b>${name}</b><br>
-      <span style="color:#9aa3b8">${layerSpec.label || state.layerId}:</span>
-      <b>${valStr}</b>
-      <span style="color:#6b7280">${layerSpec.unit || ''}</span>`;
+    return s;
   }
 
   function styleFeature(feature, layer) {
-    if (!CURRENT_LAYER_RESULT || !CURRENT_LAYER_RESULT.values) return;
+    if (!CURRENT_LAYER_RESULT) return;
     const gid = feature.properties.geo_id;
-    const v = CURRENT_LAYER_RESULT.values[gid];
+    const v = (CURRENT_LAYER_RESULT.values || {})[gid];
     const breaks = (CURRENT_LAYER_RESULT.legend || {}).breaks || [];
-    layer.setStyle({ fillColor: bucketColor(v, breaks) });
+    let fillColor;
+    if (state.mode === 'bivariate' && COMPARE_LAYER_RESULT) {
+      const vB = (COMPARE_LAYER_RESULT.values || {})[gid];
+      const breaksB = (COMPARE_LAYER_RESULT.legend || {}).breaks || [];
+      fillColor = bivariateColor(v, breaks, vB, breaksB);
+    } else {
+      fillColor = bucketColor(v, breaks);
+    }
+    let fillOpacity = state.opacity;
+    if (state.brushRange && v !== undefined && v !== null) {
+      if (v < state.brushRange[0] || v > state.brushRange[1]) fillOpacity = state.opacity * 0.10;
+    }
+    layer.setStyle({ fillColor, fillOpacity });
   }
 
-  function applyLayerToBoundaries(layerResult) {
+  function applyLayerToBoundaries(layerResult, transition) {
     CURRENT_LAYER_RESULT = layerResult;
     if (!BOUNDARY_LAYER) return;
-    BOUNDARY_LAYER.eachLayer(featureLayer => styleFeature(featureLayer.feature, featureLayer));
+    if (transition === false) {
+      BOUNDARY_LAYER.eachLayer(fl => styleFeature(fl.feature, fl));
+    } else {
+      // 400ms eased fade — Wave 1
+      const start = performance.now(); const dur = 400;
+      const step = () => {
+        const t = Math.min(1, (performance.now() - start) / dur);
+        const eased = d3.easeCubicInOut(t);
+        BOUNDARY_LAYER.eachLayer(fl => {
+          styleFeature(fl.feature, fl);
+          fl.setStyle({ fillOpacity: state.opacity * eased });
+        });
+        if (t < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
     renderLegend(layerResult);
   }
 
   function renderLegend(result) {
+    if (state.mode === 'bivariate') return renderBivariateLegend();
+    document.getElementById('legend').style.display = 'block';
+    document.getElementById('bivariate-legend').style.display = 'none';
     const spec = LAYER_SPECS[result.layer_id] || {};
     const leg = result.legend || {};
-    document.getElementById('legend').style.display = 'block';
     document.getElementById('legend-label').textContent = spec.label || result.layer_id;
     document.getElementById('legend-unit').textContent =
       (spec.unit || leg.unit || '') + (spec.vintage ? ' · ' + spec.vintage : '');
@@ -445,7 +632,30 @@
     document.getElementById('lr-max').textContent = fmtVal(leg.max, spec.unit);
   }
 
-  // ── point overlay (for point-grain layers) ──────────────────────────────
+  function renderBivariateLegend() {
+    document.getElementById('legend').style.display = 'none';
+    document.getElementById('bivariate-legend').style.display = 'block';
+    const specA = LAYER_SPECS[state.layerId] || {};
+    const specB = LAYER_SPECS[state.compareLayerId] || {};
+    document.getElementById('biv-label').textContent =
+      `${(specA.label||'A').slice(0,18)} × ${(specB.label||'B').slice(0,18)}`;
+    document.getElementById('biv-ax-y').textContent = `B: ${(specB.label||'').slice(0,16)}`;
+    const grid = document.getElementById('biv-grid');
+    grid.innerHTML = '';
+    for (let b = 2; b >= 0; b--) {
+      for (let a = 0; a < 3; a++) {
+        const d = document.createElement('div');
+        d.className = 'cell';
+        d.style.background = BIV_HEX[b * 3 + a];
+        d.title = `A ${['low','mid','high'][a]} · B ${['low','mid','high'][b]}`;
+        grid.appendChild(d);
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // POINT OVERLAY (SPEC_066 unchanged)
+  // ═══════════════════════════════════════════════════════════════════════
   function clearOverlay() {
     if (OVERLAY_LAYER) { MAP.removeLayer(OVERLAY_LAYER); OVERLAY_LAYER = null; }
     state.overlayId = null;
@@ -453,40 +663,61 @@
   async function activateOverlay(layerId) {
     clearOverlay();
     const res = await fetch(API + '/layer/' + encodeURIComponent(layerId)).then(r => r.json());
-    const features = res.features || [];
     OVERLAY_LAYER = L.layerGroup();
-    for (const f of features) {
+    for (const f of res.features || []) {
       const [lon, lat] = f.geometry.coordinates;
-      const m = L.circleMarker([lat, lon], {
-        radius: 3, color: '#22d3ee', weight: 1,
-        fillColor: '#22d3ee', fillOpacity: 0.55,
-      });
+      const m = L.circleMarker([lat, lon], { radius: 3, color: '#22d3ee', weight: 1,
+        fillColor: '#22d3ee', fillOpacity: 0.55 });
       const p = f.properties || {};
       m.bindTooltip(`<b>${p.name || '—'}</b>`, { sticky: true });
       OVERLAY_LAYER.addLayer(m);
     }
     OVERLAY_LAYER.addTo(MAP);
-    state.overlayId = layerId;
-    syncURL();
-    markActiveLayerButton(state.layerId);
+    state.overlayId = layerId; syncURL(); markActiveLayerButton();
     track('layer_toggled', { layer_id: layerId, role: 'overlay' });
   }
 
-  // ── layer panel ─────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  // WAVE 3 — bivariate compare (B-axis fetch + recolor)
+  // ═══════════════════════════════════════════════════════════════════════
+  async function activateCompare(layerId) {
+    if (LAYER_SPECS[layerId]?.grain !== 'county') {
+      toast('Compare needs a county-grain layer'); return;
+    }
+    if (layerId === state.layerId) { toast('Pick a different layer for B-axis'); return; }
+    const res = await fetch(API + '/layer/' + encodeURIComponent(layerId)).then(r => r.json());
+    state.compareLayerId = layerId;
+    state.mode = 'bivariate';
+    COMPARE_LAYER_RESULT = res;
+    document.getElementById('compare-toggle').classList.add('on');
+    document.getElementById('compare-pill').style.display = 'block';
+    document.getElementById('compare-pill').textContent = `B-axis: ${LAYER_SPECS[layerId]?.label}`;
+    syncURL(); markActiveLayerButton();
+    applyLayerToBoundaries(CURRENT_LAYER_RESULT, false);
+    renderBivariateLegend();
+    track('bivariate_pair_selected', { layer_a: state.layerId, layer_b: layerId });
+  }
+  function clearCompare() {
+    state.compareLayerId = null; COMPARE_LAYER_RESULT = null; state.mode = 'normal';
+    document.getElementById('compare-toggle').classList.remove('on');
+    document.getElementById('compare-pill').style.display = 'none';
+    syncURL(); markActiveLayerButton();
+    applyLayerToBoundaries(CURRENT_LAYER_RESULT, false);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LAYER PANEL
+  // ═══════════════════════════════════════════════════════════════════════
   function renderLayerPanel(grouped) {
     const root = document.getElementById('layer-list');
-    root.classList.remove('spinner');
-    root.innerHTML = '';
+    root.classList.remove('spinner'); root.innerHTML = '';
     for (const dom of Object.keys(grouped)) {
-      const div = document.createElement('div');
-      div.className = 'domain';
+      const div = document.createElement('div'); div.className = 'domain';
       const h3 = document.createElement('h3'); h3.textContent = dom;
       div.appendChild(h3);
       for (const spec of grouped[dom]) {
         const b = document.createElement('button');
-        b.className = 'layer-btn';
-        b.dataset.layerId = spec.id;
-        b.dataset.grain = spec.grain;
+        b.className = 'layer-btn'; b.dataset.layerId = spec.id; b.dataset.grain = spec.grain;
         b.innerHTML = `<div>${spec.label}<span class="grain">${spec.grain}</span></div>
                        <div class="meta">${spec.vintage || ''} · ${spec.coverage_note || ''}</div>`;
         b.onclick = () => onLayerClick(spec);
@@ -495,47 +726,117 @@
       root.appendChild(div);
     }
   }
-
-  function markActiveLayerButton(layerId) {
+  function markActiveLayerButton() {
     document.querySelectorAll('.layer-btn').forEach(b => {
-      b.classList.remove('active-base', 'active-overlay');
+      b.classList.remove('active-base', 'active-overlay', 'active-compare');
       if (b.dataset.layerId === state.layerId) b.classList.add('active-base');
       if (b.dataset.layerId === state.overlayId) b.classList.add('active-overlay');
+      if (b.dataset.layerId === state.compareLayerId) b.classList.add('active-compare');
     });
   }
-
   async function onLayerClick(spec) {
     if (spec.grain === 'point') {
-      // Toggle as overlay: re-click an active overlay clears it.
       if (state.overlayId === spec.id) clearOverlay();
       else await activateOverlay(spec.id);
-      markActiveLayerButton();
+      markActiveLayerButton(); return;
+    }
+    // In compare-pending mode (user clicked Compare Layers, awaiting B pick)
+    if (document.body.dataset.comparePending === '1') {
+      document.body.dataset.comparePending = '';
+      await activateCompare(spec.id);
       return;
     }
-    // Choropleth — set as base.
-    state.layerId = spec.id;
-    syncURL();
+    state.layerId = spec.id; syncURL();
     track('layer_toggled', { layer_id: spec.id, role: 'base' });
     const res = await fetch(API + '/layer/' + encodeURIComponent(spec.id)).then(r => r.json());
-    applyLayerToBoundaries(res);
-    markActiveLayerButton();
+    applyLayerToBoundaries(res, true);
+    markActiveLayerButton(); updateActiveLayerControls();
+    renderBrushedHistogram(res);
+    if (state.placeId) openPlace(state.placeId);
+    if (spec.id === 'demo_irs_migration_net_agi') {
+      // Migration is an arc-first layer — auto-dim the choropleth so arcs read.
+      state.opacity = 0.22;
+      document.getElementById('opacity-slider').value = 22;
+      document.getElementById('opacity-readout').textContent = '22%';
+      applyLayerToBoundaries(CURRENT_LAYER_RESULT, false);
+      await renderMigrationArcs();
+    } else {
+      clearArcs();
+    }
+  }
+  function updateActiveLayerControls() {
+    const spec = LAYER_SPECS[state.layerId] || {};
+    document.getElementById('active-layer-name').textContent = spec.label || state.layerId;
   }
 
-  // ── place panel ─────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  // WAVE 2 — brushed histogram + distribution-with-position panel
+  // ═══════════════════════════════════════════════════════════════════════
+  function renderBrushedHistogram(layerResult) {
+    const host = document.getElementById('brush-host'); host.innerHTML = '';
+    if (!layerResult.values) return;
+    const values = Object.values(layerResult.values).filter(v => v !== null && v !== undefined && isFinite(v));
+    if (values.length < 5) return;
+    const width = 260, height = 80, mLeft = 26, mRight = 8, mTop = 6, mBot = 18;
+    const svg = d3.select(host).append('svg').attr('width', width).attr('height', height);
+    const x = d3.scaleLinear().domain(d3.extent(values)).nice().range([mLeft, width - mRight]);
+    const bins = d3.bin().domain(x.domain()).thresholds(20)(values);
+    const y = d3.scaleLinear().domain([0, d3.max(bins, b => b.length)]).nice().range([height - mBot, mTop]);
+    svg.append('g').selectAll('rect').data(bins).join('rect')
+      .attr('x', d => x(d.x0) + 0.5).attr('y', d => y(d.length))
+      .attr('width', d => Math.max(0, x(d.x1) - x(d.x0) - 1))
+      .attr('height', d => y(0) - y(d.length))
+      .attr('fill', '#41a0d6').attr('opacity', 0.85);
+    svg.append('g').attr('transform', `translate(0,${height - mBot})`)
+       .call(d3.axisBottom(x).ticks(3).tickSize(2))
+       .selectAll('text').style('font-size', '9px').style('fill', '#9aa3b8');
+    const brush = d3.brushX().extent([[mLeft, mTop], [width - mRight, height - mBot]])
+      .on('end', ev => {
+        if (!ev.selection) { state.brushRange = null;
+          applyLayerToBoundaries(CURRENT_LAYER_RESULT, false); return; }
+        const [x0, x1] = ev.selection.map(x.invert);
+        state.brushRange = [x0, x1];
+        applyLayerToBoundaries(CURRENT_LAYER_RESULT, false);
+        track('histogram_brushed', { layer: state.layerId, range_min: x0, range_max: x1 });
+      });
+    svg.append('g').attr('class', 'brush').call(brush);
+  }
+
+  function renderDistributionPanel(host, layerId, placeValue) {
+    if (!CURRENT_LAYER_RESULT || layerId !== CURRENT_LAYER_RESULT.layer_id) return null;
+    const values = Object.values(CURRENT_LAYER_RESULT.values || {})
+                          .filter(v => v !== null && v !== undefined && isFinite(v));
+    if (values.length < 5 || placeValue === null || placeValue === undefined) return null;
+    const width = 170, height = 36, mLeft = 6, mRight = 6, mTop = 4, mBot = 12;
+    const svg = d3.select(host).append('svg').attr('width', width).attr('height', height);
+    const x = d3.scaleLinear().domain(d3.extent(values)).nice().range([mLeft, width - mRight]);
+    const bins = d3.bin().domain(x.domain()).thresholds(14)(values);
+    const yMax = d3.max(bins, b => b.length);
+    const y = d3.scaleLinear().domain([0, yMax]).range([height - mBot, mTop]);
+    svg.append('g').selectAll('rect').data(bins).join('rect')
+      .attr('x', d => x(d.x0) + 0.5).attr('y', d => y(d.length))
+      .attr('width', d => Math.max(0, x(d.x1) - x(d.x0) - 1))
+      .attr('height', d => y(0) - y(d.length))
+      .attr('fill', '#1f6fb0').attr('opacity', 0.7);
+    svg.append('line').attr('x1', x(placeValue)).attr('x2', x(placeValue))
+       .attr('y1', mTop).attr('y2', height - mBot)
+       .attr('stroke', '#22d3ee').attr('stroke-width', 1.6);
+    let lt = 0; for (const v of values) if (v < placeValue) lt++;
+    return Math.round((lt / values.length) * 100);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // PLACE PANEL — layered with sparklines + distribution + percentile
+  // ═══════════════════════════════════════════════════════════════════════
   async function openPlace(geoId) {
-    state.placeId = geoId;
-    syncURL();
+    state.placeId = geoId; syncURL();
     const data = await fetch(API + '/place/' + encodeURIComponent(geoId)).then(r => r.json());
     if (!data || data.detail) { toast('No data for ' + geoId); return; }
-
-    // Find a display name from boundary properties
     let name = geoId;
-    if (BOUNDARY_LAYER) {
-      BOUNDARY_LAYER.eachLayer(fl => {
-        if (fl.feature.properties.geo_id === geoId)
-          name = fl.feature.properties.geo_name || geoId;
-      });
-    }
+    if (BOUNDARY_LAYER) BOUNDARY_LAYER.eachLayer(fl => {
+      if (fl.feature.properties.geo_id === geoId)
+        name = fl.feature.properties.geo_name || geoId;
+    });
 
     document.getElementById('place-empty').style.display = 'none';
     document.getElementById('place-content').style.display = 'block';
@@ -543,31 +844,172 @@
     document.getElementById('place-id').textContent =
       `FIPS ${geoId} · ${data.grain} · ${Object.keys(data.layers || {}).length} layer values`;
 
-    const root = document.getElementById('place-layers');
-    root.innerHTML = '';
+    const root = document.getElementById('place-layers'); root.innerHTML = '';
     const layers = data.layers || {};
     if (!Object.keys(layers).length) {
-      root.innerHTML = '<div class="empty" style="padding:24px 0">' +
-        'No layers have values for this place.</div>';
+      root.innerHTML = '<div class="empty" style="padding:24px 0">No layers have values for this place.</div>';
     } else {
+      const SERIES_CAPABLE = new Set([
+        'disaster_fema_declarations',
+        'finance_fdic_county_deposits',
+        'demo_irs_migration_net_agi',
+      ]);
+      let percentileForActive = null;
       for (const [lid, info] of Object.entries(layers)) {
         const div = document.createElement('div');
-        div.className = 'place-layer';
+        div.className = 'place-layer'; div.dataset.layerId = lid;
         div.innerHTML = `
-          <div class="lname">${info.label}
-            <span class="ldomain">${info.domain}</span></div>
+          <div class="lname">${info.label} <span class="ldomain">${info.domain}</span></div>
           <div class="lval">${fmtVal(info.value, info.unit)}</div>
-          <div class="lmeta">${info.unit || ''} · ${info.vintage || ''}</div>`;
+          <div class="lmeta">${info.unit || ''} · ${info.vintage || ''}</div>
+          <div class="ldist"></div>
+          <div class="lspark"></div>
+          <div class="lpercentile"></div>`;
         root.appendChild(div);
+        const pct = renderDistributionPanel(div.querySelector('.ldist'), lid, info.value);
+        if (pct !== null) {
+          div.querySelector('.lpercentile').textContent =
+            `${ordinal(pct)} percentile across counties (this layer)`;
+          if (lid === state.layerId) percentileForActive = pct;
+        }
+        if (SERIES_CAPABLE.has(lid)) renderSparkline(div.querySelector('.lspark'), geoId, lid);
+      }
+      if (percentileForActive !== null) {
+        track('place_percentile_viewed', { place_id: geoId, layer: state.layerId, percentile: percentileForActive });
       }
     }
-    document.getElementById('deeper').href =
-      '/atlas.html?explore=' + encodeURIComponent(name);
-
+    document.getElementById('deeper').href = '/atlas.html?explore=' + encodeURIComponent(name);
     track('place_clicked', { geo_id: geoId, layer_count: Object.keys(layers).length });
   }
 
-  // ── search (fast-travel — uses SPEC_064 explore endpoint) ───────────────
+  async function renderSparkline(host, geoId, layerId) {
+    try {
+      const res = await fetch(API + `/place/${encodeURIComponent(geoId)}/series?layer=${encodeURIComponent(layerId)}`)
+                       .then(r => r.json());
+      const points = res.points || [];
+      if (points.length < 2) return;
+      const fig = Plot.plot({
+        width: 240, height: 36, margin: 0,
+        x: { axis: null }, y: { axis: null },
+        marks: [
+          Plot.areaY(points, { x: 'x', y: 'y', fill: '#22d3ee', fillOpacity: 0.15 }),
+          Plot.lineY(points,  { x: 'x', y: 'y', stroke: '#22d3ee', strokeWidth: 1.5 }),
+          Plot.dot([points.at(-1)], { x: 'x', y: 'y', r: 2.5, fill: '#22d3ee' }),
+        ],
+      });
+      host.appendChild(fig);
+    } catch (e) {}
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // WAVE 3 — scatter overlay
+  // ═══════════════════════════════════════════════════════════════════════
+  function populateScatterPickers() {
+    const choropleths = Object.values(LAYER_SPECS).filter(s => s.grain === 'county');
+    for (const id of ['scatter-x', 'scatter-y']) {
+      const sel = document.getElementById(id); sel.innerHTML = '';
+      for (const s of choropleths) {
+        const o = document.createElement('option'); o.value = s.id; o.textContent = s.label;
+        sel.appendChild(o);
+      }
+    }
+    document.getElementById('scatter-x').value = state.layerId;
+    document.getElementById('scatter-y').value = state.compareLayerId
+       || (choropleths.find(s => s.id !== state.layerId)?.id || state.layerId);
+  }
+  async function openScatter() {
+    document.getElementById('scatter-overlay').style.display = 'block';
+    document.getElementById('scatter-toggle').classList.add('on');
+    await renderScatter();
+  }
+  function closeScatter() {
+    document.getElementById('scatter-overlay').style.display = 'none';
+    document.getElementById('scatter-toggle').classList.remove('on');
+  }
+  async function renderScatter() {
+    const xId = document.getElementById('scatter-x').value;
+    const yId = document.getElementById('scatter-y').value;
+    const [xR, yR] = await Promise.all([
+      fetch(API + '/layer/' + encodeURIComponent(xId)).then(r => r.json()),
+      fetch(API + '/layer/' + encodeURIComponent(yId)).then(r => r.json()),
+    ]);
+    const points = [];
+    for (const gid of Object.keys(xR.values || {})) {
+      const x = xR.values[gid]; const y = (yR.values || {})[gid];
+      if (x !== null && x !== undefined && y !== null && y !== undefined
+          && isFinite(x) && isFinite(y))
+        points.push({ gid, x, y });
+    }
+    const host = document.getElementById('scatter-host'); host.innerHTML = '';
+    const fig = Plot.plot({
+      width: 280, height: 240, marginLeft: 36, marginBottom: 28,
+      x: { label: (LAYER_SPECS[xId]?.label || xId).slice(0,22), labelOffset: 22 },
+      y: { label: (LAYER_SPECS[yId]?.label || yId).slice(0,22) },
+      marks: [
+        Plot.frame({ stroke: '#2a3145' }),
+        Plot.dot(points, { x: 'x', y: 'y', r: 1.6, fill: '#22d3ee', fillOpacity: 0.55, tip: true }),
+      ],
+    });
+    host.appendChild(fig);
+    track('scatter_explored', { x_layer: xId, y_layer: yId });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // WAVE 4 — migration arcs (D3 SVG overlay on Leaflet)
+  // ═══════════════════════════════════════════════════════════════════════
+  function clearArcs() {
+    if (ARC_LAYER) {
+      MAP.off('zoomend moveend', ARC_LAYER._rerender);
+      MAP.removeLayer(ARC_LAYER); ARC_LAYER = null;
+    }
+  }
+  async function renderMigrationArcs() {
+    clearArcs();
+    const res = await fetch(API + '/migration?top_n=80').then(r => r.json());
+    const flows = (res.flows || []).filter(f => CENTROIDS[f.orig] && CENTROIDS[f.dest]);
+    if (!flows.length) return;
+    const maxAgi = d3.max(flows, f => f.agi);
+    const widthScale = d3.scaleSqrt().domain([0, maxAgi]).range([0.6, 4]);
+
+    const svgLayer = L.svg(); svgLayer.addTo(MAP);
+    const svg = d3.select(MAP.getPanes().overlayPane).select('svg').classed('atlas-arc-overlay', true);
+    const g = svg.append('g').attr('class', 'arcs');
+
+    function project(lonlat) {
+      const p = MAP.latLngToLayerPoint(L.latLng(lonlat[1], lonlat[0]));
+      return [p.x, p.y];
+    }
+    function renderArcs() {
+      g.selectAll('*').remove();
+      const sel = g.selectAll('path').data(flows).join('path')
+        .attr('class', 'arc flowing')
+        .attr('stroke-width', d => widthScale(d.agi))
+        .attr('d', d => {
+          const [x1, y1] = project(CENTROIDS[d.orig]);
+          const [x2, y2] = project(CENTROIDS[d.dest]);
+          const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+          const dx = x2 - x1, dy = y2 - y1;
+          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+          const cx = mx + (-dy / len) * len * 0.18;
+          const cy = my + ( dx / len) * len * 0.18;
+          return `M${x1},${y1} Q${cx},${cy} ${x2},${y2}`;
+        });
+      sel.append('title').text(d =>
+        `${d.orig} → ${d.dest}: $${(d.agi/1000).toFixed(1)}M AGI · ${d.returns.toLocaleString()} returns`);
+      sel.on('click', (ev, d) => {
+        track('migration_arc_clicked', { origin: d.orig, dest: d.dest, agi: d.agi });
+        toast(`${d.orig} → ${d.dest} · $${(d.agi/1000).toFixed(1)}M`);
+      });
+    }
+    renderArcs();
+    svgLayer._rerender = renderArcs;
+    MAP.on('zoomend moveend', renderArcs);
+    ARC_LAYER = svgLayer;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SEARCH (SPEC_064 fast-travel)
+  // ═══════════════════════════════════════════════════════════════════════
   async function fastTravel(query) {
     if (!query.trim()) return;
     try {
@@ -577,30 +1019,19 @@
       });
       if (!res.ok) { toast('No match — try a different name'); return; }
       const data = await res.json();
-      const re = data.resolved_entities || {};
-      if (re.geographies && re.geographies.length) {
-        // Jump to first county; open place panel
-        const fips = re.geographies[0];
-        // We don't have lat/lon for the county here — recenter only roughly via the boundary
-        if (BOUNDARY_LAYER) {
-          BOUNDARY_LAYER.eachLayer(fl => {
-            if (fl.feature.properties.geo_id === fips) {
-              const b = fl.getBounds();
-              MAP.fitBounds(b, { maxZoom: 8 });
-            }
-          });
-        }
-        await openPlace(fips);
-        track('search_executed', { query, resolved: fips });
-      } else {
-        toast('Resolved but no county to jump to');
-      }
-    } catch (e) {
-      toast('Search failed');
-    }
+      const fips = (data.resolved_entities?.geographies || [])[0];
+      if (!fips) { toast('Resolved but no county to jump to'); return; }
+      BOUNDARY_LAYER.eachLayer(fl => {
+        if (fl.feature.properties.geo_id === fips) MAP.fitBounds(fl.getBounds(), { maxZoom: 8 });
+      });
+      await openPlace(fips);
+      track('search_executed', { query, resolved: fips });
+    } catch (e) { toast('Search failed'); }
   }
 
-  // ── wiring ──────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  // WIRING
+  // ═══════════════════════════════════════════════════════════════════════
   document.getElementById('go').onclick =
     () => fastTravel(document.getElementById('search').value);
   document.getElementById('search').onkeydown = e => {
@@ -608,12 +1039,9 @@
   };
   document.getElementById('share').onclick = () => {
     navigator.clipboard.writeText(location.href);
-    toast('Share link copied');
-    track('share_created', { url: location.href });
+    toast('Share link copied'); track('share_created', { url: location.href });
   };
-  document.getElementById('reset-view').onclick = () => {
-    MAP.setView([38.5, -96], 4);
-  };
+  document.getElementById('reset-view').onclick = () => MAP.setView([38.5, -96], 4);
   document.getElementById('boundaries-toggle').onclick = e => {
     state.showBoundaries = !state.showBoundaries;
     if (BOUNDARY_LAYER) {
@@ -622,6 +1050,28 @@
     }
     e.target.textContent = state.showBoundaries ? 'Hide boundaries' : 'Show boundaries';
   };
+
+  // Wave 1: opacity slider
+  document.getElementById('opacity-slider').oninput = e => {
+    state.opacity = e.target.value / 100;
+    document.getElementById('opacity-readout').textContent = e.target.value + '%';
+    if (CURRENT_LAYER_RESULT) applyLayerToBoundaries(CURRENT_LAYER_RESULT, false);
+  };
+
+  // Wave 3: compare toggle + scatter
+  document.getElementById('compare-toggle').onclick = () => {
+    if (state.compareLayerId) { clearCompare(); return; }
+    document.body.dataset.comparePending = '1';
+    document.getElementById('compare-toggle').classList.add('on');
+    toast('Pick a county-grain layer for B-axis');
+  };
+  document.getElementById('scatter-toggle').onclick = () => {
+    if (document.getElementById('scatter-overlay').style.display === 'block') closeScatter();
+    else openScatter();
+  };
+  document.getElementById('scatter-close').onclick = closeScatter;
+  document.getElementById('scatter-x').onchange = renderScatter;
+  document.getElementById('scatter-y').onchange = renderScatter;
 
   init().catch(err => {
     console.error('Atlas init failed', err);
