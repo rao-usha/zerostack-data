@@ -215,6 +215,23 @@ PLACE_DEEP_DIVES = [
     ("Miami-Dade FL",       "12086"),
 ]
 
+def assert_scrubber_visible() -> tuple:
+    """SPEC_066c FEMA time-cascade scrubber must be shown for the FEMA layer."""
+    def f(dom):
+        # The activateFemaScrubber adds the 'show' class; either it has
+        # show OR display:none has been removed
+        return bool(re.search(r'<div id="scrubber"[^>]*class="[^"]*show', dom))
+    return ("FEMA year scrubber visible", f)
+
+
+def assert_calendar_present() -> tuple:
+    """SPEC_066c calendar heatmap rendered in place panel (Observable Plot
+    cell mark inside .place-calendar div)."""
+    def f(dom):
+        return bool(re.search(r'<div class="place-calendar"[^>]*>.*?<svg', dom, re.S))
+    return ("place calendar SVG", f)
+
+
 DYNAMIC_SCENARIOS = [
     {
         # Counters tween via D3 (start at 0, write intermediate values).
@@ -245,6 +262,17 @@ DYNAMIC_SCENARIOS = [
         "name": "place-panel-sparklines",
         "url_suffix": "/atlas.html?layer=finance_fdic_county_deposits&place=48201",
         "asserts": [assert_sparklines(1), assert_place_layers(4)],
+    },
+    # SPEC_066c additions
+    {
+        "name": "fema-time-scrubber",
+        "url_suffix": "/atlas.html?layer=disaster_fema_declarations",
+        "asserts": [assert_scrubber_visible(), assert_legend_populated()],
+    },
+    {
+        "name": "place-calendar-heatmap",
+        "url_suffix": "/atlas.html?place=48201",
+        "asserts": [assert_calendar_present()],
     },
 ]
 

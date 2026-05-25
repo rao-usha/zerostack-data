@@ -20,6 +20,9 @@
   <script src="https://unpkg.com/d3@7.9.0/dist/d3.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6.16/dist/plot.umd.min.js"></script>
 
+  <!-- Leaflet.heat (SPEC_066c) — point-overlay kernel-density rendering -->
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
   <style>
     :root {
       --bg:#0a0e1a; --panel:#141b2d; --panel-2:#1a2138;
@@ -158,6 +161,29 @@
       transition:border-color .15s, color .15s; }
     #map-actions button:hover { border-color:var(--accent); color:var(--accent); }
 
+    /* SPEC_066c — FEMA time-cascade scrubber */
+    #scrubber { position:absolute; top:60px; left:50%; transform:translateX(-50%);
+      background:rgba(20,27,45,.95); border:1px solid var(--border);
+      border-radius:10px; padding:10px 16px; z-index:500;
+      box-shadow:0 4px 16px rgba(0,0,0,.5); display:none;
+      min-width:380px; }
+    #scrubber.show { display:flex; align-items:center; gap:14px; }
+    #scrubber .label { font-size:11px; color:var(--dim);
+      text-transform:uppercase; letter-spacing:.06em; }
+    #scrubber .year-readout { font-size:18px; font-weight:700;
+      color:var(--accent); font-variant-numeric:tabular-nums; min-width:60px; }
+    #scrubber input[type="range"] { flex:1; min-width:200px; }
+    #scrubber .all-btn { background:transparent; border:1px solid var(--border);
+      color:var(--muted); padding:4px 8px; border-radius:5px; cursor:pointer;
+      font-size:11px; }
+    #scrubber .all-btn.on { color:#fff; border-color:var(--accent);
+      background:rgba(34,211,238,.15); }
+
+    /* SPEC_066c — calendar heatmap in place panel */
+    .place-calendar { margin-top:8px; }
+    .place-calendar .ctitle { font-size:11px; color:var(--dim);
+      text-transform:uppercase; letter-spacing:.04em; margin-bottom:4px; }
+
     /* Migration arc layer — SPEC_066b Wave 4 */
     svg.atlas-arc-overlay { pointer-events:auto; }
     svg.atlas-arc-overlay path.arc {
@@ -277,6 +303,15 @@
       <div id="map-actions">
         <button id="reset-view">Reset view</button>
         <button id="boundaries-toggle">Hide boundaries</button>
+        <button id="heat-toggle" style="display:none">🔥 Heat</button>
+      </div>
+
+      <!-- SPEC_066c — FEMA year-scrubber (shown only when fema layer is base) -->
+      <div id="scrubber">
+        <span class="label">FEMA year</span>
+        <span class="year-readout" id="scrubber-year">ALL</span>
+        <input type="range" id="scrubber-slider" min="0" max="0" value="0">
+        <button class="all-btn on" id="scrubber-all">ALL</button>
       </div>
       <div id="legend" style="display:none">
         <div class="label" id="legend-label">—</div>
@@ -361,6 +396,12 @@
   let CURRENT_LAYER_RESULT = null;
   let COMPARE_LAYER_RESULT = null;
   let CENTROIDS = {};
+
+  // SPEC_066c state
+  let OVERLAY_MODE = 'dots';          // 'dots' | 'heat'
+  let OVERLAY_FEATURES = null;        // cached features for re-render on heat toggle
+  let FEMA_CASCADE = null;            // {years, values_by_year}
+  let FEMA_ALL_VALUES = null;         // saved "all years" values for the all-button
 
   // ── helpers ─────────────────────────────────────────────────────────────
   function track(eventType, payload) {
@@ -487,6 +528,10 @@
       document.getElementById('opacity-readout').textContent = '22%';
       applyLayerToBoundaries(CURRENT_LAYER_RESULT, false);
       await renderMigrationArcs();
+    }
+    // SPEC_066c — scrubber on URL deep-link path
+    if (state.layerId === 'disaster_fema_declarations') {
+      await activateFemaScrubber();
     }
 
     track('query_submitted', { source:'landing', layer: state.layerId, place: state.placeId || null });
@@ -659,22 +704,42 @@
   function clearOverlay() {
     if (OVERLAY_LAYER) { MAP.removeLayer(OVERLAY_LAYER); OVERLAY_LAYER = null; }
     state.overlayId = null;
+    OVERLAY_FEATURES = null;
+    document.getElementById('heat-toggle').style.display = 'none';
   }
   async function activateOverlay(layerId) {
     clearOverlay();
     const res = await fetch(API + '/layer/' + encodeURIComponent(layerId)).then(r => r.json());
-    OVERLAY_LAYER = L.layerGroup();
-    for (const f of res.features || []) {
-      const [lon, lat] = f.geometry.coordinates;
-      const m = L.circleMarker([lat, lon], { radius: 3, color: '#22d3ee', weight: 1,
-        fillColor: '#22d3ee', fillOpacity: 0.55 });
-      const p = f.properties || {};
-      m.bindTooltip(`<b>${p.name || '—'}</b>`, { sticky: true });
-      OVERLAY_LAYER.addLayer(m);
+    OVERLAY_FEATURES = res.features || [];
+    renderOverlay();
+    state.overlayId = layerId; syncURL(); markActiveLayerButton();
+    document.getElementById('heat-toggle').style.display = '';
+    track('layer_toggled', { layer_id: layerId, role: 'overlay' });
+  }
+  // SPEC_066c — render overlay in current OVERLAY_MODE (dots OR heat)
+  function renderOverlay() {
+    if (!OVERLAY_FEATURES) return;
+    if (OVERLAY_LAYER) { MAP.removeLayer(OVERLAY_LAYER); OVERLAY_LAYER = null; }
+    if (OVERLAY_MODE === 'heat') {
+      const pts = OVERLAY_FEATURES
+        .filter(f => f.geometry?.coordinates)
+        .map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0], 0.5]);
+      OVERLAY_LAYER = L.heatLayer(pts, {
+        radius: 20, blur: 26, maxZoom: 10,
+        gradient: { 0.2: '#0e4775', 0.5: '#41a0d6', 0.8: '#7dd3fc', 1.0: '#fbbf24' },
+      });
+    } else {
+      OVERLAY_LAYER = L.layerGroup();
+      for (const f of OVERLAY_FEATURES) {
+        const [lon, lat] = f.geometry.coordinates;
+        const m = L.circleMarker([lat, lon], { radius: 3, color: '#22d3ee',
+          weight: 1, fillColor: '#22d3ee', fillOpacity: 0.55 });
+        const p = f.properties || {};
+        m.bindTooltip(`<b>${p.name || '—'}</b>`, { sticky: true });
+        OVERLAY_LAYER.addLayer(m);
+      }
     }
     OVERLAY_LAYER.addTo(MAP);
-    state.overlayId = layerId; syncURL(); markActiveLayerButton();
-    track('layer_toggled', { layer_id: layerId, role: 'overlay' });
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -762,6 +827,12 @@
       await renderMigrationArcs();
     } else {
       clearArcs();
+    }
+    // SPEC_066c — FEMA scrubber lifecycle
+    if (spec.id === 'disaster_fema_declarations') {
+      await activateFemaScrubber();
+    } else {
+      deactivateFemaScrubber();
     }
   }
   function updateActiveLayerControls() {
@@ -874,6 +945,16 @@
         }
         if (SERIES_CAPABLE.has(lid)) renderSparkline(div.querySelector('.lspark'), geoId, lid);
       }
+      // SPEC_066c — calendar heatmap below the FEMA layer card (if present)
+      if (layers['disaster_fema_declarations']) {
+        const femaDiv = root.querySelector('[data-layer-id="disaster_fema_declarations"]');
+        if (femaDiv) {
+          const calHost = document.createElement('div');
+          calHost.className = 'place-calendar';
+          femaDiv.appendChild(calHost);
+          renderPlaceCalendar(calHost, geoId);
+        }
+      }
       if (percentileForActive !== null) {
         track('place_percentile_viewed', { place_id: geoId, layer: state.layerId, percentile: percentileForActive });
       }
@@ -952,6 +1033,99 @@
     });
     host.appendChild(fig);
     track('scatter_explored', { x_layer: xId, y_layer: yId });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SPEC_066c — FEMA time-cascade scrubber
+  // ═══════════════════════════════════════════════════════════════════════
+  async function activateFemaScrubber() {
+    if (!FEMA_CASCADE) {
+      FEMA_CASCADE = await fetch(API + '/layer/disaster_fema_declarations/cascade')
+                            .then(r => r.json());
+    }
+    // Stash the all-years values so the ALL button can restore them
+    FEMA_ALL_VALUES = CURRENT_LAYER_RESULT.values;
+    const slider = document.getElementById('scrubber-slider');
+    const years = FEMA_CASCADE.years;
+    slider.min = 0; slider.max = years.length - 1; slider.value = years.length - 1;
+    document.getElementById('scrubber-year').textContent = 'ALL';
+    document.getElementById('scrubber-all').classList.add('on');
+    document.getElementById('scrubber').classList.add('show');
+  }
+  function deactivateFemaScrubber() {
+    document.getElementById('scrubber').classList.remove('show');
+    FEMA_ALL_VALUES = null;
+  }
+  function applyScrubberYear(year /* int | null = ALL */) {
+    if (!FEMA_CASCADE || !CURRENT_LAYER_RESULT) return;
+    if (year === null) {
+      CURRENT_LAYER_RESULT.values = FEMA_ALL_VALUES || CURRENT_LAYER_RESULT.values;
+      document.getElementById('scrubber-year').textContent = 'ALL';
+      document.getElementById('scrubber-all').classList.add('on');
+    } else {
+      CURRENT_LAYER_RESULT.values = FEMA_CASCADE.values_by_year[String(year)] || {};
+      document.getElementById('scrubber-year').textContent = String(year);
+      document.getElementById('scrubber-all').classList.remove('on');
+    }
+    // Recompute legend breaks from the new value set so colors map well
+    const vals = Object.values(CURRENT_LAYER_RESULT.values).filter(v => v != null && isFinite(v));
+    if (vals.length) {
+      vals.sort((a, b) => a - b);
+      const q = p => vals[Math.floor(p * (vals.length - 1))];
+      CURRENT_LAYER_RESULT.legend = {
+        ...(CURRENT_LAYER_RESULT.legend || {}),
+        min: vals[0], max: vals[vals.length - 1],
+        breaks: [q(0.2), q(0.4), q(0.6), q(0.8)],
+      };
+    }
+    applyLayerToBoundaries(CURRENT_LAYER_RESULT, false);
+    track('time_scrubbed', { layer: 'disaster_fema_declarations',
+                              year: year === null ? 'ALL' : year });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SPEC_066c — calendar heatmap in place panel
+  // ═══════════════════════════════════════════════════════════════════════
+  async function renderPlaceCalendar(host, geoId) {
+    try {
+      const res = await fetch(API + '/place/' + encodeURIComponent(geoId) +
+                              '/events?source=fema').then(r => r.json());
+      const events = res.events || [];
+      if (events.length < 1) return;
+      // Aggregate to (year, month) counts
+      const cells = {};
+      for (const e of events) {
+        if (!e.date) continue;
+        const [y, m] = e.date.split('-');
+        const k = `${y}-${m}`;
+        cells[k] = (cells[k] || 0) + 1;
+      }
+      const data = Object.entries(cells).map(([k, c]) => {
+        const [y, m] = k.split('-');
+        return { year: +y, month: +m, count: c };
+      });
+      if (!data.length) return;
+      const title = document.createElement('div');
+      title.className = 'ctitle';
+      title.textContent = `Disaster calendar — ${events.length} declarations`;
+      host.appendChild(title);
+      const fig = Plot.plot({
+        width: 320, height: 110, marginLeft: 28, marginTop: 18, marginBottom: 8,
+        x: { axis: 'top', tickRotate: -45, label: null },
+        y: { reverse: true, label: null,
+              tickFormat: m => ['','J','F','M','A','M','J','J','A','S','O','N','D'][m] },
+        color: { type: 'sqrt', scheme: 'ylorrd', legend: false },
+        marks: [
+          Plot.cell(data, {
+            x: 'year', y: 'month', fill: 'count',
+            inset: 0.5, tip: true,
+            title: d => `${d.year}-${String(d.month).padStart(2,'0')}: ${d.count}`,
+          }),
+        ],
+      });
+      host.appendChild(fig);
+      track('calendar_inspected', { place_id: geoId, layer: 'disaster_fema_declarations' });
+    } catch (e) { /* fail silently */ }
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -1072,6 +1246,30 @@
   document.getElementById('scatter-close').onclick = closeScatter;
   document.getElementById('scatter-x').onchange = renderScatter;
   document.getElementById('scatter-y').onchange = renderScatter;
+
+  // SPEC_066c — heat-toggle for point overlays
+  document.getElementById('heat-toggle').onclick = () => {
+    OVERLAY_MODE = (OVERLAY_MODE === 'heat') ? 'dots' : 'heat';
+    const btn = document.getElementById('heat-toggle');
+    btn.classList.toggle('on', OVERLAY_MODE === 'heat');
+    btn.textContent = OVERLAY_MODE === 'heat' ? '🔥 Heat on' : '🔥 Heat';
+    renderOverlay();
+    if (OVERLAY_MODE === 'heat')
+      track('heatmap_enabled', { layer_id: state.overlayId });
+  };
+  // SPEC_066c — FEMA year scrubber
+  document.getElementById('scrubber-slider').oninput = e => {
+    if (!FEMA_CASCADE) return;
+    const yr = FEMA_CASCADE.years[+e.target.value];
+    applyScrubberYear(yr);
+  };
+  document.getElementById('scrubber-all').onclick = () => {
+    applyScrubberYear(null);
+    if (FEMA_CASCADE) {
+      document.getElementById('scrubber-slider').value =
+        FEMA_CASCADE.years.length - 1;
+    }
+  };
 
   init().catch(err => {
     console.error('Atlas init failed', err);

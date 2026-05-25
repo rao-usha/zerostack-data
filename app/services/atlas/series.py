@@ -122,6 +122,88 @@ def fetch_place_series(
     return base
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC_066c additions — raw place-level events + FEMA cascade payload
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Sources supported by `fetch_place_events`. Whitelist (not lookup) so an
+# unknown `source` query param returns 400 rather than silently empty.
+EVENT_SOURCES = {"fema"}
+
+
+def fetch_place_events(
+    db: Session,
+    geo_id: str,
+    source: str = "fema",
+    limit: int = 200,
+) -> Dict[str, Any]:
+    """Return raw, dated events for a place — the data layer the calendar
+    heatmap consumes. The series endpoint aggregates these to per-year
+    counts; this exposes the underlying rows for richer visualizations."""
+    if source not in EVENT_SOURCES:
+        raise ValueError(f"unknown event source {source!r}; "
+                         f"expected one of {sorted(EVENT_SOURCES)}")
+    if not (geo_id.isdigit() and len(geo_id) == 5):
+        raise ValueError(f"geo_id must be 5-digit county FIPS; got {geo_id!r}")
+    state_fips, county_fips = geo_id[:2], geo_id[2:]
+
+    if source == "fema":
+        rows = _safe_query(db, """
+            SELECT disaster_number, declaration_date::text AS date,
+                   incident_type AS type, declaration_title AS title
+            FROM fema_disaster_declarations
+            WHERE fips_state_code = :st AND fips_county_code = :cty
+              AND declaration_date IS NOT NULL
+            ORDER BY declaration_date DESC
+            LIMIT :lim
+        """, {"st": state_fips, "cty": county_fips, "lim": max(1, min(limit, 1000))})
+        return {
+            "geo_id": geo_id,
+            "source": "fema",
+            "events": [
+                {"date": r["date"], "type": r["type"], "title": r["title"],
+                 "disaster_number": r["disaster_number"]}
+                for r in rows
+            ],
+        }
+    return {"geo_id": geo_id, "source": source, "events": []}
+
+
+def fetch_fema_cascade(db: Session) -> Dict[str, Any]:
+    """Bulk-fetch FEMA declaration counts per (county, year). The frontend
+    pre-fetches once when the time scrubber opens; year selection then
+    is a client-side dict lookup, no per-step server round-trip."""
+    rows = _safe_query(db, """
+        SELECT fips_state_code || lpad(fips_county_code, 3, '0') AS geo_id,
+               EXTRACT(YEAR FROM declaration_date)::int AS yr,
+               COUNT(*)::int AS n
+        FROM fema_disaster_declarations
+        WHERE fips_state_code IS NOT NULL
+          AND fips_county_code IS NOT NULL
+          AND declaration_date IS NOT NULL
+        GROUP BY geo_id, yr
+    """)
+    years_set = set()
+    values_by_year: Dict[str, Dict[str, int]] = {}
+    for r in rows:
+        gid = r["geo_id"]
+        if not gid or len(gid) != 5 or not gid.isdigit():
+            continue
+        y = int(r["yr"])
+        years_set.add(y)
+        values_by_year.setdefault(str(y), {})[gid] = int(r["n"])
+    years = sorted(years_set)
+    return {
+        "years": years,
+        "values_by_year": values_by_year,
+        "meta": {
+            "non_zero_cells": sum(len(v) for v in values_by_year.values()),
+            "year_range": [years[0] if years else None,
+                            years[-1] if years else None],
+        },
+    }
+
+
 def fetch_top_migration_flows(
     db: Session,
     top_n: int = 100,

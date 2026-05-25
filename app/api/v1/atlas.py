@@ -252,6 +252,33 @@ def get_place_series_endpoint(
     return series_mod.fetch_place_series(db, geo_id=geo_id, layer_id=layer)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC_066c additions — calendar events + FEMA time-cascade
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/place/{geo_id}/events")
+def get_place_events_endpoint(
+    geo_id: str,
+    source: str = "fema",
+    limit: int = 200,
+    db: Session = Depends(get_db),
+):
+    """Raw dated events for a place — the calendar-heatmap data layer."""
+    try:
+        return series_mod.fetch_place_events(
+            db, geo_id=geo_id, source=source, limit=limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/layer/disaster_fema_declarations/cascade")
+def get_fema_cascade_endpoint(db: Session = Depends(get_db)):
+    """Pre-fetched per-(county, year) FEMA counts. Drives the
+    time-cascade scrubber — frontend fetches once, slides client-side."""
+    return series_mod.fetch_fema_cascade(db)
+
+
 @router.get("/migration")
 def get_migration_flows_endpoint(
     top_n: int = 100,
