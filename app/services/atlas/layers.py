@@ -333,6 +333,29 @@ def _build_broadband_subscription(db: Session) -> LayerResult:
     )
 
 
+def _build_cbp_county(db: Session) -> LayerResult:
+    """County-grain CBP business establishments — SPEC_075.
+    Reads latest year × NAICS=00 from `census_cbp_county_yearly`.
+    Multi-year cascade via /atlas/layer/.../cascade endpoint."""
+    rows = _safe_query(db, """
+        WITH latest AS (
+            SELECT MAX(year) AS y FROM census_cbp_county_yearly
+            WHERE naics_code = '00'
+        )
+        SELECT geo_id, establishments AS value
+        FROM census_cbp_county_yearly, latest
+        WHERE year = latest.y
+          AND naics_code = '00'
+          AND establishments IS NOT NULL AND establishments > 0
+    """)
+    values = {r["geo_id"]: int(r["value"]) for r in rows if r["geo_id"]}
+    return LayerResult(
+        layer_id="econ_cbp_establishments_county", grain="county", values=values,
+        legend=_legend(list(values.values()), "business establishments"),
+        provenance=[{"table": "census_cbp_county_yearly", "rows": len(values)}],
+    )
+
+
 def _build_sec_active_filers(db: Session) -> LayerResult:
     """Count of distinct SEC filers (CIKs) per business_state — SPEC_074.
     State grain: SEC company metadata only carries state, not county."""
@@ -680,12 +703,23 @@ LAYERS: Dict[str, LayerSpec] = {
                     "of performance in the county, latest fiscal year.",
         builder=_build_federal_dollars,
     ),
+    "econ_cbp_establishments_county": LayerSpec(
+        id="econ_cbp_establishments_county", label="Business Establishments (county)",
+        domain="economy", grain="county", default_on=False,
+        vintage="2018-2022 (latest)",
+        coverage_note="3,000+ counties × 5 years via Census CBP API (SPEC_075). Cascade endpoint supports per-year time-scrubber.",
+        unit="establishments",
+        description="Total business establishments per county, latest CBP year. "
+                    "Multi-year cascade is fetchable via /atlas/layer/.../cascade.",
+        builder=_build_cbp_county,
+    ),
     "econ_cbp_establishments_state": LayerSpec(
         id="econ_cbp_establishments_state", label="Business Establishments (state)",
         domain="economy", grain="state", default_on=False,
-        vintage="2022", coverage_note="state grain (county partial — PLAN_067 SPEC_073)",
+        vintage="2022", coverage_note="state grain — superseded by econ_cbp_establishments_county (SPEC_075)",
         unit="establishments",
-        description="Total business establishments per state, Census CBP, NAICS-2 totals.",
+        description="Total business establishments per state, Census CBP, NAICS-2 totals. "
+                    "Kept for backward compatibility; the county-grain layer is the headline.",
         builder=_build_cbp_industry_density_state,
     ),
     # Finance

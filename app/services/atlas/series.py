@@ -320,6 +320,37 @@ def fetch_recent_events(
     return items[:cap]
 
 
+def fetch_cbp_cascade(db: Session) -> Dict[str, Any]:
+    """Per-year per-county CBP establishments — drives a time-scrubber
+    over industry density. Same shape as `fetch_fema_cascade` so the
+    frontend scrubber UI can be generalized. SPEC_075."""
+    rows = _safe_query(db, """
+        SELECT year, geo_id, establishments AS n
+        FROM census_cbp_county_yearly
+        WHERE naics_code = '00'
+          AND establishments IS NOT NULL AND establishments > 0
+    """)
+    years_set = set()
+    values_by_year: Dict[str, Dict[str, int]] = {}
+    for r in rows:
+        gid = r["geo_id"]
+        if not gid or len(gid) != 5 or not gid.isdigit():
+            continue
+        y = int(r["year"])
+        years_set.add(y)
+        values_by_year.setdefault(str(y), {})[gid] = int(r["n"])
+    years = sorted(years_set)
+    return {
+        "years": years,
+        "values_by_year": values_by_year,
+        "meta": {
+            "non_zero_cells": sum(len(v) for v in values_by_year.values()),
+            "year_range": [years[0] if years else None,
+                            years[-1] if years else None],
+        },
+    }
+
+
 def fetch_top_migration_flows(
     db: Session,
     top_n: int = 100,

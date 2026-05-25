@@ -279,6 +279,14 @@ def get_fema_cascade_endpoint(db: Session = Depends(get_db)):
     return series_mod.fetch_fema_cascade(db)
 
 
+@router.get("/layer/econ_cbp_establishments_county/cascade")
+def get_cbp_cascade_endpoint(db: Session = Depends(get_db)):
+    """Pre-fetched per-(county, year) CBP establishment counts. Same
+    shape as the FEMA cascade — drives the same scrubber UI pattern
+    over industry density. SPEC_075."""
+    return series_mod.fetch_cbp_cascade(db)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SPEC_067 — Recent Activity feed
 # ─────────────────────────────────────────────────────────────────────────────
