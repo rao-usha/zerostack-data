@@ -210,7 +210,7 @@ def fetch_fema_cascade(db: Session) -> Dict[str, Any]:
 
 # Source whitelist for the recent-feed endpoint. SEC + USAspending lanes
 # wire in here as PLAN_067 SPEC_074 / SPEC_071-stretch land.
-RECENT_SOURCES = {"fema"}
+RECENT_SOURCES = {"fema", "sec"}
 
 
 def _fetch_recent_fema(db: Session, limit: int) -> List[Dict[str, Any]]:
@@ -244,22 +244,78 @@ def _fetch_recent_fema(db: Session, limit: int) -> List[Dict[str, Any]]:
     ]
 
 
+def _fetch_recent_sec(db: Session, limit: int) -> List[Dict[str, Any]]:
+    """Return the most-recent SEC 10-K + 10-Q filings, joined to
+    sec_company_metadata for state geo-link (state FIPS via USPS lookup)."""
+    from app.services.atlas.state_fips import state_fips
+    rows = _safe_query(db, """
+        SELECT f.accession_number AS event_id,
+               f.filing_date::text AS date,
+               f.filing_type AS type,
+               COALESCE(f.company_name, '') AS company,
+               COALESCE(f.ticker, '') AS ticker,
+               f.filing_url AS url,
+               m.business_state AS business_state
+        FROM (
+            SELECT accession_number, filing_date, filing_type, company_name,
+                   ticker, filing_url, cik
+            FROM sec_10k
+            UNION ALL
+            SELECT accession_number, filing_date, filing_type, company_name,
+                   ticker, filing_url, cik
+            FROM sec_10q
+        ) f
+        LEFT JOIN sec_company_metadata m ON m.cik = f.cik
+        WHERE f.filing_date IS NOT NULL
+        ORDER BY f.filing_date DESC, f.accession_number DESC
+        LIMIT :lim
+    """, {"lim": max(1, min(limit, 200))})
+    items = []
+    for r in rows:
+        st_fips = state_fips(r["business_state"])
+        title_parts = [r["company"] or "(unknown)"]
+        if r["ticker"]:
+            title_parts.append(f"({r['ticker']})")
+        title = " ".join(title_parts)
+        place_name = (r["company"] or "").strip()
+        if r["business_state"]:
+            place_name = f"{place_name} ({r['business_state']})"
+        items.append({
+            "source": "sec",
+            "event_id": r["event_id"],
+            "date": r["date"],
+            "type": r["type"] or "Filing",
+            "title": title,
+            "place_id": st_fips,
+            "place_name": place_name,
+            "url": r["url"],
+        })
+    return items
+
+
 def fetch_recent_events(
     db: Session,
     sources: List[str],
     limit: int = 50,
 ) -> List[Dict[str, Any]]:
     """Return the merged most-recent event stream across requested sources,
-    sorted by date desc. v1: FEMA-only; SEC/USAspending added when their
-    backfills land."""
+    sorted by date desc. Per-source allocation: when multiple sources are
+    requested, each gets `cap/N` slots so a fresher source doesn't drown
+    out the others (FEMA-2026 would otherwise hide SEC-2025 entirely).
+    """
     unknown = set(sources) - RECENT_SOURCES
     if unknown:
         raise ValueError(f"unknown sources: {sorted(unknown)}; "
                          f"supported: {sorted(RECENT_SOURCES)}")
     cap = max(1, min(limit, 200))
+    # Per-source allocation — fairness across sources of different recency
+    src_list = [s for s in sources if s in RECENT_SOURCES]
+    per_source = max(1, cap // max(1, len(src_list)))
     items: List[Dict[str, Any]] = []
-    if "fema" in sources:
-        items.extend(_fetch_recent_fema(db, cap))
+    if "fema" in src_list:
+        items.extend(_fetch_recent_fema(db, per_source))
+    if "sec" in src_list:
+        items.extend(_fetch_recent_sec(db, per_source))
     items.sort(key=lambda x: x["date"], reverse=True)
     return items[:cap]
 

@@ -291,6 +291,16 @@ DYNAMIC_SCENARIOS = [
         "url_suffix": "/atlas.html?recent=1",
         "asserts": [assert_recent_panel_populated(10)],
     },
+    # SPEC_074 — SEC lane present in the same recent panel
+    {
+        "name": "recent-sec-source-chip",
+        "url_suffix": "/atlas.html?recent=1",
+        "asserts": [
+            assert_recent_panel_populated(10),
+            ("recent panel contains SEC source chip",
+             lambda dom: 'class="ri-src s-sec"' in dom),
+        ],
+    },
 ]
 
 

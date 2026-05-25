@@ -333,6 +333,28 @@ def _build_broadband_subscription(db: Session) -> LayerResult:
     )
 
 
+def _build_sec_active_filers(db: Session) -> LayerResult:
+    """Count of distinct SEC filers (CIKs) per business_state — SPEC_074.
+    State grain: SEC company metadata only carries state, not county."""
+    from app.services.atlas.state_fips import state_fips
+    rows = _safe_query(db, """
+        SELECT business_state AS state, COUNT(DISTINCT cik)::int AS n
+        FROM sec_company_metadata
+        WHERE business_state IS NOT NULL AND business_state != ''
+        GROUP BY business_state
+    """)
+    values: Dict[str, int] = {}
+    for r in rows:
+        fips = state_fips(r["state"])
+        if fips:
+            values[fips] = int(r["n"])
+    return LayerResult(
+        layer_id="econ_sec_active_filers", grain="state", values=values,
+        legend=_legend(list(values.values()), "active SEC filers (CIKs)"),
+        provenance=[{"table": "sec_company_metadata", "rows": len(values)}],
+    )
+
+
 def _build_federal_dollars(db: Session) -> LayerResult:
     """USAspending federal contract dollars per county — SPEC_071.
     Reads from `usaspending_county_fy_totals`, latest fiscal_year ×
@@ -639,6 +661,15 @@ LAYERS: Dict[str, LayerSpec] = {
         builder=_build_irs_migration_net,
     ),
     # Economy
+    "econ_sec_active_filers": LayerSpec(
+        id="econ_sec_active_filers", label="SEC-Active Filers (state)",
+        domain="economy", grain="state", default_on=False,
+        vintage="latest", coverage_note="state-grain — SEC carries no county address",
+        unit="distinct CIKs",
+        description="Count of distinct SEC-registered companies (by CIK) "
+                    "with business address in the state. SPEC_074.",
+        builder=_build_sec_active_filers,
+    ),
     "econ_federal_dollars": LayerSpec(
         id="econ_federal_dollars", label="Federal Contract Dollars (FY)",
         domain="economy", grain="county", default_on=False,
