@@ -204,6 +204,66 @@ def fetch_fema_cascade(db: Session) -> Dict[str, Any]:
     }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC_067 — Recent Activity feed
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Source whitelist for the recent-feed endpoint. SEC + USAspending lanes
+# wire in here as PLAN_067 SPEC_074 / SPEC_071-stretch land.
+RECENT_SOURCES = {"fema"}
+
+
+def _fetch_recent_fema(db: Session, limit: int) -> List[Dict[str, Any]]:
+    """Return the most-recent FEMA declarations (one row per
+    declaration × county) for the recent-activity feed."""
+    rows = _safe_query(db, """
+        SELECT disaster_number AS event_id,
+               declaration_date::text AS date,
+               incident_type AS type,
+               declaration_title AS title,
+               fips_state_code || lpad(fips_county_code, 3, '0') AS place_id,
+               COALESCE(county || ', ', '') || COALESCE(state, '') AS place_name
+        FROM fema_disaster_declarations
+        WHERE declaration_date IS NOT NULL
+          AND fips_state_code IS NOT NULL
+          AND fips_county_code IS NOT NULL
+        ORDER BY declaration_date DESC, disaster_number DESC
+        LIMIT :lim
+    """, {"lim": max(1, min(limit, 200))})
+    return [
+        {
+            "source": "fema",
+            "event_id": str(r["event_id"]),
+            "date": r["date"],
+            "type": r["type"] or "Unknown",
+            "title": (r["title"] or "").strip(),
+            "place_id": r["place_id"],
+            "place_name": r["place_name"].strip(", "),
+        }
+        for r in rows
+    ]
+
+
+def fetch_recent_events(
+    db: Session,
+    sources: List[str],
+    limit: int = 50,
+) -> List[Dict[str, Any]]:
+    """Return the merged most-recent event stream across requested sources,
+    sorted by date desc. v1: FEMA-only; SEC/USAspending added when their
+    backfills land."""
+    unknown = set(sources) - RECENT_SOURCES
+    if unknown:
+        raise ValueError(f"unknown sources: {sorted(unknown)}; "
+                         f"supported: {sorted(RECENT_SOURCES)}")
+    cap = max(1, min(limit, 200))
+    items: List[Dict[str, Any]] = []
+    if "fema" in sources:
+        items.extend(_fetch_recent_fema(db, cap))
+    items.sort(key=lambda x: x["date"], reverse=True)
+    return items[:cap]
+
+
 def fetch_top_migration_flows(
     db: Session,
     top_n: int = 100,

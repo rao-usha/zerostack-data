@@ -50,8 +50,31 @@ You should see:
 - **Harris County, TX** open in the right panel showing 8 layer
   values, each with a mini distribution histogram + a vertical
   marker at Harris's value + a percentile readout.
+- Below the FEMA Disaster History card: a **28-year × 12-month
+  calendar heatmap** of Harris's disaster declarations.
 
-If those three look right, the system is working.
+### 4. The time-cascade story — animate FEMA history
+[`/atlas.html?layer=disaster_fema_declarations`](http://localhost:3001/atlas.html?layer=disaster_fema_declarations)
+
+You should see:
+- A **year slider docked at top-center of the map** ("FEMA YEAR · ALL").
+- Drag the slider — the choropleth recolors to show only that year's
+  declarations. 2005 lights up Hurricane Katrina; 2024 lights up
+  Hurricane Beryl + Helene.
+- "ALL" button restores the all-years aggregate.
+
+### 5. The "what's new" story — Recent Activity
+[`/atlas.html?recent=1`](http://localhost:3001/atlas.html?recent=1)
+
+You should see:
+- The **📰 Recent panel** auto-opens top-right with ~50 most-recent
+  FEMA declarations.
+- Each item: date · type chip (fire amber, hurricane cyan, winter
+  storm light-blue) · title · place name.
+- Click any item → map fits to that county, place panel populates,
+  recent panel closes.
+
+If those five look right, the system is working.
 
 ---
 
@@ -221,6 +244,42 @@ Try [Harris Co TX, all layers](http://localhost:3001/atlas.html?place=48201) (Ha
   - FEMA Disaster History → declarations-per-year since 1999
   - Bank Deposits per County → 168 quarterly points since 1984
   - Net Migration → 2018-2021 net AGI flow
+
+### SPEC_066c additions (Wave 2 — "loop-compelling")
+
+#### Calendar heatmap in place panel
+- For any clicked county, beneath the FEMA layer card a
+  **28-year × 12-month grid** colors cells by event count.
+- Hover → tooltip `{year, month, count}`.
+- Best example: [Harris Co TX](http://localhost:3001/atlas.html?place=48201)
+  — 27 declarations span the grid; Hurricane Beryl 2024-07 + ice
+  storms 2021-02 are the brightest cells.
+
+#### EPA kernel-density heat toggle
+- Open [`/atlas.html?layer=disaster_nri&overlay=env_epa_facilities`](http://localhost:3001/atlas.html?layer=disaster_nri&overlay=env_epa_facilities).
+- The "🔥 Heat" button appears in the top-right map actions.
+- Click → cyan dots become a KDE blob layer (industrial corridors
+  visible as bright clusters). Click again to return to dots.
+- Works for any point overlay.
+
+#### FEMA time-cascade scrubber
+- Open [`/atlas.html?layer=disaster_fema_declarations`](http://localhost:3001/atlas.html?layer=disaster_fema_declarations).
+- A **year slider docks at the top center**: "FEMA YEAR · ALL".
+- Drag through 1999 → 2026. Watch the choropleth recolor per-year.
+  Highlights: 2005 (Katrina), 2012 (Sandy), 2017 (Harvey/Maria),
+  2024 (Beryl/Helene).
+- "ALL" button restores the all-years aggregate.
+
+### SPEC_067 addition (Wave 3 — "Recent Activity")
+
+#### 📰 Recent Activity panel
+- Header button **📰 Recent** opens a floating right-side panel.
+- Lists the 50 most-recent FEMA declarations across all counties.
+- Each item: date · type chip (color-coded by category) · title ·
+  place name.
+- Click an item → **map fits to that county** + place panel opens + recent panel closes.
+- Direct-link: [`?recent=1`](http://localhost:3001/atlas.html?recent=1).
+- SEC + USAspending lanes arrive when PLAN_067 SPEC_074 + SPEC_071-stretch land.
 
 ---
 

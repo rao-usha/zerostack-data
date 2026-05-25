@@ -232,6 +232,17 @@ def assert_calendar_present() -> tuple:
     return ("place calendar SVG", f)
 
 
+def assert_recent_panel_populated(min_items: int = 10) -> tuple:
+    """SPEC_067 Recent Activity panel rendered with items."""
+    def f(dom):
+        if 'id="recent-overlay" class="show"' not in dom and \
+           "id=\"recent-overlay\"" not in dom:
+            return False
+        n = count_matches(dom, r'<div class="recent-item"')
+        return n >= min_items
+    return (f"recent-item count >={min_items}", f)
+
+
 DYNAMIC_SCENARIOS = [
     {
         # Counters tween via D3 (start at 0, write intermediate values).
@@ -273,6 +284,12 @@ DYNAMIC_SCENARIOS = [
         "name": "place-calendar-heatmap",
         "url_suffix": "/atlas.html?place=48201",
         "asserts": [assert_calendar_present()],
+    },
+    # SPEC_067 — Recent Activity feed (auto-open via ?recent=1)
+    {
+        "name": "recent-activity-panel",
+        "url_suffix": "/atlas.html?recent=1",
+        "asserts": [assert_recent_panel_populated(10)],
     },
 ]
 

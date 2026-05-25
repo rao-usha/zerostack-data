@@ -197,6 +197,39 @@
       stroke-dasharray:6 6; animation: flow 3s linear infinite;
     }
 
+    /* SPEC_067 — Recent Activity floating panel */
+    #recent-overlay { position:absolute; top:60px; right:12px; z-index:600;
+      background:rgba(20,27,45,.97); border:1px solid var(--border);
+      border-radius:10px; padding:14px 14px 10px; display:none;
+      box-shadow:0 8px 28px rgba(0,0,0,.6);
+      width:380px; max-height:calc(100vh - 140px); display:none;
+      flex-direction:column; }
+    #recent-overlay.show { display:flex; }
+    #recent-overlay h4 { margin:0 0 6px; font-size:13px; font-weight:600; color:var(--text); }
+    #recent-overlay .sub { font-size:11px; color:var(--dim); margin-bottom:8px; }
+    #recent-overlay button.close { position:absolute; top:8px; right:10px;
+      background:transparent; color:var(--dim); border:none; cursor:pointer;
+      font-size:18px; padding:0; line-height:1; }
+    #recent-list { overflow-y:auto; padding-right:4px; }
+    .recent-item { padding:8px 10px; border-radius:6px; margin-bottom:5px;
+      cursor:pointer; transition:background .12s; border:1px solid transparent; }
+    .recent-item:hover { background:var(--panel-2); border-color:var(--border); }
+    .recent-item .ri-row1 { display:flex; align-items:center; gap:8px;
+      font-size:11px; color:var(--muted); margin-bottom:3px; }
+    .recent-item .ri-date { font-variant-numeric:tabular-nums; color:var(--text);
+      font-weight:600; }
+    .recent-item .ri-type { display:inline-block; padding:1px 7px; border-radius:8px;
+      font-size:10px; text-transform:uppercase; letter-spacing:.04em; font-weight:600; }
+    /* Type chips — color by category */
+    .ri-type.t-hurricane,.ri-type.t-tropical-storm { background:rgba(34,211,238,.18); color:#7dd3fc; }
+    .ri-type.t-fire { background:rgba(245,158,11,.20); color:#fbbf24; }
+    .ri-type.t-flood,.ri-type.t-severe-storms { background:rgba(99,102,241,.18); color:#a5b4fc; }
+    .ri-type.t-winter-storm,.ri-type.t-severe-ice-storm,.ri-type.t-snow { background:rgba(165,180,252,.18); color:#c7d2fe; }
+    .ri-type.t-earthquake,.ri-type.t-mud-landslide { background:rgba(139,92,246,.18); color:#c4b5fd; }
+    .ri-type.t-other { background:rgba(154,163,184,.18); color:var(--muted); }
+    .recent-item .ri-title { font-size:13px; color:var(--text); line-height:1.3; }
+    .recent-item .ri-place { font-size:11px; color:var(--dim); margin-top:2px; }
+
     /* Floating scatter overlay (SPEC_066b Wave 3) */
     #scatter-overlay { position:absolute; left:24px; bottom:24px; z-index:500;
       background:rgba(20,27,45,.97); border:1px solid var(--border);
@@ -274,6 +307,7 @@
       </div>
       <button class="btn-icon" id="compare-toggle" title="Bivariate compare mode">Compare layers</button>
       <button class="btn-icon" id="scatter-toggle" title="Scatter pair explorer">🔬 Scatter</button>
+      <button class="btn-icon" id="recent-toggle" title="Most-recent FEMA declarations">📰 Recent</button>
       <button class="btn-icon" id="share">Share view</button>
     </header>
 
@@ -332,6 +366,14 @@
           <div id="biv-grid" class="grid"></div>
         </div>
         <div class="axes"><span>A: low</span><span>high</span></div>
+      </div>
+
+      <!-- SPEC_067 — Recent Activity floating overlay -->
+      <div id="recent-overlay">
+        <button class="close" id="recent-close">×</button>
+        <h4>Recent activity</h4>
+        <div class="sub" id="recent-sub">Loading…</div>
+        <div id="recent-list" class="spinner">Loading recent events…</div>
       </div>
 
       <!-- Wave 3: scatter overlay -->
@@ -490,6 +532,9 @@
     if (p.get('lat')) state.view.lat = parseFloat(p.get('lat'));
     if (p.get('lon')) state.view.lon = parseFloat(p.get('lon'));
     if (p.get('zoom')) state.view.zoom = parseFloat(p.get('zoom'));
+    // SPEC_067 — `?recent=1` auto-opens the panel (used by smoke tests
+    // and for direct sharing of the panel itself)
+    if (p.get('recent') === '1') state.autoOpenRecent = true;
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -533,6 +578,8 @@
     if (state.layerId === 'disaster_fema_declarations') {
       await activateFemaScrubber();
     }
+    // SPEC_067 — auto-open Recent panel from ?recent=1
+    if (state.autoOpenRecent) await openRecent();
 
     track('query_submitted', { source:'landing', layer: state.layerId, place: state.placeId || null });
   }
@@ -1182,6 +1229,73 @@
   }
 
   // ═══════════════════════════════════════════════════════════════════════
+  // SPEC_067 — Recent Activity floating panel
+  // ═══════════════════════════════════════════════════════════════════════
+  async function openRecent() {
+    const panel = document.getElementById('recent-overlay');
+    panel.classList.add('show');
+    document.getElementById('recent-toggle').classList.add('on');
+    document.getElementById('recent-list').textContent = 'Loading…';
+    document.getElementById('recent-list').classList.add('spinner');
+    track('recent_panel_opened', {});
+    try {
+      const res = await fetch(API + '/recent?sources=fema&limit=50').then(r => r.json());
+      renderRecentItems(res.items || []);
+      const latest = (res.items && res.items[0]) ? res.items[0].date : null;
+      document.getElementById('recent-sub').textContent =
+        `${res.count || 0} most-recent FEMA declarations` +
+        (latest ? ` · latest ${latest}` : '');
+    } catch (e) {
+      document.getElementById('recent-list').textContent = 'Failed to load.';
+    }
+  }
+  function closeRecent() {
+    document.getElementById('recent-overlay').classList.remove('show');
+    document.getElementById('recent-toggle').classList.remove('on');
+  }
+  function renderRecentItems(items) {
+    const root = document.getElementById('recent-list');
+    root.classList.remove('spinner');
+    root.innerHTML = '';
+    if (!items.length) {
+      root.textContent = 'No recent events.';
+      return;
+    }
+    for (const item of items) {
+      const div = document.createElement('div');
+      div.className = 'recent-item';
+      const typeClass = 't-' + (item.type || 'other').toLowerCase()
+                                              .replace(/[^a-z0-9]+/g, '-');
+      div.innerHTML = `
+        <div class="ri-row1">
+          <span class="ri-date">${item.date || ''}</span>
+          <span class="ri-type ${typeClass}">${item.type || 'Other'}</span>
+        </div>
+        <div class="ri-title">${escapeHtml(item.title || '(no title)')}</div>
+        <div class="ri-place">${escapeHtml(item.place_name || item.place_id)}</div>`;
+      div.onclick = () => {
+        track('recent_item_clicked', {
+          source: item.source, event_id: item.event_id,
+          place_id: item.place_id, type: item.type,
+        });
+        // Fit map to county + open place panel; close the overlay.
+        if (BOUNDARY_LAYER) BOUNDARY_LAYER.eachLayer(fl => {
+          if (fl.feature.properties.geo_id === item.place_id)
+            MAP.fitBounds(fl.getBounds(), { maxZoom: 8 });
+        });
+        openPlace(item.place_id);
+        closeRecent();
+      };
+      root.appendChild(div);
+    }
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    })[c]);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
   // SEARCH (SPEC_064 fast-travel)
   // ═══════════════════════════════════════════════════════════════════════
   async function fastTravel(query) {
@@ -1244,6 +1358,14 @@
     else openScatter();
   };
   document.getElementById('scatter-close').onclick = closeScatter;
+
+  // SPEC_067 — Recent Activity panel
+  document.getElementById('recent-toggle').onclick = () => {
+    const panel = document.getElementById('recent-overlay');
+    if (panel.classList.contains('show')) closeRecent();
+    else openRecent();
+  };
+  document.getElementById('recent-close').onclick = closeRecent;
   document.getElementById('scatter-x').onchange = renderScatter;
   document.getElementById('scatter-y').onchange = renderScatter;
 

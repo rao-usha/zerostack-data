@@ -279,6 +279,27 @@ def get_fema_cascade_endpoint(db: Session = Depends(get_db)):
     return series_mod.fetch_fema_cascade(db)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC_067 — Recent Activity feed
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/recent")
+def get_recent_events_endpoint(
+    sources: str = "fema",
+    limit: int = 50,
+    db: Session = Depends(get_db),
+):
+    """Merged most-recent event stream for the Atlas Recent Activity
+    feed. `sources` is comma-separated; v1 supports only `fema` (SEC
+    + USAspending lanes wait for PLAN_067 SPEC_074 / SPEC_071-stretch)."""
+    src_list = [s.strip() for s in sources.split(",") if s.strip()]
+    try:
+        items = series_mod.fetch_recent_events(db, src_list, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"items": items, "sources": src_list, "limit": limit, "count": len(items)}
+
+
 @router.get("/migration")
 def get_migration_flows_endpoint(
     top_n: int = 100,
