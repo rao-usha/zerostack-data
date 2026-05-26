@@ -47,16 +47,26 @@ def _has_postgis(db: Session) -> bool:
         return False
 
 
-def _simplify_python(geojson: Dict[str, Any], tolerance: float) -> Dict[str, Any]:
-    """Fallback: very light vertex-skipping when PostGIS isn't available.
+def _unwrap_geometry(geojson: Dict[str, Any], tolerance: float) -> Dict[str, Any]:
+    """Pure Feature-unwrapper — `geojson_boundaries.geojson` stores wrapped
+    Features, we need bare geometries for the frontend.
 
-    Accepts either a bare geometry (Polygon / MultiPolygon) or a wrapped
-    Feature — `geojson_boundaries.geojson` stores Features, so we unwrap.
+    Previously this function ALSO did naive per-ring vertex skipping
+    (`ring[::step]`) when PostGIS was unavailable. That approach created
+    inter-county gaps ("glass shards"): adjacent counties' rings start
+    at different vertices and traverse the shared edge in opposite
+    orientations, so `[::step]` picks DIFFERENT vertices on each side
+    and the shared boundary no longer aligns.
 
-    Not a true Douglas-Peucker — drops every Nth point per ring. Good enough
-    for v1 county-scale display; PostGIS is the real path when present.
-    Tolerance is interpreted as the keep-1-in-N factor (tolerance=0.005 →
-    keep 1 in ~5, drop 4 of 5).
+    The proper fix is TopoJSON / shared-arc simplification (a future
+    SPEC), which simplifies the shared edge once instead of per-county.
+    Until then, ship raw geometry (~3.3MB unsimplified vs the broken
+    1.2MB simplified). Browser handles 3MB GeoJSON fine; in-memory
+    cache means the payload only ships once per session.
+
+    The `tolerance` parameter is preserved on the API surface and the
+    cache key so the future TopoJSON path can use it without breaking
+    callers.
     """
     if not geojson:
         return geojson
@@ -65,25 +75,9 @@ def _simplify_python(geojson: Dict[str, Any], tolerance: float) -> Dict[str, Any
         geojson = geojson.get("geometry") or {}
     if not geojson or geojson.get("type") not in ("Polygon", "MultiPolygon"):
         return geojson
-    # Keep every Nth vertex; minimum 4 vertices per ring.
-    step = max(1, int(1.0 / max(tolerance, 0.001) / 50))   # 0.005 → ~step 4
-    if step <= 1:
-        return geojson
-
-    def thin(ring: List[List[float]]) -> List[List[float]]:
-        if len(ring) <= 8:
-            return ring
-        kept = ring[::step]
-        if kept[-1] != ring[-1]:
-            kept.append(ring[-1])  # keep closing point
-        return kept if len(kept) >= 4 else ring
-
-    g = dict(geojson)
-    if g["type"] == "Polygon":
-        g["coordinates"] = [thin(r) for r in g["coordinates"]]
-    else:  # MultiPolygon
-        g["coordinates"] = [[thin(r) for r in poly] for poly in g["coordinates"]]
-    return g
+    # Raw geometry — no thinning. See docstring above for the why.
+    _ = tolerance  # intentionally ignored on this path
+    return geojson
 
 
 def fetch_boundaries(
@@ -140,7 +134,7 @@ def fetch_boundaries(
             features.append({
                 "type": "Feature",
                 "properties": {"geo_id": r["geo_id"], "geo_name": r["geo_name"]},
-                "geometry": _simplify_python(geom, tolerance),
+                "geometry": _unwrap_geometry(geom, tolerance),
             })
 
     fc = {
@@ -148,7 +142,7 @@ def fetch_boundaries(
         "_meta": {
             "geo_level": geo_level,
             "tolerance": tolerance,
-            "simplifier": "postgis" if postgis else "python_thin",
+            "simplifier": "postgis" if postgis else "raw_unsimplified",
             "feature_count": len(features),
         },
         "features": features,
