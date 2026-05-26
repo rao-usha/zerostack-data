@@ -330,9 +330,9 @@
         <div id="active-layer-name" style="font-weight:600; color:var(--text);">—</div>
         <div class="crow">
           <span style="font-size:11px; color:var(--dim); width:50px">Opacity</span>
-          <input type="range" id="opacity-slider" min="0" max="100" value="85" style="flex:1">
+          <input type="range" id="opacity-slider" min="0" max="100" value="55" style="flex:1">
           <span id="opacity-readout" style="font-size:11px; color:var(--muted);
-            width:34px; text-align:right; font-variant-numeric:tabular-nums">85%</span>
+            width:34px; text-align:right; font-variant-numeric:tabular-nums">55%</span>
         </div>
         <div id="compare-pill"></div>
         <!-- Brushed histogram for the active choropleth (Wave 2) -->
@@ -431,7 +431,7 @@
     placeId: null,
     view: { lat: 38.5, lon: -96, zoom: 4 },
     showBoundaries: true,
-    opacity: 0.85,
+    opacity: 0.55,  // SPEC_077 A.1 — drop from 0.85 so the basemap shows through at neighborhood zoom
     mode: 'normal',              // 'normal' | 'bivariate'
     brushRange: null,
   };
@@ -631,8 +631,14 @@
   // ═══════════════════════════════════════════════════════════════════════
   function initMap() {
     MAP = L.map('map', {
-      preferCanvas: true, worldCopyJump: false, zoomControl: true, attributionControl: false,
+      preferCanvas: true, worldCopyJump: false, zoomControl: true, attributionControl: true,
     }).setView([state.view.lat, state.view.lon], state.view.zoom);
+    // SPEC_077 A.1 — Carto Dark Matter basemap. Sits under the choropleth.
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      subdomains: 'abcd',
+      maxZoom: 19,
+    }).addTo(MAP);
     MAP.on('moveend zoomend', () => {
       state.view = { lat: MAP.getCenter().lat, lon: MAP.getCenter().lng, zoom: MAP.getZoom() };
       syncURL();
