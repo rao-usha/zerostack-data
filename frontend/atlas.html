@@ -450,8 +450,16 @@
   // SPEC_066c state
   let OVERLAY_MODE = 'dots';          // 'dots' | 'heat'
   let OVERLAY_FEATURES = null;        // cached features for re-render on heat toggle
-  let FEMA_CASCADE = null;            // {years, values_by_year}
-  let FEMA_ALL_VALUES = null;         // saved "all years" values for the all-button
+
+  // SPEC_066e — generalized time-cascade scrubber
+  // Add a layer here + ensure its cascade endpoint exists, scrubber works.
+  const SCRUBBER_LAYERS = {
+    'disaster_fema_declarations':      { label: 'FEMA year' },
+    'econ_cbp_establishments_county':  { label: 'CBP year'  },
+  };
+  let CASCADES = {};                  // layer_id → {years, values_by_year, meta}
+  let SCRUBBER_ALL_VALUES = null;     // pre-scrub all-years aggregate (for ALL btn)
+  let SCRUBBER_LAYER_ID = null;       // which layer the scrubber is bound to
 
   // ── helpers ─────────────────────────────────────────────────────────────
   function track(eventType, payload) {
@@ -582,9 +590,9 @@
       applyLayerToBoundaries(CURRENT_LAYER_RESULT, false);
       await renderMigrationArcs();
     }
-    // SPEC_066c — scrubber on URL deep-link path
-    if (state.layerId === 'disaster_fema_declarations') {
-      await activateFemaScrubber();
+    // SPEC_066e — scrubber on URL deep-link path (generic)
+    if (SCRUBBER_LAYERS[state.layerId]) {
+      await activateScrubber(state.layerId);
     }
     // SPEC_067 — auto-open Recent panel from ?recent=1
     if (state.autoOpenRecent) await openRecent();
@@ -883,11 +891,11 @@
     } else {
       clearArcs();
     }
-    // SPEC_066c — FEMA scrubber lifecycle
-    if (spec.id === 'disaster_fema_declarations') {
-      await activateFemaScrubber();
+    // SPEC_066e — generic scrubber lifecycle (FEMA + CBP currently)
+    if (SCRUBBER_LAYERS[spec.id]) {
+      await activateScrubber(spec.id);
     } else {
-      deactivateFemaScrubber();
+      deactivateScrubber();
     }
   }
   function updateActiveLayerControls() {
@@ -1093,32 +1101,41 @@
   // ═══════════════════════════════════════════════════════════════════════
   // SPEC_066c — FEMA time-cascade scrubber
   // ═══════════════════════════════════════════════════════════════════════
-  async function activateFemaScrubber() {
-    if (!FEMA_CASCADE) {
-      FEMA_CASCADE = await fetch(API + '/layer/disaster_fema_declarations/cascade')
-                            .then(r => r.json());
+  // SPEC_066e — generic scrubber, any layer in SCRUBBER_LAYERS works
+  async function activateScrubber(layerId) {
+    const cfg = SCRUBBER_LAYERS[layerId];
+    if (!cfg) return;
+    if (!CASCADES[layerId]) {
+      CASCADES[layerId] = await fetch(
+        API + '/layer/' + encodeURIComponent(layerId) + '/cascade'
+      ).then(r => r.json());
     }
-    // Stash the all-years values so the ALL button can restore them
-    FEMA_ALL_VALUES = CURRENT_LAYER_RESULT.values;
+    SCRUBBER_LAYER_ID = layerId;
+    SCRUBBER_ALL_VALUES = CURRENT_LAYER_RESULT.values;
+    const cascade = CASCADES[layerId];
     const slider = document.getElementById('scrubber-slider');
-    const years = FEMA_CASCADE.years;
+    const years = cascade.years;
     slider.min = 0; slider.max = years.length - 1; slider.value = years.length - 1;
+    document.querySelector('#scrubber > .label').textContent = cfg.label;
     document.getElementById('scrubber-year').textContent = 'ALL';
     document.getElementById('scrubber-all').classList.add('on');
     document.getElementById('scrubber').classList.add('show');
   }
-  function deactivateFemaScrubber() {
+  function deactivateScrubber() {
     document.getElementById('scrubber').classList.remove('show');
-    FEMA_ALL_VALUES = null;
+    SCRUBBER_ALL_VALUES = null;
+    SCRUBBER_LAYER_ID = null;
   }
   function applyScrubberYear(year /* int | null = ALL */) {
-    if (!FEMA_CASCADE || !CURRENT_LAYER_RESULT) return;
+    if (!SCRUBBER_LAYER_ID || !CURRENT_LAYER_RESULT) return;
+    const cascade = CASCADES[SCRUBBER_LAYER_ID];
+    if (!cascade) return;
     if (year === null) {
-      CURRENT_LAYER_RESULT.values = FEMA_ALL_VALUES || CURRENT_LAYER_RESULT.values;
+      CURRENT_LAYER_RESULT.values = SCRUBBER_ALL_VALUES || CURRENT_LAYER_RESULT.values;
       document.getElementById('scrubber-year').textContent = 'ALL';
       document.getElementById('scrubber-all').classList.add('on');
     } else {
-      CURRENT_LAYER_RESULT.values = FEMA_CASCADE.values_by_year[String(year)] || {};
+      CURRENT_LAYER_RESULT.values = cascade.values_by_year[String(year)] || {};
       document.getElementById('scrubber-year').textContent = String(year);
       document.getElementById('scrubber-all').classList.remove('on');
     }
@@ -1134,7 +1151,7 @@
       };
     }
     applyLayerToBoundaries(CURRENT_LAYER_RESULT, false);
-    track('time_scrubbed', { layer: 'disaster_fema_declarations',
+    track('time_scrubbed', { layer: SCRUBBER_LAYER_ID,
                               year: year === null ? 'ALL' : year });
   }
 

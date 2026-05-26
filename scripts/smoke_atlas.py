@@ -280,6 +280,12 @@ DYNAMIC_SCENARIOS = [
         "url_suffix": "/atlas.html?layer=disaster_fema_declarations",
         "asserts": [assert_scrubber_visible(), assert_legend_populated()],
     },
+    # SPEC_066e — generalized scrubber now drives CBP layer too
+    {
+        "name": "cbp-time-scrubber",
+        "url_suffix": "/atlas.html?layer=econ_cbp_establishments_county",
+        "asserts": [assert_scrubber_visible(), assert_legend_populated("Business")],
+    },
     {
         "name": "place-calendar-heatmap",
         "url_suffix": "/atlas.html?place=48201",
