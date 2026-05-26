@@ -16,12 +16,13 @@ A **public-data explorer** — map-first, no login, no query required, all
 
 | Category | What's there |
 |---|---|
-| **Data** | 20 layers across 10 domains, county-grain where possible, state/point where honest; 3,143 counties, ~1.07M EPA facilities, 51,093 FEMA declarations |
-| **Frontend** | Single self-contained `atlas.html` — Leaflet map, layer panel, place panel, header chrome. ~1,800 lines of HTML/CSS/JS. CDN deps only (Leaflet, D3, Observable Plot, Leaflet.heat). No build step. |
-| **Dynamic UI** | Bivariate compare, scatter pair, brushed histogram, sparklines, animated migration arcs, FEMA time-cascade scrubber, calendar heatmap per place, kernel-density heat toggle, smooth color transitions, animated counters, opacity slider |
-| **API** | FastAPI; 11 atlas endpoints (`/layers`, `/layer/{id}`, `/boundaries`, `/place/{geo_id}`, `/place/{geo_id}/series`, `/place/{geo_id}/events`, `/explore`, `/events`, `/feedback`, `/migration`, `/layer/.../cascade`) |
+| **Data** | **22 layers** across 10 domains, county-grain where possible, state/point where honest; 3,143 counties, ~1.07M EPA facilities, 51,093 FEMA declarations. PLAN_067 backfills complete: ACS county wealth (SPEC_070), USAspending federal $ (SPEC_071), ACS broadband subscription (SPEC_072), SEC active filers + recent filings lane (SPEC_074), multi-year CBP (SPEC_075). |
+| **Frontend** | Single self-contained `atlas.html` — Leaflet map, layer panel, place panel, header chrome. ~2,200 lines of HTML/CSS/JS. CDN deps only (Leaflet, D3, Observable Plot, Leaflet.heat). No build step. |
+| **Dynamic UI** | Bivariate compare, scatter pair, brushed histogram, sparklines, animated migration arcs, **generalized time-cascade scrubber (FEMA + CBP, SPEC_066e)**, calendar heatmap per place, kernel-density heat toggle, **Recent Activity feed (FEMA + SEC, SPEC_067/074)**, smooth color transitions, animated counters, opacity slider |
+| **API** | FastAPI; **14 atlas endpoints** including `/layers`, `/layer/{id}`, `/boundaries`, `/place/{geo_id}`, `/place/{geo_id}/series`, `/place/{geo_id}/events`, `/explore`, `/events`, `/feedback`, `/migration`, `/recent`, two cascade endpoints (FEMA + CBP). |
 | **Telemetry** | Every interaction fires `POST /atlas/events` to `atlas_events` table (5 tables in the SPEC_064 schema) |
-| **Quality** | 35/35 headless-Chrome smoke scenarios pass; 47/47 pytest pass; can run on every commit |
+| **Quality** | **40/40 headless-Chrome smoke scenarios** pass in ~90s; **71/71 pytest pass**; smoke harness opt-in via `ATLAS_SMOKE=1` |
+| **Tour** | `docs/LAUNCH_GUIDE.md` — comprehensive click-through showcase (the one to read) · `docs/ATLAS_TOUR.md` — developer/QA runbook |
 | **Tour** | `docs/ATLAS_TOUR.md` — runbook for clicking through every feature with deep-link URLs |
 
 **What's not built** is on the gap list (§5).

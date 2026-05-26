@@ -21,7 +21,7 @@ Three URLs. Paste, look, get the gist.
 
 You should see:
 - The **command-center counters tween up from zero** over ~1 second
-  (20 layers · 10 domains · 3,143 counties · 1.07M EPA facilities ·
+  (22 layers · 10 domains · 3,143 counties · 1.07M EPA facilities ·
   51,093 FEMA decls).
 - **Disaster risk choropleth** across every US county (the default
   `disaster_nri` layer), light blue = low risk → dark blue = high.
@@ -104,14 +104,17 @@ layers overlay cyan dots; state-grain layers are coarser.**
 [NRI default](http://localhost:3001/atlas.html?layer=disaster_nri) ·
 [FEMA declarations](http://localhost:3001/atlas.html?layer=disaster_fema_declarations)
 
-### Economy (2 layers)
+### Economy (4 layers)
 | Layer ID | What it shows | Grain | Honest about |
 |---|---|---|---|
 | `econ_federal_dollars` | Federal contract dollars FY (prime) | county | Prime contracts only; sub-awards deferred |
-| `econ_cbp_establishments_state` | Census Business Patterns establishments | state | County multi-year is PLAN_067 SPEC_073 |
+| `econ_cbp_establishments_county` | CBP business establishments (latest yr) | county | **Has a time-scrubber** (5-year cascade 2018-2022) |
+| `econ_cbp_establishments_state` | CBP establishments (state rollup) | state | Superseded by the county layer; kept for compat |
+| `econ_sec_active_filers` | SEC-registered companies by HQ state | state | State-only — SEC carries no county address |
 
 [federal dollars — Arlington VA in panel](http://localhost:3001/atlas.html?layer=econ_federal_dollars&place=51013) ·
-[CBP state](http://localhost:3001/atlas.html?layer=econ_cbp_establishments_state)
+[CBP county + scrubber](http://localhost:3001/atlas.html?layer=econ_cbp_establishments_county) ·
+[SEC active filers](http://localhost:3001/atlas.html?layer=econ_sec_active_filers)
 
 ### Energy (2 layers — both point overlays)
 | Layer ID | What it shows | Count | |
@@ -269,6 +272,14 @@ Try [Harris Co TX, all layers](http://localhost:3001/atlas.html?place=48201) (Ha
   Highlights: 2005 (Katrina), 2012 (Sandy), 2017 (Harvey/Maria),
   2024 (Beryl/Helene).
 - "ALL" button restores the all-years aggregate.
+
+#### CBP time-scrubber (SPEC_066e — generalized) 🆕
+- Open [`/atlas.html?layer=econ_cbp_establishments_county`](http://localhost:3001/atlas.html?layer=econ_cbp_establishments_county).
+- Same year-slider docked at the top, labeled "CBP YEAR" instead.
+- Drag through 2018 → 2022. Watch industry density shift — 2020 hits
+  show COVID's establishment churn; 2022 shows recovery patterns.
+- The scrubber is the same UI as FEMA, generalized via SCRUBBER_LAYERS
+  config — any layer with a `/cascade` endpoint can plug in.
 
 ### SPEC_067 addition (Wave 3 — "Recent Activity")
 
