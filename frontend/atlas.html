@@ -731,22 +731,31 @@
   // on demand. First-load fetches; subsequent toggles are cache hits.
   async function ensureBoundariesForGrain(grain) {
     if (BOUNDARY_GRAIN === grain && BOUNDARY_LAYER) return;
-    if (!BOUNDARY_CACHE[grain]) {
+    // Tract grain is too big (~78k features ≈ 30 MB) to fetch unfiltered.
+    // Use the current viewport bbox to scope it to ~visible-area tracts.
+    let url = API + `/boundaries?geo_level=${grain}&tolerance=0.005`;
+    let cacheKey = grain;
+    if (grain === 'tract') {
+      const b = MAP.getBounds().pad(0.5);   // 50% padding for pan/zoom headroom
+      const bbox = `${b.getWest().toFixed(3)},${b.getSouth().toFixed(3)},${b.getEast().toFixed(3)},${b.getNorth().toFixed(3)}`;
+      url += `&bbox=${bbox}`;
+      cacheKey = `tract:${bbox}`;
+    }
+    if (!BOUNDARY_CACHE[cacheKey]) {
       toast(`Loading ${grain} boundaries…`);
-      const url = API + `/boundaries?geo_level=${grain}&tolerance=0.005`;
       try {
-        BOUNDARY_CACHE[grain] = await fetch(url).then(r => r.json());
+        BOUNDARY_CACHE[cacheKey] = await fetch(url).then(r => r.json());
       } catch (e) {
         toast(`Failed to load ${grain} boundaries`);
         return;
       }
     }
     if (BOUNDARY_LAYER) { MAP.removeLayer(BOUNDARY_LAYER); BOUNDARY_LAYER = null; }
-    BOUNDARIES = BOUNDARY_CACHE[grain];
+    BOUNDARIES = BOUNDARY_CACHE[cacheKey];
     computeCentroids(BOUNDARIES);
     renderBoundaries(BOUNDARIES);
     BOUNDARY_GRAIN = grain;
-    track('boundary_grain_switched', { grain });
+    track('boundary_grain_switched', { grain, n_features: (BOUNDARIES.features || []).length });
   }
 
   function renderBoundaries(geojson) {

@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import logging
 from functools import lru_cache
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -85,8 +85,14 @@ def fetch_boundaries(
     geo_level: str = "county",
     tolerance: float = 0.005,
     force_refresh: bool = False,
+    bbox: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Return a GeoJSON FeatureCollection of boundaries at `geo_level`."""
+    """Return a GeoJSON FeatureCollection of boundaries at `geo_level`.
+
+    `bbox` is "minx,miny,maxx,maxy" — when set, restricts to polygons
+    whose stored bbox intersects the query bbox. Critical for tract
+    grain (78k+ features nationally would otherwise OOM the frontend
+    or timeout the response)."""
     # SPEC_077 A.2 — added tract + zcta for the commerce simulator
     if geo_level not in ("county", "state", "tract", "zcta"):
         raise ValueError(
@@ -94,7 +100,25 @@ def fetch_boundaries(
             f"got {geo_level!r}"
         )
 
-    cache_key = f"{geo_level}:{tolerance}"
+    # Parse bbox if provided: "minx,miny,maxx,maxy"
+    bbox_clause = ""
+    bbox_params: Dict[str, Any] = {}
+    if bbox:
+        try:
+            mn_x, mn_y, mx_x, mx_y = [float(x) for x in bbox.split(",")]
+            # Stored bbox columns are TEXT (per existing schema); cast to numeric
+            bbox_clause = (
+                " AND CAST(bbox_minx AS NUMERIC) <= :mx_x"
+                " AND CAST(bbox_maxx AS NUMERIC) >= :mn_x"
+                " AND CAST(bbox_miny AS NUMERIC) <= :mx_y"
+                " AND CAST(bbox_maxy AS NUMERIC) >= :mn_y"
+            )
+            bbox_params = {"mn_x": mn_x, "mn_y": mn_y, "mx_x": mx_x, "mx_y": mx_y}
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"invalid bbox {bbox!r}: {exc}")
+
+    # Cache key includes bbox so different viewports cache independently.
+    cache_key = f"{geo_level}:{tolerance}:{bbox or 'none'}"
     if not force_refresh and cache_key in _GEOMETRY_CACHE:
         return _GEOMETRY_CACHE[cache_key]
 
@@ -103,14 +127,14 @@ def fetch_boundaries(
                 geo_level, postgis, tolerance)
 
     if postgis:
-        rows = db.execute(text("""
+        rows = db.execute(text(f"""
             SELECT geo_id, geo_name,
                    ST_AsGeoJSON(ST_Simplify(
                        ST_GeomFromGeoJSON(geojson::text), :tol
                    ))::json AS geom
             FROM geojson_boundaries
-            WHERE geo_level = :lvl
-        """), {"lvl": geo_level, "tol": tolerance}).mappings().all()
+            WHERE geo_level = :lvl{bbox_clause}
+        """), {"lvl": geo_level, "tol": tolerance, **bbox_params}).mappings().all()
         features = [
             {
                 "type": "Feature",
@@ -120,11 +144,11 @@ def fetch_boundaries(
             for r in rows if r["geom"]
         ]
     else:
-        rows = db.execute(text("""
+        rows = db.execute(text(f"""
             SELECT geo_id, geo_name, geojson
             FROM geojson_boundaries
-            WHERE geo_level = :lvl
-        """), {"lvl": geo_level}).mappings().all()
+            WHERE geo_level = :lvl{bbox_clause}
+        """), {"lvl": geo_level, **bbox_params}).mappings().all()
         features = []
         for r in rows:
             geom = r["geojson"]

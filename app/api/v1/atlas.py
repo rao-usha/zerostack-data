@@ -200,14 +200,17 @@ def get_layer_endpoint(layer_id: str, db: Session = Depends(get_db)):
 def get_boundaries_endpoint(
     geo_level: str = "county",
     tolerance: float = 0.005,
+    bbox: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    """Return a GeoJSON FeatureCollection of county or state boundaries with
-    server-side geometry simplification. The map joins layer values to this
-    geometry client-side. Cached in-process per (geo_level, tolerance) since
-    boundaries don't change."""
+    """Return a GeoJSON FeatureCollection of boundaries at the requested
+    geo_level. `bbox` is "minx,miny,maxx,maxy" — restricts to polygons
+    intersecting the bbox. Critical for tract grain (~74k features
+    nationally would otherwise time out)."""
     try:
-        return boundaries_mod.fetch_boundaries(db, geo_level=geo_level, tolerance=tolerance)
+        return boundaries_mod.fetch_boundaries(
+            db, geo_level=geo_level, tolerance=tolerance, bbox=bbox,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
