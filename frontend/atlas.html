@@ -197,6 +197,28 @@
       stroke-dasharray:6 6; animation: flow 3s linear infinite;
     }
 
+    /* SPEC_079 — focal-node marker glyph (planted by Atlas Pilot or manually) */
+    .focal-marker { background:transparent !important; border:none !important; }
+    .focal-pin {
+      position:relative; width:0; height:0;
+      border-left:14px solid transparent; border-right:14px solid transparent;
+      border-top:22px solid #fbbf24;
+      filter:drop-shadow(0 2px 4px rgba(0,0,0,.6));
+      margin-left:46px;
+    }
+    .focal-pin::after {
+      content:''; position:absolute; top:-22px; left:-7px;
+      width:14px; height:14px; border-radius:50%;
+      background:#fbbf24; border:2px solid #0a0e1a;
+    }
+    .focal-naics {
+      position:absolute; bottom:24px; left:-46px;
+      width:104px; text-align:center; font-size:10px; font-weight:700;
+      color:#fbbf24; background:rgba(10,14,26,.85);
+      padding:2px 4px; border-radius:4px; letter-spacing:.04em;
+      font-family:ui-monospace,Menlo,monospace;
+    }
+
     /* SPEC_078 — Atlas Pilot question box (header) + response side panel */
     #pilot-input { background:var(--bg); border:1px solid var(--border); color:var(--text);
       padding:6px 10px; border-radius:6px; font-size:13px; width:340px; }
@@ -509,6 +531,9 @@
   // SPEC_066c state
   let OVERLAY_MODE = 'dots';          // 'dots' | 'heat'
   let OVERLAY_FEATURES = null;        // cached features for re-render on heat toggle
+
+  // SPEC_079 — focal-node marker for Atlas Pilot ui actions
+  let FOCAL_MARKER = null;
 
   // SPEC_066e — generalized time-cascade scrubber
   // Add a layer here + ensure its cascade endpoint exists, scrubber works.
@@ -1494,6 +1519,11 @@
     narrEl.style.color = 'var(--text)';
     narrEl.textContent = data.narration || '(no answer)';
 
+    // SPEC_079 — Apply UI actions the agent queued (zoom, focal_node, toggle_layer, highlight_place)
+    if (Array.isArray(data.ui_actions) && data.ui_actions.length) {
+      applyPilotUiActions(data.ui_actions);
+    }
+
     const cites = data.citations || [];
     if (cites.length) {
       const c = document.getElementById('pilot-cites');
@@ -1521,6 +1551,56 @@
 
   function closePilot() {
     document.getElementById('pilot-panel').classList.remove('show');
+  }
+
+  // SPEC_079 — apply the agent's queued UI actions in order.
+  // Each action mutates the map (zoom, layer toggle, focal node, place highlight).
+  async function applyPilotUiActions(actions) {
+    for (const a of actions) {
+      try {
+        await applyOnePilotAction(a);
+      } catch (e) {
+        console.warn('Atlas Pilot UI action failed', a, e);
+      }
+    }
+    track('pilot_ui_actions_applied', { n: actions.length });
+  }
+
+  async function applyOnePilotAction(a) {
+    const args = a.args || {};
+    if (a.name === 'zoom_to') {
+      MAP.setView([args.lat, args.lon], args.zoom_level || 12);
+    }
+    else if (a.name === 'plant_focal_node') {
+      plantFocalMarker(args.lat, args.lon, args.label || args.naics, args.naics);
+    }
+    else if (a.name === 'toggle_layer') {
+      const spec = LAYER_SPECS[args.layer_id];
+      if (!spec) return;
+      // Reuse the existing onLayerClick logic so all side-effects fire
+      await onLayerClick(spec);
+    }
+    else if (a.name === 'highlight_place') {
+      if (BOUNDARY_LAYER) BOUNDARY_LAYER.eachLayer(fl => {
+        if (fl.feature.properties.geo_id === args.geo_id) {
+          MAP.fitBounds(fl.getBounds(), { maxZoom: 14 });
+        }
+      });
+      await openPlace(args.geo_id);
+    }
+  }
+
+  function plantFocalMarker(lat, lon, label, naics) {
+    if (FOCAL_MARKER) { MAP.removeLayer(FOCAL_MARKER); FOCAL_MARKER = null; }
+    FOCAL_MARKER = L.marker([lat, lon], {
+      icon: L.divIcon({
+        className: 'focal-marker',
+        html: `<div class="focal-pin"><span class="focal-naics">${naics || ''}</span></div>`,
+        iconSize: [120, 30], iconAnchor: [60, 30],
+      }),
+    }).addTo(MAP);
+    FOCAL_MARKER.bindTooltip(`<b>Focal node</b><br>${label}<br>NAICS ${naics}`,
+                              { sticky: true });
   }
 
   // ═══════════════════════════════════════════════════════════════════════

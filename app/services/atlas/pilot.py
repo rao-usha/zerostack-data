@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from app.services.atlas.pilot_tools import TOOL_DEFS, dispatch
+from app.services.atlas.pilot_tools import TOOL_DEFS, dispatch, is_ui_tool
 
 logger = logging.getLogger(__name__)
 
@@ -44,17 +44,35 @@ about US places (states, counties, census tracts) and you answer using the
 provided tools, which read from a governed public-data corpus (Census ACS,
 FEMA, FDIC, IRS migration, USAspending, SEC, CBP, EPA, etc.).
 
+You have two kinds of tools:
+
+  READ TOOLS — fetch data so you can reason:
+    list_layers, query_place, compare_places, get_recent_events,
+    get_migration_flows, cite
+
+  UI TOOLS — pilot the map. The user sees these side effects after your
+  narration renders. Use them to show the answer visually, not just describe it:
+    plant_focal_node   — drop a focal-node glyph at lat/lon for a NAICS
+    zoom_to            — recenter+zoom the map
+    toggle_layer       — activate a choropleth or point overlay
+    highlight_place    — open a place's panel + fit the map to it
+
 How to work:
 1. Plan briefly before calling tools — one paragraph max.
 2. Use list_layers if you need to discover what data exists.
 3. Use query_place for single-place facts, compare_places for comparisons.
 4. Use get_recent_events for "what's new" questions.
 5. Use get_migration_flows for migration questions.
-6. EVERY numerical claim in your final answer MUST be backed by a cite() call.
-   Make the cite() call right before stating the claim in your final narration.
-7. If a tool returns an error or no data, say so honestly — don't fabricate.
-8. Be concise and analyst-grade. Not chat. Specific numbers, specific places.
-9. Prefer 5-digit county FIPS over 2-digit state when both apply.
+6. For questions about a SPECIFIC place: call highlight_place(geo_id) so the user
+   sees the place selected on the map.
+7. For questions about a SPECIFIC LAYER (income, broadband, federal dollars,
+   etc): call toggle_layer(layer_id) so the choropleth shows visually.
+8. For questions about a SPECIFIC LOCATION (street address, business idea at
+   coords): call plant_focal_node(naics, lat, lon) and zoom_to(lat, lon, 12).
+9. EVERY numerical claim in your final answer MUST be backed by a cite() call.
+10. If a tool returns an error or no data, say so honestly — don't fabricate.
+11. Be concise and analyst-grade. Not chat. Specific numbers, specific places.
+12. Prefer 5-digit county FIPS over 2-digit state when both apply.
 
 Final answer format: 3-6 sentences of analyst prose. Numerical claims tied
 to cite() calls. No emojis. No "Here's what I found:" preamble. DO NOT
@@ -107,6 +125,7 @@ def run_pilot(
     ]
     tool_calls_log: List[Dict[str, Any]] = []
     citations: List[Dict[str, str]] = []
+    ui_actions: List[Dict[str, Any]] = []
     final_narration: Optional[str] = None
     loop_n = 0
     truncated = False
@@ -162,6 +181,9 @@ def run_pilot(
                     "claim": args.get("claim", ""),
                     "source": args.get("source", ""),
                 })
+            # SPEC_079 — UI tools queue actions the frontend applies post-render
+            if is_ui_tool(name) and isinstance(result, dict) and result.get("action"):
+                ui_actions.append(result["action"])
             messages.append({
                 "role": "tool",
                 "tool_call_id": tc.id,
@@ -174,6 +196,7 @@ def run_pilot(
         "narration": final_narration or "",
         "tool_calls": tool_calls_log,
         "citations": citations,
+        "ui_actions": ui_actions,
         "loops_used": loop_n,
         "truncated": truncated,
         "model_used": model,
