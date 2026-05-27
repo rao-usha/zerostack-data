@@ -1,9 +1,19 @@
 # Nexdata Atlas — Launch Guide
 
-**Date:** 2026-05-25
+**Date:** 2026-05-27 *(refreshed during PLAN_073 Phase A)*
 **Audience:** you, the launcher. Click through every URL, see every feature, verify everything works.
 **Length:** ~15 min read · ~30 min clickthrough
-**Status:** the Atlas is feature-complete for v1 launch. This guide is the comprehensive showcase + pre-launch verification.
+**Status:** PLAN_073 (Atlas Pilot commerce simulator) Phase A largely shipped. The map now has a **real basemap** and **tract-grain demographic layers** as the foundation for the focal-node UX. Phases B-G follow.
+
+## What changed since last edit
+
+- **Real basemap** — Carto Dark Matter tiles now render under the choropleth. The map looks like a map. ([SPEC_077 A.1, commit 9e16920](http://localhost:3001/atlas.html))
+- **Default choropleth opacity dropped 85% → 55%** so streets are visible underneath.
+- **County click auto-zooms to neighborhood scale (~zoom 14)** instead of zoom 8 — trade-area scale. [SPEC_077 A.4]
+- **78,383 census tracts ingested** into `geojson_boundaries` ([SPEC_077 A.2, tracts shipped, ZCTAs deferred to SPEC_077b])
+- **4 new tract-grain demographic layers** registered: median income, median age, population, owner-occupied housing. The frontend auto-switches boundary grain (county ↔ tract) when you toggle these. [SPEC_077 A.3 + A.4]
+- **Boundary "glass shards" bug fixed** — adjacent counties now share clean borders. [SPEC_076, commit e15653c]
+- **PLAN_073 rev_01 committed** — pivot to LLM-piloted commerce simulator for retail site-selection consultants. Phase A complete; Phases B (agent shell), C (focal-node + competition + demand), D (suppliers + logistics), E (Atlas Pilot agent quality), F (macro stress), G (sharing) remain.
 
 > **Companion docs**
 > - `docs/LAUNCH_READINESS.md` — the strategic "should I launch?" doc

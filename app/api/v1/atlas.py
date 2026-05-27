@@ -291,6 +291,25 @@ def get_cbp_cascade_endpoint(db: Session = Depends(get_db)):
 # SPEC_067 — Recent Activity feed
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC_078 Phase B — Atlas Pilot (LLM-driven agent)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PilotBody(BaseModel):
+    question: str = Field(..., min_length=1, max_length=2000)
+    session_id: Optional[str] = None
+
+
+@router.post("/pilot")
+def atlas_pilot_endpoint(body: PilotBody, db: Session = Depends(get_db)):
+    """Atlas Pilot v0 — LLM agent that answers questions by calling
+    constrained tools over the governed Atlas data corpus. Non-streaming;
+    client waits for full transcript. SPEC_078."""
+    from app.services.atlas.pilot import run_pilot
+    result = run_pilot(db, question=body.question, session_id=body.session_id)
+    return result
+
+
 @router.get("/recent")
 def get_recent_events_endpoint(
     sources: str = "fema",

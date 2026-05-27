@@ -197,6 +197,45 @@
       stroke-dasharray:6 6; animation: flow 3s linear infinite;
     }
 
+    /* SPEC_078 — Atlas Pilot question box (header) + response side panel */
+    #pilot-input { background:var(--bg); border:1px solid var(--border); color:var(--text);
+      padding:6px 10px; border-radius:6px; font-size:13px; width:340px; }
+    #pilot-input:focus { outline:none; border-color:var(--primary); }
+    #pilot-input:disabled { opacity:.6; }
+
+    #pilot-panel { position:absolute; top:60px; right:12px; z-index:600;
+      background:rgba(20,27,45,.97); border:1px solid var(--border);
+      border-radius:10px; padding:14px 14px 12px; display:none;
+      box-shadow:0 8px 28px rgba(0,0,0,.6);
+      width:420px; max-height:calc(100vh - 140px);
+      flex-direction:column; }
+    #pilot-panel.show { display:flex; }
+    #pilot-panel h4 { margin:0 0 8px; font-size:13px; font-weight:600; color:var(--text); }
+    #pilot-panel .sub { font-size:11px; color:var(--dim); margin-bottom:8px; }
+    #pilot-panel button.close { position:absolute; top:8px; right:10px;
+      background:transparent; color:var(--dim); border:none; cursor:pointer;
+      font-size:18px; padding:0; line-height:1; }
+    #pilot-question { padding:8px 10px; border-radius:6px; background:var(--panel-2);
+      color:var(--muted); font-size:12px; font-style:italic; margin-bottom:10px; }
+    #pilot-narration { font-size:13px; line-height:1.5; color:var(--text);
+      margin-bottom:12px; white-space:pre-wrap; }
+    #pilot-tools { font-size:11px; color:var(--dim); border-top:1px solid var(--border);
+      padding-top:8px; max-height:200px; overflow-y:auto; }
+    #pilot-tools .step { padding:4px 6px; margin-bottom:3px; border-radius:4px;
+      background:var(--panel-2); font-family:ui-monospace,Menlo,monospace; font-size:10px; }
+    #pilot-tools .step.cite { color:var(--success); }
+    #pilot-cites { font-size:11px; color:var(--muted); border-top:1px solid var(--border);
+      padding-top:8px; margin-top:8px; }
+    #pilot-cites .cite { padding:3px 0; border-left:2px solid var(--success); padding-left:8px;
+      margin-bottom:4px; }
+    #pilot-meta { font-size:10px; color:var(--dim); margin-top:8px; }
+    #pilot-loading { padding:20px 0; text-align:center; color:var(--muted); font-size:12px; }
+    .pilot-spinner { display:inline-block; width:14px; height:14px;
+      border:2px solid var(--border); border-top-color:var(--accent);
+      border-radius:50%; animation:spin 1s linear infinite; margin-right:6px;
+      vertical-align:middle; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
     /* SPEC_067 — Recent Activity floating panel */
     #recent-overlay { position:absolute; top:60px; right:12px; z-index:600;
       background:rgba(20,27,45,.97); border:1px solid var(--border);
@@ -309,9 +348,11 @@
         <span><b id="ct-epa">0</b> EPA facilities</span>
         <span><b id="ct-fema">0</b> FEMA decls since 1999</span>
       </div>
-      <div id="search-wrap">
-        <input id="search" placeholder="Fast-travel: a place or NAICS sector…">
-        <button class="btn-icon" id="go">Go</button>
+      <div id="search-wrap" style="display:flex; gap:6px; align-items:center;">
+        <input id="pilot-input" placeholder="Ask the Pilot — e.g. compare Austin & Houston">
+        <button class="btn-icon" id="pilot-go" title="Ask the Atlas Pilot agent">Ask →</button>
+        <input id="search" placeholder="Fast-travel…" style="width:130px">
+        <button class="btn-icon" id="go" title="Fast-travel search">Go</button>
       </div>
       <button class="btn-icon" id="compare-toggle" title="Bivariate compare mode">Compare layers</button>
       <button class="btn-icon" id="scatter-toggle" title="Scatter pair explorer">🔬 Scatter</button>
@@ -374,6 +415,20 @@
           <div id="biv-grid" class="grid"></div>
         </div>
         <div class="axes"><span>A: low</span><span>high</span></div>
+      </div>
+
+      <!-- SPEC_078 — Atlas Pilot floating response panel -->
+      <div id="pilot-panel">
+        <button class="close" id="pilot-close">×</button>
+        <h4>Atlas Pilot</h4>
+        <div id="pilot-question"></div>
+        <div id="pilot-loading" style="display:none">
+          <span class="pilot-spinner"></span>Thinking… (5-30s)
+        </div>
+        <div id="pilot-narration" style="display:none"></div>
+        <div id="pilot-cites" style="display:none"></div>
+        <div id="pilot-tools" style="display:none"></div>
+        <div id="pilot-meta" style="display:none"></div>
       </div>
 
       <!-- SPEC_067 — Recent Activity floating overlay -->
@@ -439,6 +494,10 @@
   let MAP = null;
   let BOUNDARIES = null;
   let BOUNDARY_LAYER = null;
+  // SPEC_077 A.4 — grain-switching: cache one FeatureCollection per grain
+  // so toggling between county and tract layers doesn't re-fetch.
+  const BOUNDARY_CACHE = {};
+  let BOUNDARY_GRAIN = 'county';
   let OVERLAY_LAYER = null;
   let ARC_LAYER = null;
   let REGISTRY = null;
@@ -571,8 +630,17 @@
     renderLayerPanel(REGISTRY);
 
     BOUNDARIES = bounds;
+    BOUNDARY_CACHE['county'] = bounds;
+    BOUNDARY_GRAIN = 'county';
     computeCentroids(bounds);            // Wave 4 prereq
     renderBoundaries(bounds);
+
+    // SPEC_077 A.4 — URL deep-link case: if landing on a tract-grain
+    // layer, switch boundaries to tract before painting.
+    const initialSpec = LAYER_SPECS[state.layerId];
+    if (initialSpec && initialSpec.grain === 'tract') {
+      await ensureBoundariesForGrain('tract');
+    }
 
     CURRENT_LAYER_RESULT = layer;
     applyLayerToBoundaries(layer, /*transition=*/false);
@@ -657,6 +725,28 @@
       for (const p of ring) { sx += p[0]; sy += p[1]; }
       CENTROIDS[f.properties.geo_id] = [sx / ring.length, sy / ring.length];
     }
+  }
+
+  // SPEC_077 A.4 — switch boundary layer between county and tract grain
+  // on demand. First-load fetches; subsequent toggles are cache hits.
+  async function ensureBoundariesForGrain(grain) {
+    if (BOUNDARY_GRAIN === grain && BOUNDARY_LAYER) return;
+    if (!BOUNDARY_CACHE[grain]) {
+      toast(`Loading ${grain} boundaries…`);
+      const url = API + `/boundaries?geo_level=${grain}&tolerance=0.005`;
+      try {
+        BOUNDARY_CACHE[grain] = await fetch(url).then(r => r.json());
+      } catch (e) {
+        toast(`Failed to load ${grain} boundaries`);
+        return;
+      }
+    }
+    if (BOUNDARY_LAYER) { MAP.removeLayer(BOUNDARY_LAYER); BOUNDARY_LAYER = null; }
+    BOUNDARIES = BOUNDARY_CACHE[grain];
+    computeCentroids(BOUNDARIES);
+    renderBoundaries(BOUNDARIES);
+    BOUNDARY_GRAIN = grain;
+    track('boundary_grain_switched', { grain });
   }
 
   function renderBoundaries(geojson) {
@@ -882,6 +972,10 @@
     }
     state.layerId = spec.id; syncURL();
     track('layer_toggled', { layer_id: spec.id, role: 'base' });
+    // SPEC_077 A.4 — ensure boundary grain matches the layer's grain
+    if (spec.grain === 'county' || spec.grain === 'tract') {
+      await ensureBoundariesForGrain(spec.grain);
+    }
     const res = await fetch(API + '/layer/' + encodeURIComponent(spec.id)).then(r => r.json());
     applyLayerToBoundaries(res, true);
     markActiveLayerButton(); updateActiveLayerControls();
@@ -1326,8 +1420,9 @@
         }
         // FEMA path — fit map to county + open place panel.
         if (BOUNDARY_LAYER && item.place_id) BOUNDARY_LAYER.eachLayer(fl => {
+          // SPEC_077 A.4 — neighborhood-scale on Recent Activity click
           if (fl.feature.properties.geo_id === item.place_id)
-            MAP.fitBounds(fl.getBounds(), { maxZoom: 8 });
+            MAP.fitBounds(fl.getBounds(), { maxZoom: 14 });
         });
         if (item.place_id) openPlace(item.place_id);
         closeRecent();
@@ -1339,6 +1434,84 @@
     return String(s).replace(/[&<>"']/g, c => ({
       '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
     })[c]);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SPEC_078 — Atlas Pilot agent
+  // ═══════════════════════════════════════════════════════════════════════
+  async function askPilot(question) {
+    if (!question || !question.trim()) return;
+    const panel = document.getElementById('pilot-panel');
+    panel.classList.add('show');
+    document.getElementById('pilot-question').textContent = question;
+    document.getElementById('pilot-loading').style.display = 'block';
+    document.getElementById('pilot-narration').style.display = 'none';
+    document.getElementById('pilot-cites').style.display = 'none';
+    document.getElementById('pilot-tools').style.display = 'none';
+    document.getElementById('pilot-meta').style.display = 'none';
+    document.getElementById('pilot-input').disabled = true;
+    track('pilot_question_submitted', { question_chars: question.length });
+
+    try {
+      const res = await fetch(API + '/pilot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, session_id: SESSION }),
+      });
+      const data = await res.json();
+      renderPilotResponse(question, data);
+      track('pilot_completed', {
+        loops: data.loops_used, ok: !data.error,
+        n_tools: (data.tool_calls || []).length,
+      });
+    } catch (e) {
+      document.getElementById('pilot-loading').style.display = 'none';
+      document.getElementById('pilot-narration').textContent = 'Pilot request failed: ' + e;
+      document.getElementById('pilot-narration').style.display = 'block';
+    } finally {
+      document.getElementById('pilot-input').disabled = false;
+    }
+  }
+
+  function renderPilotResponse(question, data) {
+    document.getElementById('pilot-loading').style.display = 'none';
+    const narrEl = document.getElementById('pilot-narration');
+    narrEl.style.display = 'block';
+    if (data.error) {
+      narrEl.style.color = 'var(--warn)';
+      narrEl.textContent = data.error;
+      return;
+    }
+    narrEl.style.color = 'var(--text)';
+    narrEl.textContent = data.narration || '(no answer)';
+
+    const cites = data.citations || [];
+    if (cites.length) {
+      const c = document.getElementById('pilot-cites');
+      c.style.display = 'block';
+      c.innerHTML = '<div style="font-weight:600; margin-bottom:4px">Citations</div>' +
+        cites.map(x => `<div class="cite"><b>${escapeHtml(x.claim || '')}</b><br>
+          <span style="color:var(--dim)">${escapeHtml(x.source || '')}</span></div>`).join('');
+    }
+
+    const tools = data.tool_calls || [];
+    if (tools.length) {
+      const t = document.getElementById('pilot-tools');
+      t.style.display = 'block';
+      t.innerHTML = '<div style="font-weight:600; margin-bottom:4px">Tool calls (' + tools.length + ')</div>' +
+        tools.map(tc => `<div class="step ${tc.name === 'cite' ? 'cite' : ''}">[${tc.loop}] ${tc.name}(${
+          escapeHtml(JSON.stringify(tc.args).slice(0, 80))
+        })</div>`).join('');
+    }
+
+    document.getElementById('pilot-meta').style.display = 'block';
+    document.getElementById('pilot-meta').textContent =
+      `${data.loops_used || 0} loops · ${(data.duration_seconds || 0).toFixed(1)}s · ${data.model_used || '?'}` +
+      (data.truncated ? ' · TRUNCATED' : '');
+  }
+
+  function closePilot() {
+    document.getElementById('pilot-panel').classList.remove('show');
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -1356,7 +1529,10 @@
       const fips = (data.resolved_entities?.geographies || [])[0];
       if (!fips) { toast('Resolved but no county to jump to'); return; }
       BOUNDARY_LAYER.eachLayer(fl => {
-        if (fl.feature.properties.geo_id === fips) MAP.fitBounds(fl.getBounds(), { maxZoom: 8 });
+        // SPEC_077 A.4 — neighborhood-scale on place click (was maxZoom: 8).
+        // 14 ≈ 1-2 mile radius visible — the trade-area scale a consultant
+        // actually evaluates a site at.
+        if (fl.feature.properties.geo_id === fips) MAP.fitBounds(fl.getBounds(), { maxZoom: 14 });
       });
       await openPlace(fips);
       track('search_executed', { query, resolved: fips });
@@ -1371,6 +1547,13 @@
   document.getElementById('search').onkeydown = e => {
     if (e.key === 'Enter') fastTravel(e.target.value);
   };
+  // SPEC_078 — Atlas Pilot wiring
+  document.getElementById('pilot-go').onclick =
+    () => askPilot(document.getElementById('pilot-input').value);
+  document.getElementById('pilot-input').onkeydown = e => {
+    if (e.key === 'Enter') askPilot(e.target.value);
+  };
+  document.getElementById('pilot-close').onclick = closePilot;
   document.getElementById('share').onclick = () => {
     navigator.clipboard.writeText(location.href);
     toast('Share link copied'); track('share_created', { url: location.href });
