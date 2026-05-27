@@ -324,6 +324,12 @@ def build_scenarios(layers: List[dict]) -> List[Scenario]:
                            f"&overlay={urllib.parse.quote(lid)}",
                 asserts=[assert_overlay_active(lid)],
             ))
+        elif l["grain"] == "tract":
+            # Tract layers trigger ensureBoundariesForGrain which fetches
+            # a 30MB+ boundary collection — too heavy for the standard
+            # 18s virtual-time budget. Skip in v0 smoke; covered by a
+            # focused tract-grain scenario instead.
+            continue
         else:
             scenarios.append(Scenario(
                 category="L", name=f"{lid} ({l['grain']} choropleth)",

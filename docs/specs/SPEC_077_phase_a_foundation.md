@@ -48,16 +48,22 @@ zoom-in and show real streets.
 - [ ] Existing 40/40 smoke scenarios stay green (basemap is purely additive).
 
 ### A.2 — Sub-county boundary ingest
-- [ ] New table `geojson_boundaries_zcta` populated with ~33k ZCTA
-      polygons from Census TIGER 2024 (or latest available).
-- [ ] New table `geojson_boundaries_tract` populated with ~74k census-
-      tract polygons (latest TIGER vintage).
-- [ ] `GET /atlas/boundaries?geo_level=zcta` returns the ZCTA collection.
-- [ ] `GET /atlas/boundaries?geo_level=tract` returns the tract collection.
-- [ ] Both honor the existing in-memory cache pattern.
-- [ ] Payload size: ZCTA ~10-15 MB, tract ~30-40 MB (one-time fetch,
-      cached). Acceptable trade-off; pre-simplification is SPEC_076b
-      future work.
+- [x] Tract rows in `geojson_boundaries` (geo_level='tract'),
+      78,383 rows from TIGERweb 2020.
+- [ ] **ZCTA deferred** — TIGERweb's WAF blocks the standard 1000-
+      feature page size (returns HTML 200 reject). The 200-feature
+      smaller-page workaround works but adds ~15min ingest time.
+      Tracts are sufficient for Phase C demand surfaces; ZCTAs
+      arrive as SPEC_077b once the focal-node UX needs ZIP-based
+      input (which it doesn't strictly need — tract is finer-grain).
+- [x] `GET /atlas/boundaries?geo_level=tract` returns 78,383 features.
+- [ ] `GET /atlas/boundaries?geo_level=zcta` will work once SPEC_077b
+      ships ZCTAs (endpoint already accepts the geo_level).
+- Performance note: tract payload is ~30-50 MB unsimplified. Phase A
+  doesn't bbox-filter; Phase C will add `?bbox=` when the focal-node
+  UX needs neighborhood-scoped tracts. Until then, the endpoint is
+  available but slow to fully load — fine for dev testing, not
+  production use.
 
 ### A.3 — Tract-grain ACS demand layers
 - [ ] New table `acs5_tract_2023_demand` with one row per tract,

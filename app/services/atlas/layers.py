@@ -402,6 +402,70 @@ def _build_federal_dollars(db: Session) -> LayerResult:
     )
 
 
+# ─── Tract-grain demand layers (SPEC_077 A.3 — Phase A) ─────────────────────
+
+def _build_tract_median_income(db: Session) -> LayerResult:
+    """Tract-grain ACS B19013 median household income — SPEC_077 A.3.
+    Powers the demand surface around a focal node in Phase C."""
+    rows = _safe_query(db, """
+        SELECT geo_id, b19013_001e AS value
+        FROM acs5_tract_2023_demand
+        WHERE b19013_001e IS NOT NULL AND b19013_001e > 0
+    """)
+    values = {r["geo_id"]: int(r["value"]) for r in rows if r["geo_id"]}
+    return LayerResult(
+        layer_id="demo_tract_median_income", grain="tract", values=values,
+        legend=_legend(list(values.values()), "USD median household income"),
+        provenance=[{"table": "acs5_tract_2023_demand", "rows": len(values)}],
+    )
+
+
+def _build_tract_median_age(db: Session) -> LayerResult:
+    rows = _safe_query(db, """
+        SELECT geo_id, b01002_001e AS value
+        FROM acs5_tract_2023_demand
+        WHERE b01002_001e IS NOT NULL AND b01002_001e > 0
+    """)
+    values = {r["geo_id"]: int(r["value"]) for r in rows if r["geo_id"]}
+    return LayerResult(
+        layer_id="demo_tract_median_age", grain="tract", values=values,
+        legend=_legend(list(values.values()), "years (median age)"),
+        provenance=[{"table": "acs5_tract_2023_demand", "rows": len(values)}],
+    )
+
+
+def _build_tract_population(db: Session) -> LayerResult:
+    rows = _safe_query(db, """
+        SELECT geo_id, b01003_001e AS value
+        FROM acs5_tract_2023_demand
+        WHERE b01003_001e IS NOT NULL AND b01003_001e > 0
+    """)
+    values = {r["geo_id"]: int(r["value"]) for r in rows if r["geo_id"]}
+    return LayerResult(
+        layer_id="demo_tract_population", grain="tract", values=values,
+        legend=_legend(list(values.values()), "persons (total population)"),
+        provenance=[{"table": "acs5_tract_2023_demand", "rows": len(values)}],
+    )
+
+
+def _build_tract_owner_occupied(db: Session) -> LayerResult:
+    """Derived: owner-occupied share = B25003_002E / B25003_001E × 100."""
+    rows = _safe_query(db, """
+        SELECT geo_id,
+               (b25003_002e::numeric / NULLIF(b25003_001e, 0) * 100) AS value
+        FROM acs5_tract_2023_demand
+        WHERE b25003_001e IS NOT NULL AND b25003_001e > 0
+          AND b25003_002e IS NOT NULL
+    """)
+    values = {r["geo_id"]: float(r["value"])
+              for r in rows if r["geo_id"] and r["value"] is not None}
+    return LayerResult(
+        layer_id="demo_tract_owner_occupied", grain="tract", values=values,
+        legend=_legend(list(values.values()), "% owner-occupied housing"),
+        provenance=[{"table": "acs5_tract_2023_demand", "rows": len(values)}],
+    )
+
+
 def _build_acs_median_income(db: Session) -> LayerResult:
     """ACS B19013 median household income at county summary — SPEC_070.
     Reads from the grain-explicit `acs5_county_2023_b19013` table
@@ -657,6 +721,46 @@ LAYERS: Dict[str, LayerSpec] = {
         builder=_build_rail_density,
     ),
     # Demographics
+    # SPEC_077 A.3 — tract-grain demand layers (for the focal-node UX
+    # in PLAN_073 Phase C). geo_id is 11-digit tract FIPS; needs the
+    # frontend grain-switcher (A.4) to actually render visually.
+    "demo_tract_median_income": LayerSpec(
+        id="demo_tract_median_income", label="Median Household Income (tract)",
+        domain="demographics", grain="tract", default_on=False,
+        vintage="2023 ACS 5-year", coverage_note="~74k census tracts",
+        unit="USD",
+        description="Tract-grain median household income for trade-area "
+                    "demand analysis. SPEC_077 A.3.",
+        builder=_build_tract_median_income,
+    ),
+    "demo_tract_median_age": LayerSpec(
+        id="demo_tract_median_age", label="Median Age (tract)",
+        domain="demographics", grain="tract", default_on=False,
+        vintage="2023 ACS 5-year", coverage_note="~74k census tracts",
+        unit="years",
+        description="Tract-grain median age — drives demographic profile "
+                    "of the trade area. SPEC_077 A.3.",
+        builder=_build_tract_median_age,
+    ),
+    "demo_tract_population": LayerSpec(
+        id="demo_tract_population", label="Population (tract)",
+        domain="demographics", grain="tract", default_on=False,
+        vintage="2023 ACS 5-year", coverage_note="~74k census tracts",
+        unit="persons",
+        description="Tract-grain total population — denominator for many "
+                    "demand-density calculations. SPEC_077 A.3.",
+        builder=_build_tract_population,
+    ),
+    "demo_tract_owner_occupied": LayerSpec(
+        id="demo_tract_owner_occupied", label="Owner-Occupied Housing (tract)",
+        domain="demographics", grain="tract", default_on=False,
+        vintage="2023 ACS 5-year", coverage_note="~74k census tracts",
+        unit="% owner-occupied",
+        description="Tract-grain owner-occupied housing share — proxy for "
+                    "neighborhood stability + housing-related demand "
+                    "(furniture, appliances, home services). SPEC_077 A.3.",
+        builder=_build_tract_owner_occupied,
+    ),
     "demo_acs_median_income": LayerSpec(
         id="demo_acs_median_income", label="Median Household Income (ACS)",
         domain="demographics", grain="county", default_on=False,

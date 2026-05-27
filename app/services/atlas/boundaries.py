@@ -87,8 +87,12 @@ def fetch_boundaries(
     force_refresh: bool = False,
 ) -> Dict[str, Any]:
     """Return a GeoJSON FeatureCollection of boundaries at `geo_level`."""
-    if geo_level not in ("county", "state"):
-        raise ValueError(f"geo_level must be 'county' or 'state'; got {geo_level!r}")
+    # SPEC_077 A.2 — added tract + zcta for the commerce simulator
+    if geo_level not in ("county", "state", "tract", "zcta"):
+        raise ValueError(
+            f"geo_level must be one of 'county', 'state', 'tract', 'zcta'; "
+            f"got {geo_level!r}"
+        )
 
     cache_key = f"{geo_level}:{tolerance}"
     if not force_refresh and cache_key in _GEOMETRY_CACHE:
