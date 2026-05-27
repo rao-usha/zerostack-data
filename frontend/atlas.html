@@ -291,6 +291,65 @@
       color:var(--success); font-size:11px; opacity:0; font-weight:500;
       transition:opacity .2s; }
     .view-pane .save-flash.show { opacity:1; }
+
+    /* ─── SPEC_084 — Thesis view: Notion-style blocks ────────── */
+    #view-thesis { padding:0; display:flex; flex-direction:column; }
+    #view-thesis .thesis-header { display:flex; align-items:center;
+      gap:10px; padding:14px 16px 10px; }
+    #view-thesis .thesis-header .panel-title { flex:1; padding:0;
+      margin:0; }
+    #view-thesis .thesis-header .link-btn { background:transparent;
+      border:none; color:var(--dim); cursor:pointer; font-size:11px;
+      padding:3px 6px; border-radius:4px; letter-spacing:.02em;
+      transition:color .14s ease, background .14s ease;
+      font-family:inherit; font-weight:500; }
+    #view-thesis .thesis-header .link-btn:hover { color:var(--warn);
+      background:rgba(251,191,36,.08); }
+
+    #view-thesis details.block { border-top:1px solid var(--border);
+      background:transparent; }
+    #view-thesis details.block:last-of-type {
+      border-bottom:1px solid var(--border); }
+    #view-thesis details.block summary {
+      display:flex; align-items:center; gap:10px;
+      padding:11px 16px; cursor:pointer; list-style:none;
+      user-select:none; transition:background .14s ease;
+    }
+    #view-thesis details.block summary::-webkit-details-marker { display:none; }
+    #view-thesis details.block summary::marker { content:''; }
+    #view-thesis details.block summary:hover { background:rgba(255,255,255,.035); }
+    #view-thesis details.block .chevron {
+      width:11px; height:11px; color:var(--muted); flex-shrink:0;
+      transition:transform .18s ease, color .14s ease;
+    }
+    #view-thesis details.block[open] .chevron {
+      transform:rotate(90deg); color:var(--accent); }
+    #view-thesis details.block .block-label { font-size:12.5px;
+      font-weight:600; color:var(--text); letter-spacing:-.005em; }
+    #view-thesis details.block .block-preview { font-size:11px;
+      color:var(--dim); margin-left:auto;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      max-width:58%; font-variant-numeric:tabular-nums;
+      font-style:italic; }
+    #view-thesis details.block .block-preview.has-value {
+      color:var(--muted); font-style:normal; }
+    #view-thesis details.block[open] .block-preview { display:none; }
+    #view-thesis details.block .block-body {
+      padding:2px 16px 14px 36px;
+      animation:blockBodyIn .14s ease both; }
+    @keyframes blockBodyIn {
+      from { opacity:0; transform:translateY(-2px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    #view-thesis details.block .block-body label:first-child { margin-top:4px; }
+
+    /* Sticky save bar — pinned to the bottom of the thesis pane */
+    #thesis-save-bar { position:sticky; bottom:0; margin-top:auto;
+      display:flex; align-items:center; gap:12px;
+      padding:10px 16px; border-top:1px solid var(--border);
+      background:rgba(22,29,49,.88); backdrop-filter:blur(10px) saturate(140%);
+      -webkit-backdrop-filter:blur(10px) saturate(140%); z-index:5; }
+    #thesis-save-bar .save-btn { margin-top:0; flex-shrink:0; }
     .view-pane .empty { color:var(--dim); font-style:italic;
       text-align:center; padding:20px 6px; }
     .place-row, .hist-row {
@@ -701,46 +760,121 @@
 
     <!-- ─── LEFT COLUMN (SPEC_082) — hosts the 4 switchable views -->
     <section id="left-col">
-      <!-- View 1: Thesis editor -->
+      <!-- View 1: Thesis editor — Notion-style collapsible blocks (SPEC_084) -->
       <div id="view-thesis" class="view-pane">
-        <div class="panel-title" style="padding:0 0 8px; color:var(--dim);
-             font-size:11px; text-transform:uppercase; letter-spacing:.06em;">
-          Investment thesis
+        <div class="thesis-header">
+          <div class="panel-title">Investment thesis</div>
+          <button class="link-btn" id="thesis-reset" title="Clear all thesis fields">Reset</button>
         </div>
-        <label for="thesis-industry-label">Industry / What you're banking</label>
-        <input type="text" id="thesis-industry-label"
-               placeholder="e.g. Furniture stores">
-        <label for="thesis-industry-naics">NAICS code <span style="color:var(--dim)">(optional)</span></label>
-        <input type="text" id="thesis-industry-naics"
-               placeholder="442110" maxlength="6">
 
-        <h3>Target demographics</h3>
-        <div class="row2">
-          <div>
-            <label for="thesis-hhi-min">HHI min ($)</label>
-            <input type="number" id="thesis-hhi-min" placeholder="75000" min="0">
+        <details class="block" data-block="industry" open>
+          <summary>
+            <svg class="chevron" viewBox="0 0 12 12" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 2l4 4-4 4"/>
+            </svg>
+            <span class="block-label">Industry</span>
+            <span class="block-preview" data-preview="industry">(empty)</span>
+          </summary>
+          <div class="block-body">
+            <label for="thesis-industry-label">What you're banking</label>
+            <input type="text" id="thesis-industry-label"
+                   placeholder="e.g. Furniture stores">
+            <label for="thesis-industry-naics">NAICS code <span style="color:var(--dim)">(optional)</span></label>
+            <input type="text" id="thesis-industry-naics"
+                   placeholder="442110" maxlength="6">
           </div>
-          <div>
-            <label for="thesis-hhi-max">HHI max ($)</label>
-            <input type="number" id="thesis-hhi-max" placeholder="" min="0">
+        </details>
+
+        <details class="block" data-block="demographics">
+          <summary>
+            <svg class="chevron" viewBox="0 0 12 12" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 2l4 4-4 4"/>
+            </svg>
+            <span class="block-label">Demographics</span>
+            <span class="block-preview" data-preview="demographics">(empty)</span>
+          </summary>
+          <div class="block-body">
+            <div class="row2">
+              <div>
+                <label for="thesis-hhi-min">HHI min ($)</label>
+                <input type="number" id="thesis-hhi-min" placeholder="75000" min="0">
+              </div>
+              <div>
+                <label for="thesis-hhi-max">HHI max ($)</label>
+                <input type="number" id="thesis-hhi-max" placeholder="" min="0">
+              </div>
+            </div>
+            <label for="thesis-age-band">Target age band</label>
+            <select id="thesis-age-band">
+              <option value="">(any)</option>
+              <option value="18-24">18-24</option>
+              <option value="25-44">25-44</option>
+              <option value="45-64">45-64</option>
+              <option value="65+">65+</option>
+            </select>
+            <label for="thesis-density">Min population density (people / km²)</label>
+            <input type="number" id="thesis-density" placeholder="" min="0">
           </div>
+        </details>
+
+        <details class="block" data-block="geography">
+          <summary>
+            <svg class="chevron" viewBox="0 0 12 12" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 2l4 4-4 4"/>
+            </svg>
+            <span class="block-label">Geography</span>
+            <span class="block-preview" data-preview="geography">(empty)</span>
+          </summary>
+          <div class="block-body">
+            <label for="thesis-region">Region focus</label>
+            <input type="text" id="thesis-region"
+                   placeholder="e.g. Texas metros · Travis County · 48453">
+          </div>
+        </details>
+
+        <details class="block" data-block="notes">
+          <summary>
+            <svg class="chevron" viewBox="0 0 12 12" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 2l4 4-4 4"/>
+            </svg>
+            <span class="block-label">Notes</span>
+            <span class="block-preview" data-preview="notes">(empty)</span>
+          </summary>
+          <div class="block-body">
+            <textarea id="thesis-notes"
+                      placeholder="Free-form context the Pilot should keep in mind…"></textarea>
+          </div>
+        </details>
+
+        <details class="block" data-block="layers">
+          <summary>
+            <svg class="chevron" viewBox="0 0 12 12" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 2l4 4-4 4"/>
+            </svg>
+            <span class="block-label">Layers / Excludes</span>
+            <span class="block-preview" data-preview="layers">(empty)</span>
+          </summary>
+          <div class="block-body">
+            <label for="thesis-exclude-layers">Hide these layers (comma-separated)</label>
+            <input type="text" id="thesis-exclude-layers"
+                   placeholder="e.g. disaster_nri, broadband_fixed_25_3">
+          </div>
+        </details>
+
+        <div id="thesis-save-bar">
+          <button class="save-btn" id="thesis-save">Save thesis</button>
+          <span class="save-flash" id="thesis-saved">✓ saved</span>
         </div>
-        <label for="thesis-age-band">Target age band</label>
-        <select id="thesis-age-band">
-          <option value="">(any)</option>
-          <option value="18-24">18-24</option>
-          <option value="25-44">25-44</option>
-          <option value="45-64">45-64</option>
-          <option value="65+">65+</option>
-        </select>
-        <label for="thesis-density">Min population density (people / km²)</label>
-        <input type="number" id="thesis-density" placeholder="" min="0">
-
-        <h3>Notes</h3>
-        <textarea id="thesis-notes" placeholder="Free-form context the Pilot should keep in mind…"></textarea>
-
-        <button class="save-btn" id="thesis-save">Save thesis</button>
-        <span class="save-flash" id="thesis-saved">✓ saved</span>
       </div>
 
       <!-- View 2: Layers -->
@@ -2719,6 +2853,9 @@
       target_pop_density_min: n('thesis-density'),
       target_age_band: v('thesis-age-band') || null,
       notes: v('thesis-notes').slice(0, 800) || null,
+      // SPEC_084 — new optional fields
+      region: v('thesis-region').slice(0, 80) || null,
+      exclude_layers: v('thesis-exclude-layers').slice(0, 200) || null,
     };
     return t;
   }
@@ -2739,6 +2876,94 @@
     set('thesis-density',        t.target_pop_density_min);
     set('thesis-age-band',       t.target_age_band);
     set('thesis-notes',          t.notes);
+    set('thesis-region',         t.region);
+    set('thesis-exclude-layers', t.exclude_layers);
+  }
+
+  // SPEC_084 — Notion-style block helpers
+  const THESIS_OPEN_KEY = 'atlas_thesis_open_v1';
+
+  function loadOpenState() {
+    try { return JSON.parse(localStorage.getItem(THESIS_OPEN_KEY) || '{}'); }
+    catch (_) { return {}; }
+  }
+  function saveOpenState(state) {
+    localStorage.setItem(THESIS_OPEN_KEY, JSON.stringify(state));
+  }
+  function refreshThesisPreviews() {
+    const t = thesisFromForm();
+    const set = (block, text, hasValue) => {
+      const el = document.querySelector(
+        `#view-thesis [data-preview="${block}"]`);
+      if (!el) return;
+      el.textContent = text || '(empty)';
+      el.classList.toggle('has-value', !!hasValue);
+    };
+    // Industry — label or NAICS
+    set('industry',
+      t.industry_label
+        || (t.industry_naics ? `NAICS ${t.industry_naics}` : ''),
+      !!(t.industry_label || t.industry_naics));
+    // Demographics — combine populated facets
+    const fmt$ = n => '$' + (n >= 1000 ? Math.round(n/1000) + 'K' : n);
+    const demo = [];
+    if (t.target_hhi_min != null && t.target_hhi_max != null)
+      demo.push(`HHI ${fmt$(t.target_hhi_min)}–${fmt$(t.target_hhi_max)}`);
+    else if (t.target_hhi_min != null) demo.push(`HHI ≥ ${fmt$(t.target_hhi_min)}`);
+    else if (t.target_hhi_max != null) demo.push(`HHI ≤ ${fmt$(t.target_hhi_max)}`);
+    if (t.target_age_band)        demo.push(t.target_age_band);
+    if (t.target_pop_density_min != null)
+      demo.push(`density ≥ ${t.target_pop_density_min}/km²`);
+    set('demographics', demo.join(' · '), demo.length > 0);
+    // Geography
+    set('geography', t.region || '', !!t.region);
+    // Notes — preview first 60 chars
+    set('notes',
+      t.notes ? (t.notes.slice(0, 60) + (t.notes.length > 60 ? '…' : '')) : '',
+      !!t.notes);
+    // Layers
+    set('layers',
+      t.exclude_layers ? `hides: ${t.exclude_layers}` : '',
+      !!t.exclude_layers);
+  }
+  function initThesisBlocks() {
+    const open = loadOpenState();
+    document.querySelectorAll('#view-thesis details.block').forEach(d => {
+      const id = d.dataset.block;
+      if (id in open) d.open = !!open[id];
+      d.addEventListener('toggle', () => {
+        const s = loadOpenState();
+        s[id] = d.open;
+        saveOpenState(s);
+        track('thesis_block_toggled', { block: id, open: d.open });
+      });
+    });
+    refreshThesisPreviews();
+    // Live preview updates as user types in any thesis input
+    document.querySelectorAll(
+      '#view-thesis input, #view-thesis textarea, #view-thesis select'
+    ).forEach(el => el.addEventListener('input', refreshThesisPreviews));
+  }
+  function resetThesis() {
+    if (!confirm('Clear all thesis fields? This cannot be undone.')) return;
+    localStorage.removeItem(THESIS_LS_KEY);
+    // Empty every field, then refresh form + previews, then collapse all
+    // blocks except Industry so the user starts fresh from the entry point.
+    document.querySelectorAll(
+      '#view-thesis input, #view-thesis textarea'
+    ).forEach(el => { el.value = ''; });
+    document.querySelectorAll(
+      '#view-thesis select'
+    ).forEach(el => { el.selectedIndex = 0; });
+    document.querySelectorAll('#view-thesis details.block').forEach(d => {
+      d.open = (d.dataset.block === 'industry');
+    });
+    saveOpenState({});
+    refreshThesisPreviews();
+    track('thesis_reset', {});
+    // Pilot status nudge so the user sees the action took effect
+    if (typeof setPilotStatus === 'function')
+      setPilotStatus('Thesis cleared');
   }
   function saveThesis() {
     const t = thesisFromForm();
@@ -2747,6 +2972,8 @@
     flash.classList.add('show');
     setTimeout(() => flash.classList.remove('show'), 1500);
     track('thesis_saved', { fields: Object.keys(t).filter(k => t[k] != null).length });
+    // SPEC_084 — refresh preview text on the collapsed blocks
+    if (typeof refreshThesisPreviews === 'function') refreshThesisPreviews();
     // SPEC_083 — re-pick the default layer for this thesis. We only
     // switch when the user hasn't manually overridden the layer this
     // session (otherwise a save would clobber their choice).
@@ -2925,9 +3152,11 @@
     // Restore last-active view (default: thesis)
     const lastView = localStorage.getItem(SHELL_VIEW_KEY) || 'thesis';
     setLeftView(lastView);
-    // Thesis form
+    // Thesis form + SPEC_084 collapsible blocks
     fillThesisForm();
+    initThesisBlocks();
     document.getElementById('thesis-save').onclick = saveThesis;
+    document.getElementById('thesis-reset').onclick = resetThesis;
     // History filter
     document.getElementById('history-search').addEventListener('input', renderHistoryView);
     document.getElementById('history-clear-all').onclick = () => {

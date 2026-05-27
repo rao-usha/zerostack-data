@@ -137,3 +137,6 @@ NOT in scope this iteration. Phase A ships with localStorage only.
   visual polish (SVG icon set, refined palette, soft shadows,
   micro-transitions) + default-layer correction (NRI → median
   household income). 2026-05-27.
+- [PLAN_074 rev_02](./PLAN_074_atlas_vscode_shell_rev_02.md) —
+  Thesis form recast as Notion-style collapsible blocks with
+  summary previews + sticky Save bar. 2026-05-27.

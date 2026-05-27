@@ -223,6 +223,9 @@ _THESIS_FIELDS: Dict[str, Dict[str, Any]] = {
     "target_pop_density_min":  {"type": "int", "min": 0, "max": 1_000_000},
     "target_age_band":         {"type": "str", "max": 16},
     "notes":                   {"type": "str", "max": 800},
+    # SPEC_084 — new fields exposed through the Notion-blocks form
+    "region":                  {"type": "str", "max": 80},
+    "exclude_layers":          {"type": "str", "max": 200},
 }
 
 
@@ -274,6 +277,10 @@ def _format_thesis_block(thesis: Optional[Dict[str, Any]]) -> str:
         lines.append(f"Min population density: {t['target_pop_density_min']:,} /km²")
     if t.get("target_age_band"):
         lines.append(f"Target age band: {t['target_age_band']}")
+    if t.get("region"):
+        lines.append(f"Region focus: {t['region']}")
+    if t.get("exclude_layers"):
+        lines.append(f"Hide layers: {t['exclude_layers']}")
     if t.get("notes"):
         lines.append(f"Notes: {t['notes']}")
     if not lines:
