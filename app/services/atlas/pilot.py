@@ -28,6 +28,8 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
+from typing import Iterator
+
 from app.services.atlas.pilot_tools import TOOL_DEFS, dispatch, is_ui_tool
 
 logger = logging.getLogger(__name__)
@@ -69,7 +71,10 @@ How to work:
    etc): call toggle_layer(layer_id) so the choropleth shows visually.
 8. For questions about a SPECIFIC LOCATION (street address, business idea at
    coords): call plant_focal_node(naics, lat, lon) and zoom_to(lat, lon, 12).
-9. EVERY numerical claim in your final answer MUST be backed by a cite() call.
+9. EVERY numerical claim in your final answer MUST be backed by a cite() call,
+   made BEFORE you write the final narration. A 'numerical claim' is any
+   specific number ($73,104; 91.0%; 27 declarations; 304,305 establishments).
+   Round numbers like "about 100" don't need cites. Specific ones DO.
 10. If a tool returns an error or no data, say so honestly — don't fabricate.
 11. Be concise and analyst-grade. Not chat. Specific numbers, specific places.
 12. Prefer 5-digit county FIPS over 2-digit state when both apply.
@@ -95,6 +100,44 @@ Common FIPS you can use without looking up:
 
 def _have_openai_key() -> bool:
     return bool(os.environ.get("OPENAI_API_KEY"))
+
+
+# Patterns that look like specific numerical claims worth citing.
+# We deliberately skip small round numbers ("a few", "about 10") which
+# don't require citations.
+import re as _re
+
+_NUMERIC_PATTERNS = [
+    _re.compile(r"\$[\d,]+(?:\.\d+)?[KMBkmb]?"),     # $73,104, $1.5M, $24K
+    _re.compile(r"\d+(?:\.\d+)?\s*%"),                # 91.0%, 14%
+    _re.compile(r"\b\d{4,}(?:,\d{3})*\b"),            # 24,065 or 109874
+    _re.compile(r"\b\d+\.\d{2,}\b"),                  # 99.94
+]
+
+
+def find_unlinked_claims(narration: str, citations: List[Dict[str, str]]) -> List[str]:
+    """Return list of specific numeric strings present in the narration
+    that don't appear in any cited claim or source. v0 heuristic — false
+    positives possible (e.g. years like 2023), but flags the obvious
+    drift cases."""
+    cited_text = " ".join(
+        (c.get("claim") or "") + " " + (c.get("source") or "")
+        for c in citations
+    )
+    found = set()
+    for pat in _NUMERIC_PATTERNS:
+        for m in pat.findall(narration or ""):
+            # Skip plausible years 1900-2099
+            try:
+                if "%" not in m and "$" not in m:
+                    n = int(m.replace(",", "").replace(".", ""))
+                    if 1900 <= n <= 2099:
+                        continue
+            except (ValueError, TypeError):
+                pass
+            if m not in cited_text:
+                found.add(m)
+    return sorted(found)
 
 
 def run_pilot(
@@ -192,13 +235,137 @@ def run_pilot(
     else:
         truncated = True
 
+    unlinked = find_unlinked_claims(final_narration or "", citations)
     return {
         "narration": final_narration or "",
         "tool_calls": tool_calls_log,
         "citations": citations,
         "ui_actions": ui_actions,
+        "unlinked_claims": unlinked,
         "loops_used": loop_n,
         "truncated": truncated,
         "model_used": model,
         "duration_seconds": (datetime.utcnow() - started).total_seconds(),
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC_079 / SPEC_078 v1.5 — NDJSON streaming endpoint
+# Same loop, but yields one JSON-line event per state transition so the frontend
+# can render progressively. Cuts perceived latency on multi-loop questions.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _summarize_result(result: Any, max_chars: int = 240) -> str:
+    """One-line summary of a tool result for the streaming UX."""
+    if isinstance(result, dict):
+        if "error" in result:
+            return f"ERROR: {result['error']}"
+        if "action" in result:
+            return f"queued UI action: {result['action'].get('name')}"
+        keys = list(result.keys())
+        s = ", ".join(f"{k}={result[k]}" for k in keys[:3]
+                       if not isinstance(result[k], (list, dict)))
+        if not s and keys:
+            s = f"{keys[0]}={type(result[keys[0]]).__name__}({len(result[keys[0]]) if hasattr(result[keys[0]], '__len__') else '?'})"
+        return s[:max_chars]
+    return str(result)[:max_chars]
+
+
+def run_pilot_streaming(
+    db: Session,
+    question: str,
+    session_id: Optional[str] = None,
+    model: str = MODEL,
+) -> Iterator[str]:
+    """Generator that yields NDJSON events (one JSON object per line)
+    describing the agent's progress. The frontend reads the stream and
+    renders progressively."""
+    started = datetime.utcnow()
+
+    def event(kind: str, **payload):
+        return json.dumps({"event": kind, **payload}) + "\n"
+
+    if not _have_openai_key():
+        yield event("error", message="OPENAI_API_KEY not set.")
+        return
+    if not question or not question.strip():
+        yield event("error", message="Empty question.")
+        return
+
+    yield event("plan_started", question=question, model=model)
+
+    from openai import OpenAI
+    client = OpenAI()
+
+    messages: List[Dict[str, Any]] = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": question},
+    ]
+    tool_calls_log: List[Dict[str, Any]] = []
+    citations: List[Dict[str, str]] = []
+    ui_actions: List[Dict[str, Any]] = []
+    loop_n = 0
+    truncated = False
+    final_narration = ""
+
+    while loop_n < MAX_LOOPS:
+        loop_n += 1
+        yield event("thinking", loop=loop_n)
+        try:
+            resp = client.chat.completions.create(
+                model=model, messages=messages, tools=TOOL_DEFS,
+                tool_choice="auto", max_tokens=MAX_TOKENS,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("OpenAI streaming call failed at loop %d", loop_n)
+            yield event("error", message=f"LLM call failed: {exc}")
+            return
+
+        choice = resp.choices[0]
+        msg = choice.message
+        finish = choice.finish_reason
+
+        messages.append({
+            "role": "assistant", "content": msg.content,
+            "tool_calls": [tc.model_dump() for tc in (msg.tool_calls or [])],
+        })
+
+        if finish == "stop" or not msg.tool_calls:
+            final_narration = msg.content or ""
+            yield event("narration", text=final_narration)
+            break
+
+        for tc in msg.tool_calls:
+            name = tc.function.name
+            try:
+                args = json.loads(tc.function.arguments or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            yield event("tool_call_started", loop=loop_n, name=name, args=args,
+                         is_ui=is_ui_tool(name))
+            result = dispatch(db, name, args)
+            tool_calls_log.append({"loop": loop_n, "name": name,
+                                    "args": args, "result": result})
+            if name == "cite":
+                citations.append({"claim": args.get("claim", ""),
+                                   "source": args.get("source", "")})
+            if is_ui_tool(name) and isinstance(result, dict) and result.get("action"):
+                ui_actions.append(result["action"])
+                yield event("ui_action_queued", action=result["action"])
+            yield event("tool_call_completed", loop=loop_n, name=name,
+                         summary=_summarize_result(result),
+                         is_error="error" in (result if isinstance(result, dict) else {}))
+            messages.append({"role": "tool", "tool_call_id": tc.id,
+                              "content": json.dumps(result, default=str)[:8000]})
+    else:
+        truncated = True
+
+    unlinked = find_unlinked_claims(final_narration, citations)
+    yield event("done",
+                 loops_used=loop_n,
+                 tool_count=len(tool_calls_log),
+                 citation_count=len(citations),
+                 ui_action_count=len(ui_actions),
+                 unlinked_claims=unlinked,
+                 truncated=truncated,
+                 duration_seconds=(datetime.utcnow() - started).total_seconds())

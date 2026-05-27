@@ -1479,24 +1479,50 @@
     panel.classList.add('show');
     document.getElementById('pilot-question').textContent = question;
     document.getElementById('pilot-loading').style.display = 'block';
+    document.getElementById('pilot-loading').innerHTML =
+      '<span class="pilot-spinner"></span>Pilot working…';
     document.getElementById('pilot-narration').style.display = 'none';
+    document.getElementById('pilot-narration').textContent = '';
     document.getElementById('pilot-cites').style.display = 'none';
-    document.getElementById('pilot-tools').style.display = 'none';
+    document.getElementById('pilot-cites').innerHTML = '';
+    document.getElementById('pilot-tools').style.display = 'block';
+    document.getElementById('pilot-tools').innerHTML =
+      '<div style="font-weight:600; margin-bottom:4px">Live tool log</div>';
     document.getElementById('pilot-meta').style.display = 'none';
     document.getElementById('pilot-input').disabled = true;
     track('pilot_question_submitted', { question_chars: question.length });
 
+    const collected = {
+      tool_calls: [], citations: [], ui_actions: [],
+      narration: '', loops: 0, duration: 0, model: '?'
+    };
+
     try {
-      const res = await fetch(API + '/pilot', {
+      const res = await fetch(API + '/pilot/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question, session_id: SESSION }),
       });
-      const data = await res.json();
-      renderPilotResponse(question, data);
+      if (!res.body) throw new Error('Streaming not supported');
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let nl;
+        while ((nl = buffer.indexOf('\n')) >= 0) {
+          const line = buffer.slice(0, nl).trim();
+          buffer = buffer.slice(nl + 1);
+          if (!line) continue;
+          try { handlePilotEvent(JSON.parse(line), collected); }
+          catch (e) { console.warn('bad pilot event line', line); }
+        }
+      }
       track('pilot_completed', {
-        loops: data.loops_used, ok: !data.error,
-        n_tools: (data.tool_calls || []).length,
+        loops: collected.loops, n_tools: collected.tool_calls.length,
+        n_ui: collected.ui_actions.length, ok: true,
       });
     } catch (e) {
       document.getElementById('pilot-loading').style.display = 'none';
@@ -1505,6 +1531,89 @@
     } finally {
       document.getElementById('pilot-input').disabled = false;
     }
+  }
+
+  // SPEC_079 — stream event handler
+  function handlePilotEvent(ev, c) {
+    const toolsEl = document.getElementById('pilot-tools');
+    const loadingEl = document.getElementById('pilot-loading');
+    const narrEl = document.getElementById('pilot-narration');
+    if (ev.event === 'plan_started') {
+      c.model = ev.model;
+      appendToolLog(toolsEl, `→ planning (${ev.model})`);
+    }
+    else if (ev.event === 'thinking') {
+      c.loops = Math.max(c.loops, ev.loop);
+      appendToolLog(toolsEl, `[${ev.loop}] thinking…`);
+    }
+    else if (ev.event === 'tool_call_started') {
+      const tag = ev.is_ui ? '🎬 UI' : '🔎 read';
+      appendToolLog(toolsEl, `[${ev.loop}] ${tag} ${ev.name}(${
+        escapeHtml(JSON.stringify(ev.args).slice(0, 70))
+      })`);
+    }
+    else if (ev.event === 'tool_call_completed') {
+      c.tool_calls.push({ loop: ev.loop, name: ev.name });
+      const cls = ev.is_error ? 'step' : (ev.name === 'cite' ? 'step cite' : 'step');
+      const last = toolsEl.querySelector('.step:last-child');
+      if (last) {
+        last.className = cls;
+        last.innerHTML += `<br><span style="color:var(--muted)">  ↳ ${escapeHtml(ev.summary)}</span>`;
+      }
+    }
+    else if (ev.event === 'ui_action_queued') {
+      c.ui_actions.push(ev.action);
+      appendToolLog(toolsEl, `   ⇒ queued ${ev.action.name}(${
+        escapeHtml(JSON.stringify(ev.action.args).slice(0, 60))
+      })`);
+    }
+    else if (ev.event === 'narration') {
+      c.narration = ev.text;
+      loadingEl.style.display = 'none';
+      narrEl.style.display = 'block';
+      narrEl.textContent = ev.text;
+    }
+    else if (ev.event === 'done') {
+      c.duration = ev.duration_seconds;
+      loadingEl.style.display = 'none';
+      narrEl.style.display = 'block';
+      if (!c.narration) narrEl.textContent = '(no narration returned)';
+      // Render final citations + meta
+      if (c.tool_calls.filter(t => t.name === 'cite').length) {
+        const citeEl = document.getElementById('pilot-cites');
+        citeEl.style.display = 'block';
+      }
+      document.getElementById('pilot-meta').style.display = 'block';
+      document.getElementById('pilot-meta').textContent =
+        `${ev.loops_used} loops · ${ev.tool_count} tools · ${ev.ui_action_count} UI actions · ${ev.duration_seconds.toFixed(1)}s · ${c.model}` +
+        (ev.truncated ? ' · TRUNCATED' : '');
+      // Citation hardening: warn on unlinked numerical claims
+      if (Array.isArray(ev.unlinked_claims) && ev.unlinked_claims.length) {
+        const warn = document.createElement('div');
+        warn.style.cssText = 'background:rgba(245,158,11,.14); color:#fbbf24; ' +
+          'padding:6px 10px; border-radius:6px; font-size:11px; ' +
+          'margin-top:8px; border:1px solid rgba(245,158,11,.4)';
+        warn.innerHTML = '⚠ <b>Unlinked numerical claims</b> (no cite() call): ' +
+          ev.unlinked_claims.map(x => `<code>${escapeHtml(x)}</code>`).join(', ');
+        narrEl.parentElement.insertBefore(warn, narrEl.nextSibling);
+      }
+      // Apply UI actions (sequentially, post-narration)
+      if (c.ui_actions.length) applyPilotUiActions(c.ui_actions);
+    }
+    else if (ev.event === 'error') {
+      loadingEl.style.display = 'none';
+      narrEl.style.display = 'block';
+      narrEl.style.color = 'var(--warn)';
+      narrEl.textContent = 'Pilot error: ' + ev.message;
+    }
+  }
+
+  function appendToolLog(toolsEl, text) {
+    const d = document.createElement('div');
+    d.className = 'step';
+    d.textContent = text;
+    toolsEl.appendChild(d);
+    toolsEl.scrollTop = toolsEl.scrollHeight;
   }
 
   function renderPilotResponse(question, data) {

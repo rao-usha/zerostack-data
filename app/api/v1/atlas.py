@@ -313,6 +313,23 @@ def atlas_pilot_endpoint(body: PilotBody, db: Session = Depends(get_db)):
     return result
 
 
+@router.post("/pilot/stream")
+def atlas_pilot_stream_endpoint(body: PilotBody, db: Session = Depends(get_db)):
+    """Atlas Pilot v1 — streaming variant. Yields one NDJSON event per
+    state transition (plan_started, thinking, tool_call_started,
+    tool_call_completed, ui_action_queued, narration, done, error).
+    Frontend reads with fetch streaming and renders progressively.
+    SPEC_079."""
+    from fastapi.responses import StreamingResponse
+    from app.services.atlas.pilot import run_pilot_streaming
+    return StreamingResponse(
+        run_pilot_streaming(db, question=body.question,
+                             session_id=body.session_id),
+        media_type="application/x-ndjson",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
+
+
 @router.get("/recent")
 def get_recent_events_endpoint(
     sources: str = "fema",
