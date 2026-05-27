@@ -736,6 +736,19 @@
       state.view = { lat: MAP.getCenter().lat, lon: MAP.getCenter().lng, zoom: MAP.getZoom() };
       syncURL();
     });
+    // SPEC_080 — re-style choropleth on zoom change so outline-vs-fill mode
+    // switches at the threshold (zoom 10).
+    let lastZoomBucket = null;
+    MAP.on('zoomend', () => {
+      const z = MAP.getZoom();
+      const bucket = z >= 10 ? 'outline' : (z >= 8 ? 'medium' : 'fill');
+      if (bucket !== lastZoomBucket) {
+        lastZoomBucket = bucket;
+        if (BOUNDARY_LAYER && CURRENT_LAYER_RESULT) {
+          BOUNDARY_LAYER.eachLayer(fl => styleFeature(fl.feature, fl));
+        }
+      }
+    });
   }
 
   function computeCentroids(geojson) {
@@ -828,11 +841,27 @@
     } else {
       fillColor = bucketColor(v, breaks);
     }
+    // SPEC_080 — zoom-adaptive outline mode:
+    //   zoom ≤ 7  : full fill (state/national density read)
+    //   zoom 8-9  : medium fill
+    //   zoom ≥10  : outline-only — colored border, no fill so basemap shows
+    const z = MAP ? MAP.getZoom() : 4;
     let fillOpacity = state.opacity;
-    if (state.brushRange && v !== undefined && v !== null) {
-      if (v < state.brushRange[0] || v > state.brushRange[1]) fillOpacity = state.opacity * 0.10;
+    let weight = 0.4;
+    let color = '#2a3145';
+    if (z >= 10) {
+      // Outline mode: tint the border with the quintile color, kill the fill
+      fillOpacity = 0;
+      weight = 2.2;
+      color = (fillColor === 'var(--cno)') ? '#2a3145' : fillColor;
+    } else if (z >= 8) {
+      fillOpacity = state.opacity * 0.45;
+      weight = 0.7;
     }
-    layer.setStyle({ fillColor, fillOpacity });
+    if (state.brushRange && v !== undefined && v !== null) {
+      if (v < state.brushRange[0] || v > state.brushRange[1]) fillOpacity = fillOpacity * 0.10;
+    }
+    layer.setStyle({ fillColor, fillOpacity, weight, color });
   }
 
   function applyLayerToBoundaries(layerResult, transition) {
