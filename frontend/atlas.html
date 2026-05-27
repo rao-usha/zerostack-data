@@ -237,6 +237,17 @@
     #pilot-panel button.close { position:absolute; top:8px; right:10px;
       background:transparent; color:var(--dim); border:none; cursor:pointer;
       font-size:18px; padding:0; line-height:1; }
+    /* Polish #2 — cancel button (only visible while streaming) */
+    #pilot-cancel { position:absolute; top:8px; right:36px;
+      background:rgba(245,158,11,.18); color:#fbbf24;
+      border:1px solid rgba(245,158,11,.5); padding:2px 8px;
+      border-radius:5px; cursor:pointer; font-size:10px; display:none; }
+    #pilot-cancel.show { display:inline-block; }
+    /* Polish #3 — history controls */
+    #pilot-history { font-size:10px; color:var(--dim); padding:4px 0;
+      border-top:1px solid var(--border); margin-top:6px; }
+    #pilot-history a { color:var(--accent); cursor:pointer; text-decoration:none; }
+    #pilot-history a:hover { text-decoration:underline; }
     #pilot-question { padding:8px 10px; border-radius:6px; background:var(--panel-2);
       color:var(--muted); font-size:12px; font-style:italic; margin-bottom:10px; }
     #pilot-narration { font-size:13px; line-height:1.5; color:var(--text);
@@ -442,6 +453,7 @@
       <!-- SPEC_078 — Atlas Pilot floating response panel -->
       <div id="pilot-panel">
         <button class="close" id="pilot-close">×</button>
+        <button id="pilot-cancel" title="Cancel mid-flight Pilot run">Cancel</button>
         <h4>Atlas Pilot</h4>
         <div id="pilot-question"></div>
         <div id="pilot-loading" style="display:none">
@@ -451,6 +463,11 @@
         <div id="pilot-cites" style="display:none"></div>
         <div id="pilot-tools" style="display:none"></div>
         <div id="pilot-meta" style="display:none"></div>
+        <div id="pilot-history" style="display:none">
+          <a id="pilot-history-clear">Clear history</a>
+          ·
+          <span id="pilot-history-count">0</span> prior question(s)
+        </div>
       </div>
 
       <!-- SPEC_067 — Recent Activity floating overlay -->
@@ -621,6 +638,14 @@
     p.set('lat', (c.lat ?? c.lat).toFixed(3));
     p.set('lon', (c.lng ?? c.lon).toFixed(3));
     p.set('zoom', String(Math.round(z * 10) / 10));
+    // Polish #4 — focal-node persists in the URL so site-simulation shares
+    // carry the planted pin to the recipient.
+    if (state.focal) {
+      p.set('focal_naics', state.focal.naics);
+      p.set('focal_lat', String(state.focal.lat));
+      p.set('focal_lon', String(state.focal.lon));
+      if (state.focal.label) p.set('focal_label', state.focal.label);
+    }
     history.replaceState(null, '', '/atlas.html?' + p.toString());
   }
   function loadURL() {
@@ -635,6 +660,15 @@
     // SPEC_067 — `?recent=1` auto-opens the panel (used by smoke tests
     // and for direct sharing of the panel itself)
     if (p.get('recent') === '1') state.autoOpenRecent = true;
+    // Polish #4 — focal-node from URL
+    if (p.get('focal_naics') && p.get('focal_lat') && p.get('focal_lon')) {
+      state.focal = {
+        naics: p.get('focal_naics'),
+        lat: parseFloat(p.get('focal_lat')),
+        lon: parseFloat(p.get('focal_lon')),
+        label: p.get('focal_label') || p.get('focal_naics'),
+      };
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -689,6 +723,11 @@
     }
     // SPEC_067 — auto-open Recent panel from ?recent=1
     if (state.autoOpenRecent) await openRecent();
+    // Polish #4 — restore focal-node marker from URL state
+    if (state.focal) {
+      plantFocalMarker(state.focal.lat, state.focal.lon,
+                        state.focal.label, state.focal.naics);
+    }
 
     track('query_submitted', { source:'landing', layer: state.layerId, place: state.placeId || null });
   }
@@ -1035,6 +1074,12 @@
     }
     state.layerId = spec.id; syncURL();
     track('layer_toggled', { layer_id: spec.id, role: 'base' });
+    // Polish #6 — apply layer's default_zoom/lat/lon when present, so each
+    // layer can dictate its best initial view (tract layers → neighborhood
+    // scale, point layers → national, etc).
+    if (spec.default_zoom != null && spec.default_lat != null && spec.default_lon != null) {
+      MAP.setView([spec.default_lat, spec.default_lon], spec.default_zoom);
+    }
     // SPEC_077 A.4 — ensure boundary grain matches the layer's grain
     if (spec.grain === 'county' || spec.grain === 'tract') {
       await ensureBoundariesForGrain(spec.grain);
@@ -1502,6 +1547,9 @@
   // ═══════════════════════════════════════════════════════════════════════
   // SPEC_078 — Atlas Pilot agent
   // ═══════════════════════════════════════════════════════════════════════
+  // Polish #2 — AbortController so user can cancel mid-flight
+  let PILOT_ABORT = null;
+
   async function askPilot(question) {
     if (!question || !question.trim()) return;
     const panel = document.getElementById('pilot-panel');
@@ -1519,6 +1567,7 @@
       '<div style="font-weight:600; margin-bottom:4px">Live tool log</div>';
     document.getElementById('pilot-meta').style.display = 'none';
     document.getElementById('pilot-input').disabled = true;
+    document.getElementById('pilot-cancel').classList.add('show');
     track('pilot_question_submitted', { question_chars: question.length });
 
     const collected = {
@@ -1526,11 +1575,13 @@
       narration: '', loops: 0, duration: 0, model: '?'
     };
 
+    PILOT_ABORT = new AbortController();
     try {
       const res = await fetch(API + '/pilot/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question, session_id: SESSION }),
+        signal: PILOT_ABORT.signal,
       });
       if (!res.body) throw new Error('Streaming not supported');
       const reader = res.body.getReader();
@@ -1549,17 +1600,87 @@
           catch (e) { console.warn('bad pilot event line', line); }
         }
       }
+      // Polish #3 — persist to localStorage after a successful run
+      savePilotHistory(question, collected);
       track('pilot_completed', {
         loops: collected.loops, n_tools: collected.tool_calls.length,
         n_ui: collected.ui_actions.length, ok: true,
       });
     } catch (e) {
       document.getElementById('pilot-loading').style.display = 'none';
-      document.getElementById('pilot-narration').textContent = 'Pilot request failed: ' + e;
-      document.getElementById('pilot-narration').style.display = 'block';
+      const narrEl = document.getElementById('pilot-narration');
+      narrEl.style.display = 'block';
+      if (e.name === 'AbortError') {
+        narrEl.style.color = 'var(--warn)';
+        narrEl.textContent = 'Cancelled. Tools that already ran are logged above.';
+        track('pilot_cancelled', { loops_at_cancel: collected.loops });
+      } else {
+        narrEl.textContent = 'Pilot request failed: ' + e;
+      }
     } finally {
       document.getElementById('pilot-input').disabled = false;
+      document.getElementById('pilot-cancel').classList.remove('show');
+      PILOT_ABORT = null;
     }
+  }
+
+  // Polish #2 — cancel handler
+  function cancelPilot() {
+    if (PILOT_ABORT) PILOT_ABORT.abort();
+  }
+
+  // Polish #3 — localStorage history (last 10 Q/A pairs)
+  const PILOT_HISTORY_KEY = 'atlas_pilot_history';
+  const PILOT_HISTORY_MAX = 10;
+  function loadPilotHistory() {
+    try {
+      const raw = localStorage.getItem(PILOT_HISTORY_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  }
+  function savePilotHistory(question, collected) {
+    try {
+      const hist = loadPilotHistory();
+      hist.unshift({
+        ts: Date.now(),
+        question,
+        narration: collected.narration,
+        n_tools: collected.tool_calls.length,
+        n_ui: collected.ui_actions.length,
+      });
+      localStorage.setItem(PILOT_HISTORY_KEY,
+                            JSON.stringify(hist.slice(0, PILOT_HISTORY_MAX)));
+      refreshPilotHistoryUI();
+    } catch (e) { /* localStorage full or disabled — silent */ }
+  }
+  function clearPilotHistory() {
+    try { localStorage.removeItem(PILOT_HISTORY_KEY); } catch (e) {}
+    refreshPilotHistoryUI();
+  }
+  function refreshPilotHistoryUI() {
+    const hist = loadPilotHistory();
+    const el = document.getElementById('pilot-history');
+    if (!hist.length) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    document.getElementById('pilot-history-count').textContent = hist.length;
+  }
+  function maybeRestoreLastPilotAnswer() {
+    // On landing, if there's prior history AND no question typed yet,
+    // show the most recent answer so refresh-survives.
+    const hist = loadPilotHistory();
+    if (!hist.length) return;
+    const last = hist[0];
+    // Only auto-restore if recent (last hour) — otherwise feels stale
+    if (Date.now() - last.ts > 3600 * 1000) { refreshPilotHistoryUI(); return; }
+    const panel = document.getElementById('pilot-panel');
+    panel.classList.add('show');
+    document.getElementById('pilot-question').textContent = last.question;
+    document.getElementById('pilot-narration').style.display = 'block';
+    document.getElementById('pilot-narration').textContent = last.narration;
+    document.getElementById('pilot-meta').style.display = 'block';
+    document.getElementById('pilot-meta').textContent =
+      `restored from history · ${last.n_tools} tools · ${last.n_ui} UI actions`;
+    refreshPilotHistoryUI();
   }
 
   // SPEC_079 — stream event handler
@@ -1739,6 +1860,9 @@
     }).addTo(MAP);
     FOCAL_MARKER.bindTooltip(`<b>Focal node</b><br>${label}<br>NAICS ${naics}`,
                               { sticky: true });
+    // Polish #4 — persist focal node in URL state for shareable deep-links
+    state.focal = { naics, lat, lon, label };
+    syncURL();
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -1781,6 +1905,10 @@
     if (e.key === 'Enter') askPilot(e.target.value);
   };
   document.getElementById('pilot-close').onclick = closePilot;
+  // Polish #2 + #3 wiring
+  document.getElementById('pilot-cancel').onclick = cancelPilot;
+  document.getElementById('pilot-history-clear').onclick = clearPilotHistory;
+  maybeRestoreLastPilotAnswer();
   document.getElementById('share').onclick = () => {
     navigator.clipboard.writeText(location.href);
     toast('Share link copied'); track('share_created', { url: location.href });

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re as _re
 from typing import Any, Callable, Dict, List, Tuple
 
 from sqlalchemy.orm import Session
@@ -93,6 +94,70 @@ def _tool_cite(db: Session, claim: str, source: str) -> Dict[str, Any]:
     """Log a citation — pure side-effect tool. Every numerical claim
     in the final narration MUST be backed by a cite() call."""
     return {"acknowledged": True, "claim": claim, "source": source}
+
+
+def _tool_geocode_address(db: Session, query: str) -> Dict[str, Any]:
+    """Resolve a free-text address ('Lamar and 6th, Austin TX') into
+    {lat, lon, display_name}. Uses Nominatim's free public API.
+
+    Nominatim doesn't natively understand 'X and Y' intersections in
+    free text, so we cascade: try the full query, then progressively
+    simplify (drop the 'and Y' clause) until we get a hit."""
+    import time
+    import httpx
+    if not query or not query.strip():
+        return {"error": "empty query"}
+
+    # Build a cascade of progressively simpler queries
+    attempts = [query]
+    q = query
+    if " and " in q.lower():
+        # "Lamar Blvd and 6th St, Austin TX" → "Lamar Blvd, Austin TX"
+        prefix = _re.split(r"\s+and\s+", q, maxsplit=1, flags=_re.IGNORECASE)[0]
+        comma = q.find(",")
+        suffix = q[comma:] if comma >= 0 else ""
+        attempts.append((prefix + suffix).strip())
+    if "&" in q:
+        prefix = q.split("&", 1)[0]
+        comma = q.find(",")
+        suffix = q[comma:] if comma >= 0 else ""
+        attempts.append((prefix + suffix).strip())
+
+    seen = set()
+    for attempt in attempts:
+        if attempt in seen or not attempt:
+            continue
+        seen.add(attempt)
+        try:
+            with httpx.Client(timeout=10.0) as cli:
+                resp = cli.get(
+                    "https://nominatim.openstreetmap.org/search",
+                    params={"q": attempt, "format": "json", "limit": 3,
+                             "countrycodes": "us"},
+                    headers={"User-Agent": "Nexdata-Atlas-Pilot/0.1 (research@nexdata.io)"}
+                )
+                resp.raise_for_status()
+                results = resp.json()
+        except httpx.HTTPError as exc:
+            return {"error": f"geocoder request failed: {exc}"}
+        time.sleep(1.0)  # Nominatim's 1 req/sec etiquette
+        if results:
+            top = results[0]
+            return {
+                "ok": True,
+                "lat": float(top["lat"]),
+                "lon": float(top["lon"]),
+                "display_name": top.get("display_name", ""),
+                "query_used": attempt,
+                "fallback_used": attempt != query,
+                "candidates": [
+                    {"lat": float(r["lat"]), "lon": float(r["lon"]),
+                     "display_name": r.get("display_name", "")}
+                    for r in results[:3]
+                ],
+            }
+    return {"error": f"no geocoder match for {query!r} (tried {len(seen)} variants)",
+            "tried": list(seen)}
 
 
 # ─── UI tools (return action descriptors; frontend applies post-render) ───
@@ -287,6 +352,29 @@ TOOLS: List[Tuple[Dict[str, Any], Callable, str]] = [
             },
         },
         _tool_cite, "read",
+    ),
+    (
+        {
+            "type": "function",
+            "function": {
+                "name": "geocode_address",
+                "description": "Resolve a free-text US address or place name "
+                                "('Lamar and 6th, Austin TX') into lat/lon. "
+                                "USE THIS before plant_focal_node or zoom_to "
+                                "if the user gave a street address — don't "
+                                "guess coordinates from memory. Returns top "
+                                "match + up to 3 candidates.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string",
+                                   "description": "Free-text US address or place name."},
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        _tool_geocode_address, "read",
     ),
     # ─── UI tools (return action descriptors) ────────────────────────────
     (

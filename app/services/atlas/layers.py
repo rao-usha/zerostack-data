@@ -44,6 +44,11 @@ class LayerSpec:
     unit: str                # e.g. 'count', 'USD', 'score'
     description: str
     builder: Callable[[Session], "LayerResult"]
+    # SPEC_080b polish — optional default view per layer; frontend zooms there
+    # when the user activates the layer with no zoom in the URL.
+    default_zoom: Optional[int] = None
+    default_lat: Optional[float] = None
+    default_lon: Optional[float] = None
 
 
 @dataclass
@@ -732,6 +737,9 @@ LAYERS: Dict[str, LayerSpec] = {
         description="Tract-grain median household income for trade-area "
                     "demand analysis. SPEC_077 A.3.",
         builder=_build_tract_median_income,
+        # Default to Austin at neighborhood scale — tract layers need a
+        # zoomed-in view to be readable
+        default_zoom=11, default_lat=30.27, default_lon=-97.74,
     ),
     "demo_tract_median_age": LayerSpec(
         id="demo_tract_median_age", label="Median Age (tract)",
@@ -741,6 +749,7 @@ LAYERS: Dict[str, LayerSpec] = {
         description="Tract-grain median age — drives demographic profile "
                     "of the trade area. SPEC_077 A.3.",
         builder=_build_tract_median_age,
+        default_zoom=11, default_lat=30.27, default_lon=-97.74,
     ),
     "demo_tract_population": LayerSpec(
         id="demo_tract_population", label="Population (tract)",
@@ -750,6 +759,7 @@ LAYERS: Dict[str, LayerSpec] = {
         description="Tract-grain total population — denominator for many "
                     "demand-density calculations. SPEC_077 A.3.",
         builder=_build_tract_population,
+        default_zoom=11, default_lat=30.27, default_lon=-97.74,
     ),
     "demo_tract_owner_occupied": LayerSpec(
         id="demo_tract_owner_occupied", label="Owner-Occupied Housing (tract)",
@@ -760,6 +770,7 @@ LAYERS: Dict[str, LayerSpec] = {
                     "neighborhood stability + housing-related demand "
                     "(furniture, appliances, home services). SPEC_077 A.3.",
         builder=_build_tract_owner_occupied,
+        default_zoom=11, default_lat=30.27, default_lon=-97.74,
     ),
     "demo_acs_median_income": LayerSpec(
         id="demo_acs_median_income", label="Median Household Income (ACS)",
@@ -891,6 +902,9 @@ def list_layers_by_domain() -> Dict[str, List[Dict[str, Any]]]:
             "coverage_note": spec.coverage_note,
             "unit": spec.unit,
             "description": spec.description,
+            "default_zoom": spec.default_zoom,
+            "default_lat": spec.default_lat,
+            "default_lon": spec.default_lon,
         })
     return {d: out[d] for d in sorted(out)}
 

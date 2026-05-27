@@ -626,3 +626,11 @@ FRONTEND  ─── routes SSE events to:
 - **Free-form agent code execution in v0.** Constrained 11-tool surface.
 - **Unlinked numerical claims in narration.** Citation discipline non-negotiable.
 - **Premium-model tool selection.** Cheap model for routine; premium only for final synthesis.
+
+## Revisions
+
+- **2026-05-27 — rev_01_rev_01 polish iteration.** Six small UX
+  fixes surfaced from real click-through use: citation-validator
+  FIPS false-positives, mid-flight Pilot cancel, localStorage history,
+  focal-node URL state, address-string geocoding, per-layer default
+  zoom. See `PLAN_073_atlas_commerce_simulator_rev_01_rev_01.md`.

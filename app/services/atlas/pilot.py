@@ -70,7 +70,9 @@ How to work:
 7. For questions about a SPECIFIC LAYER (income, broadband, federal dollars,
    etc): call toggle_layer(layer_id) so the choropleth shows visually.
 8. For questions about a SPECIFIC LOCATION (street address, business idea at
-   coords): call plant_focal_node(naics, lat, lon) and zoom_to(lat, lon, 12).
+   coords): if the user gave an ADDRESS or PLACE NAME, call geocode_address
+   FIRST to resolve to lat/lon — do not guess coordinates from memory. Then
+   call plant_focal_node(naics, lat, lon) and zoom_to(lat, lon, 12).
 9. EVERY numerical claim in your final answer MUST be backed by a cite() call,
    made BEFORE you write the final narration. A 'numerical claim' is any
    specific number ($73,104; 91.0%; 27 declarations; 304,305 establishments).
@@ -117,20 +119,35 @@ _NUMERIC_PATTERNS = [
 
 def find_unlinked_claims(narration: str, citations: List[Dict[str, str]]) -> List[str]:
     """Return list of specific numeric strings present in the narration
-    that don't appear in any cited claim or source. v0 heuristic — false
-    positives possible (e.g. years like 2023), but flags the obvious
-    drift cases."""
+    that don't appear in any cited claim or source.
+
+    Skip-lists (false-positive suppression):
+      - plausible years 1900-2099
+      - 5-digit county FIPS / 2-digit state FIPS / 11-digit tract FIPS
+        that appear in the cited sources (e.g. "for 48201")
+      - any number explicitly cited in claim/source text
+    """
     cited_text = " ".join(
         (c.get("claim") or "") + " " + (c.get("source") or "")
         for c in citations
     )
+    # Polish #1 — pull all FIPS-shaped tokens out of cited sources and skip them.
+    # Models commonly cite as "layer for 48201" — that 48201 isn't a claim.
+    fips_in_sources = set(_re.findall(r"\b\d{2}\b|\b\d{5}\b|\b\d{11}\b", cited_text))
+    # Also pull bare FIPS that appear elsewhere in the narration as identifiers
+    # (parenthetical FIPS callouts are not claims).
+    paren_fips = set(_re.findall(r"\((\d{2}|\d{5}|\d{11})\)", narration or ""))
+
     found = set()
     for pat in _NUMERIC_PATTERNS:
         for m in pat.findall(narration or ""):
             # Skip plausible years 1900-2099
             try:
                 if "%" not in m and "$" not in m:
-                    n = int(m.replace(",", "").replace(".", ""))
+                    n_str = m.replace(",", "").replace(".", "")
+                    if n_str in fips_in_sources or n_str in paren_fips:
+                        continue
+                    n = int(n_str)
                     if 1900 <= n <= 2099:
                         continue
             except (ValueError, TypeError):
