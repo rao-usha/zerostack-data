@@ -204,7 +204,7 @@ async def ingest_zctas(db: Session, page_size: int = 200) -> Dict[str, Any]:
         "resultRecordCount": str(page_size),
     }
 
-    all_features: List[Dict[str, Any]] = []
+    total_inserted = 0
     offset = 0
     consecutive_failures = 0
     async with httpx.AsyncClient(timeout=60.0) as cli:
@@ -223,21 +223,26 @@ async def ingest_zctas(db: Session, page_size: int = 200) -> Dict[str, Any]:
                 logger.warning("ZCTA page offset=%d failed: %s (failure %d/3)",
                                offset, exc, consecutive_failures)
                 if consecutive_failures >= 3:
-                    logger.error("ZCTA fetch giving up after 3 consecutive failures")
+                    logger.error("ZCTA fetch giving up after 3 consecutive failures; "
+                                  "partial data preserved (%d rows)", total_inserted)
                     break
                 await asyncio.sleep(2 ** consecutive_failures)
                 continue
             consecutive_failures = 0
             feats = page.get("features", [])
-            all_features.extend(feats)
-            if len(all_features) % 2000 == 0:
-                logger.info("ZCTA progress: %d features", len(all_features))
+            # Insert this page immediately so a crash later doesn't lose it.
+            if feats:
+                inserted = await _ingest_features(db, "zcta", feats, _extract_zcta_attrs)
+                total_inserted += inserted
+                if total_inserted % 2000 < page_size:
+                    logger.info("ZCTA progress: %d rows inserted (offset %d)",
+                                total_inserted, offset)
             if len(feats) < page_size:
                 break
             offset += page_size
             await asyncio.sleep(0.4)   # polite throttle
 
-    n = await _ingest_features(db, "zcta", all_features, _extract_zcta_attrs)
+    n = total_inserted
 
     final = db.execute(text(
         "SELECT COUNT(*) FROM geojson_boundaries WHERE geo_level = 'zcta'"

@@ -1,6 +1,26 @@
-# Morning click-through — what shipped overnight
+# Morning click-through — what shipped
 
-**Wake-up state:** open `http://localhost:3001/atlas.html` and try the 5 things below in order. Each one is something new that landed in this overnight session.
+**Two cycles of work:** overnight (Phase A foundation + Phase B Atlas Pilot) and morning (Atlas Pilot ramps from "read-only Q&A" to "actually pilots the UI"). Open `http://localhost:3001/atlas.html` and try the 6 things below in order.
+
+---
+
+## 0. NEW (this morning) — The agent now pilots the map
+
+The biggest change since you slept: **the Atlas Pilot can now drop focal nodes, zoom the map, and toggle layers as part of answering your question.** This is the differentiator from PLAN_073 rev_01 — an LLM that traverses both the data AND the UI.
+
+Try in the **Ask the Pilot** input:
+
+| Question | What the agent does |
+|---|---|
+| `Plant a chair store at lat=30.272, lon=-97.7457 and show me the broadband subscription layer.` | Drops an amber focal-node pin labeled NAICS 442110 at that exact spot · activates the broadband choropleth · narrates |
+| `Show me Travis County, Texas.` | Calls `highlight_place(48453)` — fits map to county, opens place panel · narrates demographics |
+| `Compare Travis County and Cook County on income — show me the income layer.` | Calls `compare_places` + `toggle_layer(demo_acs_median_income)` · narrates the comparison |
+| `Where are people migrating to most? Show me the layer.` | Calls `get_migration_flows` + `toggle_layer(demo_irs_migration_net_agi)` — arcs auto-render · narrates top corridors |
+
+You'll see a **live tool log** stream in as the agent works (`thinking → tool_call_started → tool_call_completed → ...`). At the end, the **map mutates** with the agent's queued UI actions. Citation-validator warning badge appears if it makes specific numerical claims without calling `cite()`.
+
+Verified live before commit:
+- "Plant a chair store + broadband layer" → 4 loops, 4 tools, 2 UI actions (plant_focal_node + toggle_layer), 53.8s
 
 ---
 
