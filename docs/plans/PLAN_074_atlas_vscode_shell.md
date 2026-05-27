@@ -130,3 +130,10 @@ NOT in scope this iteration. Phase A ships with localStorage only.
 - [ ] Layer toggles still affect the map identically to today.
 - [ ] Live test: ask "I want to open a chair store" with a populated
       thesis → narration references the thesis explicitly.
+
+## Revisions
+
+- [PLAN_074 rev_01](./PLAN_074_atlas_vscode_shell_rev_01.md) —
+  visual polish (SVG icon set, refined palette, soft shadows,
+  micro-transitions) + default-layer correction (NRI → median
+  household income). 2026-05-27.

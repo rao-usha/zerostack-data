@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nexdata Atlas — the general explorer of American public data</title>
 
+  <!-- SPEC_083 — Inter for the product surface; system stack as fallback -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+
   <!-- Leaflet (SPEC_066) -->
   <link rel="stylesheet"
         href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -25,11 +31,17 @@
 
   <style>
     :root {
-      --bg:#0a0e1a; --panel:#141b2d; --panel-2:#1a2138;
-      --primary:#6366f1; --primary-hover:#818cf8;
-      --accent:#22d3ee;
-      --text:#e4e6eb; --muted:#9aa3b8; --dim:#6b7280;
-      --border:#2a3145; --warn:#f59e0b; --success:#10b981;
+      /* SPEC_083 — refreshed palette: warmer panel bg, richer indigo,
+         softer cyan, low-opacity borders for separation-not-wall feel. */
+      --bg:#0a0e1a; --panel:#161d31; --panel-2:#1c2440;
+      --primary:#7c83ff; --primary-hover:#9aa1ff; --primary-2:#6066ff;
+      --accent:#67e8f9;
+      --text:#e7eaf1; --muted:#9aa3b8; --dim:#6b7280;
+      --border:rgba(255,255,255,.08);
+      --border-2:rgba(255,255,255,.04);
+      --warn:#fbbf24; --success:#34d399;
+      --shadow-soft:0 1px 3px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.35);
+      --shadow-inset:inset 0 0 0 1px rgba(255,255,255,.04);
 
       /* 5-step sequential color ramp (low→high) for choropleths */
       --c1:#0c2a4f; --c2:#0e4775; --c3:#1f6fb0; --c4:#41a0d6; --c5:#7dd3fc;
@@ -38,8 +50,15 @@
     }
     * { box-sizing: border-box; }
     html, body { margin:0; padding:0; height:100%; overflow:hidden;
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-      background:var(--bg); color:var(--text); }
+      font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+      background:var(--bg); color:var(--text);
+      font-feature-settings:'cv11','ss01','ss03';
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      line-height:1.5; letter-spacing:-.005em; }
+    h1,h2,h3,h4 { letter-spacing:-.018em; font-weight:600; }
+    .panel-title, .domain h3 { letter-spacing:.08em !important;
+      font-weight:600 !important; }
     a { color:var(--accent); text-decoration:none; }
 
     /* ─── grid layout — SPEC_082 VS-Code-style shell ─────────── */
@@ -97,22 +116,57 @@
     .btn-icon:hover { border-color:var(--accent); }
     .btn-icon.on { background:rgba(34,211,238,.15); color:#fff; border-color:var(--accent); }
 
-    /* ─── activity bar + left column wrapper (SPEC_082) ───────── */
+    /* SPEC_083 — first-load onboarding nudge */
+    #onboarding-nudge { position:fixed; top:60px; left:50%;
+      transform:translateX(-50%) translateY(-16px);
+      z-index:900; pointer-events:none; opacity:0;
+      background:rgba(22,29,49,.85); backdrop-filter:blur(12px) saturate(140%);
+      -webkit-backdrop-filter:blur(12px) saturate(140%);
+      border:1px solid rgba(124,131,255,.35);
+      box-shadow:0 8px 28px rgba(0,0,0,.5),
+                 0 0 0 3px rgba(124,131,255,.10);
+      color:var(--text); padding:10px 14px 10px 16px; border-radius:10px;
+      font-size:12.5px; display:flex; align-items:center; gap:12px;
+      max-width:min(560px, calc(100vw - 80px));
+      transition:opacity .25s ease, transform .25s cubic-bezier(.2,.9,.3,1.4); }
+    #onboarding-nudge.show { opacity:1; pointer-events:auto;
+      transform:translateX(-50%) translateY(0); }
+    #onboarding-nudge b { color:var(--accent); font-weight:600; }
+    #onboarding-nudge .nudge-icon { width:18px; height:18px;
+      color:var(--accent); flex-shrink:0; }
+    #onboarding-nudge button { background:transparent; border:none;
+      color:var(--dim); cursor:pointer; font-size:16px; padding:0 4px;
+      border-radius:4px; transition:color .14s ease;
+      font-family:inherit; line-height:1; }
+    #onboarding-nudge button:hover { color:var(--text); }
+
+    /* ─── activity bar + left column wrapper (SPEC_082/_083) ──── */
     #activity-bar { grid-area:activity; background:var(--panel-2);
       border-right:1px solid var(--border); display:flex;
-      flex-direction:column; align-items:stretch; padding:6px 0;
-      gap:2px; }
-    #activity-bar .act { background:transparent; border:none;
-      color:var(--muted); cursor:pointer; padding:10px 0;
-      font-size:18px; line-height:1; border-left:2px solid transparent;
-      transition:color .12s, background .12s, border-color .12s; }
-    #activity-bar .act:hover { color:var(--text); background:rgba(255,255,255,.04); }
+      flex-direction:column; align-items:stretch; padding:8px 0;
+      gap:3px; position:relative; }
+    #activity-bar .act { position:relative; background:transparent;
+      border:none; color:var(--muted); cursor:pointer; padding:9px 0;
+      line-height:1;
+      display:flex; flex-direction:column; align-items:center; gap:3px;
+      transition:color .16s ease, background .16s ease, transform .12s ease; }
+    #activity-bar .act svg { width:22px; height:22px; display:block;
+      transition:transform .16s ease; }
+    #activity-bar .act small { display:block; font-size:9px;
+      color:inherit; letter-spacing:.06em; text-transform:uppercase;
+      opacity:.85; }
+    #activity-bar .act:hover { color:var(--text);
+      background:rgba(255,255,255,.04); }
+    #activity-bar .act:hover svg { transform:translateY(-1px); }
     #activity-bar .act.on { color:var(--accent);
-      border-left-color:var(--accent); background:rgba(34,211,238,.08); }
+      background:linear-gradient(90deg, rgba(124,131,255,.10), transparent 80%); }
+    #activity-bar .act.on::before { content:''; position:absolute;
+      left:0; top:8px; bottom:8px; width:2px; border-radius:0 2px 2px 0;
+      background:linear-gradient(180deg, var(--primary), var(--accent));
+      box-shadow:0 0 12px rgba(124,131,255,.45); }
+    #activity-bar .act:focus-visible { outline:none;
+      box-shadow:inset 0 0 0 2px rgba(124,131,255,.35); }
     #activity-bar .act-spacer { flex:1; }
-    #activity-bar .act small { display:block; font-size:8px;
-      margin-top:2px; color:inherit; letter-spacing:.04em;
-      text-transform:uppercase; }
 
     #left-col { grid-area:left; background:var(--panel);
       border-right:1px solid var(--border); overflow:hidden;
@@ -121,7 +175,8 @@
 
     #right-col { grid-area:right; background:var(--panel);
       border-left:1px solid var(--border); overflow:hidden;
-      display:flex; flex-direction:column; min-width:0; }
+      display:flex; flex-direction:column; min-width:0;
+      box-shadow:var(--shadow-soft); }
 
     /* Sashes — narrow draggable gutters */
     .sash { background:transparent; transition:background .12s; }
@@ -134,20 +189,32 @@
     #sash-bottom:hover, #sash-bottom.dragging { background:var(--primary); }
     #app.no-left #sash-left, #app.no-bottom #sash-bottom { display:none; }
 
-    /* Bottom inspector */
-    #bottom-panel { grid-area:bottom; background:var(--panel);
+    /* Bottom inspector — glass-morphism over the map */
+    #bottom-panel { grid-area:bottom;
+      background:rgba(22,29,49,.82); backdrop-filter:blur(10px) saturate(140%);
+      -webkit-backdrop-filter:blur(10px) saturate(140%);
       border-top:1px solid var(--border); display:flex;
       flex-direction:column; overflow:hidden; min-height:0;
-      position:relative; }
+      position:relative; box-shadow:0 -4px 16px rgba(0,0,0,.25); }
     #app.no-bottom #bottom-panel { display:none; }
     #bottom-tabs { display:flex; gap:0; border-bottom:1px solid var(--border);
-      background:var(--panel-2); flex-shrink:0; }
+      background:rgba(28,36,64,.7); flex-shrink:0; position:relative; }
     #bottom-tabs .tab { background:transparent; border:none; color:var(--muted);
-      padding:8px 14px; font-size:12px; cursor:pointer;
+      padding:9px 16px; font-size:12px; cursor:pointer; font-weight:500;
       border-bottom:2px solid transparent;
-      transition:color .12s, border-color .12s; letter-spacing:.02em; }
+      transition:color .18s ease; letter-spacing:.01em; position:relative; }
     #bottom-tabs .tab:hover { color:var(--text); }
-    #bottom-tabs .tab.on { color:var(--accent); border-bottom-color:var(--accent); }
+    #bottom-tabs .tab.on { color:var(--accent); }
+    /* Underline indicator slides under the active tab */
+    #bottom-tabs .tab.on::after { content:''; position:absolute;
+      left:8px; right:8px; bottom:-1px; height:2px; border-radius:2px;
+      background:linear-gradient(90deg, var(--primary), var(--accent));
+      box-shadow:0 0 10px rgba(124,131,255,.5);
+      animation:tabUnderlineIn .18s ease both; }
+    @keyframes tabUnderlineIn {
+      from { transform:scaleX(.4); opacity:0; }
+      to   { transform:scaleX(1); opacity:1; }
+    }
     #bottom-tabs .grow { flex:1; }
     #bottom-tabs .close-btn { color:var(--dim); padding:8px 12px;
       cursor:pointer; background:transparent; border:none; font-size:14px; }
@@ -164,41 +231,64 @@
       color:var(--muted); white-space:pre-wrap; word-break:break-word;
       background:var(--bg); padding:6px 8px; border-radius:4px; }
 
-    /* Status bar */
-    #status-bar { grid-area:status; background:var(--panel-2);
+    /* Status bar — glass-morphism strip at the foot */
+    #status-bar { grid-area:status;
+      background:rgba(22,29,49,.78); backdrop-filter:blur(10px) saturate(140%);
+      -webkit-backdrop-filter:blur(10px) saturate(140%);
       border-top:1px solid var(--border); display:flex; align-items:center;
-      padding:0 10px; gap:14px; font-size:11px; color:var(--muted);
-      letter-spacing:.02em; }
+      padding:0 12px; gap:14px; font-size:11px; color:var(--muted);
+      letter-spacing:.01em; font-weight:500; }
     #status-bar button { background:transparent; border:none;
-      color:var(--muted); cursor:pointer; font-size:11px; padding:2px 6px;
-      border-radius:3px; }
-    #status-bar button:hover { color:var(--accent); background:rgba(34,211,238,.08); }
+      color:var(--muted); cursor:pointer; font-size:11px; padding:3px 8px;
+      border-radius:4px; transition:color .14s ease, background .14s ease,
+      transform .08s ease; font-family:inherit; }
+    #status-bar button:hover { color:var(--accent);
+      background:rgba(103,232,249,.10); }
+    #status-bar button:active { transform:translateY(1px); }
     #status-bar .sb-spacer { flex:1; }
-    #status-bar .sb-pill { color:var(--text); }
+    #status-bar .sb-pill { color:var(--text); font-variant-numeric:tabular-nums; }
 
-    /* Thesis / Places / History view styling */
-    .view-pane { flex:1; overflow-y:auto; padding:10px 14px; }
-    .view-pane h3 { font-size:11px; text-transform:uppercase;
-      letter-spacing:.06em; color:var(--dim); margin:14px 0 8px;
+    /* Thesis / Places / History view styling — SPEC_083 polish */
+    .view-pane { flex:1; overflow-y:auto; padding:14px 16px;
+      animation:viewIn .14s ease both; }
+    @keyframes viewIn {
+      from { opacity:0; transform:translateY(4px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .view-pane h3 { font-size:10.5px; text-transform:uppercase;
+      letter-spacing:.08em; color:var(--dim); margin:16px 0 8px;
       font-weight:600; }
     .view-pane h3:first-child { margin-top:0; }
     .view-pane label { display:block; font-size:11px; color:var(--muted);
-      margin:8px 0 3px; letter-spacing:.02em; }
+      margin:10px 0 4px; letter-spacing:.01em; font-weight:500; }
     .view-pane input[type="text"], .view-pane input[type="number"],
     .view-pane select, .view-pane textarea {
-      width:100%; background:var(--bg); color:var(--text);
-      border:1px solid var(--border); padding:6px 8px; border-radius:5px;
-      font-family:inherit; font-size:12px; }
+      width:100%; background:rgba(10,14,26,.55); color:var(--text);
+      border:1px solid var(--border); padding:8px 11px; border-radius:7px;
+      font-family:inherit; font-size:12.5px;
+      transition:border-color .16s ease, box-shadow .16s ease,
+                 background .16s ease; }
+    .view-pane input::placeholder, .view-pane textarea::placeholder {
+      color:var(--dim); }
     .view-pane input:focus, .view-pane select:focus,
-    .view-pane textarea:focus { outline:none; border-color:var(--primary); }
-    .view-pane textarea { min-height:60px; resize:vertical; }
-    .view-pane .row2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
-    .view-pane .save-btn { background:var(--primary); color:#fff; border:none;
-      padding:8px 14px; border-radius:5px; cursor:pointer; font-size:12px;
-      font-weight:600; margin-top:12px; transition:background .12s; }
-    .view-pane .save-btn:hover { background:var(--primary-hover); }
-    .view-pane .save-flash { display:inline-block; margin-left:10px;
-      color:var(--success); font-size:11px; opacity:0;
+    .view-pane textarea:focus { outline:none;
+      border-color:var(--primary); background:rgba(10,14,26,.85);
+      box-shadow:0 0 0 3px rgba(124,131,255,.18); }
+    .view-pane textarea { min-height:72px; resize:vertical; line-height:1.5; }
+    .view-pane .row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .view-pane .save-btn { position:relative; color:#fff; border:none;
+      padding:10px 18px; border-radius:7px; cursor:pointer; font-size:12.5px;
+      font-weight:600; margin-top:14px; letter-spacing:.01em;
+      background:linear-gradient(135deg, var(--primary), var(--primary-2));
+      box-shadow:0 1px 2px rgba(0,0,0,.3), 0 2px 8px rgba(124,131,255,.25);
+      transition:transform .08s ease, box-shadow .18s ease, filter .18s ease;
+      font-family:inherit; }
+    .view-pane .save-btn:hover { filter:brightness(1.08);
+      box-shadow:0 2px 4px rgba(0,0,0,.3), 0 6px 18px rgba(124,131,255,.45); }
+    .view-pane .save-btn:active { transform:translateY(1px);
+      box-shadow:0 1px 2px rgba(0,0,0,.3), 0 1px 4px rgba(124,131,255,.25); }
+    .view-pane .save-flash { display:inline-block; margin-left:12px;
+      color:var(--success); font-size:11px; opacity:0; font-weight:500;
       transition:opacity .2s; }
     .view-pane .save-flash.show { opacity:1; }
     .view-pane .empty { color:var(--dim); font-style:italic;
@@ -558,12 +648,54 @@
       <button class="btn-icon" id="share">Share view</button>
     </header>
 
-    <!-- ─── ACTIVITY BAR (SPEC_082) ─────────────────────────── -->
+    <!-- ─── ACTIVITY BAR (SPEC_082 + SPEC_083 polish) ───────── -->
     <aside id="activity-bar" aria-label="View switcher">
-      <button class="act on" data-view="thesis"  title="Investment thesis">📋<small>Thesis</small></button>
-      <button class="act"     data-view="layers" title="Map layers">▦<small>Layers</small></button>
-      <button class="act"     data-view="places" title="Pinned places">📍<small>Places</small></button>
-      <button class="act"     data-view="history" title="Question history">🕘<small>Hist</small></button>
+      <button class="act on" data-view="thesis" title="Investment thesis"
+              aria-label="Investment thesis">
+        <!-- briefcase -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true">
+          <rect x="3" y="7" width="18" height="13" rx="2"/>
+          <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          <path d="M3 13h18"/>
+        </svg>
+        <small>Thesis</small>
+      </button>
+      <button class="act" data-view="layers" title="Map layers"
+              aria-label="Map layers">
+        <!-- stacked layers -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true">
+          <path d="M12 3 2 8l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5"/>
+          <path d="M2 12l10 5 10-5"/>
+        </svg>
+        <small>Layers</small>
+      </button>
+      <button class="act" data-view="places" title="Pinned places"
+              aria-label="Pinned places">
+        <!-- location pin -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true">
+          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+        <small>Places</small>
+      </button>
+      <button class="act" data-view="history" title="Question history"
+              aria-label="Question history">
+        <!-- clock -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"
+             aria-hidden="true">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M12 7v5l3 2"/>
+        </svg>
+        <small>Hist</small>
+      </button>
       <div class="act-spacer"></div>
     </aside>
 
@@ -821,6 +953,20 @@
 
   </div>
 
+  <!-- SPEC_083 — first-load onboarding nudge -->
+  <div id="onboarding-nudge" role="status">
+    <svg class="nudge-icon" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+         stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 2v3M5 6l2 2M2 12h3M22 12h-3M19 6l-2 2"/>
+      <path d="M9 18h6M10 22h4"/>
+      <path d="M12 8a4 4 0 0 0-3 6.5c.7.7 1 1.5 1 2.5h4c0-1 .3-1.8 1-2.5A4 4 0 0 0 12 8z"/>
+    </svg>
+    <span>Set your <b>investment thesis</b> on the left —
+          I'll tailor the map to your industry.</span>
+    <button id="onboarding-dismiss" title="Dismiss">×</button>
+  </div>
+
   <div id="toast"></div>
 
   <script>
@@ -832,7 +978,11 @@
   const SESSION = 'sess-' + Math.random().toString(36).slice(2, 10);
 
   const state = {
-    layerId: 'disaster_nri',
+    // SPEC_083 — default landing layer reflects what the primary
+    // site-selection customer wants first. NRI (the old default)
+    // is actuarial expected-annual-loss; reads as misleading
+    // "hurricane risk" for non-insurance users.
+    layerId: 'median_household_income_acs',
     overlayId: null,
     compareLayerId: null,
     placeId: null,
@@ -984,11 +1134,36 @@
     }
   }
 
+  // SPEC_083 — derive a default layer from the user's saved thesis.
+  // Industry keywords route to the layer most relevant to that vertical.
+  // Falls back to median household income, the universal site-selection
+  // starting point.
+  function pickDefaultLayer(thesis) {
+    const industry = ((thesis && thesis.industry_label) || '').toLowerCase();
+    if (/housing|apartment|real ?estate|condo|residential|multifamily/.test(industry))
+      return 'population_density';
+    if (/retail|restaurant|cafe|store|shop|coffee|bar|salon|boutique/.test(industry))
+      return 'median_household_income_acs';
+    if (/industrial|warehouse|manufactur|logist|distribution|factory|3pl/.test(industry))
+      return 'broadband_fixed_25_3';
+    return 'median_household_income_acs';
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // INIT
   // ═══════════════════════════════════════════════════════════════════════
   async function init() {
     loadURL();
+    // SPEC_083 — when ?layer= is not in the URL, derive the default
+    // from the saved thesis (if any) so first impression matches the
+    // user's industry.
+    const urlHasLayer = new URLSearchParams(location.search).has('layer');
+    if (!urlHasLayer) {
+      try {
+        const thesis = JSON.parse(localStorage.getItem('atlas_thesis_v1') || '{}');
+        state.layerId = pickDefaultLayer(thesis);
+      } catch (_) {}
+    }
     initMap();
     const [reg, bounds, layer] = await Promise.all([
       fetch(API + '/layers').then(r => r.json()),
@@ -1373,6 +1548,18 @@
       if (b.dataset.layerId === state.compareLayerId) b.classList.add('active-compare');
     });
   }
+  // SPEC_083 — programmatic layer switch by id. Looks up the spec in
+  // REGISTRY and delegates to onLayerClick. No-op when the layer isn't
+  // in the registry yet (e.g. called before init() finishes).
+  async function activateLayer(layerId) {
+    if (!layerId || !REGISTRY) return;
+    for (const domain of Object.keys(REGISTRY)) {
+      for (const spec of REGISTRY[domain] || []) {
+        if (spec.id === layerId) { await onLayerClick(spec); return; }
+      }
+    }
+  }
+
   async function onLayerClick(spec) {
     if (spec.grain === 'point') {
       if (state.overlayId === spec.id) clearOverlay();
@@ -1386,6 +1573,9 @@
       return;
     }
     state.layerId = spec.id; syncURL();
+    // SPEC_083 — mark that the user has chosen a layer this session, so
+    // a later thesis-save doesn't overwrite their choice.
+    window.__userPickedLayer = true;
     track('layer_toggled', { layer_id: spec.id, role: 'base' });
     // Polish #6 — apply layer's default_zoom/lat/lon when present, so each
     // layer can dictate its best initial view (tract layers → neighborhood
@@ -2557,6 +2747,17 @@
     flash.classList.add('show');
     setTimeout(() => flash.classList.remove('show'), 1500);
     track('thesis_saved', { fields: Object.keys(t).filter(k => t[k] != null).length });
+    // SPEC_083 — re-pick the default layer for this thesis. We only
+    // switch when the user hasn't manually overridden the layer this
+    // session (otherwise a save would clobber their choice).
+    if (typeof pickDefaultLayer === 'function' && typeof activateLayer === 'function'
+        && !window.__userPickedLayer) {
+      const next = pickDefaultLayer(t);
+      if (next && next !== state.layerId) activateLayer(next);
+    }
+    // Hide the onboarding nudge once a thesis exists
+    const nudge = document.getElementById('onboarding-nudge');
+    if (nudge) nudge.classList.remove('show');
   }
   function getThesisContext() {
     const t = loadThesis();
@@ -2760,6 +2961,20 @@
       if (window.MAP && MAP.invalidateSize) MAP.invalidateSize();
     };
     updateStatusBar();
+    // SPEC_083 — onboarding nudge (first load, no thesis, not dismissed)
+    const nudge = document.getElementById('onboarding-nudge');
+    if (nudge) {
+      const dismissed = localStorage.getItem('atlas_onboarding_dismissed_v1');
+      const hasThesis = !thesisIsEmpty(loadThesis());
+      if (!dismissed && !hasThesis) {
+        setTimeout(() => nudge.classList.add('show'), 600);
+      }
+      document.getElementById('onboarding-dismiss').onclick = () => {
+        nudge.classList.remove('show');
+        localStorage.setItem('atlas_onboarding_dismissed_v1', '1');
+        track('onboarding_dismissed', {});
+      };
+    }
   }
 
   // Run shell init AFTER the rest of the page has wired up its own
