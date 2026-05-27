@@ -302,6 +302,7 @@ class PilotBody(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000)
     session_id: Optional[str] = None
     history: Optional[List[Dict[str, Any]]] = None   # SPEC_081 — prior turns
+    thesis_context: Optional[Dict[str, Any]] = None  # SPEC_082 — user thesis
 
 
 @router.post("/pilot")
@@ -311,7 +312,8 @@ def atlas_pilot_endpoint(body: PilotBody, db: Session = Depends(get_db)):
     client waits for full transcript. SPEC_078."""
     from app.services.atlas.pilot import run_pilot
     result = run_pilot(db, question=body.question, session_id=body.session_id,
-                        history=body.history)
+                        history=body.history,
+                        thesis_context=body.thesis_context)
     return result
 
 
@@ -327,7 +329,8 @@ def atlas_pilot_stream_endpoint(body: PilotBody, db: Session = Depends(get_db)):
     return StreamingResponse(
         run_pilot_streaming(db, question=body.question,
                              session_id=body.session_id,
-                             history=body.history),
+                             history=body.history,
+                             thesis_context=body.thesis_context),
         media_type="application/x-ndjson",
         headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
     )

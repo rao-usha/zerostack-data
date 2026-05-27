@@ -42,19 +42,39 @@
       background:var(--bg); color:var(--text); }
     a { color:var(--accent); text-decoration:none; }
 
-    /* ─── grid layout ────────────────────────────────────────── */
+    /* ─── grid layout — SPEC_082 VS-Code-style shell ─────────── */
+    /* Five regions: header / activity-bar / left / map / right
+       chat / bottom inspector / status. Each gutter is a draggable
+       sash that updates a CSS var, then persisted to localStorage. */
+    :root {
+      --left-w:300px;      /* SPEC_082: activity-bar-adjacent panel */
+      --right-w:380px;     /* SPEC_082: dedicated chat column */
+      --bottom-h:200px;    /* SPEC_082: tool log / cites / queries */
+    }
     #app { display:grid; height:100vh;
-      grid-template-rows:48px 1fr;
-      grid-template-columns:300px 1fr 360px;
+      grid-template-rows:48px 1fr var(--bottom-h) 24px;
+      grid-template-columns:40px var(--left-w) 4px 1fr 4px var(--right-w);
       grid-template-areas:
-        "header header header"
-        "layers map place"; }
+        "header   header header header header header"
+        "activity left   sashL  map    sashR  right"
+        "activity bottom bottom bottom bottom right"
+        "status   status status status status status"; }
+    #app.no-left {
+      grid-template-columns:40px 0 0 1fr 4px var(--right-w); }
+    #app.no-bottom { grid-template-rows:48px 1fr 0 24px; }
+    #app.no-left.no-bottom {
+      grid-template-rows:48px 1fr 0 24px;
+      grid-template-columns:40px 0 0 1fr 4px var(--right-w); }
     @media (max-width:1000px) {
-      #app { grid-template-columns:240px 1fr; grid-template-areas:
-        "header header"
-        "layers map"
-        "place place"; }
-      #place-panel { max-height:240px; }
+      /* Mobile fallback: activity bar collapses, chat becomes a
+         bottom drawer (still toggleable), bottom inspector hidden. */
+      #app { grid-template-columns:32px 1fr; grid-template-rows:48px 1fr 0 24px;
+        grid-template-areas:
+          "header   header"
+          "activity map"
+          "status   status"; }
+      #app .right-col, #app .left-col, #app .sash, #app .bottom-panel {
+        display:none; }
     }
 
     /* ─── header / chrome ─────────────────────────────────────── */
@@ -77,9 +97,129 @@
     .btn-icon:hover { border-color:var(--accent); }
     .btn-icon.on { background:rgba(34,211,238,.15); color:#fff; border-color:var(--accent); }
 
-    /* ─── layer panel ─────────────────────────────────────────── */
-    #layer-panel { grid-area:layers; background:var(--panel);
-      border-right:1px solid var(--border); overflow-y:auto;
+    /* ─── activity bar + left column wrapper (SPEC_082) ───────── */
+    #activity-bar { grid-area:activity; background:var(--panel-2);
+      border-right:1px solid var(--border); display:flex;
+      flex-direction:column; align-items:stretch; padding:6px 0;
+      gap:2px; }
+    #activity-bar .act { background:transparent; border:none;
+      color:var(--muted); cursor:pointer; padding:10px 0;
+      font-size:18px; line-height:1; border-left:2px solid transparent;
+      transition:color .12s, background .12s, border-color .12s; }
+    #activity-bar .act:hover { color:var(--text); background:rgba(255,255,255,.04); }
+    #activity-bar .act.on { color:var(--accent);
+      border-left-color:var(--accent); background:rgba(34,211,238,.08); }
+    #activity-bar .act-spacer { flex:1; }
+    #activity-bar .act small { display:block; font-size:8px;
+      margin-top:2px; color:inherit; letter-spacing:.04em;
+      text-transform:uppercase; }
+
+    #left-col { grid-area:left; background:var(--panel);
+      border-right:1px solid var(--border); overflow:hidden;
+      display:flex; flex-direction:column; min-width:0; }
+    #app.no-left #left-col { display:none; }
+
+    #right-col { grid-area:right; background:var(--panel);
+      border-left:1px solid var(--border); overflow:hidden;
+      display:flex; flex-direction:column; min-width:0; }
+
+    /* Sashes — narrow draggable gutters */
+    .sash { background:transparent; transition:background .12s; }
+    .sash:hover, .sash.dragging { background:var(--primary); }
+    #sash-left { grid-area:sashL; cursor:col-resize; }
+    #sash-right { grid-area:sashR; cursor:col-resize; }
+    #sash-bottom { position:absolute; left:40px; right:var(--right-w,380px);
+      height:4px; cursor:row-resize; z-index:50;
+      background:transparent; transition:background .12s; }
+    #sash-bottom:hover, #sash-bottom.dragging { background:var(--primary); }
+    #app.no-left #sash-left, #app.no-bottom #sash-bottom { display:none; }
+
+    /* Bottom inspector */
+    #bottom-panel { grid-area:bottom; background:var(--panel);
+      border-top:1px solid var(--border); display:flex;
+      flex-direction:column; overflow:hidden; min-height:0;
+      position:relative; }
+    #app.no-bottom #bottom-panel { display:none; }
+    #bottom-tabs { display:flex; gap:0; border-bottom:1px solid var(--border);
+      background:var(--panel-2); flex-shrink:0; }
+    #bottom-tabs .tab { background:transparent; border:none; color:var(--muted);
+      padding:8px 14px; font-size:12px; cursor:pointer;
+      border-bottom:2px solid transparent;
+      transition:color .12s, border-color .12s; letter-spacing:.02em; }
+    #bottom-tabs .tab:hover { color:var(--text); }
+    #bottom-tabs .tab.on { color:var(--accent); border-bottom-color:var(--accent); }
+    #bottom-tabs .grow { flex:1; }
+    #bottom-tabs .close-btn { color:var(--dim); padding:8px 12px;
+      cursor:pointer; background:transparent; border:none; font-size:14px; }
+    #bottom-tabs .close-btn:hover { color:var(--warn); }
+    .bottom-pane { flex:1; overflow-y:auto; padding:10px 14px;
+      font-size:12px; line-height:1.5; display:none; }
+    .bottom-pane.on { display:block; }
+    #queries-pane .qrow { background:var(--panel-2); border:1px solid var(--border);
+      border-radius:6px; padding:6px 8px; margin-bottom:5px; }
+    #queries-pane .qrow summary { cursor:pointer; font-weight:600;
+      color:var(--accent); list-style:none; }
+    #queries-pane .qrow summary::-webkit-details-marker { display:none; }
+    #queries-pane .qrow pre { margin:6px 0 0; font-size:11px;
+      color:var(--muted); white-space:pre-wrap; word-break:break-word;
+      background:var(--bg); padding:6px 8px; border-radius:4px; }
+
+    /* Status bar */
+    #status-bar { grid-area:status; background:var(--panel-2);
+      border-top:1px solid var(--border); display:flex; align-items:center;
+      padding:0 10px; gap:14px; font-size:11px; color:var(--muted);
+      letter-spacing:.02em; }
+    #status-bar button { background:transparent; border:none;
+      color:var(--muted); cursor:pointer; font-size:11px; padding:2px 6px;
+      border-radius:3px; }
+    #status-bar button:hover { color:var(--accent); background:rgba(34,211,238,.08); }
+    #status-bar .sb-spacer { flex:1; }
+    #status-bar .sb-pill { color:var(--text); }
+
+    /* Thesis / Places / History view styling */
+    .view-pane { flex:1; overflow-y:auto; padding:10px 14px; }
+    .view-pane h3 { font-size:11px; text-transform:uppercase;
+      letter-spacing:.06em; color:var(--dim); margin:14px 0 8px;
+      font-weight:600; }
+    .view-pane h3:first-child { margin-top:0; }
+    .view-pane label { display:block; font-size:11px; color:var(--muted);
+      margin:8px 0 3px; letter-spacing:.02em; }
+    .view-pane input[type="text"], .view-pane input[type="number"],
+    .view-pane select, .view-pane textarea {
+      width:100%; background:var(--bg); color:var(--text);
+      border:1px solid var(--border); padding:6px 8px; border-radius:5px;
+      font-family:inherit; font-size:12px; }
+    .view-pane input:focus, .view-pane select:focus,
+    .view-pane textarea:focus { outline:none; border-color:var(--primary); }
+    .view-pane textarea { min-height:60px; resize:vertical; }
+    .view-pane .row2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+    .view-pane .save-btn { background:var(--primary); color:#fff; border:none;
+      padding:8px 14px; border-radius:5px; cursor:pointer; font-size:12px;
+      font-weight:600; margin-top:12px; transition:background .12s; }
+    .view-pane .save-btn:hover { background:var(--primary-hover); }
+    .view-pane .save-flash { display:inline-block; margin-left:10px;
+      color:var(--success); font-size:11px; opacity:0;
+      transition:opacity .2s; }
+    .view-pane .save-flash.show { opacity:1; }
+    .view-pane .empty { color:var(--dim); font-style:italic;
+      text-align:center; padding:20px 6px; }
+    .place-row, .hist-row {
+      display:flex; align-items:center; gap:8px; padding:6px 8px;
+      border-radius:5px; cursor:pointer; transition:background .12s; }
+    .place-row:hover, .hist-row:hover { background:var(--panel-2); }
+    .place-row .label { flex:1; font-size:12px; color:var(--text);
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .place-row .sub { font-size:10px; color:var(--dim); }
+    .place-row .actions, .hist-row .actions { display:flex; gap:4px; }
+    .place-row .iconbtn, .hist-row .iconbtn {
+      background:transparent; border:none; color:var(--dim);
+      cursor:pointer; padding:2px 4px; font-size:13px; }
+    .place-row .iconbtn:hover { color:var(--accent); }
+    .place-row .iconbtn.danger:hover { color:var(--warn); }
+
+    /* ─── layer panel (now embedded inside Layers view) ────────── */
+    #layer-panel { background:var(--panel);
+      overflow-y:auto; flex:1;
       display:flex; flex-direction:column; }
     .panel-title { font-size:11px; text-transform:uppercase; letter-spacing:.06em;
       color:var(--dim); padding:14px 16px 6px; }
@@ -225,20 +365,21 @@
     #pilot-input:focus { outline:none; border-color:var(--primary); }
     #pilot-input:disabled { opacity:.6; }
 
-    #pilot-panel { position:absolute; top:60px; right:12px; z-index:600;
-      background:rgba(20,27,45,.97); border:1px solid var(--border);
-      border-radius:10px; padding:14px 14px 12px; display:none;
-      box-shadow:0 8px 28px rgba(0,0,0,.6);
-      width:420px; max-height:calc(100vh - 140px);
-      flex-direction:column; }
+    /* SPEC_082 — pilot panel now fills the right column instead of
+       floating. The .show class is forced-on by JS so existing
+       restore-from-history code paths still work. */
+    #pilot-panel { background:var(--panel); border:none;
+      border-radius:0; padding:14px 14px 12px; display:flex;
+      flex:1; flex-direction:column; min-height:0;
+      overflow-y:auto; box-shadow:none;
+      width:auto; max-height:none; position:relative; }
     #pilot-panel.show { display:flex; }
     #pilot-panel h4 { margin:0 0 8px; font-size:13px; font-weight:600; color:var(--text); }
     #pilot-panel .sub { font-size:11px; color:var(--dim); margin-bottom:8px; }
-    #pilot-panel button.close { position:absolute; top:8px; right:10px;
-      background:transparent; color:var(--dim); border:none; cursor:pointer;
-      font-size:18px; padding:0; line-height:1; }
-    /* Polish #2 — cancel button (only visible while streaming) */
-    #pilot-cancel { position:absolute; top:8px; right:36px;
+    /* Close button is hidden in the docked layout — chat is always visible */
+    #pilot-panel button.close { display:none; }
+    /* Cancel pill */
+    #pilot-cancel { position:absolute; top:8px; right:10px;
       background:rgba(245,158,11,.18); color:#fbbf24;
       border:1px solid rgba(245,158,11,.5); padding:2px 8px;
       border-radius:5px; cursor:pointer; font-size:10px; display:none; }
@@ -348,8 +489,10 @@
     #scatter-host { width:280px; height:240px; }
 
     /* ─── place panel ─────────────────────────────────────────── */
-    #place-panel { grid-area:place; background:var(--panel);
-      border-left:1px solid var(--border); overflow-y:auto; padding:16px; }
+    /* #place-panel is now content inside the Places view of #left-col;
+       grid-area + side border removed in SPEC_082. */
+    #place-panel { background:var(--panel);
+      overflow-y:auto; padding:14px; flex:1; }
     #place-panel .empty { color:var(--dim); font-size:13px; text-align:center;
       padding:48px 16px; }
     .place-title { font-size:18px; font-weight:700; margin:0 0 4px; }
@@ -415,26 +558,140 @@
       <button class="btn-icon" id="share">Share view</button>
     </header>
 
-    <!-- ─── LAYER PANEL ─────────────────────────────────────── -->
-    <aside id="layer-panel">
-      <div class="panel-title">Layers</div>
-      <div id="layer-list" class="spinner" style="flex:1">Loading layers…</div>
-
-      <!-- Active-layer controls (SPEC_066b) — pinned to bottom -->
-      <div id="control-panel">
-        <div class="ctitle">Active layer</div>
-        <div id="active-layer-name" style="font-weight:600; color:var(--text);">—</div>
-        <div class="crow">
-          <span style="font-size:11px; color:var(--dim); width:50px">Opacity</span>
-          <input type="range" id="opacity-slider" min="0" max="100" value="55" style="flex:1">
-          <span id="opacity-readout" style="font-size:11px; color:var(--muted);
-            width:34px; text-align:right; font-variant-numeric:tabular-nums">55%</span>
-        </div>
-        <div id="compare-pill"></div>
-        <!-- Brushed histogram for the active choropleth (Wave 2) -->
-        <div id="brush-host"></div>
-      </div>
+    <!-- ─── ACTIVITY BAR (SPEC_082) ─────────────────────────── -->
+    <aside id="activity-bar" aria-label="View switcher">
+      <button class="act on" data-view="thesis"  title="Investment thesis">📋<small>Thesis</small></button>
+      <button class="act"     data-view="layers" title="Map layers">▦<small>Layers</small></button>
+      <button class="act"     data-view="places" title="Pinned places">📍<small>Places</small></button>
+      <button class="act"     data-view="history" title="Question history">🕘<small>Hist</small></button>
+      <div class="act-spacer"></div>
     </aside>
+
+    <!-- ─── LEFT COLUMN (SPEC_082) — hosts the 4 switchable views -->
+    <section id="left-col">
+      <!-- View 1: Thesis editor -->
+      <div id="view-thesis" class="view-pane">
+        <div class="panel-title" style="padding:0 0 8px; color:var(--dim);
+             font-size:11px; text-transform:uppercase; letter-spacing:.06em;">
+          Investment thesis
+        </div>
+        <label for="thesis-industry-label">Industry / What you're banking</label>
+        <input type="text" id="thesis-industry-label"
+               placeholder="e.g. Furniture stores">
+        <label for="thesis-industry-naics">NAICS code <span style="color:var(--dim)">(optional)</span></label>
+        <input type="text" id="thesis-industry-naics"
+               placeholder="442110" maxlength="6">
+
+        <h3>Target demographics</h3>
+        <div class="row2">
+          <div>
+            <label for="thesis-hhi-min">HHI min ($)</label>
+            <input type="number" id="thesis-hhi-min" placeholder="75000" min="0">
+          </div>
+          <div>
+            <label for="thesis-hhi-max">HHI max ($)</label>
+            <input type="number" id="thesis-hhi-max" placeholder="" min="0">
+          </div>
+        </div>
+        <label for="thesis-age-band">Target age band</label>
+        <select id="thesis-age-band">
+          <option value="">(any)</option>
+          <option value="18-24">18-24</option>
+          <option value="25-44">25-44</option>
+          <option value="45-64">45-64</option>
+          <option value="65+">65+</option>
+        </select>
+        <label for="thesis-density">Min population density (people / km²)</label>
+        <input type="number" id="thesis-density" placeholder="" min="0">
+
+        <h3>Notes</h3>
+        <textarea id="thesis-notes" placeholder="Free-form context the Pilot should keep in mind…"></textarea>
+
+        <button class="save-btn" id="thesis-save">Save thesis</button>
+        <span class="save-flash" id="thesis-saved">✓ saved</span>
+      </div>
+
+      <!-- View 2: Layers -->
+      <div id="view-layers" class="view-pane" style="display:none; padding:0;
+           overflow:hidden; flex:1; flex-direction:column;">
+        <aside id="layer-panel">
+          <div class="panel-title">Layers</div>
+          <div id="layer-list" class="spinner" style="flex:1">Loading layers…</div>
+
+          <!-- Active-layer controls (SPEC_066b) — pinned to bottom -->
+          <div id="control-panel">
+            <div class="ctitle">Active layer</div>
+            <div id="active-layer-name" style="font-weight:600; color:var(--text);">—</div>
+            <div class="crow">
+              <span style="font-size:11px; color:var(--dim); width:50px">Opacity</span>
+              <input type="range" id="opacity-slider" min="0" max="100" value="55" style="flex:1">
+              <span id="opacity-readout" style="font-size:11px; color:var(--muted);
+                width:34px; text-align:right; font-variant-numeric:tabular-nums">55%</span>
+            </div>
+            <div id="compare-pill"></div>
+            <!-- Brushed histogram for the active choropleth (Wave 2) -->
+            <div id="brush-host"></div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- View 3: Places (pinned counties + the active-place detail card) -->
+      <div id="view-places" class="view-pane" style="display:none; padding:0;
+           overflow:hidden; flex:1; flex-direction:column;">
+        <div style="padding:10px 14px 4px; display:flex; align-items:center; gap:8px;">
+          <div class="panel-title" style="padding:0; flex:1;
+               color:var(--dim); font-size:11px; text-transform:uppercase;
+               letter-spacing:.06em;">Pinned places</div>
+          <button id="places-clear" class="iconbtn" style="background:transparent;
+                  border:1px solid var(--border); color:var(--dim); cursor:pointer;
+                  padding:3px 8px; border-radius:4px; font-size:10px;"
+                  title="Clear all pins">Clear</button>
+        </div>
+        <div id="pinned-list" style="padding:4px 8px; max-height:240px;
+             overflow-y:auto; border-bottom:1px solid var(--border);">
+          <div class="empty">No places pinned yet. Click a county to add.</div>
+        </div>
+        <!-- Existing #place-panel (the active-place detail card) docked
+             below the pin list. Identical content + ids as before. -->
+        <aside id="place-panel">
+          <div class="empty" id="place-empty">
+            Click a county on the map.<br><br>
+            Or pick a layer to recolor →
+          </div>
+          <div id="place-content" style="display:none">
+            <div class="place-title" id="place-title">—</div>
+            <div class="place-id" id="place-id">—</div>
+            <div id="place-layers"></div>
+            <div id="place-actions">
+              <a id="deeper" target="_blank">Deeper analysis →</a>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- View 4: History -->
+      <div id="view-history" class="view-pane" style="display:none">
+        <div style="display:flex; align-items:center; gap:8px;
+             margin-bottom:8px;">
+          <div class="panel-title" style="padding:0; flex:1; margin:0;
+               color:var(--dim); font-size:11px; text-transform:uppercase;
+               letter-spacing:.06em;">Question history</div>
+          <button id="history-clear-all" style="background:transparent;
+                  border:1px solid var(--border); color:var(--dim);
+                  cursor:pointer; padding:3px 8px; border-radius:4px;
+                  font-size:10px;">Clear all</button>
+        </div>
+        <input type="text" id="history-search" placeholder="Filter…"
+               style="margin-bottom:8px">
+        <div id="history-list">
+          <div class="empty">No Pilot questions yet.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Resizable gutter between left col and map -->
+    <div id="sash-left" class="sash" data-axis="x"
+         data-target="--left-w" data-min="240" data-max="480"></div>
 
     <!-- ─── MAP ─────────────────────────────────────────────── -->
     <main id="map">
@@ -472,31 +729,6 @@
         <div class="axes"><span>A: low</span><span>high</span></div>
       </div>
 
-      <!-- SPEC_078 — Atlas Pilot floating response panel -->
-      <div id="pilot-panel">
-        <button class="close" id="pilot-close">×</button>
-        <button id="pilot-cancel" title="Cancel mid-flight Pilot run">Cancel</button>
-        <h4>Atlas Pilot</h4>
-        <div id="pilot-turn-bar" style="display:none">
-          <span>Turn <span id="pilot-turn-n">1</span> of guided tour</span>
-          <a id="pilot-start-over" title="Clear this conversation">Start over ↺</a>
-        </div>
-        <div id="pilot-question"></div>
-        <div id="pilot-loading" style="display:none">
-          <span class="pilot-spinner"></span>Thinking… (5-30s)
-        </div>
-        <div id="pilot-narration" style="display:none"></div>
-        <div id="pilot-options"></div>
-        <div id="pilot-cites" style="display:none"></div>
-        <div id="pilot-tools" style="display:none"></div>
-        <div id="pilot-meta" style="display:none"></div>
-        <div id="pilot-history" style="display:none">
-          <a id="pilot-history-clear">Clear history</a>
-          ·
-          <span id="pilot-history-count">0</span> prior question(s)
-        </div>
-      </div>
-
       <!-- SPEC_067 — Recent Activity floating overlay -->
       <div id="recent-overlay">
         <button class="close" id="recent-close">×</button>
@@ -517,21 +749,75 @@
       </div>
     </main>
 
-    <!-- ─── PLACE PANEL ─────────────────────────────────────── -->
-    <aside id="place-panel">
-      <div class="empty" id="place-empty">
-        Click a county on the map.<br><br>
-        Or pick a layer to recolor →
-      </div>
-      <div id="place-content" style="display:none">
-        <div class="place-title" id="place-title">—</div>
-        <div class="place-id" id="place-id">—</div>
-        <div id="place-layers"></div>
-        <div id="place-actions">
-          <a id="deeper" target="_blank">Deeper analysis →</a>
+    <!-- Resizable gutter between map and chat -->
+    <div id="sash-right" class="sash" data-axis="x"
+         data-target="--right-w" data-min="320" data-max="560"></div>
+
+    <!-- ─── RIGHT COLUMN: Pilot chat (SPEC_082) ─────────────── -->
+    <aside id="right-col">
+      <div id="pilot-panel" class="show">
+        <button class="close" id="pilot-close" style="display:none">×</button>
+        <button id="pilot-cancel" title="Cancel mid-flight Pilot run">Cancel</button>
+        <h4>Atlas Pilot</h4>
+        <div id="pilot-turn-bar" style="display:none">
+          <span>Turn <span id="pilot-turn-n">1</span> of guided tour</span>
+          <a id="pilot-start-over" title="Clear this conversation">Start over ↺</a>
+        </div>
+        <div id="pilot-question"></div>
+        <div id="pilot-loading" style="display:none">
+          <span class="pilot-spinner"></span>Thinking… (5-30s)
+        </div>
+        <div id="pilot-narration" style="display:none"></div>
+        <div id="pilot-options"></div>
+        <!-- Cites + tool log moved to the bottom inspector. We keep
+             these elements (still updated by JS) but hidden via CSS. -->
+        <div id="pilot-cites" style="display:none"></div>
+        <div id="pilot-tools" style="display:none"></div>
+        <div id="pilot-meta" style="display:none"></div>
+        <div id="pilot-history" style="display:none">
+          <a id="pilot-history-clear">Clear history</a>
+          ·
+          <span id="pilot-history-count">0</span> prior question(s)
         </div>
       </div>
     </aside>
+
+    <!-- ─── BOTTOM INSPECTOR (SPEC_082) ─────────────────────── -->
+    <section id="bottom-panel">
+      <div id="sash-bottom" data-axis="y" data-target="--bottom-h"
+           data-min="120" data-max="400"></div>
+      <div id="bottom-tabs">
+        <button class="tab on" data-tab="toollog">Tool Log</button>
+        <button class="tab"    data-tab="cites">Citations</button>
+        <button class="tab"    data-tab="queries">Queries</button>
+        <div class="grow"></div>
+        <button class="close-btn" id="bottom-close" title="Hide panel">×</button>
+      </div>
+      <div id="toollog-pane" class="bottom-pane on">
+        <div class="empty" style="color:var(--dim); font-style:italic;">
+          Pilot tool calls will stream here.
+        </div>
+      </div>
+      <div id="cites-pane" class="bottom-pane">
+        <div class="empty" style="color:var(--dim); font-style:italic;">
+          Citations from the last Pilot answer will appear here.
+        </div>
+      </div>
+      <div id="queries-pane" class="bottom-pane">
+        <div class="empty" style="color:var(--dim); font-style:italic;">
+          Each completed tool call shows args + result JSON.
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── STATUS BAR (SPEC_082) ───────────────────────────── -->
+    <div id="status-bar">
+      <button id="sb-toggle-left" title="Toggle left panel">⌧ Left</button>
+      <button id="sb-toggle-bottom" title="Toggle bottom panel">⌧ Bottom</button>
+      <span class="sb-spacer"></span>
+      <span class="sb-pill" id="sb-pilot">Pilot idle</span>
+      <span id="sb-layers">0 layers</span>
+    </div>
 
   </div>
 
@@ -1197,6 +1483,12 @@
   // ═══════════════════════════════════════════════════════════════════════
   // PLACE PANEL — layered with sparklines + distribution + percentile
   // ═══════════════════════════════════════════════════════════════════════
+  // SPEC_082 — Selecting a place auto-switches the left panel to the
+  // Places view so the user can see the details + pin list.
+  async function selectPlace(geoId) {
+    if (typeof setLeftView === 'function') setLeftView('places');
+    await openPlace(geoId);
+  }
   async function openPlace(geoId) {
     state.placeId = geoId; syncURL();
     const data = await fetch(API + '/place/' + encodeURIComponent(geoId)).then(r => r.json());
@@ -1206,6 +1498,8 @@
       if (fl.feature.properties.geo_id === geoId)
         name = fl.feature.properties.geo_name || geoId;
     });
+    // SPEC_082 — auto-pin every county click
+    if (typeof pinPlace === 'function') pinPlace(geoId, name);
 
     document.getElementById('place-empty').style.display = 'none';
     document.getElementById('place-content').style.display = 'block';
@@ -1617,6 +1911,11 @@
       question_chars: question.length,
       turn: Math.floor(PILOT_CONVERSATION.length / 2) + 1,
     });
+    // SPEC_082 — status bar feedback + reset Queries pane for new run
+    if (typeof setPilotStatus === 'function') setPilotStatus('Pilot thinking…');
+    const qpane = document.getElementById('queries-pane');
+    if (qpane) qpane.innerHTML = '<div class="empty" style="color:var(--dim);'
+      + ' font-style:italic;">Each completed tool call shows args + result JSON.</div>';
 
     const collected = {
       tool_calls: [], citations: [], ui_actions: [],
@@ -1633,6 +1932,9 @@
           question, session_id: SESSION,
           // SPEC_081 — last 6 turns of conversation for context
           history: PILOT_CONVERSATION.slice(-12),
+          // SPEC_082 — thesis context (only if populated)
+          thesis_context: (typeof getThesisContext === 'function')
+            ? getThesisContext() : null,
         }),
         signal: PILOT_ABORT.signal,
       });
@@ -1757,17 +2059,24 @@
     }
     else if (ev.event === 'tool_call_started') {
       const tag = ev.is_ui ? '🎬 UI' : '🔎 read';
+      c.last_args = ev.args || {};
       appendToolLog(toolsEl, `[${ev.loop}] ${tag} ${ev.name}(${
         escapeHtml(JSON.stringify(ev.args).slice(0, 70))
       })`);
     }
     else if (ev.event === 'tool_call_completed') {
-      c.tool_calls.push({ loop: ev.loop, name: ev.name });
+      c.tool_calls.push({ loop: ev.loop, name: ev.name,
+                          summary: ev.summary, is_error: ev.is_error });
       const cls = ev.is_error ? 'step' : (ev.name === 'cite' ? 'step cite' : 'step');
       const last = toolsEl.querySelector('.step:last-child');
       if (last) {
         last.className = cls;
         last.innerHTML += `<br><span style="color:var(--muted)">  ↳ ${escapeHtml(ev.summary)}</span>`;
+      }
+      // SPEC_082 — mirror into the bottom Queries pane
+      if (typeof appendQueryRow === 'function') {
+        appendQueryRow(ev.name, c.last_args || {}, { summary: ev.summary,
+                          is_error: !!ev.is_error });
       }
     }
     else if (ev.event === 'ui_action_queued') {
@@ -1818,6 +2127,12 @@
       if (c.ui_actions.length) applyPilotUiActions(c.ui_actions);
       // SPEC_081 — render guided-tour option buttons (if any)
       if (c.options_action) renderPilotOptions(c.options_action.args);
+      // SPEC_082 — mirror tool log + cites into the bottom inspector,
+      // update the status bar with a short summary.
+      if (typeof syncBottomFromPilot === 'function') syncBottomFromPilot();
+      if (typeof setPilotStatus === 'function') {
+        setPilotStatus(`${ev.tool_count} tools · ${ev.duration_seconds.toFixed(1)}s · ${c.model}`);
+      }
     }
     else if (ev.event === 'error') {
       loadingEl.style.display = 'none';
@@ -2092,6 +2407,368 @@
         FEMA_CASCADE.years.length - 1;
     }
   };
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SPEC_082 — VS-Code-style workspace shell
+  // Activity bar view switching, sash drag, thesis/places/history views,
+  // bottom-panel tab routing, status-bar wiring, telemetry.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const SHELL_LS_KEY    = 'atlas_shell_v1';
+  const THESIS_LS_KEY   = 'atlas_thesis_v1';
+  const PLACES_LS_KEY   = 'atlas_places_v1';
+  const SHELL_VIEW_KEY  = 'atlas_shell_view_v1';
+
+  // ─── Sash restore + drag ──────────────────────────────────────
+  function restoreShellSizes() {
+    try {
+      const s = JSON.parse(localStorage.getItem(SHELL_LS_KEY) || '{}');
+      if (s.leftW)   document.documentElement.style.setProperty('--left-w',   s.leftW + 'px');
+      if (s.rightW)  document.documentElement.style.setProperty('--right-w',  s.rightW + 'px');
+      if (s.bottomH) document.documentElement.style.setProperty('--bottom-h', s.bottomH + 'px');
+      if (s.noLeft)   document.getElementById('app').classList.add('no-left');
+      if (s.noBottom) document.getElementById('app').classList.add('no-bottom');
+    } catch (_) {}
+  }
+  function saveShellSizes() {
+    const cs = getComputedStyle(document.documentElement);
+    const px = v => parseInt(cs.getPropertyValue(v)) || null;
+    const app = document.getElementById('app');
+    localStorage.setItem(SHELL_LS_KEY, JSON.stringify({
+      leftW: px('--left-w'), rightW: px('--right-w'),
+      bottomH: px('--bottom-h'),
+      noLeft: app.classList.contains('no-left'),
+      noBottom: app.classList.contains('no-bottom'),
+    }));
+  }
+  function initSashes() {
+    document.querySelectorAll('.sash, #sash-bottom').forEach(sash => {
+      sash.addEventListener('pointerdown', e => {
+        e.preventDefault(); sash.setPointerCapture(e.pointerId);
+        sash.classList.add('dragging');
+        const axis = sash.dataset.axis;
+        const cssVar = sash.dataset.target;
+        const min = parseInt(sash.dataset.min) || 100;
+        const max = parseInt(sash.dataset.max) || 800;
+        const startX = e.clientX, startY = e.clientY;
+        const cs = getComputedStyle(document.documentElement);
+        const startSize = parseInt(cs.getPropertyValue(cssVar)) || 300;
+        // For #sash-right we grow when dragging LEFT (right edge pulls left)
+        // For #sash-bottom we grow when dragging UP
+        const sign = (sash.id === 'sash-right') ? -1 :
+                     (sash.id === 'sash-bottom') ? -1 : 1;
+        const onMove = ev => {
+          const delta = (axis === 'x')
+            ? (ev.clientX - startX) * sign
+            : (ev.clientY - startY) * sign;
+          const next = Math.max(min, Math.min(max, startSize + delta));
+          document.documentElement.style.setProperty(cssVar, next + 'px');
+          if (sash.id === 'sash-bottom') {
+            // Keep #sash-bottom right-anchor matching --right-w
+            sash.style.right = getComputedStyle(document.documentElement)
+              .getPropertyValue('--right-w');
+          }
+          if (window.MAP && MAP.invalidateSize) MAP.invalidateSize();
+        };
+        const onUp = () => {
+          sash.removeEventListener('pointermove', onMove);
+          sash.removeEventListener('pointerup', onUp);
+          sash.classList.remove('dragging');
+          saveShellSizes();
+          track('shell_sash_dragged', { sash: sash.id });
+          if (window.MAP && MAP.invalidateSize) MAP.invalidateSize();
+        };
+        sash.addEventListener('pointermove', onMove);
+        sash.addEventListener('pointerup', onUp);
+      });
+    });
+  }
+
+  // ─── View switcher ────────────────────────────────────────────
+  function setLeftView(viewId) {
+    const validViews = ['thesis', 'layers', 'places', 'history'];
+    if (!validViews.includes(viewId)) return;
+    const app = document.getElementById('app');
+    // Click the active icon → collapse the panel
+    const wasActive = document.querySelector(`#activity-bar .act.on[data-view="${viewId}"]`);
+    if (wasActive && !app.classList.contains('no-left')) {
+      app.classList.add('no-left');
+      saveShellSizes();
+      if (window.MAP && MAP.invalidateSize) MAP.invalidateSize();
+      track('shell_panel_toggled', { panel: 'left', state: 'collapsed' });
+      return;
+    }
+    app.classList.remove('no-left');
+    document.querySelectorAll('#activity-bar .act').forEach(b =>
+      b.classList.toggle('on', b.dataset.view === viewId));
+    validViews.forEach(v => {
+      const el = document.getElementById('view-' + v);
+      if (el) el.style.display = (v === viewId) ? 'flex' : 'none';
+    });
+    localStorage.setItem(SHELL_VIEW_KEY, viewId);
+    track('shell_view_switched', { view: viewId });
+    if (window.MAP && MAP.invalidateSize) MAP.invalidateSize();
+    // View-specific render hooks
+    if (viewId === 'places')  renderPinnedPlaces();
+    if (viewId === 'history') renderHistoryView();
+  }
+
+  // ─── Thesis view ──────────────────────────────────────────────
+  function loadThesis() {
+    try { return JSON.parse(localStorage.getItem(THESIS_LS_KEY) || '{}') || {}; }
+    catch (_) { return {}; }
+  }
+  function thesisFromForm() {
+    const v = id => (document.getElementById(id)?.value || '').toString().trim();
+    const n = id => { const x = parseInt(v(id)); return Number.isFinite(x) ? x : null; };
+    const t = {
+      industry_label: v('thesis-industry-label').slice(0, 200) || null,
+      industry_naics: v('thesis-industry-naics').slice(0, 8) || null,
+      target_hhi_min: n('thesis-hhi-min'),
+      target_hhi_max: n('thesis-hhi-max'),
+      target_pop_density_min: n('thesis-density'),
+      target_age_band: v('thesis-age-band') || null,
+      notes: v('thesis-notes').slice(0, 800) || null,
+    };
+    return t;
+  }
+  function thesisIsEmpty(t) {
+    if (!t) return true;
+    return Object.values(t).every(v => v === null || v === '' || v === undefined);
+  }
+  function fillThesisForm() {
+    const t = loadThesis();
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (el && val != null) el.value = val;
+    };
+    set('thesis-industry-label', t.industry_label);
+    set('thesis-industry-naics', t.industry_naics);
+    set('thesis-hhi-min',        t.target_hhi_min);
+    set('thesis-hhi-max',        t.target_hhi_max);
+    set('thesis-density',        t.target_pop_density_min);
+    set('thesis-age-band',       t.target_age_band);
+    set('thesis-notes',          t.notes);
+  }
+  function saveThesis() {
+    const t = thesisFromForm();
+    localStorage.setItem(THESIS_LS_KEY, JSON.stringify(t));
+    const flash = document.getElementById('thesis-saved');
+    flash.classList.add('show');
+    setTimeout(() => flash.classList.remove('show'), 1500);
+    track('thesis_saved', { fields: Object.keys(t).filter(k => t[k] != null).length });
+  }
+  function getThesisContext() {
+    const t = loadThesis();
+    return thesisIsEmpty(t) ? null : t;
+  }
+
+  // ─── Places view ──────────────────────────────────────────────
+  function loadPlaces() {
+    try { return JSON.parse(localStorage.getItem(PLACES_LS_KEY) || '[]') || []; }
+    catch (_) { return []; }
+  }
+  function savePlaces(list) {
+    localStorage.setItem(PLACES_LS_KEY, JSON.stringify(list.slice(-20)));
+  }
+  function pinPlace(geo_id, label) {
+    if (!geo_id) return;
+    const list = loadPlaces();
+    // Dedupe by geo_id; move existing to front
+    const filtered = list.filter(p => p.geo_id !== geo_id);
+    filtered.unshift({
+      geo_id, label: (label || geo_id).slice(0, 80),
+      ts: Date.now(), starred: false,
+    });
+    savePlaces(filtered);
+    track('place_pinned', { geo_id });
+    if (document.getElementById('view-places').style.display !== 'none') {
+      renderPinnedPlaces();
+    }
+  }
+  function renderPinnedPlaces() {
+    const host = document.getElementById('pinned-list');
+    if (!host) return;
+    const list = loadPlaces();
+    if (!list.length) {
+      host.innerHTML = '<div class="empty">No places pinned yet. Click a county to add.</div>';
+      return;
+    }
+    host.innerHTML = '';
+    list.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'place-row';
+      row.innerHTML = `
+        <div class="label">${escapeHtml(p.label)}
+          <div class="sub">${escapeHtml(p.geo_id)}</div></div>
+        <div class="actions">
+          <button class="iconbtn" data-act="star" title="Star">${p.starred ? '★' : '☆'}</button>
+          <button class="iconbtn danger" data-act="del" title="Remove">×</button>
+        </div>`;
+      row.addEventListener('click', e => {
+        if (e.target.closest('button')) return;
+        if (typeof selectPlace === 'function') selectPlace(p.geo_id);
+        track('place_reopened', { geo_id: p.geo_id });
+      });
+      row.querySelector('[data-act="star"]').onclick = ev => {
+        ev.stopPropagation();
+        const all = loadPlaces();
+        const it = all.find(x => x.geo_id === p.geo_id);
+        if (it) { it.starred = !it.starred; savePlaces(all); renderPinnedPlaces(); }
+      };
+      row.querySelector('[data-act="del"]').onclick = ev => {
+        ev.stopPropagation();
+        savePlaces(loadPlaces().filter(x => x.geo_id !== p.geo_id));
+        renderPinnedPlaces();
+      };
+      host.appendChild(row);
+    });
+  }
+
+  // ─── History view ─────────────────────────────────────────────
+  function renderHistoryView() {
+    const host = document.getElementById('history-list');
+    if (!host) return;
+    let items = [];
+    try { items = JSON.parse(localStorage.getItem('nexdata.pilot.hist') || '[]'); }
+    catch (_) {}
+    const filter = (document.getElementById('history-search')?.value || '')
+      .toLowerCase().trim();
+    const filtered = filter
+      ? items.filter(it => (it.question || '').toLowerCase().includes(filter))
+      : items;
+    if (!filtered.length) {
+      host.innerHTML = '<div class="empty">No Pilot questions yet.</div>';
+      return;
+    }
+    host.innerHTML = '';
+    filtered.slice().reverse().forEach(it => {
+      const row = document.createElement('div');
+      row.className = 'hist-row';
+      const when = new Date(it.ts || Date.now())
+        .toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+      row.innerHTML = `
+        <div class="label">${escapeHtml(it.question)}
+          <div class="sub">${when} · ${it.n_tools || 0} tools</div></div>
+        <div class="actions">
+          <button class="iconbtn" title="Re-ask">↻</button>
+        </div>`;
+      row.querySelector('button').onclick = ev => {
+        ev.stopPropagation();
+        if (typeof askPilot === 'function') askPilot(it.question);
+        track('history_reasked', {});
+      };
+      host.appendChild(row);
+    });
+  }
+
+  // ─── Bottom inspector tabs ────────────────────────────────────
+  function setBottomTab(tabId) {
+    document.querySelectorAll('#bottom-tabs .tab').forEach(b =>
+      b.classList.toggle('on', b.dataset.tab === tabId));
+    ['toollog','cites','queries'].forEach(t => {
+      const pane = document.getElementById(t + '-pane');
+      if (pane) pane.classList.toggle('on', t === tabId);
+    });
+    track('bottom_tab_switched', { tab: tabId });
+  }
+  function syncBottomFromPilot() {
+    // Mirror #pilot-tools children into #toollog-pane, #pilot-cites into #cites-pane.
+    const tools = document.getElementById('pilot-tools');
+    const cites = document.getElementById('pilot-cites');
+    const tlog = document.getElementById('toollog-pane');
+    const cpane = document.getElementById('cites-pane');
+    if (tlog && tools && tools.innerHTML.trim()) {
+      tlog.innerHTML = tools.innerHTML;
+    }
+    if (cpane && cites && cites.innerHTML.trim()) {
+      cpane.innerHTML = cites.innerHTML;
+    }
+  }
+  function appendQueryRow(name, args, result) {
+    const host = document.getElementById('queries-pane');
+    if (!host) return;
+    const empty = host.querySelector('.empty');
+    if (empty) empty.remove();
+    const row = document.createElement('details');
+    row.className = 'qrow';
+    row.innerHTML = `
+      <summary>${escapeHtml(name)}(${escapeHtml(JSON.stringify(args).slice(0,60))})</summary>
+      <pre>${escapeHtml(JSON.stringify(result, null, 2).slice(0, 4000))}</pre>`;
+    host.insertBefore(row, host.firstChild);
+  }
+
+  // ─── Status bar ───────────────────────────────────────────────
+  function updateStatusBar() {
+    const app = document.getElementById('app');
+    document.getElementById('sb-toggle-left').textContent =
+      (app.classList.contains('no-left') ? '☐' : '☒') + ' Left';
+    document.getElementById('sb-toggle-bottom').textContent =
+      (app.classList.contains('no-bottom') ? '☐' : '☒') + ' Bottom';
+    const layerN = document.querySelectorAll('.layer-btn.active').length;
+    document.getElementById('sb-layers').textContent = layerN + ' layer' + (layerN === 1 ? '' : 's');
+  }
+  function setPilotStatus(text) {
+    const el = document.getElementById('sb-pilot');
+    if (el) el.textContent = text;
+  }
+
+  // ─── Wire shell event handlers ────────────────────────────────
+  function initShell() {
+    restoreShellSizes();
+    initSashes();
+    // Activity bar buttons
+    document.querySelectorAll('#activity-bar .act').forEach(btn => {
+      btn.addEventListener('click', () => setLeftView(btn.dataset.view));
+    });
+    // Restore last-active view (default: thesis)
+    const lastView = localStorage.getItem(SHELL_VIEW_KEY) || 'thesis';
+    setLeftView(lastView);
+    // Thesis form
+    fillThesisForm();
+    document.getElementById('thesis-save').onclick = saveThesis;
+    // History filter
+    document.getElementById('history-search').addEventListener('input', renderHistoryView);
+    document.getElementById('history-clear-all').onclick = () => {
+      if (!confirm('Clear all Pilot history?')) return;
+      localStorage.removeItem('nexdata.pilot.hist');
+      renderHistoryView();
+    };
+    // Places clear-all
+    document.getElementById('places-clear').onclick = () => {
+      if (!confirm('Remove all pinned places?')) return;
+      savePlaces([]); renderPinnedPlaces();
+    };
+    // Bottom tabs
+    document.querySelectorAll('#bottom-tabs .tab').forEach(b =>
+      b.addEventListener('click', () => setBottomTab(b.dataset.tab)));
+    document.getElementById('bottom-close').onclick = () => {
+      document.getElementById('app').classList.toggle('no-bottom');
+      saveShellSizes(); updateStatusBar();
+      if (window.MAP && MAP.invalidateSize) MAP.invalidateSize();
+      track('shell_panel_toggled', { panel: 'bottom' });
+    };
+    // Status bar toggles
+    document.getElementById('sb-toggle-left').onclick = () => {
+      document.getElementById('app').classList.toggle('no-left');
+      saveShellSizes(); updateStatusBar();
+      if (window.MAP && MAP.invalidateSize) MAP.invalidateSize();
+    };
+    document.getElementById('sb-toggle-bottom').onclick = () => {
+      document.getElementById('app').classList.toggle('no-bottom');
+      saveShellSizes(); updateStatusBar();
+      if (window.MAP && MAP.invalidateSize) MAP.invalidateSize();
+    };
+    updateStatusBar();
+  }
+
+  // Run shell init AFTER the rest of the page has wired up its own
+  // event handlers (init() above sets up MAP, layers, etc.).
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initShell);
+  } else {
+    initShell();
+  }
 
   init().catch(err => {
     console.error('Atlas init failed', err);

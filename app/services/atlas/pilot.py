@@ -211,6 +211,76 @@ _EXPLORATORY_PATTERNS = (
 )
 
 
+# SPEC_082 — thesis-context sanitiser. The frontend may send anything;
+# we accept only known scalar fields, truncate strings, coerce ints, and
+# drop everything else. Result is rendered as a compact <thesis> block
+# prepended to the system prompt only when at least one field survives.
+_THESIS_FIELDS: Dict[str, Dict[str, Any]] = {
+    "industry_label":          {"type": "str", "max": 200},
+    "industry_naics":          {"type": "str", "max": 8},
+    "target_hhi_min":          {"type": "int", "min": 0, "max": 10_000_000},
+    "target_hhi_max":          {"type": "int", "min": 0, "max": 10_000_000},
+    "target_pop_density_min":  {"type": "int", "min": 0, "max": 1_000_000},
+    "target_age_band":         {"type": "str", "max": 16},
+    "notes":                   {"type": "str", "max": 800},
+}
+
+
+def _sanitize_thesis(raw: Any) -> Dict[str, Any]:
+    if not isinstance(raw, dict):
+        return {}
+    clean: Dict[str, Any] = {}
+    for k, spec in _THESIS_FIELDS.items():
+        v = raw.get(k)
+        if v is None or v == "":
+            continue
+        if spec["type"] == "str":
+            if not isinstance(v, str):
+                continue
+            v = v.strip()[: spec["max"]]
+            if v:
+                clean[k] = v
+        elif spec["type"] == "int":
+            try:
+                iv = int(v)
+            except (TypeError, ValueError):
+                continue
+            lo, hi = spec.get("min", 0), spec.get("max", 10**9)
+            if lo <= iv <= hi:
+                clean[k] = iv
+    return clean
+
+
+def _format_thesis_block(thesis: Optional[Dict[str, Any]]) -> str:
+    """Render a sanitised thesis as a `<thesis>...</thesis>` block to
+    prepend to the system prompt. Returns '' when nothing usable."""
+    t = _sanitize_thesis(thesis)
+    if not t:
+        return ""
+    lines: List[str] = []
+    if t.get("industry_label") or t.get("industry_naics"):
+        label = t.get("industry_label") or "(unspecified)"
+        naics = t.get("industry_naics")
+        lines.append(f"Industry: {label}" + (f" (NAICS {naics})" if naics else ""))
+    if t.get("target_hhi_min") is not None or t.get("target_hhi_max") is not None:
+        lo, hi = t.get("target_hhi_min"), t.get("target_hhi_max")
+        if lo is not None and hi is not None:
+            lines.append(f"Target HHI: ${lo:,} – ${hi:,}")
+        elif lo is not None:
+            lines.append(f"Target HHI: ${lo:,}+")
+        else:
+            lines.append(f"Target HHI: up to ${hi:,}")
+    if t.get("target_pop_density_min") is not None:
+        lines.append(f"Min population density: {t['target_pop_density_min']:,} /km²")
+    if t.get("target_age_band"):
+        lines.append(f"Target age band: {t['target_age_band']}")
+    if t.get("notes"):
+        lines.append(f"Notes: {t['notes']}")
+    if not lines:
+        return ""
+    return "<thesis>\n" + "\n".join(lines) + "\n</thesis>\n\n"
+
+
 def is_exploratory(question: str) -> bool:
     if not question:
         return False
@@ -276,6 +346,7 @@ def run_pilot(
     session_id: Optional[str] = None,
     model: str = MODEL,
     history: Optional[List[Dict[str, Any]]] = None,
+    thesis_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Run one question through the agent. Returns full transcript."""
     started = datetime.utcnow()
@@ -293,9 +364,11 @@ def run_pilot(
     from openai import OpenAI
     client = OpenAI()  # reads OPENAI_API_KEY from env
 
+    # SPEC_082 — thesis block is prepended to system prompt when populated.
     # SPEC_081 — prepend conversation history so multi-turn guided tours
     # share context (prior tool calls, narrations, chosen options).
-    messages: List[Dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    sys_content = _format_thesis_block(thesis_context) + SYSTEM_PROMPT
+    messages: List[Dict[str, Any]] = [{"role": "system", "content": sys_content}]
     if history:
         # Sanitize: only role + content; cap to last 6 turns
         for turn in history[-12:]:
@@ -428,6 +501,7 @@ def run_pilot_streaming(
     session_id: Optional[str] = None,
     model: str = MODEL,
     history: Optional[List[Dict[str, Any]]] = None,
+    thesis_context: Optional[Dict[str, Any]] = None,
 ) -> Iterator[str]:
     """Generator that yields NDJSON events (one JSON object per line)
     describing the agent's progress. The frontend reads the stream and
@@ -449,9 +523,11 @@ def run_pilot_streaming(
     from openai import OpenAI
     client = OpenAI()
 
+    # SPEC_082 — thesis block prepended to system prompt (only if populated).
     # SPEC_081 — prepend conversation history so multi-turn guided tours
     # share context (prior tool calls, narrations, chosen options).
-    messages: List[Dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    sys_content = _format_thesis_block(thesis_context) + SYSTEM_PROMPT
+    messages: List[Dict[str, Any]] = [{"role": "system", "content": sys_content}]
     if history:
         # Sanitize: only role + content; cap to last 6 turns
         for turn in history[-12:]:
