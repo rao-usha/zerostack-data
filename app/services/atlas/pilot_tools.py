@@ -228,6 +228,33 @@ def _tool_highlight_place(db: Session, geo_id: str) -> Dict[str, Any]:
     }
 
 
+def _tool_present_options(db: Session, intro: str,
+                           options: List[Dict[str, str]]) -> Dict[str, Any]:
+    """SPEC_081 — present 2-4 clickable next-step options. Use AFTER
+    narrating, to keep the user moving through a guided tour. Each
+    option's 'prompt' becomes the next user question on click."""
+    if not options or len(options) < 2 or len(options) > 4:
+        return {"error": "options must be a list of 2-4 entries"}
+    cleaned = []
+    for o in options:
+        if not isinstance(o, dict): continue
+        label = (o.get("label") or "").strip()[:80]
+        prompt = (o.get("prompt") or "").strip()[:400]
+        if label and prompt:
+            cleaned.append({"label": label, "prompt": prompt})
+    if len(cleaned) < 2:
+        return {"error": "need at least 2 well-formed options"}
+    return {
+        "ok": True,
+        "action": {
+            "name": "present_options",
+            "args": {"intro": (intro or "").strip()[:200],
+                      "options": cleaned},
+        },
+        "note": f"{len(cleaned)} guided-tour options queued for the user.",
+    }
+
+
 # ─── JSON Schema definitions (OpenAI function-calling format) ──────────────
 
 # Each entry: (definition, callable, kind: "read"|"ui")
@@ -467,6 +494,48 @@ TOOLS: List[Tuple[Dict[str, Any], Callable, str]] = [
             },
         },
         _tool_highlight_place, "ui",
+    ),
+    (
+        {
+            "type": "function",
+            "function": {
+                "name": "present_options",
+                "description": "Present 2-4 clickable next-step choices to the "
+                                "user. Use this AFTER you've mutated the map "
+                                "and narrated, to keep the user moving through "
+                                "a guided exploration. Each option carries a "
+                                "'prompt' that becomes the next user question "
+                                "if clicked. Use for EXPLORATORY questions "
+                                "(open-ended, multi-step); skip for SPECIFIC "
+                                "factual queries.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "intro": {
+                            "type": "string",
+                            "description": "Short lead-in to the choices (e.g. "
+                                           "'What would you like to look at next?')",
+                        },
+                        "options": {
+                            "type": "array",
+                            "minItems": 2, "maxItems": 4,
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "label": {"type": "string",
+                                               "description": "Short button text (≤6 words)"},
+                                    "prompt": {"type": "string",
+                                                "description": "Full question to submit if clicked"},
+                                },
+                                "required": ["label", "prompt"],
+                            },
+                        },
+                    },
+                    "required": ["intro", "options"],
+                },
+            },
+        },
+        _tool_present_options, "ui",
     ),
 ]
 

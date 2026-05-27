@@ -301,6 +301,7 @@ def get_cbp_cascade_endpoint(db: Session = Depends(get_db)):
 class PilotBody(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000)
     session_id: Optional[str] = None
+    history: Optional[List[Dict[str, Any]]] = None   # SPEC_081 — prior turns
 
 
 @router.post("/pilot")
@@ -309,7 +310,8 @@ def atlas_pilot_endpoint(body: PilotBody, db: Session = Depends(get_db)):
     constrained tools over the governed Atlas data corpus. Non-streaming;
     client waits for full transcript. SPEC_078."""
     from app.services.atlas.pilot import run_pilot
-    result = run_pilot(db, question=body.question, session_id=body.session_id)
+    result = run_pilot(db, question=body.question, session_id=body.session_id,
+                        history=body.history)
     return result
 
 
@@ -324,7 +326,8 @@ def atlas_pilot_stream_endpoint(body: PilotBody, db: Session = Depends(get_db)):
     from app.services.atlas.pilot import run_pilot_streaming
     return StreamingResponse(
         run_pilot_streaming(db, question=body.question,
-                             session_id=body.session_id),
+                             session_id=body.session_id,
+                             history=body.history),
         media_type="application/x-ndjson",
         headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
     )

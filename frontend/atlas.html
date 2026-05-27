@@ -248,6 +248,28 @@
       border-top:1px solid var(--border); margin-top:6px; }
     #pilot-history a { color:var(--accent); cursor:pointer; text-decoration:none; }
     #pilot-history a:hover { text-decoration:underline; }
+    /* SPEC_081 — guided-tour options panel */
+    #pilot-options { margin-top:10px; padding-top:8px;
+      border-top:1px solid var(--border); display:none; }
+    #pilot-options.show { display:block; }
+    #pilot-options .options-intro { font-size:11px; color:var(--muted);
+      margin-bottom:6px; font-style:italic; }
+    #pilot-options .opt {
+      display:block; width:100%; text-align:left;
+      background:rgba(99,102,241,.10); color:var(--primary-hover);
+      border:1px solid rgba(99,102,241,.35);
+      padding:8px 12px; border-radius:6px; cursor:pointer;
+      font-size:12px; line-height:1.4; margin-bottom:5px;
+      transition:background .12s, border-color .12s; font-family:inherit;
+    }
+    #pilot-options .opt:hover {
+      background:rgba(99,102,241,.20); border-color:var(--primary);
+    }
+    /* SPEC_081 — turn indicator + start-over */
+    #pilot-turn-bar { font-size:10px; color:var(--dim); padding:4px 0 8px;
+      display:flex; justify-content:space-between; align-items:center; }
+    #pilot-turn-bar a { color:var(--accent); cursor:pointer; text-decoration:none; }
+    #pilot-turn-bar a:hover { text-decoration:underline; }
     #pilot-question { padding:8px 10px; border-radius:6px; background:var(--panel-2);
       color:var(--muted); font-size:12px; font-style:italic; margin-bottom:10px; }
     #pilot-narration { font-size:13px; line-height:1.5; color:var(--text);
@@ -455,11 +477,16 @@
         <button class="close" id="pilot-close">×</button>
         <button id="pilot-cancel" title="Cancel mid-flight Pilot run">Cancel</button>
         <h4>Atlas Pilot</h4>
+        <div id="pilot-turn-bar" style="display:none">
+          <span>Turn <span id="pilot-turn-n">1</span> of guided tour</span>
+          <a id="pilot-start-over" title="Clear this conversation">Start over ↺</a>
+        </div>
         <div id="pilot-question"></div>
         <div id="pilot-loading" style="display:none">
           <span class="pilot-spinner"></span>Thinking… (5-30s)
         </div>
         <div id="pilot-narration" style="display:none"></div>
+        <div id="pilot-options"></div>
         <div id="pilot-cites" style="display:none"></div>
         <div id="pilot-tools" style="display:none"></div>
         <div id="pilot-meta" style="display:none"></div>
@@ -1549,8 +1576,14 @@
   // ═══════════════════════════════════════════════════════════════════════
   // Polish #2 — AbortController so user can cancel mid-flight
   let PILOT_ABORT = null;
+  // SPEC_081 — in-memory conversation history for this guided tour.
+  // Cleared on "Start over" or when user types a fresh question.
+  let PILOT_CONVERSATION = [];
 
-  async function askPilot(question) {
+  async function askPilot(question, opts) {
+    opts = opts || {};
+    // SPEC_081 — if not continuing a guided tour, reset conversation
+    if (!opts.keep_history) PILOT_CONVERSATION = [];
     if (!question || !question.trim()) return;
     const panel = document.getElementById('pilot-panel');
     panel.classList.add('show');
@@ -1568,11 +1601,27 @@
     document.getElementById('pilot-meta').style.display = 'none';
     document.getElementById('pilot-input').disabled = true;
     document.getElementById('pilot-cancel').classList.add('show');
-    track('pilot_question_submitted', { question_chars: question.length });
+    // SPEC_081 — reset options panel for the new turn
+    document.getElementById('pilot-options').classList.remove('show');
+    document.getElementById('pilot-options').innerHTML = '';
+    // Show turn-bar if we're in a multi-turn conversation
+    const turnBar = document.getElementById('pilot-turn-bar');
+    if (PILOT_CONVERSATION.length > 0) {
+      turnBar.style.display = 'flex';
+      document.getElementById('pilot-turn-n').textContent =
+        String(Math.floor(PILOT_CONVERSATION.length / 2) + 1);
+    } else {
+      turnBar.style.display = 'none';
+    }
+    track('pilot_question_submitted', {
+      question_chars: question.length,
+      turn: Math.floor(PILOT_CONVERSATION.length / 2) + 1,
+    });
 
     const collected = {
       tool_calls: [], citations: [], ui_actions: [],
-      narration: '', loops: 0, duration: 0, model: '?'
+      narration: '', loops: 0, duration: 0, model: '?',
+      options_action: null,  // SPEC_081 — present_options descriptor (if any)
     };
 
     PILOT_ABORT = new AbortController();
@@ -1580,7 +1629,11 @@
       const res = await fetch(API + '/pilot/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, session_id: SESSION }),
+        body: JSON.stringify({
+          question, session_id: SESSION,
+          // SPEC_081 — last 6 turns of conversation for context
+          history: PILOT_CONVERSATION.slice(-12),
+        }),
         signal: PILOT_ABORT.signal,
       });
       if (!res.body) throw new Error('Streaming not supported');
@@ -1602,6 +1655,12 @@
       }
       // Polish #3 — persist to localStorage after a successful run
       savePilotHistory(question, collected);
+      // SPEC_081 — append this turn to the live conversation
+      PILOT_CONVERSATION.push({ role: 'user', content: question });
+      if (collected.narration) {
+        PILOT_CONVERSATION.push({ role: 'assistant',
+                                    content: collected.narration });
+      }
       track('pilot_completed', {
         loops: collected.loops, n_tools: collected.tool_calls.length,
         n_ui: collected.ui_actions.length, ok: true,
@@ -1712,10 +1771,18 @@
       }
     }
     else if (ev.event === 'ui_action_queued') {
-      c.ui_actions.push(ev.action);
-      appendToolLog(toolsEl, `   ⇒ queued ${ev.action.name}(${
-        escapeHtml(JSON.stringify(ev.action.args).slice(0, 60))
-      })`);
+      // SPEC_081 — present_options is rendered separately (option buttons),
+      // not applied via applyPilotUiActions like map mutations.
+      if (ev.action && ev.action.name === 'present_options') {
+        c.options_action = ev.action;
+        appendToolLog(toolsEl, `   ⇒ queued present_options(${
+          (ev.action.args.options || []).length} choices)`);
+      } else {
+        c.ui_actions.push(ev.action);
+        appendToolLog(toolsEl, `   ⇒ queued ${ev.action.name}(${
+          escapeHtml(JSON.stringify(ev.action.args).slice(0, 60))
+        })`);
+      }
     }
     else if (ev.event === 'narration') {
       c.narration = ev.text;
@@ -1749,6 +1816,8 @@
       }
       // Apply UI actions (sequentially, post-narration)
       if (c.ui_actions.length) applyPilotUiActions(c.ui_actions);
+      // SPEC_081 — render guided-tour option buttons (if any)
+      if (c.options_action) renderPilotOptions(c.options_action.args);
     }
     else if (ev.event === 'error') {
       loadingEl.style.display = 'none';
@@ -1764,6 +1833,51 @@
     d.textContent = text;
     toolsEl.appendChild(d);
     toolsEl.scrollTop = toolsEl.scrollHeight;
+  }
+
+  // SPEC_081 — render guided-tour option buttons in #pilot-options.
+  // Each click submits the option's prompt as the next question, with
+  // PILOT_CONVERSATION preserved (keep_history=true).
+  function renderPilotOptions(args) {
+    const wrap = document.getElementById('pilot-options');
+    wrap.innerHTML = '';
+    const opts = Array.isArray(args && args.options) ? args.options : [];
+    if (opts.length < 2) { wrap.classList.remove('show'); return; }
+    if (args.intro) {
+      const intro = document.createElement('div');
+      intro.className = 'options-intro';
+      intro.textContent = args.intro;
+      wrap.appendChild(intro);
+    }
+    opts.forEach((o, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'opt';
+      btn.textContent = `${i + 1}. ${o.label}`;
+      btn.title = o.prompt;
+      btn.addEventListener('click', () => {
+        track('pilot_option_clicked', {
+          label: o.label, turn: Math.floor(PILOT_CONVERSATION.length / 2) + 1,
+        });
+        askPilot(o.prompt, { keep_history: true });
+      });
+      wrap.appendChild(btn);
+    });
+    wrap.classList.add('show');
+  }
+
+  // SPEC_081 — "Start over" clears the guided-tour conversation state.
+  function pilotStartOver() {
+    PILOT_CONVERSATION = [];
+    document.getElementById('pilot-turn-bar').style.display = 'none';
+    document.getElementById('pilot-options').classList.remove('show');
+    document.getElementById('pilot-options').innerHTML = '';
+    document.getElementById('pilot-narration').textContent = '';
+    document.getElementById('pilot-narration').style.display = 'none';
+    document.getElementById('pilot-question').textContent = '';
+    document.getElementById('pilot-tools').innerHTML = '';
+    document.getElementById('pilot-tools').style.display = 'none';
+    document.getElementById('pilot-meta').style.display = 'none';
+    track('pilot_start_over', {});
   }
 
   function renderPilotResponse(question, data) {
@@ -1908,6 +2022,8 @@
   // Polish #2 + #3 wiring
   document.getElementById('pilot-cancel').onclick = cancelPilot;
   document.getElementById('pilot-history-clear').onclick = clearPilotHistory;
+  // SPEC_081 — guided-tour: "Start over" link in the turn-bar
+  document.getElementById('pilot-start-over').onclick = pilotStartOver;
   maybeRestoreLastPilotAnswer();
   document.getElementById('share').onclick = () => {
     navigator.clipboard.writeText(location.href);

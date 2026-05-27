@@ -77,6 +77,49 @@ How to work:
    made BEFORE you write the final narration. A 'numerical claim' is any
    specific number ($73,104; 91.0%; 27 declarations; 304,305 establishments).
    Round numbers like "about 100" don't need cites. Specific ones DO.
+9a. SPEC_081 — GUIDED-TOUR MODE (HARD REQUIREMENT). When the user's question
+    is EXPLORATORY — open-ended, multi-step, business-idea-flavored, like
+      "I want to open a chair store in Austin"
+      "help me think about supply chain in Texas"
+      "walk me through demographics here"
+      "where should I open a coffee shop"
+    you MUST:
+      1) Mutate the map: zoom_to() the relevant area AND toggle_layer() a
+         relevant choropleth (median income, population, broadband, NRI…),
+      2) Narrate what's now on screen in 2-3 sentences,
+      3) ALWAYS finish by calling present_options() with 2-4 concrete
+         next-step choices. Each option.prompt must be a complete, specific
+         follow-up question (NOT a question the user asks; a question the
+         user would *want* answered next).
+    Do NOT reply conversationally ("Would you like to start by looking at…")
+    — that pattern is FORBIDDEN. Use present_options() instead. Conversational
+    questions in narration text waste a turn.
+    SKIP present_options ONLY when the question is SPECIFIC and answerable
+    in one shot ("what is median income for Travis County?", "compare A and
+    B on Z"). When in doubt, USE present_options.
+
+    EXAMPLE — exploratory flow:
+      user: "I want to open a chair store in Austin"
+      → call zoom_to(lat=30.27, lon=-97.74, zoom=10)
+      → call toggle_layer(layer_id="median_household_income_acs")
+      → call cite(...)  for any specific numbers you'll mention
+      → call present_options(
+          intro="Where would you like to dig in next?",
+          options=[
+            {"label":"Find wealthiest neighborhoods",
+             "prompt":"Show me Austin tracts with median income above $150K"},
+            {"label":"See furniture-store competition",
+             "prompt":"Where are existing furniture stores in Austin?"},
+            {"label":"Look at age demographics",
+             "prompt":"Activate the population layer for Austin"},
+            {"label":"Plant a focal node at a specific spot",
+             "prompt":"Plant a chair-store focal node on South Congress"},
+          ])
+      → final narration: 2-3 sentences about what's on screen.
+9b. When the conversation has HISTORY (prior turns visible in the messages),
+    USE that context: don't re-narrate things the user already saw, don't
+    re-call tools you've already called this conversation. Reference prior
+    state ("As we saw, Austin's median income…").
 10. If a tool returns an error or no data, say so honestly — don't fabricate.
 11. Be concise and analyst-grade. Not chat. Specific numbers, specific places.
 12. Prefer 5-digit county FIPS over 2-digit state when both apply.
@@ -157,11 +200,82 @@ def find_unlinked_claims(narration: str, citations: List[Dict[str, str]]) -> Lis
     return sorted(found)
 
 
+# SPEC_081 — exploratory-question heuristic. We use this to force a
+# present_options call when the agent forgot to make one.
+_EXPLORATORY_PATTERNS = (
+    r"\bi want to\b", r"\bi'd like to\b", r"\bi am thinking\b",
+    r"\bhelp me\b", r"\bwalk me through\b", r"\bshow me around\b",
+    r"\bwhere should i\b", r"\bwhat should i\b", r"\bguide me\b",
+    r"\btell me about\b", r"\bexplore\b", r"\bget started\b",
+    r"\bopen a\b", r"\bstart a\b", r"\blooking to\b",
+)
+
+
+def is_exploratory(question: str) -> bool:
+    if not question:
+        return False
+    q = question.strip().lower()
+    if len(q.split()) < 4:
+        return False  # specific terse queries
+    import re as _re
+    return any(_re.search(p, q) for p in _EXPLORATORY_PATTERNS)
+
+
+def _force_present_options(client, model, messages, max_tokens):
+    """SPEC_081 — one extra LLM call with tool_choice forcing
+    present_options. Used when the agent stops without calling it for
+    an exploratory question. Returns (ui_action, tool_call_log_entry)
+    or (None, None) on failure."""
+    # OpenAI rejects assistant messages with an empty tool_calls array.
+    # Drop the field when empty so the API accepts the history.
+    cleaned: List[Dict[str, Any]] = []
+    for m in messages:
+        if (m.get("role") == "assistant"
+                and isinstance(m.get("tool_calls"), list)
+                and not m["tool_calls"]):
+            mm = dict(m)
+            mm.pop("tool_calls", None)
+            cleaned.append(mm)
+        else:
+            cleaned.append(m)
+    forced_messages = cleaned + [{
+        "role": "user",
+        "content": ("Before finishing, call present_options(intro, options) "
+                    "with 2-4 concrete next-step questions the user might "
+                    "want to ask. Do not write a narration; just call the "
+                    "tool."),
+    }]
+    try:
+        resp = client.chat.completions.create(
+            model=model,
+            messages=forced_messages,
+            tools=[t for t in TOOL_DEFS
+                    if t.get("function", {}).get("name") == "present_options"],
+            tool_choice={"type": "function",
+                         "function": {"name": "present_options"}},
+            max_tokens=max_tokens,
+        )
+        msg = resp.choices[0].message
+        if not msg.tool_calls:
+            return None, None
+        tc = msg.tool_calls[0]
+        try:
+            args = json.loads(tc.function.arguments or "{}")
+        except json.JSONDecodeError:
+            return None, None
+        return args, {"loop": "forced", "name": "present_options",
+                       "args": args}
+    except Exception:  # noqa: BLE001
+        logger.exception("forced present_options call failed")
+        return None, None
+
+
 def run_pilot(
     db: Session,
     question: str,
     session_id: Optional[str] = None,
     model: str = MODEL,
+    history: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Run one question through the agent. Returns full transcript."""
     started = datetime.utcnow()
@@ -179,10 +293,16 @@ def run_pilot(
     from openai import OpenAI
     client = OpenAI()  # reads OPENAI_API_KEY from env
 
-    messages: List[Dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": question},
-    ]
+    # SPEC_081 — prepend conversation history so multi-turn guided tours
+    # share context (prior tool calls, narrations, chosen options).
+    messages: List[Dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    if history:
+        # Sanitize: only role + content; cap to last 6 turns
+        for turn in history[-12:]:
+            if isinstance(turn, dict) and turn.get("role") in ("user", "assistant"):
+                messages.append({"role": turn["role"],
+                                  "content": str(turn.get("content", ""))[:4000]})
+    messages.append({"role": "user", "content": question})
     tool_calls_log: List[Dict[str, Any]] = []
     citations: List[Dict[str, str]] = []
     ui_actions: List[Dict[str, Any]] = []
@@ -252,6 +372,20 @@ def run_pilot(
     else:
         truncated = True
 
+    # SPEC_081 — if the question is exploratory and the agent finished
+    # without calling present_options, force a follow-up tool call.
+    has_options = any(a.get("name") == "present_options" for a in ui_actions)
+    if not has_options and is_exploratory(question):
+        forced_args, forced_log = _force_present_options(
+            client, model, messages, MAX_TOKENS)
+        if forced_args:
+            result = dispatch(db, "present_options", forced_args)
+            if isinstance(result, dict) and result.get("action"):
+                ui_actions.append(result["action"])
+            if forced_log:
+                forced_log["result"] = result
+                tool_calls_log.append(forced_log)
+
     unlinked = find_unlinked_claims(final_narration or "", citations)
     return {
         "narration": final_narration or "",
@@ -293,6 +427,7 @@ def run_pilot_streaming(
     question: str,
     session_id: Optional[str] = None,
     model: str = MODEL,
+    history: Optional[List[Dict[str, Any]]] = None,
 ) -> Iterator[str]:
     """Generator that yields NDJSON events (one JSON object per line)
     describing the agent's progress. The frontend reads the stream and
@@ -314,10 +449,16 @@ def run_pilot_streaming(
     from openai import OpenAI
     client = OpenAI()
 
-    messages: List[Dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": question},
-    ]
+    # SPEC_081 — prepend conversation history so multi-turn guided tours
+    # share context (prior tool calls, narrations, chosen options).
+    messages: List[Dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    if history:
+        # Sanitize: only role + content; cap to last 6 turns
+        for turn in history[-12:]:
+            if isinstance(turn, dict) and turn.get("role") in ("user", "assistant"):
+                messages.append({"role": turn["role"],
+                                  "content": str(turn.get("content", ""))[:4000]})
+    messages.append({"role": "user", "content": question})
     tool_calls_log: List[Dict[str, Any]] = []
     citations: List[Dict[str, str]] = []
     ui_actions: List[Dict[str, Any]] = []
@@ -376,6 +517,20 @@ def run_pilot_streaming(
                               "content": json.dumps(result, default=str)[:8000]})
     else:
         truncated = True
+
+    # SPEC_081 — force present_options if exploratory question missed it
+    has_options = any(a.get("name") == "present_options" for a in ui_actions)
+    if not has_options and is_exploratory(question):
+        forced_args, forced_log = _force_present_options(
+            client, model, messages, MAX_TOKENS)
+        if forced_args:
+            result = dispatch(db, "present_options", forced_args)
+            if isinstance(result, dict) and result.get("action"):
+                ui_actions.append(result["action"])
+                yield event("ui_action_queued", action=result["action"])
+            if forced_log:
+                forced_log["result"] = result
+                tool_calls_log.append(forced_log)
 
     unlinked = find_unlinked_claims(final_narration, citations)
     yield event("done",
