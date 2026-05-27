@@ -24,12 +24,13 @@ class TestSpec083ShellPolish:
     pickDefaultLayer() are present in the shipped HTML."""
 
     def test_default_layer_is_median_income(self, html):
-        """T4: state.layerId default must be median_household_income_acs."""
+        """T4: state.layerId default must be demo_acs_median_income
+        (the real layer id from the live registry)."""
         # We look for an assignment in the state object — not just any
         # occurrence — so a stray mention in a comment doesn't pass.
         assert re.search(
-            r"layerId:\s*['\"]median_household_income_acs['\"]", html
-        ), "state.layerId default should be median_household_income_acs"
+            r"layerId:\s*['\"]demo_acs_median_income['\"]", html
+        ), "state.layerId default should be demo_acs_median_income"
         # And the OLD default must be gone from the state object.
         assert not re.search(
             r"layerId:\s*['\"]disaster_nri['\"]", html
@@ -40,21 +41,20 @@ class TestSpec083ShellPolish:
             "pickDefaultLayer(thesis) helper missing"
 
     def test_pick_default_layer_housing(self, html):
-        """T1: housing keyword → population density."""
-        # The helper body must reference both the housing pattern
-        # and the density layer id.
+        """T1: housing keyword → tract population (real registry id)."""
         assert re.search(r"housing|apartment|real ?estate", html)
-        assert "population_density" in html
+        assert "demo_tract_population" in html
 
     def test_pick_default_layer_retail(self, html):
-        """T2: retail keyword → median income."""
+        """T2: retail keyword → ACS median income (real registry id)."""
         assert re.search(r"retail|restaurant|store|shop", html)
-        assert "median_household_income_acs" in html
+        assert "demo_acs_median_income" in html
 
     def test_pick_default_layer_industrial(self, html):
-        """T3: industrial/warehouse → broadband."""
+        """T3: industrial/warehouse → broadband subscription
+        (real registry id)."""
         assert re.search(r"industrial|warehouse|manufactur|logist", html)
-        assert "broadband_fixed_25_3" in html
+        assert "infra_broadband_subscription" in html
 
     def test_no_emoji_activity_icons(self, html):
         """SVG replaces emoji in #activity-bar."""

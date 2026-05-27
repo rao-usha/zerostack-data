@@ -1116,7 +1116,7 @@
     // site-selection customer wants first. NRI (the old default)
     // is actuarial expected-annual-loss; reads as misleading
     // "hurricane risk" for non-insurance users.
-    layerId: 'median_household_income_acs',
+    layerId: 'demo_acs_median_income',
     overlayId: null,
     compareLayerId: null,
     placeId: null,
@@ -1274,13 +1274,16 @@
   // starting point.
   function pickDefaultLayer(thesis) {
     const industry = ((thesis && thesis.industry_label) || '').toLowerCase();
+    // Layer ids match the actual layer registry exposed by
+    // GET /api/v1/atlas/layers (verified live against the running
+    // service). Earlier revision used invented ids that 404'd.
     if (/housing|apartment|real ?estate|condo|residential|multifamily/.test(industry))
-      return 'population_density';
+      return 'demo_tract_population';
     if (/retail|restaurant|cafe|store|shop|coffee|bar|salon|boutique/.test(industry))
-      return 'median_household_income_acs';
+      return 'demo_acs_median_income';
     if (/industrial|warehouse|manufactur|logist|distribution|factory|3pl/.test(industry))
-      return 'broadband_fixed_25_3';
-    return 'median_household_income_acs';
+      return 'infra_broadband_subscription';
+    return 'demo_acs_median_income';
   }
 
   // ═══════════════════════════════════════════════════════════════════════
