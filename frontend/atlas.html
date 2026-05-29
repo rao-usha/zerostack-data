@@ -308,6 +308,11 @@
     #view-thesis .thesis-header .link-btn.demo { color:var(--accent); }
     #view-thesis .thesis-header .link-btn.demo:hover { color:var(--accent);
       background:rgba(103,232,249,.10); }
+    /* Inline two-click confirm state — generic so Reset, history-clear,
+       and places-clear all share it (no browser alert anywhere). */
+    button.armed { color:#fff !important; background:var(--warn) !important;
+      border-color:var(--warn) !important; font-weight:600; }
+    button.armed:hover { filter:brightness(1.08); }
 
     #view-thesis details.block { border-top:1px solid var(--border);
       background:transparent; }
@@ -3024,8 +3029,29 @@
     track('thesis_demo_loaded', { preset: 'furniture' });
   }
 
-  function resetThesis() {
-    if (!confirm('Clear all thesis fields? This cannot be undone.')) return;
+  // SPEC_085 follow-up — inline two-click confirm to replace browser
+  // confirm() dialogs. First click arms the button ("Confirm?"); a second
+  // click within 3s fires onConfirm; otherwise it disarms itself.
+  function armConfirm(btn, onConfirm) {
+    if (!btn) return;
+    const orig = btn.textContent;
+    let armed = false, timer = null;
+    const disarm = () => {
+      armed = false; btn.textContent = orig; btn.classList.remove('armed');
+      if (timer) { clearTimeout(timer); timer = null; }
+    };
+    btn.onclick = () => {
+      if (!armed) {
+        armed = true; btn.textContent = 'Confirm?'; btn.classList.add('armed');
+        timer = setTimeout(disarm, 3000);
+        return;
+      }
+      disarm();
+      onConfirm();
+    };
+  }
+
+  function doResetThesis() {
     localStorage.removeItem(THESIS_LS_KEY);
     // Empty every field, then refresh form + previews, then collapse all
     // blocks except Industry so the user starts fresh from the entry point.
@@ -3236,23 +3262,23 @@
     fillThesisForm();
     initThesisBlocks();
     document.getElementById('thesis-save').onclick = saveThesis;
-    document.getElementById('thesis-reset').onclick = resetThesis;
     document.getElementById('thesis-demo').onclick = loadFurnitureDemo;
+    // SPEC_085 follow-up — destructive buttons use an inline two-click
+    // confirm instead of a browser alert().
+    armConfirm(document.getElementById('thesis-reset'), doResetThesis);
     // History filter
     document.getElementById('history-search').addEventListener('input', renderHistoryView);
-    document.getElementById('history-clear-all').onclick = () => {
-      if (!confirm('Clear all Pilot history?')) return;
+    armConfirm(document.getElementById('history-clear-all'), () => {
       // SPEC_085 — clear the real key (atlas_pilot_history); also clear
       // the legacy key in case an old build left data there.
       localStorage.removeItem('atlas_pilot_history');
       localStorage.removeItem('nexdata.pilot.hist');
       renderHistoryView();
-    };
+    });
     // Places clear-all
-    document.getElementById('places-clear').onclick = () => {
-      if (!confirm('Remove all pinned places?')) return;
+    armConfirm(document.getElementById('places-clear'), () => {
       savePlaces([]); renderPinnedPlaces();
-    };
+    });
     // Bottom tabs
     document.querySelectorAll('#bottom-tabs .tab').forEach(b =>
       b.addEventListener('click', () => setBottomTab(b.dataset.tab)));

@@ -140,3 +140,16 @@ class TestSpec085Frontend:
         assert "function loadFurnitureDemo" in html
         assert "Furniture stores" in html
         assert "442110" in html
+
+    def test_no_browser_confirm_dialogs(self, html):
+        """Destructive buttons must NOT use native confirm() — they use
+        the inline two-click armConfirm() pattern. Comments mentioning
+        'confirm()' are fine; actual `confirm(` CALLS are not."""
+        live = [
+            ln.strip() for ln in html.splitlines()
+            if "confirm(" in ln and not ln.strip().startswith("//")
+        ]
+        assert live == [], f"browser confirm() call(s) found: {live}"
+        assert "function armConfirm" in html
+        # All three destructive buttons routed through armConfirm
+        assert html.count("armConfirm(document.getElementById") == 3
