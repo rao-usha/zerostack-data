@@ -62,10 +62,12 @@ class TestSpec084ThesisBlocks:
         )
 
     def test_reset_button_present(self, html):
-        """T5: Header reset button wired."""
+        """T5: Header reset button wired. (SPEC_085 follow-up renamed the
+        worker to doResetThesis + routed the button through armConfirm to
+        drop the browser confirm() dialog.)"""
         assert 'id="thesis-reset"' in html
-        assert "function resetThesis" in html
-        assert "thesis-reset" in html and "resetThesis" in html
+        assert "function doResetThesis" in html
+        assert "armConfirm(document.getElementById('thesis-reset')" in html
 
     def test_open_state_persistence_key(self, html):
         """T6: JS references atlas_thesis_open_v1."""

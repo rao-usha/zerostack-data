@@ -516,70 +516,93 @@
       font-family:ui-monospace,Menlo,monospace;
     }
 
-    /* SPEC_078 — Atlas Pilot question box (header) + response side panel */
-    #pilot-input { background:var(--bg); border:1px solid var(--border); color:var(--text);
-      padding:6px 10px; border-radius:6px; font-size:13px; width:340px; }
-    #pilot-input:focus { outline:none; border-color:var(--primary); }
-    #pilot-input:disabled { opacity:.6; }
-
-    /* SPEC_082 — pilot panel now fills the right column instead of
-       floating. The .show class is forced-on by JS so existing
-       restore-from-history code paths still work. */
-    #pilot-panel { background:var(--panel); border:none;
-      border-radius:0; padding:14px 14px 12px; display:flex;
-      flex:1; flex-direction:column; min-height:0;
-      overflow-y:auto; box-shadow:none;
-      width:auto; max-height:none; position:relative; }
+    /* ═══ SPEC_086 — Cursor-style Pilot chat ═══════════════════ */
+    #pilot-panel { background:var(--panel); border:none; box-shadow:none;
+      display:flex; flex:1; flex-direction:column; min-height:0;
+      width:auto; position:relative; }
     #pilot-panel.show { display:flex; }
-    #pilot-panel h4 { margin:0 0 8px; font-size:13px; font-weight:600; color:var(--text); }
-    #pilot-panel .sub { font-size:11px; color:var(--dim); margin-bottom:8px; }
-    /* Close button is hidden in the docked layout — chat is always visible */
     #pilot-panel button.close { display:none; }
-    /* Cancel pill */
-    #pilot-cancel { position:absolute; top:8px; right:10px;
-      background:rgba(245,158,11,.18); color:#fbbf24;
-      border:1px solid rgba(245,158,11,.5); padding:2px 8px;
-      border-radius:5px; cursor:pointer; font-size:10px; display:none; }
+
+    /* Header */
+    #pilot-head { display:flex; align-items:center; gap:8px;
+      padding:10px 14px; border-bottom:1px solid var(--border);
+      flex-shrink:0; }
+    #pilot-head .title { flex:1; font-size:13px; font-weight:600;
+      color:var(--text); letter-spacing:-.01em; }
+    #pilot-newchat { background:transparent; border:1px solid var(--border);
+      color:var(--muted); cursor:pointer; font-size:11px; padding:4px 9px;
+      border-radius:6px; font-family:inherit; transition:color .14s, border-color .14s; }
+    #pilot-newchat:hover { color:var(--accent); border-color:var(--accent); }
+
+    /* Thread — grows downward, scrolls; composer is pinned below it */
+    #pilot-thread { flex:1; overflow-y:auto; padding:14px;
+      display:flex; flex-direction:column; gap:14px; min-height:0; }
+    #pilot-thread .thread-empty { color:var(--dim); font-size:12px;
+      line-height:1.5; font-style:italic; margin:auto 0; text-align:center;
+      padding:0 8px; }
+
+    .msg { display:flex; flex-direction:column; }
+    .msg.user { align-items:flex-end; }
+    .msg.user .bubble { background:var(--panel-2); color:var(--text);
+      border:1px solid var(--border); padding:8px 12px; border-radius:12px 12px 4px 12px;
+      font-size:12.5px; line-height:1.45; max-width:88%; white-space:pre-wrap; }
+    .msg.assistant { align-items:stretch; }
+    .msg.assistant .narration { font-size:13px; line-height:1.55;
+      color:var(--text); white-space:pre-wrap; }
+    .msg.assistant .loading { color:var(--muted); font-size:12px;
+      display:flex; align-items:center; gap:8px; padding:2px 0; }
+    .msg.assistant .meta { font-size:10px; color:var(--dim); margin-top:8px;
+      font-variant-numeric:tabular-nums; }
+
+    /* Guided-tour options under the latest assistant turn */
+    .msg .options { margin-top:10px; display:flex; flex-direction:column; gap:5px; }
+    .msg .options .options-intro { font-size:11px; color:var(--muted);
+      margin-bottom:2px; font-style:italic; }
+    .msg .options .opt { display:block; width:100%; text-align:left;
+      background:rgba(124,131,255,.10); color:var(--primary-hover);
+      border:1px solid rgba(124,131,255,.35);
+      padding:8px 12px; border-radius:8px; cursor:pointer;
+      font-size:12px; line-height:1.4; font-family:inherit;
+      transition:background .12s, border-color .12s; }
+    .msg .options .opt:hover { background:rgba(124,131,255,.20);
+      border-color:var(--primary); }
+
+    /* Unlinked-claim warning, citations warning etc. inside a turn */
+    .msg .turn-warn { background:rgba(245,158,11,.14); color:#fbbf24;
+      padding:6px 10px; border-radius:6px; font-size:11px; margin-top:8px;
+      border:1px solid rgba(245,158,11,.4); }
+
+    /* Composer — pinned to the bottom */
+    #pilot-composer { flex-shrink:0; border-top:1px solid var(--border);
+      padding:10px 12px; display:flex; align-items:flex-end; gap:8px;
+      background:var(--panel); }
+    #pilot-input { flex:1; background:rgba(10,14,26,.55); color:var(--text);
+      border:1px solid var(--border); border-radius:10px;
+      padding:9px 12px; font-size:12.5px; font-family:inherit;
+      line-height:1.45; resize:none; max-height:140px; overflow-y:auto;
+      transition:border-color .16s, box-shadow .16s, background .16s; }
+    #pilot-input:focus { outline:none; border-color:var(--primary);
+      background:rgba(10,14,26,.85);
+      box-shadow:0 0 0 3px rgba(124,131,255,.18); }
+    #pilot-input:disabled { opacity:.6; }
+    #pilot-go { flex-shrink:0; width:34px; height:34px; border:none;
+      border-radius:9px; cursor:pointer; font-size:16px; font-weight:700;
+      color:#fff; background:linear-gradient(135deg, var(--primary), var(--primary-2));
+      box-shadow:0 1px 2px rgba(0,0,0,.3), 0 2px 8px rgba(124,131,255,.25);
+      transition:transform .08s, filter .16s; }
+    #pilot-go:hover { filter:brightness(1.08); }
+    #pilot-go:active { transform:translateY(1px); }
+    #pilot-cancel { flex-shrink:0; background:rgba(245,158,11,.18); color:#fbbf24;
+      border:1px solid rgba(245,158,11,.5); padding:6px 10px;
+      border-radius:8px; cursor:pointer; font-size:11px; display:none;
+      font-family:inherit; }
     #pilot-cancel.show { display:inline-block; }
-    /* Polish #3 — history controls */
-    #pilot-history { font-size:10px; color:var(--dim); padding:4px 0;
-      border-top:1px solid var(--border); margin-top:6px; }
-    #pilot-history a { color:var(--accent); cursor:pointer; text-decoration:none; }
-    #pilot-history a:hover { text-decoration:underline; }
-    /* SPEC_081 — guided-tour options panel */
-    #pilot-options { margin-top:10px; padding-top:8px;
-      border-top:1px solid var(--border); display:none; }
-    #pilot-options.show { display:block; }
-    #pilot-options .options-intro { font-size:11px; color:var(--muted);
-      margin-bottom:6px; font-style:italic; }
-    #pilot-options .opt {
-      display:block; width:100%; text-align:left;
-      background:rgba(99,102,241,.10); color:var(--primary-hover);
-      border:1px solid rgba(99,102,241,.35);
-      padding:8px 12px; border-radius:6px; cursor:pointer;
-      font-size:12px; line-height:1.4; margin-bottom:5px;
-      transition:background .12s, border-color .12s; font-family:inherit;
-    }
-    #pilot-options .opt:hover {
-      background:rgba(99,102,241,.20); border-color:var(--primary);
-    }
-    /* SPEC_081 — turn indicator + start-over */
-    #pilot-turn-bar { font-size:10px; color:var(--dim); padding:4px 0 8px;
-      display:flex; justify-content:space-between; align-items:center; }
-    #pilot-turn-bar a { color:var(--accent); cursor:pointer; text-decoration:none; }
-    #pilot-turn-bar a:hover { text-decoration:underline; }
-    #pilot-question { padding:8px 10px; border-radius:6px; background:var(--panel-2);
-      color:var(--muted); font-size:12px; font-style:italic; margin-bottom:10px; }
-    #pilot-narration { font-size:13px; line-height:1.5; color:var(--text);
-      margin-bottom:12px; white-space:pre-wrap; }
-    /* SPEC_085 — the verbose tool log / citations / meta live in the
-       bottom inspector now; hide them inside the chat column so the
-       chat stays clean (turn-bar → question → narration → options).
-       The elements remain in the DOM (JS still writes to them) so the
-       bottom-inspector mirror + history-restore paths keep working. */
+
+    /* Verbose tool log / cites / meta live in the bottom inspector */
     #right-col #pilot-tools,
     #right-col #pilot-cites,
-    #right-col #pilot-meta { display:none !important; }
+    #right-col #pilot-meta,
+    #right-col #pilot-history { display:none !important; }
 
     #pilot-tools { font-size:11px; color:var(--dim); border-top:1px solid var(--border);
       padding-top:8px; max-height:200px; overflow-y:auto; }
@@ -718,9 +741,9 @@
         <span><b id="ct-fema">0</b> FEMA decls since 1999</span>
       </div>
       <div id="search-wrap" style="display:flex; gap:6px; align-items:center;">
-        <input id="pilot-input" placeholder="Ask the Pilot — e.g. compare Austin & Houston">
-        <button class="btn-icon" id="pilot-go" title="Ask the Atlas Pilot agent">Ask →</button>
-        <input id="search" placeholder="Fast-travel…" style="width:130px">
+        <!-- SPEC_086 — Pilot input moved to the bottom composer in the
+             right column (Cursor-style). Header keeps fast-travel only. -->
+        <input id="search" placeholder="Fast-travel to a place…" style="width:180px">
         <button class="btn-icon" id="go" title="Fast-travel search">Go</button>
       </div>
       <button class="btn-icon" id="compare-toggle" title="Bivariate compare mode">Compare layers</button>
@@ -1043,31 +1066,37 @@
     <div id="sash-right" class="sash" data-axis="x"
          data-target="--right-w" data-min="320" data-max="560"></div>
 
-    <!-- ─── RIGHT COLUMN: Pilot chat (SPEC_082) ─────────────── -->
+    <!-- ─── RIGHT COLUMN: Cursor-style Pilot chat (SPEC_086) ──── -->
     <aside id="right-col">
       <div id="pilot-panel" class="show">
-        <button class="close" id="pilot-close" style="display:none">×</button>
-        <button id="pilot-cancel" title="Cancel mid-flight Pilot run">Cancel</button>
-        <h4>Atlas Pilot</h4>
-        <div id="pilot-turn-bar" style="display:none">
-          <span>Turn <span id="pilot-turn-n">1</span> of guided tour</span>
-          <a id="pilot-start-over" title="Clear this conversation">Start over ↺</a>
+        <div id="pilot-head">
+          <span class="title">Atlas Pilot</span>
+          <button id="pilot-newchat" title="Clear this conversation">＋ New chat</button>
         </div>
-        <div id="pilot-question"></div>
-        <div id="pilot-loading" style="display:none">
-          <span class="pilot-spinner"></span>Thinking… (5-30s)
+
+        <!-- Conversation thread — grows downward, scrolls -->
+        <div id="pilot-thread">
+          <div id="pilot-empty" class="thread-empty">
+            Ask anything about the map and data. I'll set up the view and
+            walk you through it.
+          </div>
         </div>
-        <div id="pilot-narration" style="display:none"></div>
-        <div id="pilot-options"></div>
-        <!-- Cites + tool log moved to the bottom inspector. We keep
-             these elements (still updated by JS) but hidden via CSS. -->
-        <div id="pilot-cites" style="display:none"></div>
+
+        <!-- Hidden mirror sources for the bottom inspector (SPEC_085) -->
         <div id="pilot-tools" style="display:none"></div>
-        <div id="pilot-meta" style="display:none"></div>
+        <div id="pilot-cites" style="display:none"></div>
+        <div id="pilot-meta"  style="display:none"></div>
         <div id="pilot-history" style="display:none">
-          <a id="pilot-history-clear">Clear history</a>
-          ·
+          <a id="pilot-history-clear">Clear history</a> ·
           <span id="pilot-history-count">0</span> prior question(s)
+        </div>
+
+        <!-- Composer pinned to the bottom -->
+        <div id="pilot-composer">
+          <textarea id="pilot-input" rows="1"
+                    placeholder="Ask the Atlas Pilot…"></textarea>
+          <button id="pilot-cancel" title="Cancel mid-flight Pilot run">Cancel</button>
+          <button id="pilot-go" title="Send (Enter)">↑</button>
         </div>
       </div>
     </aside>
@@ -1146,7 +1175,7 @@
     placeId: null,
     view: { lat: 38.5, lon: -96, zoom: 4 },
     showBoundaries: true,
-    opacity: 0.55,  // SPEC_077 A.1 — drop from 0.85 so the basemap shows through at neighborhood zoom
+    opacity: 0.40,  // SPEC_086 — lighter default so the basemap + geography stay legible (was 0.55)
     mode: 'normal',              // 'normal' | 'bivariate'
     brushRange: null,
   };
@@ -1216,7 +1245,25 @@
   }
 
   // Sequential ramp + bivariate 3×3 palette (SPEC_066b)
-  const RAMP_HEX = ['#0c2a4f','#0e4775','#1f6fb0','#41a0d6','#7dd3fc'];
+  // SPEC_086 — semantic per-layer ramps. "more" (teal→gold) for layers
+  // where higher = more of something positive/neutral; "risk" (green→red
+  // diverging) for hazard layers; "pop" (violet) for population/density.
+  const RAMPS = {
+    more: ['#0b3d4d', '#14708a', '#1e9bb5', '#56c1c9', '#ffd166'],
+    risk: ['#2a9d8f', '#8ab17d', '#e9c46a', '#f4a261', '#e76f51'],
+    pop:  ['#2e1065', '#5b21b6', '#7c3aed', '#a78bfa', '#ddd6fe'],
+  };
+  function rampFor(spec) {
+    const id  = ((spec && (spec.layer_id || spec.id)) || '').toLowerCase();
+    const dom = ((spec && spec.domain) || '').toLowerCase();
+    const hay = id + ' ' + dom;
+    if (/nri|fema|disaster|risk|hazard|flood/.test(hay)) return RAMPS.risk;
+    if (/\bpop\b|population|density/.test(hay))          return RAMPS.pop;
+    return RAMPS.more;
+  }
+  // The ramp currently painted on the map; set in applyLayerToBoundaries.
+  let ACTIVE_RAMP = RAMPS.more;
+  const RAMP_HEX = RAMPS.more;  // legacy alias (bivariate path untouched)
   const BIV_HEX = [
     '#1f2937', '#3b4a5e', '#5a6b80',   // B-low row    (A: low, mid, high)
     '#36556d', '#5a7895', '#84a2bf',   // B-mid row
@@ -1233,7 +1280,7 @@
   function bucketColor(value, breaks) {
     const i = bucketIdx(value, breaks);
     if (i === null) return 'var(--cno)';
-    return RAMP_HEX[i];
+    return ACTIVE_RAMP[i];  // SPEC_086 — active semantic ramp
   }
   function quintile3(value, breaks) {
     const i = bucketIdx(value, breaks);
@@ -1516,8 +1563,9 @@
     return s;
   }
 
-  function styleFeature(feature, layer) {
+  function styleFeature(feature, layer, opacityScale) {
     if (!CURRENT_LAYER_RESULT) return;
+    opacityScale = (opacityScale === undefined) ? 1 : opacityScale;
     const gid = feature.properties.geo_id;
     const v = (CURRENT_LAYER_RESULT.values || {})[gid];
     const breaks = (CURRENT_LAYER_RESULT.legend || {}).breaks || [];
@@ -1529,44 +1577,46 @@
     } else {
       fillColor = bucketColor(v, breaks);
     }
-    // SPEC_080 — zoom-adaptive outline mode:
-    //   zoom ≤ 7  : full fill (state/national density read)
-    //   zoom 8-9  : medium fill
-    //   zoom ≥10  : outline-only — colored border, no fill so basemap shows
+    // SPEC_086 — zoom TAPER (not a hard cut). Fill stays visible at a
+    // floor as we zoom in; the colored outline sharpens. styleFeature is
+    // the SINGLE owner of fillOpacity; the load transition passes an
+    // opacityScale (0→1) rather than overwriting the value afterward.
     const z = MAP ? MAP.getZoom() : 4;
+    const noData = (fillColor === 'var(--cno)');
     let fillOpacity = state.opacity;
-    let weight = 0.4;
-    let color = '#2a3145';
+    let weight = 0.5;
+    let color = 'rgba(255,255,255,.10)';
     if (z >= 10) {
-      // Outline mode: tint the border with the quintile color, kill the fill
-      fillOpacity = 0;
-      weight = 2.2;
-      color = (fillColor === 'var(--cno)') ? '#2a3145' : fillColor;
+      // Neighborhood scale: light fill floor + crisp colored outline
+      fillOpacity = Math.max(0.15, state.opacity * 0.45);
+      weight = 1.6;
+      color = noData ? 'rgba(255,255,255,.10)' : fillColor;
     } else if (z >= 8) {
-      fillOpacity = state.opacity * 0.45;
-      weight = 0.7;
+      fillOpacity = state.opacity * 0.7;
+      weight = 0.8;
     }
     if (state.brushRange && v !== undefined && v !== null) {
-      if (v < state.brushRange[0] || v > state.brushRange[1]) fillOpacity = fillOpacity * 0.10;
+      if (v < state.brushRange[0] || v > state.brushRange[1]) fillOpacity = fillOpacity * 0.12;
     }
-    layer.setStyle({ fillColor, fillOpacity, weight, color });
+    layer.setStyle({ fillColor, fillOpacity: fillOpacity * opacityScale, weight, color });
   }
 
   function applyLayerToBoundaries(layerResult, transition) {
     CURRENT_LAYER_RESULT = layerResult;
+    // SPEC_086 — pick the semantic ramp for this layer before painting.
+    ACTIVE_RAMP = rampFor(LAYER_SPECS[layerResult.layer_id] || layerResult);
     if (!BOUNDARY_LAYER) return;
     if (transition === false) {
       BOUNDARY_LAYER.eachLayer(fl => styleFeature(fl.feature, fl));
     } else {
-      // 400ms eased fade — Wave 1
+      // 400ms eased fade — SPEC_086: styleFeature owns fillOpacity; we
+      // pass an eased scale (0→1) so the fade reaches the zoom-correct
+      // target instead of overwriting it.
       const start = performance.now(); const dur = 400;
       const step = () => {
         const t = Math.min(1, (performance.now() - start) / dur);
         const eased = d3.easeCubicInOut(t);
-        BOUNDARY_LAYER.eachLayer(fl => {
-          styleFeature(fl.feature, fl);
-          fl.setStyle({ fillOpacity: state.opacity * eased });
-        });
+        BOUNDARY_LAYER.eachLayer(fl => styleFeature(fl.feature, fl, eased));
         if (t < 1) requestAnimationFrame(step);
       };
       requestAnimationFrame(step);
@@ -1585,6 +1635,12 @@
       (spec.unit || leg.unit || '') + (spec.vintage ? ' · ' + spec.vintage : '');
     document.getElementById('lr-min').textContent = fmtVal(leg.min, spec.unit);
     document.getElementById('lr-max').textContent = fmtVal(leg.max, spec.unit);
+    // SPEC_086 — paint the legend ramp swatches with the active ramp so
+    // the legend matches what's on the map.
+    const swatches = document.querySelectorAll('#legend .ramp .swatch');
+    swatches.forEach((sw, i) => {
+      if (ACTIVE_RAMP[i]) sw.style.background = ACTIVE_RAMP[i];
+    });
   }
 
   function renderBivariateLegend() {
@@ -1642,14 +1698,23 @@
       OVERLAY_LAYER = L.layerGroup();
       for (const f of OVERLAY_FEATURES) {
         const [lon, lat] = f.geometry.coordinates;
-        const m = L.circleMarker([lat, lon], { radius: 3, color: '#22d3ee',
-          weight: 1, fillColor: '#22d3ee', fillOpacity: 0.55 });
+        // SPEC_086 — white halo + bright core so points read clearly on
+        // top of any choropleth ramp without hiding the fill beneath.
+        const m = L.circleMarker([lat, lon], {
+          radius: 4, color: '#ffffff', weight: 1.5,
+          fillColor: '#22d3ee', fillOpacity: 0.95,
+        });
         const p = f.properties || {};
         m.bindTooltip(`<b>${p.name || '—'}</b>`, { sticky: true });
         OVERLAY_LAYER.addLayer(m);
       }
     }
     OVERLAY_LAYER.addTo(MAP);
+    // SPEC_086 — re-assert the choropleth style so the base fill stays
+    // visible beneath the overlay (overlay never blanks the fill).
+    if (BOUNDARY_LAYER && CURRENT_LAYER_RESULT) {
+      BOUNDARY_LAYER.eachLayer(fl => styleFeature(fl.feature, fl));
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -2225,39 +2290,53 @@
   // Cleared on "Start over" or when user types a fresh question.
   let PILOT_CONVERSATION = [];
 
+  // SPEC_086 — append a {user, assistant} turn pair to the chat thread
+  // and return the assistant turn's element refs. The Cursor-style thread
+  // grows downward; handlePilotEvent writes into these per-turn refs.
+  function appendPilotTurn(question) {
+    const thread = document.getElementById('pilot-thread');
+    const empty = document.getElementById('pilot-empty');
+    if (empty) empty.remove();
+
+    const userMsg = document.createElement('div');
+    userMsg.className = 'msg user';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = question;
+    userMsg.appendChild(bubble);
+    thread.appendChild(userMsg);
+
+    const asst = document.createElement('div');
+    asst.className = 'msg assistant';
+    asst.innerHTML =
+      '<div class="loading"><span class="pilot-spinner"></span>Pilot working…</div>'
+      + '<div class="narration" style="display:none"></div>'
+      + '<div class="options"></div>'
+      + '<div class="meta" style="display:none"></div>';
+    thread.appendChild(asst);
+    thread.scrollTop = thread.scrollHeight;
+    return {
+      loadingEl: asst.querySelector('.loading'),
+      narrEl: asst.querySelector('.narration'),
+      optionsEl: asst.querySelector('.options'),
+      metaEl: asst.querySelector('.meta'),
+    };
+  }
+  function scrollThreadToBottom() {
+    const t = document.getElementById('pilot-thread');
+    if (t) t.scrollTop = t.scrollHeight;
+  }
+
   async function askPilot(question, opts) {
     opts = opts || {};
     // SPEC_081 — if not continuing a guided tour, reset conversation
     if (!opts.keep_history) PILOT_CONVERSATION = [];
     if (!question || !question.trim()) return;
-    const panel = document.getElementById('pilot-panel');
-    panel.classList.add('show');
-    document.getElementById('pilot-question').textContent = question;
-    document.getElementById('pilot-loading').style.display = 'block';
-    document.getElementById('pilot-loading').innerHTML =
-      '<span class="pilot-spinner"></span>Pilot working…';
-    document.getElementById('pilot-narration').style.display = 'none';
-    document.getElementById('pilot-narration').textContent = '';
-    document.getElementById('pilot-cites').style.display = 'none';
-    document.getElementById('pilot-cites').innerHTML = '';
-    document.getElementById('pilot-tools').style.display = 'block';
-    document.getElementById('pilot-tools').innerHTML =
-      '<div style="font-weight:600; margin-bottom:4px">Live tool log</div>';
-    document.getElementById('pilot-meta').style.display = 'none';
+    document.getElementById('pilot-panel').classList.add('show');
+    // SPEC_086 — append this turn to the thread; grab its element refs
+    const turn = appendPilotTurn(question);
     document.getElementById('pilot-input').disabled = true;
     document.getElementById('pilot-cancel').classList.add('show');
-    // SPEC_081 — reset options panel for the new turn
-    document.getElementById('pilot-options').classList.remove('show');
-    document.getElementById('pilot-options').innerHTML = '';
-    // Show turn-bar if we're in a multi-turn conversation
-    const turnBar = document.getElementById('pilot-turn-bar');
-    if (PILOT_CONVERSATION.length > 0) {
-      turnBar.style.display = 'flex';
-      document.getElementById('pilot-turn-n').textContent =
-        String(Math.floor(PILOT_CONVERSATION.length / 2) + 1);
-    } else {
-      turnBar.style.display = 'none';
-    }
     track('pilot_question_submitted', {
       question_chars: question.length,
       turn: Math.floor(PILOT_CONVERSATION.length / 2) + 1,
@@ -2270,11 +2349,17 @@
     // SPEC_085 — reset the live Tool Log pane for the new run
     const tlpane = document.getElementById('toollog-pane');
     if (tlpane) tlpane.innerHTML = '';
+    // Hidden mirror sources reset for this run
+    document.getElementById('pilot-tools').innerHTML = '';
+    document.getElementById('pilot-cites').innerHTML = '';
 
     const collected = {
       tool_calls: [], citations: [], ui_actions: [],
       narration: '', loops: 0, duration: 0, model: '?',
       options_action: null,  // SPEC_081 — present_options descriptor (if any)
+      // SPEC_086 — per-turn DOM refs
+      narrEl: turn.narrEl, optionsEl: turn.optionsEl,
+      loadingEl: turn.loadingEl, metaEl: turn.metaEl,
     };
 
     PILOT_ABORT = new AbortController();
@@ -2322,20 +2407,24 @@
         n_ui: collected.ui_actions.length, ok: true,
       });
     } catch (e) {
-      document.getElementById('pilot-loading').style.display = 'none';
-      const narrEl = document.getElementById('pilot-narration');
-      narrEl.style.display = 'block';
-      if (e.name === 'AbortError') {
-        narrEl.style.color = 'var(--warn)';
-        narrEl.textContent = 'Cancelled. Tools that already ran are logged above.';
-        track('pilot_cancelled', { loops_at_cancel: collected.loops });
-      } else {
-        narrEl.textContent = 'Pilot request failed: ' + e;
+      if (collected.loadingEl) collected.loadingEl.style.display = 'none';
+      const narrEl = collected.narrEl;
+      if (narrEl) {
+        narrEl.style.display = 'block';
+        if (e.name === 'AbortError') {
+          narrEl.style.color = 'var(--warn)';
+          narrEl.textContent = 'Cancelled. Tools that already ran are in the bottom inspector.';
+          track('pilot_cancelled', { loops_at_cancel: collected.loops });
+        } else {
+          narrEl.style.color = 'var(--warn)';
+          narrEl.textContent = 'Pilot request failed: ' + e;
+        }
       }
     } finally {
       document.getElementById('pilot-input').disabled = false;
       document.getElementById('pilot-cancel').classList.remove('show');
       PILOT_ABORT = null;
+      scrollThreadToBottom();
     }
   }
 
@@ -2386,29 +2475,17 @@
     document.getElementById('pilot-history-count').textContent = hist.length;
   }
   function maybeRestoreLastPilotAnswer() {
-    // On landing, if there's prior history AND no question typed yet,
-    // show the most recent answer so refresh-survives.
-    const hist = loadPilotHistory();
-    if (!hist.length) return;
-    const last = hist[0];
-    // Only auto-restore if recent (last hour) — otherwise feels stale
-    if (Date.now() - last.ts > 3600 * 1000) { refreshPilotHistoryUI(); return; }
-    const panel = document.getElementById('pilot-panel');
-    panel.classList.add('show');
-    document.getElementById('pilot-question').textContent = last.question;
-    document.getElementById('pilot-narration').style.display = 'block';
-    document.getElementById('pilot-narration').textContent = last.narration;
-    document.getElementById('pilot-meta').style.display = 'block';
-    document.getElementById('pilot-meta').textContent =
-      `restored from history · ${last.n_tools} tools · ${last.n_ui} UI actions`;
+    // SPEC_086 — the Cursor-style thread starts empty on each load; past
+    // conversations live in the 🕘 History view. We just refresh the
+    // hidden history counter here (no thread restore).
     refreshPilotHistoryUI();
   }
 
-  // SPEC_079 — stream event handler
+  // SPEC_079 — stream event handler (SPEC_086: writes to per-turn refs)
   function handlePilotEvent(ev, c) {
-    const toolsEl = document.getElementById('pilot-tools');
-    const loadingEl = document.getElementById('pilot-loading');
-    const narrEl = document.getElementById('pilot-narration');
+    const toolsEl = document.getElementById('pilot-tools');  // hidden mirror src
+    const loadingEl = c.loadingEl;
+    const narrEl = c.narrEl;
     if (ev.event === 'plan_started') {
       c.model = ev.model;
       appendToolLog(toolsEl, `→ planning (${ev.model})`);
@@ -2455,50 +2532,54 @@
     }
     else if (ev.event === 'narration') {
       c.narration = ev.text;
-      loadingEl.style.display = 'none';
-      narrEl.style.display = 'block';
-      narrEl.textContent = ev.text;
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (narrEl) { narrEl.style.display = 'block'; narrEl.textContent = ev.text; }
+      scrollThreadToBottom();
     }
     else if (ev.event === 'done') {
       c.duration = ev.duration_seconds;
-      loadingEl.style.display = 'none';
-      narrEl.style.display = 'block';
-      if (!c.narration) narrEl.textContent = '(no narration returned)';
-      // Render final citations + meta
-      if (c.tool_calls.filter(t => t.name === 'cite').length) {
-        const citeEl = document.getElementById('pilot-cites');
-        citeEl.style.display = 'block';
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (narrEl) {
+        narrEl.style.display = 'block';
+        if (!c.narration) narrEl.textContent = '(no narration returned)';
       }
-      document.getElementById('pilot-meta').style.display = 'block';
-      document.getElementById('pilot-meta').textContent =
-        `${ev.loops_used} loops · ${ev.tool_count} tools · ${ev.ui_action_count} UI actions · ${ev.duration_seconds.toFixed(1)}s · ${c.model}` +
-        (ev.truncated ? ' · TRUNCATED' : '');
-      // Citation hardening: warn on unlinked numerical claims
-      if (Array.isArray(ev.unlinked_claims) && ev.unlinked_claims.length) {
+      // Render final citations + meta into this turn
+      if (c.tool_calls.filter(t => t.name === 'cite').length) {
+        document.getElementById('pilot-cites').style.display = 'block';
+      }
+      if (c.metaEl) {
+        c.metaEl.style.display = 'block';
+        c.metaEl.textContent =
+          `${ev.loops_used} loops · ${ev.tool_count} tools · ${ev.ui_action_count} UI · ${ev.duration_seconds.toFixed(1)}s · ${c.model}` +
+          (ev.truncated ? ' · TRUNCATED' : '');
+      }
+      // Citation hardening: warn on unlinked numerical claims (in-turn)
+      if (Array.isArray(ev.unlinked_claims) && ev.unlinked_claims.length && narrEl) {
         const warn = document.createElement('div');
-        warn.style.cssText = 'background:rgba(245,158,11,.14); color:#fbbf24; ' +
-          'padding:6px 10px; border-radius:6px; font-size:11px; ' +
-          'margin-top:8px; border:1px solid rgba(245,158,11,.4)';
+        warn.className = 'turn-warn';
         warn.innerHTML = '⚠ <b>Unlinked numerical claims</b> (no cite() call): ' +
           ev.unlinked_claims.map(x => `<code>${escapeHtml(x)}</code>`).join(', ');
-        narrEl.parentElement.insertBefore(warn, narrEl.nextSibling);
+        narrEl.parentElement.insertBefore(warn, c.optionsEl || narrEl.nextSibling);
       }
       // Apply UI actions (sequentially, post-narration)
       if (c.ui_actions.length) applyPilotUiActions(c.ui_actions);
-      // SPEC_081 — render guided-tour option buttons (if any)
-      if (c.options_action) renderPilotOptions(c.options_action.args);
-      // SPEC_082 — mirror tool log + cites into the bottom inspector,
-      // update the status bar with a short summary.
+      // SPEC_081 — render guided-tour option buttons into this turn
+      if (c.options_action) renderPilotOptions(c.options_action.args, c.optionsEl);
+      scrollThreadToBottom();
+      // SPEC_082 — mirror cites into the bottom inspector + status bar.
       if (typeof syncBottomFromPilot === 'function') syncBottomFromPilot();
       if (typeof setPilotStatus === 'function') {
         setPilotStatus(`${ev.tool_count} tools · ${ev.duration_seconds.toFixed(1)}s · ${c.model}`);
       }
     }
     else if (ev.event === 'error') {
-      loadingEl.style.display = 'none';
-      narrEl.style.display = 'block';
-      narrEl.style.color = 'var(--warn)';
-      narrEl.textContent = 'Pilot error: ' + ev.message;
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (narrEl) {
+        narrEl.style.display = 'block';
+        narrEl.style.color = 'var(--warn)';
+        narrEl.textContent = 'Pilot error: ' + ev.message;
+      }
+      scrollThreadToBottom();
     }
   }
 
@@ -2523,11 +2604,12 @@
     }
   }
 
-  // SPEC_081 — render guided-tour option buttons in #pilot-options.
-  // Each click submits the option's prompt as the next question, with
-  // PILOT_CONVERSATION preserved (keep_history=true).
-  function renderPilotOptions(args) {
-    const wrap = document.getElementById('pilot-options');
+  // SPEC_081/_086 — render guided-tour option buttons into the current
+  // assistant turn's .options container. Each click submits the option's
+  // prompt as the next question, with PILOT_CONVERSATION preserved.
+  function renderPilotOptions(args, targetEl) {
+    const wrap = targetEl || document.querySelector('#pilot-thread .msg.assistant:last-child .options');
+    if (!wrap) return;
     wrap.innerHTML = '';
     const opts = Array.isArray(args && args.options) ? args.options : [];
     if (opts.length < 2) { wrap.classList.remove('show'); return; }
@@ -2553,18 +2635,19 @@
     wrap.classList.add('show');
   }
 
-  // SPEC_081 — "Start over" clears the guided-tour conversation state.
+  // SPEC_086 — "New chat" clears the thread + conversation state.
   function pilotStartOver() {
     PILOT_CONVERSATION = [];
-    document.getElementById('pilot-turn-bar').style.display = 'none';
-    document.getElementById('pilot-options').classList.remove('show');
-    document.getElementById('pilot-options').innerHTML = '';
-    document.getElementById('pilot-narration').textContent = '';
-    document.getElementById('pilot-narration').style.display = 'none';
-    document.getElementById('pilot-question').textContent = '';
+    const thread = document.getElementById('pilot-thread');
+    if (thread) {
+      thread.innerHTML = '<div id="pilot-empty" class="thread-empty">'
+        + "Ask anything about the map and data. I'll set up the view and "
+        + 'walk you through it.</div>';
+    }
     document.getElementById('pilot-tools').innerHTML = '';
-    document.getElementById('pilot-tools').style.display = 'none';
-    document.getElementById('pilot-meta').style.display = 'none';
+    document.getElementById('pilot-cites').innerHTML = '';
+    const tlpane = document.getElementById('toollog-pane');
+    if (tlpane) tlpane.innerHTML = '';
     track('pilot_start_over', {});
   }
 
@@ -2700,18 +2783,29 @@
   document.getElementById('search').onkeydown = e => {
     if (e.key === 'Enter') fastTravel(e.target.value);
   };
-  // SPEC_078 — Atlas Pilot wiring
-  document.getElementById('pilot-go').onclick =
-    () => askPilot(document.getElementById('pilot-input').value);
-  document.getElementById('pilot-input').onkeydown = e => {
-    if (e.key === 'Enter') askPilot(e.target.value);
+  // SPEC_086 — Cursor-style composer wiring
+  const pilotInput = document.getElementById('pilot-input');
+  const sendPilot = () => {
+    const q = pilotInput.value;
+    if (!q.trim()) return;
+    pilotInput.value = '';
+    pilotInput.style.height = 'auto';
+    askPilot(q);
   };
-  document.getElementById('pilot-close').onclick = closePilot;
+  document.getElementById('pilot-go').onclick = sendPilot;
+  // Enter sends; Shift+Enter inserts a newline. Autosize the textarea.
+  pilotInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendPilot(); }
+  });
+  pilotInput.addEventListener('input', () => {
+    pilotInput.style.height = 'auto';
+    pilotInput.style.height = Math.min(140, pilotInput.scrollHeight) + 'px';
+  });
   // Polish #2 + #3 wiring
   document.getElementById('pilot-cancel').onclick = cancelPilot;
   document.getElementById('pilot-history-clear').onclick = clearPilotHistory;
-  // SPEC_081 — guided-tour: "Start over" link in the turn-bar
-  document.getElementById('pilot-start-over').onclick = pilotStartOver;
+  // SPEC_086 — "New chat" clears the thread + conversation
+  document.getElementById('pilot-newchat').onclick = pilotStartOver;
   maybeRestoreLastPilotAnswer();
   document.getElementById('share').onclick = () => {
     navigator.clipboard.writeText(location.href);

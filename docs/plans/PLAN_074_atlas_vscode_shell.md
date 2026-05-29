@@ -145,3 +145,8 @@ NOT in scope this iteration. Phase A ships with localStorage only.
   tool log, cluttered chat column, options-as-text, echoed-number
   false positives, history-key mismatch) + one-click furniture-store
   demo thesis. 2026-05-28.
+- [PLAN_074 rev_04](./PLAN_074_atlas_vscode_shell_rev_04.md) —
+  Map data-presentation system (overlay-kills-fill bug, lighter opacity,
+  zoom taper instead of hard outline, semantic color ramps, lighter
+  chrome) + Pilot reworked into a real chat (bottom composer, message
+  thread). 2026-05-28.
