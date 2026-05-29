@@ -36,6 +36,19 @@ class TestSpec083ShellPolish:
             r"layerId:\s*['\"]disaster_nri['\"]", html
         ), "state.layerId default still set to disaster_nri"
 
+    def test_stale_nri_url_param_unstuck(self, html):
+        """SPEC_083 follow-up — a stale ?layer=disaster_nri baked into a
+        bookmarked URL must NOT override the thesis default on load."""
+        # loadURL ignores the deprecated NRI default.
+        assert "p.get('layer') !== 'disaster_nri'" in html
+        # init() treats a stale NRI param as "no layer" so pickDefaultLayer runs.
+        assert "urlLayer !== 'disaster_nri'" in html
+
+    def test_legend_dismissible(self, html):
+        """SPEC_083 follow-up — the bottom-right legend has a close button."""
+        assert 'id="legend-close"' in html
+        assert "getElementById('legend-close').onclick" in html
+
     def test_pick_default_layer_exists(self, html):
         assert "function pickDefaultLayer" in html, \
             "pickDefaultLayer(thesis) helper missing"

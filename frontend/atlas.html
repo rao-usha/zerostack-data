@@ -430,7 +430,13 @@
       border:1px solid var(--border); border-radius:8px; padding:10px 12px;
       font-size:11px; color:var(--muted); min-width:200px; z-index:500;
       box-shadow:0 4px 16px rgba(0,0,0,.5); }
-    #legend .label { color:var(--text); font-size:12px; font-weight:600; margin-bottom:6px; }
+    #legend.hidden { display:none !important; }
+    #legend-close { position:absolute; top:4px; right:6px; background:transparent;
+      border:none; color:var(--dim); cursor:pointer; font-size:14px; line-height:1;
+      padding:2px 4px; border-radius:4px; }
+    #legend-close:hover { color:var(--warn); background:rgba(255,255,255,.05); }
+    #legend .label { color:var(--text); font-size:12px; font-weight:600;
+      margin-bottom:6px; padding-right:14px; }
     #legend .unit { color:var(--dim); font-size:10px; text-transform:uppercase;
       letter-spacing:.04em; margin-top:2px; }
     .ramp { display:flex; height:10px; border-radius:2px; overflow:hidden; margin:6px 0; }
@@ -1022,6 +1028,7 @@
         <button class="all-btn on" id="scrubber-all">ALL</button>
       </div>
       <div id="legend" style="display:none">
+        <button id="legend-close" title="Hide legend">×</button>
         <div class="label" id="legend-label">—</div>
         <div class="ramp">
           <div class="swatch" style="background:var(--c1)"></div>
@@ -1318,7 +1325,13 @@
   }
   function loadURL() {
     const p = new URLSearchParams(location.search);
-    if (p.get('layer')) state.layerId = p.get('layer');
+    // SPEC_083 follow-up — `disaster_nri` was the OLD hardcoded default and
+    // got baked into shared/bookmarked URLs via syncURL(). Ignore it on load
+    // so the thesis-derived default (median income) wins; otherwise NRI keeps
+    // coming back on every refresh. NRI is still selectable from the layer list.
+    if (p.get('layer') && p.get('layer') !== 'disaster_nri') {
+      state.layerId = p.get('layer');
+    }
     if (p.get('overlay')) state.overlayId = p.get('overlay');
     if (p.get('compare')) { state.compareLayerId = p.get('compare'); state.mode = 'bivariate'; }
     if (p.get('place')) state.placeId = p.get('place');
@@ -1364,8 +1377,10 @@
     loadURL();
     // SPEC_083 — when ?layer= is not in the URL, derive the default
     // from the saved thesis (if any) so first impression matches the
-    // user's industry.
-    const urlHasLayer = new URLSearchParams(location.search).has('layer');
+    // user's industry. A stale ?layer=disaster_nri (deprecated default)
+    // counts as "no layer" so the thesis default still wins.
+    const urlLayer = new URLSearchParams(location.search).get('layer');
+    const urlHasLayer = !!urlLayer && urlLayer !== 'disaster_nri';
     if (!urlHasLayer) {
       try {
         const thesis = JSON.parse(localStorage.getItem('atlas_thesis_v1') || '{}');
@@ -1626,7 +1641,9 @@
 
   function renderLegend(result) {
     if (state.mode === 'bivariate') return renderBivariateLegend();
-    document.getElementById('legend').style.display = 'block';
+    const legendEl = document.getElementById('legend');
+    legendEl.style.display = 'block';
+    legendEl.classList.remove('hidden');  // a new layer re-shows the legend
     document.getElementById('bivariate-legend').style.display = 'none';
     const spec = LAYER_SPECS[result.layer_id] || {};
     const leg = result.legend || {};
@@ -2810,6 +2827,11 @@
   document.getElementById('share').onclick = () => {
     navigator.clipboard.writeText(location.href);
     toast('Share link copied'); track('share_created', { url: location.href });
+  };
+  // SPEC_083 follow-up — dismissible legend (re-shows when a new layer loads)
+  document.getElementById('legend-close').onclick = () => {
+    document.getElementById('legend').classList.add('hidden');
+    track('legend_dismissed', {});
   };
   document.getElementById('reset-view').onclick = () => MAP.setView([38.5, -96], 4);
   document.getElementById('boundaries-toggle').onclick = e => {
