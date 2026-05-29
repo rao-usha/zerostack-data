@@ -140,3 +140,8 @@ NOT in scope this iteration. Phase A ships with localStorage only.
 - [PLAN_074 rev_02](./PLAN_074_atlas_vscode_shell_rev_02.md) —
   Thesis form recast as Notion-style collapsible blocks with
   summary previews + sticky Save bar. 2026-05-27.
+- [PLAN_074 rev_03](./PLAN_074_atlas_vscode_shell_rev_03.md) —
+  Atlas Pilot funkiness fixes (bad layer id in prompt, double-escaped
+  tool log, cluttered chat column, options-as-text, echoed-number
+  false positives, history-key mismatch) + one-click furniture-store
+  demo thesis. 2026-05-28.

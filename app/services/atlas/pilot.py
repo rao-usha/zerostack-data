@@ -69,6 +69,11 @@ How to work:
    sees the place selected on the map.
 7. For questions about a SPECIFIC LAYER (income, broadband, federal dollars,
    etc): call toggle_layer(layer_id) so the choropleth shows visually.
+   NEVER guess a layer_id. Valid ids come ONLY from list_layers / the
+   registry (e.g. demo_acs_median_income, demo_tract_median_income,
+   demo_tract_population, infra_broadband_subscription, disaster_nri).
+   If you are not 100% sure of the exact id, call list_layers FIRST and
+   use an id from that response. A wrong id wastes a turn on an error.
 8. For questions about a SPECIFIC LOCATION (street address, business idea at
    coords): if the user gave an ADDRESS or PLACE NAME, call geocode_address
    FIRST to resolve to lat/lon — do not guess coordinates from memory. Then
@@ -101,7 +106,7 @@ How to work:
     EXAMPLE — exploratory flow:
       user: "I want to open a chair store in Austin"
       → call zoom_to(lat=30.27, lon=-97.74, zoom=10)
-      → call toggle_layer(layer_id="median_household_income_acs")
+      → call toggle_layer(layer_id="demo_acs_median_income")
       → call cite(...)  for any specific numbers you'll mention
       → call present_options(
           intro="Where would you like to dig in next?",
@@ -116,6 +121,12 @@ How to work:
              "prompt":"Plant a chair-store focal node on South Congress"},
           ])
       → final narration: 2-3 sentences about what's on screen.
+    CRITICAL: the option choices live ONLY inside present_options().
+    Your final narration text MUST NOT contain an options list, bullet
+    points of choices, or a trailing "What would you like to explore
+    next?" line. Those are rendered as clickable buttons from the tool
+    call — repeating them as text looks broken. End the narration on a
+    statement about what's on screen, not a question with bullets.
 9b. When the conversation has HISTORY (prior turns visible in the messages),
     USE that context: don't re-narrate things the user already saw, don't
     re-call tools you've already called this conversation. Reference prior
@@ -160,7 +171,8 @@ _NUMERIC_PATTERNS = [
 ]
 
 
-def find_unlinked_claims(narration: str, citations: List[Dict[str, str]]) -> List[str]:
+def find_unlinked_claims(narration: str, citations: List[Dict[str, str]],
+                          question: str = "") -> List[str]:
     """Return list of specific numeric strings present in the narration
     that don't appear in any cited claim or source.
 
@@ -169,11 +181,37 @@ def find_unlinked_claims(narration: str, citations: List[Dict[str, str]]) -> Lis
       - 5-digit county FIPS / 2-digit state FIPS / 11-digit tract FIPS
         that appear in the cited sources (e.g. "for 48201")
       - any number explicitly cited in claim/source text
+      - SPEC_085: any numeric token the USER typed in their question
+        (e.g. "income > $150K") — echoing a threshold the user gave is
+        not a data claim that needs a citation.
     """
     cited_text = " ".join(
         (c.get("claim") or "") + " " + (c.get("source") or "")
         for c in citations
     )
+    # SPEC_085 — numbers the user supplied in the question are not claims.
+    # Capture each token AND its K/M/B-expanded forms, because the model
+    # often reformats "$150K" → "$150,000" in the narration.
+    q_numbers: set = set()
+    for tok in _re.findall(r"\$?\s*[\d,.]+\s*[KMB%]?", question or ""):
+        tok = tok.strip()
+        if not tok:
+            continue
+        q_numbers.add(tok)
+        q_numbers.add(tok.replace(" ", ""))
+        mult = {"K": 1_000, "M": 1_000_000, "B": 1_000_000_000}
+        msuf = _re.match(r"\$?\s*([\d,.]+)\s*([KMB])\b", tok, _re.IGNORECASE)
+        if msuf:
+            try:
+                base = float(msuf.group(1).replace(",", ""))
+                val = int(base * mult[msuf.group(2).upper()])
+                dollar = "$" if "$" in tok else ""
+                q_numbers.add(f"{dollar}{val:,}")     # $150,000
+                q_numbers.add(f"{dollar}{val}")        # $150000
+                q_numbers.add(f"{val:,}")              # 150,000
+                q_numbers.add(str(val))                # 150000
+            except (ValueError, KeyError):
+                pass
     # Polish #1 — pull all FIPS-shaped tokens out of cited sources and skip them.
     # Models commonly cite as "layer for 48201" — that 48201 isn't a claim.
     fips_in_sources = set(_re.findall(r"\b\d{2}\b|\b\d{5}\b|\b\d{11}\b", cited_text))
@@ -195,9 +233,33 @@ def find_unlinked_claims(narration: str, citations: List[Dict[str, str]]) -> Lis
                         continue
             except (ValueError, TypeError):
                 pass
+            # SPEC_085 — skip numbers the user supplied in the question.
+            m_norm = m.replace(" ", "")
+            if (m in q_numbers or m_norm in {q.replace(" ", "") for q in q_numbers}):
+                continue
             if m not in cited_text:
                 found.add(m)
     return sorted(found)
+
+
+# SPEC_085 — strip a trailing options block the model sometimes appends
+# to the narration ("What would you like to explore next?\n- a\n- b").
+# The choices are rendered as clickable buttons from present_options;
+# repeating them as text reads as broken.
+_OPTIONS_TAIL = _re.compile(
+    r"\n+\s*(?:what would you like[^\n]*|where would you like[^\n]*|"
+    r"what(?:'|’)s next[^\n]*|what next[^\n]*|next steps?[^\n]*|"
+    r"here are some (?:options|next steps)[^\n]*)\s*"
+    r"(?:\n\s*(?:[-*•]|\d+[.)]).*)+\s*$",
+    _re.IGNORECASE,
+)
+
+
+def _strip_options_block(text: Optional[str]) -> str:
+    """Remove a trailing 'What would you like next?\\n- bullets' block."""
+    if not text:
+        return text or ""
+    return _OPTIONS_TAIL.sub("", text).rstrip()
 
 
 # SPEC_081 — exploratory-question heuristic. We use this to force a
@@ -466,7 +528,11 @@ def run_pilot(
                 forced_log["result"] = result
                 tool_calls_log.append(forced_log)
 
-    unlinked = find_unlinked_claims(final_narration or "", citations)
+    # SPEC_085 — drop any options block the model appended to narration,
+    # and skip question-echoed numbers when flagging unlinked claims.
+    final_narration = _strip_options_block(final_narration)
+    unlinked = find_unlinked_claims(final_narration or "", citations,
+                                     question=question)
     return {
         "narration": final_narration or "",
         "tool_calls": tool_calls_log,
@@ -572,7 +638,8 @@ def run_pilot_streaming(
         })
 
         if finish == "stop" or not msg.tool_calls:
-            final_narration = msg.content or ""
+            # SPEC_085 — strip any options block before showing narration
+            final_narration = _strip_options_block(msg.content or "")
             yield event("narration", text=final_narration)
             break
 
@@ -615,7 +682,8 @@ def run_pilot_streaming(
                 forced_log["result"] = result
                 tool_calls_log.append(forced_log)
 
-    unlinked = find_unlinked_claims(final_narration, citations)
+    unlinked = find_unlinked_claims(final_narration, citations,
+                                     question=question)
     yield event("done",
                  loops_used=loop_n,
                  tool_count=len(tool_calls_log),

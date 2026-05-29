@@ -305,6 +305,9 @@
       font-family:inherit; font-weight:500; }
     #view-thesis .thesis-header .link-btn:hover { color:var(--warn);
       background:rgba(251,191,36,.08); }
+    #view-thesis .thesis-header .link-btn.demo { color:var(--accent); }
+    #view-thesis .thesis-header .link-btn.demo:hover { color:var(--accent);
+      background:rgba(103,232,249,.10); }
 
     #view-thesis details.block { border-top:1px solid var(--border);
       background:transparent; }
@@ -564,11 +567,25 @@
       color:var(--muted); font-size:12px; font-style:italic; margin-bottom:10px; }
     #pilot-narration { font-size:13px; line-height:1.5; color:var(--text);
       margin-bottom:12px; white-space:pre-wrap; }
+    /* SPEC_085 — the verbose tool log / citations / meta live in the
+       bottom inspector now; hide them inside the chat column so the
+       chat stays clean (turn-bar → question → narration → options).
+       The elements remain in the DOM (JS still writes to them) so the
+       bottom-inspector mirror + history-restore paths keep working. */
+    #right-col #pilot-tools,
+    #right-col #pilot-cites,
+    #right-col #pilot-meta { display:none !important; }
+
     #pilot-tools { font-size:11px; color:var(--dim); border-top:1px solid var(--border);
       padding-top:8px; max-height:200px; overflow-y:auto; }
     #pilot-tools .step { padding:4px 6px; margin-bottom:3px; border-radius:4px;
       background:var(--panel-2); font-family:ui-monospace,Menlo,monospace; font-size:10px; }
     #pilot-tools .step.cite { color:var(--success); }
+    /* Live tool-log lines mirrored into the bottom inspector */
+    #toollog-pane .step { padding:4px 8px; margin-bottom:3px; border-radius:4px;
+      background:var(--panel-2); font-family:ui-monospace,Menlo,monospace;
+      font-size:11px; color:var(--muted); white-space:pre-wrap;
+      word-break:break-word; }
     #pilot-cites { font-size:11px; color:var(--muted); border-top:1px solid var(--border);
       padding-top:8px; margin-top:8px; }
     #pilot-cites .cite { padding:3px 0; border-left:2px solid var(--success); padding-left:8px;
@@ -764,6 +781,8 @@
       <div id="view-thesis" class="view-pane">
         <div class="thesis-header">
           <div class="panel-title">Investment thesis</div>
+          <button class="link-btn demo" id="thesis-demo"
+                  title="Load a complete furniture-store example">⚡ Demo</button>
           <button class="link-btn" id="thesis-reset" title="Clear all thesis fields">Reset</button>
         </div>
 
@@ -2243,6 +2262,9 @@
     const qpane = document.getElementById('queries-pane');
     if (qpane) qpane.innerHTML = '<div class="empty" style="color:var(--dim);'
       + ' font-style:italic;">Each completed tool call shows args + result JSON.</div>';
+    // SPEC_085 — reset the live Tool Log pane for the new run
+    const tlpane = document.getElementById('toollog-pane');
+    if (tlpane) tlpane.innerHTML = '';
 
     const collected = {
       tool_calls: [], citations: [], ui_actions: [],
@@ -2339,6 +2361,12 @@
       localStorage.setItem(PILOT_HISTORY_KEY,
                             JSON.stringify(hist.slice(0, PILOT_HISTORY_MAX)));
       refreshPilotHistoryUI();
+      // SPEC_085 — repaint the left-panel History view if it's open
+      if (typeof renderHistoryView === 'function'
+          && document.getElementById('view-history')
+          && document.getElementById('view-history').style.display !== 'none') {
+        renderHistoryView();
+      }
     } catch (e) { /* localStorage full or disabled — silent */ }
   }
   function clearPilotHistory() {
@@ -2388,7 +2416,7 @@
       const tag = ev.is_ui ? '🎬 UI' : '🔎 read';
       c.last_args = ev.args || {};
       appendToolLog(toolsEl, `[${ev.loop}] ${tag} ${ev.name}(${
-        escapeHtml(JSON.stringify(ev.args).slice(0, 70))
+        JSON.stringify(ev.args).slice(0, 70)
       })`);
     }
     else if (ev.event === 'tool_call_completed') {
@@ -2416,7 +2444,7 @@
       } else {
         c.ui_actions.push(ev.action);
         appendToolLog(toolsEl, `   ⇒ queued ${ev.action.name}(${
-          escapeHtml(JSON.stringify(ev.action.args).slice(0, 60))
+          JSON.stringify(ev.action.args).slice(0, 60)
         })`);
       }
     }
@@ -2475,6 +2503,19 @@
     d.textContent = text;
     toolsEl.appendChild(d);
     toolsEl.scrollTop = toolsEl.scrollHeight;
+    // SPEC_085 — stream the same line LIVE into the bottom-inspector
+    // Tool Log pane (the chat-column #pilot-tools is hidden). textContent
+    // keeps it injection-safe; no escapeHtml needed.
+    const pane = document.getElementById('toollog-pane');
+    if (pane) {
+      const empty = pane.querySelector('.empty');
+      if (empty) empty.remove();
+      const r = document.createElement('div');
+      r.className = 'step';
+      r.textContent = text;
+      pane.appendChild(r);
+      pane.scrollTop = pane.scrollHeight;
+    }
   }
 
   // SPEC_081 — render guided-tour option buttons in #pilot-options.
@@ -2947,6 +2988,42 @@
       '#view-thesis input, #view-thesis textarea, #view-thesis select'
     ).forEach(el => el.addEventListener('input', refreshThesisPreviews));
   }
+  // SPEC_085 — one-click complete furniture-store thesis. Gives the user
+  // a known-good happy path: load → ask the Pilot → clean guided tour.
+  const FURNITURE_DEMO = {
+    industry_label: 'Furniture stores',
+    industry_naics: '442110',
+    target_hhi_min: 75000,
+    target_hhi_max: null,
+    target_age_band: '25-44',
+    target_pop_density_min: 1000,
+    region: 'Austin, TX metro',
+    exclude_layers: 'disaster_nri',
+    notes: 'Mid-to-high-end home furnishings. Trade area ~5 mi / 12-min '
+         + 'drive. Want affluent, growing, household-formation-age areas; '
+         + 'avoid pure-rural and disaster-risk-dominated tracts.',
+  };
+  function loadFurnitureDemo() {
+    localStorage.setItem(THESIS_LS_KEY, JSON.stringify(FURNITURE_DEMO));
+    fillThesisForm();
+    refreshThesisPreviews();
+    // Expand a couple of blocks so the user sees it filled in
+    document.querySelectorAll('#view-thesis details.block').forEach(d => {
+      d.open = ['industry', 'demographics'].includes(d.dataset.block);
+    });
+    // Persist as the saved thesis + re-pick the default layer for it
+    if (typeof pickDefaultLayer === 'function' && typeof activateLayer === 'function') {
+      const next = pickDefaultLayer(FURNITURE_DEMO);
+      if (next && next !== state.layerId) activateLayer(next);
+    }
+    // Hide onboarding nudge — we now have a thesis
+    const nudge = document.getElementById('onboarding-nudge');
+    if (nudge) nudge.classList.remove('show');
+    if (typeof toast === 'function')
+      toast('Furniture-store demo loaded — ask the Pilot "walk me through where to open this"');
+    track('thesis_demo_loaded', { preset: 'furniture' });
+  }
+
   function resetThesis() {
     if (!confirm('Clear all thesis fields? This cannot be undone.')) return;
     localStorage.removeItem(THESIS_LS_KEY);
@@ -3060,8 +3137,11 @@
   function renderHistoryView() {
     const host = document.getElementById('history-list');
     if (!host) return;
+    // SPEC_085 — read the SAME key the Pilot writes (atlas_pilot_history),
+    // which is already stored newest-first. Previously read a stale key
+    // (nexdata.pilot.hist) so the view was always empty.
     let items = [];
-    try { items = JSON.parse(localStorage.getItem('nexdata.pilot.hist') || '[]'); }
+    try { items = JSON.parse(localStorage.getItem('atlas_pilot_history') || '[]'); }
     catch (_) {}
     const filter = (document.getElementById('history-search')?.value || '')
       .toLowerCase().trim();
@@ -3073,7 +3153,7 @@
       return;
     }
     host.innerHTML = '';
-    filtered.slice().reverse().forEach(it => {
+    filtered.forEach(it => {
       const row = document.createElement('div');
       row.className = 'hist-row';
       const when = new Date(it.ts || Date.now())
@@ -3104,14 +3184,11 @@
     track('bottom_tab_switched', { tab: tabId });
   }
   function syncBottomFromPilot() {
-    // Mirror #pilot-tools children into #toollog-pane, #pilot-cites into #cites-pane.
-    const tools = document.getElementById('pilot-tools');
+    // SPEC_085 — the Tool Log pane is now streamed LIVE by appendToolLog,
+    // so we no longer overwrite it here (that would clobber the stream).
+    // We only mirror the final citations into the Citations pane.
     const cites = document.getElementById('pilot-cites');
-    const tlog = document.getElementById('toollog-pane');
     const cpane = document.getElementById('cites-pane');
-    if (tlog && tools && tools.innerHTML.trim()) {
-      tlog.innerHTML = tools.innerHTML;
-    }
     if (cpane && cites && cites.innerHTML.trim()) {
       cpane.innerHTML = cites.innerHTML;
     }
@@ -3160,10 +3237,14 @@
     initThesisBlocks();
     document.getElementById('thesis-save').onclick = saveThesis;
     document.getElementById('thesis-reset').onclick = resetThesis;
+    document.getElementById('thesis-demo').onclick = loadFurnitureDemo;
     // History filter
     document.getElementById('history-search').addEventListener('input', renderHistoryView);
     document.getElementById('history-clear-all').onclick = () => {
       if (!confirm('Clear all Pilot history?')) return;
+      // SPEC_085 — clear the real key (atlas_pilot_history); also clear
+      // the legacy key in case an old build left data there.
+      localStorage.removeItem('atlas_pilot_history');
       localStorage.removeItem('nexdata.pilot.hist');
       renderHistoryView();
     };
