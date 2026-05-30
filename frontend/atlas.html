@@ -431,6 +431,73 @@
       font-size:11px; color:var(--muted); min-width:200px; z-index:500;
       box-shadow:0 4px 16px rgba(0,0,0,.5); }
     #legend.hidden { display:none !important; }
+
+    /* SPEC_087 — fit-score legend weight breakdown (rendered below the ramp) */
+    #legend .weights { font-size:10px; color:var(--muted); margin-top:6px;
+      padding-top:6px; border-top:1px solid var(--border); line-height:1.55;
+      letter-spacing:.01em; }
+    #legend .weights .w { display:inline-block; margin-right:8px; }
+    #legend .weights .w b { color:var(--text); font-weight:600; }
+    #legend .recipe-tag { display:inline-block; font-size:9px;
+      padding:1px 6px; border-radius:8px; background:rgba(124,131,255,.18);
+      color:var(--primary-hover); margin-left:6px; letter-spacing:.04em;
+      text-transform:uppercase; }
+
+    /* SPEC_087 — top-N candidate pins (numbered markers via Leaflet divIcon) */
+    .fit-pin { position:relative; width:26px; height:26px; pointer-events:auto; }
+    .fit-pin .badge {
+      position:absolute; left:0; top:0; width:26px; height:26px;
+      border-radius:50%; background:rgba(124,131,255,.95); color:#fff;
+      border:2px solid #fff; box-shadow:0 2px 8px rgba(0,0,0,.5);
+      display:flex; align-items:center; justify-content:center;
+      font-family:'Inter',sans-serif; font-weight:700; font-size:11px;
+      letter-spacing:0; transition:transform .12s, background .12s;
+    }
+    .fit-pin .badge:hover { transform:scale(1.18); background:var(--accent); color:#0a0e1a; }
+    .fit-pin .score {
+      position:absolute; left:30px; top:3px; font-size:10px;
+      color:var(--text); background:rgba(20,27,45,.92); padding:1px 5px;
+      border-radius:4px; white-space:nowrap; pointer-events:none;
+      border:1px solid var(--border);
+    }
+
+    /* SPEC_087 — blank-landing prompt card */
+    #map-empty { position:absolute; inset:0; z-index:450;
+      display:none; align-items:center; justify-content:center;
+      pointer-events:none; }
+    #map-empty.show { display:flex; }
+    #map-empty .card { pointer-events:auto;
+      max-width:420px; padding:22px 24px;
+      background:rgba(22,29,49,.88); backdrop-filter:blur(12px) saturate(140%);
+      -webkit-backdrop-filter:blur(12px) saturate(140%);
+      border:1px solid rgba(124,131,255,.35); border-radius:14px;
+      box-shadow:0 10px 36px rgba(0,0,0,.55),
+                 0 0 0 4px rgba(124,131,255,.08);
+      color:var(--text);
+    }
+    #map-empty .kicker { font-size:10px; letter-spacing:.10em;
+      text-transform:uppercase; color:var(--accent); margin-bottom:4px;
+      font-weight:600; }
+    #map-empty .title { font-size:18px; font-weight:600;
+      letter-spacing:-.012em; margin-bottom:8px; color:var(--text); }
+    #map-empty p { margin:0 0 14px; font-size:13px; line-height:1.55;
+      color:var(--muted); }
+    #map-empty p b { color:var(--text); font-weight:600; }
+    #map-empty .actions { display:flex; gap:8px; flex-wrap:wrap; }
+    #map-empty button { background:linear-gradient(135deg,
+      var(--primary), var(--primary-2)); color:#fff; border:none;
+      padding:9px 14px; border-radius:8px; cursor:pointer; font-size:12px;
+      font-weight:600; font-family:inherit;
+      box-shadow:0 1px 2px rgba(0,0,0,.3), 0 2px 8px rgba(124,131,255,.25);
+      transition:filter .14s, transform .08s; }
+    #map-empty button:hover { filter:brightness(1.10); }
+    #map-empty button:active { transform:translateY(1px); }
+    #map-empty button#map-empty-thesis { background:transparent;
+      border:1px solid var(--border); color:var(--text); box-shadow:none; }
+    #map-empty button#map-empty-thesis:hover { border-color:var(--accent);
+      color:var(--accent); filter:none; }
+    #map-empty .footnote { margin-top:12px; font-size:10.5px;
+      color:var(--dim); font-style:italic; }
     #legend-close { position:absolute; top:4px; right:6px; background:transparent;
       border:none; color:var(--dim); cursor:pointer; font-size:14px; line-height:1;
       padding:2px 4px; border-radius:4px; }
@@ -1020,6 +1087,23 @@
         <button id="heat-toggle" style="display:none">🔥 Heat</button>
       </div>
 
+      <!-- SPEC_087 — blank-landing prompt card. Shown when no thesis is
+           saved; hidden once a fit-score has been painted. -->
+      <div id="map-empty">
+        <div class="card">
+          <div class="kicker">Decision Map</div>
+          <div class="title">Where does your thesis fit?</div>
+          <p>Set your <b>investment thesis</b> on the left —
+             I'll paint the country with a thesis-fit score
+             and pin the top candidates.</p>
+          <div class="actions">
+            <button id="map-empty-demo">⚡ Try the furniture-store demo</button>
+            <button id="map-empty-thesis">Open the thesis form</button>
+          </div>
+          <div class="footnote">No opinion until you give me one.</div>
+        </div>
+      </div>
+
       <!-- SPEC_066c — FEMA year-scrubber (shown only when fema layer is base) -->
       <div id="scrubber">
         <span class="label">FEMA year</span>
@@ -1195,6 +1279,9 @@
   const BOUNDARY_CACHE = {};
   let BOUNDARY_GRAIN = 'county';
   let OVERLAY_LAYER = null;
+  // SPEC_087 — top-N candidate pins for the Decision Map fit-score.
+  let FIT_PINS_LAYER = null;
+  let CURRENT_FIT_RESULT = null;   // last /fit-score response (for re-paint, e.g. opacity)
   let ARC_LAYER = null;
   let REGISTRY = null;
   let LAYER_SPECS = {};
@@ -1371,27 +1458,34 @@
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  // INIT
+  // INIT  (SPEC_087 Decision Map — three entry modes: url-layer, fit-score, blank)
   // ═══════════════════════════════════════════════════════════════════════
   async function init() {
     loadURL();
-    // SPEC_083 — when ?layer= is not in the URL, derive the default
-    // from the saved thesis (if any) so first impression matches the
-    // user's industry. A stale ?layer=disaster_nri (deprecated default)
-    // counts as "no layer" so the thesis default still wins.
+    // SPEC_087 — pick the entry mode BEFORE fetching:
+    //   'url-layer'  → user shared/bookmarked a specific layer (honor it)
+    //   'fit-score'  → no URL layer + saved thesis → paint thesis fit
+    //   'blank'      → no URL layer + no thesis    → blank basemap + prompt
     const urlLayer = new URLSearchParams(location.search).get('layer');
     const urlHasLayer = !!urlLayer && urlLayer !== 'disaster_nri';
-    if (!urlHasLayer) {
-      try {
-        const thesis = JSON.parse(localStorage.getItem('atlas_thesis_v1') || '{}');
-        state.layerId = pickDefaultLayer(thesis);
-      } catch (_) {}
-    }
+    const savedThesis = (() => {
+      try { return JSON.parse(localStorage.getItem('atlas_thesis_v1') || '{}'); }
+      catch (_) { return {}; }
+    })();
+    let entryMode;
+    if (urlHasLayer)                     entryMode = 'url-layer';
+    else if (!thesisIsEmpty(savedThesis)) entryMode = 'fit-score';
+    else                                  entryMode = 'blank';
+
     initMap();
+    // Registry + base county boundaries are needed for every mode
+    const fetchLayerPromise = (entryMode === 'url-layer')
+      ? fetch(API + '/layer/' + encodeURIComponent(state.layerId)).then(r => r.json())
+      : Promise.resolve(null);
     const [reg, bounds, layer] = await Promise.all([
       fetch(API + '/layers').then(r => r.json()),
       fetch(API + '/boundaries?geo_level=county&tolerance=0.005').then(r => r.json()),
-      fetch(API + '/layer/' + encodeURIComponent(state.layerId)).then(r => r.json()),
+      fetchLayerPromise,
     ]);
     REGISTRY = reg.layers_by_domain;
     flattenSpecs(REGISTRY);
@@ -1405,18 +1499,24 @@
     computeCentroids(bounds);            // Wave 4 prereq
     renderBoundaries(bounds);
 
-    // SPEC_077 A.4 — URL deep-link case: if landing on a tract-grain
-    // layer, switch boundaries to tract before painting.
-    const initialSpec = LAYER_SPECS[state.layerId];
-    if (initialSpec && initialSpec.grain === 'tract') {
-      await ensureBoundariesForGrain('tract');
+    if (entryMode === 'url-layer') {
+      // SPEC_077 A.4 — URL deep-link case: if landing on a tract-grain
+      // layer, switch boundaries to tract before painting.
+      const initialSpec = LAYER_SPECS[state.layerId];
+      if (initialSpec && initialSpec.grain === 'tract') {
+        await ensureBoundariesForGrain('tract');
+      }
+      CURRENT_LAYER_RESULT = layer;
+      applyLayerToBoundaries(layer, /*transition=*/false);
+      markActiveLayerButton();
+      updateActiveLayerControls();
+      renderBrushedHistogram(layer);       // Wave 2
+    } else if (entryMode === 'fit-score') {
+      await fetchAndPaintFitScore(savedThesis);
+    } else {
+      // 'blank' — leave the map empty + show the prompt card
+      document.getElementById('map-empty').classList.add('show');
     }
-
-    CURRENT_LAYER_RESULT = layer;
-    applyLayerToBoundaries(layer, /*transition=*/false);
-    markActiveLayerButton();
-    updateActiveLayerControls();
-    renderBrushedHistogram(layer);       // Wave 2
 
     if (state.overlayId) await activateOverlay(state.overlayId);
     if (state.compareLayerId) await activateCompare(state.compareLayerId);
@@ -1679,6 +1779,104 @@
         grid.appendChild(d);
       }
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SPEC_087 — DECISION MAP fit-score painting + top-N pins
+  // ═══════════════════════════════════════════════════════════════════════
+  async function fetchAndPaintFitScore(thesis) {
+    try {
+      const r = await fetch(API + '/fit-score', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thesis: thesis || {}, top_n: 10 }),
+      }).then(x => x.json());
+      paintFitScore(r);
+      track('fit_score_painted', {
+        recipe: r.recipe, n_components: (r.weights || []).length,
+        n_candidates: Object.keys(r.scores || {}).length,
+      });
+    } catch (e) {
+      console.warn('fit-score fetch failed', e);
+      toast('Fit-score unavailable — showing blank map');
+      document.getElementById('map-empty').classList.add('show');
+    }
+  }
+
+  function paintFitScore(r) {
+    // Hide the empty-landing card
+    document.getElementById('map-empty').classList.remove('show');
+    if (!r || !r.scores || !Object.keys(r.scores).length) {
+      toast('No fit-score data for this thesis');
+      return;
+    }
+    CURRENT_FIT_RESULT = r;
+    // Synthesize a layer-result the existing painter understands
+    const synth = {
+      layer_id: 'fit_score', grain: 'county',
+      values: r.scores,
+      legend: { breaks: [20, 40, 60, 80], min: 0, max: 100, unit: '' },
+    };
+    // Use the "more" ramp (teal→gold) for low→high fit
+    ACTIVE_RAMP = RAMPS.more;
+    applyLayerToBoundaries(synth, /*transition=*/true);
+    renderFitLegend(r);
+    renderTopNPins(r.top_n || []);
+    state.layerId = 'fit_score';   // so layer-toggle UI doesn't show wrong active
+    markActiveLayerButton();
+  }
+
+  function renderFitLegend(r) {
+    // Override the standard legend label + add the weight breakdown
+    const legendEl = document.getElementById('legend');
+    legendEl.classList.remove('hidden'); legendEl.style.display = 'block';
+    document.getElementById('legend-label').innerHTML =
+      'Thesis fit (0–100)' +
+      (r.recipe ? `<span class="recipe-tag">${escapeHtml(r.recipe)}</span>` : '');
+    document.getElementById('legend-unit').textContent = '';
+    document.getElementById('lr-min').textContent = '0 · poor fit';
+    document.getElementById('lr-max').textContent = '100 · strong fit';
+    // Append (or replace) the weighted-blend explainer
+    let wrap = legendEl.querySelector('.weights');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.className = 'weights';
+      legendEl.appendChild(wrap);
+    }
+    const ws = (r.weights || []).map(w =>
+      `<span class="w"><b>${Math.round(w.weight * 100)}%</b> ${escapeHtml(w.label)}</span>`
+    ).join('');
+    wrap.innerHTML = ws || '<span class="w" style="color:var(--dim)">no components loaded</span>';
+    // Paint the actual swatches with the active ramp
+    const swatches = legendEl.querySelectorAll('.ramp .swatch');
+    swatches.forEach((sw, i) => { if (ACTIVE_RAMP[i]) sw.style.background = ACTIVE_RAMP[i]; });
+  }
+
+  function clearTopNPins() {
+    if (FIT_PINS_LAYER) { MAP.removeLayer(FIT_PINS_LAYER); FIT_PINS_LAYER = null; }
+  }
+
+  function renderTopNPins(topN) {
+    clearTopNPins();
+    if (!topN || !topN.length || !BOUNDARY_LAYER) return;
+    FIT_PINS_LAYER = L.layerGroup();
+    topN.forEach((cand, i) => {
+      // Find the centroid for this geo_id via the existing CENTROIDS map
+      const c = (typeof CENTROIDS === 'object' && CENTROIDS) ? CENTROIDS[cand.geo_id] : null;
+      if (!c) return;
+      const icon = L.divIcon({
+        className: 'fit-pin',
+        iconSize: [26, 26], iconAnchor: [13, 13],
+        html: `<div class="badge" title="Rank ${i + 1} — fit ${cand.score}">${i + 1}</div>`
+              + `<div class="score">${cand.score}</div>`,
+      });
+      const m = L.marker([c.lat, c.lon], { icon, zIndexOffset: 1000 });
+      m.on('click', () => {
+        if (typeof selectPlace === 'function') selectPlace(cand.geo_id);
+        track('fit_pin_clicked', { rank: i + 1, geo_id: cand.geo_id, score: cand.score });
+      });
+      FIT_PINS_LAYER.addLayer(m);
+    });
+    FIT_PINS_LAYER.addTo(MAP);
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -3132,10 +3330,9 @@
     document.querySelectorAll('#view-thesis details.block').forEach(d => {
       d.open = ['industry', 'demographics'].includes(d.dataset.block);
     });
-    // Persist as the saved thesis + re-pick the default layer for it
-    if (typeof pickDefaultLayer === 'function' && typeof activateLayer === 'function') {
-      const next = pickDefaultLayer(FURNITURE_DEMO);
-      if (next && next !== state.layerId) activateLayer(next);
+    // SPEC_087 — paint the Decision Map fit-score for the demo thesis
+    if (typeof fetchAndPaintFitScore === 'function') {
+      fetchAndPaintFitScore(FURNITURE_DEMO);
     }
     // Hide onboarding nudge — we now have a thesis
     const nudge = document.getElementById('onboarding-nudge');
@@ -3186,6 +3383,19 @@
     // Pilot status nudge so the user sees the action took effect
     if (typeof setPilotStatus === 'function')
       setPilotStatus('Thesis cleared');
+    // SPEC_087 — drop the painted fit-score and return the map to blank.
+    if (typeof clearTopNPins === 'function') clearTopNPins();
+    CURRENT_FIT_RESULT = null;
+    CURRENT_LAYER_RESULT = null;
+    if (BOUNDARY_LAYER) {
+      BOUNDARY_LAYER.eachLayer(fl => fl.setStyle({
+        fillOpacity: 0, weight: 0.4, color: 'rgba(255,255,255,.10)',
+      }));
+    }
+    document.getElementById('legend').classList.add('hidden');
+    document.getElementById('map-empty').classList.add('show');
+    // User picking a layer manually after reset shouldn't be auto-clobbered
+    window.__userPickedLayer = false;
   }
   function saveThesis() {
     const t = thesisFromForm();
@@ -3196,13 +3406,12 @@
     track('thesis_saved', { fields: Object.keys(t).filter(k => t[k] != null).length });
     // SPEC_084 — refresh preview text on the collapsed blocks
     if (typeof refreshThesisPreviews === 'function') refreshThesisPreviews();
-    // SPEC_083 — re-pick the default layer for this thesis. We only
-    // switch when the user hasn't manually overridden the layer this
-    // session (otherwise a save would clobber their choice).
-    if (typeof pickDefaultLayer === 'function' && typeof activateLayer === 'function'
-        && !window.__userPickedLayer) {
-      const next = pickDefaultLayer(t);
-      if (next && next !== state.layerId) activateLayer(next);
+    // SPEC_087 — re-paint the Decision Map fit-score for the new thesis.
+    // We only auto-refit when the user hasn't manually overridden the
+    // map this session (otherwise saving the thesis would clobber what
+    // they're looking at).
+    if (typeof fetchAndPaintFitScore === 'function' && !window.__userPickedLayer) {
+      fetchAndPaintFitScore(t);
     }
     // Hide the onboarding nudge once a thesis exists
     const nudge = document.getElementById('onboarding-nudge');
@@ -3379,6 +3588,11 @@
     initThesisBlocks();
     document.getElementById('thesis-save').onclick = saveThesis;
     document.getElementById('thesis-demo').onclick = loadFurnitureDemo;
+    // SPEC_087 — blank-landing card actions
+    const meDemo = document.getElementById('map-empty-demo');
+    if (meDemo) meDemo.onclick = loadFurnitureDemo;
+    const meThesis = document.getElementById('map-empty-thesis');
+    if (meThesis) meThesis.onclick = () => setLeftView('thesis');
     // SPEC_085 follow-up — destructive buttons use an inline two-click
     // confirm instead of a browser alert().
     armConfirm(document.getElementById('thesis-reset'), doResetThesis);

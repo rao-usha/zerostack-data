@@ -298,6 +298,24 @@ def get_cbp_cascade_endpoint(db: Session = Depends(get_db)):
 # SPEC_078 Phase B — Atlas Pilot (LLM-driven agent)
 # ─────────────────────────────────────────────────────────────────────────────
 
+class FitScoreBody(BaseModel):
+    # SPEC_087 — Decision Map fit-score request body. thesis is the same
+    # shape the Pilot accepts via thesis_context; top_n is capped server-
+    # side in compute_fit_score (1..50).
+    thesis: Optional[Dict[str, Any]] = None
+    top_n: Optional[int] = 10
+
+
+@router.post("/fit-score")
+def atlas_fit_score(body: FitScoreBody, db: Session = Depends(get_db)):
+    """SPEC_087 — return per-geo thesis fit scores 0-100 + weight
+    breakdown + top-N candidates. Land-page replacement for the old
+    default-layer choropleth."""
+    from app.services.atlas.fit_score import compute_fit_score
+    return compute_fit_score(db, thesis=body.thesis,
+                              top_n=body.top_n or 10)
+
+
 class PilotBody(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000)
     session_id: Optional[str] = None
